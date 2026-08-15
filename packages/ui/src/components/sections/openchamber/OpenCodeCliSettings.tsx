@@ -110,11 +110,11 @@ export const OpenCodeCliSettings: React.FC = () => {
             <>
               {t('settings.openchamber.opencodeCli.tipPrefix')}
               {' '}
-              <span className="font-mono">OPENCODE_BINARY</span>
+              <span className="font-mono">PI_BINARY</span>
               {' '}
               {t('settings.openchamber.opencodeCli.tipMiddle')}
               {' '}
-              <span className="font-mono">~/.config/openchamber/settings.json</span>
+              <span className="font-mono">~/.pi/agent</span>
               {'.'}
             </>
           )}

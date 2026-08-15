@@ -984,7 +984,7 @@ export const settingsDict = {
   "settings.openchamber.opencodeCli.tooltipPrefix": "Caminho absoluto opcional para o",
   "settings.openchamber.opencodeCli.tooltipSuffix": "executável.",
   "settings.openchamber.opencodeCli.field.binaryPath": "Caminho do executável do OpenCode",
-  "settings.openchamber.opencodeCli.field.binaryPathPlaceholder": "/Users/you/.bun/bin/opencode",
+  "settings.openchamber.opencodeCli.field.binaryPathPlaceholder": "~/.local/bin/pi",
   "settings.openchamber.opencodeCli.field.showUpdateNotifications": "Mostrar notificações de atualização do OpenCode",
   "settings.openchamber.opencodeCli.field.showUpdateNotificationsAria": "Mostrar notificações de atualização do OpenCode",
   "settings.openchamber.opencodeCli.actions.browseAria": "Buscar caminho do executável do OpenCode",

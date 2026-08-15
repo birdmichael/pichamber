@@ -241,7 +241,11 @@ const INSTALLED_APPS_CACHE_TTL_SECS = 60 * 60 * 24;
 const INSTALLED_APPS_CACHE_FILE = 'discovered-apps.json';
 const LINUX_DESKTOP_ENTRIES_CACHE_TTL_MS = 30_000;
 const OPENCODE_SHUTDOWN_GRACE_MS = 100;
-const { autoUpdater } = updaterPkg;
+const getAutoUpdater = () => {
+  // electron-updater throws on unpackaged Linux/dev when app.getVersion() is "0.0".
+  if (!app.isPackaged) return null;
+  return updaterPkg.autoUpdater;
+};
 
 const state = {
   serverHandle: null,
@@ -1031,12 +1035,12 @@ const resolveStoredClientTokenForUrl = (targetUrl, config = readDesktopHostsConf
   return '';
 };
 
-const waitForHealth = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPollMs = 2000) => {
+const waitForHttpOk = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPollMs = 2000) => {
   const deadline = Date.now() + timeoutMs;
   let pollMs = initialPollMs;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(buildHealthUrl(url), { signal: AbortSignal.timeout(Math.min(pollMs * 4, 1500)) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(Math.min(pollMs * 4, 1500)) });
       if (response.ok) {
         return true;
       }
@@ -1047,6 +1051,10 @@ const waitForHealth = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPo
   }
   return false;
 };
+
+const waitForHealth = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPollMs = 2000) => (
+  waitForHttpOk(buildHealthUrl(url), timeoutMs, initialPollMs, maxPollMs)
+);
 
 const pickUnusedPort = async (host = '127.0.0.1') => {
   const net = await import('node:net');
@@ -2981,7 +2989,7 @@ const resolveInitialUrl = async () => {
 
   const localUiUrl = usePackagedUi
     ? buildPackagedUiUrl('/index.html')
-    : startupProbePlan.probeHmrUi && await waitForHealth(hmrUiUrl, 8_000, 100)
+    : startupProbePlan.probeHmrUi && await waitForHttpOk(hmrUiUrl, 8_000, 100)
     ? hmrUiUrl
     : localUrl;
 
@@ -3060,6 +3068,7 @@ const setupAutoUpdater = () => {
   if (!app.isPackaged) {
     return;
   }
+  const autoUpdater = getAutoUpdater();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
@@ -4392,8 +4401,12 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     }
 
     case 'desktop_check_for_updates': {
-      assertUpdaterCapability({ packaged: app.isPackaged });
       const currentVersion = APP_VERSION;
+      if (!app.isPackaged) {
+        return { available: false, currentVersion, version: null, body: null, date: null };
+      }
+      assertUpdaterCapability({ packaged: app.isPackaged });
+      const autoUpdater = getAutoUpdater();
       const { available, updateInfo, updateResult, nextVersion, pendingUpdate } = await checkForDesktopUpdate({
         autoUpdater,
         currentVersion,
@@ -4428,6 +4441,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         },
       }));
       try {
+        const autoUpdater = getAutoUpdater();
         if (!state.pendingUpdate.electronUpdate) {
           throw new Error('Electron updater metadata is not available for this build');
         }
@@ -4495,7 +4509,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         try {
           if (applyUpdate) {
             killSidecar();
-            autoUpdater.quitAndInstall();
+            getAutoUpdater().quitAndInstall();
           } else {
             prepareForQuit();
             app.relaunch();
