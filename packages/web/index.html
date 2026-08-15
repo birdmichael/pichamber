@@ -515,7 +515,7 @@
       <!-- Loading fallback while React initializes -->
       <div id="initial-loading">
         <div style="display: flex; align-items: center; justify-content: center;">
-          <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="OpenChamber loading icon">
+          <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pichamber loading icon">
             <!-- Isometric cube: edge=48, centerY=50 -->
             <!-- Points: top(50,2), left(8.432,26), right(91.568,26), center(50,50), bottomLeft(8.432,74), bottomRight(91.568,74), bottom(50,98) -->
 
@@ -575,22 +575,19 @@
     </div>
 
     <script>
-      // Fallback: hide loading screen after 10 seconds if React fails to load.
-      // Desktop shells manage their own splash via the injected boot outcome;
-      // do not force-remove for desktop windows.
+      // Fallback: hide loading screen if React never dismisses it.
+      // Desktop used to skip this whenever LOCAL_ORIGIN was set, which left
+      // electron:dev stuck on the cube after a Vite remount.
       setTimeout(function() {
-        if (typeof window.__OPENCHAMBER_LOCAL_ORIGIN__ === 'string' && window.__OPENCHAMBER_LOCAL_ORIGIN__.length > 0) {
-          return;
-        }
         var loading = document.getElementById('initial-loading');
         if (loading) {
-          console.warn('Loading screen timeout - forcing hide after 10s');
+          console.warn('Loading screen timeout - forcing hide after 12s');
           loading.classList.add('fade-out');
           setTimeout(function() {
             loading.remove();
           }, 300);
         }
-      }, 10000);
+      }, 12000);
     </script>
 
     <!-- CSS Font Loading API for reliable Nerd Font loading. The ~2 MB of

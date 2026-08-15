@@ -99,6 +99,43 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.state.output).toBe('ok');
   });
 
+
+  it('attaches parentID, agent, model, and stable time to assistant info', () => {
+    const t = translator();
+    t.setUserMessage('msg_user', {
+      agent: 'pi',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+    });
+    const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.info).toMatchObject({
+      id: 'msg_1',
+      role: 'assistant',
+      parentID: 'msg_user',
+      agent: 'pi',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+      time: { created: 1_700_000_000_000 },
+    });
+    expect(started[0].properties.info.time.completed).toBeUndefined();
+    expect(started[0].properties.info.finish).toBeUndefined();
+
+    const ended = t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    expect(ended[0].properties.info).toMatchObject({
+      parentID: 'msg_user',
+      finish: 'stop',
+      time: { created: 1_700_000_000_000, completed: 1_700_000_000_000 },
+    });
+  });
+
+  it('does not echo a second user text part when the facade already recorded the prompt', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    const events = t.translate({
+      type: 'message_start',
+      message: { role: 'user', id: 'pi_user_echo', content: 'hello' },
+    });
+    expect(events).toEqual([]);
+    expect(t.userMessageID).toBe('msg_user');
+  });
   it('maps auto_retry_start to session.status retry', () => {
     const events = translator().translate({
       type: 'auto_retry_start',

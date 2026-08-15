@@ -39,7 +39,11 @@ export const createEventTranslator = ({
   const reasoningParts = new Map();
   const toolParts = new Map();
   let assistantMessageID = null;
+  let assistantCreatedAt = null;
+  let assistantParentID = null;
   let userMessageID = null;
+  let agent = 'pi';
+  let model = undefined;
 
   const event = (type, properties) => createOpenCodeEvent(type, properties, {
     id: nextEventId(),
@@ -48,20 +52,52 @@ export const createEventTranslator = ({
 
   const setAssistantMessage = (messageID) => {
     assistantMessageID = messageID;
+    if (assistantCreatedAt == null) assistantCreatedAt = now();
+    if (!assistantParentID && userMessageID) assistantParentID = userMessageID;
   };
 
-  const setUserMessage = (messageID) => {
+  const setUserMessage = (messageID, extras = {}) => {
     userMessageID = messageID;
+    if (typeof extras.agent === 'string' && extras.agent.trim()) {
+      agent = extras.agent;
+    }
+    if (extras.model) {
+      model = extras.model;
+    }
   };
 
-  const assistantInfo = ({ completed = false, model } = {}) => {
-    const created = now();
+  const beginAssistantMessage = (messageID) => {
+    assistantMessageID = messageID || nextMessageId();
+    assistantCreatedAt = now();
+    assistantParentID = userMessageID;
+    textParts.clear();
+    reasoningParts.clear();
+    toolParts.clear();
+    return assistantMessageID;
+  };
+
+  const ensureAssistantMessage = () => {
+    if (!assistantMessageID) {
+      beginAssistantMessage();
+    }
+    return assistantMessageID;
+  };
+
+  const assistantInfo = ({ completed = false, model: modelOverride } = {}) => {
+    ensureAssistantMessage();
+    const created = assistantCreatedAt ?? now();
+    const resolvedModel = modelOverride || model;
     return {
       id: assistantMessageID,
       sessionID,
       role: 'assistant',
-      time: completed ? { created, completed } : { created },
-      ...(model ? { model } : {}),
+      // OpenCode chat turns group assistants by parentID === user message id.
+      // Without this the UI drops the reply (streaming and on reload).
+      ...(assistantParentID ? { parentID: assistantParentID } : {}),
+      agent,
+      time: completed ? { created, completed: now() } : { created },
+      ...(resolvedModel ? { model: resolvedModel } : {}),
+      ...(completed ? { finish: 'stop' } : {}),
     };
   };
 
@@ -103,9 +139,7 @@ export const createEventTranslator = ({
 
     switch (delta.type) {
       case 'text_start': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         const partID = nextPartId();
         textParts.set(contentIndex, partID);
         return [
@@ -114,9 +148,7 @@ export const createEventTranslator = ({
         ];
       }
       case 'text_delta': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         let partID = textParts.get(contentIndex);
         const created = [];
         if (!partID) {
@@ -142,9 +174,7 @@ export const createEventTranslator = ({
         return [event('message.part.updated', { sessionID, part: textPart(partID, text) })];
       }
       case 'thinking_start': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         const partID = nextPartId();
         reasoningParts.set(contentIndex, partID);
         return [
@@ -153,9 +183,7 @@ export const createEventTranslator = ({
         ];
       }
       case 'thinking_delta': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         let partID = reasoningParts.get(contentIndex);
         const created = [];
         if (!partID) {
@@ -185,9 +213,7 @@ export const createEventTranslator = ({
         return [event('message.part.updated', { sessionID, part: reasoningPart(partID, text) })];
       }
       case 'toolcall_start': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         const callID = delta.toolCall?.id || delta.id || nextPartId();
         const tool = delta.toolCall?.name || delta.name || 'tool';
         const partID = nextPartId();
@@ -253,7 +279,13 @@ export const createEventTranslator = ({
         const message = piEvent.message;
         const role = message?.role;
         if (role === 'user') {
-          userMessageID = message.id || userMessageID || nextMessageId();
+          // Facade promptAsync already persisted the user bubble. Pi also
+          // emits message_start with the same text; echoing it adds a second
+          // text part on the same (or a new) user message.
+          if (userMessageID) {
+            return [];
+          }
+          userMessageID = message.id || nextMessageId();
           const text = typeof message.content === 'string'
             ? message.content
             : Array.isArray(message.content)
@@ -281,10 +313,10 @@ export const createEventTranslator = ({
             }),
           ];
         }
-        assistantMessageID = nextMessageId();
-        textParts.clear();
-        reasoningParts.clear();
-        toolParts.clear();
+        if (message?.model) {
+          model = message.model;
+        }
+        beginAssistantMessage(message?.id && typeof message.id === 'string' ? message.id : undefined);
         return [event('message.updated', { info: assistantInfo() })];
       }
 
@@ -298,9 +330,7 @@ export const createEventTranslator = ({
       }
 
       case 'tool_execution_start': {
-        if (!assistantMessageID) {
-          assistantMessageID = nextMessageId();
-        }
+        ensureAssistantMessage();
         const callID = piEvent.toolCallId;
         let partID = toolParts.get(callID);
         const created = [];

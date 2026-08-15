@@ -143,13 +143,34 @@ const createSessionInfo = ({
   };
 };
 
+const lastUserMessage = (store) => {
+  for (let index = store.messages.length - 1; index >= 0; index -= 1) {
+    const entry = store.messages[index];
+    if (entry?.info?.role === 'user' && entry.info.id) return entry;
+  }
+  return undefined;
+};
+
 const applyEventToStore = (store, ocEvent) => {
   const type = ocEvent?.type;
   const props = ocEvent?.properties || {};
   if (type === 'message.updated' && props.info) {
     const existing = store.messages.find((entry) => entry.info.id === props.info.id);
     if (existing) {
-      existing.info = { ...existing.info, ...props.info };
+      const prevTime = existing.info.time || {};
+      const nextTime = props.info.time || {};
+      existing.info = {
+        ...existing.info,
+        ...props.info,
+        time: {
+          ...prevTime,
+          ...nextTime,
+          created: prevTime.created ?? nextTime.created,
+        },
+        parentID: props.info.parentID || existing.info.parentID,
+        agent: props.info.agent || existing.info.agent,
+        model: props.info.model || existing.info.model,
+      };
     } else {
       store.messages.push({ info: props.info, parts: [] });
     }
@@ -158,12 +179,16 @@ const applyEventToStore = (store, ocEvent) => {
     const messageID = props.part.messageID;
     let entry = store.messages.find((item) => item.info.id === messageID);
     if (!entry) {
+      const parent = lastUserMessage(store);
       entry = {
         info: {
           id: messageID,
           sessionID: props.part.sessionID,
           role: 'assistant',
           time: { created: Date.now() },
+          ...(parent?.info?.id ? { parentID: parent.info.id } : {}),
+          ...(parent?.info?.agent ? { agent: parent.info.agent } : { agent: 'pi' }),
+          ...(parent?.info?.model ? { model: parent.info.model } : {}),
         },
         parts: [],
       };
@@ -172,6 +197,13 @@ const applyEventToStore = (store, ocEvent) => {
     const index = entry.parts.findIndex((part) => part.id === props.part.id);
     if (index >= 0) {
       entry.parts[index] = props.part;
+    } else if (
+      entry.info.role === 'user'
+      && props.part.type === 'text'
+      && typeof props.part.text === 'string'
+      && entry.parts.some((part) => part.type === 'text' && part.text === props.part.text)
+    ) {
+      // Pi message_start echo of the facade prompt — keep one text part.
     } else {
       entry.parts.push(props.part);
     }
@@ -569,7 +601,11 @@ export const createPiHost = ({
       }
 
       const userMessageID = body.messageID || createMessageId();
-      record.translator.setUserMessage(userMessageID);
+      const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
+      record.translator.setUserMessage(userMessageID, {
+        agent: userAgent,
+        model: body.model,
+      });
       const userPart = {
         id: createPartId(),
         sessionID,
@@ -582,7 +618,7 @@ export const createPiHost = ({
         sessionID,
         role: 'user',
         time: { created: Date.now() },
-        ...(body.agent ? { agent: body.agent } : {}),
+        agent: userAgent,
         ...(body.model ? { model: body.model } : {}),
       };
       record.messages.push({ info: userInfo, parts: [userPart] });

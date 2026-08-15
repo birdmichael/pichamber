@@ -251,6 +251,7 @@ const state = {
   serverHandle: null,
   sidecarUrl: null,
   localOrigin: null,
+  uiOrigin: null,
   apiBaseUrl: null,
   clientToken: null,
   requestHeaders: {},
@@ -2694,6 +2695,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
 const activateMainWindow = async (url, localOrigin, bootOutcome, runtimeConfig = {}) => {
   state.startupResolved = true;
   state.localOrigin = localOrigin;
+  state.uiOrigin = originOf(url) || state.uiOrigin;
   state.apiBaseUrl = typeof runtimeConfig.apiBaseUrl === 'string' ? runtimeConfig.apiBaseUrl : state.apiBaseUrl;
   state.clientToken = typeof runtimeConfig.clientToken === 'string' ? runtimeConfig.clientToken : '';
   state.requestHeaders = sanitizeRuntimeRequestHeaders(runtimeConfig.requestHeaders || {});
@@ -5040,6 +5042,28 @@ const COMMANDS_SAFE_FOR_REMOTE = new Set([
   'desktop_tray_update',
 ]);
 
+
+const originOf = (url) => {
+  try {
+    return url ? new URL(url).origin : '';
+  } catch {
+    return '';
+  }
+};
+
+const getRendererRuntimeSnapshot = () => ({
+  localOrigin: state.localOrigin || state.sidecarUrl || '',
+  uiOrigin: state.uiOrigin || '',
+  apiBaseUrl: state.apiBaseUrl || '',
+  clientToken: state.clientToken || '',
+  requestHeaders: sanitizeRuntimeRequestHeaders(state.requestHeaders || {}),
+});
+
+
+ipcMain.on('openchamber:runtime-config', (event) => {
+  event.returnValue = getRendererRuntimeSnapshot();
+});
+
 ipcMain.handle('openchamber:invoke', async (event, command, args) => {
   if (!isLocalSender(event.sender) && !COMMANDS_SAFE_FOR_REMOTE.has(command)) {
     log.warn(`[ipc] rejected ${command} from non-local origin: ${event.sender?.getURL?.() || '(unknown)'}`);
@@ -5459,16 +5483,24 @@ app.whenReady().then(async () => {
     return;
   }
 
+  const { initialUrl, localOrigin, bootOutcome, apiBaseUrl, clientToken, requestHeaders } = await resolveInitialUrl();
+  state.localOrigin = localOrigin;
+  state.uiOrigin = originOf(initialUrl);
+  state.apiBaseUrl = apiBaseUrl;
+  state.clientToken = clientToken;
+  state.bootOutcome = bootOutcome ?? null;
+  state.requestHeaders = sanitizeRuntimeRequestHeaders(requestHeaders || {});
+
   state.mainWindow = createBrowserWindow({
     label: 'main',
     restoreGeometry: true,
     url: null,
+    runtimeConfig: { apiBaseUrl, clientToken, requestHeaders },
   });
 
   const initial = extractInitialDeepLinks();
   if (initial.length > 0) handleDeepLinks(initial);
 
-  const { initialUrl, localOrigin, bootOutcome, apiBaseUrl, clientToken, requestHeaders } = await resolveInitialUrl();
   await activateMainWindow(initialUrl, localOrigin, bootOutcome, { apiBaseUrl, clientToken, requestHeaders });
 
   // Notify renderer on OS wake-from-sleep so the SSE event pipeline can

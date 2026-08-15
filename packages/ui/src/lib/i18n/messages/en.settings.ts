@@ -475,7 +475,7 @@ export const settingsDict = {
   'settings.projects.actions.actions.save': 'Save Actions',
   'settings.projects.actions.toast.saveFailed': 'Failed to save actions',
   'settings.projects.actions.toast.saved': 'Project actions saved',
-  'settings.openchamber.about.title': 'About OpenChamber',
+  'settings.openchamber.about.title': 'About Pichamber',
   'settings.openchamber.about.field.version': 'Version',
   'settings.openchamber.about.field.openCodeVersion': 'Pi version',
   'settings.openchamber.about.field.instanceUrls': 'Instance URLs',

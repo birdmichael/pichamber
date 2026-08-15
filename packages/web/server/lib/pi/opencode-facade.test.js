@@ -109,7 +109,11 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const messages = await (await fetch(`${url}/api/session/${created.id}/message`)).json();
       expect(messages[0].info.role).toBe('user');
-      expect(messages.some((entry) => entry.info.role === 'assistant')).toBe(true);
+      expect(messages[0].parts.filter((part) => part.type === 'text')).toHaveLength(1);
+      const assistant = messages.find((entry) => entry.info.role === 'assistant');
+      expect(assistant).toBeTruthy();
+      expect(assistant.info.parentID).toBe('msg_user_1');
+      expect(assistant.info.finish).toBe('stop');
 
       const status = await (await fetch(`${url}/api/session/status`)).json();
       expect(status).toEqual({});

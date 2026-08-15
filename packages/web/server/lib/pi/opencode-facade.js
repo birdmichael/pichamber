@@ -59,6 +59,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getKernelInfo());
   }));
 
+  app.get('/api/health', handle(async (_req, res) => {
+    json(res, 200, { healthy: true, kernel: 'pi' });
+  }));
+
   app.get('/api/global/config', handle(async (_req, res) => {
     json(res, 200, { kernel: 'pi', ...host.getDefaults() });
   }));

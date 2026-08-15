@@ -11,10 +11,22 @@ const readArgValue = (name) => {
   return entry.slice(prefix.length);
 };
 
-const localOrigin = readArgValue('--openchamber-local-origin');
-const apiBaseUrl = readArgValue('--openchamber-api-base-url');
-const clientToken = readArgValue('--openchamber-client-token');
-const runtimeHeadersRaw = readArgValue('--openchamber-runtime-headers');
+const runtimeSnapshot = (() => {
+  try {
+    const snapshot = ipcRenderer.sendSync('openchamber:runtime-config');
+    return snapshot && typeof snapshot === 'object' ? snapshot : {};
+  } catch {
+    return {};
+  }
+})();
+
+const localOrigin = runtimeSnapshot.localOrigin || readArgValue('--openchamber-local-origin');
+const uiOrigin = runtimeSnapshot.uiOrigin || '';
+const apiBaseUrl = runtimeSnapshot.apiBaseUrl || readArgValue('--openchamber-api-base-url');
+const clientToken = runtimeSnapshot.clientToken || readArgValue('--openchamber-client-token');
+const runtimeHeadersRaw = runtimeSnapshot.requestHeaders
+  ? JSON.stringify(runtimeSnapshot.requestHeaders)
+  : readArgValue('--openchamber-runtime-headers');
 const homeDirectory = readArgValue('--openchamber-home');
 const macosMajorRaw = readArgValue('--openchamber-macos-major');
 const macosMajor = Number.parseInt(macosMajorRaw, 10);
@@ -38,9 +50,20 @@ const currentOrigin = (() => {
     return '';
   }
 })();
+const isLoopbackOrigin = (origin) => {
+  try {
+    const parsed = new URL(origin);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+};
 const isLocalPage = currentOrigin !== 'null'
   && (currentOrigin === 'openchamber-ui://app'
-  || (localOrigin && currentOrigin === localOrigin));
+  || (localOrigin && currentOrigin === localOrigin)
+  || (uiOrigin && currentOrigin === uiOrigin)
+  || (apiBaseUrl && isLoopbackOrigin(currentOrigin)));
 
 // Remote pages need __OPENCHAMBER_LOCAL_ORIGIN__ so the HostSwitcher knows
 // the URL of the Local entry (isDesktopLocalOriginActive() falls back to

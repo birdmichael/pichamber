@@ -82,7 +82,7 @@ async function stopChildTree(child) {
 }
 
 const uiPort = process.env.OPENCHAMBER_HMR_UI_PORT || '5180';
-const backendPort = process.env.OPENCHAMBER_HMR_API_PORT || '3902';
+const backendPort = process.env.OPENCHAMBER_HMR_API_PORT || '3901';
 const hmrHost = process.env.OPENCHAMBER_HMR_HOST || '127.0.0.1';
 
 function getLanAddresses() {

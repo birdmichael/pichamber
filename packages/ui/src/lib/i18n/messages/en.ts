@@ -2832,7 +2832,7 @@ export const dict = {
   'onboarding.desktopRecovery.actions.retrying': 'Retrying…',
   'onboarding.desktopRecovery.actions.retryConnection': 'Retry Connection',
   'startup.initRecovery.title': 'Startup failed',
-  'startup.initRecovery.description': 'OpenChamber could not finish initialization. Check that the server is running, then retry.',
+  'startup.initRecovery.description': 'Pichamber could not finish initialization. Check that the server is running, then retry.',
   'startup.initRecovery.retry': 'Retry',
   'startup.initRecovery.retrying': 'Retrying…',
   'onboarding.desktopRecovery.placeholders.remoteServer': 'the remote server',

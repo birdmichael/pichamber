@@ -65,7 +65,7 @@ export const settingsDict = {
   'settings.view.search.aria': '搜索设置',
   'settings.view.search.clear': '清除设置搜索',
   'settings.view.search.noResults': '没有匹配的设置',
-  'settings.view.nav.group.general': 'OpenChamber',
+  'settings.view.nav.group.general': 'Pichamber',
   'settings.view.nav.group.projects': '工作区',
   'settings.view.nav.group.opencode': 'OpenCode',
   'settings.view.nav.group.content': '资源库',
