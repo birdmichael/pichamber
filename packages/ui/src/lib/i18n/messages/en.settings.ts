@@ -1024,7 +1024,7 @@ export const settingsDict = {
   'settings.openchamber.opencodeCli.actions.saveAndReload': 'Save + Reload',
   'settings.openchamber.opencodeCli.actions.restartingOpenCode': 'Restarting OpenCode…',
   'settings.openchamber.opencodeCli.dialog.selectBinaryTitle': 'Select opencode binary',
-  'settings.openchamber.opencodeCli.tipPrefix': 'Tip: you can also use',
+  'settings.openchamber.opencodeCli.tipPrefix': 'Desktop boots the in-process Pi kernel by default. This path is used only when OPENCHAMBER_KERNEL=opencode. You can also use',
   'settings.openchamber.opencodeCli.tipMiddle': 'env var, but this setting persists in',
   'settings.mcp.sidebar.title': 'MCP Servers',
   'settings.mcp.sidebar.total': 'Total {count}',

@@ -76,14 +76,14 @@ const computeIconState = (counts) => {
 };
 
 const computeTooltip = (counts, sessionCount) => {
-  if (sessionCount === 0) return 'OpenChamber — no active sessions';
+  if (sessionCount === 0) return 'Pichamber — no active sessions';
   const bits = [];
   if (counts.approvals > 0) bits.push(`${counts.approvals} awaiting approval`);
   if (counts.error > 0) bits.push(`${counts.error} with errors`);
   if (counts.busy > 0) bits.push(`${counts.busy} working`);
   if (counts.unseen > 0) bits.push(`${counts.unseen} unread`);
   const suffix = bits.length ? ` · ${bits.join(', ')}` : ' · idle';
-  return `OpenChamber — ${sessionCount} session${sessionCount === 1 ? '' : 's'}${suffix}`;
+  return `Pichamber — ${sessionCount} session${sessionCount === 1 ? '' : 's'}${suffix}`;
 };
 
 // Frame cadence for the "breathing" busy animation. With the eased frame set

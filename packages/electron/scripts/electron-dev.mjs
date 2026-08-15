@@ -3,6 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyDesktopKernelEnv } from '../kernel-env.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -197,6 +198,8 @@ async function stopChildTree(child) {
 }
 
 async function main() {
+  const kernel = applyDesktopKernelEnv(process.env);
+  console.log(`[electron:dev] kernel=${kernel} (set OPENCHAMBER_KERNEL=opencode to restore the OpenCode process)`);
   const useBundledUi = process.env.OPENCHAMBER_ELECTRON_USE_BUNDLED_UI === '1';
   let devServer = null;
   let hmrApiPort = '';

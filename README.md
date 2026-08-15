@@ -75,9 +75,17 @@ Run a prompt once, daily, weekly, or on a cron schedule. Scheduled tasks can use
 
 ## Quick start
 
-### Desktop — macOS, Windows, and Linux
+### Desktop — macOS (Pichamber)
 
-Download the latest release from [GitHub Releases](https://github.com/openchamber/openchamber/releases/latest). Desktop bundles the matching OpenCode CLI, so no separate OpenCode installation is required.
+This fork's product is the **macOS Desktop app** running the in-process Pi kernel. See [`docs/PICHAMBER.md`](docs/PICHAMBER.md).
+
+```bash
+bun install
+bun run electron:dev          # Mac dev, boots Pi
+bun run electron:build        # Mac only: Pichamber-*.dmg in packages/electron/dist
+```
+
+No OpenCode CLI install is required. Configure `~/.pi/agent`. Set `OPENCHAMBER_KERNEL=opencode` only to restore the leftover OpenCode process path.
 
 Linux releases are available as x86_64 and ARM64 AppImages. Make the downloaded AppImage executable and keep it in a writable location for in-app updates:
 

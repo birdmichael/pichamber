@@ -139,7 +139,20 @@ const findBinary = (root, binaryName) => {
   return null;
 };
 
+const shouldBundleOpenCodeCli = (env = process.env) => {
+  if (env.OPENCHAMBER_BUNDLE_OPENCODE_CLI === '1' || env.OPENCHAMBER_BUNDLE_OPENCODE_CLI === 'true') {
+    return true;
+  }
+  const kernel = typeof env.OPENCHAMBER_KERNEL === 'string' ? env.OPENCHAMBER_KERNEL.trim().toLowerCase() : '';
+  return kernel === 'opencode';
+};
+
 const main = async () => {
+  if (!shouldBundleOpenCodeCli()) {
+    console.log('[electron] skipping OpenCode CLI download; Mac desktop boots the in-process Pi kernel.');
+    console.log('[electron] set OPENCHAMBER_BUNDLE_OPENCODE_CLI=1 (or OPENCHAMBER_KERNEL=opencode) to stage the leftover CLI.');
+    return;
+  }
   const version = process.env.OPENCHAMBER_OPENCODE_CLI_VERSION || readPinnedSdkVersion();
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`Invalid OpenCode CLI version: ${version}`);

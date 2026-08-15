@@ -12,6 +12,16 @@ if (process.platform === 'win32' && !env.CSC_LINK && !env.WINDOWS_CSC_LINK) {
   console.log('[electron] Windows code signing disabled; building unsigned installer.');
 }
 
+if (process.platform === 'darwin' && !env.CSC_LINK && !env.CSC_NAME && !env.APPLE_ID) {
+  env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+  builderArgs.push('--config.mac.notarize=false');
+  console.log('[electron] macOS signing/notarization disabled; building an unsigned dmg/zip.');
+}
+
+if (process.platform !== 'darwin' && builderArgs.some((argument) => argument === '--mac' || argument.startsWith('--mac='))) {
+  console.warn('[electron] Mac .dmg/.app artifacts must be built on macOS. This host cannot produce a usable Mac desktop package.');
+}
+
 const bunBinaryCandidates = [
   process.env.npm_execpath,
   process.env.BUN_INSTALL ? path.join(process.env.BUN_INSTALL, 'bin', process.platform === 'win32' ? 'bun.exe' : 'bun') : null,

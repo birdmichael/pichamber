@@ -1,12 +1,12 @@
-# OpenChamber Desktop
+# Pichamber Desktop
 
-Electron desktop runtime for OpenChamber on macOS, Windows, and Linux.
+Electron desktop runtime for Pichamber. **macOS is the product target.** Windows and Linux desktop packaging is leftover upstream work and is not maintained here.
 
 This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The web UI and OpenChamber server logic still live in `packages/web` and shared React UI lives in `packages/ui`.
 
 ## How It Runs
 
-Desktop starts the OpenChamber web server in the same Electron main process. There is no separate sidecar subprocess for the OpenChamber server.
+Desktop starts the Pichamber web server in the same Electron main process and boots the **in-process Pi kernel** by default (`OPENCHAMBER_KERNEL=pi`). There is no separate sidecar subprocess for the server, and no managed OpenCode child process on the default path.
 
 `main.mjs` imports `@openchamber/web/server/index.js` and calls `startWebUiServer()`. The Electron window then loads the UI from the local server in development, or from packaged `resources/web-dist` assets in packaged builds.
 
@@ -25,7 +25,8 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 | `scripts/electron-dev.mjs` | Desktop dev launcher with Vite HMR support |
 | `scripts/ensure-electron.mjs` | Verifies the installed Electron binary is complete and repairs it via the postinstall under Bun |
 | `scripts/build-web-assets.mjs` | Builds `packages/web` and stages UI assets into `resources/web-dist` |
-| `scripts/prepare-opencode-cli.mjs` | Downloads and stages the pinned OpenCode CLI into `resources/opencode-cli` |
+| `scripts/prepare-pi-kernel.mjs` | Verifies the in-process Pi SDK (`@earendil-works/pi-coding-agent`) is installed |
+| `scripts/prepare-opencode-cli.mjs` | Optional leftover: downloads OpenCode CLI only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode` |
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/main.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
 | `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows builds when signing env is missing |
@@ -40,7 +41,7 @@ bun install
 bun run electron:dev
 ```
 
-`bun run electron:dev` starts the web dev server with HMR, then launches Electron against `packages/electron/main.mjs`.
+Run this **on a Mac**. `bun run electron:dev` starts the web dev server with HMR, then launches Electron against `packages/electron/main.mjs` with `OPENCHAMBER_KERNEL=pi`. The window title is Pichamber. Configure models/auth in `~/.pi/agent`.
 
 The Electron workspace package trusts Electron's install script so `bun install` downloads the platform runtime in fresh checkouts and worktrees.
 
@@ -73,14 +74,15 @@ bun run electron:build
 That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
-2. `prepare:opencode-cli` to download/cache the pinned OpenCode CLI and copy it into `packages/electron/resources/opencode-cli`.
-3. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
-4. `rebuild:native` to rebuild native modules for Electron.
-5. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
+2. `prepare:pi-kernel` to verify the in-process Pi SDK is installed.
+3. `prepare:opencode-cli` — skipped for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` to stage the leftover OpenCode CLI.
+4. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
+5. `rebuild:native` to rebuild native modules for Electron.
+6. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
 
-Build output goes to `packages/electron/dist`.
+**Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`). Without Apple signing env, the Mac build is unsigned and notarization is disabled.
 
-macOS builds produce `dmg` and `zip` artifacts. Windows builds produce an NSIS installer. Linux builds produce an AppImage for the native x64 or arm64 host.
+Windows/Linux desktop packaging is leftover and not the product target.
 
 ## Platform Notes
 
@@ -108,11 +110,13 @@ On Windows and Linux, the General setting persisted as `desktopMinimizeToTrayEna
 
 The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart; while disabled, Desktop does not create the native tray controller or start the renderer subscriptions, polling, quota refresh, or IPC updates that feed it.
 
-## Bundled OpenCode CLI
+## Bundled kernel (Pi)
 
-Packaged Desktop builds include the official OpenCode CLI that matches the pinned `@opencode-ai/sdk` version in the root `package.json`. `prepare:opencode-cli` downloads the platform-specific release artifact, caches it under `packages/electron/.cache/opencode-cli`, stages `opencode` or `opencode.exe` into `resources/opencode-cli`, and verifies `opencode --version` before packaging. Re-running the step is fast when the staged binary already matches the pinned version.
+Packaged Mac Desktop boots the in-process Pi SDK that ships with `@openchamber/web` (`@earendil-works/pi-coding-agent`). There is no bundled Pi CLI binary and no managed OpenCode child on the default path.
 
-Managed local Desktop startup prefers OpenCode binaries in this order:
+The leftover OpenCode CLI extraResource is optional. `prepare:opencode-cli` downloads it only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode`. The OpenCode CLI settings page stays visible for that leftover path.
+
+When the leftover OpenCode kernel is enabled, managed startup prefers binaries in this order:
 
 1. `settings.opencodeBinary`.
 2. Environment overrides: `OPENCODE_BINARY`, `OPENCODE_PATH`, `OPENCHAMBER_OPENCODE_PATH`, or `OPENCHAMBER_OPENCODE_BIN`.
@@ -133,7 +137,9 @@ Use an explicit override when testing a different OpenCode CLI build or when a u
 | `OPENCHAMBER_HMR_UI_PORT` | Preferred Vite UI port for desktop dev, default `5173` |
 | `OPENCHAMBER_HMR_API_PORT` | Preferred API port for desktop dev, default `3901` |
 | `OPENCHAMBER_RUNTIME=desktop` | Set by Electron before starting the web server |
-| `OPENCHAMBER_OPENCODE_CLI_VERSION` | Optional packaging override for the bundled OpenCode CLI version; defaults to the pinned root `@opencode-ai/sdk` version |
+| `OPENCHAMBER_KERNEL` | Desktop/server kernel. Defaults to `pi`. Set `opencode` to restore the leftover OpenCode process |
+| `OPENCHAMBER_BUNDLE_OPENCODE_CLI` | Set `1` during `electron:build` to stage the leftover OpenCode CLI extraResource |
+| `OPENCHAMBER_OPENCODE_CLI_VERSION` | Optional packaging override for the leftover OpenCode CLI version; defaults to the pinned root `@opencode-ai/sdk` version |
 | `OPENCHAMBER_TARGET_ARCH` | Explicit desktop package architecture (`x64` or `arm64`); Linux requires it to match the native host |
 | `OPENCHAMBER_DESKTOP_NOTIFY=true` | Enables desktop notification flow in the web server |
 | `OPENCHAMBER_SKIP_API_COMPRESSION=true` | Defaulted by Desktop to reduce local CPU overhead |
@@ -174,9 +180,9 @@ Add new native capabilities in this order:
 
 ## Logs And Data
 
-Electron uses `electron-log`. In development, console logs are also visible in the terminal. In packaged apps, logs are written through the platform log path for the `OpenChamber` app name.
+Electron uses `electron-log`. In development, console logs are also visible in the terminal. In packaged apps, logs are written through the platform log path for the `Pichamber` app name.
 
-Development builds use a separate user data directory named `OpenChamber Dev`, so dev state does not overwrite normal packaged app state.
+Development builds use a separate user data directory named `Pichamber Dev`, so dev state does not overwrite normal packaged app state.
 
 ## Things To Be Careful With
 

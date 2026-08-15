@@ -4,27 +4,58 @@ Pichamber keeps the OpenChamber UI (`@opencode-ai/sdk/v2`) and serves an OpenCod
 
 The happy path does **not** require OpenCode to be installed.
 
-## macOS (the supported product target)
+## macOS Desktop (the product)
 
-1. Install [bun](https://bun.sh) and Node 22+.
+The product is the **macOS Electron app**. The web server is only the in-process backend that Desktop already starts. Do not treat the browser UI as the shipping surface.
+
+1. On a Mac, install [bun](https://bun.sh) and Node 22+.
 2. Clone this repo and install dependencies:
 
 ```bash
 bun install
 ```
 
-3. Configure Pi auth/models the usual way (`~/.pi/agent`, or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` in the environment). The `pi` CLI on your PATH is optional; the in-process SDK is preferred.
-4. Start the web server:
+3. Configure Pi auth/models the usual way (`~/.pi/agent/auth.json` and `~/.pi/agent/models.json`, or provider keys in the environment). The `pi` CLI on your PATH is optional; Desktop uses the in-process `@earendil-works/pi-coding-agent` SDK.
+4. Run Desktop in development (HMR). This boots Pi by default — no OpenCode install is required:
+
+```bash
+bun run electron:dev
+```
+
+Useful variants:
+
+```bash
+bun run electron:dev:bundled          # packaged web assets instead of Vite HMR
+OPENCHAMBER_KERNEL=opencode bun run electron:dev   # restore the leftover OpenCode process path
+```
+
+5. Package a Mac `.dmg` / `.zip` **on macOS** (a Linux VM cannot produce a usable Mac desktop build):
+
+```bash
+bun run electron:build
+# same thing:
+bun run --cwd packages/electron package
+```
+
+That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds native modules, and runs electron-builder. Output lands in `packages/electron/dist` as `Pichamber-<version>-mac-<arch>.dmg` and `.zip`.
+
+- Unsigned local builds are the default when Apple signing env (`CSC_LINK` / `APPLE_ID`) is unset.
+- Notarized release builds still need Xcode + Apple signing/notarization credentials.
+- OpenCode CLI is **not** downloaded for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` only if you also want the leftover OpenCode CLI extraResource.
+
+`OPENCHAMBER_KERNEL` defaults to `pi` in both Desktop and the in-process server. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.
+
+The OpenCode CLI / update settings page, MCP, plugins, permissions, share, revert, and Agents remain visible. They are leftover OpenCode UI, not the default kernel.
+
+### In-process web server only
+
+Use the web server directly only when debugging the Desktop backend:
 
 ```bash
 OPENCHAMBER_KERNEL=pi bun run start:web
 # or, during development:
 OPENCHAMBER_KERNEL=pi bun run dev
 ```
-
-`OPENCHAMBER_KERNEL` defaults to `pi`. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.
-
-5. Open the UI. Chat/session/event traffic stays on `/api/session`, `/api/global/event`, and `/api/global/event/ws`. Git, files, and terminal RuntimeAPIs are unchanged.
 
 ### Mock kernel (no LLM keys)
 
@@ -51,4 +82,6 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 ```bash
 cd packages/web
 bunx vitest run server/lib/pi
+
+bun test --cwd packages/electron ./kernel-env.test.mjs
 ```
