@@ -7,6 +7,7 @@ import {
   buildDeferredRestartResponse,
 } from './config-mutation-response.js';
 import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
   const {
@@ -328,6 +329,9 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
   });
 
   app.get('/api/opencode/health', async (_req, res) => {
+    if (isPiKernelEnabled()) {
+      return res.json({ healthy: true, kernel: 'pi' });
+    }
     try {
       const healthResponse = await fetch(buildOpenCodeUrl('/global/health', ''), {
         method: 'GET',
@@ -350,6 +354,9 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
   });
 
   app.get('/api/opencode/version', async (_req, res) => {
+    if (isPiKernelEnabled()) {
+      return res.json({ version: 'pi', kernel: 'pi' });
+    }
     try {
       const healthResponse = await fetch(buildOpenCodeUrl('/global/health', ''), {
         method: 'GET',

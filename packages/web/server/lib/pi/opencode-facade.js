@@ -68,7 +68,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.patch('/api/config', parseJson, handle(async (req, res) => {
-    json(res, 200, { kernel: 'pi', ...(req.body?.config || req.body || {}) });
+    const patch = req.body?.config || req.body || {};
+    json(res, 200, { kernel: 'pi', ...host.setDefaults(patch) });
   }));
 
   app.get('/api/config/providers', handle(async (_req, res) => {

@@ -233,9 +233,9 @@ const LOCAL_DESKTOP_CLIENT_DEDUPE_KEY = 'desktop-local';
 // connecting to someone else's server).
 const REMOTE_DESKTOP_CLIENT_KIND = 'desktop';
 const ENV_OVERRIDE_HOST_ID = '__env';
-const CHANGELOG_URL = 'https://raw.githubusercontent.com/openchamber/openchamber/main/CHANGELOG.md';
-const GITHUB_BUG_REPORT_URL = 'https://github.com/openchamber/openchamber/issues/new?template=bug_report.yml';
-const GITHUB_FEATURE_REQUEST_URL = 'https://github.com/openchamber/openchamber/issues/new?template=feature_request.yml';
+const CHANGELOG_URL = 'https://raw.githubusercontent.com/birdmichael/pichamber/main/CHANGELOG.md';
+const GITHUB_BUG_REPORT_URL = 'https://github.com/birdmichael/pichamber/issues/new';
+const GITHUB_FEATURE_REQUEST_URL = 'https://github.com/birdmichael/pichamber/issues/new';
 const DISCORD_INVITE_URL = 'https://discord.gg/ZYRSdnwwKA';
 const INSTALLED_APPS_CACHE_TTL_SECS = 60 * 60 * 24;
 const INSTALLED_APPS_CACHE_FILE = 'discovered-apps.json';
@@ -1229,7 +1229,28 @@ const registerPackagedUiProtocol = () => {
           const body = injectRuntimeConfigIntoHtml(html);
           return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
         }
-        return electronNet.fetch(pathToFileURL(filePath).toString());
+        const mimeByExt = {
+          '.js': 'text/javascript; charset=utf-8',
+          '.mjs': 'text/javascript; charset=utf-8',
+          '.css': 'text/css; charset=utf-8',
+          '.svg': 'image/svg+xml',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp',
+          '.woff': 'font/woff',
+          '.woff2': 'font/woff2',
+          '.ttf': 'font/ttf',
+          '.json': 'application/json',
+          '.map': 'application/json',
+          '.wasm': 'application/wasm',
+        };
+        const ext = path.extname(filePath).toLowerCase();
+        const body = await fsp.readFile(filePath);
+        return new Response(body, {
+          headers: { 'Content-Type': mimeByExt[ext] || 'application/octet-stream' },
+        });
       }
     } catch {
     }
