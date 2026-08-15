@@ -193,6 +193,7 @@ export const registerOpenCodeProxy = (app, deps) => {
     SSE_HEARTBEAT_INTERVAL_MS = DEFAULT_SSE_HEARTBEAT_INTERVAL_MS,
     SSE_UPSTREAM_STALL_TIMEOUT_MS = DEFAULT_UPSTREAM_STALL_TIMEOUT_MS,
     getSseUpstreamStallTimeoutMs = () => SSE_UPSTREAM_STALL_TIMEOUT_MS,
+    piKernel = null,
   } = deps;
 
   if (app.get('opencodeProxyConfigured')) {
@@ -206,6 +207,11 @@ export const registerOpenCodeProxy = (app, deps) => {
     console.log('Setting up OpenCode API gate (OpenCode not started yet)');
   }
   app.set('opencodeProxyConfigured', true);
+
+  if (piKernel) {
+    piKernel.register(app);
+    console.log('Pi kernel facade registered (OpenCode proxy is fallback-only)');
+  }
 
   const isAbortError = (error) => error?.name === 'AbortError';
   const FALLBACK_PROXY_TARGET = 'http://127.0.0.1:3902';
@@ -621,6 +627,9 @@ export const registerOpenCodeProxy = (app, deps) => {
   };
 
   app.use('/api', async (req, res, next) => {
+    if (piKernel) {
+      return next();
+    }
     if (
       req.path.startsWith('/themes/custom') ||
       req.path.startsWith('/push') ||

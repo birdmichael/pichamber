@@ -47,6 +47,7 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
     getManagedOpenCodeShellEnvSnapshot,
     getManagedOpenCodeEnv = async () => ({}),
     getActiveSessionCount = () => 0,
+    isPiKernelEnabled = () => false,
     reapManagedOrphanedProcesses = reapOrphanedProcesses,
     getWarmupDirectories = async () => [],
     onOpenCodeRestarted = null,
@@ -857,6 +858,19 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
     const bootstrapStartedAt = performance.now();
     let bootstrapError = null;
     recordStartupPerformance('opencode.bootstrap.start');
+    if (isPiKernelEnabled()) {
+      state.isOpenCodeReady = true;
+      state.lastOpenCodeError = null;
+      state.openCodeNotReadySince = 0;
+      state.isExternalOpenCode = true;
+      syncToHmrState();
+      recordStartupPerformance('opencode.bootstrap.ready', {
+        durationMs: performance.now() - bootstrapStartedAt,
+        kernel: 'pi',
+      });
+      console.log('[lifecycle] Pi kernel active — skipping OpenCode process bootstrap');
+      return;
+    }
     try {
       // Before doing anything, reap any OpenCode process WE spawned in a prior
       // run that was orphaned by a crash/hard-exit. Verified + scoped to our own

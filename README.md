@@ -142,6 +142,11 @@ Around that foundation, OpenChamber brings together the work that happens before
 
 OpenChamber is an independent project and is not affiliated with the OpenCode team.
 
+## Pichamber (Pi kernel)
+
+This fork runs the OpenChamber UI against [Pi](https://github.com/earendil-works/pi) instead of an OpenCode process. See [docs/PICHAMBER.md](docs/PICHAMBER.md) for macOS setup, mock mode, and what is still OpenCode-only.
+
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and contribution guidelines. Documentation authoring guidance lives in [`packages/docs`](packages/docs/README.md).

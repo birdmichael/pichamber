@@ -48,6 +48,7 @@ import {
 } from './lib/event-stream/index.js';
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
+import { createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
 import { createOpenCodeEnvRuntime } from './lib/opencode/env-runtime.js';
 import { resolveOpenCodeEnvConfig } from './lib/opencode/env-config.js';
 import { createHmrStateRuntime } from './lib/opencode/hmr-state-runtime.js';
@@ -779,11 +780,24 @@ const contextObligatoryRuntime = createContextObligatoryRuntime({
   getOpenCodeAuthHeaders,
 });
 
-const globalMessageStreamHub = createGlobalMessageStreamHub({
-  buildOpenCodeUrl,
-  getOpenCodeAuthHeaders,
-  upstreamStallTimeoutMs: getUpstreamStallTimeoutMs,
-});
+const piKernelEnabled = isPiKernelEnabled();
+const piKernel = piKernelEnabled
+  ? createPiKernel({
+      defaultDirectory: process.cwd(),
+      mock: isPiMockEnabled(),
+    })
+  : null;
+if (piKernel) {
+  console.log(`[pichamber] kernel=pi mock=${piKernel.mock ? 'yes' : 'no'} (OpenCode process not required)`);
+}
+
+const globalMessageStreamHub = piKernel
+  ? piKernel.bus
+  : createGlobalMessageStreamHub({
+      buildOpenCodeUrl,
+      getOpenCodeAuthHeaders,
+      upstreamStallTimeoutMs: getUpstreamStallTimeoutMs,
+    });
 
 const permissionAutoAcceptRuntime = createPermissionAutoAcceptRuntime({
   globalEventHub: globalMessageStreamHub,
@@ -920,6 +934,7 @@ const serverUtilsRuntime = createServerUtilsRuntime({
     }
     return snapshot.PATH;
   },
+  piKernel,
 });
 
 const setOpenCodePort = (...args) => serverUtilsRuntime.setOpenCodePort(...args);
@@ -1061,6 +1076,7 @@ const openCodeLifecycleRuntime = createOpenCodeLifecycleRuntime({
   buildManagedOpenCodePath,
   getManagedOpenCodeShellEnvSnapshot: getLoginShellEnvSnapshot,
   getActiveSessionCount,
+  isPiKernelEnabled: () => piKernelEnabled,
   // Most-recently-used directories first: OpenCode initializes each directory
   // lazily on first request (seconds on large session stores), so the
   // lifecycle warms these right after readiness — before the UI's first
@@ -1249,6 +1265,12 @@ const ensureGlobalWatcherStarted = async () => {
   return globalWatcherStartPromise;
 };
 const bootstrapOpenCodeAtStartup = async (...args) => {
+  if (piKernel) {
+    await piKernel.ready();
+    await openCodeLifecycleRuntime.bootstrapOpenCodeAtStartup(...args);
+    console.log('[pichamber] Pi kernel ready — chat/session/event routes are served by the facade');
+    return;
+  }
   await openCodeLifecycleRuntime.bootstrapOpenCodeAtStartup(...args);
   scheduleOpenCodeApiDetection();
   if (openCodeLifecycleState.openCodeProcess && !openCodeLifecycleState.isExternalOpenCode) {
@@ -1540,8 +1562,10 @@ async function main(options = {}) {
         ? resolveManagedOpenCodeLaunchSpec(resolvedOpencodeBinary)
         : null;
       return {
+        kernel: piKernelEnabled ? 'pi' : 'opencode',
+        piMock: Boolean(piKernel?.mock),
         openCodePort,
-        openCodeRunning: Boolean(openCodePort && isOpenCodeReady && !isRestartingOpenCode),
+        openCodeRunning: piKernelEnabled ? true : Boolean(openCodePort && isOpenCodeReady && !isRestartingOpenCode),
         openCodeSecureConnection: isOpenCodeConnectionSecure(),
         openCodeAuthSource: openCodeAuthSource || null,
         openCodeApiPrefix: '',

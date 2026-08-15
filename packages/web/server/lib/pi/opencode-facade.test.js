@@ -1,0 +1,132 @@
+import express from 'express';
+import { createServer } from 'node:http';
+import { describe, expect, it } from 'vitest';
+
+import { createPiKernel } from './index.js';
+import { registerPiFacade } from './opencode-facade.js';
+
+const listen = (app) => new Promise((resolve) => {
+  const server = createServer(app);
+  server.listen(0, '127.0.0.1', () => {
+    const { port } = server.address();
+    resolve({
+      server,
+      url: `http://127.0.0.1:${port}`,
+      close: () => new Promise((done) => server.close(done)),
+    });
+  });
+});
+
+const startFacade = async () => {
+  const kernel = createPiKernel({
+    mock: true,
+    defaultDirectory: '/tmp/project',
+  });
+  const app = express();
+  app.use(express.json());
+  registerPiFacade(app, { host: kernel.host, bus: kernel.bus, defaultDirectory: '/tmp/project' });
+  const http = await listen(app);
+  return { kernel, ...http };
+};
+
+describe('OpenCode facade HTTP/SSE', () => {
+  it('bootstraps path/providers/session and streams a mock prompt', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const pathRes = await fetch(`${url}/api/path`);
+      const pathBody = await pathRes.json();
+      expect(pathRes.status).toBe(200);
+      expect(pathBody.directory).toBe('/tmp/project');
+      expect(pathBody.config).toContain('.pi/agent');
+
+      const providers = await (await fetch(`${url}/api/config/providers`)).json();
+      expect(providers.providers[0].id).toBe('pi-mock');
+
+      expect(await (await fetch(`${url}/api/mcp`)).json()).toEqual({});
+      expect(await (await fetch(`${url}/api/lsp`)).json()).toEqual([]);
+      expect(await (await fetch(`${url}/api/permission`)).json()).toEqual([]);
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+      expect(await (await fetch(`${url}/api/command`)).json()).toEqual([]);
+
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Facade session' }),
+      })).json();
+      expect(created.id).toMatch(/^ses_/);
+      expect(created.title).toBe('Facade session');
+
+      const listed = await (await fetch(`${url}/api/session`)).json();
+      expect(listed).toHaveLength(1);
+
+      const sseChunks = [];
+      const sseAbort = new AbortController();
+      const ssePromise = (async () => {
+        const response = await fetch(`${url}/api/global/event`, { signal: sseAbort.signal });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseChunks.push(decoder.decode(value));
+          if (sseChunks.join('').includes('session.idle')) break;
+        }
+      })();
+
+      const prompt = await fetch(`${url}/api/session/${created.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          messageID: 'msg_user_1',
+          parts: [{ type: 'text', text: 'hello facade' }],
+        }),
+      });
+      expect(prompt.status).toBe(200);
+
+      await Promise.race([
+        ssePromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SSE timeout')), 2000)),
+      ]);
+      sseAbort.abort();
+
+      const stream = sseChunks.join('');
+      expect(stream).toContain('message.part.delta');
+      expect(stream).toContain('"field":"text"');
+      expect(stream).toContain('session.idle');
+
+      const messages = await (await fetch(`${url}/api/session/${created.id}/message`)).json();
+      expect(messages[0].info.role).toBe('user');
+      expect(messages.some((entry) => entry.info.role === 'assistant')).toBe(true);
+
+      const status = await (await fetch(`${url}/api/session/status`)).json();
+      expect(status).toEqual({});
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('aborts a streaming mock session', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Abort me' }),
+      })).json();
+
+      const prompt = fetch(`${url}/api/session/${created.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parts: [{ type: 'text', text: 'long' }] }),
+      });
+      const aborted = await fetch(`${url}/api/session/${created.id}/abort`, { method: 'POST' });
+      expect(aborted.status).toBe(200);
+      expect(await aborted.json()).toBe(true);
+      await prompt;
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+});

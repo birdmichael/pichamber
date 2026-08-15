@@ -22,6 +22,7 @@ export const createServerUtilsRuntime = (dependencies) => {
     setOpenCodeNotReadySince,
     clearLastOpenCodeError,
     getLoginShellPath,
+    piKernel = null,
   } = dependencies;
 
   const setOpenCodePort = (port) => {
@@ -215,6 +216,7 @@ export const createServerUtilsRuntime = (dependencies) => {
       ensureOpenCodeApiPrefix,
       getSseUpstreamStallTimeoutMs: getUpstreamStallTimeoutMs,
       getUiNotificationClients,
+      piKernel,
     });
   };
 
