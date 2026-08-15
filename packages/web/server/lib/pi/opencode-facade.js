@@ -43,10 +43,15 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     '/command', '/session', '/provider', '/config', '/path', '/event',
     '/global', '/project', '/agent', '/skill', '/mcp', '/lsp', '/vcs',
     '/file', '/find', '/pty', '/permission', '/question', '/experimental',
-    '/auth', '/log', '/instance', '/formatter', '/tool',
+    '/log', '/instance', '/formatter', '/tool',
   ];
+  const uiAuthPaths = ['/auth/session', '/auth/passkey', '/auth/url-token'];
   app.use((req, _res, next) => {
     const pathname = (req.path || '').split('?')[0];
+    if (uiAuthPaths.some((root) => pathname === root || pathname.startsWith(`${root}/`))) {
+      next();
+      return;
+    }
     if (sdkRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`))) {
       req.url = `/api${req.url}`;
     }
@@ -79,6 +84,13 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.get('/api/health', handle(async (_req, res) => {
     json(res, 200, { healthy: true, kernel: 'pi' });
+  }));
+
+  app.get('/api/auth/session', handle(async (_req, res) => {
+    json(res, 200, { authenticated: true, disabled: true, kernel: 'pi' });
+  }));
+  app.post('/api/auth/session', parseJson, handle(async (_req, res) => {
+    json(res, 200, { authenticated: true, disabled: true, kernel: 'pi' });
   }));
 
   app.get('/api/global/config', handle(async (_req, res) => {

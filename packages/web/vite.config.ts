@@ -108,15 +108,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/auth': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || process.env.OPENCHAMBER_HMR_API_PORT || 3901}`,
         changeOrigin: true,
       },
       '/health': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || process.env.OPENCHAMBER_HMR_API_PORT || 3901}`,
         changeOrigin: true,
       },
       '/api': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || process.env.OPENCHAMBER_HMR_API_PORT || 3901}`,
         changeOrigin: true,
         ws: true,
       },

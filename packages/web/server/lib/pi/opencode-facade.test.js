@@ -165,6 +165,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       const sdkSkills = await (await fetch(`${url}/skill`)).json();
       expect(Array.isArray(sdkSkills)).toBe(true);
 
+      const auth = await (await fetch(`${url}/api/auth/session`)).json();
+      expect(auth.authenticated).toBe(true);
+      expect(auth.disabled).toBe(true);
+
       const patched = await (await fetch(`${url}/api/pi/defaults`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
