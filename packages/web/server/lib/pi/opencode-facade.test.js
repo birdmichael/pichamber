@@ -157,9 +157,13 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'compact')).toBe(true);
+      const sdkCommands = await (await fetch(`${url}/command`)).json();
+      expect(sdkCommands.some((command) => command.name === 'compact')).toBe(true);
 
       const skills = await (await fetch(`${url}/api/config/skills`)).json();
       expect(Array.isArray(skills.skills)).toBe(true);
+      const sdkSkills = await (await fetch(`${url}/skill`)).json();
+      expect(Array.isArray(sdkSkills)).toBe(true);
 
       const patched = await (await fetch(`${url}/api/pi/defaults`, {
         method: 'PATCH',

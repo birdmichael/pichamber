@@ -134,7 +134,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
     const checkForUpdate = async (attempt: number, runtimeKey = getRuntimeKey()) => {
       try {
         const response = await runtimeFetch('/api/opencode/upgrade-status', { headers: { Accept: 'application/json' } });
-        if (!response.ok) throw new Error(response.statusText || 'OpenCode upgrade status check failed');
+        if (!response.ok) throw new Error(response.statusText || 'Pi upgrade status check failed');
         const status = await response.json().catch(() => null) as OpenCodeUpgradeStatusLike | null;
         const version = resolveOpenCodeUpgradeStatusVersion(status);
         if (!cancelled && runtimeKey === getRuntimeKey() && version) {

@@ -271,17 +271,72 @@ export function shouldRestartDesktopBootFlow(input: DesktopBootFlowRestartInput)
  * Returns `null` when not in desktop, when the outcome has not been set yet,
  * or when the injected payload is malformed.
  */
+const PICHAMBER_BOOT_OUTCOME_KEY = 'pichamber.desktopBootOutcome';
+const PICHAMBER_SPLASH_DISMISSED_KEY = 'pichamber.splashDismissed';
+
+const getSessionStorage = (): Storage | null => {
+  try {
+    return typeof window !== 'undefined' ? window.sessionStorage : null;
+  } catch {
+    return null;
+  }
+};
+
+const readCachedBootOutcome = (): unknown => {
+  const storage = getSessionStorage();
+  if (!storage) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(PICHAMBER_BOOT_OUTCOME_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const persistDesktopBootOutcome = (outcome: DesktopBootOutcome | null | undefined) => {
+  if (typeof window === 'undefined' || !outcome) {
+    return;
+  }
+  try {
+    getSessionStorage()?.setItem(PICHAMBER_BOOT_OUTCOME_KEY, JSON.stringify(outcome));
+    (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: unknown }).__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = outcome;
+  } catch {
+  }
+};
+
+export const markInitialLoadingDismissed = () => {
+  try {
+    getSessionStorage()?.setItem(PICHAMBER_SPLASH_DISMISSED_KEY, '1');
+  } catch {
+  }
+};
+
+const readRawBootOutcome = (): unknown => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const injected = (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: unknown })
+    .__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__;
+  if (injected !== undefined && injected !== null) {
+    return injected;
+  }
+  return readCachedBootOutcome();
+};
+
 export function getInjectedBootOutcome(): DesktopBootOutcome | null {
   const status = getBootInjectionStatus();
   if (status !== 'valid') {
     return null;
   }
 
-  const raw = (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: unknown })
-    .__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__;
-
-  const result = validateBootOutcome(raw);
-  return result.valid ? result.outcome : null;
+  const result = validateBootOutcome(readRawBootOutcome());
+  if (!result.valid) {
+    return null;
+  }
+  persistDesktopBootOutcome(result.outcome);
+  return result.outcome;
 }
 
 /**
@@ -297,13 +352,16 @@ export function getBootInjectionStatus(): BootInjectionStatus {
     return 'not-injected';
   }
 
-  const raw = (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: unknown })
-    .__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__;
+  const raw = readRawBootOutcome();
 
   if (raw === undefined || raw === null) {
     return 'not-injected';
   }
 
   const result = validateBootOutcome(raw);
-  return result.valid ? 'valid' : 'malformed';
+  if (result.valid) {
+    persistDesktopBootOutcome(result.outcome);
+    return 'valid';
+  }
+  return 'malformed';
 }

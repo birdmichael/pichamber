@@ -20,15 +20,15 @@ type BootstrapMessages = {
 };
 
 const EN_MESSAGES: BootstrapMessages = {
-  startingApi: 'Starting OpenCode API…',
+  startingApi: 'Starting Pi…',
   initializing: 'Initializing…',
   connecting: 'Connecting…',
   connected: 'Connected!',
   connectionError: 'Connection error',
   disconnected: 'Disconnected',
   reconnecting: 'Reconnecting…',
-  initialDataLoadFailed: 'OpenCode connected, but initial data load failed.',
-  cliNotFound: 'OpenCode CLI not found. Please install it first.',
+  initialDataLoadFailed: 'Pi connected, but initial data load failed.',
+  cliNotFound: 'Pi CLI not found. Please install it first.',
   providersReady: '✓ Providers',
   providersLoading: '… Providers',
   agentsReady: '✓ Agents',
@@ -58,15 +58,15 @@ const FR_MESSAGES: BootstrapMessages = {
 };
 
 const ZH_CN_MESSAGES: BootstrapMessages = {
-  startingApi: '正在启动 OpenCode API…',
+  startingApi: '正在启动 Pi…',
   initializing: '正在初始化…',
   connecting: '正在连接…',
   connected: '已连接！',
   connectionError: '连接错误',
   disconnected: '已断开连接',
   reconnecting: '正在重新连接…',
-  initialDataLoadFailed: 'OpenCode 已连接，但初始数据加载失败。',
-  cliNotFound: '未找到 OpenCode CLI。请先安装它。',
+  initialDataLoadFailed: 'Pi 已连接，但初始数据加载失败。',
+  cliNotFound: '未找到 Pi CLI。请先安装它。',
   providersReady: '✓ 提供商',
   providersLoading: '… 提供商',
   agentsReady: '✓ 智能体',

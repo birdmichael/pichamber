@@ -147,7 +147,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
           <OpenChamberLogo width={64} height={64} />
 
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">OpenChamber</h2>
+            <h2 className="text-lg font-semibold">Pichamber</h2>
             <div className="space-y-0.5 typography-meta text-muted-foreground">
               {displayVersion && (
                 <p>{t('aboutDialog.openChamberVersionLabel', { version: displayVersion })}</p>
@@ -184,7 +184,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
           <div className="flex flex-col items-center gap-2 pt-2">
             <div className="flex items-center justify-center gap-4">
               <a
-                href="https://github.com/openchamber/openchamber"
+                href="https://github.com/birdmichael/pichamber"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 typography-meta text-muted-foreground hover:text-foreground transition-colors"

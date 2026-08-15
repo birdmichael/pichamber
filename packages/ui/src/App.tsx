@@ -24,6 +24,8 @@ import {
   getBootInjectionStatus,
   resolveDesktopBootView,
   canDismissInitialLoading,
+  markInitialLoadingDismissed,
+  persistDesktopBootOutcome,
   shouldRestartDesktopBootFlow,
   type BootInjectionStatus,
   type DesktopBootView,
@@ -358,6 +360,8 @@ function App({ apis }: AppProps) {
     const timer = setTimeout(() => {
       const loadingElement = document.getElementById('initial-loading');
       if (loadingElement) {
+        markInitialLoadingDismissed();
+        persistDesktopBootOutcome(getInjectedBootOutcome());
         loadingElement.classList.add('fade-out');
         setTimeout(() => {
           loadingElement.remove();

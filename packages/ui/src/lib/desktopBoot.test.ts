@@ -414,3 +414,29 @@ describe('canDismissInitialLoading with malformed injection', () => {
     ).toBe(true);
   });
 });
+
+describe('boot outcome sessionStorage cache', () => {
+  const restoreWindow = () => {
+    delete (globalThis as Record<string, unknown>).window;
+  };
+
+  test('reads a cached local-ok outcome when the injected global is missing', () => {
+    const store = new Map<string, string>();
+    (globalThis as Record<string, unknown>).window = {
+      sessionStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+      },
+    };
+    try {
+      store.set('pichamber.desktopBootOutcome', JSON.stringify({ target: 'local', status: 'ok' }));
+      expect(getBootInjectionStatus()).toBe('valid');
+      expect(getInjectedBootOutcome()).toEqual({ target: 'local', status: 'ok' });
+    } finally {
+      restoreWindow();
+    }
+  });
+});
+

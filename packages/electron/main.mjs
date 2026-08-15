@@ -5057,6 +5057,7 @@ const getRendererRuntimeSnapshot = () => ({
   apiBaseUrl: state.apiBaseUrl || '',
   clientToken: state.clientToken || '',
   requestHeaders: sanitizeRuntimeRequestHeaders(state.requestHeaders || {}),
+  bootOutcome: state.bootOutcome || null,
 });
 
 

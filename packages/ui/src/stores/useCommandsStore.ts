@@ -31,11 +31,11 @@ export interface Command extends CommandConfig {
   isBuiltIn?: boolean;
 }
 
-// Built-in commands provided by OpenCode (not defined in user config directories)
-const BUILTIN_COMMAND_NAMES = new Set(['init', 'review']);
+// Built-in commands from OpenCode leftovers plus Pi slash commands
+const BUILTIN_COMMAND_NAMES = new Set(['init', 'review', 'compact', 'reload', 'model', 'thinking', 'login']);
 
 export const isCommandBuiltIn = (command: Command): boolean => {
-  return BUILTIN_COMMAND_NAMES.has(command.name);
+  return command.source === 'builtin' || BUILTIN_COMMAND_NAMES.has(command.name);
 };
 
 const CONFIG_EVENT_SOURCE = "useCommandsStore";

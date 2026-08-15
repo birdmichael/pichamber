@@ -36,6 +36,24 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }
   app.set('piFacadeConfigured', true);
 
+  // OpenCode SDK v2 calls unprefixed paths (/command, /session, ...) when
+  // baseUrl is the host origin (desktop injects http://127.0.0.1:3901).
+  // Chat uses /api/* via runtimeFetch; settings/SDK use the bare paths.
+  const sdkRoots = [
+    '/command', '/session', '/provider', '/config', '/path', '/event',
+    '/global', '/project', '/agent', '/skill', '/mcp', '/lsp', '/vcs',
+    '/file', '/find', '/pty', '/permission', '/question', '/experimental',
+    '/auth', '/log', '/instance', '/formatter', '/tool',
+  ];
+  app.use((req, _res, next) => {
+    const pathname = (req.path || '').split('?')[0];
+    if (sdkRoots.some((root) => pathname === root || pathname.startsWith(`${root}/`))) {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
+
+
   const resolveDirectory = (req) => requestDirectory(req) || defaultDirectory;
   const parseJson = express.json({ limit: '50mb' });
 
@@ -125,6 +143,17 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   app.get('/api/config/skills', handle(async (req, res) => {
     json(res, 200, host.getConfigSkills(resolveDirectory(req)));
   }));
+
+  app.get('/api/skill', handle(async (req, res) => {
+    const skills = host.listSkills(resolveDirectory(req)).map((skill) => ({
+      name: skill.name,
+      description: skill.description,
+      location: skill.path,
+      content: skill.content,
+    }));
+    json(res, 200, skills);
+  }));
+
 
   app.get('/api/pi/skills', handle(async (req, res) => {
     json(res, 200, { skills: host.listSkills(resolveDirectory(req)) });
