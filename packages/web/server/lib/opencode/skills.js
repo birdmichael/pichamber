@@ -20,10 +20,32 @@ import {
   getAncestors,
   findWorktreeRoot,
 } from './shared.js';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 
 const BUILT_IN_SKILL_LOCATION = '<built-in>';
 
+function getProjectPiSkillDir(workingDirectory, skillName) {
+  return path.join(workingDirectory, '.pi', 'skills', skillName);
+}
+
+function getProjectPiSkillPath(workingDirectory, skillName) {
+  return path.join(getProjectPiSkillDir(workingDirectory, skillName), 'SKILL.md');
+}
+
+function getUserPiSkillDir(skillName) {
+  return path.join(os.homedir(), '.pi', 'agent', 'skills', skillName);
+}
+
+function getUserPiSkillPath(skillName) {
+  return path.join(getUserPiSkillDir(skillName), 'SKILL.md');
+}
+
 function ensureProjectSkillDir(workingDirectory) {
+  if (isPiKernelEnabled()) {
+    const projectSkillDir = path.join(workingDirectory, '.pi', 'skills');
+    fs.mkdirSync(projectSkillDir, { recursive: true });
+    return projectSkillDir;
+  }
   const projectSkillDir = path.join(workingDirectory, '.opencode', 'skills');
   if (!fs.existsSync(projectSkillDir)) {
     fs.mkdirSync(projectSkillDir, { recursive: true });
@@ -36,6 +58,12 @@ function ensureProjectSkillDir(workingDirectory) {
 }
 
 function getProjectSkillDir(workingDirectory, skillName) {
+  if (isPiKernelEnabled()) {
+    const piPath = getProjectPiSkillDir(workingDirectory, skillName);
+    const leftover = path.join(workingDirectory, '.opencode', 'skills', skillName);
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(workingDirectory, '.opencode', 'skills', skillName);
   const legacyPath = path.join(workingDirectory, '.opencode', 'skill', skillName);
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
@@ -43,6 +71,12 @@ function getProjectSkillDir(workingDirectory, skillName) {
 }
 
 function getProjectSkillPath(workingDirectory, skillName) {
+  if (isPiKernelEnabled()) {
+    const piPath = getProjectPiSkillPath(workingDirectory, skillName);
+    const leftover = path.join(workingDirectory, '.opencode', 'skills', skillName, 'SKILL.md');
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(workingDirectory, '.opencode', 'skills', skillName, 'SKILL.md');
   const legacyPath = path.join(workingDirectory, '.opencode', 'skill', skillName, 'SKILL.md');
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
@@ -50,6 +84,12 @@ function getProjectSkillPath(workingDirectory, skillName) {
 }
 
 function getUserSkillDir(skillName) {
+  if (isPiKernelEnabled()) {
+    const piPath = getUserPiSkillDir(skillName);
+    const leftover = path.join(SKILL_DIR, skillName);
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(SKILL_DIR, skillName);
   const legacyPath = path.join(OPENCODE_CONFIG_DIR, 'skill', skillName);
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
@@ -57,6 +97,12 @@ function getUserSkillDir(skillName) {
 }
 
 function getUserSkillPath(skillName) {
+  if (isPiKernelEnabled()) {
+    const piPath = getUserPiSkillPath(skillName);
+    const leftover = path.join(SKILL_DIR, skillName, 'SKILL.md');
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(SKILL_DIR, skillName, 'SKILL.md');
   const legacyPath = path.join(OPENCODE_CONFIG_DIR, 'skill', skillName, 'SKILL.md');
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
@@ -634,6 +680,7 @@ function getManagedSkillRoots(workingDirectory) {
     }
   };
 
+  pushRoot(path.join(os.homedir(), '.pi', 'agent', 'skills'));
   pushRoot(SKILL_DIR);
   pushRoot(path.join(OPENCODE_CONFIG_DIR, 'skill'));
   pushRoot(path.join(os.homedir(), '.opencode', 'skills'));
@@ -652,6 +699,7 @@ function getManagedSkillRoots(workingDirectory) {
   if (workingDirectory) {
     const worktreeRoot = findWorktreeRoot(workingDirectory) || path.resolve(workingDirectory);
     for (const ancestor of getAncestors(workingDirectory, worktreeRoot)) {
+      pushRoot(path.join(ancestor, '.pi', 'skills'));
       pushRoot(path.join(ancestor, '.opencode', 'skills'));
       pushRoot(path.join(ancestor, '.opencode', 'skill'));
       pushRoot(path.join(ancestor, '.claude', 'skills'));

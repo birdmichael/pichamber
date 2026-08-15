@@ -25,6 +25,13 @@ vi.mock('./call.js', () => ({
     return entry && typeof entry === 'object' ? entry : null;
   }),
 }));
+vi.mock('./pi.js', () => ({
+  isPiSmallModelEnabled: () => false,
+  resolvePiSmallModel: vi.fn(),
+  describePiSmallModel: vi.fn(),
+  listPiAuthenticatedProviders: vi.fn(() => []),
+  callPiSmallModel: vi.fn(),
+}));
 
 const { generateSmallModelText, describeSmallModel, listAuthenticatedProviders } = await import('./index.js');
 const { readAuthFile } = await import('../opencode/auth.js');

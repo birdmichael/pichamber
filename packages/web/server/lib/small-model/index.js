@@ -6,6 +6,13 @@ import { readConfigLayers } from '../opencode/shared.js';
 import { getModelCatalog } from './catalog.js';
 import { resolveSmallModel, parseModelRef, isUsableAuthEntry, getAuthEntryForProvider } from './resolve.js';
 import { callSmallModel, resolveProviderLogin } from './call.js';
+import {
+  callPiSmallModel,
+  describePiSmallModel,
+  isPiSmallModelEnabled,
+  listPiAuthenticatedProviders,
+  resolvePiSmallModel,
+} from './pi.js';
 
 const OPENCHAMBER_SETTINGS_FILE = path.join(
   process.env.OPENCHAMBER_DATA_DIR
@@ -98,20 +105,28 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
     throw Object.assign(new Error('prompt is required'), { statusCode: 400 });
   }
 
-  const auth = readAuthFile();
-  const catalog = await getModelCatalog().catch(() => ({}));
+  const auth = isPiSmallModelEnabled() ? {} : readAuthFile();
+  let catalog = isPiSmallModelEnabled()
+    ? {}
+    : await getModelCatalog().catch(() => ({}));
 
   const explicit = parseModelRef(model);
   const resolved = explicit
     ? { ...explicit, source: 'request' }
-    : resolveSmallModel({
-      auth,
-      catalog,
-      settingsSmallModel: readSmallModelSettingsOverride(),
-      configSmallModel: readConfiguredSmallModel(directory),
-      preferredProviderID,
-      preferredModelID,
-    });
+    : (isPiSmallModelEnabled()
+      ? resolvePiSmallModel({
+        settingsSmallModel: readSmallModelSettingsOverride(),
+        preferredProviderID,
+        preferredModelID,
+      })
+      : resolveSmallModel({
+        auth,
+        catalog,
+        settingsSmallModel: readSmallModelSettingsOverride(),
+        configSmallModel: readConfiguredSmallModel(directory),
+        preferredProviderID,
+        preferredModelID,
+      }));
 
   if (!resolved) {
     throw Object.assign(
@@ -132,12 +147,33 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
   // model) is always allowed, anything else must stay on the session's
   // provider.
   if (restrictToPreferredProvider
-    && !['settings', 'config', 'request'].includes(resolved.source)
+    && !['settings', 'config', 'request', 'pi-default', 'session-model'].includes(resolved.source)
     && resolved.providerID !== preferredProviderID) {
     throw Object.assign(
       new Error('No small model available within the session provider'),
       { statusCode: 404 },
     );
+  }
+
+  if (isPiSmallModelEnabled()) {
+    const described = describePiSmallModel({
+      overrideModel: `${resolved.providerID}/${resolved.modelID}`,
+      outputReserveTokens: Number(maxOutputTokens) > 0 ? Number(maxOutputTokens) : undefined,
+    });
+    if (described) {
+      catalog = {
+        [resolved.providerID]: {
+          models: {
+            [resolved.modelID]: {
+              limit: {
+                context: described.contextTokens,
+                output: described.outputTokenLimit,
+              },
+            },
+          },
+        },
+      };
+    }
   }
 
   const outputTokens = resolveOutputTokens({
@@ -156,19 +192,30 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
     outputReserveTokens: outputTokens,
   });
 
-  const text = await callSmallModel({
-    auth,
-    catalog,
-    workingDirectory: directory,
-    providerID: resolved.providerID,
-    modelID: resolved.modelID,
-    prompt: clamped.prompt,
-    system: typeof system === 'string' && system.trim() ? system.trim() : undefined,
-    maxOutputTokens: outputTokens,
-    responseSchema,
-    timeoutMs,
-    signal,
-  });
+  const text = isPiSmallModelEnabled()
+    ? await callPiSmallModel({
+      providerID: resolved.providerID,
+      modelID: resolved.modelID,
+      prompt: clamped.prompt,
+      system: typeof system === 'string' && system.trim() ? system.trim() : undefined,
+      maxOutputTokens: outputTokens,
+      responseSchema,
+      timeoutMs,
+      signal,
+    })
+    : await callSmallModel({
+      auth,
+      catalog,
+      workingDirectory: directory,
+      providerID: resolved.providerID,
+      modelID: resolved.modelID,
+      prompt: clamped.prompt,
+      system: typeof system === 'string' && system.trim() ? system.trim() : undefined,
+      maxOutputTokens: outputTokens,
+      responseSchema,
+      timeoutMs,
+      signal,
+    });
 
   return {
     text: text.trim(),
@@ -185,6 +232,9 @@ export async function generateSmallModelText({ prompt, system, maxOutputTokens, 
  * would only ever fail (e.g. opencode free models without a token).
  */
 export function listAuthenticatedProviders() {
+  if (isPiSmallModelEnabled()) {
+    return listPiAuthenticatedProviders();
+  }
   try {
     const auth = readAuthFile();
     const ids = new Set(
@@ -226,6 +276,16 @@ const resolveReserveTokens = (outputReserveTokens, limits) => (
 );
 
 export async function describeSmallModel({ directory, preferredProviderID, preferredModelID, outputReserveTokens, overrideModel } = {}) {
+  if (isPiSmallModelEnabled()) {
+    return describePiSmallModel({
+      overrideModel,
+      settingsSmallModel: readSmallModelSettingsOverride(),
+      preferredProviderID,
+      preferredModelID,
+      outputReserveTokens,
+    });
+  }
+
   const auth = readAuthFile();
   const catalog = await getModelCatalog().catch(() => ({}));
   // A caller with its own model setting (the diff walkthrough) outranks the

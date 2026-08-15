@@ -1,5 +1,7 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 import {
   CONFIG_FILE,
   OPENCODE_CONFIG_DIR,
@@ -23,6 +25,11 @@ import {
  * Ensure project-level command directory exists
  */
 function ensureProjectCommandDir(workingDirectory) {
+  if (isPiKernelEnabled()) {
+    const projectCommandDir = path.join(workingDirectory, '.pi', 'prompts');
+    fs.mkdirSync(projectCommandDir, { recursive: true });
+    return projectCommandDir;
+  }
   const projectCommandDir = path.join(workingDirectory, '.opencode', 'commands');
   if (!fs.existsSync(projectCommandDir)) {
     fs.mkdirSync(projectCommandDir, { recursive: true });
@@ -34,30 +41,32 @@ function ensureProjectCommandDir(workingDirectory) {
   return projectCommandDir;
 }
 
-/**
- * Get project-level command path
- */
 function getProjectCommandPath(workingDirectory, commandName) {
+  if (isPiKernelEnabled()) {
+    const piPath = path.join(workingDirectory, '.pi', 'prompts', `${commandName}.md`);
+    const leftover = path.join(workingDirectory, '.opencode', 'commands', `${commandName}.md`);
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(workingDirectory, '.opencode', 'commands', `${commandName}.md`);
   const legacyPath = path.join(workingDirectory, '.opencode', 'command', `${commandName}.md`);
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
   return pluralPath;
 }
 
-/**
- * Get user-level command path
- */
 function getUserCommandPath(commandName) {
+  if (isPiKernelEnabled()) {
+    const piPath = path.join(os.homedir(), '.pi', 'agent', 'prompts', `${commandName}.md`);
+    const leftover = path.join(COMMAND_DIR, `${commandName}.md`);
+    if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
+    return piPath;
+  }
   const pluralPath = path.join(COMMAND_DIR, `${commandName}.md`);
   const legacyPath = path.join(OPENCODE_CONFIG_DIR, 'command', `${commandName}.md`);
   if (fs.existsSync(legacyPath) && !fs.existsSync(pluralPath)) return legacyPath;
   return pluralPath;
 }
 
-/**
- * Determine command scope based on where the .md file exists
- * Priority: project level > user level > null (built-in only)
- */
 function getCommandScope(commandName, workingDirectory) {
   if (workingDirectory) {
     const projectPath = getProjectCommandPath(workingDirectory, commandName);

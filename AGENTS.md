@@ -1,10 +1,12 @@
-# OpenChamber Agent Guide
+# Pichamber Agent Guide
 
 ## Purpose
 
-OpenChamber provides shared web, desktop, VS Code, hosted-mobile, and native-mobile UI surfaces for OpenCode.
+Pichamber is a desktop-first workspace for running, supervising, and reviewing AI coding work. The default kernel is [Pi](https://github.com/earendil-works/pi) (`@earendil-works/pi-coding-agent`), served in-process behind an OpenCode-shaped HTTP/SSE facade.
 
-This file contains only always-on repository rules and routing. Detailed workflows belong to project skills and module documentation.
+This file is always-on repository rules and routing. Detailed workflows belong to project skills and module documentation.
+
+Repo: `birdmichael/pichamber`. Owner: birdmichael. Never open a pull request against upstream `openchamber/openchamber`.
 
 ## Instruction Order
 
@@ -23,28 +25,33 @@ read. Skill loading is a required part of the task, not optional guidance.
 ## Runtime Boundaries
 
 - `packages/ui`: shared React UI, state, sync, and runtime contracts.
-- `packages/web`: web surfaces, OpenChamber server, managed/external OpenCode lifecycle, and CLI.
-- `packages/electron`: native desktop shell and privileged Electron boundary.
-- `packages/vscode`: extension host, webview, and runtime bridge.
-- `packages/mobile`: Capacitor iOS/Android shell; bundles the mobile web surface and connects to an existing OpenChamber server.
+- `packages/web`: in-process Pichamber server, Pi kernel facade, and leftover OpenCode process path.
+- `packages/electron`: native desktop shell (the shipping product) and privileged Electron boundary.
+- `packages/vscode`: leftover extension host; not the product target for the Pi kernel.
+- `packages/mobile`: leftover Capacitor shell; not the product target for the Pi kernel.
 - `packages/docs`: product documentation; not a Bun workspace.
 
-Shared UI calls official OpenCode APIs through `@opencode-ai/sdk/v2`. OpenChamber-owned capabilities use `RuntimeAPIs`, `runtimeFetch`, and shared browser/realtime transport helpers. Server-side upstream integrations may use their owning runtime modules.
+The UI still speaks `@opencode-ai/sdk/v2` HTTP/SSE. On the default kernel those routes are implemented by the Pi facade (`packages/web/server/lib/pi`). Pichamber-owned capabilities use `RuntimeAPIs`, `runtimeFetch`, and shared browser/realtime transport helpers.
 
-Electron starts the OpenChamber backend in-process, never as a sidecar. Development may load loopback/HMR UI; packaged builds load staged assets through `openchamber-ui://` while the loopback server remains the API backend. Keep domain backends in web/runtime modules unless behavior is inherently native.
+Electron starts the Pichamber backend in-process, never as a sidecar. Development may load loopback/HMR UI; packaged builds load staged assets through `openchamber-ui://` while the loopback server remains the API backend. Keep domain backends in web/runtime modules unless behavior is inherently native.
+
+Pi config and auth live in `~/.pi/agent` (`auth.json`, `models.json`, `pichamber.json`, `AGENTS.md`, `skills/`, `prompts/`). Project skills also live under `.agents/skills` and `.pi/skills`. Do not treat `.opencode` as the skills/commands location.
+
+`OPENCHAMBER_KERNEL` defaults to `pi`. Set `OPENCHAMBER_KERNEL=opencode` only to restore the leftover OpenCode process path. Do not mock Pi for product behavior.
 
 Shared contracts must define intentional behavior for every applicable runtime: web, desktop, VS Code, hosted mobile, and Capacitor mobile.
 
 ## Always-On Constraints
 
-- Do not modify `../opencode`; it is a separate repository.
+- Work only in `birdmichael/pichamber`. Do not PR or push upstream `openchamber/openchamber`.
 - Do not run git or GitHub commands unless the user explicitly asks.
 - Do not add dependencies unless explicitly requested.
-- Never add or log secrets, bearer tokens, pairing credentials, or sensitive user data.
+- Never add or log secrets, bearer tokens, pairing credentials, or sensitive user data. Do not print API keys from `~/.pi/agent/auth.json`.
 - Keep changes minimal and preserve unrelated worktree changes.
 - Enforce security and correctness in core/runtime logic, not only UI visibility or prompts.
 - Keep entrypoints and bridges thin; place domain logic in focused owning modules.
 - Update owning documentation when module ownership, contracts, or invariants change.
+- Use the real Pi model/provider already configured in `~/.pi/agent`. Do not invent a second provider.
 
 ## Correctness Invariants
 
@@ -62,6 +69,7 @@ Before changing a module, search for the nearest `DOCUMENTATION.md`; before pack
 
 High-value anchors:
 
+- Pi kernel: `docs/PICHAMBER.md`
 - Sync: `packages/ui/src/sync/DOCUMENTATION.md`
 - Stores: `packages/ui/src/stores/DOCUMENTATION.md`
 - CLI: `packages/web/bin/lib/DOCUMENTATION.md`
@@ -83,7 +91,7 @@ process violation.
 |---|---|
 | Source/dependency changes, exports or package contracts, build/generated assets, or module ownership | `openchamber-change-discipline` |
 | CLI commands, prompts, terminal output, non-TTY, `--quiet`, or `--json` behavior | `clack-cli-patterns` |
-| Shared UI data access, OpenCode SDK or server routes, `RuntimeAPIs`, runtime auth/URLs, bridges, or runtime switching | `ui-api-decoupling` |
+| Shared UI data access, Pi facade or leftover OpenCode routes, `RuntimeAPIs`, runtime auth/URLs, bridges, or runtime switching | `ui-api-decoupling` |
 | Electron main/preload, IPC, native UI, updater, deep links, SSH/tunnels, packaging, or child processes | `desktop-shell` |
 | Session sync, bootstrap/reconnect, reducers, polling, optimistic state, queues, live status, reconciliation, or directory-scoped caches | `sync-state-invariants` |
 | Render/store/event hot paths, large lists, caches/indexes, or reported lag, freezes, CPU/memory, startup, or performance regressions | `performance-engineering` |
@@ -134,3 +142,5 @@ Before creating or updating a pull request, read `CONTRIBUTING.md` and
 current evidence for the final PR HEAD; do not make the reviewer reconstruct
 intent, affected surfaces, applicable guidance, validation, visual behavior,
 or failure and rollback considerations from the diff alone.
+
+Open PRs only on `birdmichael/pichamber`. Never target upstream `openchamber/openchamber`.

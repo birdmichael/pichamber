@@ -1,9 +1,16 @@
 # Small Model
 
-Server-side direct LLM calls that reuse the user's existing OpenCode provider
-logins (`~/.local/share/opencode/auth.json`). OpenCode uses a "small model"
-internally (titles, summaries) but does not expose it through the SDK or
-plugins — this module replicates that mechanism as an OpenChamber runtime API.
+Server-side direct LLM calls for utility text (titles, summaries, walkthroughs).
+
+On the default Pi kernel, resolution uses the current Pi model from
+`~/.pi/agent` (`pichamber.json` defaults, then the first `models.json` entry).
+`GET /api/small-model` reports that model and its provider as authenticated.
+Generation goes through `@earendil-works/pi-coding-agent` `ModelRuntime` — the
+same runtime as chat — and does not invent a second provider or mock Pi.
+
+The leftover OpenCode path still reuses OpenCode provider logins
+(`~/.local/share/opencode/auth.json`) and mirrors OpenCode's `getSmallModel`
+chain. That path is only used when `OPENCHAMBER_KERNEL=opencode`.
 
 ## Security boundary
 
@@ -14,8 +21,9 @@ other runtime API.
 
 ## Files
 
-- `index.js` — orchestration: `generateSmallModelText()` / `describeSmallModel()`.
-- `resolve.js` — model selection, mirroring OpenCode's `getSmallModel` chain:
+- `index.js` — orchestration: `generateSmallModelText()` / `describeSmallModel()`. On Pi this delegates to `pi.js`.
+- `pi.js` — Pi kernel resolution from `~/.pi/agent` and `ModelRuntime.complete`.
+- `resolve.js` — leftover OpenCode model selection, mirroring `getSmallModel`:
   0. OpenChamber's own settings override (Settings → Sessions → Small Model):
      when `smallModelUseDefault` is `false`, `smallModelOverride`
      (`provider/model`) outranks everything below. Sanitized in

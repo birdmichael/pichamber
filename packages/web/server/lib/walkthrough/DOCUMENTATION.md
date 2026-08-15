@@ -100,6 +100,11 @@ When a change consists only of generated files, generation is refused with
 
 ## Model selection
 
+On the default Pi kernel, the walkthrough uses the current Pi model
+(`~/.pi/agent` via `GET /api/small-model` / `describeSmallModel`). There is no
+separate OpenCode "small model" login. An explicit walkthrough override still
+outranks that default.
+
 The walkthrough has its own model setting (Settings → Sessions → Changes
 Walkthrough Model), read by `model-settings.js`:
 
