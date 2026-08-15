@@ -43,7 +43,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     '/command', '/session', '/provider', '/config', '/path', '/event',
     '/global', '/project', '/agent', '/skill', '/mcp', '/lsp', '/vcs',
     '/file', '/find', '/pty', '/permission', '/question', '/experimental',
-    '/log', '/instance', '/formatter', '/tool',
+    '/log', '/instance', '/formatter', '/tool', '/user',
   ];
   const uiAuthPaths = ['/auth/session', '/auth/passkey', '/auth/url-token'];
   app.use((req, _res, next) => {
@@ -84,6 +84,21 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.get('/api/health', handle(async (_req, res) => {
     json(res, 200, { healthy: true, kernel: 'pi' });
+  }));
+
+  // OpenCode SDK calls GET /user (and /api/user). A missing handler used to
+  // fall through to the generic proxy, which self-fetched this same process
+  // and 500'd after ~8s.
+  const piUser = () => ({
+    id: 'usr_pi',
+    email: 'pi@localhost',
+    name: 'Pichamber',
+  });
+  app.get('/api/user', handle(async (_req, res) => {
+    json(res, 200, piUser());
+  }));
+  app.get('/user', handle(async (_req, res) => {
+    json(res, 200, piUser());
   }));
 
   app.get('/api/auth/session', handle(async (_req, res) => {

@@ -176,4 +176,57 @@ describe('session goal live activity gate', () => {
     });
     runtime.stop();
   });
+
+  it('reads session state in-process on the Pi kernel without fetching localhost', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('fetch should not be called on the Pi kernel');
+    });
+    const host = {
+      getSession: vi.fn(() => ({ info: session })),
+      getStatus: vi.fn(() => ({})),
+      listSessions: vi.fn(() => []),
+      getMessages: vi.fn(() => [{
+        info: {
+          id: 'msg_assistant',
+          sessionID: SESSION_ID,
+          role: 'assistant',
+          providerID: 'provider',
+          modelID: 'model',
+          time: { completed: 2 },
+          tokens: { input: 1, output: 1, cache: { read: 0 } },
+        },
+        parts: [{ type: 'text', text: 'The task is verified complete.' }],
+      }]),
+      updateSession: vi.fn(() => ({ info: session })),
+    };
+    const service = {
+      generateSmallModelText: vi.fn(async () => ({
+        text: '{"verdict":"complete","note":"Task verified complete"}',
+        providerID: 'provider',
+        modelID: 'model',
+      })),
+    };
+    vi.stubGlobal('fetch', fetchImpl);
+    const runtime = createSessionGoalRuntime({
+      buildOpenCodeUrl: (pathname) => `http://127.0.0.1:3901${pathname}`,
+      getOpenCodeAuthHeaders: () => ({}),
+      getSmallModelService: async () => service,
+      getPiHost: () => host,
+      isPiKernelEnabled: () => true,
+      idleQuietMs: 10,
+    });
+
+    runtime.processPayload({
+      type: 'session.status',
+      properties: { sessionID: SESSION_ID, status: { type: 'idle' }, directory: DIRECTORY },
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(host.getSession).toHaveBeenCalled();
+    expect(host.getMessages).toHaveBeenCalledWith(SESSION_ID);
+    expect(service.generateSmallModelText).toHaveBeenCalledOnce();
+    expect(host.updateSession).toHaveBeenCalled();
+    runtime.stop();
+  });
 });

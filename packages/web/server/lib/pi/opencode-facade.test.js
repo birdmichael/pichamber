@@ -213,4 +213,25 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('serves an OpenCode-shaped user object on /user and /api/user', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const bare = await fetch(`${url}/user`);
+      expect(bare.status).toBe(200);
+      const user = await bare.json();
+      expect(user).toMatchObject({
+        id: expect.any(String),
+        email: expect.any(String),
+        name: expect.any(String),
+      });
+
+      const prefixed = await fetch(`${url}/api/user`);
+      expect(prefixed.status).toBe(200);
+      expect(await prefixed.json()).toEqual(user);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });

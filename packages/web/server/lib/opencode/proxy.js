@@ -850,6 +850,20 @@ export const registerOpenCodeProxy = (app, deps) => {
     next();
   });
 
+  if (piKernel) {
+    // Unmatched /api routes must not self-proxy to this same bun process.
+    // That deadlock is what turned GET /user into a ~8s 500.
+    app.use('/api', (req, res, next) => {
+      if (res.headersSent) return next();
+      res.status(404).json({
+        error: 'unsupported',
+        message: `${req.method} ${req.path} is not implemented on the Pi kernel`,
+        kernel: 'pi',
+      });
+    });
+    return;
+  }
+
   app.use('/api', applyProxyResponseDeadline);
   app.post('/api/provider/:providerID/oauth/callback', interactiveOAuthProxy);
   // OpenCode's native MCP OAuth flow: the request blocks until the user

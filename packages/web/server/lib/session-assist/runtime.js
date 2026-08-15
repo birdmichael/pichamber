@@ -12,6 +12,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { dispatchPiSessionRequest, resolvePiHost } from '../pi/in-process-session.js';
+
 const OPENCHAMBER_SETTINGS_FILE = path.join(
   process.env.OPENCHAMBER_DATA_DIR
     ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
@@ -149,6 +151,8 @@ export const createSessionAssistRuntime = ({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   getSmallModelService,
+  getPiHost = null,
+  isPiKernelEnabled = null,
   quietMs = IDLE_QUIET_MS,
 }) => {
   const timers = new Map();
@@ -163,9 +167,16 @@ export const createSessionAssistRuntime = ({
     }
   };
 
-  const openCodeFetch = async (path, { directory, method = 'GET', body } = {}) => {
-    const base = buildOpenCodeUrl(path, '');
-    const url = directory ? `${base}?directory=${encodeURIComponent(directory)}` : base;
+  const openCodeFetch = async (fetchPath, { directory, method = 'GET', body, query } = {}) => {
+    const host = resolvePiHost(getPiHost, isPiKernelEnabled);
+    if (host) {
+      return dispatchPiSessionRequest(host, fetchPath, { directory, method, body, query });
+    }
+    const base = buildOpenCodeUrl(fetchPath, '');
+    const params = new URLSearchParams(query || {});
+    if (directory) params.set('directory', directory);
+    const search = params.toString();
+    const url = search ? `${base}?${search}` : base;
     const response = await fetch(url, {
       method,
       headers: {
@@ -177,22 +188,16 @@ export const createSessionAssistRuntime = ({
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!response.ok) {
-      throw new Error(`OpenCode ${method} ${path} failed with ${response.status}`);
+      throw new Error(`OpenCode ${method} ${fetchPath} failed with ${response.status}`);
     }
     return response.json().catch(() => null);
   };
 
   const fetchRecentMessages = async (sessionId, directory) => {
-    const base = buildOpenCodeUrl(`/session/${encodeURIComponent(sessionId)}/message`, '');
-    const params = new URLSearchParams({ limit: String(TRANSCRIPT_MESSAGE_LIMIT) });
-    if (directory) params.set('directory', directory);
-    const response = await fetch(`${base}?${params.toString()}`, {
-      method: 'GET',
-      headers: { Accept: 'application/json', ...getOpenCodeAuthHeaders() },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    const messages = await response.json().catch(() => null);
+    const messages = await openCodeFetch(`/session/${encodeURIComponent(sessionId)}/message`, {
+      directory,
+      query: { limit: String(TRANSCRIPT_MESSAGE_LIMIT) },
+    }).catch(() => null);
     return Array.isArray(messages) ? messages : null;
   };
 

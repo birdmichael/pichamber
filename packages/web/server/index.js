@@ -740,16 +740,31 @@ const maybeSendPushForTrigger = (...args) => notificationTriggerRuntime.maybeSen
 const setAutoAcceptSession = (sessionId, enabled) => permissionAutoAcceptRuntime.setSessionPolicy(sessionId, enabled);
 clearPendingPushBadge = () => notificationTriggerRuntime.clearPendingPushBadge();
 
+const piKernelEnabled = isPiKernelEnabled();
+const piKernel = piKernelEnabled
+  ? createPiKernel({
+      defaultDirectory: process.cwd(),
+      mock: isPiMockEnabled(),
+    })
+  : null;
+if (piKernel) {
+  console.log(`[pichamber] kernel=pi mock=${piKernel.mock ? 'yes' : 'no'} (OpenCode process not required)`);
+}
+
 const sessionAssistRuntime = createSessionAssistRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   getSmallModelService: async () => import('./lib/small-model/index.js'),
+  getPiHost: () => piKernel?.host,
+  isPiKernelEnabled: () => piKernelEnabled,
 });
 
 const sessionGoalRuntime = createSessionGoalRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   getSmallModelService: async () => import('./lib/small-model/index.js'),
+  getPiHost: () => piKernel?.host,
+  isPiKernelEnabled: () => piKernelEnabled,
   emitGoalNotification: async ({ sessionId, directory, status, goal }) => {
     // The goal settle notification replaces the per-turn ready notifications
     // (suppressed while the goal is active) — so it obeys the same toggle.
@@ -789,17 +804,6 @@ const contextObligatoryRuntime = createContextObligatoryRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
 });
-
-const piKernelEnabled = isPiKernelEnabled();
-const piKernel = piKernelEnabled
-  ? createPiKernel({
-      defaultDirectory: process.cwd(),
-      mock: isPiMockEnabled(),
-    })
-  : null;
-if (piKernel) {
-  console.log(`[pichamber] kernel=pi mock=${piKernel.mock ? 'yes' : 'no'} (OpenCode process not required)`);
-}
 
 const globalMessageStreamHub = piKernel
   ? piKernel.bus

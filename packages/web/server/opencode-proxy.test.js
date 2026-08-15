@@ -706,4 +706,35 @@ describe('OpenCode proxy SSE forwarding', () => {
 
     expect(response.status).toBe(504);
   });
+
+  it('does not self-proxy unmatched /api/user when the Pi kernel is set', async () => {
+    const app = express();
+    registerOpenCodeProxy(app, {
+      fs: {},
+      os: {},
+      path,
+      OPEN_CODE_READY_GRACE_MS: 0,
+      getRuntime: () => ({
+        openCodePort: null,
+        isOpenCodeReady: true,
+        openCodeNotReadySince: 0,
+        isRestartingOpenCode: false,
+      }),
+      getOpenCodeAuthHeaders: () => ({}),
+      buildOpenCodeUrl: (requestPath) => `http://127.0.0.1:3901${requestPath}`,
+      ensureOpenCodeApiPrefix: () => {},
+      piKernel: {
+        register() {},
+      },
+    });
+    proxyServer = await listen(app);
+    const proxyPort = proxyServer.address().port;
+
+    const started = Date.now();
+    const response = await fetch(`http://127.0.0.1:${proxyPort}/api/user`);
+    const elapsed = Date.now() - started;
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ kernel: 'pi', error: 'unsupported' });
+    expect(elapsed).toBeLessThan(1000);
+  });
 });

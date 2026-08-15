@@ -19,6 +19,7 @@ import os from 'os';
 import path from 'path';
 
 import { GOAL_OBJECTIVE_CHAR_LIMIT, readObjective } from './objectives.js';
+import { dispatchPiSessionRequest, resolvePiHost } from '../pi/in-process-session.js';
 
 const OPENCHAMBER_SETTINGS_FILE = path.join(
   process.env.OPENCHAMBER_DATA_DIR
@@ -249,6 +250,8 @@ export const createSessionGoalRuntime = ({
   getOpenCodeAuthHeaders,
   getSmallModelService,
   emitGoalNotification,
+  getPiHost = null,
+  isPiKernelEnabled = null,
   idleQuietMs = IDLE_QUIET_MS,
   kickoffQuietMs = KICKOFF_QUIET_MS,
   maxAutoTurns = MAX_AUTO_TURNS,
@@ -266,6 +269,10 @@ export const createSessionGoalRuntime = ({
   };
 
   const openCodeFetch = async (fetchPath, { directory, method = 'GET', body, query } = {}) => {
+    const host = resolvePiHost(getPiHost, isPiKernelEnabled);
+    if (host) {
+      return dispatchPiSessionRequest(host, fetchPath, { directory, method, body, query });
+    }
     const base = buildOpenCodeUrl(fetchPath, '');
     const params = new URLSearchParams(query || {});
     if (directory) params.set('directory', directory);
