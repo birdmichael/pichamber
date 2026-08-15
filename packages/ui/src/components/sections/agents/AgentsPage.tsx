@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui';
-import { useAgentsStore, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
+import { useAgentsStore, isAgentBuiltIn, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
 import { ModelSelector } from './ModelSelector';
 import { useI18n } from '@/lib/i18n';
@@ -54,6 +55,7 @@ const getVariantOptionsForModel = (
 };
 export const AgentsPage: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const providers = useConfigStore((state) => state.providers) as AgentVariantProvider[];
   const {
     selectedAgentName,
@@ -75,6 +77,10 @@ export const AgentsPage: React.FC = () => {
 
   const selectedAgent = selectedAgentName ? getAgentByName(selectedAgentName) : null;
   const isNewAgent = Boolean(agentDraft && agentDraft.name === selectedAgentName && !selectedAgent);
+  const isPiNativeReadOnly = isPiKernel && !isNewAgent && (
+    (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === 'pi'
+  );
+
 
   const [draftName, setDraftName] = React.useState('');
   const [draftScope, setDraftScope] = React.useState<AgentScope>('user');
@@ -199,6 +205,9 @@ export const AgentsPage: React.FC = () => {
   }, [description, draftName, draftScope, isNewAgent, mode, model, prompt, temperature, topP, variant]);
 
   const handleSave = async () => {
+    if (isPiKernel) {
+      return;
+    }
     const agentName = isNewAgent ? draftName.trim().replace(/\s+/g, '-') : selectedAgentName?.trim();
 
     if (!agentName) {
@@ -275,7 +284,11 @@ export const AgentsPage: React.FC = () => {
   return (
     <SettingsPageLayout
       title={isNewAgent ? t('settings.agents.page.title.new') : selectedAgentName}
-      description={isNewAgent ? t('settings.agents.page.subtitle.new') : t('settings.agents.page.subtitle.edit')}
+      description={isNewAgent
+        ? t('settings.agents.page.subtitle.new')
+        : isPiNativeReadOnly
+          ? t('settings.agents.page.subtitle.piNative')
+          : t('settings.agents.page.subtitle.edit')}
       showSaveStatus={false}
     >
       <SettingsSection
@@ -295,9 +308,10 @@ export const AgentsPage: React.FC = () => {
                 onChange={(e) => setDraftName(e.target.value)}
                 placeholder={t('settings.agents.page.field.agentNamePlaceholder')}
                 className="h-7 w-40 px-2"
+                disabled={isPiKernel}
               />
             </div>
-            <Select value={draftScope} onValueChange={(v) => setDraftScope(v as AgentScope)}>
+            <Select value={draftScope} onValueChange={(v) => setDraftScope(v as AgentScope)} disabled={isPiKernel}>
               <SelectTrigger size={SETTINGS_SELECT_SIZE} className="w-fit min-w-[100px]">
                 <SelectValue placeholder={t('settings.agents.page.field.scopePlaceholder')} />
               </SelectTrigger>
@@ -329,6 +343,7 @@ export const AgentsPage: React.FC = () => {
             placeholder={t('settings.agents.page.field.descriptionPlaceholder')}
             rows={2}
             className="w-full resize-none min-h-[60px] bg-transparent"
+            disabled={isPiNativeReadOnly}
           />
         </SettingsStackedField>
 
@@ -342,9 +357,9 @@ export const AgentsPage: React.FC = () => {
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'primary', label: t('settings.agents.page.mode.primary') },
-              { value: 'subagent', label: t('settings.agents.page.mode.subagent') },
-              { value: 'all', label: t('settings.agents.page.mode.all') },
+              { value: 'primary', label: t('settings.agents.page.mode.primary'), disabled: isPiNativeReadOnly },
+              { value: 'subagent', label: t('settings.agents.page.mode.subagent'), disabled: isPiNativeReadOnly },
+              { value: 'all', label: t('settings.agents.page.mode.all'), disabled: isPiNativeReadOnly },
             ]}
           />
         </SettingsStackedField>
@@ -361,6 +376,7 @@ export const AgentsPage: React.FC = () => {
           <ModelSelector
             providerId={parseModelIdentifier(model)?.providerId ?? ''}
             modelId={parseModelIdentifier(model)?.modelId ?? ''}
+            disabled={isPiNativeReadOnly}
             onChange={(providerId: string, modelId: string) => {
               if (providerId && modelId) {
                 setModel(`${providerId}/${modelId}`);
@@ -387,6 +403,7 @@ export const AgentsPage: React.FC = () => {
             <Select
               value={selectedVariantValue}
               onValueChange={(value) => setVariant(value === '__default' ? '' : value)}
+              disabled={isPiNativeReadOnly}
             >
               <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                 <SelectValue placeholder={t('settings.agents.page.field.variantPlaceholder')}>
@@ -406,10 +423,10 @@ export const AgentsPage: React.FC = () => {
                 value={variant}
                 onChange={(event) => setVariant(event.target.value)}
                 placeholder={t('settings.agents.page.field.variantPlaceholder')}
-                disabled={!model && !variant}
+                disabled={isPiNativeReadOnly || (!model && !variant)}
                 className="h-8 w-40 rounded-md px-3"
               />
-              {variant && (
+              {variant && !isPiNativeReadOnly && (
                 <Button
                   size="sm"
                   type="button"
@@ -448,8 +465,9 @@ export const AgentsPage: React.FC = () => {
             placeholder="—"
             emptyLabel="—"
             className="w-16"
+            disabled={isPiNativeReadOnly}
           />
-          {temperature !== undefined && (
+          {temperature !== undefined && !isPiNativeReadOnly && (
             <Button
               size="sm"
               type="button"
@@ -486,8 +504,9 @@ export const AgentsPage: React.FC = () => {
             placeholder="—"
             emptyLabel="—"
             className="w-16"
+            disabled={isPiNativeReadOnly}
           />
-          {topP !== undefined && (
+          {topP !== undefined && !isPiNativeReadOnly && (
             <Button
               size="sm"
               type="button"
@@ -513,23 +532,26 @@ export const AgentsPage: React.FC = () => {
           placeholder={t('settings.agents.page.field.systemPromptPlaceholder')}
           rows={8}
           className="w-full font-mono typography-meta min-h-[120px] max-h-[60vh] bg-transparent resize-y"
+          disabled={isPiNativeReadOnly}
         />
       </SettingsSection>
 
-      {!isNewAgent && selectedAgent && (
+      {!isNewAgent && selectedAgent && !isPiNativeReadOnly && (
         <AgentPermissionsEditor agent={selectedAgent} />
       )}
 
-      <div className="pb-8">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || !isDirty}
-          size="xs"
-          className="!font-normal"
-        >
-          {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}
-        </Button>
-      </div>
+      {!isPiKernel && (
+        <div className="pb-8">
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || !isDirty}
+            size="xs"
+            className="!font-normal"
+          >
+            {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}
+          </Button>
+        </div>
+      )}
     </SettingsPageLayout>
   );
 };

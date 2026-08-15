@@ -5,7 +5,8 @@ import {
   SettingsCheckboxRow,
   SETTINGS_OPTION_STACK_CLASS,
 } from '@/components/sections/shared/SettingsSection';
-import { recordDeferredOpenCodeRestart } from '@/lib/opencode/deferredRestart';
+import { toast } from '@/components/ui';
+import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
@@ -17,9 +18,8 @@ import { useI18n } from '@/lib/i18n';
  * belong together and not under the CLI's own configuration — the binary path
  * is about which OpenCode runs, these are about what it can do.
  *
- * A toggle is written immediately but only reaches agents once OpenCode
- * restarts, so each one records a pending restart rather than implying the
- * change is already live.
+ * A toggle is written immediately, then Pi is reloaded so the change
+ * reaches agents without a deferred restart banner.
  */
 export const OpenChamberToolsSettings: React.FC = () => {
   const { t } = useI18n();
@@ -30,15 +30,39 @@ export const OpenChamberToolsSettings: React.FC = () => {
 
   const handleAgentControlToolChange = React.useCallback((enabled: boolean) => {
     setAgentControlToolEnabled(enabled);
-    void updateDesktopSettings({ agentControlToolEnabled: enabled });
-    recordDeferredOpenCodeRestart('cli', { id: 'agent-control-tool' });
-  }, [setAgentControlToolEnabled]);
+    void (async () => {
+      try {
+        await updateDesktopSettings({ agentControlToolEnabled: enabled });
+        await reloadOpenCodeConfiguration({
+          message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
+        });
+        toast.success(t('settings.openchamber.opencodeCli.toast.savedReloaded'));
+      } catch (error) {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : t('settings.view.pendingRestart.applyFailed');
+        toast.error(message);
+      }
+    })();
+  }, [setAgentControlToolEnabled, t]);
 
   const handleAgentWebToolChange = React.useCallback((enabled: boolean) => {
     setAgentWebToolEnabled(enabled);
-    void updateDesktopSettings({ agentWebToolEnabled: enabled });
-    recordDeferredOpenCodeRestart('cli', { id: 'agent-web-tool' });
-  }, [setAgentWebToolEnabled]);
+    void (async () => {
+      try {
+        await updateDesktopSettings({ agentWebToolEnabled: enabled });
+        await reloadOpenCodeConfiguration({
+          message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
+        });
+        toast.success(t('settings.openchamber.opencodeCli.toast.savedReloaded'));
+      } catch (error) {
+        const message = error instanceof Error && error.message
+          ? error.message
+          : t('settings.view.pendingRestart.applyFailed');
+        toast.error(message);
+      }
+    })();
+  }, [setAgentWebToolEnabled, t]);
 
   return (
     <SettingsSection title={t('settings.openchamber.tools.title')}>

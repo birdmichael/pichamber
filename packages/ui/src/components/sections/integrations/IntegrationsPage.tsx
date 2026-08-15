@@ -1,6 +1,7 @@
 import React from 'react';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { ComingSoonMessengersSection } from './ComingSoonMessengersSection';
 import { ThirdPartyIntegrationsSection } from './ThirdPartyIntegrationsSection';
 
@@ -14,6 +15,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({
   onOpenPluginManager,
 }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
 
   return (
     <SettingsPageLayout
@@ -22,10 +24,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({
       showSaveStatus={false}
     >
       <ComingSoonMessengersSection />
-      <ThirdPartyIntegrationsSection
-        onOpenProviderSetup={onOpenProviderSetup}
-        onOpenPluginManager={onOpenPluginManager}
-      />
+      {!isPiKernel && (
+        <ThirdPartyIntegrationsSection
+          onOpenProviderSetup={onOpenProviderSetup}
+          onOpenPluginManager={onOpenPluginManager}
+        />
+      )}
     </SettingsPageLayout>
   );
 };

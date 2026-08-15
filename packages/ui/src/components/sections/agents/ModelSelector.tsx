@@ -27,6 +27,7 @@ interface ModelSelectorProps {
     placeholder?: string;
     tooltipsEnabled?: boolean;
     dropdownPortalToBody?: boolean;
+    disabled?: boolean;
     /**
      * Drop the model name and the chevron, leaving the provider logo. For
      * headers that run out of room before they run out of controls — the logo
@@ -47,6 +48,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     tooltipsEnabled = true,
     dropdownPortalToBody = false,
     compact = false,
+    disabled = false,
 }) => {
     const { t } = useI18n();
     const { isReady, isUnavailable } = useOpenCodeReadiness();
@@ -140,8 +142,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             <>
                 <button
                     type="button"
-                    onClick={isReady ? () => setIsMobilePanelOpen(true) : undefined}
-                    disabled={!isReady}
+                    onClick={isReady && !disabled ? () => setIsMobilePanelOpen(true) : undefined}
+                    disabled={!isReady || disabled}
                     className={cn(
                         dropdownTriggerVariants(),
                         'w-full',
@@ -175,13 +177,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
 
     return (
-        <DropdownMenu open={isReady && isDropdownOpen} onOpenChange={isReady ? setIsDropdownOpen : undefined}>
+        <DropdownMenu open={isReady && !disabled && isDropdownOpen} onOpenChange={isReady && !disabled ? setIsDropdownOpen : undefined}>
             <DropdownMenuTrigger asChild>
                 <div
                     className={cn(
                         dropdownTriggerVariants({ size: 'sm' }),
                         'min-w-0 w-fit',
-                        !isReady && 'opacity-60 cursor-not-allowed',
+                        (!isReady || disabled) && 'opacity-60 cursor-not-allowed',
                         className,
                     )}
                     // The name is gone from the trigger, so it has to stay

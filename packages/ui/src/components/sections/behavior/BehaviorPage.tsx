@@ -30,7 +30,7 @@ import {
   SETTINGS_SELECT_SIZE,
 } from '@/components/sections/shared/SettingsSection';
 
-const AGENTS_MD_PATH = '~/.config/opencode/AGENTS.md';
+const AGENTS_MD_PATH = '~/.pi/agent/AGENTS.md';
 
 const readApiError = async (response: Response, fallback: string) => {
   const data = await response.json().catch(() => null) as { error?: unknown } | null;

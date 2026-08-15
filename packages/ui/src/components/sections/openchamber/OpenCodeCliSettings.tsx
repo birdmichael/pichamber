@@ -12,7 +12,7 @@ import {
 } from '@/components/sections/shared/SettingsSection';
 import { isDesktopShell, requestFileAccess } from '@/lib/desktop';
 import { updateDesktopSettings } from '@/lib/persistence';
-import { recordDeferredOpenCodeRestart } from '@/lib/opencode/deferredRestart';
+import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
@@ -88,8 +88,15 @@ export const OpenCodeCliSettings: React.FC = () => {
         ? trimmed.slice(1, -1).trim()
         : trimmed;
       await updateDesktopSettings({ opencodeBinary: unquoted });
-      recordDeferredOpenCodeRestart('cli', { id: 'opencode-binary' });
-      toast.success(t('settings.view.pendingRestart.saved'));
+      await reloadOpenCodeConfiguration({
+        message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
+      });
+      toast.success(t('settings.openchamber.opencodeCli.toast.savedReloaded'));
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : t('settings.view.pendingRestart.applyFailed');
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }

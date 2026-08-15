@@ -81,6 +81,9 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
 
   app.post('/api/config/agents/:name', async (req, res) => {
     try {
+      if (isPiKernelEnabled()) {
+        return res.status(400).json({ error: 'Pi kernel uses a single native agent', kernel: 'pi' });
+      }
       const agentName = req.params.name;
       const { scope, ...config } = req.body;
       const { directory, error } = await resolveProjectDirectory(req);
@@ -104,6 +107,9 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
 
   app.patch('/api/config/agents/:name', async (req, res) => {
     try {
+      if (isPiKernelEnabled()) {
+        return res.status(400).json({ error: 'Pi kernel uses a single native agent', kernel: 'pi' });
+      }
       const agentName = req.params.name;
       const updates = req.body;
       const { directory, error } = await resolveProjectDirectory(req);
@@ -131,6 +137,9 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
 
   app.delete('/api/config/agents/:name', async (req, res) => {
     try {
+      if (isPiKernelEnabled()) {
+        return res.status(400).json({ error: 'Pi kernel uses a single native agent', kernel: 'pi' });
+      }
       const agentName = req.params.name;
       const { directory, error } = await resolveProjectDirectory(req);
       if (!directory) {

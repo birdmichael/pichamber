@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useAgentsStore, isAgentBuiltIn, isAgentHidden, type AgentScope, type AgentDraft } from '@/stores/useAgentsStore';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import type { Agent } from '@opencode-ai/sdk/v2';
@@ -104,6 +105,7 @@ const rulesetToPermissionConfig = (ruleset: unknown): AgentDraft['permission'] =
 
 export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const [renameDialogAgent, setRenameDialogAgent] = React.useState<Agent | null>(null);
   const [renameNewName, setRenameNewName] = React.useState('');
   const [confirmActionAgent, setConfirmActionAgent] = React.useState<Agent | null>(null);
@@ -357,14 +359,16 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
         <SettingsProjectSelector className="mb-3" />
         <div className="flex items-center justify-between gap-2">
           <span className="typography-meta text-muted-foreground">{t('settings.agents.sidebar.total', { count: visibleAgents.length })}</span>
-          <Button size="sm"
-            data-settings-item="agents.create"
-            variant="ghost"
-            className="h-7 w-7 px-0 -my-1 text-muted-foreground"
-            onClick={handleCreateNew}
-          >
-            <Icon name="add" className="h-3.5 w-3.5" />
-          </Button>
+          {!isPiKernel && (
+            <Button size="sm"
+              data-settings-item="agents.create"
+              variant="ghost"
+              className="h-7 w-7 px-0 -my-1 text-muted-foreground"
+              onClick={handleCreateNew}
+            >
+              <Icon name="add" className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -392,8 +396,8 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
                       onItemSelect?.();
 
                     }}
-                    onReset={() => handleResetAgent(agent)}
-                    onDuplicate={() => handleDuplicateAgent(agent)}
+                    onReset={isPiKernel ? undefined : () => handleResetAgent(agent)}
+                    onDuplicate={isPiKernel ? undefined : () => handleDuplicateAgent(agent)}
                     getAgentModeIcon={getAgentModeIcon}
                     isMenuOpen={openMenuAgent === agent.name}
                     onMenuOpenChange={(open) => setOpenMenuAgent(open ? agent.name : null)}
@@ -426,9 +430,9 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
                           onItemSelect?.();
 
                         }}
-                        onRename={() => handleOpenRenameDialog(agent)}
-                        onDelete={() => handleDeleteAgent(agent)}
-                        onDuplicate={() => handleDuplicateAgent(agent)}
+                        onRename={isPiKernel ? undefined : () => handleOpenRenameDialog(agent)}
+                        onDelete={isPiKernel ? undefined : () => handleDeleteAgent(agent)}
+                        onDuplicate={isPiKernel ? undefined : () => handleDuplicateAgent(agent)}
                         getAgentModeIcon={getAgentModeIcon}
                         isMenuOpen={openMenuAgent === agent.name}
                         onMenuOpenChange={(open) => setOpenMenuAgent(open ? agent.name : null)}
@@ -448,9 +452,9 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
                       onItemSelect?.();
 
                     }}
-                    onRename={() => handleOpenRenameDialog(agent)}
-                    onDelete={() => handleDeleteAgent(agent)}
-                    onDuplicate={() => handleDuplicateAgent(agent)}
+                    onRename={isPiKernel ? undefined : () => handleOpenRenameDialog(agent)}
+                    onDelete={isPiKernel ? undefined : () => handleDeleteAgent(agent)}
+                    onDuplicate={isPiKernel ? undefined : () => handleDuplicateAgent(agent)}
                     getAgentModeIcon={getAgentModeIcon}
                     isMenuOpen={openMenuAgent === agent.name}
                     onMenuOpenChange={(open) => setOpenMenuAgent(open ? agent.name : null)}
@@ -540,7 +544,7 @@ interface AgentListItemProps {
   onDelete?: () => void;
   onReset?: () => void;
   onRename?: () => void;
-  onDuplicate: () => void;
+  onDuplicate?: () => void;
   getAgentModeIcon: (mode?: string) => React.ReactNode;
   isMenuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
@@ -562,6 +566,7 @@ const AgentListItem: React.FC<AgentListItemProps> = ({
   const extAgent = agent as Agent & { scope?: AgentScope };
   const isMobile = isMobileDeviceViaCSS();
   const [isContextMenuOpen, setIsContextMenuOpen] = React.useState(false);
+  const hasMenuActions = Boolean(onRename || onDuplicate || onReset || onDelete);
   const renderMenuItems = (Item: React.ElementType) => (
     <>
       {onRename && (
@@ -570,10 +575,12 @@ const AgentListItem: React.FC<AgentListItemProps> = ({
           {t('settings.common.actions.rename')}
         </Item>
       )}
-      <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDuplicate(); }}>
-        <Icon name="file-copy" className="h-4 w-4 mr-px" />
-        {t('settings.common.actions.duplicate')}
-      </Item>
+      {onDuplicate && (
+        <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDuplicate(); }}>
+          <Icon name="file-copy" className="h-4 w-4 mr-px" />
+          {t('settings.common.actions.duplicate')}
+        </Item>
+      )}
       {onReset && (
         <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onReset(); }}>
           <Icon name="restart" className="h-4 w-4 mr-px" />
@@ -591,7 +598,7 @@ const AgentListItem: React.FC<AgentListItemProps> = ({
   
   return (
     <ContextMenu open={isContextMenuOpen} onOpenChange={setIsContextMenuOpen}>
-      <ContextMenuTrigger render={<div className={cn('group relative flex items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover')} onContextMenu={!isMobile ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
+      <ContextMenuTrigger render={<div className={cn('group relative flex items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover')} onContextMenu={!isMobile && hasMenuActions ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
       <div className="flex min-w-0 flex-1 items-center">
         <button
           onClick={onSelect}
@@ -617,24 +624,28 @@ const AgentListItem: React.FC<AgentListItemProps> = ({
           )}
         </button>
 
-        <DropdownMenu open={isMenuOpen} onOpenChange={(open) => { if (open) setIsContextMenuOpen(false); onMenuOpenChange(open); }}>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm"
-              variant="ghost"
-              className="h-6 w-6 px-0 flex-shrink-0 -mr-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
-            >
-              <Icon name="more-2" className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-fit min-w-20">
-            {renderMenuItems(DropdownMenuItem)}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {hasMenuActions && (
+          <DropdownMenu open={isMenuOpen} onOpenChange={(open) => { if (open) setIsContextMenuOpen(false); onMenuOpenChange(open); }}>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm"
+                variant="ghost"
+                className="h-6 w-6 px-0 flex-shrink-0 -mr-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+              >
+                <Icon name="more-2" className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-fit min-w-20">
+              {renderMenuItems(DropdownMenuItem)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-fit min-w-20">
-        {renderMenuItems(ContextMenuItem)}
-      </ContextMenuContent>
+      {hasMenuActions && (
+        <ContextMenuContent className="w-fit min-w-20">
+          {renderMenuItems(ContextMenuItem)}
+        </ContextMenuContent>
+      )}
     </ContextMenu>
   );
 };
