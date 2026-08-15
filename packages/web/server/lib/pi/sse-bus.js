@@ -9,7 +9,11 @@ const writeSse = (res, eventId, payload) => {
   if (eventId) lines.push(`id: ${eventId}`);
   lines.push(`data: ${JSON.stringify(payload)}`);
   lines.push('', '');
-  return res.write(lines.join('\n'));
+  const ok = res.write(lines.join('\n'));
+  if (typeof res.flush === 'function') {
+    try { res.flush(); } catch { /* ignore */ }
+  }
+  return ok;
 };
 
 export const createSseBus = ({
@@ -62,10 +66,10 @@ export const createSseBus = ({
       payload: normalized.payload,
     };
     for (const res of Array.from(sseClients)) {
-      const ok = writeSse(res, normalized.eventId, ssePayload);
-      if (!ok) {
-        sseClients.delete(res);
-      }
+      // write() === false is kernel backpressure, not a disconnect.
+      // Dropping the client here silently starves the UI of later events
+      // while heartbeats on the same socket keep the stream "alive".
+      writeSse(res, normalized.eventId, ssePayload);
     }
 
     return normalized;
@@ -88,10 +92,9 @@ export const createSseBus = ({
     start();
 
     const lastEventId = req.headers?.['last-event-id'] || req.query?.lastEventId;
-    if (lastEventId) {
-      for (const entry of replayAfter(lastEventId)) {
-        writeSse(res, entry.eventId, { directory: entry.directory, payload: entry.payload });
-      }
+    const replayEntries = lastEventId ? replayAfter(lastEventId) : replay.slice();
+    for (const entry of replayEntries) {
+      writeSse(res, entry.eventId, { directory: entry.directory, payload: entry.payload });
     }
 
     const heartbeat = setInterval(() => {

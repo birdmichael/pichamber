@@ -3,7 +3,9 @@ import { WebSocketServer } from 'ws';
 import { parseRequestPathname } from '../terminal/terminal-ws-protocol.js';
 import {
   MESSAGE_STREAM_DIRECTORY_WS_PATH,
+  MESSAGE_STREAM_DIRECTORY_WS_PATHS,
   MESSAGE_STREAM_GLOBAL_WS_PATH,
+  MESSAGE_STREAM_GLOBAL_WS_PATHS,
   MESSAGE_STREAM_WS_HEARTBEAT_INTERVAL_MS,
   sendMessageStreamWsEvent,
 } from './protocol.js';
@@ -98,7 +100,7 @@ export function createMessageStreamWsRuntime({
     const rawUrl = typeof req?.url === 'string' ? req.url : MESSAGE_STREAM_GLOBAL_WS_PATH;
     const pathname = parseRequestPathname(rawUrl);
     const requestUrl = new URL(rawUrl, 'http://127.0.0.1');
-    const isGlobalStream = pathname === MESSAGE_STREAM_GLOBAL_WS_PATH;
+    const isGlobalStream = MESSAGE_STREAM_GLOBAL_WS_PATHS.includes(pathname);
     const requestedLastEventId = requestUrl.searchParams.get('lastEventId')?.trim() || '';
     const requestedDirectory = requestUrl.searchParams.get('directory')?.trim() || '';
 
@@ -132,7 +134,7 @@ export function createMessageStreamWsRuntime({
 
   const upgradeHandler = (req, socket, head) => {
     const pathname = parseRequestPathname(req.url);
-    if (pathname !== MESSAGE_STREAM_GLOBAL_WS_PATH && pathname !== MESSAGE_STREAM_DIRECTORY_WS_PATH) {
+    if (!MESSAGE_STREAM_GLOBAL_WS_PATHS.includes(pathname) && !MESSAGE_STREAM_DIRECTORY_WS_PATHS.includes(pathname)) {
       return;
     }
 

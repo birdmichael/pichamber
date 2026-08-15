@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MESSAGE_STREAM_DIRECTORY_WS_PATH,
+  MESSAGE_STREAM_DIRECTORY_WS_PATHS,
   MESSAGE_STREAM_GLOBAL_WS_PATH,
+  MESSAGE_STREAM_GLOBAL_WS_PATHS,
   MESSAGE_STREAM_WS_MAX_BUFFERED_BYTES,
   MESSAGE_STREAM_WS_BACKPRESSURE_WARN_BYTES,
   parseSseEventEnvelope,
@@ -14,6 +16,8 @@ describe('event stream protocol helpers', () => {
   it('exports stable websocket paths', () => {
     expect(MESSAGE_STREAM_GLOBAL_WS_PATH).toBe('/api/global/event/ws');
     expect(MESSAGE_STREAM_DIRECTORY_WS_PATH).toBe('/api/event/ws');
+    expect(MESSAGE_STREAM_GLOBAL_WS_PATHS).toEqual(['/api/global/event/ws', '/global/event/ws']);
+    expect(MESSAGE_STREAM_DIRECTORY_WS_PATHS).toEqual(['/api/event/ws', '/event/ws']);
   });
 
   it('parses wrapped SSE payloads with event id and directory', () => {

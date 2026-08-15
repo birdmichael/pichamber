@@ -107,11 +107,17 @@ describe('createEventTranslator', () => {
       model: { providerID: 'xai', modelID: 'grok-4.6' },
     });
     const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.sessionID).toBe('ses_1');
     expect(started[0].properties.info).toMatchObject({
       id: 'msg_1',
+      sessionID: 'ses_1',
       role: 'assistant',
       parentID: 'msg_user',
+      modelID: 'grok-4.6',
+      providerID: 'xai',
+      mode: 'pi',
       agent: 'pi',
+      path: { cwd: '/tmp/project', root: '/tmp/project' },
       model: { providerID: 'xai', modelID: 'grok-4.6' },
       time: { created: 1_700_000_000_000 },
     });

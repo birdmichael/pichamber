@@ -56,3 +56,28 @@ describe('createSseBus', () => {
     bus.stop();
   });
 });
+
+  it('does not drop SSE clients when write returns false', () => {
+    const bus = createSseBus({ heartbeatMs: 60_000 });
+    const { req, res, chunks } = createFakeSseResponse();
+    res.write = (value) => {
+      chunks.push(String(value));
+      return false;
+    };
+    bus.attachSse(req, res);
+    bus.publish('/tmp/project', { id: 'evt_1', type: 'session.idle', properties: { sessionID: 'ses_1' } }, { eventId: 'evt_1' });
+    bus.publish('/tmp/project', { id: 'evt_2', type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'idle' } } }, { eventId: 'evt_2' });
+    expect(bus.getSseClientCount()).toBe(1);
+    expect(chunks.join('')).toContain('evt_2');
+    bus.stop();
+  });
+
+  it('replays the buffer to a fresh SSE client without lastEventId', () => {
+    const bus = createSseBus({ heartbeatMs: 60_000 });
+    bus.publish('/tmp/project', { id: 'evt_1', type: 'message.updated', properties: { sessionID: 'ses_1' } }, { eventId: 'evt_1' });
+    const { req, res, chunks } = createFakeSseResponse();
+    bus.attachSse(req, res);
+    expect(chunks.join('')).toContain('evt_1');
+    expect(chunks.join('')).toContain('message.updated');
+    bus.stop();
+  });

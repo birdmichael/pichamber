@@ -87,19 +87,33 @@ export const createEventTranslator = ({
     ensureAssistantMessage();
     const created = assistantCreatedAt ?? now();
     const resolvedModel = modelOverride || model;
+    const modelID = resolvedModel?.modelID || resolvedModel?.id || 'pi';
+    const providerID = resolvedModel?.providerID || resolvedModel?.provider || 'pi';
+    const cwd = directory || '';
     return {
       id: assistantMessageID,
       sessionID,
       role: 'assistant',
       // OpenCode chat turns group assistants by parentID === user message id.
       // Without this the UI drops the reply (streaming and on reload).
-      ...(assistantParentID ? { parentID: assistantParentID } : {}),
+      parentID: assistantParentID || userMessageID || '',
+      modelID,
+      providerID,
+      mode: agent || 'pi',
       agent,
+      path: { cwd, root: cwd },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
       time: completed ? { created, completed: now() } : { created },
       ...(resolvedModel ? { model: resolvedModel } : {}),
       ...(completed ? { finish: 'stop' } : {}),
     };
   };
+
+  // SDK EventMessageUpdated.properties requires top-level sessionID + info.
+  // EventMessagePartUpdated.properties requires sessionID + part + time.
+  const messageUpdated = (info) => event('message.updated', { sessionID, info });
+  const partUpdated = (part) => event('message.part.updated', { sessionID, part, time: now() });
 
   const textPart = (partID, text = '') => ({
     id: partID,
@@ -143,8 +157,8 @@ export const createEventTranslator = ({
         const partID = nextPartId();
         textParts.set(contentIndex, partID);
         return [
-          event('message.updated', { info: assistantInfo() }),
-          event('message.part.updated', { sessionID, part: textPart(partID, '') }),
+          messageUpdated(assistantInfo()),
+          partUpdated(textPart(partID, '')),
         ];
       }
       case 'text_delta': {
@@ -154,8 +168,8 @@ export const createEventTranslator = ({
         if (!partID) {
           partID = nextPartId();
           textParts.set(contentIndex, partID);
-          created.push(event('message.updated', { info: assistantInfo() }));
-          created.push(event('message.part.updated', { sessionID, part: textPart(partID, '') }));
+          created.push(messageUpdated(assistantInfo()));
+          created.push(partUpdated(textPart(partID, '')));
         }
         created.push(event('message.part.delta', {
           sessionID,
@@ -171,15 +185,15 @@ export const createEventTranslator = ({
         if (!partID || !assistantMessageID) return [];
         const text = typeof delta.content === 'string' ? delta.content : undefined;
         if (text === undefined) return [];
-        return [event('message.part.updated', { sessionID, part: textPart(partID, text) })];
+        return [partUpdated(textPart(partID, text))];
       }
       case 'thinking_start': {
         ensureAssistantMessage();
         const partID = nextPartId();
         reasoningParts.set(contentIndex, partID);
         return [
-          event('message.updated', { info: assistantInfo() }),
-          event('message.part.updated', { sessionID, part: reasoningPart(partID, '') }),
+          messageUpdated(assistantInfo()),
+          partUpdated(reasoningPart(partID, '')),
         ];
       }
       case 'thinking_delta': {
@@ -189,8 +203,8 @@ export const createEventTranslator = ({
         if (!partID) {
           partID = nextPartId();
           reasoningParts.set(contentIndex, partID);
-          created.push(event('message.updated', { info: assistantInfo() }));
-          created.push(event('message.part.updated', { sessionID, part: reasoningPart(partID, '') }));
+          created.push(messageUpdated(assistantInfo()));
+          created.push(partUpdated(reasoningPart(partID, '')));
         }
         created.push(event('message.part.delta', {
           sessionID,
@@ -210,7 +224,7 @@ export const createEventTranslator = ({
             ? delta.thinking
             : undefined;
         if (text === undefined) return [];
-        return [event('message.part.updated', { sessionID, part: reasoningPart(partID, text) })];
+        return [partUpdated(reasoningPart(partID, text))];
       }
       case 'toolcall_start': {
         ensureAssistantMessage();
@@ -219,11 +233,8 @@ export const createEventTranslator = ({
         const partID = nextPartId();
         toolParts.set(callID, partID);
         return [
-          event('message.updated', { info: assistantInfo() }),
-          event('message.part.updated', {
-            sessionID,
-            part: toolPart(partID, { callID, tool, status: 'pending', input: delta.toolCall?.arguments || {} }),
-          }),
+          messageUpdated(assistantInfo()),
+          partUpdated(toolPart(partID, { callID, tool, status: 'pending', input: delta.toolCall?.arguments || {} })),
         ];
       }
       case 'toolcall_end': {
@@ -231,15 +242,12 @@ export const createEventTranslator = ({
         const callID = call.id || delta.id;
         const partID = callID ? toolParts.get(callID) : null;
         if (!partID || !assistantMessageID) return [];
-        return [event('message.part.updated', {
-          sessionID,
-          part: toolPart(partID, {
+        return [partUpdated(toolPart(partID, {
             callID,
             tool: call.name || 'tool',
             status: 'pending',
             input: call.arguments || {},
-          }),
-        })];
+          }))];
       }
       default:
         return [];
@@ -293,23 +301,18 @@ export const createEventTranslator = ({
               : '';
           const partID = nextPartId();
           return [
-            event('message.updated', {
-              info: {
-                id: userMessageID,
-                sessionID,
-                role: 'user',
-                time: { created: now() },
-              },
-            }),
-            event('message.part.updated', {
+            messageUpdated({
+              id: userMessageID,
               sessionID,
-              part: {
-                id: partID,
-                sessionID,
-                messageID: userMessageID,
-                type: 'text',
-                text,
-              },
+              role: 'user',
+              time: { created: now() },
+            }),
+            partUpdated({
+              id: partID,
+              sessionID,
+              messageID: userMessageID,
+              type: 'text',
+              text,
             }),
           ];
         }
@@ -317,7 +320,7 @@ export const createEventTranslator = ({
           model = message.model;
         }
         beginAssistantMessage(message?.id && typeof message.id === 'string' ? message.id : undefined);
-        return [event('message.updated', { info: assistantInfo() })];
+        return [messageUpdated(assistantInfo())];
       }
 
       case 'message_update':
@@ -325,7 +328,7 @@ export const createEventTranslator = ({
 
       case 'message_end': {
         if (!assistantMessageID) return [];
-        const events = [event('message.updated', { info: assistantInfo({ completed: true }) })];
+        const events = [messageUpdated(assistantInfo({ completed: true }))];
         return events;
       }
 
@@ -337,17 +340,14 @@ export const createEventTranslator = ({
         if (!partID) {
           partID = nextPartId();
           toolParts.set(callID, partID);
-          created.push(event('message.updated', { info: assistantInfo() }));
+          created.push(messageUpdated(assistantInfo()));
         }
-        created.push(event('message.part.updated', {
-          sessionID,
-          part: toolPart(partID, {
+        created.push(partUpdated(toolPart(partID, {
             callID,
             tool: piEvent.toolName || 'tool',
             status: 'running',
             input: piEvent.args || {},
-          }),
-        }));
+          })));
         return created;
       }
 
@@ -356,16 +356,13 @@ export const createEventTranslator = ({
         const partID = toolParts.get(callID);
         if (!partID || !assistantMessageID) return [];
         const output = toolText(piEvent.partialResult?.content ?? piEvent.partialResult);
-        return [event('message.part.updated', {
-          sessionID,
-          part: toolPart(partID, {
+        return [partUpdated(toolPart(partID, {
             callID,
             tool: piEvent.toolName || 'tool',
             status: 'running',
             input: piEvent.args || {},
             output,
-          }),
-        })];
+          }))];
       }
 
       case 'tool_execution_end': {
@@ -373,17 +370,14 @@ export const createEventTranslator = ({
         const partID = toolParts.get(callID);
         if (!partID || !assistantMessageID) return [];
         const output = toolText(piEvent.result?.content ?? piEvent.result);
-        return [event('message.part.updated', {
-          sessionID,
-          part: toolPart(partID, {
+        return [partUpdated(toolPart(partID, {
             callID,
             tool: piEvent.toolName || 'tool',
             status: piEvent.isError ? 'error' : 'completed',
             input: piEvent.args || {},
             output,
             error: piEvent.isError ? output || 'tool error' : undefined,
-          }),
-        })];
+          }))];
       }
 
       default:

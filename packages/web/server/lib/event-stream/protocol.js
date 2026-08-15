@@ -1,5 +1,9 @@
 export const MESSAGE_STREAM_GLOBAL_WS_PATH = '/api/global/event/ws';
 export const MESSAGE_STREAM_DIRECTORY_WS_PATH = '/api/event/ws';
+// Desktop injects http://127.0.0.1:3901 (no /api). SDK then opens
+// /global/event/ws if baseUrl lacks the prefix. Accept both.
+export const MESSAGE_STREAM_GLOBAL_WS_PATHS = [MESSAGE_STREAM_GLOBAL_WS_PATH, '/global/event/ws'];
+export const MESSAGE_STREAM_DIRECTORY_WS_PATHS = [MESSAGE_STREAM_DIRECTORY_WS_PATH, '/event/ws'];
 export const MESSAGE_STREAM_WS_HEARTBEAT_INTERVAL_MS = 15 * 1000;
 // Per-client pending outbound WS buffer, not a payload or stream-size limit.
 // Healthy clients stay near 0; this only trips when a client is far behind.

@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 
-import { createMessageId, createPartId, createSessionId } from './ids.js';
+import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
 import {
   listPiCommands,
@@ -641,8 +641,16 @@ export const createPiHost = ({
         ...(body.model ? { model: body.model } : {}),
       };
       record.messages.push({ info: userInfo, parts: [userPart] });
-      emit(record.directory, { type: 'message.updated', properties: { info: userInfo } });
-      emit(record.directory, { type: 'message.part.updated', properties: { sessionID, part: userPart } });
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'message.updated',
+        properties: { sessionID, info: userInfo },
+      });
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'message.part.updated',
+        properties: { sessionID, part: userPart, time: Date.now() },
+      });
 
       const images = extractPromptImages(body.parts);
       const promptOptions = {
@@ -669,10 +677,11 @@ export const createPiHost = ({
         } catch (error) {
           record.status = { type: 'idle' };
           emit(record.directory, {
+            id: createEventId(),
             type: 'session.error',
             properties: { sessionID, error: { message: error?.message || String(error) } },
           });
-          emit(record.directory, { type: 'session.idle', properties: { sessionID } });
+          emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
         }
       };
 

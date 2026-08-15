@@ -723,6 +723,10 @@ const getSessionIdFromPayload = (event: Event): string | null => {
   const props = properties as Record<string, unknown>
 
   if (event.type === "message.updated") {
+    const topLevel = props.sessionID
+    if (typeof topLevel === "string" && topLevel.length > 0) {
+      return topLevel
+    }
     const info = props.info
     if (!info || typeof info !== "object") {
       return null
@@ -734,6 +738,8 @@ const getSessionIdFromPayload = (event: Event): string | null => {
   if (
     event.type === "message.removed"
     || event.type === "session.status"
+    || event.type === "session.idle"
+    || event.type === "session.error"
     || event.type === "todo.updated"
     || event.type === "permission.asked"
     || event.type === "permission.replied"

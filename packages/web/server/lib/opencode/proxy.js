@@ -768,8 +768,12 @@ export const registerOpenCodeProxy = (app, deps) => {
     return forwardSanitizedSessionListRequest(req, res, next, 'session.list');
   });
 
-  app.get('/api/global/event', forwardSseRequest);
-  app.get('/api/event', forwardSseRequest);
+  // Pi kernel already registered attachSse on these paths. A second handler
+  // would self-proxy to this same process if it ever ran.
+  if (!piKernel) {
+    app.get('/api/global/event', forwardSseRequest);
+    app.get('/api/event', forwardSseRequest);
+  }
 
   app.get('/api/experimental/session', (req, res, next) => {
     return forwardSanitizedSessionListRequest(req, res, next, 'experimental.session');
