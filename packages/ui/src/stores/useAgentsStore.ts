@@ -652,14 +652,14 @@ async function waitForOpenCodeConnection(delayMs?: number) {
 
   while (Date.now() - start < MAX_HEALTH_WAIT_MS) {
     attempt += 1;
-    updateConfigUpdateMessage(`Waiting for OpenCode… (attempt ${attempt})`);
+    updateConfigUpdateMessage(`Waiting for Pi… (attempt ${attempt})`);
 
     try {
       const isHealthy = await opencodeClient.checkHealth();
       if (isHealthy) {
         return;
       }
-      lastError = new Error("OpenCode health check reported not ready");
+      lastError = new Error("Pi health check reported not ready");
     } catch (error) {
       lastError = error;
     }
@@ -678,7 +678,7 @@ async function waitForOpenCodeConnection(delayMs?: number) {
     await sleep(waitMs);
   }
 
-  throw lastError || new Error("OpenCode did not become ready in time");
+  throw lastError || new Error("Pi did not become ready in time");
 }
 
 type ConfigRefreshMode = "active" | "projects";
@@ -775,7 +775,7 @@ async function performConfigRefresh(options: {
     updateConfigUpdateMessage("Refreshing configuration…");
     await Promise.all([...sdkRefreshTasks, ...uiRefreshTasks]);
   } catch (error) {
-    updateConfigUpdateMessage("OpenCode refresh failed. Please retry.");
+    updateConfigUpdateMessage("Pi refresh failed. Please retry.");
     await sleep(1500);
     throw error;
   } finally {
@@ -798,7 +798,7 @@ export async function reloadOpenCodeConfiguration(options?: {
   scopes?: ConfigChangeScope[];
   mode?: ConfigRefreshMode;
 }) {
-  startConfigUpdate(options?.message || "Reloading OpenCode configuration…");
+  startConfigUpdate(options?.message || "Reloading Pi configuration…");
 
   try {
 

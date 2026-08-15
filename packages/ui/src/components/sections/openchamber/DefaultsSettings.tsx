@@ -54,7 +54,11 @@ export const DefaultsSettings: React.FC = () => {
   const [smallModelOverride, setSmallModelOverride] = React.useState<string | undefined>();
   const [smallModelProviders, setSmallModelProviders] = React.useState<string[]>([]);
   const [walkthroughModelOverride, setWalkthroughModelOverride] = React.useState<string | undefined>();
+  const [thinkingLevel, setThinkingLevel] = React.useState('medium');
+  const [compaction, setCompaction] = React.useState(true);
+  const [retry, setRetry] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(true);
+  const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
   const parsedModel = React.useMemo(() => getDisplayModel(defaultModel), [defaultModel]);
 
@@ -105,6 +109,31 @@ export const DefaultsSettings: React.FC = () => {
           if (response.ok) {
             data = await response.json();
           }
+        }
+
+        try {
+          const piDefaultsResponse = await runtimeFetch('/api/pi/defaults', {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (piDefaultsResponse.ok) {
+            const piDefaults = await piDefaultsResponse.json() as {
+              model?: string;
+              thinking?: string;
+              compaction?: boolean;
+              retry?: boolean;
+            };
+            if (typeof piDefaults.model === 'string' && piDefaults.model.trim()) {
+              setDefaultModel(piDefaults.model.trim());
+            }
+            if (typeof piDefaults.thinking === 'string' && piDefaults.thinking.trim()) {
+              setThinkingLevel(piDefaults.thinking.trim());
+            }
+            if (typeof piDefaults.compaction === 'boolean') setCompaction(piDefaults.compaction);
+            if (typeof piDefaults.retry === 'boolean') setRetry(piDefaults.retry);
+          }
+        } catch {
+          // Pi defaults are optional when the kernel route is unavailable.
         }
 
         if (data) {
@@ -165,6 +194,11 @@ export const DefaultsSettings: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ defaultModel: newValue }),
         });
+        await runtimeFetch('/api/pi/defaults', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: newValue ?? '' }),
+        }).catch(() => undefined);
         if (!response.ok) {
           console.warn('Failed to save default model to server:', response.status, response.statusText);
         }
@@ -363,17 +397,30 @@ export const DefaultsSettings: React.FC = () => {
               settingsItem="sessions.default-thinking"
               label={t('settings.openchamber.defaults.field.defaultThinking')}
             >
-              <Select value={defaultVariant ?? DEFAULT_VARIANT_VALUE} onValueChange={handleVariantChange} disabled={!supportsVariants}>
+              <Select
+                value={thinkingLevel}
+                onValueChange={async (value) => {
+                  setThinkingLevel(value);
+                  try {
+                    await runtimeFetch('/api/pi/defaults', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ thinking: value }),
+                    });
+                  } catch (error) {
+                    console.warn('Failed to save Pi thinking level:', error);
+                  }
+                }}
+              >
                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                   <SelectValue placeholder={t('settings.openchamber.defaults.field.thinkingPlaceholder')}>
-                    {formatVariantLabel(defaultVariant ?? DEFAULT_VARIANT_VALUE)}
+                    {formatVariantLabel(thinkingLevel)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={DEFAULT_VARIANT_VALUE}>{t('settings.openchamber.defaults.option.default')}</SelectItem>
-                  {availableVariants.map((variant) => (
-                    <SelectItem key={variant} value={variant}>
-                      {formatVariantLabel(variant)}
+                  {PI_THINKING_LEVELS.map((level) => (
+                    <SelectItem key={level} value={level}>
+                      {formatVariantLabel(level)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -393,6 +440,42 @@ export const DefaultsSettings: React.FC = () => {
           </div>
 
           <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
+            <SettingsCheckboxRow
+              settingsItem="sessions.compaction"
+              checked={compaction}
+              onChange={async (checked) => {
+                setCompaction(checked);
+                try {
+                  await runtimeFetch('/api/pi/defaults', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ compaction: checked }),
+                  });
+                } catch (error) {
+                  console.warn('Failed to save Pi compaction default:', error);
+                }
+              }}
+              label={t('settings.openchamber.defaults.field.compaction')}
+              ariaLabel={t('settings.openchamber.defaults.field.compactionAria')}
+            />
+            <SettingsCheckboxRow
+              settingsItem="sessions.retry"
+              checked={retry}
+              onChange={async (checked) => {
+                setRetry(checked);
+                try {
+                  await runtimeFetch('/api/pi/defaults', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ retry: checked }),
+                  });
+                } catch (error) {
+                  console.warn('Failed to save Pi retry default:', error);
+                }
+              }}
+              label={t('settings.openchamber.defaults.field.retry')}
+              ariaLabel={t('settings.openchamber.defaults.field.retryAria')}
+            />
             <SettingsCheckboxRow
               settingsItem="sessions.deletion-dialog"
               checked={showDeletionDialog}

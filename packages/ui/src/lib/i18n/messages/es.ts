@@ -2352,7 +2352,7 @@ export const dict: Record<I18nKey, string> = {
   "commandPalette.item.toggleTerminal": "Mostrar u ocultar terminal",
   "commandPalette.item.openSettings": "Abrir configuración...",
   "commandPalette.session.untitled": "Sesión sin título",
-  "openCodeStatusDialog.title": "Estado de OpenCode",
+  "openCodeStatusDialog.title": "Estado de Pi",
   "openCodeStatusDialog.description": "Inspecciona el estado actual de OpenCode y diagnósticos.",
   "openCodeStatusDialog.actions.copy": "Copiar",
   "openCodeStatusDialog.empty.noData": "No hay datos.",

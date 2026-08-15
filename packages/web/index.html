@@ -18,8 +18,8 @@
     <!-- Web app manifest (endpoint-first with data URL fallback) -->
     <script>
       const baseUrl = location.origin;
-      const defaultAppName = 'OpenChamber - AI Coding Assistant';
-      const defaultShortName = 'OpenChamber';
+      const defaultAppName = 'Pichamber - AI Coding Assistant';
+      const defaultShortName = 'Pichamber';
       const pwaNameStorageKey = 'openchamber.pwaName';
       const pwaOrientationStorageKey = 'openchamber.pwaOrientation';
       const mobileKeyboardModeStorageKey = 'openchamber.mobileKeyboardMode';
@@ -225,7 +225,7 @@
         return {
           name: appName,
           short_name: shortName,
-          description: 'Web interface companion for OpenCode AI coding agent',
+          description: 'Web interface companion for the Pi coding agent',
           id: `${baseUrl}/`,
           start_url: `${baseUrl}/`,
           scope: `${baseUrl}/`,
@@ -422,12 +422,12 @@
     <!-- iOS Safari PWA styling -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="OpenChamber" />
+    <meta name="apple-mobile-web-app-title" content="Pichamber" />
 
-    <title>OpenChamber - AI Coding Assistant</title>
-    <meta name="description" content="Web interface companion for OpenCode AI coding agent" />
-    <meta name="application-name" content="OpenChamber" />
-    <meta name="apple-mobile-web-app-title" content="OpenChamber" />
+    <title>Pichamber - AI Coding Assistant</title>
+    <meta name="description" content="Web interface companion for the Pi coding agent" />
+    <meta name="application-name" content="Pichamber" />
+    <meta name="apple-mobile-web-app-title" content="Pichamber" />
 
     <!-- Inline CSS for loading screen and Nerd Fonts (before Tailwind loads) -->
     <style>

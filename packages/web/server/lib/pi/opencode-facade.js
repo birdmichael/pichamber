@@ -55,12 +55,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getPath(resolveDirectory(req)));
   }));
 
+  app.get('/api/kernel', handle(async (_req, res) => {
+    json(res, 200, host.getKernelInfo());
+  }));
+
   app.get('/api/global/config', handle(async (_req, res) => {
-    json(res, 200, { kernel: 'pi' });
+    json(res, 200, { kernel: 'pi', ...host.getDefaults() });
   }));
 
   app.get('/api/config', handle(async (_req, res) => {
-    json(res, 200, { kernel: 'pi' });
+    json(res, 200, { kernel: 'pi', ...host.getDefaults() });
   }));
 
   app.patch('/api/config', parseJson, handle(async (req, res) => {
@@ -96,8 +100,45 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     });
   }));
 
-  app.get('/api/command', handle(async (_req, res) => {
-    json(res, 200, []);
+  app.get('/api/command', handle(async (req, res) => {
+    json(res, 200, host.listCommands(resolveDirectory(req)));
+  }));
+
+  app.get('/api/config/commands/:name', handle(async (req, res) => {
+    const command = host.listCommands(resolveDirectory(req)).find((item) => item.name === req.params.name);
+    if (!command) {
+      json(res, 404, { error: 'Command not found' });
+      return;
+    }
+    json(res, 200, {
+      ...command,
+      scope: command.source === 'builtin' ? undefined : 'user',
+      sources: command.path ? { md: { exists: true, path: command.path, scope: 'user' } } : {},
+    });
+  }));
+
+  app.get('/api/config/skills', handle(async (req, res) => {
+    json(res, 200, host.getConfigSkills(resolveDirectory(req)));
+  }));
+
+  app.get('/api/pi/skills', handle(async (req, res) => {
+    json(res, 200, { skills: host.listSkills(resolveDirectory(req)) });
+  }));
+
+  app.get('/api/pi/prompts', handle(async (req, res) => {
+    json(res, 200, { prompts: host.listPrompts(resolveDirectory(req)) });
+  }));
+
+  app.get('/api/pi/models', handle(async (_req, res) => {
+    json(res, 200, await host.getProviders());
+  }));
+
+  app.get('/api/pi/defaults', handle(async (_req, res) => {
+    json(res, 200, host.getDefaults());
+  }));
+
+  app.patch('/api/pi/defaults', parseJson, handle(async (req, res) => {
+    json(res, 200, host.setDefaults(req.body || {}));
   }));
 
   app.get('/api/agent', handle(async (_req, res) => {
@@ -150,16 +191,37 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getStatus(requestDirectory(req) || undefined));
   }));
 
+  const listSessionInfos = async (directory) => {
+    const live = host.listSessions(directory || undefined).map((record) => record.info);
+    const seen = new Set(live.map((info) => info.id));
+    if (typeof host.listPersistedSessions === 'function') {
+      const persisted = await host.listPersistedSessions(directory || undefined);
+      for (const item of persisted || []) {
+        const id = item.id || item.path;
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        live.push({
+          id,
+          projectID: item.cwd || directory || 'pi',
+          directory: item.cwd || directory,
+          title: item.name || item.firstMessage || 'Pi session',
+          version: 'pi',
+          time: {
+            created: item.created ? new Date(item.created).getTime() : Date.now(),
+            updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
+          },
+        });
+      }
+    }
+    return live;
+  };
+
   app.get('/api/session', handle(async (req, res) => {
-    const directory = requestDirectory(req);
-    const records = host.listSessions(directory || undefined);
-    json(res, 200, records.map((record) => record.info));
+    json(res, 200, await listSessionInfos(requestDirectory(req)));
   }));
 
   app.get('/api/experimental/session', handle(async (req, res) => {
-    const directory = requestDirectory(req);
-    const records = host.listSessions(directory || undefined);
-    json(res, 200, records.map((record) => record.info));
+    json(res, 200, await listSessionInfos(requestDirectory(req)));
   }));
 
   app.post('/api/session', parseJson, handle(async (req, res) => {
@@ -233,6 +295,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       title: source.info.title,
       parentID: source.id,
     });
+    json(res, 200, record.info);
+  }));
+
+  app.post('/api/session/:sessionID/clone', parseJson, handle(async (req, res) => {
+    const record = await host.cloneSession(req.params.sessionID);
     json(res, 200, record.info);
   }));
 

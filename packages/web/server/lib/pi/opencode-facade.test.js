@@ -1,9 +1,19 @@
 import express from 'express';
 import { createServer } from 'node:http';
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
+
+const tempHomes = [];
+afterEach(() => {
+  for (const dir of tempHomes.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 const listen = (app) => new Promise((resolve) => {
   const server = createServer(app);
@@ -18,9 +28,12 @@ const listen = (app) => new Promise((resolve) => {
 });
 
 const startFacade = async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-home-'));
+  tempHomes.push(home);
   const kernel = createPiKernel({
     mock: true,
     defaultDirectory: '/tmp/project',
+    home,
   });
   const app = express();
   app.use(express.json());
@@ -46,7 +59,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(await (await fetch(`${url}/api/lsp`)).json()).toEqual([]);
       expect(await (await fetch(`${url}/api/permission`)).json()).toEqual([]);
       expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
-      expect(await (await fetch(`${url}/api/command`)).json()).toEqual([]);
+      expect((await (await fetch(`${url}/api/command`)).json()).some((command) => command.name === 'compact')).toBe(true);
 
       const created = await (await fetch(`${url}/api/session`, {
         method: 'POST',
@@ -124,6 +137,43 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(aborted.status).toBe(200);
       expect(await aborted.json()).toBe(true);
       await prompt;
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('exposes Pi kernel, skills, commands, defaults, and clone', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const kernelInfo = await (await fetch(`${url}/api/kernel`)).json();
+      expect(kernelInfo.kernel).toBe('pi');
+      expect(kernelInfo.product).toBe('Pichamber');
+      expect(kernelInfo.thinkingLevels).toContain('high');
+
+      const commands = await (await fetch(`${url}/api/command`)).json();
+      expect(commands.some((command) => command.name === 'compact')).toBe(true);
+
+      const skills = await (await fetch(`${url}/api/config/skills`)).json();
+      expect(Array.isArray(skills.skills)).toBe(true);
+
+      const patched = await (await fetch(`${url}/api/pi/defaults`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ thinking: 'high', compaction: false }),
+      })).json();
+      expect(patched.thinking).toBe('high');
+      expect(patched.compaction).toBe(false);
+
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Clone source' }),
+      })).json();
+      const cloned = await (await fetch(`${url}/api/session/${created.id}/clone`, { method: 'POST' })).json();
+      expect(cloned.id).not.toBe(created.id);
+      expect(cloned.parentID).toBe(created.id);
+      expect(cloned.title).toContain('copy');
     } finally {
       kernel.dispose();
       await close();

@@ -2352,7 +2352,7 @@ export const dict: Record<I18nKey, string> = {
   "commandPalette.item.toggleTerminal": "Перемкнути термінал",
   "commandPalette.item.openSettings": "Відкрити налаштування...",
   "commandPalette.session.untitled": "Сесія без назви",
-  "openCodeStatusDialog.title": "Статус OpenCode",
+  "openCodeStatusDialog.title": "Статус Pi",
   "openCodeStatusDialog.description": "Перегляньте поточний стан OpenCode і діагностику.",
   "openCodeStatusDialog.actions.copy": "Копіювати",
   "openCodeStatusDialog.empty.noData": "Немає даних.",

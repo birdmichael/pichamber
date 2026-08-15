@@ -2091,7 +2091,7 @@ export const dict = {
   'commandPalette.item.toggleTerminal': 'Basculer le terminal',
   'commandPalette.item.openSettings': 'Ouvrez les paramètres...',
   'commandPalette.session.untitled': 'Session sans titre',
-  'openCodeStatusDialog.title': 'Statut OpenCode',
+  'openCodeStatusDialog.title': 'Statut Pi',
   'openCodeStatusDialog.description': 'Inspectez l’état et les diagnostics actuels du OpenCode.',
   'openCodeStatusDialog.actions.copy': 'Copie',
   'openCodeStatusDialog.empty.noData': 'Aucune donnée.',

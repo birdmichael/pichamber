@@ -259,23 +259,23 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
 
   const lines: string[] = [];
   lines.push(`Time: ${now.toISOString()}`);
-  lines.push(`OpenChamber version: ${appVersion}`);
+  lines.push(`Pichamber version: ${appVersion}`);
   lines.push(`Runtime: ${origin || '(unknown)'} (api=${apiBase || '(unknown)'})`);
-  lines.push(`OpenCode SDK base: ${opencodeClient.getBaseUrl()}`);
+  lines.push(`Pi kernel base: ${opencodeClient.getBaseUrl()}`);
   lines.push(`Event stream: ${eventStreamStatus}`);
   lines.push(`Directory: ${directory || '(none)'}`);
   lines.push(`Platform: ${platform}`);
 
   const runtimeOpenCodePort = normalizePort(openChamberHealth?.openCodePort);
-  lines.push(`OpenCode runtime port: ${runtimeOpenCodePort ?? '(unknown)'}`);
+  lines.push(`Pi runtime port: ${runtimeOpenCodePort ?? '(unknown)'}`);
   if (typeof openChamberHealth?.openCodeRunning === 'boolean') {
-    lines.push(`OpenCode runtime running: ${openChamberHealth.openCodeRunning ? 'yes' : 'no'}`);
+    lines.push(`Pi runtime running: ${openChamberHealth.openCodeRunning ? 'yes' : 'no'}`);
   }
   if (typeof openChamberHealth?.openCodeSecureConnection === 'boolean') {
-    lines.push(`Secure OpenCode connection: ${openChamberHealth.openCodeSecureConnection ? 'true' : 'false'}`);
+    lines.push(`Secure Pi connection: ${openChamberHealth.openCodeSecureConnection ? 'true' : 'false'}`);
   }
   if (typeof openChamberHealth?.openCodeAuthSource === 'string' && openChamberHealth.openCodeAuthSource.trim()) {
-    lines.push(`OpenCode auth source: ${openChamberHealth.openCodeAuthSource}`);
+    lines.push(`Pi auth source: ${openChamberHealth.openCodeAuthSource}`);
   }
 
   if (typeof window !== 'undefined') {
@@ -288,7 +288,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
   const isLikelyMac = /Mac OS X|Macintosh/.test(platform);
   if (isLikelyMac) {
     lines.push('');
-    lines.push('OpenCode CLI resolution:');
+    lines.push('Pi kernel resolution:');
 
     const launchDiagnostics = isRecord(openChamberHealth?.lastOpenCodeLaunchDiagnostics)
       ? openChamberHealth.lastOpenCodeLaunchDiagnostics
@@ -381,7 +381,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
 
   lines.push('');
   if (probes.length) {
-    lines.push('OpenCode API probes:');
+    lines.push('Pi API probes:');
     for (const probe of probes) {
       if (!probe.result) {
         lines.push(`- ${probe.label}: (no url)`);
@@ -392,7 +392,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
       lines.push(`- ${probe.label}: ${ok ? 'ok' : 'fail'} status=${status} time=${elapsedMs}ms ${summary}${suffix}`);
     }
   } else {
-    lines.push('OpenCode API probes: (skipped)');
+    lines.push('Pi API probes: (skipped)');
   }
 
   lines.push('');

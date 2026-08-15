@@ -156,6 +156,20 @@ function getSkillWritePath(skillName, workingDirectory, requestedScope) {
 function discoverSkills(workingDirectory) {
   const skills = new Map();
 
+  const homePiSkills = path.join(os.homedir(), '.pi', 'agent', 'skills');
+  for (const skillMdPath of walkSkillMdFiles(homePiSkills)) {
+    addSkillFromMdFile(skills, skillMdPath, SKILL_SCOPE.USER, 'pi');
+  }
+  if (workingDirectory) {
+    const worktreeRoot = findWorktreeRoot(workingDirectory) || path.resolve(workingDirectory);
+    const ancestors = getAncestors(workingDirectory, worktreeRoot);
+    for (const ancestor of ancestors) {
+      for (const skillMdPath of walkSkillMdFiles(path.join(ancestor, '.pi', 'skills'))) {
+        addSkillFromMdFile(skills, skillMdPath, SKILL_SCOPE.PROJECT, 'pi');
+      }
+    }
+  }
+
   for (const externalRootName of ['.claude', '.agents']) {
     const homeRoot = path.join(os.homedir(), externalRootName, 'skills');
     const source = externalRootName === '.agents' ? 'agents' : 'claude';

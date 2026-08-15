@@ -2385,7 +2385,7 @@ export const dict: Record<I18nKey, string> = {
   'commandPalette.item.toggleTerminal': 'ターミナルの切り替え',
   'commandPalette.item.openSettings': '設定を開く...',
   'commandPalette.session.untitled': '無題のセッション',
-  'openCodeStatusDialog.title': 'OpenCodeステータス',
+  'openCodeStatusDialog.title': 'Piステータス',
   'openCodeStatusDialog.description': '現在のOpenCodeステータスと診断情報を確認します。',
   'openCodeStatusDialog.actions.copy': 'コピー',
   'openCodeStatusDialog.empty.noData': 'データがありません。',

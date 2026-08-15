@@ -678,7 +678,7 @@ export const registerOpenCodeProxy = (app, deps) => {
     });
     if (!res.headersSent) {
       res.status(503).json({
-        error: 'OpenCode is restarting',
+        error: 'Pi is starting',
         restarting: true,
       });
     }

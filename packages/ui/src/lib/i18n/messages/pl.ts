@@ -2510,7 +2510,7 @@ export const dict: Record<I18nKey, string> = {
   'openCodeStatusDialog.actions.copy': 'Kopiuj',
   'openCodeStatusDialog.description': 'Sprawdź bieżący status i diagnostykę OpenCode.',
   'openCodeStatusDialog.empty.noData': 'Brak danych.',
-  'openCodeStatusDialog.title': 'Status OpenCode',
+  'openCodeStatusDialog.title': 'Status Pi',
   'openCodeStatusDialog.toast.copiedDescription': 'Status skopiowany do schowka',
   'openCodeStatusDialog.toast.copiedTitle': 'Skopiowano',
   'openCodeStatusDialog.toast.copyFailed': 'Nie udało się skopiować statusu',

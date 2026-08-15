@@ -2213,7 +2213,7 @@ export const dict = {
   'commandPalette.item.toggleTerminal': 'Terminal umschalten',
   'commandPalette.item.openSettings': 'Einstellungen öffnen...',
   'commandPalette.session.untitled': 'Unbenannte Sitzung',
-  'openCodeStatusDialog.title': 'OpenCode-Status',
+  'openCodeStatusDialog.title': 'Pi-Status',
   'openCodeStatusDialog.description': 'Aktuellen OpenCode-Status und Diagnoseergebnisse prüfen.',
   'openCodeStatusDialog.actions.copy': 'Kopieren',
   'openCodeStatusDialog.empty.noData': 'Keine Daten.',

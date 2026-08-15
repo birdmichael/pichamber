@@ -3,6 +3,14 @@ import path from 'node:path';
 
 import { createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
+import {
+  listPiCommands,
+  listPiPrompts,
+  listPiSkills,
+  readPiDefaults,
+  toConfigSkillsPayload,
+  writePiDefaults,
+} from './pi-resources.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -354,9 +362,18 @@ export const createPiHost = ({
     let model;
     try {
       const runtime = await ensureModelRuntime();
+      const defaults = readPiDefaults(home);
       if (runtime && typeof runtime.getAvailable === 'function') {
         const available = await runtime.getAvailable();
-        model = Array.isArray(available) && available.length > 0 ? available[0] : undefined;
+        if (defaults.model && Array.isArray(available)) {
+          const [providerID, modelID] = defaults.model.split('/');
+          model = available.find((item) => (
+            (item.id === defaults.model)
+            || (item.id === modelID && (!providerID || item.provider === providerID))
+          )) || available[0];
+        } else {
+          model = Array.isArray(available) && available.length > 0 ? available[0] : undefined;
+        }
       }
     } catch {
     }
@@ -476,6 +493,41 @@ export const createPiHost = ({
         config: path.join(home, '.pi', 'agent'),
       };
     },
+    listSkills(directory) {
+      return listPiSkills({ home, directory: directory || defaultDirectory });
+    },
+    listPrompts(directory) {
+      return listPiPrompts({ home, directory: directory || defaultDirectory });
+    },
+    listCommands(directory) {
+      return listPiCommands({ home, directory: directory || defaultDirectory });
+    },
+    getDefaults() {
+      return readPiDefaults(home);
+    },
+    setDefaults(patch = {}) {
+      return writePiDefaults(home, patch);
+    },
+    getKernelInfo() {
+      const defaults = readPiDefaults(home);
+      return {
+        kernel: 'pi',
+        product: 'Pichamber',
+        mock,
+        defaults,
+        thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+        paths: {
+          home,
+          agent: path.join(home, '.pi', 'agent'),
+          models: path.join(home, '.pi', 'agent', 'models.json'),
+          skills: path.join(home, '.pi', 'agent', 'skills'),
+          prompts: path.join(home, '.pi', 'agent', 'prompts'),
+        },
+      };
+    },
+    getConfigSkills(directory) {
+      return toConfigSkillsPayload(this.listSkills(directory));
+    },
     async getProviders() {
       if (mock) {
         return {
@@ -576,6 +628,30 @@ export const createPiHost = ({
       const record = getRecord(sessionID);
       await record.piSession.abort();
       return true;
+    },
+    async cloneSession(sessionID) {
+      const source = getRecord(sessionID);
+      const record = await createFacadeSession({
+        directory: source.directory,
+        title: source.info.title ? `${source.info.title} (copy)` : 'Cloned session',
+        parentID: source.id,
+      });
+      record.messages = source.messages.map((entry) => ({
+        info: { ...entry.info, sessionID: record.id },
+        parts: (entry.parts || []).map((part) => ({ ...part, sessionID: record.id })),
+      }));
+      record.info.time.updated = Date.now();
+      return record;
+    },
+    async listPersistedSessions(directory) {
+      if (mock) return [];
+      try {
+        const pi = await loadPiSdk();
+        if (typeof pi.SessionManager?.list !== 'function') return [];
+        return await pi.SessionManager.list(directory || defaultDirectory);
+      } catch {
+        return [];
+      }
     },
     dispose() {
       for (const record of sessions.values()) {
