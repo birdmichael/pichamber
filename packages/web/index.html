@@ -583,10 +583,6 @@
             window.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = JSON.parse(cachedOutcome);
           }
         }
-        if (sessionStorage.getItem('pichamber.splashDismissed') === '1') {
-          var prior = document.getElementById('initial-loading');
-          if (prior) prior.remove();
-        }
       } catch (_restoreError) {}
     </script>
     <script>
