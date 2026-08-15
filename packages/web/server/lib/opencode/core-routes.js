@@ -1015,6 +1015,16 @@ export const registerSettingsUtilityRoutes = (app, dependencies) => {
 
       const refreshResult = await refreshOpenCodeAfterConfigChange('manual configuration reload');
 
+      if (refreshResult?.kernel === 'pi') {
+        return res.json({
+          success: true,
+          kernel: 'pi',
+          requiresReload: false,
+          reloaded: true,
+          message: refreshResult?.message || 'Pi kernel reloaded',
+        });
+      }
+
       if (refreshResult?.external) {
         return res.json(buildExternalManualRestartResponse(
           'Configuration is saved on disk. Restart your connected OpenCode server to apply the changes.',

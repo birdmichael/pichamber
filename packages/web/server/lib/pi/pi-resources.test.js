@@ -11,6 +11,8 @@ import {
   writePiDefaults,
   writePiPrompt,
   deletePiPrompt,
+  getPiAuthMethods,
+  getPiProviderSources,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -85,5 +87,24 @@ describe('pi-resources', () => {
     const deleted = deletePiPrompt({ home, name: 'ship' });
     expect(deleted.deleted).toBe(true);
     expect(listPiCommands({ home }).some((command) => command.name === 'ship')).toBe(false);
+  });
+
+  it('reads Pi auth methods and sources without exposing keys', () => {
+    const home = makeTemp();
+    const agent = path.join(home, '.pi', 'agent');
+    fs.mkdirSync(agent, { recursive: true });
+    fs.writeFileSync(path.join(agent, 'auth.json'), JSON.stringify({
+      bmlab: { type: 'api', key: 'sk-test-do-not-leak' },
+    }));
+    fs.writeFileSync(path.join(agent, 'models.json'), JSON.stringify({
+      providers: { bmlab: { baseUrl: 'https://example.test' } },
+    }));
+    const methods = getPiAuthMethods(home);
+    expect(methods.bmlab).toEqual([{ type: 'api', label: 'API Key' }]);
+    expect(JSON.stringify(methods)).not.toContain('sk-test');
+    const sources = getPiProviderSources('bmlab', { home });
+    expect(sources.sources.auth.exists).toBe(true);
+    expect(sources.sources.user.exists).toBe(true);
+    expect(sources.sources.auth.path).toContain(path.join('.pi', 'agent', 'auth.json'));
   });
 });

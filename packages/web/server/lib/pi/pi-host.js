@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
 import {
+  THINKING_LEVELS,
   listPiCommands,
   listPiPrompts,
   listPiSkills,
@@ -12,6 +13,8 @@ import {
   writePiDefaults,
   writePiPrompt,
   deletePiPrompt,
+  getPiAuthMethods,
+  getPiProviderSources,
 } from './pi-resources.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -254,6 +257,84 @@ export const mapPiModelsToProviders = (models) => {
 
 const loadPiSdk = async () => import('@earendil-works/pi-coding-agent');
 
+const expandPromptTemplate = (template, argument) => {
+  const source = typeof template === 'string' ? template : '';
+  const args = typeof argument === 'string' ? argument : '';
+  return source
+    .replaceAll('$ARGUMENTS', args)
+    .replaceAll('$@', args)
+    .replaceAll('$1', args);
+};
+
+const createLocalReply = (emit) => (record, body, userText, assistantText) => {
+  const sessionID = record.id;
+  const userMessageID = body.messageID || createMessageId();
+  const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
+  if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
+    const userPart = {
+      id: createPartId(),
+      sessionID,
+      messageID: userMessageID,
+      type: 'text',
+      text: userText,
+    };
+    const userInfo = {
+      id: userMessageID,
+      sessionID,
+      role: 'user',
+      time: { created: Date.now() },
+      agent: userAgent,
+      ...(body.model ? { model: body.model } : {}),
+    };
+    record.messages.push({ info: userInfo, parts: [userPart] });
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'message.updated',
+      properties: { sessionID, info: userInfo },
+    });
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'message.part.updated',
+      properties: { sessionID, part: userPart, time: Date.now() },
+    });
+  }
+
+  const assistantID = createMessageId();
+  const assistantInfo = {
+    id: assistantID,
+    sessionID,
+    role: 'assistant',
+    parentID: userMessageID,
+    time: { created: Date.now(), completed: Date.now() },
+    agent: 'pi',
+    finish: 'stop',
+  };
+  const assistantPart = {
+    id: createPartId(),
+    sessionID,
+    messageID: assistantID,
+    type: 'text',
+    text: assistantText,
+  };
+  record.messages.push({ info: assistantInfo, parts: [assistantPart] });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.updated',
+    properties: { sessionID, info: assistantInfo },
+  });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.part.updated',
+    properties: { sessionID, part: assistantPart, time: Date.now() },
+  });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'session.idle',
+    properties: { sessionID },
+  });
+  return { info: assistantInfo, parts: [assistantPart] };
+};
+
 export const createPiHost = ({
   createSession,
   createModelRuntime,
@@ -274,6 +355,7 @@ export const createPiHost = ({
       onEvent(directory, ocEvent);
     }
   };
+  const completeLocalReply = createLocalReply(emit);
 
   const resolveCreateSession = async () => {
     if (typeof createSession === 'function') return createSession;
@@ -557,7 +639,23 @@ export const createPiHost = ({
       return readPiDefaults(home);
     },
     setDefaults(patch = {}) {
-      return writePiDefaults(home, patch);
+      const mapped = { ...patch };
+      if (typeof patch.defaultModel === 'string' && typeof patch.model !== 'string') {
+        mapped.model = patch.defaultModel;
+      }
+      if (typeof patch.defaultVariant === 'string' && typeof patch.thinking !== 'string') {
+        mapped.thinking = patch.defaultVariant;
+      }
+      return writePiDefaults(home, mapped);
+    },
+    getAuthMethods() {
+      return getPiAuthMethods(home);
+    },
+    getProviderSources(providerId, directory) {
+      return getPiProviderSources(providerId, {
+        home,
+        directory: directory || defaultDirectory,
+      });
     },
     getKernelInfo() {
       const defaults = readPiDefaults(home);
@@ -716,6 +814,140 @@ export const createPiHost = ({
       } catch {
         return [];
       }
+    },
+    async reload(directory) {
+      modelRuntime = null;
+      modelRuntimeError = null;
+      readyPromise = null;
+
+      for (const runtime of directoryRuntimes.values()) {
+        try {
+          runtime.dispose?.();
+        } catch {
+        }
+      }
+      directoryRuntimes.clear();
+
+      const factory = await resolveCreateSession();
+      try {
+        await ensureModelRuntime();
+      } catch {
+      }
+
+      for (const record of sessions.values()) {
+        try {
+          record.unsubscribe?.();
+          if (typeof record.piSession?.reload === 'function') {
+            await record.piSession.reload();
+          } else {
+            try {
+              record.piSession?.dispose?.();
+            } catch {
+            }
+            record.piSession = await factory({
+              cwd: record.directory,
+              modelRuntime,
+            });
+          }
+          attachSession(record);
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        } catch (error) {
+          console.warn(`[pi-host] reload failed for session ${record.id}:`, error?.message || error);
+        }
+      }
+
+      await ready();
+
+      const cwd = directory || defaultDirectory;
+      const skills = listPiSkills({ home, directory: cwd });
+      const commands = listPiCommands({ home, directory: cwd });
+      emit(cwd, {
+        id: createEventId(),
+        type: 'server.connected',
+        properties: { kernel: 'pi', reloaded: true },
+      });
+
+      return {
+        reloaded: true,
+        kernel: 'pi',
+        sessions: sessions.size,
+        skills: skills.length,
+        commands: commands.length,
+      };
+    },
+    async runCommand(sessionID, body = {}) {
+      const record = getRecord(sessionID);
+      const rawName = typeof body.command === 'string' ? body.command : '';
+      const name = rawName.replace(/^\//, '').trim();
+      const argument = typeof body.arguments === 'string' ? body.arguments.trim() : '';
+      const userText = `/${[name, argument].filter(Boolean).join(' ')}`;
+
+      const reply = async (assistantText) => completeLocalReply(record, body, userText, assistantText);
+
+      if (name === 'reload') {
+        const result = await this.reload(record.directory);
+        return reply(
+          `Reloaded Pi skills, prompts, and context files (${result.skills} skills, ${result.commands} commands).`,
+        );
+      }
+      if (name === 'compact') {
+        if (typeof record.piSession?.compact === 'function') {
+          await record.piSession.compact(argument || undefined);
+          return reply('Compacted session context.');
+        }
+        const defaults = readPiDefaults(home);
+        return reply(
+          defaults.compaction
+            ? 'Pi compaction stays enabled and runs automatically when context is full.'
+            : 'Pi compaction is disabled. Enable it in Settings → Sessions.',
+        );
+      }
+      if (name === 'thinking') {
+        const current = readPiDefaults(home);
+        if (argument && THINKING_LEVELS.includes(argument)) {
+          writePiDefaults(home, { thinking: argument });
+          return reply(`Thinking level set to ${argument}. New sessions will use this default.`);
+        }
+        return reply(
+          `Current thinking level: ${current.thinking}. Valid levels: ${THINKING_LEVELS.join(', ')}.`,
+        );
+      }
+      if (name === 'model') {
+        const current = readPiDefaults(home);
+        if (argument) {
+          writePiDefaults(home, { model: argument });
+          return reply(`Default model set to ${argument}.`);
+        }
+        return reply(
+          current.model
+            ? `Current default model: ${current.model}`
+            : 'No default model set. Use /model provider/id or Settings → Sessions.',
+        );
+      }
+      if (name === 'login') {
+        return reply(
+          'Pi authentication is managed in Settings → Providers and stored in ~/.pi/agent. Interactive /login is not run in this desktop UI.',
+        );
+      }
+
+      const listed = listPiCommands({ home, directory: record.directory });
+      const found = listed.find((item) => item.name === name && item.source === 'prompt' && item.template);
+      if (found) {
+        const text = expandPromptTemplate(found.template, argument);
+        return this.promptAsync(sessionID, {
+          ...body,
+          parts: [{ type: 'text', text }],
+        });
+      }
+
+      return this.promptAsync(sessionID, {
+        ...body,
+        parts: [{ type: 'text', text: userText }],
+      });
     },
     dispose() {
       for (const record of sessions.values()) {

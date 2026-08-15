@@ -234,4 +234,104 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('returns provider auth methods from ~/.pi/agent without erroring', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'auth.json'), JSON.stringify({
+        bmlab: { type: 'api', key: 'sk-test-do-not-leak' },
+      }));
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'models.json'), JSON.stringify({
+        providers: { bmlab: { baseUrl: 'https://example.test' } },
+      }));
+      const prefixed = await fetch(`${url}/api/provider/auth`);
+      expect(prefixed.status).toBe(200);
+      const methods = await prefixed.json();
+      expect(methods.bmlab[0]).toMatchObject({ type: 'api' });
+      expect(JSON.stringify(methods)).not.toContain('sk-test');
+
+      const bare = await fetch(`${url}/provider/auth`);
+      expect(bare.status).toBe(200);
+      expect(await bare.json()).toEqual(methods);
+
+      const source = await (await fetch(`${url}/api/provider/bmlab/source`)).json();
+      expect(source.sources.auth.exists).toBe(true);
+      expect(source.sources.user.exists).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reloads the in-process Pi kernel without requiring a window reload', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Stay alive' }),
+      })).json();
+      let reloads = 0;
+      const original = kernel.host.reload.bind(kernel.host);
+      kernel.host.reload = async () => {
+        reloads += 1;
+        return original();
+      };
+      const response = await fetch(`${url}/api/config/reload`, { method: 'POST' });
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        success: true,
+        kernel: 'pi',
+        requiresReload: false,
+      });
+      expect(reloads).toBe(1);
+      const listed = await (await fetch(`${url}/api/session`)).json();
+      expect(listed.some((item) => item.id === created.id)).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('runs /reload as a Pi command and persists thinking defaults', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Commands' }),
+      })).json();
+      let reloads = 0;
+      const original = kernel.host.reload.bind(kernel.host);
+      kernel.host.reload = async () => {
+        reloads += 1;
+        return original();
+      };
+      const command = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'reload', arguments: '' }),
+      });
+      expect(command.status).toBe(200);
+      const body = await command.json();
+      expect(body.info.role).toBe('assistant');
+      expect(body.parts[0].text).toMatch(/Reloaded Pi/);
+      expect(reloads).toBe(1);
+
+      const thinking = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'thinking', arguments: 'high' }),
+      });
+      expect(thinking.status).toBe(200);
+      const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
+      expect(defaults.thinking).toBe('high');
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });

@@ -48,6 +48,7 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
     getManagedOpenCodeEnv = async () => ({}),
     getActiveSessionCount = () => 0,
     isPiKernelEnabled = () => false,
+    getPiHost = () => null,
     reapManagedOrphanedProcesses = reapOrphanedProcesses,
     getWarmupDirectories = async () => [],
     onOpenCodeRestarted = null,
@@ -618,7 +619,21 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
     throw lastError;
   };
 
+  const resolvePiHost = () => (typeof getPiHost === 'function' ? getPiHost() : getPiHost);
+
+  const reloadPiHost = async () => {
+    const host = resolvePiHost();
+    if (host && typeof host.reload === 'function') {
+      return host.reload();
+    }
+    return { reloaded: true, kernel: 'pi' };
+  };
+
   const restartOpenCode = async () => {
+    if (isPiKernelEnabled()) {
+      await reloadPiHost();
+      return;
+    }
     if (state.isShuttingDown) return;
     if (state.currentRestartPromise) {
       await state.currentRestartPromise;
@@ -823,6 +838,12 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
   };
 
   const refreshOpenCodeAfterConfigChange = async (reason, options = {}) => {
+    if (isPiKernelEnabled()) {
+      console.log(`Refreshing Pi kernel after ${reason}`);
+      await reloadPiHost();
+      return { reloaded: true, external: false, kernel: 'pi' };
+    }
+
     const { agentName } = options;
 
     console.log(`Refreshing OpenCode after ${reason}`);

@@ -573,6 +573,15 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
         return res.status(400).json({ error: resolved.error });
       }
 
+      if (isPiKernelEnabled()) {
+        const { getPiProviderSources } = await import('../pi/pi-resources.js');
+        const piSources = getPiProviderSources(providerId, { directory });
+        return res.json({
+          providerId,
+          sources: piSources.sources,
+        });
+      }
+
       const sources = getProviderSources(providerId, directory);
       const { getProviderAuth } = await getAuthLibrary();
       const auth = getProviderAuth(providerId);

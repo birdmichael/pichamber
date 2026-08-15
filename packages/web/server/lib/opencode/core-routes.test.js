@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { createTunnelAuth } from './tunnel-auth.js';
-import { registerAuthAndAccessRoutes, registerCommonRequestMiddleware, registerServerStatusRoutes } from './core-routes.js';
+import { registerAuthAndAccessRoutes, registerCommonRequestMiddleware, registerServerStatusRoutes, registerSettingsUtilityRoutes } from './core-routes.js';
 
 describe('core-routes', () => {
   afterEach(() => {
@@ -860,5 +860,27 @@ describe('client auth routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.port).toBe(9988);
     expect(response.body.tunnelUrl).toBe('https://worktree-a.example.trycloudflare.com');
+  });
+
+  it('returns a Pi in-process reload without requiring a window refresh', async () => {
+    const app = express();
+    const refreshOpenCodeAfterConfigChange = vi.fn(async () => ({
+      reloaded: true,
+      external: false,
+      kernel: 'pi',
+    }));
+    registerSettingsUtilityRoutes(app, {
+      readCustomThemesFromDisk: async () => [],
+      refreshOpenCodeAfterConfigChange,
+      clientReloadDelayMs: 800,
+    });
+    const response = await request(app).post('/api/config/reload');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      kernel: 'pi',
+      requiresReload: false,
+    });
+    expect(refreshOpenCodeAfterConfigChange).toHaveBeenCalledTimes(1);
   });
 });

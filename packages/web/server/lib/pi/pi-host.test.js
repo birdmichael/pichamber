@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createInMemoryPiSession, createPiHost, mapPiModelsToProviders } from './pi-host.js';
@@ -132,5 +135,65 @@ describe('createPiHost', () => {
     await prompt;
     expect(host.getStatus()[record.id]).toBeUndefined();
     host.dispose();
+  });
+
+  it('reload keeps live sessions and re-reads Pi resources', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-reload-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project', title: 'Keep me' });
+      const result = await host.reload();
+      expect(result.reloaded).toBe(true);
+      expect(result.kernel).toBe('pi');
+      expect(host.getSession(record.id).info.title).toBe('Keep me');
+      expect(host.listSessions()).toHaveLength(1);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('runCommand /reload invokes reload and replies in-process', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let reloads = 0;
+      const original = host.reload.bind(host);
+      host.reload = async () => {
+        reloads += 1;
+        return original();
+      };
+      const result = await host.runCommand(record.id, { command: 'reload', messageID: 'msg_reload' });
+      expect(reloads).toBe(1);
+      expect(result.info.role).toBe('assistant');
+      expect(result.parts[0].text).toMatch(/Reloaded Pi/);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('setDefaults persists thinking for session settings', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-defaults-'));
+    try {
+      const host = createPiHost({ mock: true, home, defaultDirectory: '/tmp/project' });
+      expect(host.getDefaults().thinking).toBe('medium');
+      const saved = host.setDefaults({ thinking: 'high', defaultModel: 'bmlab/grok-4.6' });
+      expect(saved.thinking).toBe('high');
+      expect(saved.model).toBe('bmlab/grok-4.6');
+      expect(host.getDefaults()).toMatchObject({ thinking: 'high', model: 'bmlab/grok-4.6' });
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 });

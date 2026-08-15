@@ -1091,6 +1091,7 @@ const openCodeLifecycleRuntime = createOpenCodeLifecycleRuntime({
   getManagedOpenCodeShellEnvSnapshot: getLoginShellEnvSnapshot,
   getActiveSessionCount,
   isPiKernelEnabled: () => piKernelEnabled,
+  getPiHost: () => piKernel?.host,
   // Most-recently-used directories first: OpenCode initializes each directory
   // lazily on first request (seconds on large session stores), so the
   // lifecycle warms these right after readiness — before the UI's first

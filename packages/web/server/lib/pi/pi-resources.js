@@ -88,6 +88,65 @@ export const resolvePiAgentDir = (home = os.homedir()) => path.join(home, '.pi',
 
 export const resolvePiDefaultsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'pichamber.json');
 
+export const resolvePiAuthPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'auth.json');
+
+export const resolvePiModelsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'models.json');
+
+const readJsonObject = (filePath) => {
+  try {
+    const parsed = JSON.parse(readText(filePath));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const providerMap = (models) => (
+  models.providers && typeof models.providers === 'object' && !Array.isArray(models.providers)
+    ? models.providers
+    : {}
+);
+
+export const getPiAuthMethods = (home = os.homedir()) => {
+  const auth = readJsonObject(resolvePiAuthPath(home));
+  const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  const ids = new Set([...Object.keys(auth), ...Object.keys(providers)]);
+  const result = {};
+  for (const id of ids) {
+    if (!id) continue;
+    const entry = auth[id];
+    const rawType = entry && typeof entry === 'object' && typeof entry.type === 'string'
+      ? entry.type.toLowerCase()
+      : 'api';
+    const methodType = rawType === 'oauth' ? 'oauth' : 'api';
+    result[id] = [{
+      type: methodType,
+      label: methodType === 'oauth' ? 'OAuth' : 'API Key',
+    }];
+  }
+  return result;
+};
+
+export const getPiProviderSources = (providerId, { home = os.homedir(), directory } = {}) => {
+  const authPath = resolvePiAuthPath(home);
+  const modelsPath = resolvePiModelsPath(home);
+  const auth = readJsonObject(authPath);
+  const providers = providerMap(readJsonObject(modelsPath));
+  const projectModelsPath = directory ? path.join(directory, '.pi', 'models.json') : null;
+  const projectProviders = projectModelsPath ? providerMap(readJsonObject(projectModelsPath)) : {};
+  return {
+    sources: {
+      auth: { exists: Boolean(auth[providerId]), path: authPath },
+      user: { exists: Object.prototype.hasOwnProperty.call(providers, providerId), path: modelsPath },
+      project: {
+        exists: Object.prototype.hasOwnProperty.call(projectProviders, providerId),
+        path: projectModelsPath,
+      },
+      custom: { exists: false, path: null },
+    },
+  };
+};
+
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
     { root: path.join(home, '.pi', 'agent', 'skills'), scope: 'user', source: 'pi' },

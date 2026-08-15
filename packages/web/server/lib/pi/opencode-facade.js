@@ -130,6 +130,48 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, providers);
   }));
 
+  const providerAuth = (_req, res) => {
+    try {
+      json(res, 200, typeof host.getAuthMethods === 'function' ? host.getAuthMethods() : {});
+    } catch {
+      json(res, 200, {});
+    }
+  };
+  app.get('/api/provider/auth', handle(async (req, res) => {
+    providerAuth(req, res);
+  }));
+  app.get('/provider/auth', handle(async (req, res) => {
+    providerAuth(req, res);
+  }));
+
+  const providerSource = (req, res) => {
+    const providerId = req.params.providerId;
+    const directory = resolveDirectory(req);
+    const payload = typeof host.getProviderSources === 'function'
+      ? host.getProviderSources(providerId, directory)
+      : { sources: { auth: { exists: false }, user: { exists: false }, project: { exists: false }, custom: { exists: false } } };
+    json(res, 200, { providerId, sources: payload.sources || payload });
+  };
+  app.get('/api/provider/:providerId/source', handle(async (req, res) => {
+    providerSource(req, res);
+  }));
+
+  const piReload = async (_req, res) => {
+    const result = typeof host.reload === 'function'
+      ? await host.reload()
+      : { reloaded: true, kernel: 'pi' };
+    json(res, 200, {
+      success: true,
+      kernel: 'pi',
+      requiresReload: false,
+      reloaded: true,
+      message: 'Pi kernel reloaded',
+      ...result,
+    });
+  };
+  app.post('/api/config/reload', handle(piReload));
+  app.post('/config/reload', handle(piReload));
+
   app.get('/api/project', handle(async (req, res) => {
     const directory = resolveDirectory(req);
     json(res, 200, [{
@@ -348,6 +390,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/command', parseJson, handle(async (req, res) => {
+    if (typeof host.runCommand === 'function') {
+      json(res, 200, await host.runCommand(req.params.sessionID, req.body || {}));
+      return;
+    }
     const command = typeof req.body?.command === 'string' ? req.body.command : '';
     const args = typeof req.body?.arguments === 'string' ? req.body.arguments : '';
     const text = [command, args].filter(Boolean).join(' ').trim();
@@ -385,7 +431,14 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, unsupported('session.share'));
   }));
 
-  app.post('/api/session/:sessionID/summarize', parseJson, handle(async (_req, res) => {
+  app.post('/api/session/:sessionID/summarize', parseJson, handle(async (req, res) => {
+    if (typeof host.runCommand === 'function') {
+      await host.runCommand(req.params.sessionID, {
+        ...(req.body || {}),
+        command: 'compact',
+        arguments: typeof req.body?.arguments === 'string' ? req.body.arguments : '',
+      });
+    }
     json(res, 200, true);
   }));
 
