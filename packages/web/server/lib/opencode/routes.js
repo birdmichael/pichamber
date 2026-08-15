@@ -8,7 +8,7 @@ import {
 } from './config-mutation-response.js';
 import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
-import { resolveBehaviorAgentsMd, resolvePiAgentsMdPath } from '../pi/pi-resources.js';
+import { resolveBehaviorAgentsMd, resolvePiAgentsMdPath, readPiSystemPromptFiles, writePiSystemPromptFile } from '../pi/pi-resources.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
   const {
@@ -840,6 +840,80 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
     } catch (error) {
       console.error('Failed to write AGENTS.md:', error);
       return res.status(500).json({ error: error.message || 'Failed to write AGENTS.md' });
+    }
+  });
+
+  app.get('/api/behavior/system-md', async (_req, res) => {
+    try {
+      if (!isPiKernelEnabled()) {
+        return res.status(404).json({ error: 'SYSTEM.md is only available on the Pi kernel' });
+      }
+      return res.json(readPiSystemPromptFiles());
+    } catch (error) {
+      console.error('Failed to read SYSTEM.md:', error);
+      return res.status(500).json({ error: 'Failed to read SYSTEM.md' });
+    }
+  });
+
+  app.put('/api/behavior/system-md', async (req, res) => {
+    try {
+      if (!isPiKernelEnabled()) {
+        return res.status(404).json({ error: 'SYSTEM.md is only available on the Pi kernel' });
+      }
+      const content = typeof req.body?.content === 'string' ? req.body.content : '';
+      if (content.length > MAX_BEHAVIOR_PROMPT_SIZE) {
+        return res.status(413).json({ error: `Content exceeds maximum size of ${MAX_BEHAVIOR_PROMPT_SIZE} bytes` });
+      }
+      const written = writePiSystemPromptFile({
+        kind: req.body?.kind === 'append' ? 'append' : 'replace',
+        scope: req.body?.scope === 'project' ? 'project' : 'user',
+        content,
+      });
+      if (typeof refreshOpenCodeAfterConfigChange === 'function') {
+        await refreshOpenCodeAfterConfigChange('Pi SYSTEM.md');
+      }
+      return res.json({ success: true, kernel: 'pi', ...written });
+    } catch (error) {
+      const status = Number(error?.status) || 500;
+      console.error('Failed to write SYSTEM.md:', error);
+      return res.status(status).json({ error: error.message || 'Failed to write SYSTEM.md' });
+    }
+  });
+
+  app.get('/api/behavior/append-system-md', async (_req, res) => {
+    try {
+      if (!isPiKernelEnabled()) {
+        return res.status(404).json({ error: 'APPEND_SYSTEM.md is only available on the Pi kernel' });
+      }
+      return res.json(readPiSystemPromptFiles());
+    } catch (error) {
+      console.error('Failed to read APPEND_SYSTEM.md:', error);
+      return res.status(500).json({ error: 'Failed to read APPEND_SYSTEM.md' });
+    }
+  });
+
+  app.put('/api/behavior/append-system-md', async (req, res) => {
+    try {
+      if (!isPiKernelEnabled()) {
+        return res.status(404).json({ error: 'APPEND_SYSTEM.md is only available on the Pi kernel' });
+      }
+      const content = typeof req.body?.content === 'string' ? req.body.content : '';
+      if (content.length > MAX_BEHAVIOR_PROMPT_SIZE) {
+        return res.status(413).json({ error: `Content exceeds maximum size of ${MAX_BEHAVIOR_PROMPT_SIZE} bytes` });
+      }
+      const written = writePiSystemPromptFile({
+        kind: 'append',
+        scope: req.body?.scope === 'project' ? 'project' : 'user',
+        content,
+      });
+      if (typeof refreshOpenCodeAfterConfigChange === 'function') {
+        await refreshOpenCodeAfterConfigChange('Pi APPEND_SYSTEM.md');
+      }
+      return res.json({ success: true, kernel: 'pi', ...written });
+    } catch (error) {
+      const status = Number(error?.status) || 500;
+      console.error('Failed to write APPEND_SYSTEM.md:', error);
+      return res.status(status).json({ error: error.message || 'Failed to write APPEND_SYSTEM.md' });
     }
   });
 };

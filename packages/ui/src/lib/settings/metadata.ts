@@ -13,6 +13,7 @@ export type SettingsPageSlug =
   | 'commands'
   | 'mcp'
   | 'plugins'
+  | 'extensions'
   | 'skills.installed'
   | 'skills.catalog'
   | 'git'
@@ -134,6 +135,14 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
     kind: 'split',
     keywords: ['plugin', 'plugins', 'extensions', 'addons', 'npm', 'opencode-wakatime'],
     isAvailable: (ctx) => !ctx.isPiKernel,
+  },
+  {
+    slug: 'extensions',
+    title: 'Extensions',
+    group: 'opencode',
+    kind: 'single',
+    keywords: ['extension', 'extensions', 'pi', 'packages'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
     slug: 'skills.installed',
@@ -282,6 +291,8 @@ export function getSettingsNavIcon(slug: SettingsPageSlug): IconName | null {
     case 'mcp':
       return null;
     case 'plugins':
+      return 'plug-2';
+    case 'extensions':
       return 'plug-2';
 
     case 'skills.installed':

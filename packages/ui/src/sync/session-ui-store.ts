@@ -134,7 +134,7 @@ export function routeMessage(params: {
   inputMode?: "normal" | "shell"
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
   additionalParts?: Array<{ text: string; synthetic?: boolean; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
-  delivery?: 'steer'
+  delivery?: 'steer' | 'followUp'
 }): Promise<void> {
   const requestDirectory = params.directory ?? undefined
   if (params.inputMode === "shell") {
@@ -233,7 +233,7 @@ type SendMessageOptions = {
   directory?: string
   /** Immutable copy of the new-session draft at submit time; used instead of the live draft. */
   draftSnapshot?: NewSessionDraftState
-  delivery?: 'steer'
+  delivery?: 'steer' | 'followUp'
 }
 
 type AssistantMessageSessionExecution = {

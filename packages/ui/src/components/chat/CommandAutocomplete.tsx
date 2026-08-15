@@ -9,6 +9,7 @@ import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 import { commandMatchesSearch, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
 
@@ -50,6 +51,24 @@ const NEUTRAL_BADGE_CLASS = cn(
   "bg-[var(--surface-muted)] text-muted-foreground border-[var(--interactive-border)]/60"
 );
 
+
+const PI_HIDDEN_SLASH_COMMANDS = new Set([
+  'init', 'undo', 'redo', 'timeline', 'summary',
+  'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
+  'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
+]);
+
+const filterPiSlashCommands = (commands: CommandInfo[], isPiKernel: boolean) => {
+  if (!isPiKernel) return commands;
+  return commands.filter((command) => {
+    if (command.isOpenChamber) return false;
+    if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) return false;
+    const agent = typeof command.agent === "string" ? command.agent.toLowerCase() : "";
+    if (agent === "openchamber" && command.name !== "compact") return false;
+    return true;
+  });
+};
+
 interface CommandAutocompleteProps {
   searchQuery: string;
   onCommandSelect: (command: CommandInfo) => void;
@@ -64,6 +83,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   style,
 }, ref) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const sessionMessages = useSessionMessages(currentSessionId ?? '');
   const hasMessagesInCurrentSession = sessionMessages.length > 0;
@@ -193,7 +213,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
             : []
           ),
         ];
-        const allCommands = mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands);
+        const allCommands = filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel);
 
         const allowInitCommand = !hasMessagesInCurrentSession;
         const filtered = (searchQuery
@@ -268,12 +288,13 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           ),
         ];
 
+        const fallbackCommands = filterPiSlashCommands(builtInCommands, isPiKernel);
         const filtered = (searchQuery
-          ? builtInCommands.filter(cmd =>
+          ? fallbackCommands.filter(cmd =>
               fuzzyMatch(cmd.name, searchQuery) ||
               (cmd.description && fuzzyMatch(cmd.description, searchQuery))
             )
-          : builtInCommands).filter(cmd => allowInitCommand || cmd.name !== 'init');
+          : fallbackCommands).filter(cmd => allowInitCommand || cmd.name !== 'init');
 
         setCommands(filtered);
       } finally {
@@ -282,7 +303,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     };
 
     loadCommands();
-  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t]);
+  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel]);
 
   React.useEffect(() => {
     setSelectedIndex(0);
@@ -454,7 +475,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
                       )}
                       {isOpenChamberBadge ? (
                         <span className={NEUTRAL_BADGE_CLASS}>
-                          OpenChamber
+                          Pichamber
                         </span>
                       ) : isSystem ? (
                         <span className={NEUTRAL_BADGE_CLASS}>
@@ -467,7 +488,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
                       ) : null}
                       {command.agent && (
                         <span className={NEUTRAL_BADGE_CLASS}>
-                          {command.agent}
+                          {String(command.agent).toLowerCase() === 'openchamber' ? 'Pichamber' : command.agent}
                         </span>
                       )}
                     </div>

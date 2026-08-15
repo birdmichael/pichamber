@@ -5,6 +5,7 @@ import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { getRuntimeKey, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
@@ -23,6 +24,7 @@ const UPDATE_TOAST_DISMISSED_VERSION_KEY = 'opencode-update-toast-dismissed-vers
 
 export const OpenCodeUpdateToast: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
   const seenVersionsRef = React.useRef(new Set<string>());
   const upgradingRef = React.useRef(false);
@@ -43,7 +45,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
   }, [t]);
 
   const runUpgrade = React.useCallback(async () => {
-    if (upgradingRef.current) return;
+    if (isPiKernel || upgradingRef.current) return;
     upgradingRef.current = true;
     toast.dismiss(UPDATE_TOAST_ID);
     toast.message(t('opencodeUpdate.toast.upgrading.title'), {
@@ -155,6 +157,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
     };
 
+    if (isPiKernel) return;
     if (showOpenCodeUpdateNotifications) {
       timeoutIds.push(setTimeout(() => { void checkForUpdate(0); }, INITIAL_CHECK_DELAY_MS));
     }
@@ -174,7 +177,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
       unsubscribeRuntime();
       window.removeEventListener('openchamber:opencode-update-available', onUpdateAvailable);
     };
-  }, [runUpgrade, showOpenCodeUpdateNotifications, t]);
+  }, [isPiKernel, runUpgrade, showOpenCodeUpdateNotifications, t]);
 
   return null;
 };

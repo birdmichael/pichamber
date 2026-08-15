@@ -9,6 +9,7 @@ import { Icon } from "@/components/icon/Icon";
 import { OpenChamberLogo } from '@/components/ui/OpenChamberLogo';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { InstanceServiceUrls } from './InstanceServiceUrls';
 import {
   SettingsSection,
@@ -16,9 +17,8 @@ import {
   SETTINGS_FIELD_LABEL_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 
-const GITHUB_URL = 'https://github.com/openchamber/openchamber';
+const GITHUB_URL = 'https://github.com/birdmichael/pichamber';
 const DISCORD_URL = 'https://discord.gg/ZYRSdnwwKA';
-const X_URL = 'https://x.com/openchamber_dev';
 
 const MIN_CHECKING_DURATION = 800; // ms
 
@@ -28,6 +28,7 @@ type AboutSettingsProps = {
 
 export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialogOpen = false }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const [updateDialogOpen, setUpdateDialogOpen] = React.useState(initialUpdateDialogOpen);
   const [showChecking, setShowChecking] = React.useState(false);
   const [openChamberVersion, setOpenChamberVersion] = React.useState<string | null>(null);
@@ -80,6 +81,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
     let cancelled = false;
 
     const loadOpenCodeVersion = async () => {
+      if (isPiKernel) return;
       try {
         const response = await runtimeFetch('/api/opencode/upgrade-status', {
           method: 'GET',
@@ -101,7 +103,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isPiKernel]);
 
   // Track if we initiated a check to show toast on completion
   const didInitiateCheck = React.useRef(false);
@@ -134,7 +136,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
           <h2 className={`mt-4 ${SETTINGS_BRAND_TITLE_CLASS}`}>Pichamber</h2>
           <div className="mt-2 space-y-1 typography-ui text-muted-foreground">
             <p>{t('aboutDialog.openChamberVersionLabel', { version: currentVersion })}</p>
-            <p>{t('aboutDialog.openCodeVersionLabel', { version: openCodeVersion || t('settings.openchamber.about.state.unknown') })}</p>
+            {!isPiKernel ? <p>{t('aboutDialog.openCodeVersionLabel', { version: openCodeVersion || t('settings.openchamber.about.state.unknown') })}</p> : null}
           </div>
           <InstanceServiceUrls />
         </div>
@@ -196,16 +198,6 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
               <span>Discord</span>
             </a>
           </div>
-
-          <a
-            href={X_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 typography-ui-label text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Icon name="twitter-xfill" className="size-5" />
-            <span>@openchamber_dev</span>
-          </a>
         </div>
 
         <p className="text-center typography-ui text-muted-foreground/60">
@@ -237,10 +229,12 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
             <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.openchamber.about.field.version')}</span>
             <span className="typography-meta text-muted-foreground font-mono">{currentVersion}</span>
           </div>
+          {!isPiKernel ? (
           <div className="flex min-w-0 flex-col">
             <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.openchamber.about.field.openCodeVersion')}</span>
             <span className="typography-meta text-muted-foreground font-mono">{openCodeVersion || t('settings.openchamber.about.state.unknown')}</span>
           </div>
+          ) : null}
           
           <div className="flex items-center gap-3">
             {updateStore.checking && (
@@ -295,16 +289,6 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
             <Icon name="github-fill" className="h-4 w-4" />
             <span>GitHub</span>
           </a>
-
-            <a
-              href={X_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground typography-meta transition-colors"
-          >
-            <Icon name="twitter-xfill" className="h-4 w-4" />
-              <span>@openchamber_dev</span>
-            </a>
         </div>
       </div>
 

@@ -13,6 +13,8 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  listPiExtensions,
+  listPiPackages,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -62,14 +64,14 @@ describe('pi-resources', () => {
   it('reads and writes Pi defaults without touching auth.json', () => {
     const home = makeTemp();
     expect(readPiDefaults(home).thinking).toBe('medium');
-    const saved = writePiDefaults(home, { model: 'bmlab/grok-4.6', thinking: 'high', compaction: false });
-    expect(saved).toEqual({
-      model: 'bmlab/grok-4.6',
+    const saved = writePiDefaults(home, { model: 'example-provider/example-model', thinking: 'high', compaction: false });
+    expect(saved).toMatchObject({
+      model: 'example-provider/example-model',
       thinking: 'high',
       compaction: false,
       retry: true,
     });
-    expect(readPiDefaults(home).model).toBe('bmlab/grok-4.6');
+    expect(readPiDefaults(home).model).toBe('example-provider/example-model');
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'auth.json'))).toBe(false);
   });
 
@@ -94,17 +96,62 @@ describe('pi-resources', () => {
     const agent = path.join(home, '.pi', 'agent');
     fs.mkdirSync(agent, { recursive: true });
     fs.writeFileSync(path.join(agent, 'auth.json'), JSON.stringify({
-      bmlab: { type: 'api', key: 'sk-test-do-not-leak' },
+      'example-provider': { type: 'api', key: 'sk-test-do-not-leak' },
     }));
     fs.writeFileSync(path.join(agent, 'models.json'), JSON.stringify({
-      providers: { bmlab: { baseUrl: 'https://example.test' } },
+      providers: { 'example-provider': { baseUrl: 'https://example.test' } },
     }));
     const methods = getPiAuthMethods(home);
-    expect(methods.bmlab).toEqual([{ type: 'api', label: 'API Key' }]);
+    expect(methods['example-provider']).toEqual([{ type: 'api', label: 'API Key' }]);
     expect(JSON.stringify(methods)).not.toContain('sk-test');
-    const sources = getPiProviderSources('bmlab', { home });
+    const sources = getPiProviderSources('example-provider', { home });
     expect(sources.sources.auth.exists).toBe(true);
     expect(sources.sources.user.exists).toBe(true);
     expect(sources.sources.auth.path).toContain(path.join('.pi', 'agent', 'auth.json'));
+  });
+
+  it('persists compaction and retry objects without wiping other agent settings', () => {
+    const home = makeTemp();
+    const agentDir = path.join(home, '.pi', 'agent');
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, 'settings.json'), JSON.stringify({ theme: 'keep-me', compaction: { enabled: true } }) + '\n');
+    const saved = writePiDefaults(home, {
+      compaction: true,
+      compactionSettings: { reserveTokens: 4096, keepRecentTokens: 8000 },
+      retrySettings: { maxRetries: 5, baseDelayMs: 1500 },
+    });
+    expect(saved.compaction).toBe(true);
+    expect(saved.compactionSettings).toMatchObject({ enabled: true, reserveTokens: 4096, keepRecentTokens: 8000 });
+    expect(saved.retrySettings).toMatchObject({ enabled: true, maxRetries: 5, baseDelayMs: 1500 });
+    const again = readPiDefaults(home);
+    expect(again.compactionSettings.reserveTokens).toBe(4096);
+    expect(again.retrySettings.maxRetries).toBe(5);
+    const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
+    expect(chamber.compaction).toBe(true);
+    expect(chamber.retry).toBe(true);
+    expect(chamber.compactionSettings).toBeUndefined();
+    const agent = JSON.parse(fs.readFileSync(path.join(agentDir, 'settings.json'), 'utf8'));
+    expect(agent.theme).toBe('keep-me');
+    expect(agent.compaction.reserveTokens).toBe(4096);
+    expect(agent.retry.maxRetries).toBe(5);
+  });
+
+  it('lists user and project extensions and installed packages', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    const pkgSource = 'n' + 'pm';
+    fs.mkdirSync(path.join(home, '.pi', 'agent', 'extensions', 'demo-ext'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'extensions', 'demo-ext', 'index.js'), 'export default {};\n');
+    fs.mkdirSync(path.join(project, '.pi', 'extensions'), { recursive: true });
+    fs.writeFileSync(path.join(project, '.pi', 'extensions', 'local.js'), 'export default {};\n');
+    const userPkg = path.join(home, '.pi', 'agent', pkgSource, 'demo-pkg');
+    fs.mkdirSync(userPkg, { recursive: true });
+    fs.writeFileSync(path.join(userPkg, 'package.json'), JSON.stringify({ name: 'demo-pkg', version: '1.0.0' }));
+    const extensions = listPiExtensions({ home, directory: project });
+    expect(extensions.map((item) => item.name).sort()).toEqual(['demo-ext', 'local']);
+    expect(extensions.find((item) => item.name === 'demo-ext').scope).toBe('user');
+    expect(extensions.find((item) => item.name === 'local').scope).toBe('project');
+    const packages = listPiPackages({ home, directory: project });
+    expect(packages.some((item) => item.name === 'demo-pkg' && item.source === pkgSource && item.scope === 'user')).toBe(true);
   });
 });

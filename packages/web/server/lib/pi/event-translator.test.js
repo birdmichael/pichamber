@@ -104,7 +104,7 @@ describe('createEventTranslator', () => {
     const t = translator();
     t.setUserMessage('msg_user', {
       agent: 'pi',
-      model: { providerID: 'xai', modelID: 'grok-4.6' },
+      model: { providerID: 'xai', modelID: 'example-model' },
     });
     const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
     expect(started[0].properties.sessionID).toBe('ses_1');
@@ -113,12 +113,12 @@ describe('createEventTranslator', () => {
       sessionID: 'ses_1',
       role: 'assistant',
       parentID: 'msg_user',
-      modelID: 'grok-4.6',
+      modelID: 'example-model',
       providerID: 'xai',
       mode: 'pi',
       agent: 'pi',
       path: { cwd: '/tmp/project', root: '/tmp/project' },
-      model: { providerID: 'xai', modelID: 'grok-4.6' },
+      model: { providerID: 'xai', modelID: 'example-model' },
       time: { created: 1_700_000_000_000 },
     });
     expect(started[0].properties.info.time.completed).toBeUndefined();
@@ -153,6 +153,23 @@ describe('createEventTranslator', () => {
     expect(events[0].properties.status.type).toBe('retry');
     expect(events[0].properties.status.attempt).toBe(2);
     expect(events[0].properties.status.message).toBe('overloaded');
+  });
+
+  it('maps compaction_start to busy plus compact start, and compaction_end without idle', () => {
+    const t = translator();
+    const start = t.translate({ type: 'compaction_start', instructions: 'trim' });
+    expect(start.map((event) => event.type)).toEqual(['session.status', 'session.compact']);
+    expect(start[0].properties.status).toEqual({ type: 'busy' });
+    expect(start[1].properties).toMatchObject({ sessionID: 'ses_1', status: 'start' });
+    const end = t.translate({ type: 'compaction_end' });
+    expect(end).toEqual([
+      expect.objectContaining({
+        type: 'session.compact',
+        properties: { sessionID: 'ses_1', status: 'end' },
+      }),
+    ]);
+    expect(end.some((event) => event.type === 'session.idle')).toBe(false);
+    expect(end.some((event) => event.type === 'session.status')).toBe(false);
   });
 });
 

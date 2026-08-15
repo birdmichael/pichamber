@@ -45,7 +45,7 @@ That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds nat
 
 `OPENCHAMBER_KERNEL` defaults to `pi` in both Desktop and the in-process server. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.
 
-The OpenCode CLI / update settings page, MCP, plugins, permissions, share, revert, and Agents remain visible. They are leftover OpenCode UI, not the default kernel.
+On the Pi kernel, Usage/MCP/Plugins are hidden. Agents is the built-in `pi` agent (read-only). Share, revert, and session.shell remain empty-success stubs. Skills and commands write to `~/.pi/agent` and `.pi`, not `.opencode`. Walkthrough review uses the current Pi model from `~/.pi/agent` / `GET /api/pi/models` — never a hardcoded model.
 
 ### In-process web server only
 
@@ -71,6 +71,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 - Providers from `ModelRuntime.getAvailable()` (or a mock provider)
 - Event mapping: `text_delta` → `message.part.delta` field `text`; `thinking_delta` → reasoning; `tool_execution_*` → tool parts; `agent_start` → busy; `agent_settled` → idle
 - Empty-success stubs so bootstrap does not crash: MCP, LSP, permission, question, share, revert
+- `GET /api/find/files` (and `/find/files`) for composer @ file search
 
 ## Still OpenCode-only / not ported
 

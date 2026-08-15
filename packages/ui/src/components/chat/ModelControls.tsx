@@ -345,12 +345,20 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
         setPiThinking(level);
+        const sessionId = useSessionUIStore.getState().currentSessionId;
         try {
             await runtimeFetch('/api/pi/defaults', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ thinking: level }),
             });
+            if (sessionId) {
+                await runtimeFetch(`/api/session/${sessionId}/thinking`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ thinking: level }),
+                });
+            }
         } catch {
             // keep the optimistic chip; Settings → Sessions remains the fallback
         }
@@ -727,6 +735,11 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             setModel(modelId);
 
             if (currentSessionId) {
+                void runtimeFetch(`/api/session/${currentSessionId}/model`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: `${providerId}/${modelId}` }),
+                }).catch(() => undefined);
                 saveSessionModelSelection(currentSessionId, providerId, modelId);
                 if (agentName) {
                     saveAgentModelForSession(currentSessionId, agentName, providerId, modelId);

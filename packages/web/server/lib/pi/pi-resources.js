@@ -4,11 +4,25 @@ import path from 'node:path';
 
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
+export const DEFAULT_COMPACTION_SETTINGS = {
+  enabled: true,
+  reserveTokens: 16384,
+  keepRecentTokens: 20000,
+};
+
+export const DEFAULT_RETRY_SETTINGS = {
+  enabled: true,
+  maxRetries: 3,
+  baseDelayMs: 2000,
+};
+
 export const DEFAULT_PI_SETTINGS = {
-  model: '',
-  thinking: 'medium',
+  model: "",
+  thinking: "medium",
   compaction: true,
   retry: true,
+  compactionSettings: { ...DEFAULT_COMPACTION_SETTINGS },
+  retrySettings: { ...DEFAULT_RETRY_SETTINGS },
 };
 
 export const BUILTIN_COMMANDS = [
@@ -93,6 +107,12 @@ export const resolvePiAuthPath = (home = os.homedir()) => path.join(resolvePiAge
 export const resolvePiModelsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'models.json');
 
 export const resolvePiAgentsMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'AGENTS.md');
+
+export const resolvePiSettingsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'settings.json');
+
+export const resolvePiSystemMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'SYSTEM.md');
+
+export const resolvePiAppendSystemMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'APPEND_SYSTEM.md');
 
 export const resolveActiveProjectDirectory = (home = os.homedir()) => {
   const settingsFile = path.join(
@@ -282,39 +302,284 @@ export const listPiCommands = ({ home = os.homedir(), directory } = {}) => {
   ];
 };
 
-export const readPiDefaults = (home = os.homedir()) => {
-  const filePath = resolvePiDefaultsPath(home);
-  if (!isFile(filePath)) {
-    return { ...DEFAULT_PI_SETTINGS };
-  }
-  try {
-    const parsed = JSON.parse(readText(filePath));
-    const thinking = THINKING_LEVELS.includes(parsed?.thinking) ? parsed.thinking : DEFAULT_PI_SETTINGS.thinking;
-    return {
-      model: typeof parsed?.model === 'string' ? parsed.model : '',
-      thinking,
-      compaction: parsed?.compaction !== false,
-      retry: parsed?.retry !== false,
-    };
-  } catch {
-    return { ...DEFAULT_PI_SETTINGS };
-  }
+const asNonNegativeInt = (value, fallback) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.floor(number) : fallback;
 };
 
-export const writePiDefaults = (home = os.homedir(), patch = {}) => {
-  const current = readPiDefaults(home);
-  const next = {
-    ...current,
-    ...(typeof patch.model === 'string' ? { model: patch.model } : {}),
-    ...(THINKING_LEVELS.includes(patch.thinking) ? { thinking: patch.thinking } : {}),
-    ...(typeof patch.compaction === 'boolean' ? { compaction: patch.compaction } : {}),
-    ...(typeof patch.retry === 'boolean' ? { retry: patch.retry } : {}),
-  };
-  const filePath = resolvePiDefaultsPath(home);
+const normalizeCompactionSettings = (value, enabledFallback = DEFAULT_COMPACTION_SETTINGS.enabled) => {
+  if (typeof value === "boolean") {
+    return { ...DEFAULT_COMPACTION_SETTINGS, enabled: value };
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return {
+      enabled: typeof value.enabled === "boolean" ? value.enabled : enabledFallback,
+      reserveTokens: asNonNegativeInt(value.reserveTokens, DEFAULT_COMPACTION_SETTINGS.reserveTokens),
+      keepRecentTokens: asNonNegativeInt(value.keepRecentTokens, DEFAULT_COMPACTION_SETTINGS.keepRecentTokens),
+    };
+  }
+  return { ...DEFAULT_COMPACTION_SETTINGS, enabled: enabledFallback };
+};
+
+const normalizeRetrySettings = (value, enabledFallback = DEFAULT_RETRY_SETTINGS.enabled) => {
+  if (typeof value === "boolean") {
+    return { ...DEFAULT_RETRY_SETTINGS, enabled: value };
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return {
+      enabled: typeof value.enabled === "boolean" ? value.enabled : enabledFallback,
+      maxRetries: asNonNegativeInt(value.maxRetries, DEFAULT_RETRY_SETTINGS.maxRetries),
+      baseDelayMs: asNonNegativeInt(value.baseDelayMs, DEFAULT_RETRY_SETTINGS.baseDelayMs),
+    };
+  }
+  return { ...DEFAULT_RETRY_SETTINGS, enabled: enabledFallback };
+};
+
+const pickObjectPatch = (value) => (
+  value && typeof value === "object" && !Array.isArray(value) ? value : null
+);
+
+const pickCompactionPatch = (patch = {}) => {
+  const fromSettings = pickObjectPatch(patch.compactionSettings);
+  const fromObject = pickObjectPatch(patch.compaction);
+  const fromBool = typeof patch.compaction === "boolean" ? { enabled: patch.compaction } : null;
+  if (!fromSettings && !fromObject && !fromBool) return null;
+  return { ...fromSettings, ...fromObject, ...fromBool };
+};
+
+const pickRetryPatch = (patch = {}) => {
+  const fromSettings = pickObjectPatch(patch.retrySettings);
+  const fromObject = pickObjectPatch(patch.retry);
+  const fromBool = typeof patch.retry === "boolean" ? { enabled: patch.retry } : null;
+  if (!fromSettings && !fromObject && !fromBool) return null;
+  return { ...fromSettings, ...fromObject, ...fromBool };
+};
+
+export const readPiAgentSettings = (home = os.homedir()) => readJsonObject(resolvePiSettingsPath(home));
+
+export const writePiAgentSettings = (home = os.homedir(), patch = {}) => {
+  const filePath = resolvePiSettingsPath(home);
+  const current = readJsonObject(filePath);
+  const next = { ...current };
+  if (patch.compaction && typeof patch.compaction === "object" && !Array.isArray(patch.compaction)) {
+    next.compaction = {
+      ...(current.compaction && typeof current.compaction === "object" && !Array.isArray(current.compaction)
+        ? current.compaction
+        : {}),
+      ...patch.compaction,
+    };
+  }
+  if (patch.retry && typeof patch.retry === "object" && !Array.isArray(patch.retry)) {
+    next.retry = {
+      ...(current.retry && typeof current.retry === "object" && !Array.isArray(current.retry)
+        ? current.retry
+        : {}),
+      ...patch.retry,
+    };
+  }
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 };
+
+export const readPiDefaults = (home = os.homedir()) => {
+  const chamberPath = resolvePiDefaultsPath(home);
+  const chamber = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
+  const agent = readPiAgentSettings(home);
+  const thinking = THINKING_LEVELS.includes(chamber.thinking) ? chamber.thinking : DEFAULT_PI_SETTINGS.thinking;
+  const chamberCompaction = typeof chamber.compaction === "boolean" ? chamber.compaction : DEFAULT_PI_SETTINGS.compaction;
+  const chamberRetry = typeof chamber.retry === "boolean" ? chamber.retry : DEFAULT_PI_SETTINGS.retry;
+  const compactionSettings = normalizeCompactionSettings(agent.compaction ?? chamber.compaction, chamberCompaction);
+  const retrySettings = normalizeRetrySettings(agent.retry ?? chamber.retry, chamberRetry);
+  return {
+    model: typeof chamber.model === "string" ? chamber.model : "",
+    thinking,
+    compaction: compactionSettings.enabled,
+    retry: retrySettings.enabled,
+    compactionSettings,
+    retrySettings,
+  };
+};
+
+export const writePiDefaults = (home = os.homedir(), patch = {}) => {
+  const current = readPiDefaults(home);
+  const compactionPatch = pickCompactionPatch(patch);
+  const retryPatch = pickRetryPatch(patch);
+  const compactionSettings = compactionPatch
+    ? normalizeCompactionSettings({ ...current.compactionSettings, ...compactionPatch }, current.compaction)
+    : current.compactionSettings;
+  const retrySettings = retryPatch
+    ? normalizeRetrySettings({ ...current.retrySettings, ...retryPatch }, current.retry)
+    : current.retrySettings;
+  const next = {
+    model: typeof patch.model === "string" ? patch.model : current.model,
+    thinking: THINKING_LEVELS.includes(patch.thinking) ? patch.thinking : current.thinking,
+    compaction: compactionSettings.enabled,
+    retry: retrySettings.enabled,
+    compactionSettings,
+    retrySettings,
+  };
+  const chamberPath = resolvePiDefaultsPath(home);
+  fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
+  fs.writeFileSync(chamberPath, `${JSON.stringify({
+    model: next.model,
+    thinking: next.thinking,
+    compaction: next.compaction,
+    retry: next.retry,
+  }, null, 2)}\n`);
+  writePiAgentSettings(home, {
+    compaction: compactionSettings,
+    retry: retrySettings,
+  });
+  return next;
+};
+
+export const resolvePiSystemPromptFiles = (home = os.homedir()) => {
+  const directory = resolveActiveProjectDirectory(home);
+  return {
+    directory,
+    global: {
+      replace: resolvePiSystemMdPath(home),
+      append: resolvePiAppendSystemMdPath(home),
+    },
+    project: directory
+      ? {
+        replace: path.join(directory, ".pi", "SYSTEM.md"),
+        append: path.join(directory, ".pi", "APPEND_SYSTEM.md"),
+      }
+      : null,
+  };
+};
+
+const describePromptFile = (filePath) => ({
+  path: filePath,
+  exists: isFile(filePath),
+  content: isFile(filePath) ? readText(filePath) : "",
+});
+
+export const readPiSystemPromptFiles = (home = os.homedir()) => {
+  const paths = resolvePiSystemPromptFiles(home);
+  return {
+    directory: paths.directory,
+    global: {
+      replace: describePromptFile(paths.global.replace),
+      append: describePromptFile(paths.global.append),
+    },
+    project: paths.project
+      ? {
+        replace: describePromptFile(paths.project.replace),
+        append: describePromptFile(paths.project.append),
+      }
+      : null,
+  };
+};
+
+export const writePiSystemPromptFile = ({
+  home = os.homedir(),
+  kind = "replace",
+  scope = "user",
+  content = "",
+} = {}) => {
+  const paths = resolvePiSystemPromptFiles(home);
+  const target = scope === "project" ? paths.project : paths.global;
+  if (!target) {
+    const error = new Error("Project SYSTEM.md needs a lastDirectory");
+    error.status = 400;
+    throw error;
+  }
+  const filePath = kind === "append" ? target.append : target.replace;
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const body = typeof content === "string" ? content : "";
+  fs.writeFileSync(filePath, body.endsWith("\n") || body.length === 0 ? body : `${body}\n`);
+  return { path: filePath, scope: scope === "project" ? "project" : "user", kind: kind === "append" ? "append" : "replace" };
+};
+
+export const listPiExtensionRoots = ({ home = os.homedir(), directory } = {}) => {
+  const roots = [
+    { root: path.join(resolvePiAgentDir(home), "extensions"), scope: "user" },
+  ];
+  if (directory) {
+    roots.push({ root: path.join(directory, ".pi", "extensions"), scope: "project" });
+  }
+  return roots;
+};
+
+export const listPiExtensions = ({ home = os.homedir(), directory } = {}) => {
+  const extensions = [];
+  const seen = new Set();
+  for (const { root, scope } of listPiExtensionRoots({ home, directory })) {
+    if (!isDirectory(root)) continue;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(root, entry.name);
+      const isExtFile = entry.isFile() && /\.(ts|js|mjs|cjs)$/i.test(entry.name);
+      if (!entry.isDirectory() && !isExtFile) continue;
+      const name = entry.isDirectory() ? entry.name : path.basename(entry.name, path.extname(entry.name));
+      const key = `${scope}:${name}`;
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      extensions.push({ name, path: fullPath, scope });
+    }
+  }
+  return extensions;
+};
+
+const collectPackageJsonFiles = (root, depth = 0, results = []) => {
+  if (depth > 3 || !isDirectory(root)) return results;
+  const manifest = path.join(root, "package.json");
+  if (isFile(manifest)) {
+    results.push(manifest);
+    return results;
+  }
+  let entries = [];
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    collectPackageJsonFiles(path.join(root, entry.name), depth + 1, results);
+  }
+  return results;
+};
+
+export const listPiPackageRoots = ({ home = os.homedir(), directory } = {}) => {
+  const roots = [
+    { root: path.join(resolvePiAgentDir(home), "npm"), source: "npm", scope: "user" },
+    { root: path.join(resolvePiAgentDir(home), "git"), source: "git", scope: "user" },
+  ];
+  if (directory) {
+    roots.push({ root: path.join(directory, ".pi", "npm"), source: "npm", scope: "project" });
+    roots.push({ root: path.join(directory, ".pi", "git"), source: "git", scope: "project" });
+  }
+  return roots;
+};
+
+export const listPiPackages = ({ home = os.homedir(), directory } = {}) => {
+  const packages = [];
+  const seen = new Set();
+  for (const { root, source, scope } of listPiPackageRoots({ home, directory })) {
+    for (const manifest of collectPackageJsonFiles(root)) {
+      const parsed = readJsonObject(manifest);
+      const name = typeof parsed.name === "string" && parsed.name.trim()
+        ? parsed.name.trim()
+        : path.basename(path.dirname(manifest));
+      const key = [scope, source, name].join(":");
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      packages.push({ name, source, scope, path: path.dirname(manifest) });
+    }
+  }
+  return packages;
+};
+
 
 export const toConfigSkillsPayload = (skills) => ({
   skills,

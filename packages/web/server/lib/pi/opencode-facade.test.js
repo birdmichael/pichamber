@@ -27,19 +27,26 @@ const listen = (app) => new Promise((resolve) => {
   });
 });
 
-const startFacade = async () => {
+const startFacade = async ({ directory = '/tmp/project' } = {}) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-home-'));
   tempHomes.push(home);
+  const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
+  process.env.OPENCHAMBER_DATA_DIR = home;
   const kernel = createPiKernel({
     mock: true,
-    defaultDirectory: '/tmp/project',
+    defaultDirectory: directory,
     home,
   });
   const app = express();
   app.use(express.json());
-  registerPiFacade(app, { host: kernel.host, bus: kernel.bus, defaultDirectory: '/tmp/project' });
+  registerPiFacade(app, { host: kernel.host, bus: kernel.bus, defaultDirectory: directory });
   const http = await listen(app);
-  return { kernel, ...http };
+  const close = async () => {
+    if (previousDataDir === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+    else process.env.OPENCHAMBER_DATA_DIR = previousDataDir;
+    await http.close();
+  };
+  return { kernel, url: http.url, server: http.server, close };
 };
 
 describe('OpenCode facade HTTP/SSE', () => {
@@ -241,22 +248,22 @@ describe('OpenCode facade HTTP/SSE', () => {
       const home = kernel.host.getPath().home;
       fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
       fs.writeFileSync(path.join(home, '.pi', 'agent', 'auth.json'), JSON.stringify({
-        bmlab: { type: 'api', key: 'sk-test-do-not-leak' },
+        'example-provider': { type: 'api', key: 'sk-test-do-not-leak' },
       }));
       fs.writeFileSync(path.join(home, '.pi', 'agent', 'models.json'), JSON.stringify({
-        providers: { bmlab: { baseUrl: 'https://example.test' } },
+        providers: { 'example-provider': { baseUrl: 'https://example.test' } },
       }));
       const prefixed = await fetch(`${url}/api/provider/auth`);
       expect(prefixed.status).toBe(200);
       const methods = await prefixed.json();
-      expect(methods.bmlab[0]).toMatchObject({ type: 'api' });
+      expect(methods['example-provider'][0]).toMatchObject({ type: 'api' });
       expect(JSON.stringify(methods)).not.toContain('sk-test');
 
       const bare = await fetch(`${url}/provider/auth`);
       expect(bare.status).toBe(200);
       expect(await bare.json()).toEqual(methods);
 
-      const source = await (await fetch(`${url}/api/provider/bmlab/source`)).json();
+      const source = await (await fetch(`${url}/api/provider/example-provider/source`)).json();
       expect(source.sources.auth.exists).toBe(true);
       expect(source.sources.user.exists).toBe(true);
     } finally {
@@ -329,6 +336,31 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(thinking.status).toBe(200);
       const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
       expect(defaults.thinking).toBe('high');
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('searches project files for @ mentions', async () => {
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-find-files-'));
+    tempHomes.push(project);
+    fs.mkdirSync(path.join(project, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(project, 'src', 'composer.ts'), 'export {}\n');
+    fs.writeFileSync(path.join(project, 'README.md'), 'hi\n');
+    fs.mkdirSync(path.join(project, 'node_modules', 'skip'), { recursive: true });
+    fs.writeFileSync(path.join(project, 'node_modules', 'skip', 'hidden.ts'), 'nope\n');
+    const { url, close, kernel } = await startFacade({ directory: project });
+    try {
+      const dirQ = `directory=${encodeURIComponent(project)}`;
+      const all = await (await fetch(`${url}/api/find/files?${dirQ}`)).json();
+      expect(all).toEqual(expect.arrayContaining(['README.md', 'src/composer.ts']));
+      expect(all.join('|')).not.toContain('node_modules');
+      const filtered = await (await fetch(`${url}/api/find/files?query=composer&type=file&${dirQ}`)).json();
+      expect(filtered).toEqual(['src/composer.ts']);
+      const bare = await fetch(`${url}/find/files?query=README&${dirQ}`);
+      expect(bare.status).toBe(200);
+      expect(await bare.json()).toEqual(['README.md']);
     } finally {
       kernel.dispose();
       await close();

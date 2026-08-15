@@ -18,6 +18,7 @@ import { useDeviceInfo } from '@/lib/device';
 import { isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
 import { isCapacitorApp } from '@/lib/platform';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import type { OpenChamberSection } from './types';
 
@@ -38,6 +39,7 @@ interface OpenChamberPageProps {
 
 export const OpenChamberPage: React.FC<OpenChamberPageProps> = ({ section }) => {
     const { t } = useI18n();
+    const isPiKernel = usePiKernel();
     const { isMobile } = useDeviceInfo();
     const runtimeEndpointEpoch = useRuntimeEndpointEpoch();
     const showAbout = isMobile && isWebRuntime();
@@ -52,8 +54,8 @@ export const OpenChamberPage: React.FC<OpenChamberPageProps> = ({ section }) => 
                 <OpenChamberVisualSettings />
                 <DefaultsSettings />
                 {showDesktopNetworkSettings && <DesktopNetworkSettings />}
-                {!isVSCode && <OpenCodeCliSettings />}
-                {!isVSCode && <OpenChamberToolsSettings />}
+                {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
+                {!isVSCode && !isPiKernel && <OpenChamberToolsSettings />}
                 <SessionRetentionSettings />
                 {isWebRuntime() && !isDesktopShell() && !isVSCode && !isCapacitorApp() && <PasskeySettings />}
                 {showAbout && <AboutSettings />}
@@ -135,6 +137,7 @@ const ShortcutsSectionContent: React.FC = () => {
 // passkeys, OpenCode CLI binary, message stream transport, privacy.
 const GeneralSectionContent: React.FC = () => {
     const isVSCode = isVSCodeRuntime();
+    const isPiKernel = usePiKernel();
     const runtimeEndpointEpoch = useRuntimeEndpointEpoch();
     void runtimeEndpointEpoch;
     const showDesktopNetworkSettings = isDesktopShell() && isDesktopLocalOriginActive();
@@ -145,8 +148,8 @@ const GeneralSectionContent: React.FC = () => {
         <>
             {showDesktopNetworkSettings && <DesktopNetworkSettings />}
             {showPasskeySettings && <PasskeySettings />}
-            {!isVSCode && <OpenCodeCliSettings />}
-            {!isVSCode && <OpenChamberToolsSettings />}
+            {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
+            {!isVSCode && !isPiKernel && <OpenChamberToolsSettings />}
             <OpenChamberVisualSettings visibleSettings={[
                 'fileEditorKeymap',
                 'autoSaveEnabled',

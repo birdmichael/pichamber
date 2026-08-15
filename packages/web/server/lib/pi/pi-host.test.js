@@ -187,13 +187,36 @@ describe('createPiHost', () => {
     try {
       const host = createPiHost({ mock: true, home, defaultDirectory: '/tmp/project' });
       expect(host.getDefaults().thinking).toBe('medium');
-      const saved = host.setDefaults({ thinking: 'high', defaultModel: 'bmlab/grok-4.6' });
+      const saved = host.setDefaults({ thinking: 'high', defaultModel: 'example-provider/example-model' });
       expect(saved.thinking).toBe('high');
-      expect(saved.model).toBe('bmlab/grok-4.6');
-      expect(host.getDefaults()).toMatchObject({ thinking: 'high', model: 'bmlab/grok-4.6' });
+      expect(saved.model).toBe('example-provider/example-model');
+      expect(host.getDefaults()).toMatchObject({ thinking: 'high', model: 'example-provider/example-model' });
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it('forkSession copies messages up to the chosen user message', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Source' });
+    await host.promptAsync(record.id, { messageID: 'msg_a', parts: [{ type: 'text', text: 'first' }] });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    await host.promptAsync(record.id, { messageID: 'msg_b', parts: [{ type: 'text', text: 'second' }] });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const sourceMessages = host.getMessages(record.id);
+    expect(sourceMessages.some((entry) => entry.info.id === 'msg_a')).toBe(true);
+    expect(sourceMessages.some((entry) => entry.info.id === 'msg_b')).toBe(true);
+    const forked = await host.forkSession(record.id, 'msg_a');
+    const forkedMessages = host.getMessages(forked.id);
+    expect(forkedMessages.map((entry) => entry.info.id)).toContain('msg_a');
+    expect(forkedMessages.map((entry) => entry.info.id)).not.toContain('msg_b');
+    expect(forkedMessages.every((entry) => entry.info.sessionID === forked.id)).toBe(true);
+    const texts = forkedMessages.flatMap((entry) => (entry.parts || []).map((part) => part.text).filter(Boolean));
+    expect(texts.join(' ')).toContain('first');
+    expect(texts.join(' ')).not.toContain('second');
+    const tree = host.getSessionTree(record.id);
+    expect(tree.some((node) => node.id === 'msg_a' && node.role === 'user')).toBe(true);
+    host.dispose();
   });
 });

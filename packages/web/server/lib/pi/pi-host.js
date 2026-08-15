@@ -6,6 +6,8 @@ import { createEventTranslator, extractPromptImages, extractPromptText } from '.
 import {
   THINKING_LEVELS,
   listPiCommands,
+  listPiExtensions,
+  listPiPackages,
   listPiPrompts,
   listPiSkills,
   readPiDefaults,
@@ -115,6 +117,24 @@ export const createInMemoryPiSession = ({
       aborted = true;
       streaming = false;
       emit({ type: 'agent_settled' });
+    },
+    thinkingLevel: 'medium',
+    currentModel: null,
+    getAvailableThinkingLevels() {
+      return ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+    },
+    setThinkingLevel(level) {
+      this.thinkingLevel = level;
+    },
+    setModel(model) {
+      this.currentModel = model;
+    },
+    getContextUsage() {
+      return { tokens: 0, contextLimit: 128000, percent: 0 };
+    },
+    async compact(instructions) {
+      emit({ type: 'compaction_start', instructions: instructions || '' });
+      emit({ type: 'compaction_end' });
     },
     dispose() {
       listeners.clear();
@@ -499,6 +519,20 @@ export const createPiHost = ({
       modelRuntime,
       model,
     });
+    try {
+      const defaults = readPiDefaults(home);
+      if (typeof piSession?.setThinkingLevel === "function") {
+        let level = defaults.thinking;
+        if (typeof piSession.getAvailableThinkingLevels === "function") {
+          const levels = piSession.getAvailableThinkingLevels();
+          if (Array.isArray(levels) && levels.length > 0 && !levels.includes(level)) {
+            level = levels.includes("medium") ? "medium" : levels[0];
+          }
+        }
+        piSession.setThinkingLevel(level);
+      }
+    } catch {
+    }
     const sessionID = id || createSessionId();
     const record = {
       id: sessionID,
@@ -910,7 +944,10 @@ export const createPiHost = ({
         const current = readPiDefaults(home);
         if (argument && THINKING_LEVELS.includes(argument)) {
           writePiDefaults(home, { thinking: argument });
-          return reply(`Thinking level set to ${argument}. New sessions will use this default.`);
+          if (typeof record.piSession?.setThinkingLevel === 'function') {
+            try { record.piSession.setThinkingLevel(argument); } catch {}
+          }
+          return reply(`Thinking level set to ${argument}.`);
         }
         return reply(
           `Current thinking level: ${current.thinking}. Valid levels: ${THINKING_LEVELS.join(', ')}.`,
@@ -948,6 +985,120 @@ export const createPiHost = ({
         ...body,
         parts: [{ type: 'text', text: userText }],
       });
+    },
+    listExtensions(directory) {
+      return listPiExtensions({ home, directory: directory || defaultDirectory });
+    },
+    listPackages(directory) {
+      return listPiPackages({ home, directory: directory || defaultDirectory });
+    },
+    getSessionTree(sessionID) {
+      const record = getRecord(sessionID);
+      return record.messages.map((entry) => {
+        const textPart = (entry.parts || []).find((part) => part.type === "text" && typeof part.text === "string");
+        const preview = String(textPart?.text || "").replace(/\s+/g, " ").trim().slice(0, 140);
+        return {
+          id: entry.info?.id,
+          parentId: entry.info?.parentID || null,
+          role: entry.info?.role || "user",
+          preview,
+          timestamp: entry.info?.time?.created || 0,
+        };
+      });
+    },
+    async forkSession(sessionID, messageID) {
+      const source = getRecord(sessionID);
+      const record = await createFacadeSession({
+        directory: source.directory,
+        title: source.info.title,
+        parentID: source.id,
+      });
+      let messages = source.messages;
+      if (typeof messageID === "string" && messageID.trim()) {
+        const index = source.messages.findIndex((entry) => entry.info?.id === messageID);
+        if (index >= 0) {
+          messages = source.messages.slice(0, index + 1);
+        }
+      }
+      record.messages = messages.map((entry) => ({
+        info: { ...entry.info, sessionID: record.id },
+        parts: (entry.parts || []).map((part) => ({ ...part, sessionID: record.id })),
+      }));
+      record.info.time.updated = Date.now();
+      return record;
+    },
+    async setSessionThinking(sessionID, level) {
+      const record = getRecord(sessionID);
+      if (typeof record.piSession?.setThinkingLevel !== "function") {
+        return { applied: false, thinking: level };
+      }
+      let next = THINKING_LEVELS.includes(level) ? level : null;
+      if (typeof record.piSession.getAvailableThinkingLevels === "function") {
+        const available = record.piSession.getAvailableThinkingLevels();
+        if (Array.isArray(available) && available.length > 0) {
+          if (!next || !available.includes(next)) {
+            next = available.includes("medium") ? "medium" : available[0];
+          }
+        }
+      }
+      if (!next) {
+        const error = new Error("Invalid thinking level");
+        error.status = 400;
+        throw error;
+      }
+      record.piSession.setThinkingLevel(next);
+      return { applied: true, thinking: next };
+    },
+    async setSessionModel(sessionID, modelRef) {
+      const record = getRecord(sessionID);
+      if (typeof record.piSession?.setModel !== "function") {
+        return { applied: false, model: modelRef };
+      }
+      const runtime = await ensureModelRuntime();
+      if (!runtime || typeof runtime.getAvailable !== "function") {
+        const error = new Error("Pi models are not available");
+        error.status = 400;
+        throw error;
+      }
+      const available = await runtime.getAvailable();
+      const raw = typeof modelRef === "string" ? modelRef.trim() : "";
+      const [providerID, modelID] = raw.split("/");
+      const model = Array.isArray(available)
+        ? available.find((item) => (
+          item.id === raw
+          || (item.id === modelID && (!providerID || item.provider === providerID))
+        ))
+        : null;
+      if (!model) {
+        const error = new Error("Unknown Pi model");
+        error.status = 400;
+        throw error;
+      }
+      record.piSession.setModel(model);
+      return { applied: true, model: model.provider ? `${model.provider}/${model.id}` : model.id };
+    },
+    getSessionUsage(sessionID) {
+      const record = getRecord(sessionID);
+      try {
+        if (typeof record.piSession?.getContextUsage === "function") {
+          return { available: true, ...record.piSession.getContextUsage() };
+        }
+        if (typeof record.piSession?.getSessionStats === "function") {
+          return { available: true, ...record.piSession.getSessionStats() };
+        }
+      } catch {
+      }
+      return { available: false };
+    },
+    async compactSession(sessionID, instructions) {
+      const record = getRecord(sessionID);
+      if (typeof record.piSession?.compact !== "function") {
+        const error = new Error("Pi compact is not available on this session");
+        error.status = 400;
+        throw error;
+      }
+      await record.piSession.compact(typeof instructions === "string" && instructions.trim() ? instructions : undefined);
+      return { compacted: true };
     },
     dispose() {
       for (const record of sessions.values()) {

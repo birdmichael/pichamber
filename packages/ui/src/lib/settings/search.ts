@@ -211,14 +211,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'chat',
     titleKey: 'settings.openchamber.visual.field.sessionGoal',
     keywords: ['goal', 'objective', 'auto continue', 'small model'],
-    isAvailable: (ctx) => !ctx.isVSCode,
+    isAvailable: (ctx) => !ctx.isVSCode && !ctx.isPiKernel,
   },
   {
     id: 'chat.session-goal-budget',
     page: 'chat',
     titleKey: 'settings.openchamber.visual.goal.budgetLabel',
     keywords: ['goal', 'budget', 'tokens', 'limit'],
-    isAvailable: (ctx) => !ctx.isVSCode,
+    isAvailable: (ctx) => !ctx.isVSCode && !ctx.isPiKernel,
   },
   {
     id: 'chat.reasoning-traces',
@@ -356,6 +356,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'sessions',
     titleKey: 'settings.openchamber.defaults.field.defaultAgent',
     keywords: ['agent', 'new sessions'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'sessions.deletion-dialog',
@@ -464,14 +465,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'general',
     titleKey: 'settings.openchamber.opencodeCli.field.binaryPath',
     keywords: ['opencode', 'cli', 'binary', 'path'],
-    isAvailable: (ctx) => !ctx.isVSCode,
+    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode,
   },
   {
     id: 'sessions.opencode-update-notifications',
     page: 'general',
     titleKey: 'settings.openchamber.opencodeCli.field.showUpdateNotifications',
     keywords: ['opencode', 'cli', 'updates'],
-    isAvailable: (ctx) => !ctx.isVSCode && !ctx.isWindowsArm64,
+    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode && !ctx.isWindowsArm64,
   },
   {
     id: 'sessions.agent-control-tool',
@@ -479,7 +480,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
     descriptionKey: 'settings.openchamber.tools.field.agentControlToolInfo',
     keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'sessions', 'schedule', 'control'],
-    isAvailable: (ctx) => !ctx.isVSCode,
+    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode,
   },
   {
     id: 'sessions.agent-web-tool',
@@ -487,7 +488,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentWebTool',
     descriptionKey: 'settings.openchamber.tools.field.agentWebToolInfo',
     keywords: ['agent', 'tool', 'web', 'browser', 'page', 'preview', 'openchamber'],
-    isAvailable: (ctx) => !ctx.isVSCode,
+    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode,
   },
   {
     id: 'git.github-account',
@@ -593,6 +594,20 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.behavior.page.section.systemPrompt',
     descriptionKey: 'settings.behavior.page.warning.title',
     keywords: ['agents.md', 'global instructions', 'system prompt'],
+  },
+  {
+    id: 'behavior.system-md',
+    page: 'behavior',
+    titleKey: 'settings.behavior.page.section.systemMd',
+    keywords: ['system.md', 'system prompt', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'behavior.append-system-md',
+    page: 'behavior',
+    titleKey: 'settings.behavior.page.section.appendSystemMd',
+    keywords: ['append_system.md', 'append', 'system prompt', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
     id: 'behavior.response-style',
@@ -742,6 +757,22 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'plugins',
     titleKey: 'settings.plugins.page.field.content',
     keywords: ['file', 'code'],
+  },
+  {
+    id: 'extensions.list',
+    page: 'extensions',
+    titleKey: 'settings.extensions.page.extensions.title',
+    descriptionKey: 'settings.extensions.page.extensions.info',
+    keywords: ['extension', 'extensions', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'extensions.packages',
+    page: 'extensions',
+    titleKey: 'settings.extensions.page.packages.title',
+    descriptionKey: 'settings.extensions.page.packages.info',
+    keywords: ['packages', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
     id: 'snippets.create',
@@ -959,6 +990,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'integrations',
     titleKey: 'settings.integrations.thirdParty.title',
     keywords: ['plugin', 'provider', 'oauth', 'install', 'update', 'remove'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'integrations.third-party.opencode-claude',
@@ -966,6 +998,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.integrations.thirdParty.opencodeClaude.name',
     descriptionKey: 'settings.integrations.thirdParty.opencodeClaude.description',
     keywords: ['claude', 'anthropic', 'claude code', 'pro', 'max', 'agent sdk', '@openchamber/opencode-claude'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'integrations.third-party.opencode-commandcode',
@@ -973,6 +1006,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.integrations.thirdParty.opencodeCommandcode.name',
     descriptionKey: 'settings.integrations.thirdParty.opencodeCommandcode.description',
     keywords: ['command code', 'commandcode', 'laguna', 'poolside', 'gateway', '@openchamber/opencode-commandcode'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'integrations.third-party.opencode-cursor-oauth',
@@ -980,6 +1014,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.integrations.thirdParty.opencodeCursorOauth.name',
     descriptionKey: 'settings.integrations.thirdParty.opencodeCursorOauth.description',
     keywords: ['cursor', 'oauth', 'subscription', 'openai compatible', '@openchamber/opencode-cursor'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
 ] as const;
 

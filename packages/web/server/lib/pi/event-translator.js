@@ -380,6 +380,17 @@ export const createEventTranslator = ({
           }))];
       }
 
+      case 'compaction_start':
+        return [
+          event('session.status', { sessionID, status: { type: 'busy' } }),
+          event('session.compact', { sessionID, status: 'start' }),
+        ];
+
+      case 'compaction_end':
+        return [
+          event('session.compact', { sessionID, status: 'end' }),
+        ];
+
       default:
         return [];
     }

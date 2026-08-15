@@ -11,6 +11,7 @@ import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { getDesktopAppVersion } from '@/lib/desktopNative';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
 
 interface AboutDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
   onOpenChange,
 }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const showDiagnostics = import.meta.env.DEV;
   const [version, setVersion] = React.useState<string | null>(null);
   const [openCodeVersion, setOpenCodeVersion] = React.useState<string | null>(null);
@@ -81,13 +83,14 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
     };
 
     void fetchVersion();
-  }, [open]);
+  }, [open, isPiKernel]);
 
   React.useEffect(() => {
     if (!open) return;
 
     let cancelled = false;
     const fetchOpenCodeVersion = async () => {
+      if (isPiKernel) return;
       try {
         const response = await runtimeFetch('/api/opencode/upgrade-status', {
           headers: { Accept: 'application/json' },
@@ -107,7 +110,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, isPiKernel]);
 
   React.useEffect(() => {
     if (!open || !showDiagnostics) {
@@ -202,15 +205,6 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
                 <span>Discord</span>
               </a>
             </div>
-            <a
-              href="https://x.com/openchamber_dev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 typography-meta text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Icon name="twitter-xfill" className="h-4 w-4" />
-              <span>@openchamber_dev</span>
-            </a>
           </div>
 
           <p className="typography-meta text-muted-foreground/60 pt-2">

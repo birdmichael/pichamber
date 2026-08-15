@@ -2,6 +2,7 @@ import React from 'react';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
 import { AgentSelector } from '@/components/sections/commands/AgentSelector';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { NumberInput } from '@/components/ui/number-input';
 import {
   SettingsSection,
   SettingsFieldRow,
@@ -12,6 +13,8 @@ import {
   SETTINGS_SELECT_ROW_TRIGGER_CLASS,
   SETTINGS_SELECT_SIZE,
   SETTINGS_OPTION_STACK_CLASS,
+  SETTINGS_NUMBER_STEPPER_ROW_CLASS,
+  SETTINGS_NUMBER_UNIT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { updateDesktopSettings } from '@/lib/persistence';
@@ -21,6 +24,7 @@ import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useI18n } from '@/lib/i18n';
 import { parseModelIdentifier } from '@/lib/modelIdentifier';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
 
 const getDisplayModel = (
   storedModel: string | undefined
@@ -35,6 +39,7 @@ const getDisplayModel = (
 
 export const DefaultsSettings: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const setProvider = useConfigStore((state) => state.setProvider);
   const setModel = useConfigStore((state) => state.setModel);
   const setAgent = useConfigStore((state) => state.setAgent);
@@ -57,6 +62,10 @@ export const DefaultsSettings: React.FC = () => {
   const [thinkingLevel, setThinkingLevel] = React.useState('medium');
   const [compaction, setCompaction] = React.useState(true);
   const [retry, setRetry] = React.useState(true);
+  const [reserveTokens, setReserveTokens] = React.useState(16384);
+  const [keepRecentTokens, setKeepRecentTokens] = React.useState(20000);
+  const [maxRetries, setMaxRetries] = React.useState(3);
+  const [baseDelayMs, setBaseDelayMs] = React.useState(2000);
   const [isLoading, setIsLoading] = React.useState(true);
   const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
@@ -122,6 +131,8 @@ export const DefaultsSettings: React.FC = () => {
               thinking?: string;
               compaction?: boolean;
               retry?: boolean;
+              compactionSettings?: { enabled?: boolean; reserveTokens?: number; keepRecentTokens?: number };
+              retrySettings?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number };
             };
             if (typeof piDefaults.model === 'string' && piDefaults.model.trim()) {
               setDefaultModel(piDefaults.model.trim());
@@ -131,6 +142,10 @@ export const DefaultsSettings: React.FC = () => {
             }
             if (typeof piDefaults.compaction === 'boolean') setCompaction(piDefaults.compaction);
             if (typeof piDefaults.retry === 'boolean') setRetry(piDefaults.retry);
+            if (typeof piDefaults.compactionSettings?.reserveTokens === 'number') setReserveTokens(piDefaults.compactionSettings.reserveTokens);
+            if (typeof piDefaults.compactionSettings?.keepRecentTokens === 'number') setKeepRecentTokens(piDefaults.compactionSettings.keepRecentTokens);
+            if (typeof piDefaults.retrySettings?.maxRetries === 'number') setMaxRetries(piDefaults.retrySettings.maxRetries);
+            if (typeof piDefaults.retrySettings?.baseDelayMs === 'number') setBaseDelayMs(piDefaults.retrySettings.baseDelayMs);
           }
         } catch {
           // Pi defaults are optional when the kernel route is unavailable.
@@ -367,7 +382,7 @@ export const DefaultsSettings: React.FC = () => {
             {parsedModel.providerId ? (
               <span className="text-foreground">
                 {parsedModel.providerId}/{parsedModel.modelId}
-                {supportsVariants ? ` (${defaultVariant ?? t('settings.openchamber.defaults.option.defaultLowercase')})` : ''}
+                {!isPiKernel && supportsVariants ? ` (${defaultVariant ?? t('settings.openchamber.defaults.option.defaultLowercase')})` : ''}
               </span>
             ) : (
               <span className="text-foreground">{t('settings.openchamber.defaults.summaryOpenCodeDefault')}</span>
@@ -427,6 +442,7 @@ export const DefaultsSettings: React.FC = () => {
               </Select>
             </SettingsFieldRow>
 
+            {!isPiKernel ? (
             <SettingsFieldRow
               settingsItem="sessions.default-agent"
               label={t('settings.openchamber.defaults.field.defaultAgent')}
@@ -437,6 +453,7 @@ export const DefaultsSettings: React.FC = () => {
                 className={SETTINGS_CUSTOM_TRIGGER_CLASS}
               />
             </SettingsFieldRow>
+            ) : null}
           </div>
 
           <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
@@ -458,6 +475,63 @@ export const DefaultsSettings: React.FC = () => {
               label={t('settings.openchamber.defaults.field.compaction')}
               ariaLabel={t('settings.openchamber.defaults.field.compactionAria')}
             />
+
+            {compaction ? (
+              <>
+                <SettingsFieldRow
+                  settingsItem="sessions.compaction-reserve"
+                  label={t('settings.openchamber.defaults.field.reserveTokens')}
+                >
+                  <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
+                    <NumberInput
+                      value={reserveTokens}
+                      onValueChange={async (value) => {
+                        setReserveTokens(value);
+                        try {
+                          await runtimeFetch('/api/pi/defaults', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ compactionSettings: { reserveTokens: value } }),
+                          });
+                        } catch (error) {
+                          console.warn('Failed to save Pi reserve tokens:', error);
+                        }
+                      }}
+                      min={0}
+                      max={200000}
+                      step={1024}
+                      aria-label={t('settings.openchamber.defaults.field.reserveTokensAria')}
+                    />
+                  </div>
+                </SettingsFieldRow>
+                <SettingsFieldRow
+                  settingsItem="sessions.compaction-keep"
+                  label={t('settings.openchamber.defaults.field.keepRecentTokens')}
+                >
+                  <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
+                    <NumberInput
+                      value={keepRecentTokens}
+                      onValueChange={async (value) => {
+                        setKeepRecentTokens(value);
+                        try {
+                          await runtimeFetch('/api/pi/defaults', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ compactionSettings: { keepRecentTokens: value } }),
+                          });
+                        } catch (error) {
+                          console.warn('Failed to save Pi keep recent tokens:', error);
+                        }
+                      }}
+                      min={0}
+                      max={200000}
+                      step={1024}
+                      aria-label={t('settings.openchamber.defaults.field.keepRecentTokensAria')}
+                    />
+                  </div>
+                </SettingsFieldRow>
+              </>
+            ) : null}
             <SettingsCheckboxRow
               settingsItem="sessions.retry"
               checked={retry}
@@ -476,6 +550,64 @@ export const DefaultsSettings: React.FC = () => {
               label={t('settings.openchamber.defaults.field.retry')}
               ariaLabel={t('settings.openchamber.defaults.field.retryAria')}
             />
+
+            {retry ? (
+              <>
+                <SettingsFieldRow
+                  settingsItem="sessions.retry-max"
+                  label={t('settings.openchamber.defaults.field.maxRetries')}
+                >
+                  <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
+                    <NumberInput
+                      value={maxRetries}
+                      onValueChange={async (value) => {
+                        setMaxRetries(value);
+                        try {
+                          await runtimeFetch('/api/pi/defaults', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ retrySettings: { maxRetries: value } }),
+                          });
+                        } catch (error) {
+                          console.warn('Failed to save Pi max retries:', error);
+                        }
+                      }}
+                      min={0}
+                      max={20}
+                      step={1}
+                      aria-label={t('settings.openchamber.defaults.field.maxRetriesAria')}
+                    />
+                  </div>
+                </SettingsFieldRow>
+                <SettingsFieldRow
+                  settingsItem="sessions.retry-delay"
+                  label={t('settings.openchamber.defaults.field.baseDelayMs')}
+                >
+                  <div className={SETTINGS_NUMBER_STEPPER_ROW_CLASS}>
+                    <NumberInput
+                      value={baseDelayMs}
+                      onValueChange={async (value) => {
+                        setBaseDelayMs(value);
+                        try {
+                          await runtimeFetch('/api/pi/defaults', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ retrySettings: { baseDelayMs: value } }),
+                          });
+                        } catch (error) {
+                          console.warn('Failed to save Pi retry delay:', error);
+                        }
+                      }}
+                      min={0}
+                      max={60000}
+                      step={250}
+                      aria-label={t('settings.openchamber.defaults.field.baseDelayMsAria')}
+                    />
+                    <span className={SETTINGS_NUMBER_UNIT_CLASS}>{t('settings.openchamber.defaults.field.ms')}</span>
+                  </div>
+                </SettingsFieldRow>
+              </>
+            ) : null}
             <SettingsCheckboxRow
               settingsItem="sessions.deletion-dialog"
               checked={showDeletionDialog}

@@ -35,7 +35,7 @@ The UI still speaks `@opencode-ai/sdk/v2` HTTP/SSE. On the default kernel those 
 
 Electron starts the Pichamber backend in-process, never as a sidecar. Development may load loopback/HMR UI; packaged builds load staged assets through `openchamber-ui://` while the loopback server remains the API backend. Keep domain backends in web/runtime modules unless behavior is inherently native.
 
-Pi config and auth live in `~/.pi/agent` (`auth.json`, `models.json`, `pichamber.json`, `AGENTS.md`, `skills/`, `prompts/`). Project skills also live under `.agents/skills` and `.pi/skills`. Do not treat `.opencode` as the skills/commands location.
+Pi config and auth live in `~/.pi/agent` (`auth.json`, `models.json`, `pichamber.json`, `AGENTS.md`, `skills/`, `prompts/`). Project skills live under `.agents/skills` and `.pi/skills`. Project commands/prompts live under `.pi/prompts`. Do not treat `.opencode` as the skills/commands location.
 
 `OPENCHAMBER_KERNEL` defaults to `pi`. Set `OPENCHAMBER_KERNEL=opencode` only to restore the leftover OpenCode process path. Do not mock Pi for product behavior.
 

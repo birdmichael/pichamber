@@ -17,12 +17,15 @@ import { SessionGoalButton, SessionGoalObjectiveCounter } from '@/components/cha
 import { ComposerDictation } from '@/components/dictation/ComposerDictation';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { ModelControls } from '../../ModelControls';
 import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
 import { FocusModeButton } from './FocusModeButton';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
+import { ContextUsageChip } from './ContextUsageChip';
+import { SessionTreeDialog } from '@/components/chat/SessionTreeDialog';
 
 const MemoModelControls = React.memo(ModelControls);
 const MemoComposerDictation = React.memo(ComposerDictation);
@@ -69,6 +72,7 @@ export interface ComposerFooterProps {
 
 export function ComposerFooter(props: ComposerFooterProps) {
     const { t } = useI18n();
+    const isPiKernel = usePiKernel();
     const {
         isMobile,
         isVSCode,
@@ -105,6 +109,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationInsertAndSend,
         onDictationContentHeightChange,
     } = props;
+    const [treeOpen, setTreeOpen] = React.useState(false);
 
     return (
         <div
@@ -133,6 +138,8 @@ export function ComposerFooter(props: ComposerFooterProps) {
                                 onOpenSettings={onOpenSettings}
                                 onOpenMobileSheet={onOpenAttachSheet}
                             />
+                            {!isPiKernel ? (
+                              <>
                             <PermissionAutoAcceptButton
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
@@ -148,6 +155,8 @@ export function ComposerFooter(props: ComposerFooterProps) {
                                 iconSizeClass={iconSizeClass}
                             />
                             <SessionGoalObjectiveCounter length={messageLength} />
+                              </>
+                            ) : null}
                         </div>
                         <div className="flex items-center min-w-0 gap-x-1 justify-end">
                             <div className="flex items-center gap-x-1 flex-shrink-0">
@@ -207,6 +216,8 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             isExpandedInput={isExpandedInput}
                             onToggle={onToggleExpandedInput}
                         />
+                        {!isPiKernel ? (
+                          <>
                         <PermissionAutoAcceptButton
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
@@ -224,8 +235,22 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             withTooltip
                         />
                         <SessionGoalObjectiveCounter length={messageLength} />
+                          </>
+                        ) : null}
                     </div>
                     <div className={cn('flex items-center flex-1 justify-end', footerGapClass, 'md:gap-x-3')}>
+                        {isPiKernel ? <ContextUsageChip sessionId={currentSessionId} /> : null}
+                        {isPiKernel && currentSessionId ? (
+                          <button
+                            type="button"
+                            className={footerIconButtonClass}
+                            onClick={() => setTreeOpen(true)}
+                            title={t('chat.sessionTree.open')}
+                            aria-label={t('chat.sessionTree.open')}
+                          >
+                            {t('chat.sessionTree.open')}
+                          </button>
+                        ) : null}
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
                             radius={chatInputRadius}
@@ -255,6 +280,9 @@ export function ComposerFooter(props: ComposerFooterProps) {
                     </div>
                 </>
             )}
+            {isPiKernel ? (
+              <SessionTreeDialog open={treeOpen} onOpenChange={setTreeOpen} sessionId={currentSessionId} />
+            ) : null}
         </div>
     );
 }

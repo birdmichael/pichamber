@@ -817,7 +817,7 @@ export async function reloadOpenCodeConfiguration(options?: {
     if (payload?.requiresManualRestart) {
       finishConfigUpdate();
       const error = new Error(
-        payload?.message || 'Restart your connected OpenCode server to apply the changes.',
+        payload?.message || 'Restart Pi to apply the changes.',
       );
       (error as Error & { requiresManualRestart?: boolean }).requiresManualRestart = true;
       throw error;

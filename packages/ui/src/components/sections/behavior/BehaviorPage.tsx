@@ -20,6 +20,8 @@ import {
 } from '@/lib/responseStyle';
 import type { DesktopSettings } from '@/lib/desktop';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { SystemMdSettings } from './SystemMdSettings';
 import { noteDeferredRestartFromPayload, recordDeferredOpenCodeRestart } from '@/lib/opencode/deferredRestart';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
@@ -103,6 +105,7 @@ const saveBehaviorSetting = async (settings: Partial<DesktopSettings>, fallbackE
 export const BehaviorPage: React.FC = () => {
   const { t } = useI18n();
   const isVSCode = useIsVSCodeRuntime();
+  const isPiKernel = usePiKernel();
   const [prompt, setPrompt] = React.useState('');
   const [optimizeSystemPrompt, setOptimizeSystemPrompt] = React.useState(false);
   const [responseStyleEnabled, setResponseStyleEnabled] = React.useState(DEFAULT_BEHAVIOR_SETTINGS.responseStyleEnabled);
@@ -352,6 +355,7 @@ export const BehaviorPage: React.FC = () => {
         </Button>
       </SettingsSection>
 
+      {isPiKernel ? <SystemMdSettings /> : null}
       <SettingsSection
         title={t('settings.behavior.page.section.responseStyle')}
         info={t('settings.behavior.page.responseStyle.tooltip')}

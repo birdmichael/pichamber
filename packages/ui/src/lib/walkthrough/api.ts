@@ -21,7 +21,7 @@ const isJsonResponse = (response: Response): boolean =>
 
 /**
  * A server without these routes does not answer 404 with JSON. Unmatched
- * `/api/*` falls through to the OpenCode proxy, and OpenCode serves its embedded
+ * `/api/*` falls through to the leftover kernel proxy, and that kernel serves its embedded
  * web UI for any path it does not know — HTML, status 200. Parsing that as JSON
  * surfaced `Unexpected token '<', "<!doctype "...` in the panel, which names
  * neither the cause nor the remedy.
@@ -31,7 +31,7 @@ const isJsonResponse = (response: Response): boolean =>
  * keeps its own failure rather than becoming advice to upgrade.
  */
 const serverUnsupported = () =>
-  new WalkthroughError('This OpenChamber server has no walkthrough API', { code: 'server-unsupported' });
+  new WalkthroughError('This Pichamber server has no walkthrough API', { code: 'server-unsupported' });
 
 const looksUnsupported = (response: Response): boolean =>
   !isJsonResponse(response) && (response.ok || response.status === 404);

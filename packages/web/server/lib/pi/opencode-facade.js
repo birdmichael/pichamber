@@ -1,5 +1,6 @@
 import express from 'express';
 import { resolveActiveProjectDirectory } from './pi-resources.js';
+import { findProjectFiles } from './find-files.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -262,6 +263,14 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.setDefaults(req.body || {}));
   }));
 
+  app.get('/api/pi/extensions', handle(async (req, res) => {
+    const directory = resolveDirectory(req);
+    json(res, 200, {
+      extensions: typeof host.listExtensions === 'function' ? host.listExtensions(directory) : [],
+      packages: typeof host.listPackages === 'function' ? host.listPackages(directory) : [],
+    });
+  }));
+
   app.get('/api/config/agents', handle(async (_req, res) => {
     json(res, 200, [{
       name: 'pi',
@@ -325,6 +334,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   app.get('/api/tool', handle(async (_req, res) => {
     json(res, 200, ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']);
   }));
+
+  app.get('/api/find/files', handle(async (req, res) => {
+    const directory = resolveDirectory(req);
+    const query = typeof req.query?.query === 'string' ? req.query.query : '';
+    const limit = Number(req.query?.limit);
+    const includeDirs = req.query?.dirs !== 'false';
+    const type = req.query?.type === 'directory' || req.query?.type === 'file' ? req.query.type : null;
+    json(res, 200, findProjectFiles(directory, { query, limit, includeDirs, type }));
+  }));
+
 
   app.get('/api/session/status', handle(async (req, res) => {
     json(res, 200, host.getStatus(requestDirectory(req) || undefined));
@@ -431,13 +450,33 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, unsupported('session.unrevert'));
   }));
 
+  app.get('/api/session/:sessionID/tree', handle(async (req, res) => {
+    json(res, 200, host.getSessionTree(req.params.sessionID));
+  }));
+
+  app.get('/api/session/:sessionID/usage', handle(async (req, res) => {
+    json(res, 200, host.getSessionUsage(req.params.sessionID));
+  }));
+
+  app.patch('/api/session/:sessionID/thinking', parseJson, handle(async (req, res) => {
+    const level = req.body?.thinking ?? req.body?.level ?? req.body?.variant;
+    json(res, 200, await host.setSessionThinking(req.params.sessionID, level));
+  }));
+
+  app.patch('/api/session/:sessionID/model', parseJson, handle(async (req, res) => {
+    const model = req.body?.model ?? req.body?.modelID ?? req.body?.id;
+    json(res, 200, await host.setSessionModel(req.params.sessionID, model));
+  }));
+
   app.post('/api/session/:sessionID/fork', parseJson, handle(async (req, res) => {
-    const source = host.getSession(req.params.sessionID);
-    const record = await host.createSession({
-      directory: source.directory,
-      title: source.info.title,
-      parentID: source.id,
-    });
+    const messageID = req.body?.messageID ?? req.body?.messageId;
+    const record = typeof host.forkSession === 'function'
+      ? await host.forkSession(req.params.sessionID, messageID)
+      : await host.createSession({
+        directory: host.getSession(req.params.sessionID).directory,
+        title: host.getSession(req.params.sessionID).info.title,
+        parentID: req.params.sessionID,
+      });
     json(res, 200, record.info);
   }));
 
@@ -451,11 +490,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/summarize', parseJson, handle(async (req, res) => {
-    if (typeof host.runCommand === 'function') {
+    const instructions = typeof req.body?.arguments === 'string'
+      ? req.body.arguments
+      : (typeof req.body?.instructions === 'string' ? req.body.instructions : '');
+    if (typeof host.compactSession === 'function') {
+      await host.compactSession(req.params.sessionID, instructions);
+    } else if (typeof host.runCommand === 'function') {
       await host.runCommand(req.params.sessionID, {
         ...(req.body || {}),
         command: 'compact',
-        arguments: typeof req.body?.arguments === 'string' ? req.body.arguments : '',
+        arguments: instructions,
       });
     }
     json(res, 200, true);
