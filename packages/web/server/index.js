@@ -559,6 +559,7 @@ let openCodeBaseUrl = hmrState.openCodeBaseUrl ?? null;
 let isShuttingDown = hmrState.isShuttingDown;
 let signalsAttached = hmrState.signalsAttached;
 let openCodeWorkingDirectory = hmrState.openCodeWorkingDirectory;
+let localListenPort = null;
 
 const {
   configuredOpenCodePort: ENV_CONFIGURED_OPENCODE_PORT,
@@ -617,6 +618,15 @@ const openCodeNetworkRuntime = createOpenCodeNetworkRuntime({
   state: openCodeNetworkState,
   getOpenCodeAuthHeaders,
   configuredOpenCodeHostname: ENV_CONFIGURED_OPENCODE_HOSTNAME,
+  isPiKernelEnabled,
+  getLocalFacadeOrigin: () => {
+    const port = localListenPort
+      || Number(process.env.OPENCHAMBER_PORT || process.env.OPENCHAMBER_HMR_API_PORT || 0);
+    if (Number.isFinite(port) && port > 0) {
+      return `http://127.0.0.1:${Math.trunc(port)}`;
+    }
+    return 'http://127.0.0.1:3001';
+  },
 });
 
 const waitForReady = (...args) => openCodeNetworkRuntime.waitForReady(...args);
@@ -1339,6 +1349,7 @@ const gracefulShutdown = (...args) => gracefulShutdownRuntime.gracefulShutdown(.
 
 async function main(options = {}) {
   const port = Number.isFinite(options.port) && options.port >= 0 ? Math.trunc(options.port) : DEFAULT_PORT;
+  localListenPort = port;
   const host = typeof options.host === 'string' && options.host.length > 0 ? options.host : undefined;
   const effectiveBindHost = host
     || (typeof process.env.OPENCHAMBER_HOST === 'string' && process.env.OPENCHAMBER_HOST.trim().length > 0

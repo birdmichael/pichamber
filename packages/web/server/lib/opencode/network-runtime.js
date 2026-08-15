@@ -3,6 +3,8 @@ export const createOpenCodeNetworkRuntime = (deps) => {
     state,
     getOpenCodeAuthHeaders,
     configuredOpenCodeHostname = '127.0.0.1',
+    isPiKernelEnabled = () => false,
+    getLocalFacadeOrigin = null,
   } = deps;
 
   const resolveConnectHostname = () => {
@@ -83,13 +85,28 @@ export const createOpenCodeNetworkRuntime = (deps) => {
     }
   };
 
-  const buildOpenCodeUrl = (path, prefixOverride) => {
-    if (!state.openCodePort) {
-      throw new Error('OpenCode port is not available');
+  const resolvePiFacadeOrigin = () => {
+    if (typeof getLocalFacadeOrigin === 'function') {
+      const origin = String(getLocalFacadeOrigin() || '').trim().replace(/\/+$/, '');
+      if (origin) return origin;
     }
+    const envPort = Number(process.env.OPENCHAMBER_PORT || process.env.OPENCHAMBER_HMR_API_PORT || 0);
+    if (Number.isFinite(envPort) && envPort > 0) {
+      return `http://127.0.0.1:${Math.trunc(envPort)}`;
+    }
+    return 'http://127.0.0.1:3001';
+  };
+
+  const buildOpenCodeUrl = (path, prefixOverride) => {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     const prefix = normalizeApiPrefix(prefixOverride !== undefined ? prefixOverride : '');
     const fullPath = `${prefix}${normalizedPath}`;
+    if (!state.openCodePort) {
+      if (isPiKernelEnabled()) {
+        return `${resolvePiFacadeOrigin()}${fullPath}`;
+      }
+      throw new Error('OpenCode port is not available');
+    }
     const base = state.openCodeBaseUrl ?? `http://${resolveConnectHostname()}:${state.openCodePort}`;
     return `${base}${fullPath}`;
   };

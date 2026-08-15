@@ -223,7 +223,7 @@ async function main() {
     });
   }
 
-  const electron = spawnProcess('npx', ['electron', './main.mjs'], {
+  const electron = spawnProcess('npx', ['electron', './main.mjs', '--disable-dev-shm-usage', '--disable-gpu'], {
     cwd: electronDir,
     env: {
       ...process.env,

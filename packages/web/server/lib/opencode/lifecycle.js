@@ -729,6 +729,11 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
   };
 
   const waitForOpenCodeReady = async (timeoutMs = 20000, intervalMs = 400) => {
+    if (isPiKernelEnabled()) {
+      state.isOpenCodeReady = true;
+      state.lastOpenCodeError = null;
+      return;
+    }
     if (!state.openCodePort) {
       throw new Error('OpenCode port is not available');
     }
@@ -787,6 +792,9 @@ export const createOpenCodeLifecycleRuntime = (deps) => {
   };
 
   const waitForAgentPresence = async (agentName, timeoutMs = 15000, intervalMs = 300) => {
+    if (isPiKernelEnabled()) {
+      return;
+    }
     if (!state.openCodePort) {
       throw new Error('OpenCode port is not available');
     }

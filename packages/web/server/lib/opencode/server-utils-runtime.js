@@ -49,6 +49,9 @@ export const createServerUtilsRuntime = (dependencies) => {
   };
 
   const waitForOpenCodePort = async (timeoutMs = 15000) => {
+    if (piKernel) {
+      return getOpenCodePort();
+    }
     if (getOpenCodePort() !== null) {
       return getOpenCodePort();
     }
@@ -179,7 +182,7 @@ export const createServerUtilsRuntime = (dependencies) => {
   };
 
   const fetchArraySnapshot = async (route, invalidMessage) => {
-    if (!getOpenCodePort()) {
+    if (!getOpenCodePort() && !piKernel) {
       throw new Error('OpenCode port is not available');
     }
 

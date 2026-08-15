@@ -338,7 +338,9 @@ export const SessionAuthGate: React.FC<SessionAuthGateProps> = ({
   const vscodeRuntime = React.useMemo(() => isVSCodeRuntime(), []);
   const skipAuth = vscodeRuntime;
   const showHostSwitcher = React.useMemo(() => isDesktopShell() && !vscodeRuntime, [vscodeRuntime]);
-  const [state, setState] = React.useState<GateState>(() => (skipAuth ? 'authenticated' : 'pending'));
+  const [state, setState] = React.useState<GateState>(() => (
+    skipAuth || isLocalDesktopRuntime() ? 'authenticated' : 'pending'
+  ));
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
@@ -831,6 +833,12 @@ export const SessionAuthGate: React.FC<SessionAuthGateProps> = ({
   const canUsePasskey = canOfferPasskeySetup && passkeyStatus.hasPasskeys;
 
   if (state === 'pending') {
+    // Local desktop / Pi (auth disabled) must keep the app mounted. Replacing
+    // children with the cube on a remount/recheck unmounts App, so splash
+    // cannot dismiss and a later #initial-loading timeout leaves a blank #root.
+    if (isLocalDesktopRuntime()) {
+      return <>{children}</>;
+    }
     return <LoadingScreen />;
   }
 

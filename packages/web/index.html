@@ -591,8 +591,13 @@
       // electron:dev stuck on the cube after a Vite remount.
       setTimeout(function() {
         var loading = document.getElementById('initial-loading');
-        if (loading) {
-          console.warn('Loading screen timeout - forcing hide after 12s');
+        var root = document.getElementById('root');
+        var reactMounted = !!(root && Array.prototype.some.call(root.children, function(el) {
+          return el.id !== 'initial-loading';
+        }));
+        // Never strip the cube if React has not mounted — that leaves a blank #root.
+        if (loading && reactMounted) {
+          console.warn('Loading screen timeout - hiding after 12s because React is mounted');
           loading.classList.add('fade-out');
           setTimeout(function() {
             loading.remove();

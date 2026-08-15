@@ -48,6 +48,28 @@ describe('OpenCode network runtime', () => {
     expect(runtime.buildOpenCodeUrl('/provider')).toBe('http://remote.example:4096/provider');
   });
 
+  it('points session-goal/assist at the Pi facade when kernel=pi and no OpenCode port', () => {
+    const runtime = createOpenCodeNetworkRuntime({
+      state: {
+        openCodePort: null,
+        openCodeBaseUrl: null,
+        openCodeApiPrefix: '',
+        openCodeApiPrefixDetected: true,
+        openCodeApiDetectionTimer: null,
+      },
+      getOpenCodeAuthHeaders: () => ({}),
+      isPiKernelEnabled: () => true,
+      getLocalFacadeOrigin: () => 'http://127.0.0.1:3901',
+    });
+
+    expect(runtime.buildOpenCodeUrl('/session/ses_1')).toBe('http://127.0.0.1:3901/session/ses_1');
+  });
+
+  it('still throws when OpenCode is required and no port is available', () => {
+    const runtime = createRuntime({ state: { openCodePort: null } });
+    expect(() => runtime.buildOpenCodeUrl('/session/ses_1')).toThrow('OpenCode port is not available');
+  });
+
   it('normalizes wildcard and IPv6 OpenCode bind hosts for local connects', () => {
     expect(createRuntime({ configuredOpenCodeHostname: '0.0.0.0' }).buildOpenCodeUrl('/provider'))
       .toBe('http://127.0.0.1:4096/provider');

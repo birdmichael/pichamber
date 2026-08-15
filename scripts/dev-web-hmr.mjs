@@ -118,7 +118,7 @@ const api = run('api', 'bun', ['run', '--cwd', 'packages/web', 'dev:server:watch
 const vite = run(
   'vite',
   'bun',
-  ['x', 'vite', '--force', '--host', hmrHost, '--port', uiPort, '--strictPort'],
+  ['x', 'vite', '--host', hmrHost, '--port', uiPort, '--strictPort'],
   {
     OPENCHAMBER_PORT: backendPort,
     OPENCHAMBER_DISABLE_PWA_DEV: '1',

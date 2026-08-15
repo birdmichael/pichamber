@@ -2669,6 +2669,13 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     }
   });
 
+  browserWindow.webContents.on('render-process-gone', (_event, details) => {
+    log.error('[electron] renderer gone', details);
+    if (!browserWindow.isDestroyed()) {
+      void browserWindow.webContents.reload();
+    }
+  });
+
   browserWindow.once('ready-to-show', () => {
     if (browserWindow.__ocLabel === 'main') {
       recordElectronStartupPerformance('electron.window.ready-to-show', {
