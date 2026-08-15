@@ -140,6 +140,23 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     });
   }));
 
+  const writeCommand = (req, res) => {
+    const created = host.writeCommand(resolveDirectory(req), req.params.name, req.body || {});
+    json(res, 200, {
+      ...created,
+      sources: created.path ? { md: { exists: true, path: created.path, scope: created.scope } } : {},
+    });
+  };
+  app.post('/api/config/commands/:name', parseJson, handle(async (req, res) => {
+    writeCommand(req, res);
+  }));
+  app.patch('/api/config/commands/:name', parseJson, handle(async (req, res) => {
+    writeCommand(req, res);
+  }));
+  app.delete('/api/config/commands/:name', handle(async (req, res) => {
+    json(res, 200, host.deleteCommand(resolveDirectory(req), req.params.name));
+  }));
+
   app.get('/api/config/skills', handle(async (req, res) => {
     json(res, 200, host.getConfigSkills(resolveDirectory(req)));
   }));

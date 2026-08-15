@@ -1,4 +1,6 @@
 import { buildDeferredRestartResponse } from './config-mutation-response.js';
+import { isPiKernelEnabled } from '../pi/kernel.js';
+import { writePiPrompt, deletePiPrompt, listPiCommands } from '../pi/pi-resources.js';
 
 export const registerConfigEntityRoutes = (app, dependencies) => {
   const {
@@ -250,6 +252,20 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
         ? sources.md.scope
         : (sources.json.exists ? sources.json.scope : null);
 
+      if (isPiKernelEnabled()) {
+        const command = listPiCommands({ directory }).find((item) => item.name === commandName);
+        if (command) {
+          res.json({
+            ...command,
+            scope: command.source === 'builtin' ? undefined : (command.scope || 'user'),
+            isBuiltIn: command.source === 'builtin',
+            sources: command.path
+              ? { md: { exists: true, path: command.path, scope: command.scope || 'user' } }
+              : sources,
+          });
+          return;
+        }
+      }
       res.json({
         name: commandName,
         sources: sources,
@@ -275,6 +291,17 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
       console.log('[Server] Config received:', JSON.stringify(config, null, 2));
       console.log('[Server] Scope:', scope, 'Working directory:', directory);
 
+      if (isPiKernelEnabled()) {
+        const created = writePiPrompt({
+          directory,
+          name: commandName,
+          description: config.description,
+          template: config.template,
+          scope: scope === 'project' ? 'project' : 'user',
+        });
+        res.json(created);
+        return;
+      }
       createCommand(commandName, config, directory, scope);
       res.json(buildDeferredRestartResponse(
         `Command ${commandName} created successfully. Restart OpenCode to apply.`,
@@ -298,6 +325,17 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
       console.log('[Server] Updates:', JSON.stringify(updates, null, 2));
       console.log('[Server] Working directory:', directory);
 
+      if (isPiKernelEnabled()) {
+        const updated = writePiPrompt({
+          directory,
+          name: commandName,
+          description: updates.description,
+          template: updates.template,
+          scope: updates.scope === 'project' ? 'project' : 'user',
+        });
+        res.json(updated);
+        return;
+      }
       updateCommand(commandName, updates, directory);
 
       console.log(`[Server] Command ${commandName} updated successfully`);
@@ -320,6 +358,10 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
 
+      if (isPiKernelEnabled()) {
+        res.json(deletePiPrompt({ directory, name: commandName }));
+        return;
+      }
       deleteCommand(commandName, directory);
       res.json(buildDeferredRestartResponse(
         `Command ${commandName} deleted successfully. Restart OpenCode to apply.`,

@@ -180,6 +180,8 @@ export const listPiCommands = ({ home = os.homedir(), directory } = {}) => {
     source: 'prompt',
     template: prompt.template,
     agent: 'pi',
+    path: prompt.path,
+    scope: prompt.scope,
   }));
   return [
     ...BUILTIN_COMMANDS.map((command) => ({ ...command, agent: 'pi' })),
@@ -228,3 +230,85 @@ export const toConfigSkillsPayload = (skills) => ({
     allDisabled: false,
   },
 });
+
+const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+export const isBuiltinCommandName = (name) => BUILTIN_COMMANDS.some((command) => command.name === name);
+
+const sanitizeCommandName = (name) => {
+  const value = typeof name === 'string' ? name.trim() : '';
+  if (!SAFE_COMMAND_NAME.test(value)) {
+    const error = new Error('Invalid command name');
+    error.status = 400;
+    throw error;
+  }
+  return value;
+};
+
+const promptFileForScope = ({ home = os.homedir(), directory, name, scope } = {}) => {
+  if (scope === 'project') {
+    if (!directory) {
+      const error = new Error('Project commands need a directory');
+      error.status = 400;
+      throw error;
+    }
+    return path.join(directory, '.pi', 'prompts', `${name}.md`);
+  }
+  return path.join(resolvePiAgentDir(home), 'prompts', `${name}.md`);
+};
+
+export const writePiPrompt = ({
+  home = os.homedir(),
+  directory,
+  name,
+  description = '',
+  template = '',
+  scope = 'user',
+} = {}) => {
+  const commandName = sanitizeCommandName(name);
+  if (isBuiltinCommandName(commandName)) {
+    const error = new Error('Cannot overwrite a built-in Pi command');
+    error.status = 400;
+    throw error;
+  }
+  const filePath = promptFileForScope({ home, directory, name: commandName, scope });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const desc = typeof description === 'string' ? description.trim() : '';
+  const body = typeof template === 'string' ? template : '';
+  const contents = desc
+    ? `---\ndescription: ${desc.replace(/\n/g, ' ')}\n---\n${body}${body.endsWith('\n') ? '' : '\n'}`
+    : `${body}${body.endsWith('\n') ? '' : '\n'}`;
+  fs.writeFileSync(filePath, contents);
+  return {
+    name: commandName,
+    description: desc || `/${commandName}`,
+    source: 'prompt',
+    template: body,
+    agent: 'pi',
+    path: filePath,
+    scope: scope === 'project' ? 'project' : 'user',
+  };
+};
+
+export const deletePiPrompt = ({ home = os.homedir(), directory, name } = {}) => {
+  const commandName = sanitizeCommandName(name);
+  if (isBuiltinCommandName(commandName)) {
+    const error = new Error('Cannot delete a built-in Pi command');
+    error.status = 400;
+    throw error;
+  }
+  const candidates = [
+    path.join(resolvePiAgentDir(home), 'prompts', `${commandName}.md`),
+  ];
+  if (directory) {
+    candidates.unshift(path.join(directory, '.pi', 'prompts', `${commandName}.md`));
+  }
+  const existing = candidates.find((filePath) => isFile(filePath));
+  if (!existing) {
+    const error = new Error('Command not found');
+    error.status = 404;
+    throw error;
+  }
+  fs.unlinkSync(existing);
+  return { deleted: true, name: commandName, path: existing };
+};

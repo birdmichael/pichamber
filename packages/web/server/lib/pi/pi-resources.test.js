@@ -9,6 +9,8 @@ import {
   parseMarkdownFrontmatter,
   readPiDefaults,
   writePiDefaults,
+  writePiPrompt,
+  deletePiPrompt,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -67,5 +69,21 @@ describe('pi-resources', () => {
     });
     expect(readPiDefaults(home).model).toBe('bmlab/grok-4.6');
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'auth.json'))).toBe(false);
+  });
+
+  it('writes and deletes user prompt commands under ~/.pi/agent/prompts', () => {
+    const home = makeTemp();
+    const created = writePiPrompt({
+      home,
+      name: 'ship',
+      description: 'Prepare a change',
+      template: 'Prepare the change for review.',
+    });
+    expect(created.path).toBe(path.join(home, '.pi', 'agent', 'prompts', 'ship.md'));
+    expect(listPiCommands({ home }).some((command) => command.name === 'ship')).toBe(true);
+    expect(() => writePiPrompt({ home, name: 'compact', template: 'nope' })).toThrow(/built-in/);
+    const deleted = deletePiPrompt({ home, name: 'ship' });
+    expect(deleted.deleted).toBe(true);
+    expect(listPiCommands({ home }).some((command) => command.name === 'ship')).toBe(false);
   });
 });

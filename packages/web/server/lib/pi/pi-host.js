@@ -10,6 +10,8 @@ import {
   readPiDefaults,
   toConfigSkillsPayload,
   writePiDefaults,
+  writePiPrompt,
+  deletePiPrompt,
 } from './pi-resources.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -533,6 +535,23 @@ export const createPiHost = ({
     },
     listCommands(directory) {
       return listPiCommands({ home, directory: directory || defaultDirectory });
+    },
+    writeCommand(directory, name, config = {}) {
+      return writePiPrompt({
+        home,
+        directory: directory || defaultDirectory,
+        name,
+        description: config.description,
+        template: config.template,
+        scope: config.scope === 'project' ? 'project' : 'user',
+      });
+    },
+    deleteCommand(directory, name) {
+      return deletePiPrompt({
+        home,
+        directory: directory || defaultDirectory,
+        name,
+      });
     },
     getDefaults() {
       return readPiDefaults(home);

@@ -187,4 +187,26 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('creates and deletes a Pi prompt command', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/config/commands/ship`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ description: 'Ship it', template: 'Prepare the change.' }),
+      })).json();
+      expect(created.name).toBe('ship');
+      expect(created.source).toBe('prompt');
+      const listed = await (await fetch(`${url}/api/command`)).json();
+      expect(listed.some((command) => command.name === 'ship')).toBe(true);
+      const deleted = await fetch(`${url}/api/config/commands/ship`, { method: 'DELETE' });
+      expect(deleted.status).toBe(200);
+      const after = await (await fetch(`${url}/api/command`)).json();
+      expect(after.some((command) => command.name === 'ship')).toBe(false);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });
