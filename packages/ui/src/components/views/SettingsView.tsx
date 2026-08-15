@@ -63,6 +63,7 @@ import {
   type SettingsPageMeta,
 } from '@/lib/settings/metadata';
 import { buildSettingsSearchResults, type SettingsSearchResult } from '@/lib/settings/search';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 
 // UI Kit: fixed settings navigation width
 const SETTINGS_NAV_WIDTH = 256;
@@ -121,10 +122,10 @@ const NAV_GROUP_ORDER = ['general', 'projects', 'opencode', 'content'] as const;
 
 const ADD_PROVIDER_SETTINGS_ID = '__add_provider__';
 
-function buildRuntimeContext(isDesktop: boolean, isMobile: boolean): SettingsRuntimeContext {
+function buildRuntimeContext(isDesktop: boolean, isMobile: boolean, isPiKernel = false): SettingsRuntimeContext {
   const isVSCode = isVSCodeRuntime();
   const isWeb = !isDesktop && isWebRuntime();
-  return { isVSCode, isWeb, isDesktop, isMobile };
+  return { isVSCode, isWeb, isDesktop, isMobile, isPiKernel };
 }
 
 function isPageAvailable(page: SettingsPageMeta, ctx: SettingsRuntimeContext): boolean {
@@ -234,7 +235,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
 
   // keep platform check available for future window chrome tweaks
 
-  const runtimeCtx = React.useMemo(() => buildRuntimeContext(isDesktopApp, isMobile), [isDesktopApp, isMobile]);
+  const [isPiKernel, setIsPiKernel] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const res = await runtimeFetch('/api/health', { method: 'GET' }).catch(() => null);
+      if (!res || !res.ok || cancelled) {
+        return;
+      }
+      const payload = (await res.json().catch(() => null)) as null | { kernel?: unknown };
+      if (!payload || cancelled) {
+        return;
+      }
+      setIsPiKernel(payload.kernel === 'pi');
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const runtimeCtx = React.useMemo(() => buildRuntimeContext(isDesktopApp, isMobile, isPiKernel), [isDesktopApp, isMobile, isPiKernel]);
 
   const visiblePages = React.useMemo(() => {
     const allowedPages = visiblePageSlugs ? new Set<SettingsPageSlug>(visiblePageSlugs) : null;

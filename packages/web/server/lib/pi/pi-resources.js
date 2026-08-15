@@ -92,6 +92,40 @@ export const resolvePiAuthPath = (home = os.homedir()) => path.join(resolvePiAge
 
 export const resolvePiModelsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'models.json');
 
+export const resolvePiAgentsMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'AGENTS.md');
+
+export const resolveActiveProjectDirectory = (home = os.homedir()) => {
+  const settingsFile = path.join(
+    process.env.OPENCHAMBER_DATA_DIR
+      ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
+      : path.join(home, '.config', 'openchamber'),
+    'settings.json',
+  );
+  try {
+    const settings = JSON.parse(readText(settingsFile));
+    if (typeof settings.lastDirectory === 'string' && settings.lastDirectory.trim()) {
+      return settings.lastDirectory.trim();
+    }
+  } catch {
+  }
+  return '';
+};
+
+export const resolveBehaviorAgentsMd = (home = os.homedir()) => {
+  const userPath = resolvePiAgentsMdPath(home);
+  if (isFile(userPath)) {
+    return { path: userPath, scope: 'user', exists: true };
+  }
+  const directory = resolveActiveProjectDirectory(home);
+  if (directory) {
+    const projectPath = path.join(directory, 'AGENTS.md');
+    if (isFile(projectPath)) {
+      return { path: projectPath, scope: 'project', exists: true };
+    }
+  }
+  return { path: userPath, scope: 'user', exists: false };
+};
+
 const readJsonObject = (filePath) => {
   try {
     const parsed = JSON.parse(readText(filePath));

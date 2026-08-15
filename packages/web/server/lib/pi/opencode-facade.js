@@ -1,4 +1,5 @@
 import express from 'express';
+import { resolveActiveProjectDirectory } from './pi-resources.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -59,7 +60,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   });
 
 
-  const resolveDirectory = (req) => requestDirectory(req) || defaultDirectory;
+  const resolveDirectory = (req) => requestDirectory(req) || resolveActiveProjectDirectory() || defaultDirectory;
   const parseJson = express.json({ limit: '50mb' });
 
   const handle = (fn) => async (req, res, next) => {
@@ -259,6 +260,24 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.patch('/api/pi/defaults', parseJson, handle(async (req, res) => {
     json(res, 200, host.setDefaults(req.body || {}));
+  }));
+
+  app.get('/api/config/agents', handle(async (_req, res) => {
+    json(res, 200, [{
+      name: 'pi',
+      mode: 'primary',
+      native: true,
+      hidden: false,
+      description: 'Pi coding agent',
+    }]);
+  }));
+
+  app.get('/api/plugin', handle(async (_req, res) => {
+    json(res, 200, []);
+  }));
+
+  app.get('/api/prompts', handle(async (_req, res) => {
+    json(res, 200, []);
   }));
 
   app.get('/api/agent', handle(async (_req, res) => {

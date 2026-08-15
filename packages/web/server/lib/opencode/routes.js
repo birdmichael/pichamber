@@ -8,6 +8,7 @@ import {
 } from './config-mutation-response.js';
 import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
+import { resolveBehaviorAgentsMd, resolvePiAgentsMdPath } from '../pi/pi-resources.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
   const {
@@ -775,17 +776,25 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
   });
 
   // Behavior / Global AGENTS.md endpoints
-  const AGENTS_MD_PATH = path.join(os.homedir(), '.config', 'opencode', 'AGENTS.md');
+  const OPENCODE_AGENTS_MD_PATH = path.join(os.homedir(), '.config', 'opencode', 'AGENTS.md');
   const MAX_BEHAVIOR_PROMPT_SIZE = 1024 * 1024; // 1 MB
 
   app.get('/api/behavior/agents-md', async (_req, res) => {
     try {
+      if (isPiKernelEnabled()) {
+        const resolved = resolveBehaviorAgentsMd();
+        if (!resolved.exists) {
+          return res.json({ content: '', exists: false, kernel: 'pi', path: resolved.path, scope: resolved.scope });
+        }
+        const content = await fs.promises.readFile(resolved.path, 'utf8');
+        return res.json({ content, exists: true, kernel: 'pi', path: resolved.path, scope: resolved.scope });
+      }
       try {
-        await fs.promises.access(AGENTS_MD_PATH);
+        await fs.promises.access(OPENCODE_AGENTS_MD_PATH);
       } catch {
         return res.json({ content: '', exists: false });
       }
-      const content = await fs.promises.readFile(AGENTS_MD_PATH, 'utf8');
+      const content = await fs.promises.readFile(OPENCODE_AGENTS_MD_PATH, 'utf8');
       return res.json({ content, exists: true });
     } catch (error) {
       console.error('Failed to read AGENTS.md:', error);
@@ -801,15 +810,29 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
         return res.status(413).json({ error: `Content exceeds maximum size of ${MAX_BEHAVIOR_PROMPT_SIZE} bytes` });
       }
 
-      // Ensure parent directory exists
-      const parentDir = path.dirname(AGENTS_MD_PATH);
+      const filePath = isPiKernelEnabled() ? resolvePiAgentsMdPath() : OPENCODE_AGENTS_MD_PATH;
+      const parentDir = path.dirname(filePath);
       try {
         await fs.promises.access(parentDir);
       } catch {
         await fs.promises.mkdir(parentDir, { recursive: true });
       }
 
-      await fs.promises.writeFile(AGENTS_MD_PATH, content, 'utf8');
+      await fs.promises.writeFile(filePath, content, 'utf8');
+
+      if (isPiKernelEnabled()) {
+        if (typeof refreshOpenCodeAfterConfigChange === 'function') {
+          await refreshOpenCodeAfterConfigChange('Pi behavior AGENTS.md');
+        }
+        return res.json({
+          success: true,
+          kernel: 'pi',
+          requiresReload: false,
+          reloaded: true,
+          path: filePath,
+          message: 'Pi AGENTS.md saved',
+        });
+      }
 
       return res.json(buildDeferredRestartResponse(
         'AGENTS.md saved. Restart OpenCode to apply.',
