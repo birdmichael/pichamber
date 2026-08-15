@@ -38,6 +38,8 @@ import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { eventMatchesShortcut, getEffectiveShortcutCombo, normalizeCombo } from '@/lib/shortcuts';
 import { markStartupTrace } from '@/lib/startupTrace';
 import {
@@ -296,6 +298,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     onMobilePanelChange,
 }) => {
     const { t } = useI18n();
+    const isPiKernel = usePiKernel();
+    const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+    const [piThinking, setPiThinking] = React.useState('high');
     const { isReady, isUnavailable } = useOpenCodeReadiness();
     const readinessLabel = isUnavailable ? t('common.unavailable') : t('common.loading');
     const providers = useConfigStore((state) => state.providers);
@@ -315,6 +320,42 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
     const getCurrentAgent = useConfigStore((state) => state.getCurrentAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
+
+    React.useEffect(() => {
+        if (!isPiKernel) {
+            return;
+        }
+        let cancelled = false;
+        void runtimeFetch('/api/pi/defaults', { method: 'GET' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((payload) => {
+                if (cancelled || !payload || typeof payload.thinking !== 'string') {
+                    return;
+                }
+                const next = payload.thinking.trim();
+                if (PI_THINKING_LEVELS.includes(next as typeof PI_THINKING_LEVELS[number])) {
+                    setPiThinking(next);
+                }
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [isPiKernel]);
+
+    const handlePiThinkingSelect = React.useCallback(async (level: string) => {
+        setPiThinking(level);
+        try {
+            await runtimeFetch('/api/pi/defaults', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ thinking: level }),
+            });
+        } catch {
+            // keep the optimistic chip; Settings → Sessions remains the fallback
+        }
+    }, []);
+
 
     // Use visible agents (excludes hidden internal agents)
     const agents = getVisibleAgents();
@@ -2559,6 +2600,87 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderVariantSelector = () => {
+        if (isPiKernel) {
+            const displayVariant = formatEffortLabel(piThinking);
+            const colorClass = piThinking === 'off' ? 'text-muted-foreground' : 'text-[color:var(--status-info)]';
+
+            if (isCompact) {
+                return (
+                    <button
+                        type="button"
+                        onClick={() => setActiveMobilePanel('variant')}
+                        className={cn(
+                            'model-controls__variant-trigger flex items-center gap-1.5 transition-opacity min-w-0 focus:outline-none',
+                            buttonHeight,
+                            'cursor-pointer hover:bg-transparent hover:opacity-70',
+                        )}
+                    >
+                        <Icon name="brain-ai-3" className={cn(controlIconSize, 'flex-shrink-0', colorClass)} />
+                        <span className={cn(
+                            'model-controls__variant-label',
+                            controlTextSize,
+                            'font-medium truncate min-w-0',
+                            isMobile && 'max-w-[60px]',
+                            colorClass
+                        )}>
+                            {displayVariant}
+                        </span>
+                    </button>
+                );
+            }
+
+            return (
+                <Tooltip delayDuration={600}>
+                    <DropdownMenu>
+                        <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                                <div
+                                    className={cn(
+                                        'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        buttonHeight,
+                                    )}
+                                >
+                                    <Icon name="brain-ai-3" className={cn(controlIconSize, 'flex-shrink-0', colorClass)} />
+                                    <span
+                                        className={cn(
+                                            'model-controls__variant-label',
+                                            controlTextSize,
+                                            'font-medium min-w-0 truncate',
+                                            isDesktop ? 'max-w-[180px]' : undefined,
+                                            colorClass,
+                                        )}
+                                    >
+                                        {displayVariant}
+                                    </span>
+                                </div>
+                            </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(180px,calc(100vw-2rem))]">
+                            <DropdownMenuLabel className="typography-ui-header font-semibold text-foreground">{t('chat.modelControls.thinking')}</DropdownMenuLabel>
+                            {PI_THINKING_LEVELS.map((level) => {
+                                const selected = piThinking === level;
+                                return (
+                                    <DropdownMenuItem
+                                        key={level}
+                                        className="typography-meta"
+                                        onSelect={() => { void handlePiThinkingSelect(level); }}
+                                    >
+                                        <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                                            <span className="typography-meta font-medium text-foreground truncate min-w-0">{formatEffortLabel(level)}</span>
+                                            {selected && <Icon name="check" className="size-4 text-primary flex-shrink-0" />}
+                                        </div>
+                                    </DropdownMenuItem>
+                                );
+                            })}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <TooltipContent side="top">
+                        <p className="typography-meta">Thinking: {displayVariant}</p>
+                    </TooltipContent>
+                </Tooltip>
+            );
+        }
+
         if (!isReady || !hasVariants) {
             return null;
         }
