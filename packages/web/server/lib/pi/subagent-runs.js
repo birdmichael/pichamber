@@ -519,7 +519,9 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
 
   const combined = mergeSubagentRuns(live, extras);
   const visible = combined.filter((run) => (
-    asChildSessionId(run.sessionID, run.parentID) || isLiveRunState(run.state)
+    asChildSessionId(run.sessionID, run.parentID)
+    || isLiveRunState(run.state)
+    || Boolean(run.toolCallId)
   ));
   const seenSession = new Set();
   return visible.filter((run) => {

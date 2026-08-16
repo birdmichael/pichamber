@@ -210,4 +210,43 @@ describe('Pi host subagent runs', () => {
       else process.env.TMPDIR = originalTmp;
     }
   });
+
+  it('mints a writable facade child for a live tool-call that never got a child id', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_sub',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_live',
+        state: {
+          status: 'error',
+          input: { agent: 'scout', task: 'List the README filename' },
+          output: 'NotImplementedError: node:v8 createHook is not yet implemented in Bun',
+        },
+      }],
+    });
+    const listed = await host.listSubagentRuns(parent.id);
+    expect(listed.runs).toHaveLength(1);
+    expect(listed.runs[0].openable).toBe(true);
+    expect(listed.runs[0].sessionID).toBeTruthy();
+    expect(listed.runs[0].sessionID).not.toBe(parent.id);
+    const again = await host.listSubagentRuns(parent.id);
+    expect(again.runs[0].sessionID).toBe(listed.runs[0].sessionID);
+    const child = await host.ensureSession(listed.runs[0].sessionID, '/tmp/project');
+    expect(child.info.parentID).toBe(parent.id);
+    await host.promptAsync(listed.runs[0].sessionID, { text: 'also list the test entry points' });
+    expect(host.getMessages(parent.id).some((entry) => (
+      entry.parts?.some((part) => part.text === 'also list the test entry points')
+    ))).toBe(false);
+  });
 });
