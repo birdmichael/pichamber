@@ -55,7 +55,10 @@ import {
 } from './mcp-status.js';
 import {
   persistSessionMetadata,
+  readPersistedArchivedTimestamp,
   readPersistedSessionMetadata,
+  readPersistedSessionMetadataFromFile,
+  sessionTimeWithArchived,
 } from './session-metadata.js';
 import { createExtensionUIController } from './extension-ui.js';
 import {
@@ -437,7 +440,7 @@ const createSessionInfo = ({
     parentID,
     title: title || 'New session',
     version: 'pi',
-    time: { created, updated: created },
+    time: sessionTimeWithArchived({ created, updated: created }, metadata),
     cost: 0,
     tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
     ...(metadata ? { metadata } : {}),
@@ -1222,10 +1225,10 @@ export const createPiHost = ({
           projectID: cwd,
           metadata,
         }),
-        time: {
+        time: sessionTimeWithArchived({
           created: Number.isFinite(created) ? created : Date.now(),
           updated: Number.isFinite(updated) ? updated : Date.now(),
-        },
+        }, metadata),
       },
       messages: facadeMessagesFromPiEntries(entries, sessionID),
       status: { type: 'idle' },
@@ -1528,16 +1531,17 @@ export const createPiHost = ({
   const toPersistedSessionInfo = (item, directory) => {
     const id = item?.id || item?.path;
     if (!id) return null;
+    const metadata = readPersistedSessionMetadataFromFile(item.path);
     return {
       id,
       projectID: item.cwd || directory || 'pi',
       directory: item.cwd || directory,
       title: item.name || item.firstMessage || 'Pi session',
       version: 'pi',
-      time: {
+      time: sessionTimeWithArchived({
         created: item.created ? new Date(item.created).getTime() : Date.now(),
         updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
-      },
+      }, metadata),
     };
   };
 
@@ -1585,12 +1589,11 @@ export const createPiHost = ({
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
       }
       const persisted = await findPersistedSession(record.id, record.directory);
-      if (persisted?.modified) {
-        const updated = new Date(persisted.modified).getTime();
-        if (Number.isFinite(updated)) {
-          record.info.time = { ...(record.info.time || {}), updated };
-        }
-      }
+      const updated = persisted?.modified ? new Date(persisted.modified).getTime() : undefined;
+      record.info.time = sessionTimeWithArchived({
+        ...(record.info.time || {}),
+        ...(Number.isFinite(updated) ? { updated } : {}),
+      }, metadata || record.info.metadata);
       return true;
     } catch (error) {
       console.warn(`[pi-host] session record refresh failed for ${record.id}:`, error?.message || error);
@@ -1660,10 +1663,16 @@ export const createPiHost = ({
       }
       if (patch.metadata && typeof patch.metadata === 'object') {
         record.info.metadata = { ...(record.info.metadata || {}), ...patch.metadata };
-        persistSessionMetadata(record.sessionManager, record.info.metadata);
       }
-      if (patch.time?.archived) {
-        record.info.time = { ...record.info.time, archived: patch.time.archived };
+      if (patch.time && Object.prototype.hasOwnProperty.call(patch.time, 'archived') && patch.time.archived !== null) {
+        const archived = readPersistedArchivedTimestamp({ archived: patch.time.archived });
+        if (archived !== undefined) {
+          record.info.time = { ...record.info.time, archived };
+          record.info.metadata = { ...(record.info.metadata || {}), archived };
+        }
+      }
+      if (patch.metadata || (patch.time && Object.prototype.hasOwnProperty.call(patch.time, 'archived'))) {
+        persistSessionMetadata(record.sessionManager, record.info.metadata);
       }
       record.info.time.updated = Date.now();
       emit(record.directory, {

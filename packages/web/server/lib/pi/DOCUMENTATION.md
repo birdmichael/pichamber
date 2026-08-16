@@ -169,6 +169,14 @@ the same shape live SSE already emits in `event-translator.js`.
 until a later slice. Do not invent a second session store. Live SSE is
 unchanged.
 
+Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
+entry: `{ archived: ms | 0 }`. `updateSession` writes that value (including
+`0` for restore). `toPersistedSessionInfo`, hydrate, and sidebar Refresh
+read it onto `info.time.archived`. `0` is restored, not archived.
+`GET /api/session` and `GET /api/experimental/session` omit truthy archived
+rows unless `archived=true`. Last-session restore must not open an archived
+id. One unreadable session file does not drop other complete sessions.
+
 ## MCP adapter
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot

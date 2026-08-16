@@ -671,12 +671,24 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     return live;
   };
 
+  const includeArchivedSessions = (archivedQuery) => archivedQuery === true || archivedQuery === 'true';
+
+  const filterSessionInfosByArchivedQuery = (infos, archivedQuery) => {
+    if (includeArchivedSessions(archivedQuery)) return infos;
+    return (infos || []).filter((info) => !info?.time?.archived);
+  };
+
+  const listSessionInfosForRequest = async (req) => filterSessionInfosByArchivedQuery(
+    await listSessionInfos(requestDirectory(req)),
+    req.query?.archived,
+  );
+
   app.get('/api/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfos(requestDirectory(req)));
+    json(res, 200, await listSessionInfosForRequest(req));
   }));
 
   app.get('/api/experimental/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfos(requestDirectory(req)));
+    json(res, 200, await listSessionInfosForRequest(req));
   }));
 
   app.post('/api/session', parseJson, handle(async (req, res) => {

@@ -904,6 +904,49 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('keeps archived Pi sessions off archived=false lists and reports time.archived when included', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-archive-'));
+    tempHomes.push(directory);
+    const { url, close, kernel } = await startFacade({
+      directory,
+      mock: false,
+      createSession: async ({ sessionManager }) => ({
+        sessionId: typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+        isStreaming: false,
+        subscribe() { return () => {}; },
+        async prompt() {},
+        async abort() {},
+        dispose() {},
+      }),
+    });
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Archive via HTTP' }),
+      })).json();
+      const archivedAt = 1_700_000_456_000;
+      const patched = await (await fetch(`${url}/api/session/${created.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ time: { archived: archivedAt } }),
+      })).json();
+      expect(patched.time.archived).toBe(archivedAt);
+
+      const dirQ = `directory=${encodeURIComponent(directory)}`;
+      const active = await (await fetch(`${url}/api/experimental/session?archived=false&${dirQ}`)).json();
+      expect(active.map((item) => item.id)).not.toContain(created.id);
+
+      const inclusive = await (await fetch(`${url}/api/experimental/session?archived=true&${dirQ}`)).json();
+      expect(inclusive.find((item) => item.id === created.id)?.time.archived).toBe(archivedAt);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('lists default feature plugin slots without installing', async () => {
     const { url, close, kernel } = await startFacade();
     try {
