@@ -56,4 +56,29 @@ describe('i18n dictionaries', () => {
       expect(openCodeCopy, locale).toMatch(/MCP/);
     }
   });
+
+  test('empty-session draft titles stay native and keep {project}', () => {
+    const englishTitle = enDict['chat.emptyState.draftTitle'];
+    const englishTitleWithProject = enDict['chat.emptyState.draftTitleWithProject'];
+
+    expect(englishTitle).toBe('What are we working on?');
+    expect(englishTitleWithProject).toBe('What are we working on in {project}?');
+
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      if (locale === 'en') continue;
+      expect(dictionary['chat.emptyState.draftTitle']).not.toBe(englishTitle);
+      expect(dictionary['chat.emptyState.draftTitleWithProject']).not.toBe(englishTitleWithProject);
+      expect(dictionary['chat.emptyState.draftTitleWithProject']).toContain('{project}');
+    }
+  });
+
+  test('command palette copy describes sessions, actions, and files', () => {
+    expect(enDict['commandPalette.description']).toBe('Search sessions, actions, and files.');
+    expect(enDict['commandPalette.input.placeholder']).toBe('Search sessions, actions, files...');
+
+    for (const dictionary of Object.values(localeDictionaries)) {
+      expect(dictionary['commandPalette.description']).not.toBe('Search files, sessions, and commands.');
+      expect(dictionary['commandPalette.input.placeholder']).not.toBe('Search files, sessions, commands...');
+    }
+  });
 });
