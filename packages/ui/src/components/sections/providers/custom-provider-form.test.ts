@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  addRemoteModelsToForm,
   buildAuthSetRequest,
+  buildFetchRemoteModelsRequest,
   buildProviderUpsertRequest,
+  classifyRemoteModelFamily,
+  collapseRemoteModels,
+  fetchRemoteModelsErrorKey,
+  filterRemoteModels,
+  parseRemoteProviderModelsPayload,
+  prepareRemoteModelPicker,
+  remoteModelAlreadyAdded,
   isConfigDefinedCustomProvider,
   isCustomOpenAICompatibleProvider,
   providerToCustomFormState,
@@ -346,5 +355,163 @@ describe('provider edit helpers', () => {
       project: { exists: false },
       custom: { exists: true },
     })).toBe('custom');
+  });
+});
+
+describe('fetch remote models request', () => {
+  test('requires a base URL and credentials unless stored auth is allowed', () => {
+    expect(buildFetchRemoteModelsRequest(baseForm({ baseURL: '' }))).toEqual({
+      errorKey: 'settings.providers.page.custom.error.fetch.baseURL',
+    });
+    expect(buildFetchRemoteModelsRequest(baseForm({ apiKey: '' }))).toEqual({
+      errorKey: 'settings.providers.page.custom.error.fetch.apiKey',
+    });
+    expect(buildFetchRemoteModelsRequest(baseForm({ apiKey: '' }), {
+      allowExistingAuth: true,
+      editingProviderID: 'custom-provider',
+    })).toEqual({
+      request: {
+        baseURL: 'https://api.example.com/v1',
+        providerID: 'custom-provider',
+      },
+    });
+  });
+
+  test('includes a literal key and optional headers', () => {
+    expect(buildFetchRemoteModelsRequest(baseForm({
+      headers: [{ row: 'h0', key: 'X-Test', value: '1' }],
+    }))).toEqual({
+      request: {
+        baseURL: 'https://api.example.com/v1',
+        apiKey: 'sk-test',
+        headers: { 'X-Test': '1' },
+      },
+    });
+  });
+
+  test('parses a remote list without treating empty as malformed', () => {
+    expect(parseRemoteProviderModelsPayload(null)).toBeNull();
+    expect(parseRemoteProviderModelsPayload({ models: [] })).toEqual([]);
+    expect(parseRemoteProviderModelsPayload({
+      models: [
+        { id: 'grok-4.6', name: 'Grok 4.6' },
+        { id: '  grok-4.6  ', name: 'Duplicate' },
+        { id: '  ', name: 'blank' },
+        { name: 'missing-id' },
+      ],
+    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6' }]);
+  });
+
+  test('filters remote models by id, name, and family without mutating the source', () => {
+    const models = [
+      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'x-ai/grok-4.6', name: 'xAI Grok' },
+      { id: 'claude-*', name: 'Claude' },
+      { id: 'gpt-*', name: 'GPT' },
+      { id: 'o3*', name: 'o3' },
+      { id: 'deepseek-chat', name: 'DeepSeek' },
+      { id: 'composer-2.5', name: 'Composer' },
+    ];
+    expect(classifyRemoteModelFamily(models[0]!)).toBe('grok');
+    expect(classifyRemoteModelFamily(models[1]!)).toBe('grok');
+    expect(classifyRemoteModelFamily(models[2]!)).toBe('cc');
+    expect(classifyRemoteModelFamily(models[3]!)).toBe('gpt');
+    expect(classifyRemoteModelFamily(models[4]!)).toBe('gpt');
+    expect(classifyRemoteModelFamily(models[5]!)).toBe('ds');
+    expect(classifyRemoteModelFamily(models[6]!)).toBe('other');
+    expect(filterRemoteModels(models, '4.6')).toEqual([models[0], models[1]]);
+    expect(filterRemoteModels(models, 'CLAUDE')).toEqual([models[2]]);
+    expect(filterRemoteModels(models, 'nope')).toEqual([]);
+    expect(filterRemoteModels(models, '  ')).toEqual(models);
+    expect(filterRemoteModels(models, '', 'grok').map((model) => model.id)).toEqual(['grok-4.6', 'x-ai/grok-4.6']);
+    expect(filterRemoteModels(models, '4.6', 'cc')).toEqual([]);
+    expect(filterRemoteModels(models, '', 'other').map((model) => model.id)).toEqual(['composer-2.5']);
+  });
+
+  test('classifies Claude by role names, not the letters cc', () => {
+    expect(classifyRemoteModelFamily({ id: 'claude-opus-4-6', name: 'Claude Opus 4.6' })).toBe('cc');
+    expect(classifyRemoteModelFamily({ id: 'opus-4.6', name: 'Opus 4.6' })).toBe('cc');
+    expect(classifyRemoteModelFamily({ id: 'sonnet-4.5', name: 'Sonnet 4.5' })).toBe('cc');
+    expect(classifyRemoteModelFamily({ id: 'haiku-4.5', name: 'Haiku 4.5' })).toBe('cc');
+    expect(classifyRemoteModelFamily({ id: 'anthropic/claude-sonnet-4-6', name: 'Sonnet' })).toBe('cc');
+    expect(classifyRemoteModelFamily({ id: 'my-cc-relay', name: 'CC relay' })).toBe('other');
+    expect(classifyRemoteModelFamily({ id: 'ds-chat', name: 'DS chat' })).toBe('other');
+    expect(classifyRemoteModelFamily({ id: 'deepseek-reasoner', name: 'DeepSeek R1' })).toBe('ds');
+    expect(filterRemoteModels(
+      [
+        { id: 'opus-4.6', name: 'Opus 4.6' },
+        { id: 'grok-4.6', name: 'Grok 4.6' },
+      ],
+      'opus',
+      'cc',
+    ).map((model) => model.id)).toEqual(['opus-4.6']);
+  });
+
+  test('collapses gateway aliases and hides wildcard catalog rows', () => {
+    const collapsed = collapseRemoteModels([
+      { id: 'claude-*', name: 'claude-*' },
+      { id: 'gpt-*', name: 'gpt-*' },
+      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'x-ai/grok-4.6', name: 'x-ai/grok-4.6' },
+      { id: 'xai/grok-4.6', name: 'xai/grok-4.6' },
+      { id: 'grok/grok-4.6', name: 'grok/grok-4.6' },
+      { id: 'composer-2.5', name: 'composer-2.5' },
+      { id: 'x-ai/composer-2.5', name: 'x-ai/composer-2.5' },
+    ]);
+    expect(collapsed.map((choice) => choice.id)).toEqual(['composer-2.5', 'grok-4.6']);
+    expect(collapsed[1]?.aliases).toEqual(['grok/grok-4.6', 'x-ai/grok-4.6', 'xai/grok-4.6']);
+    expect(remoteModelAlreadyAdded([{ row: 'm0', id: 'x-ai/grok-4.6', name: 'Grok' }], 'grok-4.6')).toBe(true);
+
+    const split = collapseRemoteModels([
+      { id: 'org-a/llama-3', name: 'Llama A' },
+      { id: 'org-b/llama-3', name: 'Llama B' },
+    ]);
+    expect(split.map((choice) => choice.id).sort()).toEqual(['org-a/llama-3', 'org-b/llama-3']);
+    expect(remoteModelAlreadyAdded(
+      [{ row: 'm0', id: 'org-a/llama-3', name: 'Llama A' }],
+      'org-b/llama-3',
+    )).toBe(false);
+
+    const picker = prepareRemoteModelPicker([
+      { id: 'claude-*', name: 'claude-*' },
+      { id: 'opus-4.6', name: 'Opus 4.6' },
+      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'x-ai/grok-4.6', name: 'x-ai/grok-4.6' },
+    ], '', 'cc');
+    expect(picker.fetchedCount).toBe(4);
+    expect(picker.uniqueCount).toBe(2);
+    expect(picker.familyCounts).toEqual({ cc: 1, gpt: 0, grok: 1, ds: 0, other: 0 });
+    expect(picker.choices.map((choice) => choice.id)).toEqual(['opus-4.6']);
+  });
+
+  test('adds only chosen remote models and leaves the current list otherwise unchanged', () => {
+    const current = [{ row: 'm0', id: 'old', name: 'Old' }];
+    expect(addRemoteModelsToForm(current, [])).toEqual(current);
+    expect(remoteModelAlreadyAdded(current, 'old')).toBe(true);
+    expect(remoteModelAlreadyAdded(current, 'grok-4.6')).toBe(false);
+
+    const blank = [{ row: 'm1', id: '', name: '' }];
+    const first = addRemoteModelsToForm(blank, [{ id: 'grok-4.6', name: 'Grok 4.6' }]);
+    expect(first).toHaveLength(1);
+    expect(first[0]?.id).toBe('grok-4.6');
+    expect(first[0]?.name).toBe('Grok 4.6');
+    expect(first[0]?.row.startsWith('row-')).toBe(true);
+
+    const appended = addRemoteModelsToForm(first, [
+      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'x-ai/grok-4.6', name: 'Grok 4.6' },
+      { id: 'grok-4.5', name: 'Grok 4.5' },
+    ]);
+    expect(appended.map((row) => row.id)).toEqual(['grok-4.6', 'grok-4.5']);
+    expect(prepareRemoteModelPicker([
+      { id: 'claude-*', name: 'claude-*' },
+      { id: 'gpt-*', name: 'gpt-*' },
+    ]).uniqueCount).toBe(0);
+    expect(fetchRemoteModelsErrorKey(401, 'unauthorized')).toBe(
+      'settings.providers.page.custom.error.fetch.unauthorized',
+    );
+    expect(fetchRemoteModelsErrorKey(404)).toBe(
+      'settings.providers.page.custom.error.fetch.unsupported',
+    );
   });
 });

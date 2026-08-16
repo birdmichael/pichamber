@@ -276,6 +276,107 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('saves API keys and custom providers to ~/.pi/agent', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const authResponse = await fetch(`${url}/auth/acme`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'api', key: 'sk-test-do-not-leak' }),
+      });
+      expect(authResponse.status).toBe(200);
+      expect(await authResponse.json()).toBe(true);
+
+      const prefixedAuth = await fetch(`${url}/api/auth/acme`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'api', key: 'sk-test-do-not-leak' }),
+      });
+      expect(prefixedAuth.status).toBe(200);
+
+      const upsert = await fetch(`${url}/api/provider`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          providerID: 'acme',
+          scope: 'user',
+          config: {
+            npm: '@ai-sdk/openai-compatible',
+            name: 'Acme',
+            options: { baseURL: 'https://api.acme.test/v1' },
+            models: { 'grok-4.6': { name: 'Grok 4.6' } },
+          },
+        }),
+      });
+      expect(upsert.status).toBe(200);
+      const payload = await upsert.json();
+      expect(payload).toMatchObject({
+        success: true,
+        kernel: 'pi',
+        requiresReload: true,
+        providerId: 'acme',
+      });
+      expect(JSON.stringify(payload)).not.toContain('sk-test');
+
+      const storedAuth = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+      expect(storedAuth.acme).toEqual({ type: 'api_key', key: 'sk-test-do-not-leak' });
+      const storedModels = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+      expect(storedModels.providers.acme.baseUrl).toBe('https://api.acme.test/v1');
+      expect(storedModels.providers.acme.models).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6' }]);
+
+      const methods = await (await fetch(`${url}/api/provider/auth`)).json();
+      expect(methods.acme[0]).toMatchObject({ type: 'api' });
+      expect(JSON.stringify(methods)).not.toContain('sk-test');
+
+      const disconnected = await fetch(`${url}/api/provider/acme/auth?scope=all`, { method: 'DELETE' });
+      expect(disconnected.status).toBe(200);
+      expect((await disconnected.json()).removed).toBe(true);
+      const afterAuth = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+      expect(afterAuth.acme).toBeUndefined();
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('lists remote provider models without echoing the API key', async () => {
+    const { url, close, kernel } = await startFacade();
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async (requestUrl, init) => {
+        const href = String(requestUrl);
+        if (href.startsWith('https://ai.example.test')) {
+          expect(href).toBe('https://ai.example.test/v1/models');
+          expect(init.headers.Authorization).toBe('Bearer sk-test-do-not-leak');
+          return {
+            ok: true,
+            status: 200,
+            headers: { get: () => 'application/json' },
+            text: async () => JSON.stringify({ data: [{ id: 'grok-4.6', name: 'Grok 4.6' }] }),
+          };
+        }
+        return originalFetch(requestUrl, init);
+      };
+      const response = await fetch(`${url}/api/provider/models`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          baseURL: 'https://ai.example.test/v1',
+          apiKey: 'sk-test-do-not-leak',
+        }),
+      });
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toEqual({ models: [{ id: 'grok-4.6', name: 'Grok 4.6' }] });
+      expect(JSON.stringify(payload)).not.toContain('sk-test');
+    } finally {
+      globalThis.fetch = originalFetch;
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('writes and disconnects provider auth for whatever id is in the URL', async () => {
     const { url, close, kernel } = await startFacade();
     try {

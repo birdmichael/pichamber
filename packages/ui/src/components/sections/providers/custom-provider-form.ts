@@ -389,6 +389,356 @@ export function buildAuthSetRequest(plan: CustomProviderPersistPlan): {
   };
 }
 
+export type RemoteProviderModel = {
+  id: string;
+  name: string;
+};
+
+export type FetchRemoteModelsRequest = {
+  baseURL: string;
+  apiKey?: string;
+  headers?: Record<string, string>;
+  providerID?: string;
+};
+
+export function buildFetchRemoteModelsRequest(
+  form: CustomProviderFormState,
+  options?: { allowExistingAuth?: boolean; editingProviderID?: string },
+): { request: FetchRemoteModelsRequest } | { errorKey: string } {
+  const baseURL = form.baseURL.trim();
+  if (!baseURL) {
+    return { errorKey: 'settings.providers.page.custom.error.fetch.baseURL' };
+  }
+  if (!BASE_URL_PATTERN.test(baseURL)) {
+    return { errorKey: 'settings.providers.page.custom.error.baseURL.format' };
+  }
+
+  const { env, key } = parseEnvApiKey(form.apiKey);
+  const providerID = form.providerID.trim();
+  const canUseStoredAuth = Boolean(
+    options?.allowExistingAuth
+    && options.editingProviderID
+    && options.editingProviderID === providerID,
+  );
+  if (!env && !key && !canUseStoredAuth) {
+    return { errorKey: 'settings.providers.page.custom.error.fetch.apiKey' };
+  }
+
+  const headers = Object.fromEntries(
+    form.headers
+      .map((header) => ({ key: header.key.trim(), value: header.value.trim() }))
+      .filter((header) => header.key && header.value)
+      .map((header) => [header.key, header.value]),
+  );
+
+  return {
+    request: {
+      baseURL,
+      ...(key || env ? { apiKey: form.apiKey.trim() } : {}),
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
+      ...(canUseStoredAuth ? { providerID } : {}),
+    },
+  };
+}
+
+export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProviderModel[] | null {
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { models?: unknown }).models)) {
+    return null;
+  }
+  const models: RemoteProviderModel[] = [];
+  const seen = new Set<string>();
+  for (const item of (payload as { models: unknown[] }).models) {
+    if (!item || typeof item !== 'object' || typeof (item as { id?: unknown }).id !== 'string') {
+      continue;
+    }
+    const id = (item as { id: string }).id.trim();
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    const rawName = (item as { name?: unknown }).name;
+    const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : id;
+    models.push({ id, name });
+  }
+  return models;
+}
+
+export const REMOTE_MODEL_FAMILIES = ['all', 'cc', 'gpt', 'grok', 'ds', 'other'] as const;
+export type RemoteModelFamily = (typeof REMOTE_MODEL_FAMILIES)[number];
+
+const hasToken = (haystack: string, token: string): boolean => {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(haystack);
+};
+
+const includesAny = (haystack: string, needles: readonly string[]): boolean => (
+  needles.some((needle) => haystack.includes(needle))
+);
+
+const hasAnyToken = (haystack: string, tokens: readonly string[]): boolean => (
+  tokens.some((token) => hasToken(haystack, token))
+);
+
+/**
+ * Family chips follow vendor product names, not 2-letter abbreviations.
+ * OpenRouter groups by architecture (Claude / GPT / Grok / DeepSeek).
+ * Anthropic, LiteLLM, and CC Switch identify Claude by role IDs
+ * (opus / sonnet / haiku), including aliases like `opus-4-6` without a
+ * `claude-` prefix. Short tokens such as `cc` or `ds` are not used.
+ */
+export function classifyRemoteModelFamily(
+  model: Pick<RemoteProviderModel, 'id' | 'name'>,
+): Exclude<RemoteModelFamily, 'all'> {
+  const text = `${model.id} ${model.name}`.toLowerCase();
+  if (includesAny(text, ['grok']) || hasAnyToken(text, ['x-ai', 'xai'])) {
+    return 'grok';
+  }
+  if (includesAny(text, ['deepseek', 'deep-seek'])) {
+    return 'ds';
+  }
+  if (includesAny(text, ['claude', 'anthropic']) || hasAnyToken(text, ['opus', 'sonnet', 'haiku'])) {
+    return 'cc';
+  }
+  if (
+    includesAny(text, ['gpt', 'openai', 'chatgpt', 'codex'])
+    || /(^|[^a-z0-9])o[1-9]/.test(text)
+  ) {
+    return 'gpt';
+  }
+  return 'other';
+}
+
+export function filterRemoteModels(
+  models: readonly RemoteProviderModel[],
+  query: string,
+  family: RemoteModelFamily = 'all',
+): RemoteProviderModel[] {
+  const needle = query.trim().toLowerCase();
+  return models.filter((model) => {
+    if (family !== 'all' && classifyRemoteModelFamily(model) !== family) {
+      return false;
+    }
+    if (!needle) {
+      return true;
+    }
+    return model.id.toLowerCase().includes(needle) || model.name.toLowerCase().includes(needle);
+  });
+}
+
+function isWildcardRemoteModelId(id: string): boolean {
+  return /[*?]/.test(id.trim());
+}
+
+/** Last path segment: `x-ai/grok-4.6` and `grok/grok-4.6` share `grok-4.6`. */
+function remoteModelCanonicalId(id: string): string {
+  const trimmed = id.trim();
+  const slash = trimmed.lastIndexOf('/');
+  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
+}
+
+function remoteModelPrefix(id: string): string {
+  const trimmed = id.trim();
+  const slash = trimmed.lastIndexOf('/');
+  return slash >= 0 ? trimmed.slice(0, slash).toLowerCase() : '';
+}
+
+/**
+ * Only collapse a shared slug across known vendor aliases
+ * (`x-ai/grok-4.6` + `grok-4.6`). `org-a/llama-3` and `org-b/llama-3` stay apart.
+ */
+const REMOTE_MODEL_PREFIX_FAMILIES: ReadonlyArray<ReadonlySet<string>> = [
+  new Set(['', 'x-ai', 'xai', 'grok']),
+  new Set(['', 'openai', 'open-ai']),
+  new Set(['', 'anthropic', 'claude']),
+  new Set(['', 'deepseek', 'deep-seek']),
+];
+
+function remoteModelsShareAliasFamily(leftId: string, rightId: string): boolean {
+  const left = remoteModelPrefix(leftId);
+  const right = remoteModelPrefix(rightId);
+  if (left === right) {
+    return true;
+  }
+  return REMOTE_MODEL_PREFIX_FAMILIES.some((family) => family.has(left) && family.has(right));
+}
+
+function clusterRemoteModelsByAliasFamily(models: readonly RemoteProviderModel[]): RemoteProviderModel[][] {
+  const clusters: RemoteProviderModel[][] = [];
+  for (const model of models) {
+    const existing = clusters.find((cluster) => (
+      cluster.some((member) => remoteModelsShareAliasFamily(member.id, model.id))
+    ));
+    if (existing) {
+      existing.push(model);
+    } else {
+      clusters.push([model]);
+    }
+  }
+  return clusters;
+}
+
+const preferRemoteModelId = (ids: readonly string[]): string => (
+  [...ids].sort((left, right) => {
+    const leftPrefixed = left.includes('/') ? 1 : 0;
+    const rightPrefixed = right.includes('/') ? 1 : 0;
+    if (leftPrefixed !== rightPrefixed) {
+      return leftPrefixed - rightPrefixed;
+    }
+    if (left.length !== right.length) {
+      return left.length - right.length;
+    }
+    return left.localeCompare(right);
+  })[0] ?? ids[0] ?? ''
+);
+
+export type RemoteModelChoice = {
+  id: string;
+  name: string;
+  aliases: string[];
+};
+
+/**
+ * CC Switch groups a fetch by vendor and lets the user pick one ID.
+ * Aggregators often repeat the same slug under `x-ai/`, `grok/`, and bare IDs.
+ * Collapse those, drop glob IDs like `claude-*`, and keep the shortest bare ID.
+ */
+export function collapseRemoteModels(
+  models: readonly RemoteProviderModel[],
+): RemoteModelChoice[] {
+  const groups = new Map<string, RemoteProviderModel[]>();
+  for (const model of models) {
+    if (isWildcardRemoteModelId(model.id)) {
+      continue;
+    }
+    const key = remoteModelCanonicalId(model.id).toLowerCase();
+    if (!key) {
+      continue;
+    }
+    const group = groups.get(key) ?? [];
+    group.push(model);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .flatMap((group) => clusterRemoteModelsByAliasFamily(group))
+    .map((group) => {
+      const ids = [...new Set(group.map((model) => model.id))];
+      const id = preferRemoteModelId(ids);
+      const named = group.find((model) => model.name.trim() && model.name.trim() !== model.id);
+      return {
+        id,
+        name: named?.name.trim() || group.find((model) => model.id === id)?.name || id,
+        aliases: ids.filter((alias) => alias !== id).sort((left, right) => left.localeCompare(right)),
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+export type RemoteModelFamilyCounts = Record<Exclude<RemoteModelFamily, 'all'>, number>;
+
+export function prepareRemoteModelPicker(
+  models: readonly RemoteProviderModel[],
+  query = '',
+  family: RemoteModelFamily = 'all',
+): {
+  choices: RemoteModelChoice[];
+  familyCounts: RemoteModelFamilyCounts;
+  fetchedCount: number;
+  uniqueCount: number;
+} {
+  const collapsed = collapseRemoteModels(models);
+  const familyCounts: RemoteModelFamilyCounts = {
+    cc: 0,
+    gpt: 0,
+    grok: 0,
+    ds: 0,
+    other: 0,
+  };
+  for (const choice of collapsed) {
+    familyCounts[classifyRemoteModelFamily(choice)] += 1;
+  }
+  const needle = query.trim().toLowerCase();
+  const choices = collapsed.filter((choice) => {
+    if (family !== 'all' && classifyRemoteModelFamily(choice) !== family) {
+      return false;
+    }
+    if (!needle) {
+      return true;
+    }
+    return [choice.id, choice.name, ...choice.aliases].some((value) => value.toLowerCase().includes(needle));
+  });
+  return {
+    choices,
+    familyCounts,
+    fetchedCount: models.length,
+    uniqueCount: collapsed.length,
+  };
+}
+
+export function remoteModelAlreadyAdded(current: readonly ModelRow[], modelId: string): boolean {
+  const id = modelId.trim();
+  if (!id) {
+    return false;
+  }
+  const canonical = remoteModelCanonicalId(id).toLowerCase();
+  return current.some((row) => {
+    const rowId = row.id.trim();
+    if (!rowId || rowId === id) {
+      return Boolean(rowId);
+    }
+    if (remoteModelCanonicalId(rowId).toLowerCase() !== canonical) {
+      return false;
+    }
+    return remoteModelsShareAliasFamily(rowId, id);
+  });
+}
+
+const isBlankModelRow = (row: ModelRow): boolean => !row.id.trim() && !row.name.trim();
+
+/**
+ * Appends chosen remote models. Fetch must not replace the form list.
+ * A single blank starter row is replaced so the first add does not leave an empty slot.
+ */
+export function addRemoteModelsToForm(
+  current: readonly ModelRow[],
+  selected: readonly RemoteProviderModel[],
+): ModelRow[] {
+  const added: ModelRow[] = [];
+  const seen = current.map((row) => ({ ...row }));
+  for (const model of selected) {
+    const id = model.id.trim();
+    if (!id || remoteModelAlreadyAdded(seen, id) || remoteModelAlreadyAdded(added, id)) {
+      continue;
+    }
+    const row = {
+      row: nextRow(),
+      id,
+      name: model.name.trim() || id,
+    };
+    added.push(row);
+    seen.push(row);
+  }
+  if (added.length === 0) {
+    return current.length > 0 ? [...current] : [createModelRow()];
+  }
+  const kept = current.filter((row) => !isBlankModelRow(row));
+  const next = [...kept, ...added];
+  return next.length > 0 ? next : [createModelRow()];
+}
+
+export function fetchRemoteModelsErrorKey(status: number, code?: string): string {
+  if (code === 'unauthorized' || status === 401 || status === 403) {
+    return 'settings.providers.page.custom.error.fetch.unauthorized';
+  }
+  if (code === 'unsupported' || status === 404 || status === 405) {
+    return 'settings.providers.page.custom.error.fetch.unsupported';
+  }
+  if (code === 'invalid' || status === 400) {
+    return 'settings.providers.page.custom.error.fetch.failed';
+  }
+  return 'settings.providers.page.custom.error.fetch.failed';
+}
+
 /**
  * Builds the OpenChamber provider upsert request body (config persistence).
  * `scope` selects the OpenCode config layer (user/project/custom). Create

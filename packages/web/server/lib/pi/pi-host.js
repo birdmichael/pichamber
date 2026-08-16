@@ -20,6 +20,9 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  listPiProviderPublicConfigs,
+  upsertPiProviderConfig,
+  deletePiProviderConfig,
   writePiProviderAuth,
   removePiProviderAuth,
 } from './pi-resources.js';
@@ -292,6 +295,64 @@ const applyEventToStore = (store, ocEvent) => {
   }
 };
 
+const toProviderModelRecord = (model) => {
+  const id = typeof model?.id === 'string' ? model.id.trim() : '';
+  if (!id) return null;
+  const contextWindow = Number(model.contextWindow);
+  const maxTokens = Number(model.maxTokens);
+  const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
+  const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
+  return {
+    id,
+    name: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id,
+    reasoning: Boolean(model.reasoning),
+    ...(hasContext ? { contextWindow } : {}),
+    ...(hasOutput ? { maxTokens } : {}),
+    cost: model.cost,
+    ...(hasContext || hasOutput ? {
+      limit: {
+        ...(hasContext ? { context: contextWindow } : {}),
+        ...(hasOutput ? { output: maxTokens } : {}),
+      },
+    } : {}),
+  };
+};
+
+const applyPublicProviderConfig = (provider, config) => {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    return provider;
+  }
+  if (typeof config.name === 'string' && config.name.trim()) {
+    provider.name = config.name.trim();
+  }
+  const baseURL = typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '';
+  const headers = config.headers && typeof config.headers === 'object' && !Array.isArray(config.headers)
+    ? config.headers
+    : null;
+  if (baseURL) {
+    provider.options = {
+      ...(provider.options && typeof provider.options === 'object' ? provider.options : {}),
+      baseURL,
+      ...(headers ? { headers } : {}),
+    };
+  }
+  if (Array.isArray(config.env)) {
+    const env = config.env
+      .filter((entry) => typeof entry === 'string' && entry.trim())
+      .map((entry) => entry.trim());
+    if (env.length > 0) {
+      provider.env = env;
+    }
+  }
+  const extraModels = Array.isArray(config.models) ? config.models : [];
+  for (const extra of extraModels) {
+    const record = toProviderModelRecord(extra);
+    if (record && !provider.models[record.id]) {
+      provider.models[record.id] = record;
+    }
+  }
+  return provider;
+};
 
 export const normalizePiSessionUsage = (contextUsage, sessionStats) => {
   const usage = (contextUsage && typeof contextUsage === 'object')
@@ -321,10 +382,12 @@ export const normalizePiSessionUsage = (contextUsage, sessionStats) => {
   };
 };
 
-export const mapPiModelsToProviders = (models) => {
+export const mapPiModelsToProviders = (models, { configs = {} } = {}) => {
   const byProvider = new Map();
   for (const model of models || []) {
-    const providerID = model.provider || 'pi';
+    const providerID = typeof model.provider === 'string' && model.provider.trim()
+      ? model.provider.trim()
+      : 'pi';
     if (!byProvider.has(providerID)) {
       byProvider.set(providerID, {
         id: providerID,
@@ -334,25 +397,23 @@ export const mapPiModelsToProviders = (models) => {
         models: {},
       });
     }
-    const provider = byProvider.get(providerID);
-    const contextWindow = Number(model.contextWindow);
-    const maxTokens = Number(model.maxTokens);
-    const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
-    const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
-    provider.models[model.id] = {
-      id: model.id,
-      name: model.name || model.id,
-      reasoning: Boolean(model.reasoning),
-      ...(hasContext ? { contextWindow } : {}),
-      ...(hasOutput ? { maxTokens } : {}),
-      cost: model.cost,
-      ...(hasContext || hasOutput ? {
-        limit: {
-          ...(hasContext ? { context: contextWindow } : {}),
-          ...(hasOutput ? { output: maxTokens } : {}),
-        },
-      } : {}),
-    };
+    const record = toProviderModelRecord(model);
+    if (record) {
+      byProvider.get(providerID).models[record.id] = record;
+    }
+  }
+  for (const [id, config] of Object.entries(configs || {})) {
+    if (!id) continue;
+    if (!byProvider.has(id)) {
+      byProvider.set(id, {
+        id,
+        name: id,
+        source: 'pi',
+        env: [],
+        models: {},
+      });
+    }
+    applyPublicProviderConfig(byProvider.get(id), config);
   }
   return Array.from(byProvider.values());
 };
@@ -653,6 +714,12 @@ export const createPiHost = ({
     return record;
   };
 
+  const invalidateModelRuntime = () => {
+    modelRuntime = null;
+    modelRuntimeError = null;
+    readyPromise = null;
+  };
+
   return {
     ready,
     isMock() {
@@ -781,11 +848,38 @@ export const createPiHost = ({
         directory: directory || defaultDirectory,
       });
     },
+    invalidateModelRuntime,
     setProviderAuth(providerId, body) {
-      return writePiProviderAuth(providerId, body, { home });
+      const result = writePiProviderAuth(providerId, body, { home });
+      invalidateModelRuntime();
+      return result;
     },
     removeProviderAuth(providerId) {
-      return removePiProviderAuth(providerId, { home });
+      const result = removePiProviderAuth(providerId, { home });
+      invalidateModelRuntime();
+      return result;
+    },
+    upsertProvider(providerId, config, options = {}) {
+      const result = upsertPiProviderConfig({
+        home,
+        directory: options.directory || defaultDirectory,
+        providerId,
+        config,
+        scope: options.scope,
+        hasStoredAuth: options.hasStoredAuth,
+      });
+      invalidateModelRuntime();
+      return result;
+    },
+    deleteProvider(providerId, options = {}) {
+      const result = deletePiProviderConfig({
+        home,
+        directory: options.directory || defaultDirectory,
+        providerId,
+        scope: options.scope,
+      });
+      invalidateModelRuntime();
+      return result;
     },
     getKernelInfo() {
       const defaults = readPiDefaults(home);
@@ -828,7 +922,9 @@ export const createPiHost = ({
         const available = runtime && typeof runtime.getAvailable === 'function'
           ? await runtime.getAvailable()
           : [];
-        const providers = mapPiModelsToProviders(available);
+        const providers = mapPiModelsToProviders(available, {
+          configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
+        });
         const first = providers[0];
         const firstModel = first ? Object.keys(first.models)[0] : undefined;
         return {

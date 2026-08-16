@@ -9,6 +9,7 @@ import {
 import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
 import { readBehaviorAgentsMd, resolvePiAgentsMdPath, readPiSystemPromptFiles, writePiSystemPromptFile } from '../pi/pi-resources.js';
+import { handleFetchRemoteProviderModels } from '../pi/remote-provider-models.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
   const {
@@ -553,6 +554,10 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
     }
   });
 
+  app.post('/api/provider/models', async (req, res) => {
+    await handleFetchRemoteProviderModels(req, res, { home: os.homedir() });
+  });
+
   app.get('/api/provider/:providerId/source', async (req, res) => {
     try {
       const { providerId } = req.params;
@@ -600,6 +605,7 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
     }
   });
 
+  if (!isPiKernelEnabled()) {
   app.put('/api/provider', async (req, res) => {
     try {
       const providerID = typeof req.body?.providerID === 'string'
@@ -721,6 +727,7 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
       return res.status(500).json({ error: error.message || 'Failed to disconnect provider' });
     }
   });
+  }
 
   app.post('/api/opencode/directory', async (req, res) => {
     try {

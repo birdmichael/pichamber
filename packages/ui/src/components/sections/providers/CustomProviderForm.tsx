@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  SettingsChipGroup,
   SettingsSection,
   SettingsStackedField,
   SETTINGS_FIELDS_STACK_CLASS,
@@ -12,17 +13,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
+import { toast } from '@/components/ui';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import {
+  addRemoteModelsToForm,
+  buildFetchRemoteModelsRequest,
   createEmptyCustomProviderForm,
   createHeaderRow,
   createModelRow,
+  fetchRemoteModelsErrorKey,
+  parseRemoteProviderModelsPayload,
+  prepareRemoteModelPicker,
+  remoteModelAlreadyAdded,
   validateCustomProvider,
+  type RemoteModelFamily,
   type CustomProviderFormState,
   type CustomProviderPersistPlan,
   type CustomProviderTranslator,
   type FieldErrors,
   type HeaderFieldErrors,
   type ModelFieldErrors,
+  type RemoteProviderModel,
 } from './custom-provider-form';
 
 type CustomProviderFormProps = {
@@ -58,7 +69,55 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   const [err, setErr] = React.useState<FieldErrors>({});
   const [modelErrors, setModelErrors] = React.useState<ModelFieldErrors[]>([]);
   const [headerErrors, setHeaderErrors] = React.useState<HeaderFieldErrors[]>([]);
+  const [fetchingModels, setFetchingModels] = React.useState(false);
+  const [remoteModels, setRemoteModels] = React.useState<RemoteProviderModel[] | null>(null);
+  const [remotePickerOpen, setRemotePickerOpen] = React.useState(false);
+  const [remoteModelQuery, setRemoteModelQuery] = React.useState('');
+  const [remoteModelFamily, setRemoteModelFamily] = React.useState<RemoteModelFamily>('all');
   const seededEditProviderIdRef = React.useRef<string | null>(null);
+  const fetchAbortRef = React.useRef<AbortController | null>(null);
+  const lastFetchFingerprintRef = React.useRef('');
+  const remotePicker = React.useMemo(
+    () => (remoteModels
+      ? prepareRemoteModelPicker(remoteModels, remoteModelQuery, remoteModelFamily)
+      : null),
+    [remoteModels, remoteModelQuery, remoteModelFamily],
+  );
+  const remoteFamilyOptions = React.useMemo(() => {
+    const countKeys: Record<Exclude<RemoteModelFamily, 'all'>, Parameters<typeof t>[0]> = {
+      cc: 'settings.providers.page.custom.models.picker.family.ccCount',
+      gpt: 'settings.providers.page.custom.models.picker.family.gptCount',
+      grok: 'settings.providers.page.custom.models.picker.family.grokCount',
+      ds: 'settings.providers.page.custom.models.picker.family.dsCount',
+      other: 'settings.providers.page.custom.models.picker.family.otherCount',
+    };
+    const options: Array<{ value: RemoteModelFamily; label: string }> = [
+      { value: 'all', label: t('settings.providers.page.custom.models.picker.family.all') },
+    ];
+    (Object.keys(countKeys) as Array<Exclude<RemoteModelFamily, 'all'>>).forEach((family) => {
+      const count = remotePicker?.familyCounts[family] ?? 0;
+      if (family !== remoteModelFamily && count === 0) {
+        return;
+      }
+      options.push({
+        value: family,
+        label: t(countKeys[family], { count }),
+      });
+    });
+    return options;
+  }, [remoteModelFamily, remotePicker, t]);
+
+  React.useEffect(() => () => {
+    fetchAbortRef.current?.abort();
+  }, []);
+
+  React.useEffect(() => {
+    setRemoteModels(null);
+    setRemotePickerOpen(false);
+    setRemoteModelQuery('');
+    setRemoteModelFamily('all');
+    lastFetchFingerprintRef.current = '';
+  }, [form.baseURL, form.providerID]);
 
   React.useEffect(() => {
     if (!initialValues) {
@@ -126,6 +185,103 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
       return;
     }
     await onSubmit(output.result);
+  };
+
+  const remoteFetchFingerprint = () => (
+    `${form.baseURL.trim()}\n${form.apiKey.trim()}\n${form.providerID.trim()}`
+  );
+
+  const handleFetchModels = async () => {
+    if (busy) {
+      return;
+    }
+    if (fetchingModels) {
+      fetchAbortRef.current?.abort();
+      return;
+    }
+    const fingerprint = remoteFetchFingerprint();
+    if (
+      remoteModels
+      && remoteModels.length > 0
+      && !remotePickerOpen
+      && lastFetchFingerprintRef.current === fingerprint
+    ) {
+      setRemotePickerOpen(true);
+      return;
+    }
+    const built = buildFetchRemoteModelsRequest(form, {
+      allowExistingAuth: isEdit && allowExistingAuth,
+      editingProviderID: isEdit ? form.providerID : undefined,
+    });
+    if ('errorKey' in built) {
+      toast.error(t(built.errorKey as Parameters<typeof t>[0]));
+      return;
+    }
+
+    fetchAbortRef.current?.abort();
+    const abort = new AbortController();
+    fetchAbortRef.current = abort;
+    setFetchingModels(true);
+    try {
+      const response = await runtimeFetch('/api/provider/models', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(built.request),
+        signal: abort.signal,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const code = payload && typeof payload === 'object' && typeof payload.error === 'string'
+          ? payload.error
+          : undefined;
+        throw new Error(t(fetchRemoteModelsErrorKey(response.status, code) as Parameters<typeof t>[0]));
+      }
+      const models = parseRemoteProviderModelsPayload(payload);
+      if (!models) {
+        throw new Error(t('settings.providers.page.custom.error.fetch.failed'));
+      }
+      if (models.length === 0) {
+        toast.error(t('settings.providers.page.custom.toast.modelsEmpty'));
+        setRemoteModels(null);
+        setRemotePickerOpen(false);
+        return;
+      }
+      if (prepareRemoteModelPicker(models).uniqueCount === 0) {
+        toast.error(t('settings.providers.page.custom.toast.modelsNoneAddable'));
+        setRemoteModels(null);
+        setRemotePickerOpen(false);
+        return;
+      }
+      lastFetchFingerprintRef.current = fingerprint;
+      setRemoteModelQuery('');
+      setRemoteModelFamily('all');
+      setRemoteModels(models);
+      setRemotePickerOpen(true);
+    } catch (error) {
+      if (abort.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        return;
+      }
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : t('settings.providers.page.custom.error.fetch.failed'),
+      );
+    } finally {
+      if (fetchAbortRef.current === abort) {
+        setFetchingModels(false);
+      }
+    }
+  };
+
+  const addRemoteModel = (model: RemoteProviderModel) => {
+    setForm((prev) => ({
+      ...prev,
+      models: addRemoteModelsToForm(prev.models, [model]),
+    }));
+    setModelErrors([]);
   };
 
   return (
@@ -218,6 +374,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
 
       <SettingsSection
         title={t('settings.providers.page.custom.models.title')}
+        info={t('settings.providers.page.custom.models.fetchInfo')}
         contentClassName={SETTINGS_FIELDS_STACK_CLASS}
       >
         {form.models.map((model, index) => (
@@ -276,18 +433,136 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
             </div>
           </div>
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          className="!font-normal"
-          onClick={() => {
-            setForm((prev) => ({ ...prev, models: [...prev.models, createModelRow()] }));
-            setModelErrors((prev) => [...prev, {}]);
-          }}
-        >
-          {t('settings.providers.page.custom.models.add')}
-        </Button>
+        <div className={`${SETTINGS_CONTROL_CLUSTER_CLASS} flex flex-wrap items-center gap-2`} data-settings-item="providers.custom.fetchModels">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            className="!font-normal"
+            onClick={() => void handleFetchModels()}
+            disabled={busy}
+            aria-busy={fetchingModels}
+            aria-label={
+              fetchingModels
+                ? t('settings.providers.page.custom.models.fetchCancel')
+                : t('settings.providers.page.custom.models.fetch')
+            }
+          >
+            <Icon name="download" className="size-3.5" />
+            {fetchingModels
+              ? t('settings.providers.page.custom.models.fetchCancel')
+              : t('settings.providers.page.custom.models.fetch')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            className="!font-normal"
+            disabled={busy}
+            onClick={() => {
+              setForm((prev) => ({ ...prev, models: [...prev.models, createModelRow()] }));
+              setModelErrors((prev) => [...prev, {}]);
+            }}
+          >
+            {t('settings.providers.page.custom.models.add')}
+          </Button>
+        </div>
+        {remotePickerOpen && remoteModels ? (
+          <div
+            className="space-y-3"
+            role="region"
+            aria-label={t('settings.providers.page.custom.models.picker.region')}
+          >
+            <div>
+              <p className={SETTINGS_FIELD_LABEL_CLASS}>
+                {t('settings.providers.page.custom.models.picker.title')}
+              </p>
+              <p className={SETTINGS_HELPER_CLASS}>
+                {remotePicker && remotePicker.uniqueCount < remotePicker.fetchedCount
+                  ? t('settings.providers.page.custom.models.picker.descriptionCollapsed', {
+                      shown: String(remotePicker.uniqueCount),
+                      count: String(remotePicker.fetchedCount),
+                    })
+                  : t('settings.providers.page.custom.models.picker.description', {
+                      count: remotePicker?.fetchedCount ?? remoteModels.length,
+                    })}
+              </p>
+            </div>
+            <SettingsChipGroup
+              value={remoteModelFamily}
+              onChange={setRemoteModelFamily}
+              aria-label={t('settings.providers.page.custom.models.picker.family.label')}
+              options={remoteFamilyOptions}
+            />
+            <Input
+              value={remoteModelQuery}
+              onChange={(event) => setRemoteModelQuery(event.target.value)}
+              placeholder={t('settings.providers.page.custom.models.picker.search')}
+              className="h-8 rounded-md px-3"
+              aria-label={t('settings.providers.page.custom.models.picker.search')}
+            />
+            <div className="min-h-0 max-h-64 overflow-y-auto" role="list">
+              {!remotePicker || remotePicker.choices.length === 0 ? (
+                <p className="typography-meta text-muted-foreground py-3">
+                  {remoteModelQuery.trim()
+                    ? t('settings.providers.page.custom.models.picker.empty')
+                    : t('settings.providers.page.custom.models.picker.familyEmpty')}
+                </p>
+              ) : (
+                remotePicker.choices.map((model) => {
+                  const added = remoteModelAlreadyAdded(form.models, model.id);
+                  return (
+                    <div
+                      key={model.id}
+                      role="listitem"
+                      className="flex items-center gap-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="typography-ui-label truncate">{model.name}</p>
+                        {model.name !== model.id ? (
+                          <p className="typography-meta font-mono text-muted-foreground truncate">{model.id}</p>
+                        ) : null}
+                        {model.aliases.length > 0 ? (
+                          <p className="typography-meta text-muted-foreground truncate">
+                            {t('settings.providers.page.custom.models.picker.aliases', {
+                              count: String(model.aliases.length),
+                            })}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        className="!font-normal shrink-0"
+                        disabled={added}
+                        onClick={() => addRemoteModel(model)}
+                        aria-label={
+                          added
+                            ? t('settings.providers.page.custom.models.picker.added')
+                            : t('settings.providers.page.custom.models.picker.addAria', { name: model.name })
+                        }
+                      >
+                        {added
+                          ? t('settings.providers.page.custom.models.picker.added')
+                          : t('settings.providers.page.custom.models.picker.add')}
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              className="!font-normal"
+              onClick={() => setRemotePickerOpen(false)}
+            >
+              {t('settings.providers.page.custom.models.picker.done')}
+            </Button>
+          </div>
+        ) : null}
       </SettingsSection>
 
       <SettingsSection

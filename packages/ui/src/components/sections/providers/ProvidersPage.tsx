@@ -23,6 +23,7 @@ import type { ModelMetadata } from '@/types';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { opencodeClient } from '@/lib/opencode/client';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { shouldLoadAvailableProviders } from './providerAvailability';
 import {
   getOAuthAuthMethods,
@@ -144,9 +145,11 @@ const parseProvidersPayload = (payload: unknown): ProviderOption[] => {
 
 export const ProvidersPage: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const providers = useConfigStore((state) => state.providers);
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
+  const loadProviders = useConfigStore((state) => state.loadProviders);
   const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
   const hiddenModels = useUIStore((state) => state.hiddenModels);
   const toggleHiddenModel = useUIStore((state) => state.toggleHiddenModel);
@@ -395,7 +398,10 @@ export const ProvidersPage: React.FC = () => {
 
       toast.success(t('settings.providers.page.toast.apiKeySaved'));
       setApiKeyInputs((prev) => ({ ...prev, [providerId]: '' }));
-      recordDeferredOpenCodeRestart('providers', { id: providerId });
+      if (!isPiKernel) {
+        recordDeferredOpenCodeRestart('providers', { id: providerId });
+      }
+      await loadProviders({ source: 'settings:api-key-save' });
       setSelectedProvider(providerId);
     } catch (error) {
       console.error('Failed to save API key:', error);
@@ -447,6 +453,7 @@ export const ProvidersPage: React.FC = () => {
       }
 
       toast.success(t('settings.providers.page.toast.customProviderSaved', { provider: plan.name }));
+      await loadProviders({ source: 'settings:custom-provider-save' });
       setCandidateProviderId('');
       setEditingCustomProviderId(null);
       setEditingCustomFormInitial(null);
@@ -497,6 +504,7 @@ export const ProvidersPage: React.FC = () => {
       // Only accumulate when the server actually deferred a restart (e.g. auth removed).
       // removed:false payloads must not create a phantom pending Apply & Restart.
       noteDeferredRestartFromPayload(payload, 'providers', { id: providerId });
+      await loadProviders({ source: 'settings:provider-disconnect' });
     } catch (error) {
       console.error('Failed to disconnect provider:', error);
       toast.error(t('settings.providers.page.toast.providerDisconnectFailed'));

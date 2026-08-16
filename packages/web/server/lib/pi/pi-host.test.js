@@ -15,6 +15,42 @@ describe('mapPiModelsToProviders', () => {
     expect(providers[0].models['claude-sonnet-4-5'].name).toBe('Sonnet');
   });
 
+  it('attaches models.json name and baseURL so Settings can edit custom providers', () => {
+    const providers = mapPiModelsToProviders(
+      [{ id: 'grok-4.6', name: 'Grok 4.6', provider: 'grok' }],
+      {
+        configs: {
+          grok: {
+            name: 'Grok',
+            baseUrl: 'https://ai.example.test/v1',
+            headers: { 'X-Test': '1' },
+            models: [{ id: 'grok-4.6', name: 'Grok 4.6' }],
+          },
+        },
+      },
+    );
+    expect(providers[0].name).toBe('Grok');
+    expect(providers[0].options).toEqual({
+      baseURL: 'https://ai.example.test/v1',
+      headers: { 'X-Test': '1' },
+    });
+  });
+
+  it('exposes $VAR providers as env so Settings can edit without a pasted key', () => {
+    const providers = mapPiModelsToProviders([], {
+      configs: {
+        grok: {
+          name: 'Grok',
+          baseUrl: 'https://ai.example.test/v1',
+          env: ['GROK_KEY'],
+          models: [{ id: 'grok-4.6', name: 'Grok 4.6' }],
+        },
+      },
+    });
+    expect(providers[0].env).toEqual(['GROK_KEY']);
+    expect(providers[0].options.baseURL).toBe('https://ai.example.test/v1');
+  });
+
   it('exposes limit.context from Pi contextWindow', () => {
     const providers = mapPiModelsToProviders([
       { id: 'example-model', name: 'Example', provider: 'example', contextWindow: 200000, maxTokens: 8192 },
@@ -56,7 +92,6 @@ describe('normalizePiSessionUsage', () => {
     });
   });
 });
-
 
 describe('session conversation titles', () => {
   it('treats empty and default labels as placeholders', () => {

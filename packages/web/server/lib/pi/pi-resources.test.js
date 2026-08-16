@@ -13,8 +13,11 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  listPiProviderPublicConfigs,
   writePiProviderAuth,
   removePiProviderAuth,
+  upsertPiProviderConfig,
+  deletePiProviderConfig,
   listPiExtensions,
   listPiPackages,
   filterProvidersByEnabledModels,
@@ -111,7 +114,7 @@ describe('pi-resources', () => {
       'example-provider': { type: 'api', key: 'sk-test-do-not-leak' },
     }));
     fs.writeFileSync(path.join(agent, 'models.json'), JSON.stringify({
-      providers: { 'example-provider': { baseUrl: 'https://example.test' } },
+      providers: { 'example-provider': { baseUrl: 'https://example.test', apiKey: 'sk-test-do-not-leak' } },
     }));
     const methods = getPiAuthMethods(home);
     expect(methods['example-provider']).toEqual([{ type: 'api', label: 'API Key' }]);
@@ -120,6 +123,88 @@ describe('pi-resources', () => {
     expect(sources.sources.auth.exists).toBe(true);
     expect(sources.sources.user.exists).toBe(true);
     expect(sources.sources.auth.path).toContain(path.join('.pi', 'agent', 'auth.json'));
+    const publicConfigs = listPiProviderPublicConfigs({ home });
+    expect(publicConfigs['example-provider'].baseUrl).toBe('https://example.test');
+    expect(JSON.stringify(publicConfigs)).not.toContain('sk-test');
+  });
+
+  it('writes Pi auth.json as api_key with 0600 and never returns the key', () => {
+    const home = makeTemp();
+    const saved = writePiProviderAuth('example-provider', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(saved).toMatchObject({ providerId: 'example-provider', type: 'api' });
+    expect(JSON.stringify(saved)).not.toContain('sk-test');
+
+    const authPath = path.join(home, '.pi', 'agent', 'auth.json');
+    const stored = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(stored['example-provider']).toEqual({ type: 'api_key', key: 'sk-test-do-not-leak' });
+    if (process.platform !== 'win32') {
+      expect(fs.statSync(authPath).mode & 0o777).toBe(0o600);
+    }
+    expect(JSON.stringify(getPiAuthMethods(home))).not.toContain('sk-test');
+    expect(() => writePiProviderAuth('session', { type: 'api', key: 'nope' }, { home })).toThrow(/reserved/);
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: '   ' }, { home })).toThrow(/API key/);
+  });
+
+  it('maps OpenCode custom provider payloads onto models.json without storing literal keys', () => {
+    const home = makeTemp();
+    writePiProviderAuth('acme', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    const upserted = upsertPiProviderConfig({
+      home,
+      providerId: 'acme',
+      config: {
+        npm: '@ai-sdk/openai-compatible',
+        name: 'Acme',
+        options: {
+          baseURL: 'https://api.acme.test/v1',
+          headers: { 'X-Custom-Header': 'from-settings' },
+        },
+        models: { 'grok-4.6': { name: 'Grok 4.6' } },
+      },
+    });
+    expect(upserted.providerId).toBe('acme');
+    expect(upserted.config.baseUrl).toBe('https://api.acme.test/v1');
+    expect(upserted.config.api).toBe('openai-completions');
+    expect(upserted.config.models).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6' }]);
+    expect(upserted.config.headers).toEqual({ 'X-Custom-Header': 'from-settings' });
+    expect(upserted.config).not.toHaveProperty('apiKey');
+    expect(JSON.stringify(upserted)).not.toContain('sk-test');
+
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(models.providers.acme.apiKey).toBeUndefined();
+    expect(models.providers.acme.npm).toBeUndefined();
+
+    const envProvider = upsertPiProviderConfig({
+      home,
+      providerId: 'enved',
+      config: {
+        name: 'Env Provider',
+        env: ['ACME_KEY'],
+        options: { baseURL: 'https://env.acme.test/v1' },
+        models: { fast: { name: 'Fast' } },
+      },
+    });
+    expect(envProvider.config.baseUrl).toBe('https://env.acme.test/v1');
+    const envModels = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(envModels.providers.enved.apiKey).toBe('$ACME_KEY');
+    expect(envProvider.config.env).toEqual(['ACME_KEY']);
+    expect(envProvider.config).not.toHaveProperty('apiKey');
+    expect(listPiProviderPublicConfigs({ home }).enved.env).toEqual(['ACME_KEY']);
+    expect(JSON.stringify(listPiProviderPublicConfigs({ home }))).not.toContain('$ACME_KEY');
+
+    expect(removePiProviderAuth('acme', { home })).toEqual({ providerId: 'acme', removed: true });
+    expect(deletePiProviderConfig({ home, providerId: 'acme' }).removed).toBe(true);
+    expect(getPiProviderSources('acme', { home }).sources.auth.exists).toBe(false);
+    expect(getPiProviderSources('acme', { home }).sources.user.exists).toBe(false);
+
+    expect(() => upsertPiProviderConfig({
+      home,
+      providerId: 'orphan',
+      config: {
+        name: 'Orphan',
+        options: { baseURL: 'https://orphan.test/v1' },
+        models: { x: { name: 'X' } },
+      },
+    })).toThrow(/API key or \{env:VAR\}/);
   });
 
   it('writes and removes provider auth in the Pi auth.json shape', () => {
