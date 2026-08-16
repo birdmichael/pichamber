@@ -79,7 +79,7 @@ export interface PiSlashCommandItem {
 }
 
 /** Composer chips / Session Defaults own these; they are not invokable slash entries on Pi. */
-export const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
+const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
   'model', 'thinking',
 ]);
 
