@@ -2,7 +2,7 @@
 
 ## Purpose
 
-- This module owns GitHub auth, Octokit access, repo resolution, and Pull Request status resolution for OpenChamber.
+- This module owns GitHub auth, Octokit access, repo resolution, and Pull Request status resolution for Pichamber.
 - From user perspective, this is the layer that lets the app know which PR belongs to a local branch and keeps that UI feeling current.
 
 ## Entrypoints and structure
@@ -21,12 +21,12 @@
 
 ### Auth
 
-- `getGitHubAuth()`: current auth entry.
-- `getGitHubAuthAccounts()`: all configured accounts.
-- `setGitHubAuth({ accessToken, scope, tokenType, user, accountId })`: save or update account.
-- `activateGitHubAuth(accountId)`: switch active account.
-- `clearGitHubAuth()`: clear current account.
-- `getGitHubClientId()`: resolve client id.
+- `getGitHubAuth()`: current auth entry issued to the resolved Pichamber client id, or `null`.
+- `getGitHubAuthAccounts()`: configured accounts issued to the resolved client id.
+- `setGitHubAuth({ accessToken, scope, tokenType, user, accountId })`: save or update a Pichamber-stamped account.
+- `activateGitHubAuth(accountId)`: switch active compatible account.
+- `clearGitHubAuth()`: clear the current Pichamber account; leftover OpenChamber tokens stay on disk.
+- `getGitHubClientId()`: resolve the Pichamber (or self-host override) client id.
 - `getGitHubScopes()`: resolve scopes.
 - `GITHUB_AUTH_FILE`: auth file path.
 
@@ -46,9 +46,11 @@
 
 ## Auth storage and config
 
-- Auth storage: `~/.config/openchamber/github-auth.json`
+- Auth storage: `github-auth.json` under `OPENCHAMBER_DATA_DIR` or `~/.config/openchamber`.
 - Writes are atomic and file mode is `0o600`.
-- Client ID resolution order: `OPENCHAMBER_GITHUB_CLIENT_ID` -> `settings.json` -> default.
+- New OAuth tokens are stamped with the client id that issued them. A leftover OpenChamber token (missing `clientId`, or stamped `Ov23lizomPOC3eFYo56r`) is not a Pichamber login.
+- Client ID resolution order: `PICHAMBER_GITHUB_CLIENT_ID` -> deprecated `OPENCHAMBER_GITHUB_CLIENT_ID` -> `settings.json` `githubClientId` -> Pichamber default `Ov23lit4gCvEzB2YqOuU`.
+- The leftover OpenChamber public id is never used as a resolved client id, including when it still appears in env or settings.
 - Scope resolution order: `OPENCHAMBER_GITHUB_SCOPES` -> `settings.json` -> default.
 - Account id resolution order: explicit `accountId` -> user login -> user id -> token prefix.
 
