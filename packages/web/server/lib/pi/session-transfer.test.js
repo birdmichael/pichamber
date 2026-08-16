@@ -72,4 +72,171 @@ describe('session-transfer', () => {
     expect(() => parseSessionImport('')).toThrow(/empty/i);
     expect(() => parseSessionImport('{"type":"session","id":"ses_x","cwd":"/tmp"}\n')).toThrow(/messages/i);
   });
+
+  it('hydrates a skill-reading turn as one user and one assistant with a tool part', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'read the skill' }] },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'load skills' },
+            { type: 'text', text: '先按仓库规则加载相关技能。' },
+            { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't1',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{
+            type: 'text',
+            text: '---\nname: using-superpowers\ndescription: Use when starting any conversation\n---\n',
+          }],
+        },
+      },
+    ], 'ses_repro');
+
+    expect(messages).toHaveLength(2);
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(messages[0].parts.map((part) => part.type)).toEqual(['text']);
+    expect(messages[0].parts[0].text).toBe('read the skill');
+    expect(messages[1].parts.map((part) => part.type)).toEqual(['reasoning', 'text', 'tool']);
+    expect(messages[1].parts[2]).toMatchObject({
+      type: 'tool',
+      callID: 'c1',
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { path: 'SKILL.md' },
+        output: '---\nname: using-superpowers\ndescription: Use when starting any conversation\n---\n',
+      },
+    });
+    expect(messages.filter((entry) => entry.info.role === 'user')).toHaveLength(1);
+    expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('using-superpowers')))).toBe(false);
+  });
+
+  it('pairs read and bash toolCalls with later toolResults on the same assistant', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'inspect then list' }] },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'reading and listing' },
+            { type: 'toolCall', id: 'c_read', name: 'read', arguments: { path: 'AGENTS.md' } },
+            { type: 'toolCall', id: 'c_bash', name: 'bash', arguments: { command: 'ls' } },
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't_read',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c_read',
+          content: [{ type: 'text', text: '# Pichamber Agent Guide\n' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 't_bash',
+        message: {
+          role: 'toolResult',
+          toolName: 'bash',
+          toolCallId: 'c_bash',
+          content: [{ type: 'text', text: 'CHANGELOG.md:10\n' }],
+        },
+      },
+    ], 'ses_tools');
+
+    expect(messages).toHaveLength(2);
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    const toolParts = messages[1].parts.filter((part) => part.type === 'tool');
+    expect(toolParts).toHaveLength(2);
+    expect(toolParts[0]).toMatchObject({
+      callID: 'c_read',
+      tool: 'read',
+      state: { status: 'completed', input: { path: 'AGENTS.md' }, output: '# Pichamber Agent Guide\n' },
+    });
+    expect(toolParts[1]).toMatchObject({
+      callID: 'c_bash',
+      tool: 'bash',
+      state: { status: 'completed', input: { command: 'ls' }, output: 'CHANGELOG.md:10\n' },
+    });
+    expect(messages.filter((entry) => entry.info.role === 'user')).toHaveLength(1);
+  });
+
+  it('drops unmatched toolResults and leaves image blocks for a later slice', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'see this' },
+            { type: 'image', mimeType: 'image/png', data: 'AAAA' },
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'reading' },
+            { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't1',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{ type: 'text', text: '---\nname: using-superpowers\n---\n' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 't_orphan',
+        message: {
+          role: 'toolResult',
+          toolName: 'bash',
+          toolCallId: 'missing',
+          content: [{ type: 'text', text: 'orphan dump' }],
+        },
+      },
+    ], 'ses_repro');
+
+    expect(messages.map((entry) => ({
+      role: entry.info.role,
+      types: entry.parts.map((part) => part.type),
+    }))).toEqual([
+      { role: 'user', types: ['text'] },
+      { role: 'assistant', types: ['text', 'tool'] },
+    ]);
+    expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('orphan dump')))).toBe(false);
+  });
 });
