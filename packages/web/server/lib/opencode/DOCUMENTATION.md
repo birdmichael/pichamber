@@ -76,8 +76,8 @@ This module provides OpenCode server integration utilities for the web server ru
 - `getJsonWriteTarget(layers, preferredScope)`: Determines write target for config updates.
 - `getAncestors(startDir, stopDir)`, `findWorktreeRoot(startDir)`: Git worktree helpers.
 - `isPromptFileReference(value)`, `resolvePromptFilePath(reference)`, `writePromptFile(filePath, content)`: Prompt file reference handling.
-- `walkSkillMdFiles(rootDir)`: Recursively finds all SKILL.md files.
-- `addSkillFromMdFile(skillsMap, skillMdPath, scope, source)`: Parses and indexes a skill file.
+- `walkSkillMdFiles(rootDir)`: Recursively finds all SKILL.md files. Follows directory and file symlinks, skips broken links, and stops on realpath cycles.
+- `addSkillFromMdFile(skillsMap, skillMdPath, scope, source)`: Parses and indexes a skill file. Uses frontmatter `name` when present, otherwise the SKILL.md parent directory name.
 - `resolveSkillSearchDirectories(workingDirectory)`: Returns skill search path order (config, project, home, custom).
 - `listSkillSupportingFiles(skillDir)`, `readSkillSupportingFile(skillDir, relativePath)`, `writeSkillSupportingFile(skillDir, relativePath, content)`, `deleteSkillSupportingFile(skillDir, relativePath)`: Skill supporting file management.
 
@@ -377,6 +377,7 @@ an authoritative loopback callback URL even when OpenChamber binds port `0`.
 ## Public exports (skill-routes.js)
 - `registerSkillRoutes(app, dependencies)`: registers skills-related routes:
   - Skills config CRUD and metadata under `/api/config/skills*`
+  - `GET /api/config/skills/:name` prefers the Pi host detail/list path when present so Settings opens the same `SKILL.md` the list walker found (nested symlink skills included)
   - Skill rename via `PATCH /api/config/skills/:name` with `{ renameTo }` (directory rename preserves `SKILL.md` body and supporting files; restricted to managed skill roots under `.opencode/skills|skill`, `.claude/skills`, and `.agents/skills`)
   - Skill list responses include authoritative `renamable` derived from the same managed-root policy used by rename
   - Skills catalog listing/source pagination, scan, and install routes

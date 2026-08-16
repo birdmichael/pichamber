@@ -102,6 +102,29 @@ describe('useSkillsStore directory resolution', () => {
     }]);
   });
 
+  test('loadSkills derives a sidebar name from the SKILL.md path when the list omits name', async () => {
+    runtimeFetchImpl = async () => new Response(JSON.stringify({
+      skills: [{
+        name: '',
+        path: `${activeProjectPath}/.agents/skills/blank-row-skill/SKILL.md`,
+        scope: 'project',
+        source: 'agents',
+        injected: false,
+        sources: { md: { description: 'Has a path but no name' } },
+      }],
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(await useSkillsStore.getState().loadSkills()).toBe(true);
+    expect(useSkillsStore.getState().skills[0]).toMatchObject({
+      name: 'blank-row-skill',
+      scope: 'project',
+      source: 'agents',
+      injected: false,
+    });
+  });
+
   test('loadSkills maps authoritative renamable from the list response', async () => {
     runtimeFetchImpl = async () => new Response(JSON.stringify({
       skills: [

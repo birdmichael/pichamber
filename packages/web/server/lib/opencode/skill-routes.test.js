@@ -275,4 +275,61 @@ describe('skill-routes Pi config skills', () => {
     expect(body.skills.find((skill) => skill.name === 'local').injected).toBe(false);
     expect(discovered).toBe(false);
   });
+
+  it('returns getSkillDetail for a nested symlink skill with a YAML block description', async () => {
+    const projectRoot = '/tmp/pi-skills-detail-project';
+    const skillPath = '/tmp/home/.agents/skills/superpowers/brainstorming/SKILL.md';
+    const description = 'This skill brainstorms approaches.\nSecond line stays in the blurb.';
+    const detail = {
+      name: 'brainstorming',
+      exists: true,
+      scope: 'user',
+      source: 'agents',
+      sources: {
+        md: {
+          exists: true,
+          path: skillPath,
+          dir: path.dirname(skillPath),
+          fields: ['name', 'description', 'instructions'],
+          scope: 'user',
+          source: 'agents',
+          supportingFiles: [],
+          name: 'brainstorming',
+          description,
+          instructions: 'Ask clarifying questions first.',
+        },
+      },
+    };
+
+    appHandle = startSkillsApp({
+      projectRoot,
+      extraDependencies: {
+        getPiHost: () => ({
+          getConfigSkills: () => ({ skills: [{ name: 'brainstorming', path: skillPath }] }),
+          getSkillDetail: (directory, name) => {
+            expect(directory).toBe(projectRoot);
+            expect(name).toBe('brainstorming');
+            return detail;
+          },
+        }),
+        getSkillSources: () => {
+          throw new Error('OpenCode getSkillSources should not run when Pi detail exists');
+        },
+        getOpenCodePort: () => {
+          throw new Error('OpenCode port should not be required');
+        },
+      },
+    });
+
+    const response = await fetch(
+      `${appHandle.baseUrl}/api/config/skills/brainstorming?directory=${encodeURIComponent(projectRoot)}`,
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.exists).toBe(true);
+    expect(body.sources.md.path).toBe(skillPath);
+    expect(body.sources.md.description).toBe(description);
+    expect(body.sources.md.description).not.toBe('|');
+    expect(body.sources.md.instructions).toBe('Ask clarifying questions first.');
+  });
 });

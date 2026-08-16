@@ -128,6 +128,21 @@ export const registerSkillRoutes = (app, dependencies) => {
     return { scope: SKILL_SCOPE.USER, source };
   };
 
+  const findListedSkill = (skills, skillName) => {
+    if (!Array.isArray(skills)) return null;
+    return skills.find((skill) => skill?.name === skillName) || null;
+  };
+
+  const resolveDiscoveredSkill = async (skillName, workingDirectory) => {
+    const piHost = getPiHost?.();
+    if (typeof piHost?.getConfigSkills === 'function') {
+      const listed = findListedSkill(piHost.getConfigSkills(workingDirectory)?.skills, skillName);
+      if (listed) return listed;
+    }
+
+    return findListedSkill(await fetchOpenCodeDiscoveredSkills(workingDirectory), skillName);
+  };
+
   const fetchOpenCodeDiscoveredSkills = async (workingDirectory) => {
     if (!getOpenCodePort()) {
       return [];
@@ -589,8 +604,16 @@ export const registerSkillRoutes = (app, dependencies) => {
       if (error) {
         return res.status(400).json({ error });
       }
-      const discoveredSkill = (await fetchOpenCodeDiscoveredSkills(directory))
-        .find((skill) => skill.name === skillName) || null;
+
+      const piHost = getPiHost?.();
+      if (typeof piHost?.getSkillDetail === 'function') {
+        const detail = piHost.getSkillDetail(directory, skillName);
+        if (detail?.exists) {
+          return res.json(detail);
+        }
+      }
+
+      const discoveredSkill = await resolveDiscoveredSkill(skillName, directory);
       const sources = getSkillSources(skillName, directory, discoveredSkill);
 
       res.json({
@@ -618,8 +641,7 @@ export const registerSkillRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
 
-      const discoveredSkill = (await fetchOpenCodeDiscoveredSkills(directory))
-        .find((skill) => skill.name === skillName) || null;
+      const discoveredSkill = await resolveDiscoveredSkill(skillName, directory);
       const sources = getSkillSources(skillName, directory, discoveredSkill);
       if (!sources.md.exists || !sources.md.dir) {
         return res.status(404).json({ error: 'Skill not found' });
@@ -715,8 +737,7 @@ export const registerSkillRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
 
-      const discoveredSkill = (await fetchOpenCodeDiscoveredSkills(directory))
-        .find((skill) => skill.name === skillName) || null;
+      const discoveredSkill = await resolveDiscoveredSkill(skillName, directory);
       const sources = getSkillSources(skillName, directory, discoveredSkill);
       if (!sources.md.exists || !sources.md.dir) {
         return res.status(404).json({ error: 'Skill not found' });
@@ -749,8 +770,7 @@ export const registerSkillRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
 
-      const discoveredSkill = (await fetchOpenCodeDiscoveredSkills(directory))
-        .find((skill) => skill.name === skillName) || null;
+      const discoveredSkill = await resolveDiscoveredSkill(skillName, directory);
       const sources = getSkillSources(skillName, directory, discoveredSkill);
       if (!sources.md.exists || !sources.md.dir) {
         return res.status(404).json({ error: 'Skill not found' });

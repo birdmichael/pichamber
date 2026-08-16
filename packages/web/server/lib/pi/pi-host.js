@@ -10,6 +10,7 @@ import {
   listPiPackages,
   listPiPrompts,
   listPiSkills,
+  getPiSkillDetail,
   readPiDefaults,
   readPiProjectTrust,
   setPiProjectTrust,
@@ -901,6 +902,9 @@ export const createPiHost = ({
     getConfigSkills(directory) {
       const cwd = directory || defaultDirectory;
       return toConfigSkillsPayload(this.listSkills(cwd), { home, directory: cwd });
+    },
+    getSkillDetail(directory, name) {
+      return getPiSkillDetail({ home, directory: directory || defaultDirectory, name });
     },
     async getProviders() {
       if (mock) {

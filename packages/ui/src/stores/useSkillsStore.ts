@@ -84,6 +84,16 @@ export interface DiscoveredSkill {
   injected?: boolean;
 }
 
+/** Directory that contains SKILL.md, used when the list payload omits `name`. */
+function skillNameFromPath(filePath: string): string {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const parts = normalizedPath.split('/').filter(Boolean);
+  if (parts.length >= 2 && parts[parts.length - 1].toLowerCase() === 'skill.md') {
+    return parts[parts.length - 2];
+  }
+  return parts[parts.length - 1] || '';
+}
+
 /** Parse the domain group folder from a skill file path.
  *  e.g. "~/.config/opencode/skills/automation-ai/ai-production/SKILL.md" → "automation-ai"
  *  e.g. "~/.config/opencode/skills/theme-system/SKILL.md"                → undefined (flat)
@@ -286,7 +296,7 @@ export const useSkillsStore = create<SkillsStore>()(
                 const data = await response.json();
                 const rawSkills: RawSkillResponse[] = data.skills || [];
                 const configSkills: DiscoveredSkill[] = rawSkills.map((s) => ({
-                  name: s.name,
+                  name: (typeof s.name === 'string' ? s.name.trim() : '') || skillNameFromPath(s.path || ''),
                   path: s.path,
                   scope: s.scope ?? 'user',
                   source: s.source ?? 'opencode',

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   listPiCommands,
   listPiSkills,
+  getPiSkillDetail,
   parseMarkdownFrontmatter,
   readPiDefaults,
   writePiDefaults,
@@ -141,6 +142,64 @@ description: >
     expect(Date.now() - started).toBeLessThan(2000);
     expect(skills.map((skill) => skill.name).sort()).toEqual(['brainstorming', 'debugging']);
     expect(skills.every((skill) => skill.scope === 'user')).toBe(true);
+  });
+
+  it('returns YAML block description and body for a nested symlink skill without rewriting the file', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    const realSkills = path.join(home, 'codex', 'superpowers', 'skills');
+    const skillDir = path.join(realSkills, 'brainstorming');
+    const skillPath = path.join(skillDir, 'SKILL.md');
+    const original = [
+      '---',
+      'name: brainstorming',
+      'description: |',
+      '  This skill brainstorms approaches.',
+      '  Second line stays in the blurb.',
+      '---',
+      '',
+      'Ask clarifying questions first.',
+      '',
+    ].join('\n');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(skillPath, original, 'utf8');
+    fs.mkdirSync(path.join(home, '.agents', 'skills'), { recursive: true });
+    fs.symlinkSync(realSkills, path.join(home, '.agents', 'skills', 'superpowers'));
+
+    const skills = listPiSkills({ home, directory: project });
+    const listed = skills.find((skill) => skill.name === 'brainstorming');
+    expect(listed).toBeTruthy();
+    expect(listed.path).toBe(path.join(home, '.agents', 'skills', 'superpowers', 'brainstorming', 'SKILL.md'));
+    expect(listed.description).toContain('This skill brainstorms approaches.');
+    expect(listed.description).toContain('Second line stays in the blurb.');
+    expect(listed.description).not.toBe('|');
+
+    const before = fs.readFileSync(skillPath, 'utf8');
+    const detail = getPiSkillDetail({ home, directory: project, name: 'brainstorming' });
+    expect(detail.exists).toBe(true);
+    expect(detail.sources.md.path).toBe(listed.path);
+    expect(detail.sources.md.description).toContain('This skill brainstorms approaches.');
+    expect(detail.sources.md.description).toContain('Second line stays in the blurb.');
+    expect(detail.sources.md.description).not.toBe('|');
+    expect(detail.sources.md.instructions).toBe('Ask clarifying questions first.');
+    expect(fs.readFileSync(skillPath, 'utf8')).toBe(before);
+    expect(fs.readFileSync(skillPath, 'utf8')).toBe(original);
+  });
+
+  it('loads a flat ~/.agents/skills/<name>/SKILL.md by name', () => {
+    const home = makeTemp();
+    const skillDir = path.join(home, '.agents', 'skills', 'find-skills');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, 'SKILL.md'),
+      '---\nname: find-skills\ndescription: Helps users discover skills\n---\nSearch first.\n',
+    );
+
+    const detail = getPiSkillDetail({ home, name: 'find-skills' });
+    expect(detail.exists).toBe(true);
+    expect(detail.sources.md.description).toBe('Helps users discover skills');
+    expect(detail.sources.md.instructions).toBe('Search first.');
+    expect(detail.sources.md.path).toBe(path.join(skillDir, 'SKILL.md'));
   });
 
   it('dedupes the same skill path when the project directory is $HOME', () => {
