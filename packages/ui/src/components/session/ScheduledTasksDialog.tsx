@@ -18,7 +18,6 @@ import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/pro
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
 import type { ProjectEntry } from '@/lib/api/types';
 import {
   deleteScheduledTask,
@@ -172,11 +171,10 @@ const toneStyle = (tone: StatusTone): React.CSSProperties => {
 
 export function ScheduledTasksDialog() {
   const { t } = useI18n();
-  const isPiKernel = usePiKernel();
   const open = useUIStore((state) => state.isScheduledTasksDialogOpen);
   const setOpen = useUIStore((state) => state.setScheduledTasksDialogOpen);
   const isMobile = useUIStore((state) => state.isMobile);
-  const surfaceOpen = open && !isPiKernel;
+  const surfaceOpen = open;
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const projects = useProjectsStore((state) => state.projects);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
@@ -191,12 +189,6 @@ export function ScheduledTasksDialog() {
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editorTask, setEditorTask] = React.useState<ScheduledTask | null>(null);
   const [mutatingTaskID, setMutatingTaskID] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (isPiKernel && open) {
-      setOpen(false);
-    }
-  }, [isPiKernel, open, setOpen]);
 
   const selectedProject = React.useMemo(
     () => projects.find((project) => project.id === selectedProjectID) || null,

@@ -4,10 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Sessions:** Scheduled Tasks is a Pichamber scheduler on Pi. The sidebar calendar and `/schedule-task` are available again; Run now and due timers start a real Pi session with the task prompt. New multi-run stays hidden on Pi. The OpenCode kernel still uses its existing execution path.
 - **Chat:** typing `/` now lists installed, trusted skills as `/skill:name` next to Pi builtins, matching the Pi CLI. Untrusted project skills stay out of the menu. `/model` and `/thinking` remain on the chips.
 - Work status: the provider quota block is hidden on Pi, where that API does not exist. Session context percentage and cost stay visible.
 - UI: a new session no longer shows empty Pull request and Walkthrough context tabs. Those surfaces appear when there is a pull request, a diff, or you ask for a walkthrough.
-- Sessions: Scheduled Tasks and New multi-run are hidden on the Pi kernel — the sidebar calendar and merge-arrows buttons, the leftover OpenCode pages, and `/schedule-task` no longer appear. The OpenCode kernel still has both features.
 - **Settings/Providers:** custom OpenAI-compatible providers can now be edited after save, keep the provider list current after save, fetch their remote `/models` list in an inline picker (re-click cancels; closing the list keeps it), collapse known vendor aliases, hide wildcard IDs, filter by Claude Code (including Opus / Sonnet / Haiku) / GPT / Grok / DeepSeek / other, and add only the models you choose.
 - Git: the pull request panel now follows the current open PR for the branch instead of keeping a merged or closed one after reload or a later open PR (thanks to @makeittech).
 - **Usage/Claude:** Claude plan limits now work when you are signed in through Claude Code, without also signing into Anthropic in OpenCode; the account is read from Claude Code's own login on macOS, Linux, and WSL. The page shows your session and weekly limits again, adds per-model weekly limits and extra usage spending, and names your plan. Limits are kept on screen instead of disappearing when Anthropic temporarily blocks refreshes.

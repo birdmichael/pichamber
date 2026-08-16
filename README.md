@@ -14,10 +14,11 @@ This is a new product line on a fork of OpenChamber. Versioning starts at **1.0.
 - **Pi models and thinking** — providers and models come from `~/.pi/agent` at runtime. Thinking levels (`off` … `max`) sit next to the composer model chip.
 - **Skills, prompts, and commands** — user and project skills under `~/.pi/agent` and `.pi`. Slash commands are Pi builtins plus your prompts.
 - **Sessions** — compact, retry, scoped models, export/import JSONL or HTML, and a session tree for fork-from-here.
+- **Scheduled Tasks** — a Pichamber scheduler that creates a real Pi session and sends the task prompt. The sidebar calendar and `/schedule-task` stay available on Pi.
 - **Project trust** — decide whether a folder may load `.pi` settings and extensions.
 - **Files, git, and terminal** — review changes, open PRs, and keep a docked shell beside the chat.
 
-OpenCode-only surfaces (Usage, MCP, Plugins, Session Goals, Scheduled Tasks, Multi-run, the OpenCode CLI) are hidden on the Pi kernel.
+OpenCode-only surfaces (Usage, MCP, Plugins, Session Goals, Multi-run, the OpenCode CLI) are hidden on the Pi kernel.
 
 ## Quick start
 
