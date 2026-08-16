@@ -153,19 +153,26 @@ export const resolveActiveProjectDirectory = (home = os.homedir()) => {
   return '';
 };
 
+export const resolveProjectAgentsMd = (home = os.homedir(), directory = resolveActiveProjectDirectory(home)) => {
+  if (!directory) {
+    return { path: '', scope: 'project', exists: false };
+  }
+  const projectPath = path.join(directory, 'AGENTS.md');
+  return { path: projectPath, scope: 'project', exists: isFile(projectPath) };
+};
+
+/** Global / user AGENTS.md only. Never fall back to the project repo file. */
 export const resolveBehaviorAgentsMd = (home = os.homedir()) => {
   const userPath = resolvePiAgentsMdPath(home);
-  if (isFile(userPath)) {
-    return { path: userPath, scope: 'user', exists: true };
-  }
-  const directory = resolveActiveProjectDirectory(home);
-  if (directory) {
-    const projectPath = path.join(directory, 'AGENTS.md');
-    if (isFile(projectPath)) {
-      return { path: projectPath, scope: 'project', exists: true };
-    }
-  }
-  return { path: userPath, scope: 'user', exists: false };
+  return { path: userPath, scope: 'user', exists: isFile(userPath) };
+};
+
+export const readBehaviorAgentsMd = (home = os.homedir()) => {
+  const resolved = resolveBehaviorAgentsMd(home);
+  return {
+    ...resolved,
+    content: resolved.exists ? readText(resolved.path) : '',
+  };
 };
 
 const readJsonObject = (filePath) => {
@@ -183,6 +190,15 @@ const providerMap = (models) => (
     : {}
 );
 
+const authMethodType = (entry) => {
+  const rawType = entry && typeof entry === 'object' && typeof entry.type === 'string'
+    ? entry.type.toLowerCase()
+    : 'api';
+  return rawType === 'oauth' ? 'oauth' : 'api';
+};
+
+const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API Key');
+
 export const getPiAuthMethods = (home = os.homedir()) => {
   const auth = readJsonObject(resolvePiAuthPath(home));
   const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
@@ -190,14 +206,10 @@ export const getPiAuthMethods = (home = os.homedir()) => {
   const result = {};
   for (const id of ids) {
     if (!id) continue;
-    const entry = auth[id];
-    const rawType = entry && typeof entry === 'object' && typeof entry.type === 'string'
-      ? entry.type.toLowerCase()
-      : 'api';
-    const methodType = rawType === 'oauth' ? 'oauth' : 'api';
+    const methodType = authMethodType(auth[id]);
     result[id] = [{
       type: methodType,
-      label: methodType === 'oauth' ? 'OAuth' : 'API Key',
+      label: authMethodLabel(methodType),
     }];
   }
   return result;
@@ -279,57 +291,93 @@ export const hasPiStoredAuth = (home, providerId) => {
   return authEntryLooksStored(auth[id]);
 };
 
-/**
- * Persist a provider credential to ~/.pi/agent/auth.json.
- * OpenCode SDK sends `{ type: 'api', key }`; Pi stores `{ type: 'api_key', key }`.
- * Never returns the key.
- */
-export const writePiAuth = (home = os.homedir(), providerId, auth = {}) => {
-  const id = sanitizeProviderId(providerId);
-  const incoming = auth && typeof auth === 'object' && !Array.isArray(auth) ? auth : {};
-  const rawType = typeof incoming.type === 'string' ? incoming.type.trim().toLowerCase() : 'api_key';
-  if (rawType === 'oauth') {
-    throw httpError(400, 'OAuth login is not supported from this form');
+const readPiAuthFile = (filePath) => {
+  if (!isFile(filePath)) return {};
+  const text = readText(filePath).trim();
+  if (!text) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const error = new Error('Failed to read Pi auth.json');
+    error.status = 500;
+    throw error;
   }
-  if (rawType !== 'api' && rawType !== 'api_key') {
-    throw httpError(400, 'Only API key credentials can be saved');
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const error = new Error('Invalid Pi auth.json: expected an object');
+    error.status = 500;
+    throw error;
   }
-  const key = typeof incoming.key === 'string' ? incoming.key.trim() : '';
-  if (!key) {
-    throw httpError(400, 'API key is required');
-  }
-
-  const filePath = resolvePiAuthPath(home);
-  const current = readJsonObject(filePath);
-  const existing = current[id] && typeof current[id] === 'object' && !Array.isArray(current[id])
-    ? current[id]
-    : {};
-  const next = { ...current };
-  next[id] = {
-    type: 'api_key',
-    key,
-    ...(existing.env && typeof existing.env === 'object' && !Array.isArray(existing.env)
-      ? { env: existing.env }
-      : {}),
-  };
-  writeJsonFile(filePath, next, 0o600);
-  return { providerId: id, type: 'api' };
+  return parsed;
 };
 
-export const deletePiAuth = (home = os.homedir(), providerId) => {
+const writePiAuthFile = (filePath, data) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(filePath, 0o600);
+    } catch {
+    }
+  }
+  return data;
+};
+
+export const normalizePiAuthCredential = (body = {}) => {
+  const source = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body.auth && typeof body.auth === 'object' && !Array.isArray(body.auth) ? body.auth : body)
+    : {};
+  const rawType = typeof source.type === 'string' ? source.type.toLowerCase() : '';
+  if (rawType === 'oauth') {
+    const access = typeof source.access === 'string' ? source.access : '';
+    const refresh = typeof source.refresh === 'string' ? source.refresh : '';
+    const expires = Number(source.expires);
+    if (!access || !refresh || !Number.isFinite(expires)) {
+      const error = new Error('OAuth credentials need access, refresh, and expires');
+      error.status = 400;
+      throw error;
+    }
+    const credential = { type: 'oauth', access, refresh, expires };
+    if (typeof source.accountId === 'string' && source.accountId) credential.accountId = source.accountId;
+    if (typeof source.enterpriseUrl === 'string' && source.enterpriseUrl) credential.enterpriseUrl = source.enterpriseUrl;
+    return credential;
+  }
+  const key = typeof source.key === 'string' && source.key.trim()
+    ? source.key.trim()
+    : (typeof source.token === 'string' ? source.token.trim() : '');
+  if (!key) {
+    const error = new Error('API key is required');
+    error.status = 400;
+    throw error;
+  }
+  return { type: 'api_key', key };
+};
+
+export const writePiProviderAuth = (providerId, body, { home = os.homedir() } = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const credential = normalizePiAuthCredential(body);
+  const filePath = resolvePiAuthPath(home);
+  const current = readPiAuthFile(filePath);
+  writePiAuthFile(filePath, { ...current, [id]: credential });
+  const methodType = authMethodType(credential);
+  return {
+    providerId: id,
+    type: methodType,
+    methods: [{ type: methodType, label: authMethodLabel(methodType) }],
+  };
+};
+
+export const removePiProviderAuth = (providerId, { home = os.homedir() } = {}) => {
   const id = sanitizeProviderId(providerId);
   const filePath = resolvePiAuthPath(home);
-  const current = readJsonObject(filePath);
-  if (!Object.prototype.hasOwnProperty.call(current, id)) {
-    return { removed: false, providerId: id };
+  const current = readPiAuthFile(filePath);
+  const removed = Object.prototype.hasOwnProperty.call(current, id);
+  if (removed) {
+    const next = { ...current };
+    delete next[id];
+    writePiAuthFile(filePath, next);
   }
-  delete current[id];
-  if (Object.keys(current).length === 0) {
-    try { fs.unlinkSync(filePath); } catch { /* already gone */ }
-  } else {
-    writeJsonFile(filePath, current, 0o600);
-  }
-  return { removed: true, providerId: id };
+  return { providerId: id, removed };
 };
 
 const normalizePiModels = (models) => {
@@ -533,6 +581,7 @@ export const deletePiProviderConfig = ({
   }
   return { removed: true, providerId: id, path: filePath };
 };
+
 
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
@@ -984,13 +1033,31 @@ export const listPiPackages = ({ home = os.homedir(), directory } = {}) => {
 };
 
 
-export const toConfigSkillsPayload = (skills) => ({
-  skills,
-  externalSkills: {
-    claudeDisabled: false,
-    allDisabled: false,
-  },
-});
+export const areProjectSkillsInjected = (trust) => {
+  if (trust?.current?.trusted === true) return true;
+  if (trust?.current?.trusted == null && trust?.defaultProjectTrust === 'always') return true;
+  return false;
+};
+
+export const toConfigSkillsPayload = (skills, { home, directory } = {}) => {
+  const trust = readPiProjectTrust(home, directory);
+  const projectInjected = areProjectSkillsInjected(trust);
+  return {
+    skills: (Array.isArray(skills) ? skills : []).map((skill) => ({
+      ...skill,
+      injected: skill.scope !== 'project' || projectInjected,
+    })),
+    projectTrust: {
+      trusted: projectInjected,
+      defaultProjectTrust: trust.defaultProjectTrust,
+      current: trust.current,
+    },
+    externalSkills: {
+      claudeDisabled: false,
+      allDisabled: false,
+    },
+  };
+};
 
 const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 

@@ -14,8 +14,8 @@ import {
   getPiAuthMethods,
   getPiProviderSources,
   listPiProviderPublicConfigs,
-  writePiAuth,
-  deletePiAuth,
+  writePiProviderAuth,
+  removePiProviderAuth,
   upsertPiProviderConfig,
   deletePiProviderConfig,
   listPiExtensions,
@@ -25,6 +25,11 @@ import {
   readPiProjectTrust,
   writePiProjectTrust,
   setPiProjectTrust,
+  resolveBehaviorAgentsMd,
+  resolveProjectAgentsMd,
+  readBehaviorAgentsMd,
+  resolvePiAgentsMdPath,
+  toConfigSkillsPayload,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -125,8 +130,8 @@ describe('pi-resources', () => {
 
   it('writes Pi auth.json as api_key with 0600 and never returns the key', () => {
     const home = makeTemp();
-    const saved = writePiAuth(home, 'example-provider', { type: 'api', key: 'sk-test-do-not-leak' });
-    expect(saved).toEqual({ providerId: 'example-provider', type: 'api' });
+    const saved = writePiProviderAuth('example-provider', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(saved).toMatchObject({ providerId: 'example-provider', type: 'api' });
     expect(JSON.stringify(saved)).not.toContain('sk-test');
 
     const authPath = path.join(home, '.pi', 'agent', 'auth.json');
@@ -136,13 +141,13 @@ describe('pi-resources', () => {
       expect(fs.statSync(authPath).mode & 0o777).toBe(0o600);
     }
     expect(JSON.stringify(getPiAuthMethods(home))).not.toContain('sk-test');
-    expect(() => writePiAuth(home, 'session', { type: 'api', key: 'nope' })).toThrow(/reserved/);
-    expect(() => writePiAuth(home, 'example-provider', { type: 'api', key: '   ' })).toThrow(/API key/);
+    expect(() => writePiProviderAuth('session', { type: 'api', key: 'nope' }, { home })).toThrow(/reserved/);
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: '   ' }, { home })).toThrow(/API key/);
   });
 
   it('maps OpenCode custom provider payloads onto models.json without storing literal keys', () => {
     const home = makeTemp();
-    writePiAuth(home, 'acme', { type: 'api', key: 'sk-test-do-not-leak' });
+    writePiProviderAuth('acme', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
     const upserted = upsertPiProviderConfig({
       home,
       providerId: 'acme',
@@ -186,7 +191,7 @@ describe('pi-resources', () => {
     expect(listPiProviderPublicConfigs({ home }).enved.env).toEqual(['ACME_KEY']);
     expect(JSON.stringify(listPiProviderPublicConfigs({ home }))).not.toContain('$ACME_KEY');
 
-    expect(deletePiAuth(home, 'acme')).toEqual({ removed: true, providerId: 'acme' });
+    expect(removePiProviderAuth('acme', { home })).toEqual({ providerId: 'acme', removed: true });
     expect(deletePiProviderConfig({ home, providerId: 'acme' }).removed).toBe(true);
     expect(getPiProviderSources('acme', { home }).sources.auth.exists).toBe(false);
     expect(getPiProviderSources('acme', { home }).sources.user.exists).toBe(false);
@@ -200,6 +205,55 @@ describe('pi-resources', () => {
         models: { x: { name: 'X' } },
       },
     })).toThrow(/API key or \{env:VAR\}/);
+  });
+
+  it('writes and removes provider auth in the Pi auth.json shape', () => {
+    const home = makeTemp();
+    const other = writePiProviderAuth('other-provider', { type: 'api', key: 'sk-keep-me' }, { home });
+    expect(other).toMatchObject({
+      providerId: 'other-provider',
+      type: 'api',
+      methods: [{ type: 'api', label: 'API Key' }],
+    });
+    const saved = writePiProviderAuth('example-provider', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(saved.providerId).toBe('example-provider');
+    expect(saved.methods).toEqual(getPiAuthMethods(home)['example-provider']);
+
+    const authPath = path.join(home, '.pi', 'agent', 'auth.json');
+    const stored = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(stored['example-provider']).toEqual({ type: 'api_key', key: 'sk-test-do-not-leak' });
+    expect(stored['other-provider']).toEqual({ type: 'api_key', key: 'sk-keep-me' });
+    expect(getPiProviderSources('example-provider', { home }).sources.auth.exists).toBe(true);
+    expect(JSON.stringify(getPiAuthMethods(home))).not.toContain('sk-test');
+
+    writePiProviderAuth('example-provider', { auth: { type: 'api', key: 'sk-rotated' } }, { home });
+    const rotated = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(rotated['example-provider']).toEqual({ type: 'api_key', key: 'sk-rotated' });
+    expect(rotated['other-provider'].key).toBe('sk-keep-me');
+
+    const removed = removePiProviderAuth('example-provider', { home });
+    expect(removed).toEqual({ providerId: 'example-provider', removed: true });
+    const after = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(after['example-provider']).toBeUndefined();
+    expect(after['other-provider']).toEqual({ type: 'api_key', key: 'sk-keep-me' });
+    expect(getPiProviderSources('example-provider', { home }).sources.auth.exists).toBe(false);
+    expect(removePiProviderAuth('example-provider', { home }).removed).toBe(false);
+  });
+
+  it('rejects empty provider ids and missing API keys without creating auth.json', () => {
+    const home = makeTemp();
+    expect(() => writePiProviderAuth('', { type: 'api', key: 'sk-x' }, { home })).toThrow(/Provider ID/);
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: '   ' }, { home })).toThrow(/API key/);
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'auth.json'))).toBe(false);
+  });
+
+  it('refuses to overwrite a malformed auth.json', () => {
+    const home = makeTemp();
+    const agent = path.join(home, '.pi', 'agent');
+    fs.mkdirSync(agent, { recursive: true });
+    fs.writeFileSync(path.join(agent, 'auth.json'), '{not-json');
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: 'sk-x' }, { home })).toThrow(/auth\.json/);
+    expect(fs.readFileSync(path.join(agent, 'auth.json'), 'utf8')).toBe('{not-json');
   });
 
   it('persists compaction and retry objects without wiping other agent settings', () => {
@@ -305,6 +359,120 @@ describe('pi-resources', () => {
     const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
     expect(after.enabledModels).toBeUndefined();
   });
+
+  it('marks untrusted project skills as not injected', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'skills', 'review', 'SKILL.md'), '---\ndescription: Review\n---\n');
+    fs.mkdirSync(path.join(project, '.pi', 'skills', 'local'), { recursive: true });
+    fs.writeFileSync(path.join(project, '.pi', 'skills', 'local', 'SKILL.md'), '---\ndescription: Local\n---\n');
+
+    const skills = listPiSkills({ home, directory: project });
+    const untrusted = toConfigSkillsPayload(skills, { home, directory: project });
+    expect(untrusted.projectTrust.trusted).toBe(false);
+    expect(untrusted.skills.find((skill) => skill.name === 'review').injected).toBe(true);
+    expect(untrusted.skills.find((skill) => skill.name === 'local').injected).toBe(false);
+
+    setPiProjectTrust(home, project, true);
+    const trusted = toConfigSkillsPayload(skills, { home, directory: project });
+    expect(trusted.projectTrust.trusted).toBe(true);
+    expect(trusted.skills.find((skill) => skill.name === 'local').injected).toBe(true);
+  });
+});
+
+describe('behavior AGENTS.md', () => {
+  const withUnsetDataDir = (fn) => {
+    const previous = process.env.OPENCHAMBER_DATA_DIR;
+    delete process.env.OPENCHAMBER_DATA_DIR;
+    try {
+      return fn();
+    } finally {
+      if (previous === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+      else process.env.OPENCHAMBER_DATA_DIR = previous;
+    }
+  };
+
+  it('reads and writes only ~/.pi/agent/AGENTS.md as the global user prompt', () => {
+    const home = makeTemp();
+    const userPath = resolvePiAgentsMdPath(home);
+    expect(resolveBehaviorAgentsMd(home)).toEqual({
+      path: userPath,
+      scope: 'user',
+      exists: false,
+    });
+    expect(readBehaviorAgentsMd(home)).toMatchObject({
+      path: userPath,
+      scope: 'user',
+      exists: false,
+      content: '',
+    });
+
+    fs.mkdirSync(path.dirname(userPath), { recursive: true });
+    fs.writeFileSync(userPath, 'Be concise.\n');
+    expect(resolveBehaviorAgentsMd(home)).toEqual({
+      path: userPath,
+      scope: 'user',
+      exists: true,
+    });
+    expect(readBehaviorAgentsMd(home).content).toBe('Be concise.\n');
+  });
+
+  it('does not present project/repo AGENTS.md as the global user prompt', () => {
+    withUnsetDataDir(() => {
+      const home = makeTemp();
+      const project = makeTemp();
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ lastDirectory: project }),
+      );
+      fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\nRepo rules only.\n');
+
+      const resolved = resolveBehaviorAgentsMd(home);
+      expect(resolved.scope).toBe('user');
+      expect(resolved.exists).toBe(false);
+      expect(resolved.path).toBe(path.join(home, '.pi', 'agent', 'AGENTS.md'));
+      expect(resolved.path).not.toBe(path.join(project, 'AGENTS.md'));
+
+      const read = readBehaviorAgentsMd(home);
+      expect(read.content).toBe('');
+      expect(read.exists).toBe(false);
+      expect(read.scope).toBe('user');
+
+      const projectResolved = resolveProjectAgentsMd(home);
+      expect(projectResolved).toEqual({
+        path: path.join(project, 'AGENTS.md'),
+        scope: 'project',
+        exists: true,
+      });
+    });
+  });
+
+  it('keeps a user AGENTS.md even when a project file also exists', () => {
+    withUnsetDataDir(() => {
+      const home = makeTemp();
+      const project = makeTemp();
+      const userPath = resolvePiAgentsMdPath(home);
+      fs.mkdirSync(path.dirname(userPath), { recursive: true });
+      fs.writeFileSync(userPath, 'User global rules.\n');
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ lastDirectory: project }),
+      );
+      fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\n');
+
+      const read = readBehaviorAgentsMd(home);
+      expect(read).toMatchObject({
+        path: userPath,
+        scope: 'user',
+        exists: true,
+        content: 'User global rules.\n',
+      });
+      expect(resolveProjectAgentsMd(home).exists).toBe(true);
+    });
+  });
 });
 
 describe('resolvePiDefaultModel', () => {
@@ -326,3 +494,4 @@ describe('resolvePiDefaultModel', () => {
     expect(resolvePiDefaultModel('missing/gone', catalog)).toBe('bmlab/grok-4.6');
   });
 });
+

@@ -21,10 +21,10 @@ import {
   getPiAuthMethods,
   getPiProviderSources,
   listPiProviderPublicConfigs,
-  writePiAuth,
-  deletePiAuth,
   upsertPiProviderConfig,
   deletePiProviderConfig,
+  writePiProviderAuth,
+  removePiProviderAuth,
 } from './pi-resources.js';
 import {
   buildSessionHtml,
@@ -849,13 +849,13 @@ export const createPiHost = ({
       });
     },
     invalidateModelRuntime,
-    setAuth(providerId, auth) {
-      const result = writePiAuth(home, providerId, auth);
+    setProviderAuth(providerId, body) {
+      const result = writePiProviderAuth(providerId, body, { home });
       invalidateModelRuntime();
       return result;
     },
-    deleteAuth(providerId) {
-      const result = deletePiAuth(home, providerId);
+    removeProviderAuth(providerId) {
+      const result = removePiProviderAuth(providerId, { home });
       invalidateModelRuntime();
       return result;
     },
@@ -899,7 +899,8 @@ export const createPiHost = ({
       };
     },
     getConfigSkills(directory) {
-      return toConfigSkillsPayload(this.listSkills(directory));
+      const cwd = directory || defaultDirectory;
+      return toConfigSkillsPayload(this.listSkills(cwd), { home, directory: cwd });
     },
     async getProviders() {
       if (mock) {

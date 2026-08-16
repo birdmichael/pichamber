@@ -165,33 +165,47 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   };
 
   const providerIdFromRequest = (req) => (
-    req.params.providerID
+    req.params.provider
+    || req.params.providerID
     || req.params.providerId
     || (typeof req.body?.providerID === 'string' ? req.body.providerID : '')
     || (typeof req.body?.providerId === 'string' ? req.body.providerId : '')
   );
 
-  const putAuth = (req, res) => {
-    if (typeof host.setAuth !== 'function') {
-      json(res, 501, unsupported('auth.set'));
+  const setProviderAuth = (req, res) => {
+    const providerId = providerIdFromRequest(req);
+    if (typeof host.setProviderAuth !== 'function') {
+      json(res, 404, unsupported(`PUT /api/auth/${providerId}`));
       return;
     }
-    host.setAuth(providerIdFromRequest(req), authBody(req));
+    host.setProviderAuth(providerId, authBody(req));
     json(res, 200, true);
   };
-  app.put('/api/auth/:providerID', parseJson, handle(async (req, res) => {
-    putAuth(req, res);
+  app.put('/api/auth/:provider', parseJson, handle(async (req, res) => {
+    setProviderAuth(req, res);
   }));
 
-  const deleteAuth = (req, res) => {
-    if (typeof host.deleteAuth !== 'function') {
-      json(res, 501, unsupported('auth.delete'));
+  const deleteAuthByProvider = (req, res, { boolean = false } = {}) => {
+    const providerId = providerIdFromRequest(req);
+    if (typeof host.removeProviderAuth !== 'function') {
+      json(res, 404, unsupported(`DELETE /api/auth/${providerId}`));
       return;
     }
-    json(res, 200, host.deleteAuth(providerIdFromRequest(req)));
+    const result = host.removeProviderAuth(providerId);
+    if (boolean) {
+      json(res, 200, true);
+      return;
+    }
+    json(res, 200, {
+      success: true,
+      removed: Boolean(result?.removed),
+      kernel: 'pi',
+      requiresReload: false,
+      message: result?.removed ? 'Provider disconnected' : 'Provider was not connected',
+    });
   };
-  app.delete('/api/auth/:providerID', handle(async (req, res) => {
-    deleteAuth(req, res);
+  app.delete('/api/auth/:provider', handle(async (req, res) => {
+    deleteAuthByProvider(req, res, { boolean: true });
   }));
 
   app.post('/api/provider/models', parseJson, handle(async (req, res) => {
@@ -232,8 +246,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     const directory = resolveDirectory(req);
     let removed = false;
     if (scope === 'auth' || scope === 'all') {
-      if (typeof host.deleteAuth === 'function') {
-        removed = Boolean(host.deleteAuth(providerId).removed) || removed;
+      if (typeof host.removeProviderAuth === 'function') {
+        removed = Boolean(host.removeProviderAuth(providerId).removed) || removed;
       }
     }
     if (scope === 'user' || scope === 'custom' || scope === 'all') {
@@ -250,7 +264,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       success: true,
       removed,
       kernel: 'pi',
-      requiresReload: removed,
+      requiresReload: false,
       requiresRestart: false,
       message: removed ? 'Provider disconnected' : 'Provider was not connected',
     });

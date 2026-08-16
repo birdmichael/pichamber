@@ -8,7 +8,7 @@ import {
 } from './config-mutation-response.js';
 import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
-import { resolveBehaviorAgentsMd, resolvePiAgentsMdPath, readPiSystemPromptFiles, writePiSystemPromptFile } from '../pi/pi-resources.js';
+import { readBehaviorAgentsMd, resolvePiAgentsMdPath, readPiSystemPromptFiles, writePiSystemPromptFile } from '../pi/pi-resources.js';
 import { handleFetchRemoteProviderModels } from '../pi/remote-provider-models.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
@@ -789,12 +789,14 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
   app.get('/api/behavior/agents-md', async (_req, res) => {
     try {
       if (isPiKernelEnabled()) {
-        const resolved = resolveBehaviorAgentsMd();
-        if (!resolved.exists) {
-          return res.json({ content: '', exists: false, kernel: 'pi', path: resolved.path, scope: resolved.scope });
-        }
-        const content = await fs.promises.readFile(resolved.path, 'utf8');
-        return res.json({ content, exists: true, kernel: 'pi', path: resolved.path, scope: resolved.scope });
+        const resolved = readBehaviorAgentsMd();
+        return res.json({
+          content: resolved.content,
+          exists: resolved.exists,
+          kernel: 'pi',
+          path: resolved.path,
+          scope: resolved.scope,
+        });
       }
       try {
         await fs.promises.access(OPENCODE_AGENTS_MD_PATH);
@@ -837,6 +839,7 @@ ${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return 
           requiresReload: false,
           reloaded: true,
           path: filePath,
+          scope: 'user',
           message: 'Pi AGENTS.md saved',
         });
       }
