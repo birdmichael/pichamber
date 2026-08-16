@@ -46,6 +46,7 @@ This module provides notification message preparation utilities for the web serv
   - `maybeSendPushForTrigger(payload)`
 - Owns:
   - completion/error/question/permission trigger routing; permission suppression consults the authoritative permission-auto-accept runtime
+  - ready/completion fanout only on `session.idle` (Pi `agent_settled`) or `session.error`, never on intermediate assistant `message.updated` `finish: 'stop'` / `message_end` hops
   - session parent cache for subtask suppression
   - template resolution and fallback behavior
   - native notification fanout and web push payload fanout
