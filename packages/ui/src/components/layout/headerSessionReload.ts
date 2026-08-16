@@ -33,8 +33,11 @@ export function isSessionTitleReloadBlockedByStatus(statusType: string | null | 
 }
 
 /**
- * Same live signals ChatInput uses for the stop button (`useCurrentSessionActivity`
- * + `useAssistantStatus`): composing, streaming, tool-calling, retry.
+ * Live output signal for the title refresh disable.
+ *
+ * ChatInput's red stop square is `useCurrentSessionActivity().phase !== 'idle'`.
+ * StatusRow "Composing ..." is `useAssistantStatus().working.statusText === 'composing'`.
+ * Global `session_status` is often missing on Pi while those are already true.
  */
 export function isSessionTitleReloadOutputting(input: {
   sessionPhase?: string | null;
@@ -43,6 +46,7 @@ export function isSessionTitleReloadOutputting(input: {
   assistantIsStreaming?: boolean;
   assistantIsForming?: boolean;
   assistantCanAbort?: boolean;
+  assistantStatusText?: string | null;
 }): boolean {
   return (
     (input.sessionPhase != null && input.sessionPhase !== 'idle')
@@ -51,6 +55,7 @@ export function isSessionTitleReloadOutputting(input: {
     || input.assistantIsStreaming === true
     || input.assistantIsForming === true
     || input.assistantCanAbort === true
+    || input.assistantStatusText === 'composing'
   );
 }
 

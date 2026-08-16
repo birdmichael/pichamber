@@ -52,7 +52,17 @@ describe('session title reload status disable', () => {
     expect(isSessionTitleReloadBlockedByStatus(undefined)).toBe(false);
   });
 
+  test('blocks from ChatInput canAbort: sessionPhase !== idle', () => {
+    expect(isSessionTitleReloadOutputting({ sessionPhase: 'busy' })).toBe(true);
+    expect(isSessionTitleReloadOutputting({ sessionPhase: 'retry' })).toBe(true);
+    expect(isSessionTitleReloadOutputting({ sessionPhase: 'idle' })).toBe(false);
+  });
+
   test('blocks while composing or streaming even when global status is missing', () => {
+    expect(isSessionTitleReloadOutputting({
+      sessionPhase: 'idle',
+      assistantStatusText: 'composing',
+    })).toBe(true);
     expect(isSessionTitleReloadOutputting({
       sessionPhase: 'idle',
       assistantIsForming: true,

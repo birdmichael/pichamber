@@ -1244,15 +1244,18 @@ export const Header: React.FC<HeaderProps> = ({
   }, [currentSession?.title, currentSessionId, headerDirectoryStore, openDirectory, sync, t]);
 
   const isCurrentSessionActive = currentSessionStatus?.type === 'busy' || currentSessionStatus?.type === 'retry';
-  const { phase: sessionActivityPhase, isWorking: sessionActivityIsWorking } = useCurrentSessionActivity();
+  // Same live signals as the composer: ChatInput `canAbort` and StatusRow "Composing ...".
+  const { phase: sessionPhase } = useCurrentSessionActivity();
   const assistantStatus = useAssistantStatus();
+  const canAbort = sessionPhase !== 'idle';
   const sessionTitleReloadIsOutputting = isSessionTitleReloadOutputting({
-    sessionPhase: sessionActivityPhase,
-    sessionIsWorking: sessionActivityIsWorking,
+    sessionPhase,
+    sessionIsWorking: canAbort,
     assistantIsWorking: assistantStatus.working.isWorking,
     assistantIsStreaming: assistantStatus.working.isStreaming,
     assistantIsForming: assistantStatus.forming.isActive,
     assistantCanAbort: assistantStatus.working.canAbort,
+    assistantStatusText: assistantStatus.working.statusText,
   });
   const sessionTitleReloadIsCompacting = assistantStatus.working.compactionDeadline != null;
   const sessionTitleReloadLiveBlocked = isSessionTitleReloadBlocked({

@@ -271,6 +271,26 @@ describe('createPiHost', () => {
     }
   });
 
+  it('host.reload() does not emit type: server.connected', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    await host.createSession({ directory: '/tmp/project', title: 'Stay' });
+    events.length = 0;
+    const result = await host.reload();
+    expect(result).toMatchObject({ reloaded: true, kernel: 'pi' });
+    expect(result.skills).toBeDefined();
+    expect(result.commands).toBeDefined();
+    expect(events.map((event) => event.type)).not.toContain('server.connected');
+    expect(events.some((event) => event.type === 'session.updated')).toBe(true);
+    host.dispose();
+  });
+
   it('reload refuses while a session is streaming', async () => {
     const host = createPiHost({
       mock: true,
