@@ -7,7 +7,7 @@ export type PiThinkingChipPresentation =
   | { status: 'pending' }
   | { status: 'ready'; level: PiThinkingLevel; label: string };
 
-export function isPiThinkingLevel(value: string): value is PiThinkingLevel {
+function isPiThinkingLevel(value: string): value is PiThinkingLevel {
   return (PI_THINKING_LEVELS as readonly string[]).includes(value);
 }
 

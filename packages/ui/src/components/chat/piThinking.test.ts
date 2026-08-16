@@ -20,13 +20,13 @@ describe('parsePiThinkingLevel', () => {
   });
 
   test('does not invent high when the payload is missing or invalid', () => {
-    expect(parsePiThinkingLevel(undefined)).toBeUndefined();
-    expect(parsePiThinkingLevel(null)).toBeUndefined();
-    expect(parsePiThinkingLevel('')).toBeUndefined();
-    expect(parsePiThinkingLevel('   ')).toBeUndefined();
-    expect(parsePiThinkingLevel('HIGH')).toBeUndefined();
-    expect(parsePiThinkingLevel('unknown')).toBeUndefined();
-    expect(parsePiThinkingLevel(4)).toBeUndefined();
+    expect(parsePiThinkingLevel(undefined)).toBe(undefined);
+    expect(parsePiThinkingLevel(null)).toBe(undefined);
+    expect(parsePiThinkingLevel('')).toBe(undefined);
+    expect(parsePiThinkingLevel('   ')).toBe(undefined);
+    expect(parsePiThinkingLevel('HIGH')).toBe(undefined);
+    expect(parsePiThinkingLevel('unknown')).toBe(undefined);
+    expect(parsePiThinkingLevel(4)).toBe(undefined);
   });
 });
 
@@ -56,7 +56,7 @@ describe('resolvePiThinkingChipPresentation', () => {
 
   test('does not treat high as the implicit product default', () => {
     const pending = resolvePiThinkingChipPresentation(undefined);
-    expect(pending).not.toMatchObject({ level: 'high' });
-    expect(pending).not.toMatchObject({ label: 'High' });
+    expect(pending).toEqual({ status: 'pending' });
+    expect(pending).not.toEqual({ status: 'ready', level: 'high', label: 'High' });
   });
 });
