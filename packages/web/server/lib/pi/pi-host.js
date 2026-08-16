@@ -1966,7 +1966,7 @@ export const createPiHost = ({
         success: true,
         kernel: 'pi',
         reloaded: true,
-        ...reload,
+        reload,
       };
     },
     async setPiMcpEnabled(name, enabled, directory) {
@@ -1983,7 +1983,7 @@ export const createPiHost = ({
         success: true,
         kernel: 'pi',
         reloaded: true,
-        ...reload,
+        reload,
       };
     },
     async startPiMcpAuth(name, directory) {

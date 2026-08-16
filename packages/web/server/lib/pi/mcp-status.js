@@ -8,7 +8,7 @@ const normalizeDirectory = (directory) => {
   return trimmed || '';
 };
 
-export const rememberMcpStatusSnapshot = (directory, snapshot) => {
+const rememberMcpStatusSnapshot = (directory, snapshot) => {
   const key = normalizeDirectory(directory);
   if (!key) return;
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
@@ -24,11 +24,7 @@ export const getRememberedMcpStatusSnapshot = (directory) => {
   return snapshotsByDirectory.get(key) || null;
 };
 
-export const clearMcpStatusSnapshots = () => {
-  snapshotsByDirectory.clear();
-};
-
-export const resolvePiSessionEvents = (piSession) => {
+const resolvePiSessionEvents = (piSession) => {
   if (!piSession || typeof piSession !== 'object') return null;
   const candidates = [
     piSession.events,

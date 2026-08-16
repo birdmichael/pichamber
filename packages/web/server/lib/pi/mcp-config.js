@@ -49,7 +49,7 @@ export const isMcpFeaturePluginActive = (home = os.homedir()) => {
   return isFeaturePluginSourceInstalled(mcp.source, listConfiguredPiPackageSources(home));
 };
 
-export const listAdapterMcpConfigPaths = ({
+const listAdapterMcpConfigPaths = ({
   home = os.homedir(),
   cwd,
 } = {}) => {
@@ -95,7 +95,7 @@ const isDefinitionEntry = (entry) => {
   );
 };
 
-export const validateMcpName = (name) => {
+const validateMcpName = (name) => {
   if (!name || typeof name !== 'string') {
     const error = new Error('MCP server name is required');
     error.status = 400;
@@ -225,7 +225,7 @@ const writeMcpServerToFile = (filePath, name, entry, { remove = false } = {}) =>
   writeJsonFile(filePath, config);
 };
 
-export const resolveAdapterMcpLayers = ({
+const resolveAdapterMcpLayers = ({
   home = os.homedir(),
   cwd,
 } = {}) => {
@@ -276,7 +276,7 @@ export const listAdapterMcpConfigs = ({
     .sort((left, right) => left.name.localeCompare(right.name));
 };
 
-export const getAdapterMcpOwnership = ({
+const getAdapterMcpOwnership = ({
   home = os.homedir(),
   cwd,
   name,
@@ -435,7 +435,7 @@ export const setAdapterMcpEnabled = ({
   writeMcpServerToFile(overridePath, name, { disabled: true });
 };
 
-export const mapAdapterStatusToOpenCode = (status) => {
+const mapAdapterStatusToOpenCode = (status) => {
   if (status === 'needs-auth') return 'needs_auth';
   if (status === 'not-connected') return 'cached';
   if (
