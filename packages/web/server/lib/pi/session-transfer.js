@@ -261,22 +261,6 @@ const textFromFacadeParts = (parts) => {
     .join('\n');
 };
 
-const piContentFromFacadeParts = (parts) => {
-  if (!Array.isArray(parts)) return [];
-  const content = [];
-  for (const part of parts) {
-    if (!part || typeof part !== 'object') continue;
-    if (part.type === 'reasoning' && typeof part.text === 'string') {
-      content.push({ type: 'thinking', thinking: part.text });
-      continue;
-    }
-    if (part.type === 'text' && typeof part.text === 'string') {
-      content.push({ type: 'text', text: part.text });
-    }
-  }
-  return content;
-};
-
 const toolResultFromFacadePart = (part, timestamp) => {
   if (!part || part.type !== 'tool') return null;
   const callID = asTrimmedString(part.callID);
@@ -294,7 +278,7 @@ const toolResultFromFacadePart = (part, timestamp) => {
   };
 };
 
-/** Persist-only: facade parts → Pi-native messages for SessionManager.appendMessage. */
+/** Facade parts → Pi-native messages for SessionManager.appendMessage and JSONL export. */
 export const piMessagesFromFacadeEntry = (entry) => {
   const role = entry?.info?.role === 'assistant' ? 'assistant' : 'user';
   const timestamp = millisFromUnknown(entry?.info?.time?.created);
@@ -396,19 +380,27 @@ export const buildSessionJsonl = (record) => {
   let prevId = null;
   for (const entry of record?.messages || []) {
     const messageId = entry?.info?.id || createMessageId();
-    const role = entry?.info?.role === 'assistant' ? 'assistant' : 'user';
-    lines.push(JSON.stringify({
-      type: 'message',
-      id: messageId,
-      parentId: entry?.info?.parentID || prevId,
-      timestamp: isoFromUnknown(entry?.info?.time?.created),
-      message: {
-        role,
-        content: piContentFromFacadeParts(entry?.parts),
-        timestamp: millisFromUnknown(entry?.info?.time?.created),
-      },
-    }));
-    prevId = messageId;
+    const parentId = entry?.info?.parentID || prevId;
+    const timestamp = isoFromUnknown(entry?.info?.time?.created);
+    const mapped = piMessagesFromFacadeEntry(entry);
+    const messages = mapped.length > 0
+      ? mapped
+      : [{
+          role: entry?.info?.role === 'assistant' ? 'assistant' : 'user',
+          content: [],
+          timestamp: millisFromUnknown(entry?.info?.time?.created),
+        }];
+    for (const [index, message] of messages.entries()) {
+      const id = index === 0 ? messageId : createMessageId();
+      lines.push(JSON.stringify({
+        type: 'message',
+        id,
+        parentId: index === 0 ? parentId : prevId,
+        timestamp,
+        message,
+      }));
+      prevId = id;
+    }
   }
   return `${lines.join('\n')}\n`;
 };

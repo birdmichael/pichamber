@@ -110,7 +110,7 @@ Onboarding and bootstrap wait on those Pi signals. They must not treat the OpenC
 - Composer Goal button when Feature Plugins `goal` is installed and enabled. Click opens a modal; a required objective runs `session.command` → `session.prompt("/goal <objective>")`. Bare `/goal` is rejected. A missing live command errors and is not sent as chat. OpenChamber Session Goal stays hidden on Pi.
 - Hidden OpenCode-only stubs (501 unsupported, not offered in the UI): share, revert, session.shell
 - `GET /api/find/files` (and `/find/files`) for composer @ file search
-- Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`
+- Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`. JSONL export writes Pi-native `text` / `thinking` / `toolCall` / `toolResult` / `image` so import reconstructs the same facade parts. HTML export stays text-only.
 - Project trust: `GET|PUT|POST /api/pi/trust` (`~/.pi/agent/trust.json` + `defaultProjectTrust`)
 - Skills: `GET /api/skill` and `GET /api/pi/skills` walk `~/.pi/agent/skills`, `~/.agents/skills`, and the project `.pi/skills` / `.agents/skills` trees. The walk follows directory symlinks, skips cycles and broken links, and lists each resolved `SKILL.md` once. Settings detail (`GET /api/config/skills/:name`) uses that same walked path so nested symlink skills keep their YAML `|` / `>` block text instead of an empty editor. Project skills stay `injected: false` until the project is trusted. Leftover `~/.config/opencode/skills` and `~/.opencode/skills` are not first-class Pi roots.
 - Scoped models: `enabledModels` on `GET|PATCH /api/pi/defaults` (`~/.pi/agent/settings.json`)
