@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import yaml from 'yaml';
 import { parse as parseJsonc } from 'jsonc-parser';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 
 // ============== PATH CONSTANTS ==============
 
@@ -33,6 +34,11 @@ const SKILL_SCOPE = {
 // ============== DIRECTORY OPERATIONS ==============
 
 function ensureDirs() {
+  // Pi config lives under ~/.pi/agent. Do not mkdir leftover OpenCode home
+  // dirs just because the Pi kernel created or updated a skill/command.
+  if (isPiKernelEnabled()) {
+    return;
+  }
   if (!fs.existsSync(OPENCODE_CONFIG_DIR)) {
     fs.mkdirSync(OPENCODE_CONFIG_DIR, { recursive: true });
   }

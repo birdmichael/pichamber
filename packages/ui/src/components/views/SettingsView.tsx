@@ -497,7 +497,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     if (result.id.startsWith('skills.')) {
       const store = useSkillsStore.getState();
       const name = nextUniqueName('new-skill', store.skills.map((skill) => skill.name));
-      store.setSkillDraft({ name, scope: 'user', source: 'opencode', description: '', instructions: '' });
+      store.setSkillDraft({ name, scope: 'user', source: isPiKernel ? 'pi' : 'opencode', description: '', instructions: '' });
       store.setSelectedSkill(name);
       return resolveSettingsSearchHighlightId(result);
     }

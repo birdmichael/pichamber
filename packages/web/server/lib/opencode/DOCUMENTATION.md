@@ -68,7 +68,7 @@ This module provides OpenCode server integration utilities for the web server ru
 ## Public exports (shared.js)
 - `OPENCODE_CONFIG_DIR`, `AGENT_DIR`, `COMMAND_DIR`, `SKILL_DIR`, `CONFIG_FILE`: Path constants. `OPENCODE_CONFIG` is resolved at call time for the custom config layer path.
 - `AGENT_SCOPE`, `COMMAND_SCOPE`, `SKILL_SCOPE`: Scope constants with USER and PROJECT values.
-- `ensureDirs()`: Creates required OpenCode directories.
+- `ensureDirs()`: Creates required OpenCode directories on the OpenCode kernel. No-ops on the Pi kernel so boot/create/update does not mkdir `~/.config/opencode/{skills,commands}`.
 - `parseMdFile(filePath)`, `writeMdFile(filePath, frontmatter, body)`: Markdown file operations with YAML frontmatter.
 - `getConfigPaths(workingDirectory)`, `readConfigLayers(workingDirectory)`, `readConfig(workingDirectory)`: Config file operations with layer merging (user, project, custom).
 - `writeConfig(config, filePath)`: Writes config with automatic backup.
@@ -378,14 +378,16 @@ an authoritative loopback callback URL even when OpenChamber binds port `0`.
 - `registerSkillRoutes(app, dependencies)`: registers skills-related routes:
   - Skills config CRUD and metadata under `/api/config/skills*`
   - `GET /api/config/skills/:name` prefers the Pi host detail/list path when present so Settings opens the same `SKILL.md` the list walker found (nested symlink skills included)
-  - Skill rename via `PATCH /api/config/skills/:name` with `{ renameTo }` (directory rename preserves `SKILL.md` body and supporting files; restricted to managed skill roots under `.opencode/skills|skill`, `.claude/skills`, and `.agents/skills`)
+  - Skill rename via `PATCH /api/config/skills/:name` with `{ renameTo }` (directory rename preserves `SKILL.md` body and supporting files; restricted to managed skill roots — on Pi: `~/.pi/agent/skills`, `.pi/skills`, `.agents/skills`, `.claude/skills`; on OpenCode: those plus `.opencode/skills|skill`)
   - Skill list responses include authoritative `renamable` derived from the same managed-root policy used by rename
   - Skills catalog listing/source pagination, scan, and install routes
   - Supporting skill file read/write/delete routes
   - Directory resolution prefers an explicit request directory, then soft-falls
     back to the active project / `lastDirectory` so repository-local
-    `.agents/skills` and `.opencode/skills` remain discoverable when the client
-    omits `directory`. Requests without any project still list user-scoped skills.
+    `.agents/skills` and, on the OpenCode kernel, `.opencode/skills` remain
+    discoverable when the client omits `directory`. On Pi, leftover OpenCode
+    trees are not first-class discovery roots. Requests without any project
+    still list user-scoped skills.
 
 ## Public exports (proxy.js)
 - `registerOpenCodeProxy(app, dependencies)`: registers OpenCode proxy routes and middleware.

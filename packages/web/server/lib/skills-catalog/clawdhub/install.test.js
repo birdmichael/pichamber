@@ -57,7 +57,7 @@ describe('installSkillsFromClawdHub (adm-zip extraction path)', () => {
 
     expect(result.ok).toBe(true);
     expect(result.installed).toEqual([
-      { skillName: 'demo-skill', scope: 'user', source: 'opencode' },
+      { skillName: 'demo-skill', scope: 'user', source: 'pi' },
     ]);
     expect(result.skipped).toEqual([]);
 

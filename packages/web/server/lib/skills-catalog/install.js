@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { isPiKernelEnabled } from '../pi/kernel.js';
 import { assertGitAvailable, looksLikeAuthError, runGit } from './git.js';
 import { parseSkillRepoSource } from './source.js';
 
@@ -105,8 +106,13 @@ async function cloneRepo({ cloneUrl, identity, tempDir }) {
   };
 }
 
+function normalizeInstallTargetSource(targetSource) {
+  if (targetSource === 'agents') return 'agents';
+  return isPiKernelEnabled() ? 'pi' : 'opencode';
+}
+
 function getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir, skillName }) {
-  const source = targetSource === 'agents' ? 'agents' : 'opencode';
+  const source = normalizeInstallTargetSource(targetSource);
 
   if (scope === 'user') {
     if (source === 'agents') {
@@ -121,6 +127,10 @@ function getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir
 
   if (source === 'agents') {
     return path.join(workingDirectory, '.agents', 'skills', skillName);
+  }
+
+  if (source === 'pi') {
+    return path.join(workingDirectory, '.pi', 'skills', skillName);
   }
 
   return path.join(workingDirectory, '.opencode', 'skills', skillName);
@@ -157,7 +167,7 @@ export async function installSkillsFromRepository({
     return { ok: false, error: { kind: 'invalidSource', message: 'Invalid scope' } };
   }
 
-  if (targetSource !== undefined && targetSource !== 'opencode' && targetSource !== 'agents') {
+  if (targetSource !== undefined && targetSource !== 'opencode' && targetSource !== 'agents' && targetSource !== 'pi') {
     return { ok: false, error: { kind: 'invalidSource', message: 'Invalid target source' } };
   }
 
@@ -197,7 +207,7 @@ export async function installSkillsFromRepository({
       const decision = conflictDecisions?.[plan.skillName];
       const hasAutoPolicy = conflictPolicy === 'skipAll' || conflictPolicy === 'overwriteAll';
       if (!decision && !hasAutoPolicy) {
-        conflicts.push({ skillName: plan.skillName, scope, source: targetSource === 'agents' ? 'agents' : 'opencode' });
+        conflicts.push({ skillName: plan.skillName, scope, source: normalizeInstallTargetSource(targetSource) });
       }
     }
   }
@@ -277,7 +287,7 @@ export async function installSkillsFromRepository({
 
       try {
         await copyDirectoryNoSymlinks(srcDir, targetDir);
-        installed.push({ skillName: plan.skillName, scope, source: targetSource === 'agents' ? 'agents' : 'opencode' });
+        installed.push({ skillName: plan.skillName, scope, source: normalizeInstallTargetSource(targetSource) });
       } catch (error) {
         await safeRm(targetDir);
         skipped.push({

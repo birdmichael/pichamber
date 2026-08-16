@@ -15,6 +15,8 @@ describe('resolveSkillRoot', () => {
     expect(resolveSkillRoot('/repo/.agents/skills/a/SKILL.md')).toBe('agents');
     expect(resolveSkillRoot('/repo/.opencode/skills/a/SKILL.md')).toBe('opencode');
     expect(resolveSkillRoot('/home/u/.config/opencode/skill/a/SKILL.md')).toBe('opencode');
+    expect(resolveSkillRoot('/repo/.pi/skills/a/SKILL.md')).toBe('pi');
+    expect(resolveSkillRoot('/home/u/.pi/agent/skills/a/SKILL.md')).toBe('pi');
   });
 
   test('does not match a directory that merely contains the name', () => {

@@ -121,6 +121,23 @@ description: >
     expect(commands.some((command) => command.name === 'ship' && command.template.includes('Prepare the change'))).toBe(true);
   });
 
+  it('does not list leftover OpenCode skill trees as Pi skills', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'skills', 'review', 'SKILL.md'), '---\ndescription: Review\n---\n');
+    fs.mkdirSync(path.join(home, '.config', 'opencode', 'skills', 'codex'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.config', 'opencode', 'skills', 'codex', 'SKILL.md'), '---\ndescription: Leftover\n---\n');
+    fs.mkdirSync(path.join(home, '.opencode', 'skills', 'frontend-design'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.opencode', 'skills', 'frontend-design', 'SKILL.md'), '---\ndescription: Leftover home\n---\n');
+    fs.mkdirSync(path.join(project, '.opencode', 'skills', 'old'), { recursive: true });
+    fs.writeFileSync(path.join(project, '.opencode', 'skills', 'old', 'SKILL.md'), '---\ndescription: Leftover project\n---\n');
+
+    const skills = listPiSkills({ home, directory: project });
+    expect(skills.map((skill) => skill.name)).toEqual(['review']);
+    expect(skills[0].source).toBe('pi');
+  });
+
   it('follows skill directory symlinks, finds nested SKILL.md, and does not hang on cycles', () => {
     const home = makeTemp();
     const project = makeTemp();

@@ -20,7 +20,7 @@ import { useI18n } from '@/lib/i18n';
 export type SkillConflict = {
   skillName: string;
   scope: 'user' | 'project';
-  source?: 'opencode' | 'agents';
+  source?: 'pi' | 'opencode' | 'agents';
 };
 
 export type ConflictDecision = 'skip' | 'overwrite';
@@ -94,7 +94,9 @@ export const InstallConflictsDialog: React.FC<InstallConflictsDialogProps> = ({
                         : t('settings.skills.catalog.conflicts.scope.user'),
                       source: conflict.source === 'agents'
                         ? t('settings.skills.catalog.conflicts.source.agents')
-                        : t('settings.skills.catalog.conflicts.source.opencode'),
+                        : conflict.source === 'pi'
+                          ? t('settings.skills.catalog.conflicts.source.pi')
+                          : t('settings.skills.catalog.conflicts.source.opencode'),
                     })}
                   </div>
                 </div>

@@ -1260,7 +1260,7 @@ export interface SkillsCatalogSource {
 interface SkillsCatalogItemInstalledBadge {
   isInstalled: boolean;
   scope?: 'user' | 'project';
-  source?: 'opencode' | 'agents' | 'claude';
+  source?: 'pi' | 'opencode' | 'agents' | 'claude';
 }
 
 interface ClawdHubSkillMetadata {
@@ -1339,7 +1339,7 @@ export interface SkillsInstallRequest {
   subpath?: string;
   gitIdentityId?: string;
   scope: 'user' | 'project';
-  targetSource?: 'opencode' | 'agents';
+  targetSource?: 'pi' | 'opencode' | 'agents';
   selections: SkillsInstallSelection[];
   conflictPolicy?: 'prompt' | 'skipAll' | 'overwriteAll';
   conflictDecisions?: Record<string, 'skip' | 'overwrite'>;
@@ -1348,12 +1348,12 @@ export interface SkillsInstallRequest {
 export type SkillsInstallError = SkillsRepoScanError | {
   kind: 'conflicts';
   message: string;
-  conflicts: Array<{ skillName: string; scope: 'user' | 'project'; source?: 'opencode' | 'agents' }>;
+  conflicts: Array<{ skillName: string; scope: 'user' | 'project'; source?: 'pi' | 'opencode' | 'agents' }>;
 };
 
 export interface SkillsInstallResponse {
   ok: boolean;
-  installed?: Array<{ skillName: string; scope: 'user' | 'project'; source?: 'opencode' | 'agents' }>;
+  installed?: Array<{ skillName: string; scope: 'user' | 'project'; source?: 'pi' | 'opencode' | 'agents' }>;
   skipped?: Array<{ skillName: string; reason: string }>;
   error?: SkillsInstallError;
   requiresReload?: boolean;

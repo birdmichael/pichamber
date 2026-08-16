@@ -38,7 +38,7 @@ The following functions are exported and used by the web server:
 - `scanSkillsRepository({ source, subpath, defaultSubpath, identity })`: Scan git repository for skills by cloning and analyzing SKILL.md files. Returns array of skill items with metadata.
 
 ### Git Repository Installation (`install.js`)
-- `installSkillsFromRepository({ source, subpath, defaultSubpath, identity, scope, targetSource, workingDirectory, userSkillDir, selections, conflictPolicy, conflictDecisions })`: Install skills from git repository. Supports user/project scopes, opencode/agents targets, conflict resolution (prompt/skipAll/overwriteAll), and sparse checkout for efficiency.
+- `installSkillsFromRepository({ source, subpath, defaultSubpath, identity, scope, targetSource, workingDirectory, userSkillDir, selections, conflictPolicy, conflictDecisions })`: Install skills from git repository. Supports user/project scopes, `pi`/`opencode`/`agents` targets (`pi` on the Pi kernel, `opencode` on the leftover OpenCode kernel), conflict resolution (prompt/skipAll/overwriteAll), and sparse checkout for efficiency.
 
 ### ClawHub Integration (`clawdhub/index.js`)
 - `isClawdHubSource(source)`: Check if source string refers to ClawHub.
@@ -80,7 +80,7 @@ The following functions are internal helpers used by exported functions:
 
 ### Path Helpers (`install.js`)
 - `toFsPath(repoDir, repoRelPosixPath)`: Convert POSIX path to filesystem path.
-- `getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir, skillName })`: Determine target installation directory based on scope (user/project), targetSource (opencode/agents), and skill name.
+- `getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir, skillName })`: Determine target installation directory based on scope (user/project), targetSource (`pi` / `opencode` / `agents`), and skill name. On the Pi kernel a non-agents target writes to `.pi/skills` (project) or the supplied user skill dir (`~/.pi/agent/skills`).
 
 ### ClawHub API Helpers (`clawdhub/api.js`)
 - `rateLimitedFetch(url, options)`: Fetch with rate limiting (120 req/min limit, 100ms delay between requests, exponential backoff on 429/500 errors).

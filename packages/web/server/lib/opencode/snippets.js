@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import yaml from 'yaml';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 
 const OPENCODE_CONFIG_DIR = path.join(os.homedir(), '.config', 'opencode');
 const GLOBAL_SNIPPET_DIR = path.join(OPENCODE_CONFIG_DIR, 'snippet');
@@ -13,6 +14,12 @@ const MAX_EXPANSION_COUNT = 15;
 
 function getProjectSnippetDirs(workingDirectory) {
   if (!workingDirectory) return [];
+  if (isPiKernelEnabled()) {
+    return [
+      path.join(workingDirectory, '.pi', 'snippets'),
+      path.join(workingDirectory, '.pi', 'snippet'),
+    ];
+  }
   return [
     path.join(workingDirectory, '.opencode', 'snippets'),
     path.join(workingDirectory, '.opencode', 'snippet'),
@@ -20,6 +27,12 @@ function getProjectSnippetDirs(workingDirectory) {
 }
 
 function getGlobalSnippetDirs() {
+  if (isPiKernelEnabled()) {
+    return [
+      path.join(os.homedir(), '.pi', 'agent', 'snippets'),
+      path.join(os.homedir(), '.pi', 'agent', 'snippet'),
+    ];
+  }
   return [GLOBAL_SNIPPET_DIR_ALT, GLOBAL_SNIPPET_DIR];
 }
 
@@ -138,6 +151,13 @@ function listUniqueSnippets(registry) {
 }
 
 function getWritableSnippetDir(scope, workingDirectory) {
+  if (isPiKernelEnabled()) {
+    if (scope === 'project') {
+      if (!workingDirectory) throw new Error('Project directory is required for project snippets');
+      return path.join(workingDirectory, '.pi', 'snippets');
+    }
+    return path.join(os.homedir(), '.pi', 'agent', 'snippets');
+  }
   if (scope === 'project') {
     if (!workingDirectory) throw new Error('Project directory is required for project snippets');
     const preferred = path.join(workingDirectory, '.opencode', 'snippet');

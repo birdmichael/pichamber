@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 import AdmZip from 'adm-zip';
 
+import { isPiKernelEnabled } from '../../pi/kernel.js';
 import { downloadClawdHubSkill, fetchClawdHubSkillInfo } from './api.js';
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
@@ -43,8 +44,13 @@ async function ensureDir(dirPath) {
   await fs.promises.mkdir(dirPath, { recursive: true });
 }
 
+function normalizeInstallTargetSource(targetSource) {
+  if (targetSource === 'agents') return 'agents';
+  return isPiKernelEnabled() ? 'pi' : 'opencode';
+}
+
 function getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir, skillName }) {
-  const source = targetSource === 'agents' ? 'agents' : 'opencode';
+  const source = normalizeInstallTargetSource(targetSource);
 
   if (scope === 'user') {
     if (source === 'agents') {
@@ -59,6 +65,10 @@ function getTargetSkillDir({ scope, targetSource, workingDirectory, userSkillDir
 
   if (source === 'agents') {
     return path.join(workingDirectory, '.agents', 'skills', skillName);
+  }
+
+  if (source === 'pi') {
+    return path.join(workingDirectory, '.pi', 'skills', skillName);
   }
 
   return path.join(workingDirectory, '.opencode', 'skills', skillName);
@@ -89,7 +99,7 @@ export async function installSkillsFromClawdHub({
     return { ok: false, error: { kind: 'invalidSource', message: 'Invalid scope' } };
   }
 
-  if (targetSource !== undefined && targetSource !== 'opencode' && targetSource !== 'agents') {
+  if (targetSource !== undefined && targetSource !== 'opencode' && targetSource !== 'agents' && targetSource !== 'pi') {
     return { ok: false, error: { kind: 'invalidSource', message: 'Invalid target source' } };
   }
 
@@ -134,7 +144,7 @@ export async function installSkillsFromClawdHub({
       const decision = conflictDecisions?.[plan.slug];
       const hasAutoPolicy = conflictPolicy === 'skipAll' || conflictPolicy === 'overwriteAll';
       if (!decision && !hasAutoPolicy) {
-        conflicts.push({ skillName: plan.slug, scope, source: targetSource === 'agents' ? 'agents' : 'opencode' });
+        conflicts.push({ skillName: plan.slug, scope, source: normalizeInstallTargetSource(targetSource) });
       }
     }
   }
@@ -220,7 +230,7 @@ export async function installSkillsFromClawdHub({
         await ensureDir(path.dirname(targetDir));
         await fs.promises.rename(tempDir, targetDir);
 
-        installed.push({ skillName: plan.slug, scope, source: targetSource === 'agents' ? 'agents' : 'opencode' });
+        installed.push({ skillName: plan.slug, scope, source: normalizeInstallTargetSource(targetSource) });
       } catch (extractError) {
         await safeRm(tempDir);
         throw extractError;
