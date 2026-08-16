@@ -20,6 +20,10 @@ import {
   readPiProjectTrust,
   writePiProjectTrust,
   setPiProjectTrust,
+  resolveBehaviorAgentsMd,
+  resolveProjectAgentsMd,
+  readBehaviorAgentsMd,
+  resolvePiAgentsMdPath,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -217,6 +221,100 @@ describe('pi-resources', () => {
     expect(cleared.enabledModels).toEqual([]);
     const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
     expect(after.enabledModels).toBeUndefined();
+  });
+});
+
+describe('behavior AGENTS.md', () => {
+  const withUnsetDataDir = (fn) => {
+    const previous = process.env.OPENCHAMBER_DATA_DIR;
+    delete process.env.OPENCHAMBER_DATA_DIR;
+    try {
+      return fn();
+    } finally {
+      if (previous === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+      else process.env.OPENCHAMBER_DATA_DIR = previous;
+    }
+  };
+
+  it('reads and writes only ~/.pi/agent/AGENTS.md as the global user prompt', () => {
+    const home = makeTemp();
+    const userPath = resolvePiAgentsMdPath(home);
+    expect(resolveBehaviorAgentsMd(home)).toEqual({
+      path: userPath,
+      scope: 'user',
+      exists: false,
+    });
+    expect(readBehaviorAgentsMd(home)).toMatchObject({
+      path: userPath,
+      scope: 'user',
+      exists: false,
+      content: '',
+    });
+
+    fs.mkdirSync(path.dirname(userPath), { recursive: true });
+    fs.writeFileSync(userPath, 'Be concise.\n');
+    expect(resolveBehaviorAgentsMd(home)).toEqual({
+      path: userPath,
+      scope: 'user',
+      exists: true,
+    });
+    expect(readBehaviorAgentsMd(home).content).toBe('Be concise.\n');
+  });
+
+  it('does not present project/repo AGENTS.md as the global user prompt', () => {
+    withUnsetDataDir(() => {
+      const home = makeTemp();
+      const project = makeTemp();
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ lastDirectory: project }),
+      );
+      fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\nRepo rules only.\n');
+
+      const resolved = resolveBehaviorAgentsMd(home);
+      expect(resolved.scope).toBe('user');
+      expect(resolved.exists).toBe(false);
+      expect(resolved.path).toBe(path.join(home, '.pi', 'agent', 'AGENTS.md'));
+      expect(resolved.path).not.toBe(path.join(project, 'AGENTS.md'));
+
+      const read = readBehaviorAgentsMd(home);
+      expect(read.content).toBe('');
+      expect(read.exists).toBe(false);
+      expect(read.scope).toBe('user');
+
+      const projectResolved = resolveProjectAgentsMd(home);
+      expect(projectResolved).toEqual({
+        path: path.join(project, 'AGENTS.md'),
+        scope: 'project',
+        exists: true,
+      });
+    });
+  });
+
+  it('keeps a user AGENTS.md even when a project file also exists', () => {
+    withUnsetDataDir(() => {
+      const home = makeTemp();
+      const project = makeTemp();
+      const userPath = resolvePiAgentsMdPath(home);
+      fs.mkdirSync(path.dirname(userPath), { recursive: true });
+      fs.writeFileSync(userPath, 'User global rules.\n');
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ lastDirectory: project }),
+      );
+      fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\n');
+
+      const read = readBehaviorAgentsMd(home);
+      expect(read).toMatchObject({
+        path: userPath,
+        scope: 'user',
+        exists: true,
+        content: 'User global rules.\n',
+      });
+      expect(resolveProjectAgentsMd(home).exists).toBe(true);
+    });
   });
 });
 

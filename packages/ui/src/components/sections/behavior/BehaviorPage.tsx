@@ -141,27 +141,28 @@ export const BehaviorPage: React.FC = () => {
         ]);
 
         let nextSettings: BehaviorSettingsState = DEFAULT_BEHAVIOR_SETTINGS;
+        let settingsData: { globalBehaviorPrompt?: unknown; optimizeSystemPrompt?: unknown; responseStyleEnabled?: unknown; responseStylePreset?: unknown; responseStyleCustomInstructions?: unknown } | null = null;
         if (settingsRes.ok) {
-          const data = await settingsRes.json();
+          settingsData = await settingsRes.json();
           nextSettings = {
             ...nextSettings,
-            optimizeSystemPrompt: data.optimizeSystemPrompt === true,
-            responseStyleEnabled: data.responseStyleEnabled === true,
-            responseStylePreset: sanitizeResponseStylePreset(data.responseStylePreset),
-            responseStyleCustomInstructions: typeof data.responseStyleCustomInstructions === 'string'
-              ? data.responseStyleCustomInstructions
+            optimizeSystemPrompt: settingsData.optimizeSystemPrompt === true,
+            responseStyleEnabled: settingsData.responseStyleEnabled === true,
+            responseStylePreset: sanitizeResponseStylePreset(settingsData.responseStylePreset),
+            responseStyleCustomInstructions: typeof settingsData.responseStyleCustomInstructions === 'string'
+              ? settingsData.responseStyleCustomInstructions
               : '',
           };
-          if (typeof data.globalBehaviorPrompt === 'string') {
-            nextSettings = { ...nextSettings, prompt: data.globalBehaviorPrompt };
-          }
         }
 
-        if (!nextSettings.prompt.trim() && agentsMdRes.ok) {
-          const agentsData = await agentsMdRes.json();
-          if (typeof agentsData.content === 'string') {
+        // Global AGENTS.md is ~/.pi/agent/AGENTS.md only. Never treat project/repo AGENTS.md as the user prompt.
+        if (agentsMdRes.ok) {
+          const agentsData = await agentsMdRes.json() as { content?: unknown; scope?: unknown; exists?: unknown };
+          if (agentsData.scope !== 'project' && typeof agentsData.content === 'string') {
             nextSettings = { ...nextSettings, prompt: agentsData.content };
           }
+        } else if (typeof settingsData?.globalBehaviorPrompt === 'string') {
+          nextSettings = { ...nextSettings, prompt: settingsData.globalBehaviorPrompt };
         }
 
         setPrompt(nextSettings.prompt);
