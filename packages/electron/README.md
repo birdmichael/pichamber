@@ -30,7 +30,26 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/main.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
 | `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows builds when signing env is missing |
+| `scripts/generate-product-icons.mjs` | Rasterizes `app-icon.svg` / `tray-glyph.svg` into icns, ico, PNG, tray frames, and web/docs badges |
+| `scripts/generate-macos-icon-assets.cjs` | Compiles `AppIcon.icon` to `Assets.car` with Xcode `actool` (macOS only) |
 | `resources/` | Packaged web assets, icons, and macOS entitlements |
+
+## Product icons
+
+Desktop identity is generated from SVG masters. Do not hand-edit the raster/icns/ico outputs.
+
+| Source | Role |
+|--------|------|
+| `resources/icons/app-icon.svg` | Dock mark: open-top cube + official Pi glyph in the old OpenCode O slot (`scale(0.068)`, `ty=-24`). Not `pi.dev/favicon.svg`. |
+| `resources/icons/tray/tray-glyph.svg` | Same in-app chamber+glyph, black, no plate. Template-safe tray idle/unseen/breath. |
+| `resources/icons/dev-icon.png` | Same desktop mark plus a small amber (`#F5A524`) badge for `electron:dev`. |
+
+```bash
+bun run --cwd packages/electron generate:product-icons
+bun run --cwd packages/electron generate:macos-icon   # macOS + Xcode, writes Assets.car
+```
+
+`generate:product-icons` refuses a raw `pi.dev/favicon.svg` copy and the rejected `scale(0.115)` / `ty=6` inner placement. In-app `OpenChamberLogo` is the same chamber + top-face glyph at `currentColor`.
 
 ## Development
 

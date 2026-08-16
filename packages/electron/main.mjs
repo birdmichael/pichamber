@@ -94,7 +94,7 @@ const shouldStartInBackground = (loginItemSettings = readLoginItemSettings()) =>
 // ~/Library/Logs/Pichamber/ (not ~/Library/Logs/@openchamber/electron/).
 app.setName(APP_DISPLAY_NAME);
 if (process.platform === 'linux') {
-  app.setDesktopName('openchamber.desktop');
+  app.setDesktopName('pichamber.desktop');
 }
 if (isDev) {
   app.setPath('userData', path.join(app.getPath('appData'), 'Pichamber Dev'));
@@ -2437,6 +2437,22 @@ const getWindowIconPath = () => {
     ? path.join(__dirname, 'resources', 'icons', iconFileName)
     : path.join(process.resourcesPath, 'icons', iconFileName);
   return fs.existsSync(iconPath) ? iconPath : undefined;
+};
+
+const getDevDockIconPath = () => {
+  const iconPath = path.join(resourceRoot(), 'icons', 'dev-icon.png');
+  return fs.existsSync(iconPath) ? iconPath : undefined;
+};
+
+const applyDevDockIcon = () => {
+  if (!isDev || process.platform !== 'darwin' || typeof app.dock?.setIcon !== 'function') return;
+  const iconPath = getDevDockIconPath();
+  if (!iconPath) return;
+  try {
+    app.dock.setIcon(iconPath);
+  } catch (error) {
+    log.warn('[electron] failed to apply dev dock icon', error);
+  }
 };
 
 const canUseTitleBarOverlay = (browserWindow) => (
@@ -5177,7 +5193,7 @@ ipcMain.handle('openchamber:file:grant-existing', async (event, filePath) => {
 // Tray clicks flow back through dispatchTrayAction → renderer (focus/respond) or
 // native handlers (show / hide / toggle / quit).
 
-// Icon assets: a calm outline (idle), a statically filled cube (a finished
+// Icon assets: a dim template glyph (idle), a full-opacity glyph (a finished
 // session left unread), and an eased sequence the busy state breathes through.
 const TRAY_BREATH_FRAME_COUNT = 16;
 // The window the user is "on" for tray routing: the focused one, else the last
@@ -5463,6 +5479,7 @@ app.whenReady().then(async () => {
     loginItemSettings,
   });
   nativeTheme.themeSource = readThemeSource();
+  applyDevDockIcon();
   registerPackagedUiProtocol();
   hardenBrowserPanelSession();
   setupAutoUpdater();

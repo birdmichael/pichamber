@@ -67,8 +67,8 @@ const computeTitle = (counts) => {
 };
 
 // Which icon variant to show. Busy work animates a "breathing" fill; unread
-// (with nothing active) holds a static filled cube until the state clears;
-// otherwise the plain outline.
+// (with nothing active) holds a static full-opacity glyph until the state
+// clears; otherwise the dimmer idle glyph.
 const computeIconState = (counts) => {
   if (counts.busy > 0) return 'busy';
   if (counts.unseen > 0) return 'unseen';

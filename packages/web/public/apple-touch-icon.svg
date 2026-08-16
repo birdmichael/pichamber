@@ -1,16 +1,26 @@
-<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
-  <!-- OpenChamber logo - simplified, no background (for iOS) -->
-  <g transform="translate(90, 90) scale(1.4)">
-    <!-- Left face - simplified, no grid cells -->
-    <path d="M0 0 L-41.568 -24 L-41.568 24 L0 48 Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Right face - simplified, no grid cells -->
-    <path d="M0 0 L41.568 -24 L41.568 24 L0 48 Z" fill="white" fill-opacity="0.35" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Top face - open -->
-    <path d="M0 -48 L-41.568 -24 L0 0 L41.568 -24 Z" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- OpenCode logo on top face -->
-    <g transform="matrix(0.866, 0.5, -0.866, 0.5, 0, -24) scale(0.75)">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z" fill="white"/>
-      <path d="M-8 -4 L8 -4 L8 12 L-8 12 Z" fill="white" fill-opacity="0.4"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="iconShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-opacity="0.5" flood-color="#000000"/>
+    </filter>
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#303030"/>
+      <stop offset="100%" stop-color="#141414"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(100, 100)">
+    <rect x="0" y="0" width="824" height="824" rx="185" ry="185" fill="url(#bgGradient)" filter="url(#iconShadow)"/>
+    <g transform="translate(412, 412) scale(6.5)">
+      <path d="M0 0 L-41.568 -24 L-41.568 24 L0 48 Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M0 0 L41.568 -24 L41.568 24 L0 48 Z" fill="white" fill-opacity="0.35" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M0 -48 L-41.568 -24 L0 0 L41.568 -24 Z" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+      <g transform="matrix(0.866, 0.5, -0.866, 0.5, 0, -24) scale(0.068)">
+        <path fill="#fff" fill-rule="evenodd" d="
+          M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z
+          M-117.35 -117.35 V0 H0 V-117.35 Z"/>
+        <path fill="#fff" d="M117.36 0 H234.72 V234.72 H117.36 Z"/>
+      </g>
     </g>
   </g>
 </svg>
