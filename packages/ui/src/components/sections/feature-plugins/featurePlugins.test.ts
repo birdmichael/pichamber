@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
+  FEATURE_PLUGIN_SLOT_COPY,
+  FEATURE_PLUGIN_SLOTS,
   emptyFeaturePluginsPayload,
+  featurePluginPackageLabel,
   parseFeaturePluginsPayload,
   presetSourceLabel,
 } from './featurePlugins';
@@ -43,7 +48,34 @@ describe('feature plugin payload parsing', () => {
     expect(parsed?.slots.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
   });
 
-  test('shows the npm spec without the protocol prefix on preset chips', () => {
+  test('shows the default package name without the npm protocol prefix', () => {
     expect(presetSourceLabel('npm:@narumitw/pi-goal')).toBe('@narumitw/pi-goal');
+    expect(featurePluginPackageLabel('goal')).toBe('@narumitw/pi-goal');
+    expect(featurePluginPackageLabel('plan')).toBe('@narumitw/pi-plan-mode');
+    expect(featurePluginPackageLabel('mcp')).toBe('pi-mcp-adapter');
+    expect(featurePluginPackageLabel('subagents')).toBe('pi-subagents');
+  });
+
+  test('keeps Settings search IDs on the four slot cards', () => {
+    expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
+      'feature-plugins.goal',
+      'feature-plugins.plan',
+      'feature-plugins.mcp',
+      'feature-plugins.subagents',
+    ]);
+  });
+
+  test('Feature Plugins page has no text inputs and anchors search on each card', () => {
+    const page = readFileSync(join(import.meta.dir, 'FeaturePluginsPage.tsx'), 'utf8');
+    expect(page).not.toMatch(/<Input\b/);
+    expect(page).not.toContain('SettingsChipGroup');
+    expect(page).not.toContain('settings.featurePlugins.field.source');
+    expect(page).not.toContain('settings.featurePlugins.field.command');
+    expect(page).toContain('@xl:grid-cols-2');
+    expect(page).not.toMatch(/(?:^|[^@\w])(?:sm|lg):/);
+    for (const slot of FEATURE_PLUGIN_SLOTS) {
+      expect(page).toContain(`data-settings-item={copy.settingsItem}`);
+      expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
+    }
   });
 });

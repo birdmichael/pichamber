@@ -806,7 +806,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.goal.title',
     descriptionKey: 'settings.featurePlugins.slot.goal.info',
-    keywords: ['goal', 'pi-goal', 'npm', 'install'],
+    keywords: ['goal', 'pi-goal', '@narumitw/pi-goal', 'npm', 'install'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -814,7 +814,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.plan.title',
     descriptionKey: 'settings.featurePlugins.slot.plan.info',
-    keywords: ['plan', 'pi-plan-mode', 'npm', 'install'],
+    keywords: ['plan', 'pi-plan-mode', '@narumitw/pi-plan-mode', 'npm', 'install'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

@@ -166,4 +166,24 @@ describe('settings search', () => {
     expect(openCode.some((result) => result.id === 'mcp.create')).toBe(true);
     expect(hidden.some((result) => result.id === 'feature-plugins.mcp')).toBe(true);
   });
+
+  test('lands Feature Plugins search on each slot card', () => {
+    const getPageTitle = (page: string) => page;
+    const queries = [
+      { query: 'goal', id: 'feature-plugins.goal' },
+      { query: '@narumitw/pi-plan-mode', id: 'feature-plugins.plan' },
+      { query: 'pi-mcp-adapter', id: 'feature-plugins.mcp' },
+      { query: 'pi-subagents', id: 'feature-plugins.subagents' },
+    ] as const;
+
+    for (const { query, id } of queries) {
+      const results = buildSettingsSearchResults({
+        query,
+        runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+        t,
+        getPageTitle,
+      });
+      expect(results.some((result) => result.id === id)).toBe(true);
+    }
+  });
 });
