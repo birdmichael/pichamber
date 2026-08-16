@@ -153,19 +153,26 @@ export const resolveActiveProjectDirectory = (home = os.homedir()) => {
   return '';
 };
 
+export const resolveProjectAgentsMd = (home = os.homedir(), directory = resolveActiveProjectDirectory(home)) => {
+  if (!directory) {
+    return { path: '', scope: 'project', exists: false };
+  }
+  const projectPath = path.join(directory, 'AGENTS.md');
+  return { path: projectPath, scope: 'project', exists: isFile(projectPath) };
+};
+
+/** Global / user AGENTS.md only. Never fall back to the project repo file. */
 export const resolveBehaviorAgentsMd = (home = os.homedir()) => {
   const userPath = resolvePiAgentsMdPath(home);
-  if (isFile(userPath)) {
-    return { path: userPath, scope: 'user', exists: true };
-  }
-  const directory = resolveActiveProjectDirectory(home);
-  if (directory) {
-    const projectPath = path.join(directory, 'AGENTS.md');
-    if (isFile(projectPath)) {
-      return { path: projectPath, scope: 'project', exists: true };
-    }
-  }
-  return { path: userPath, scope: 'user', exists: false };
+  return { path: userPath, scope: 'user', exists: isFile(userPath) };
+};
+
+export const readBehaviorAgentsMd = (home = os.homedir()) => {
+  const resolved = resolveBehaviorAgentsMd(home);
+  return {
+    ...resolved,
+    content: resolved.exists ? readText(resolved.path) : '',
+  };
 };
 
 const readJsonObject = (filePath) => {
