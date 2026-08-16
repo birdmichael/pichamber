@@ -69,6 +69,7 @@ import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCop
 import {
   getSessionTitleReloadBlockReason,
   isSessionTitleReloadBlocked,
+  isSessionTitleReloadInFlightForSession,
   isSessionTitleReloadOutputting,
   isSessionTitleReloadVisible,
   reloadPiSessionTitleConfig,
@@ -1263,8 +1264,14 @@ export const Header: React.FC<HeaderProps> = ({
     isOutputting: sessionTitleReloadIsOutputting,
     isCompacting: sessionTitleReloadIsCompacting,
   });
-  const [isPiReloadInFlight, setIsPiReloadInFlight] = React.useState(false);
-  const isPiReloadInFlightRef = React.useRef(false);
+  const [reloadingSessionIds, setReloadingSessionIds] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const reloadingSessionIdsRef = React.useRef<Set<string>>(new Set());
+  const isPiReloadInFlight = isSessionTitleReloadInFlightForSession(
+    currentSessionId,
+    reloadingSessionIds,
+  );
   const showSessionTitleReload = isSessionTitleReloadVisible({
     isPiKernel,
     hasCurrentSession: Boolean(currentSessionId),
@@ -1279,12 +1286,12 @@ export const Header: React.FC<HeaderProps> = ({
   });
   const isSessionTitleReloadDisabled = sessionTitleReloadBlockReason !== null;
   const reloadPiKernel = React.useCallback(() => {
-    if (sessionTitleReloadLiveBlocked || isPiReloadInFlightRef.current) return;
-    isPiReloadInFlightRef.current = true;
-    setIsPiReloadInFlight(true);
-    void reloadPiSessionTitleConfig({
-      message: t('header.sessionReload.disabledInFlight'),
-    })
+    if (!currentSessionId || sessionTitleReloadLiveBlocked) return;
+    if (reloadingSessionIdsRef.current.has(currentSessionId)) return;
+    const sessionID = currentSessionId;
+    reloadingSessionIdsRef.current.add(sessionID);
+    setReloadingSessionIds(new Set(reloadingSessionIdsRef.current));
+    void reloadPiSessionTitleConfig({ sessionID })
       .then(() => {
         toast.success(t('header.sessionReload.success'));
       })
@@ -1295,10 +1302,10 @@ export const Header: React.FC<HeaderProps> = ({
         toast.error(message);
       })
       .finally(() => {
-        isPiReloadInFlightRef.current = false;
-        setIsPiReloadInFlight(false);
+        reloadingSessionIdsRef.current.delete(sessionID);
+        setReloadingSessionIds(new Set(reloadingSessionIdsRef.current));
       });
-  }, [sessionTitleReloadLiveBlocked, t]);
+  }, [currentSessionId, sessionTitleReloadLiveBlocked, t]);
   const moveCurrentSessionToWorktree = React.useCallback(() => {
     if (!currentSessionId || !sessionDirectory || isCurrentSessionActive || isCurrentSessionMovingToWorktree) return;
     const sessions = useGlobalSessionsStore.getState().activeSessions;

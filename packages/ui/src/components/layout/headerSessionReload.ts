@@ -1,6 +1,8 @@
 import type { I18nKey } from '@/lib/i18n';
-import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { invalidateCommandsLoadCache, useCommandsStore } from '@/stores/useCommandsStore';
 import { usePluginsStore } from '@/stores/usePluginsStore';
+import { invalidateSkillsLoadCache, useSkillsStore } from '@/stores/useSkillsStore';
 
 export type SessionTitleReloadBlockReason = 'busy' | 'compacting' | 'inFlight';
 
@@ -13,8 +15,12 @@ export type SessionTitleReloadBlockReason = 'busy' | 'compacting' | 'inFlight';
  */
 export const SESSION_TITLE_RELOAD_BLOCKING_STATUS_TYPES = ['busy', 'retry'] as const;
 
-type ReloadConfiguration = typeof reloadOpenCodeConfiguration;
-type RefreshExtensions = () => Promise<unknown>;
+type ReloadSession = (sessionID: string) => Promise<unknown>;
+type RefreshLists = () => Promise<unknown>;
+type SessionTitleReloadFetch = (
+  path: string,
+  init?: RequestInit,
+) => Promise<Pick<Response, 'ok' | 'json'>>;
 
 export function isSessionTitleReloadVisible(input: {
   isPiKernel: boolean;
@@ -71,6 +77,13 @@ export function isSessionTitleReloadBlocked(input: {
   );
 }
 
+export function isSessionTitleReloadInFlightForSession(
+  currentSessionId: string | null | undefined,
+  reloadingSessionIds: ReadonlySet<string>,
+): boolean {
+  return Boolean(currentSessionId && reloadingSessionIds.has(currentSessionId));
+}
+
 export function getSessionTitleReloadBlockReason(input: {
   statusType?: string | null;
   isOutputting?: boolean;
@@ -97,19 +110,49 @@ export function sessionTitleReloadTooltipKey(reason: SessionTitleReloadBlockReas
   return 'header.sessionReload.tooltip';
 }
 
-export async function reloadPiSessionTitleConfig(options?: {
-  message?: string;
-  reloadConfiguration?: ReloadConfiguration;
-  refreshExtensions?: RefreshExtensions;
+export async function postPiSessionTitleReload(
+  sessionID: string,
+  fetchImpl: SessionTitleReloadFetch = runtimeFetch,
+): Promise<void> {
+  const response = await fetchImpl(`/api/session/${encodeURIComponent(sessionID)}/reload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const payload = await response.json().catch(() => null) as { error?: string } | null;
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Failed to reload session');
+  }
+}
+
+export async function refreshSessionTitleReloadLists(options?: {
+  loadCommands?: () => Promise<unknown>;
+  loadSkills?: () => Promise<unknown>;
+  loadPlugins?: () => Promise<unknown>;
 }): Promise<void> {
-  const reloadConfiguration = options?.reloadConfiguration ?? reloadOpenCodeConfiguration;
-  const refreshExtensions = options?.refreshExtensions
+  const loadCommands = options?.loadCommands ?? (async () => {
+    invalidateCommandsLoadCache();
+    return useCommandsStore.getState().loadCommands();
+  });
+  const loadSkills = options?.loadSkills ?? (async () => {
+    invalidateSkillsLoadCache();
+    return useSkillsStore.getState().loadSkills();
+  });
+  const loadPlugins = options?.loadPlugins
     ?? (() => usePluginsStore.getState().loadPlugins({ force: true }));
 
-  await reloadConfiguration({
-    message: options?.message,
-    scopes: ['all'],
-    mode: 'projects',
-  });
-  await refreshExtensions();
+  await Promise.all([loadCommands(), loadSkills(), loadPlugins()]);
+}
+
+export async function reloadPiSessionTitleConfig(options: {
+  sessionID: string;
+  reloadSession?: ReloadSession;
+  refreshLists?: RefreshLists;
+  fetchImpl?: SessionTitleReloadFetch;
+}): Promise<void> {
+  const reloadSession = options.reloadSession
+    ?? ((sessionID) => postPiSessionTitleReload(sessionID, options.fetchImpl));
+  const refreshLists = options.refreshLists ?? refreshSessionTitleReloadLists;
+
+  await reloadSession(options.sessionID);
+  await refreshLists();
 }

@@ -508,6 +508,51 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('reloads one session while a sibling is streaming', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({
+      chunks: ['one ', 'two ', 'three'],
+      chunkDelayMs: 40,
+    });
+    let createdCount = 0;
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => {
+        createdCount += 1;
+        return createdCount === 1 ? idleSession : busySession;
+      },
+    });
+    try {
+      const idle = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Idle' }),
+      })).json();
+      const busy = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Busy' }),
+      })).json();
+      void fetch(`${url}/api/session/${busy.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parts: [{ type: 'text', text: 'go' }] }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const response = await fetch(`${url}/api/session/${idle.id}/reload`, { method: 'POST' });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        success: true,
+        reloaded: true,
+        sessionID: idle.id,
+      });
+      expect(idleSession.reloadCount).toBe(1);
+      expect(busySession.reloadCount).toBe(0);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('runs /reload as a Pi command and persists thinking defaults', async () => {
     const { url, close, kernel } = await startFacade();
     try {

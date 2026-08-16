@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 
+import { getConfigUpdateSnapshot } from '@/lib/configUpdate';
 import { dict as enDict } from '@/lib/i18n/messages/en';
 import { dict as zhCnDict } from '@/lib/i18n/messages/zh-CN';
 import {
   getSessionTitleReloadBlockReason,
   isSessionTitleReloadBlocked,
   isSessionTitleReloadBlockedByStatus,
+  isSessionTitleReloadInFlightForSession,
   isSessionTitleReloadOutputting,
   isSessionTitleReloadVisible,
+  postPiSessionTitleReload,
+  refreshSessionTitleReloadLists,
   reloadPiSessionTitleConfig,
   SESSION_TITLE_RELOAD_BLOCKING_STATUS_TYPES,
   sessionTitleReloadAriaKey,
@@ -118,6 +122,21 @@ describe('session title reload status disable', () => {
       isReloadInFlight: false,
     })).toBeNull();
   });
+
+  test('in-flight disable is only for the session that is reloading', () => {
+    const reloading = new Set(['ses_a']);
+    expect(isSessionTitleReloadInFlightForSession('ses_a', reloading)).toBe(true);
+    expect(isSessionTitleReloadInFlightForSession('ses_b', reloading)).toBe(false);
+    expect(isSessionTitleReloadInFlightForSession(null, reloading)).toBe(false);
+    expect(getSessionTitleReloadBlockReason({
+      statusType: 'idle',
+      isReloadInFlight: isSessionTitleReloadInFlightForSession('ses_b', reloading),
+    })).toBeNull();
+    expect(getSessionTitleReloadBlockReason({
+      statusType: 'idle',
+      isReloadInFlight: isSessionTitleReloadInFlightForSession('ses_a', reloading),
+    })).toBe('inFlight');
+  });
 });
 
 describe('session title reload copy', () => {
@@ -159,38 +178,61 @@ describe('session title reload copy keys', () => {
 });
 
 describe('reloadPiSessionTitleConfig', () => {
-  test('reuses reloadOpenCodeConfiguration then refreshes extensions', async () => {
+  test('reloads one session then refreshes command/skill/extension lists', async () => {
     const calls: string[] = [];
-    let reloadOptions: unknown;
     await reloadPiSessionTitleConfig({
-      message: 'Reloading skills, prompts, and extensions',
-      reloadConfiguration: async (options) => {
-        reloadOptions = options;
-        calls.push('commands-skills');
+      sessionID: 'ses_a',
+      reloadSession: async (sessionID) => {
+        calls.push(`reload:${sessionID}`);
       },
-      refreshExtensions: async () => {
-        calls.push('extensions');
+      refreshLists: async () => {
+        calls.push('lists');
       },
     });
-    expect(calls).toEqual(['commands-skills', 'extensions']);
-    expect(reloadOptions).toEqual({
-      message: 'Reloading skills, prompts, and extensions',
-      scopes: ['all'],
-      mode: 'projects',
-    });
+    expect(calls).toEqual(['reload:ses_a', 'lists']);
   });
 
-  test('does not refresh extensions when command/skill reload fails', async () => {
+  test('posts a session-scoped reload instead of process-wide config reload', async () => {
+    const urls: string[] = [];
+    await postPiSessionTitleReload('ses_a', async (path, init) => {
+      urls.push(path);
+      expect(init?.method).toBe('POST');
+      return {
+        ok: true,
+        json: async () => ({ reloaded: true, sessionID: 'ses_a' }),
+      };
+    });
+    expect(urls).toEqual(['/api/session/ses_a/reload']);
+  });
+
+  test('does not call startConfigUpdate', async () => {
+    const before = getConfigUpdateSnapshot();
+    await reloadPiSessionTitleConfig({
+      sessionID: 'ses_a',
+      reloadSession: async () => undefined,
+      refreshLists: async () => refreshSessionTitleReloadLists({
+        loadCommands: async () => undefined,
+        loadSkills: async () => undefined,
+        loadPlugins: async () => undefined,
+      }),
+    });
+    const after = getConfigUpdateSnapshot();
+    expect(after.isUpdating).toBe(before.isUpdating);
+    expect(after.isUpdating).toBe(false);
+  });
+
+  test('does not refresh lists when the session reload fails', async () => {
     const calls: string[] = [];
     await expect(reloadPiSessionTitleConfig({
-      reloadConfiguration: async () => {
-        calls.push('commands-skills');
+      sessionID: 'ses_a',
+      reloadSession: async () => {
+        calls.push('reload');
         throw new Error('host reload failed');
       },
-      refreshExtensions: async () => {
-        calls.push('extensions');
+      refreshLists: async () => {
+        calls.push('lists');
       },
     })).rejects.toThrow('host reload failed');
-    expect(calls).toEqual(['commands-skills']);
+    expect(calls).toEqual(['reload']);
   });
 });

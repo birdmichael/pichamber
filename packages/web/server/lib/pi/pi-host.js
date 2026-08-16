@@ -64,6 +64,7 @@ export const createInMemoryPiSession = ({
   let streaming = false;
   let compactingFlag = compacting === true;
   let aborted = false;
+  let reloadCount = 0;
   const messages = [];
 
   const emit = (event) => {
@@ -178,6 +179,12 @@ export const createInMemoryPiSession = ({
       } finally {
         compactingFlag = false;
       }
+    },
+    async reload() {
+      reloadCount += 1;
+    },
+    get reloadCount() {
+      return reloadCount;
     },
     dispose() {
       listeners.clear();
@@ -1305,7 +1312,56 @@ export const createPiHost = ({
         return [];
       }
     },
-    async reload(directory) {
+    async reload(options) {
+      const target = typeof options === 'string'
+        ? { directory: options }
+        : (options && typeof options === 'object' ? options : {});
+      const sessionID = typeof target.sessionID === 'string' ? target.sessionID.trim() : '';
+      const directory = typeof target.directory === 'string' ? target.directory : undefined;
+
+      const reloadRecord = async (record) => {
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          const error = new Error(blocked);
+          error.status = 409;
+          throw error;
+        }
+        record.unsubscribe?.();
+        if (typeof record.piSession?.reload === 'function') {
+          await record.piSession.reload();
+        } else {
+          try {
+            record.piSession?.dispose?.();
+          } catch {
+          }
+          const factory = await resolveCreateSession();
+          record.piSession = await factory({
+            cwd: record.directory,
+            modelRuntime,
+          });
+        }
+        attachSession(record);
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      };
+
+      if (sessionID) {
+        const record = await ensureRecord(sessionID, directory);
+        await reloadRecord(record);
+        const skills = listPiSkills({ home, directory: record.directory });
+        const commands = listPiCommands({ home, directory: record.directory });
+        return {
+          reloaded: true,
+          kernel: 'pi',
+          sessionID: record.id,
+          skills: skills.length,
+          commands: commands.length,
+        };
+      }
+
       for (const record of sessions.values()) {
         if (directory && record.directory !== directory) continue;
         const blocked = sessionBlocksPiReload(record);
@@ -1328,33 +1384,15 @@ export const createPiHost = ({
       }
       directoryRuntimes.clear();
 
-      const factory = await resolveCreateSession();
       try {
         await ensureModelRuntime();
       } catch {
       }
 
       for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
         try {
-          record.unsubscribe?.();
-          if (typeof record.piSession?.reload === 'function') {
-            await record.piSession.reload();
-          } else {
-            try {
-              record.piSession?.dispose?.();
-            } catch {
-            }
-            record.piSession = await factory({
-              cwd: record.directory,
-              modelRuntime,
-            });
-          }
-          attachSession(record);
-          emit(record.directory, {
-            id: createEventId(),
-            type: 'session.updated',
-            properties: { info: record.info },
-          });
+          await reloadRecord(record);
         } catch (error) {
           console.warn(`[pi-host] reload failed for session ${record.id}:`, error?.message || error);
         }

@@ -291,6 +291,36 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('reload({ sessionID }) only reloads that session and ignores a busy sibling', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({ compacting: true });
+    const created = [];
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => {
+        const next = created.length === 0 ? idleSession : busySession;
+        created.push(next);
+        return next;
+      },
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    const busy = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    const result = await host.reload({ sessionID: idle.id });
+    expect(result).toMatchObject({
+      reloaded: true,
+      kernel: 'pi',
+      sessionID: idle.id,
+    });
+    expect(idleSession.reloadCount).toBe(1);
+    expect(busySession.reloadCount).toBe(0);
+    await expect(host.reload({ sessionID: busy.id })).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for compaction to finish before reloading.',
+    });
+    expect(busySession.reloadCount).toBe(0);
+    host.dispose();
+  });
+
   it('reload refuses while a session is streaming', async () => {
     const host = createPiHost({
       mock: true,
