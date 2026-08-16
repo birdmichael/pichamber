@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Chat: empty-session titles now use native wording in Chinese and other translated locales instead of leftover English.
 - UI: the command palette now says it searches sessions, actions, and files, matching the groups it actually shows.
 - Settings: Commands no longer lists `/model` or `/thinking` on Pi — those stay on the composer chips and Session Defaults. Custom prompts still appear in Commands and in the slash menu.
+- Chat: on the Pi kernel, message Revert and composer shell / `/shell` are hidden because those actions are not implemented yet. Share stays hidden. OpenCode still offers revert and shell.
 
 ## [1.18.4] - 2026-08-14
 

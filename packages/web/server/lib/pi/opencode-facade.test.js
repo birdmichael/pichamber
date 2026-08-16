@@ -540,6 +540,27 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('rejects revert, unrevert, and shell as unsupported instead of empty success', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      for (const action of ['revert', 'unrevert', 'shell']) {
+        const response = await fetch(`${url}/api/session/ses_stub/${action}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        expect(response.status).toBe(501);
+        expect(await response.json()).toMatchObject({
+          error: 'unsupported',
+          kernel: 'pi',
+        });
+      }
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('exports JSONL and imports a session with prefix messages', async () => {
     const { url, close, kernel } = await startFacade();
     try {

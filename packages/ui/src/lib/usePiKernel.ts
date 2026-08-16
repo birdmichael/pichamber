@@ -1,6 +1,14 @@
 import React from 'react';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
+/**
+ * Session share, message revert, and composer / session.shell are OpenCode-only.
+ * On Pi they are empty stubs and must not be offered as successful actions.
+ */
+export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
+  return !isPiKernel;
+}
+
 export function usePiKernel(): boolean {
   const [isPiKernel, setIsPiKernel] = React.useState(true);
   React.useEffect(() => {

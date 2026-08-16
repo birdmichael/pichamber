@@ -13,6 +13,7 @@ import { useSessionMessageRecords } from '@/sync/sync-context';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from "@/components/icon/Icon";
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
+import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { getFullText, getMessagePreview } from './lib/messagePreview';
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,7 @@ export const TimelineDialog: React.FC<TimelineDialogProps> = ({
     onLoadEarlier,
 }) => {
     const { t } = useI18n();
+    const canRevertMessage = canOfferOpenCodeSessionStub(usePiKernel());
     const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
     const messages = useSessionMessageRecords(currentSessionId ?? '');
     const revertToMessage = useSessionUIStore((state) => state.revertToMessage);
@@ -327,6 +329,7 @@ export const TimelineDialog: React.FC<TimelineDialogProps> = ({
 
                                         <div className="flex-shrink-0 h-5 flex items-center mr-2">
                                             <div className={cn("gap-1", alwaysShowActions ? "flex" : "hidden group-hover:flex")}>
+                                                {canRevertMessage ? (
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <button
@@ -343,6 +346,7 @@ export const TimelineDialog: React.FC<TimelineDialogProps> = ({
                                                     </TooltipTrigger>
                                                     <TooltipContent sideOffset={6}>{t('chat.timeline.actions.revertFromHere')}</TooltipContent>
                                                 </Tooltip>
+                                                ) : null}
 
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>

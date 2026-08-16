@@ -168,6 +168,7 @@ describe('filterPiSlashCommands', () => {
   test('leaves OpenCode lists unchanged', () => {
     const commands = [
       { name: 'model', isSkill: false },
+      { name: 'shell' },
       { name: 'catch-up', isOpenChamber: true },
     ];
     expect(filterPiSlashCommands(commands, false)).toEqual(commands);
@@ -181,6 +182,7 @@ describe('filterPiSlashCommands', () => {
       { name: 'pr-review' },
       { name: 'model' },
       { name: 'thinking' },
+      { name: 'shell' },
       { name: 'schedule-task', isOpenChamber: true },
       { name: 'catch-up', isOpenChamber: true },
       { name: 'clack-cli-patterns', isSkill: true },

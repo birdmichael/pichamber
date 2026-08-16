@@ -89,6 +89,7 @@ const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
   'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
   ...PI_CHIP_OWNED_SLASH_COMMANDS,
+  'shell',
 ]);
 
 /** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */

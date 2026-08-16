@@ -582,11 +582,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/revert', parseJson, handle(async (_req, res) => {
-    json(res, 200, unsupported('session.revert'));
+    json(res, 501, unsupported('session.revert'));
   }));
 
   app.post('/api/session/:sessionID/unrevert', parseJson, handle(async (_req, res) => {
-    json(res, 200, unsupported('session.unrevert'));
+    json(res, 501, unsupported('session.unrevert'));
   }));
 
   app.get('/api/session/:sessionID/tree', handle(async (req, res) => {
@@ -675,7 +675,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/shell', parseJson, handle(async (_req, res) => {
-    json(res, 200, unsupported('session.shell'));
+    json(res, 501, unsupported('session.shell'));
   }));
 
   if (bus) {
