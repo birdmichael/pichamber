@@ -329,6 +329,48 @@ describe('reconcileParentSubagentRuns', () => {
     expect(reconciled).toHaveLength(1);
     expect(toPublicSubagentRun(reconciled[0]).openable).toBe(false);
   });
+
+  it('keeps only the newest terminal tool-call without a child', () => {
+    const reconciled = reconcileParentSubagentRuns([], [
+      {
+        runId: 'old_done',
+        toolCallId: 'old_done',
+        name: 'subagent',
+        state: 'done',
+        sessionID: null,
+        startedAt: 1,
+      },
+      {
+        runId: 'newer_failed',
+        toolCallId: 'newer_failed',
+        name: 'scout',
+        state: 'failed',
+        sessionID: null,
+        startedAt: 2,
+      },
+      {
+        runId: 'still_running',
+        toolCallId: 'still_running',
+        name: 'scout',
+        state: 'running',
+        sessionID: null,
+        startedAt: 3,
+      },
+      {
+        runId: 'has_child',
+        name: 'scout',
+        state: 'done',
+        sessionID: 'child-1',
+        parentID: 'parent-1',
+        startedAt: 0,
+      },
+    ]);
+    expect(reconciled.map((run) => run.runId).sort()).toEqual([
+      'has_child',
+      'newer_failed',
+      'still_running',
+    ]);
+  });
 });
 
 describe('mergeSubagentRuns', () => {

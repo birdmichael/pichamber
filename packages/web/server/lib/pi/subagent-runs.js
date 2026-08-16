@@ -498,6 +498,8 @@ export const mergeSubagentRuns = (...lists) => {
 /**
  * Live tool-call runs win. Stale adapter status files without a child id are
  * dropped; status-only stays only while a run is still queued/running/blocked.
+ * Terminal tool-calls without a child stay only as the newest one, so attach
+ * can mint a writable facade without flooding Work Status.
  */
 export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
   const live = mergeSubagentRuns(liveRuns);
@@ -518,11 +520,19 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
   }
 
   const combined = mergeSubagentRuns(live, extras);
-  const visible = combined.filter((run) => (
+  const withChildOrLive = combined.filter((run) => (
     asChildSessionId(run.sessionID, run.parentID)
     || isLiveRunState(run.state)
-    || Boolean(run.toolCallId)
   ));
+  const kept = new Set(withChildOrLive);
+  const mintable = combined
+    .filter((run) => !kept.has(run) && run.toolCallId)
+    .sort((left, right) => {
+      const byTime = (right.startedAt || 0) - (left.startedAt || 0);
+      if (byTime !== 0) return byTime;
+      return combined.indexOf(right) - combined.indexOf(left);
+    });
+  const visible = mintable[0] ? [...withChildOrLive, mintable[0]] : withChildOrLive;
   const seenSession = new Set();
   return visible.filter((run) => {
     if (!run.sessionID) return true;
