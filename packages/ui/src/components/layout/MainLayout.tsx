@@ -62,10 +62,10 @@ export const MainLayout: React.FC = () => {
             setSettingsWindowMounted(true);
         }
     }, [isSettingsDialogOpen]);
-    const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
+    const isPiKernel = usePiKernel();
+    const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen) && !isPiKernel;
     const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
     const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
-    const isPiKernel = usePiKernel();
     const isScheduledTasksPageOpen = useUIStore((state) => state.isScheduledTasksDialogOpen) && !isPiKernel;
     const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
     const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
@@ -74,6 +74,12 @@ export const MainLayout: React.FC = () => {
     // floating chrome bleeds through, and selecting a session / draft / main
     // tab anywhere closes the surface.
     const isSurfacePageOpen = isScheduledTasksPageOpen || isArchivePageOpen || Boolean(worktreesPageProjectId) || isMultiRunLauncherOpen;
+
+    React.useEffect(() => {
+        if (!isPiKernel) return;
+        const { isMultiRunLauncherOpen: leftoverOpen, setMultiRunLauncherOpen: closeLeftover } = useUIStore.getState();
+        if (leftoverOpen) closeLeftover(false);
+    }, [isPiKernel]);
 
     React.useEffect(() => {
         const closeSurfacePages = () => useUIStore.getState().closeMainSurfaces();

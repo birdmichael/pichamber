@@ -1277,7 +1277,7 @@ export const Header: React.FC<HeaderProps> = ({
   const isScheduledSurfaceOpen = useUIStore((state) => state.isScheduledTasksDialogOpen) && !isPiKernel;
   const isArchiveSurfaceOpen = useUIStore((state) => state.isArchivePageOpen);
   const worktreesSurfaceProjectId = useUIStore((state) => state.worktreesPageProjectId);
-  const isMultiRunSurfaceOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
+  const isMultiRunSurfaceOpen = useUIStore((state) => state.isMultiRunLauncherOpen) && !isPiKernel;
   const worktreesSurfaceProjectLabel = useProjectsStore((state) => {
     if (!worktreesSurfaceProjectId) return null;
     const project = state.projects.find((entry) => entry.id === worktreesSurfaceProjectId);
