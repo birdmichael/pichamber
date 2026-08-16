@@ -344,10 +344,12 @@ describe('Pi host subagent runs', () => {
     expect(result.info.role).toBe('assistant');
     await new Promise((resolve) => setTimeout(resolve, 30));
     const listed = await host.listSubagentRuns(parent.id);
-    expect(listed.runs).toHaveLength(1);
-    expect(listed.runs[0].sessionID).toBeTruthy();
-    expect(listed.runs[0].sessionID).not.toBe(parent.id);
-    expect(listed.runs[0].openable).toBe(true);
+    expect(listed.runs.every((run) => run.sessionID !== parent.id)).toBe(true);
+    const texts = host.getMessages(parent.id).flatMap((entry) => (
+      (entry.parts || []).map((part) => part.text).filter(Boolean)
+    ));
+    expect(texts.some((text) => text.includes('Could not start a subagent run'))).toBe(true);
+    expect(host.getStatus()[parent.id]).toBeUndefined();
     host.dispose();
   });
 
