@@ -4,7 +4,6 @@ import {
   parseFeaturePluginsPayload,
   type FeaturePluginsPayload,
 } from '@/components/sections/feature-plugins/featurePlugins';
-import { isPiGoalPluginAvailable } from '@/lib/piGoal';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'failed';
@@ -62,10 +61,4 @@ export const isPiPlanPluginAvailable = (payload: FeaturePluginsPayload | null | 
 
 export const usePiPlanPluginAvailable = (): boolean => (
   usePiFeaturePluginsStore((state) => isPiPlanPluginAvailable(state.payload))
-);
-
-export { isPiGoalPluginAvailable };
-
-export const usePiGoalPluginAvailable = (): boolean => (
-  usePiFeaturePluginsStore((state) => isPiGoalPluginAvailable(state.payload))
 );

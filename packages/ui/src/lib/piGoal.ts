@@ -13,15 +13,12 @@ export type PiGoalStartCommand = {
   arguments: string;
 };
 
-export type PiGoalStartFailure =
+export type PiGoalStartResult =
+  | { ok: true; command: string; arguments: string }
   | { ok: false; reason: 'empty' }
   | { ok: false; reason: 'no-session' }
   | { ok: false; reason: 'missing-command'; command: string }
   | { ok: false; reason: 'failed'; command: string; status?: number };
-
-export type PiGoalStartResult =
-  | { ok: true; command: string; arguments: string }
-  | PiGoalStartFailure;
 
 export function isPiGoalPluginAvailable(payload: FeaturePluginsPayload | null | undefined): boolean {
   return Boolean(payload?.slots.goal.installed && payload.slots.goal.enabled);
