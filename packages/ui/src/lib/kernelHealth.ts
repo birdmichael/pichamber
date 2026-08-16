@@ -1,4 +1,4 @@
-export type KernelHealthSnapshot = {
+type KernelHealthSnapshot = {
   kernel?: unknown;
   status?: unknown;
   kernelReady?: unknown;
