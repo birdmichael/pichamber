@@ -821,6 +821,79 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('promptAsync keeps file and image parts on the user message and forwards them to Pi', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Image attach' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = { text, options };
+      return originalPrompt(text, options);
+    };
+
+    const result = await host.promptAsync(record.id, {
+      messageID: 'msg_image',
+      parts: [
+        { type: 'text', text: 'see this' },
+        { type: 'file', mime: 'image/png', url: 'data:image/png;base64,AAAA', filename: 'shot.png' },
+      ],
+    });
+
+    expect(result.parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(result.parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(user.parts[0].text).toBe('see this');
+    expect(user.parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
+    expect(forwarded.text).toBe('see this');
+    expect(forwarded.options.images).toEqual([{
+      type: 'image',
+      mimeType: 'image/png',
+      data: 'AAAA',
+    }]);
+    host.dispose();
+  });
+
+  it('promptAsync persists a Pi-native image part as a facade file part', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Native image' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = options;
+      return originalPrompt(text, options);
+    };
+
+    await host.promptAsync(record.id, {
+      parts: [
+        { type: 'text', text: 'look' },
+        { type: 'image', mimeType: 'image/jpeg', data: 'BBBB' },
+      ],
+    });
+
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(user.parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/jpeg',
+      url: 'data:image/jpeg;base64,BBBB',
+    });
+    expect(forwarded.images).toEqual([{
+      type: 'image',
+      mimeType: 'image/jpeg',
+      data: 'BBBB',
+    }]);
+    host.dispose();
+  });
+
   it('promptAsync applies the requested Pi model before sending the prompt', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Multi-run' });

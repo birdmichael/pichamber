@@ -184,7 +184,60 @@ describe('session-transfer', () => {
     expect(messages.filter((entry) => entry.info.role === 'user')).toHaveLength(1);
   });
 
-  it('drops unmatched toolResults and leaves image blocks for a later slice', () => {
+  it('hydrates user text plus a Pi image block as text and file parts', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'see this' },
+            { type: 'image', mimeType: 'image/png', data: 'AAAA' },
+          ],
+        },
+      },
+    ], 'ses_images');
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].info.role).toBe('user');
+    expect(messages[0].parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(messages[0].parts[0].text).toBe('see this');
+    expect(messages[0].parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
+    expect(messages[0].parts.some((part) => part.type === 'text' && !part.text)).toBe(false);
+  });
+
+  it('hydrates a source-shaped image block as a file part', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'look' },
+            {
+              type: 'image',
+              source: { type: 'base64', mediaType: 'image/jpeg', data: 'BBBB' },
+            },
+          ],
+        },
+      },
+    ], 'ses_source_image');
+
+    expect(messages[0].parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(messages[0].parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/jpeg',
+      url: 'data:image/jpeg;base64,BBBB',
+    });
+  });
+
+  it('drops unmatched toolResults and hydrates image blocks as file parts', () => {
     const messages = facadeMessagesFromPiEntries([
       {
         type: 'message',
@@ -234,9 +287,14 @@ describe('session-transfer', () => {
       role: entry.info.role,
       types: entry.parts.map((part) => part.type),
     }))).toEqual([
-      { role: 'user', types: ['text'] },
+      { role: 'user', types: ['text', 'file'] },
       { role: 'assistant', types: ['text', 'tool'] },
     ]);
+    expect(messages[0].parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
     expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('orphan dump')))).toBe(false);
   });
 });

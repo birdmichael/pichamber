@@ -257,7 +257,15 @@ describe('prompt extractors', () => {
       { type: 'file', mime: 'image/png', url: 'data:image/png;base64,abc' },
     ])).toEqual([{
       type: 'image',
-      source: { type: 'base64', mediaType: 'image/png', data: 'abc' },
+      mimeType: 'image/png',
+      data: 'abc',
+    }]);
+    expect(extractPromptImages([
+      { type: 'image', mimeType: 'image/jpeg', data: 'xyz' },
+    ])).toEqual([{
+      type: 'image',
+      mimeType: 'image/jpeg',
+      data: 'xyz',
     }]);
   });
 });

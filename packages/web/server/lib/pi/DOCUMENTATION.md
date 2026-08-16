@@ -165,8 +165,11 @@ Walk `type: "message"` entries in order. `thinking` → `reasoning` and
 `toolResult` with the same `toolCallId` become one assistant `type: "tool"`
 part (`callID`, `tool`, `state.input`, `state.output`, `state.status`) —
 the same shape live SSE already emits in `event-translator.js`.
-`role: "toolResult"` is never a user message. `image` blocks stay dropped
-until a later slice. Do not invent a second session store. Live SSE is
+`role: "toolResult"` is never a user message. A Pi `image` block
+(`mimeType` + `data`, or a `source` payload) becomes a facade `file` part
+(`mime` + `url: data:...`). `promptAsync` keeps those file/image parts on
+the user message and forwards Pi-native `{ type: "image", data, mimeType }`
+to `session.prompt`. Do not invent a second session store. Live SSE is
 unchanged.
 
 Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
