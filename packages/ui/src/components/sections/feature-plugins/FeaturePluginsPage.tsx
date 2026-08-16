@@ -8,25 +8,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
-  SETTINGS_FIELDS_STACK_CLASS,
   SETTINGS_HELPER_CLASS,
   SettingsCheckboxRow,
-  SettingsChipGroup,
   SettingsSection,
-  SettingsStackedField,
 } from '@/components/sections/shared/SettingsSection';
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { useI18n } from '@/lib/i18n';
 import { reportSettingsSaveState } from '@/lib/persistence';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { cn } from '@/lib/utils';
 import { useFeaturePluginsStore } from '@/stores/useFeaturePluginsStore';
 import { useFeaturePluginSlotsStore } from '@/stores/useFeaturePluginSlotsStore';
 import { applyFeaturePluginsPayload } from '@/sync/pi-feature-plugins-store';
 import {
+  DEFAULT_FEATURE_PLUGIN_SOURCES,
   FEATURE_PLUGIN_SLOT_COPY,
   FEATURE_PLUGIN_SLOTS,
   type FeaturePluginSlot,
@@ -34,8 +32,8 @@ import {
   type FeaturePluginsPayload,
   type FeaturePluginsReloadResult,
   emptyFeaturePluginsPayload,
+  featurePluginPackageLabel,
   parseFeaturePluginsPayload,
-  presetSourceLabel,
 } from './featurePlugins';
 
 type LoadState =
@@ -48,21 +46,18 @@ type PendingAction = {
   action: 'install' | 'uninstall';
 };
 
-const SETTINGS_INPUT_CLASS = 'h-8 rounded-md px-3 font-mono typography-meta';
-
 async function readJson(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
 }
 
+/** Catalog of four fixed slots. Do not copy these boxed cards onto General / Appearance / Chat. */
 export const FeaturePluginsPage: React.FC = () => {
   const { t } = useI18n();
   const [loadState, setLoadState] = React.useState<LoadState>({ status: 'loading' });
-  const [drafts, setDrafts] = React.useState<FeaturePluginsPayload>(emptyFeaturePluginsPayload);
   const [pending, setPending] = React.useState<PendingAction | null>(null);
   const [busySlot, setBusySlot] = React.useState<FeaturePluginSlot | null>(null);
 
   const applyPayload = React.useCallback((payload: FeaturePluginsPayload) => {
-    setDrafts(payload);
     setLoadState({ status: 'ready', data: payload });
     applyFeaturePluginsPayload(payload);
     useFeaturePluginsStore.getState().applyPayload(payload);
@@ -89,16 +84,16 @@ export const FeaturePluginsPage: React.FC = () => {
     void loadPlugins();
   }, [loadPlugins]);
 
-  const persistSlot = React.useCallback(async (
+  const persistEnabled = React.useCallback(async (
     slot: FeaturePluginSlot,
-    patch: Partial<Pick<FeaturePluginSlotState, 'source' | 'enabled' | 'command'>>,
+    enabled: boolean,
   ) => {
     reportSettingsSaveState('saving');
     try {
       const response = await runtimeFetch('/api/pi/feature-plugins', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ [slot]: patch }),
+        body: JSON.stringify({ [slot]: { enabled } }),
       });
       const raw = await readJson(response) as (FeaturePluginsPayload & { reload?: FeaturePluginsReloadResult }) | null;
       const parsed = parseFeaturePluginsPayload(raw);
@@ -108,7 +103,7 @@ export const FeaturePluginsPage: React.FC = () => {
       }
       applyPayload(parsed);
       reportSettingsSaveState('saved');
-      if ('enabled' in patch && parsed.slots[slot].installed) {
+      if (parsed.slots[slot].installed) {
         await refreshSessionTitleReloadLists();
         if ((raw?.reload?.skipped?.length ?? 0) > 0) {
           toast.error(t('settings.featurePlugins.toast.reloadPartial'));
@@ -119,27 +114,14 @@ export const FeaturePluginsPage: React.FC = () => {
     }
   }, [applyPayload, t]);
 
-  const updateDraft = React.useCallback((
-    slot: FeaturePluginSlot,
-    patch: Partial<Pick<FeaturePluginSlotState, 'source' | 'command'>>,
-  ) => {
-    setDrafts((current) => ({
-      slots: {
-        ...current.slots,
-        [slot]: { ...current.slots[slot], ...patch },
-      },
-    }));
-  }, []);
-
   const runPackageAction = React.useCallback(async (action: PendingAction) => {
     const slot = action.slot;
-    const draft = drafts.slots[slot];
     setBusySlot(slot);
     try {
       const response = await runtimeFetch(`/api/pi/feature-plugins/${slot}/${action.action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ source: draft.source }),
+        body: JSON.stringify({ source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot] }),
       });
       const raw = await readJson(response) as (FeaturePluginsPayload & { reload?: FeaturePluginsReloadResult; error?: string }) | null;
       const parsed = parseFeaturePluginsPayload(raw);
@@ -162,9 +144,10 @@ export const FeaturePluginsPage: React.FC = () => {
       setBusySlot(null);
       setPending(null);
     }
-  }, [applyPayload, drafts.slots, t]);
+  }, [applyPayload, t]);
 
   const ready = loadState.status === 'ready';
+  const payload = ready ? loadState.data : emptyFeaturePluginsPayload();
 
   return (
     <SettingsPageLayout
@@ -182,118 +165,28 @@ export const FeaturePluginsPage: React.FC = () => {
           <p className={SETTINGS_HELPER_CLASS}>{t('settings.featurePlugins.page.loadFailed')}</p>
         </SettingsSection>
       ) : null}
-      {loadState.status === 'loading' ? null : FEATURE_PLUGIN_SLOTS.map((slot, index) => {
-        const copy = FEATURE_PLUGIN_SLOT_COPY[slot];
-        const draft = drafts.slots[slot];
-        const saved = ready ? loadState.data.slots[slot] : draft;
-        const selectedPreset = draft.presets.find((preset) => preset.source === draft.source)?.source ?? '';
-        const isBusy = busySlot === slot;
-        return (
-          <SettingsSection
-            key={slot}
-            title={t(copy.titleKey)}
-            info={t(copy.infoKey)}
-            divider={index === 0 && loadState.status === 'ready' ? false : undefined}
-            settingsItem={copy.settingsItem}
-          >
-            <div className={SETTINGS_FIELDS_STACK_CLASS}>
-              <SettingsStackedField
-                label={t('settings.featurePlugins.field.source')}
-                info={t('settings.featurePlugins.field.source.info')}
-                settingsItem={`${copy.settingsItem}.source`}
-                controlClassName="w-full max-w-none"
-              >
-                <Input
-                  value={draft.source}
-                  onChange={(event) => updateDraft(slot, { source: event.target.value })}
-                  onBlur={() => {
-                    if (!ready || draft.source === saved.source) return;
-                    void persistSlot(slot, { source: draft.source });
-                  }}
-                  placeholder={t('settings.featurePlugins.field.source.placeholder')}
-                  aria-label={t('settings.featurePlugins.field.source.aria', { slot: t(copy.titleKey) })}
-                  className={SETTINGS_INPUT_CLASS}
-                  disabled={!ready || isBusy}
-                />
-              </SettingsStackedField>
-              {draft.presets.length > 0 ? (
-                <SettingsChipGroup
-                  value={selectedPreset}
-                  aria-label={t('settings.featurePlugins.presets.aria', { slot: t(copy.titleKey) })}
-                  options={draft.presets.map((preset) => ({
-                    value: preset.source,
-                    label: presetSourceLabel(preset.source),
-                  }))}
-                  onChange={(source) => {
-                    updateDraft(slot, { source });
-                    if (ready) void persistSlot(slot, { source });
-                  }}
-                />
-              ) : null}
-              {slot === 'goal' ? (
-                <SettingsStackedField
-                  label={t('settings.featurePlugins.field.command')}
-                  info={t('settings.featurePlugins.field.command.info')}
-                  settingsItem={`${copy.settingsItem}.command`}
-                >
-                  <Input
-                    value={draft.command ?? ''}
-                    onChange={(event) => updateDraft(slot, { command: event.target.value })}
-                    onBlur={() => {
-                      if (!ready || draft.command === saved.command) return;
-                      void persistSlot(slot, { command: draft.command });
-                    }}
-                    placeholder={t('settings.featurePlugins.field.command.placeholder')}
-                    aria-label={t('settings.featurePlugins.field.command.aria')}
-                    className={SETTINGS_INPUT_CLASS}
-                    disabled={!ready || isBusy}
-                  />
-                </SettingsStackedField>
-              ) : null}
-              <p className={SETTINGS_HELPER_CLASS}>
-                {saved.installed
-                  ? t('settings.featurePlugins.status.installed')
-                  : t('settings.featurePlugins.status.notInstalled')}
-              </p>
-              <SettingsCheckboxRow
-                checked={saved.enabled}
-                onChange={(enabled) => {
-                  updateDraft(slot, {});
-                  void persistSlot(slot, { enabled });
-                }}
-                label={t('settings.featurePlugins.enabled.label')}
-                info={t('settings.featurePlugins.enabled.info')}
-                ariaLabel={t('settings.featurePlugins.enabled.label')}
-                settingsItem={`${copy.settingsItem}.enabled`}
-                disabled={!ready || isBusy}
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={!ready || isBusy || !draft.source.trim()}
-                  onClick={() => setPending({ slot, action: 'install' })}
-                >
-                  {isBusy && pending?.action === 'install'
-                    ? t('settings.featurePlugins.actions.installing')
-                    : t('settings.featurePlugins.actions.install')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!ready || isBusy || !saved.installed}
-                  onClick={() => setPending({ slot, action: 'uninstall' })}
-                >
-                  {isBusy && pending?.action === 'uninstall'
-                    ? t('settings.featurePlugins.actions.uninstalling')
-                    : t('settings.featurePlugins.actions.uninstall')}
-                </Button>
-              </div>
-            </div>
-          </SettingsSection>
-        );
-      })}
+      {loadState.status === 'loading' ? null : (
+        <SettingsSection
+          divider={loadState.status !== 'error' ? false : undefined}
+          contentClassName="grid grid-cols-1 items-stretch gap-3 @xl:grid-cols-2"
+        >
+          {FEATURE_PLUGIN_SLOTS.map((slot) => (
+            <FeaturePluginCard
+              key={slot}
+              slot={slot}
+              saved={payload.slots[slot]}
+              ready={ready}
+              isBusy={busySlot === slot}
+              pendingAction={pending?.slot === slot ? pending.action : null}
+              onEnabledChange={(enabled) => {
+                void persistEnabled(slot, enabled);
+              }}
+              onInstall={() => setPending({ slot, action: 'install' })}
+              onUninstall={() => setPending({ slot, action: 'uninstall' })}
+            />
+          ))}
+        </SettingsSection>
+      )}
 
       <Dialog
         open={pending !== null}
@@ -341,3 +234,92 @@ export const FeaturePluginsPage: React.FC = () => {
     </SettingsPageLayout>
   );
 };
+
+function FeaturePluginCard({
+  slot,
+  saved,
+  ready,
+  isBusy,
+  pendingAction,
+  onEnabledChange,
+  onInstall,
+  onUninstall,
+}: {
+  slot: FeaturePluginSlot;
+  saved: FeaturePluginSlotState;
+  ready: boolean;
+  isBusy: boolean;
+  pendingAction: PendingAction['action'] | null;
+  onEnabledChange: (enabled: boolean) => void;
+  onInstall: () => void;
+  onUninstall: () => void;
+}) {
+  const { t } = useI18n();
+  const copy = FEATURE_PLUGIN_SLOT_COPY[slot];
+
+  return (
+    <div
+      data-settings-item={copy.settingsItem}
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--interactive-border)] bg-[var(--surface-elevated)]"
+    >
+      <div className="flex min-w-0 items-start gap-3 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-foreground">{t(copy.titleKey)}</div>
+          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+            {t(copy.infoKey)}
+          </p>
+          <p className="typography-meta mt-2 font-mono text-muted-foreground">
+            {featurePluginPackageLabel(slot)}
+          </p>
+        </div>
+        <span
+          aria-live="polite"
+          className={cn(
+            'max-w-36 shrink-0 truncate rounded-full px-2 py-0.5 text-[10px] font-medium',
+            saved.installed
+              ? 'bg-[var(--status-success)]/15 text-[var(--status-success)]'
+              : 'bg-[var(--surface-muted)] text-muted-foreground',
+          )}
+        >
+          {saved.installed
+            ? t('settings.featurePlugins.status.installed')
+            : t('settings.featurePlugins.status.notInstalled')}
+        </span>
+      </div>
+      <div className="mt-auto space-y-3 border-t border-[var(--interactive-border)] px-4 py-4">
+        <SettingsCheckboxRow
+          checked={saved.enabled}
+          onChange={onEnabledChange}
+          label={t('settings.featurePlugins.enabled.label')}
+          info={t('settings.featurePlugins.enabled.info')}
+          ariaLabel={t('settings.featurePlugins.enabled.label')}
+          settingsItem={`${copy.settingsItem}.enabled`}
+          disabled={!ready || isBusy}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            disabled={!ready || isBusy}
+            onClick={onInstall}
+          >
+            {isBusy && pendingAction === 'install'
+              ? t('settings.featurePlugins.actions.installing')
+              : t('settings.featurePlugins.actions.install')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!ready || isBusy || !saved.installed}
+            onClick={onUninstall}
+          >
+            {isBusy && pendingAction === 'uninstall'
+              ? t('settings.featurePlugins.actions.uninstalling')
+              : t('settings.featurePlugins.actions.uninstall')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

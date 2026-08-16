@@ -112,3 +112,8 @@ export function parseFeaturePluginsPayload(value: unknown): FeaturePluginsPayloa
 export function presetSourceLabel(source: string): string {
   return source.replace(/^npm:/, '');
 }
+
+/** Default package name shown on the Feature Plugins card. Never a typed source. */
+export function featurePluginPackageLabel(slot: FeaturePluginSlot): string {
+  return presetSourceLabel(DEFAULT_FEATURE_PLUGIN_SOURCES[slot]);
+}

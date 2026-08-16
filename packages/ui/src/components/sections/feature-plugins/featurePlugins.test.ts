@@ -1,10 +1,21 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
+  FEATURE_PLUGIN_SLOT_COPY,
+  FEATURE_PLUGIN_SLOTS,
   emptyFeaturePluginsPayload,
+  featurePluginPackageLabel,
   parseFeaturePluginsPayload,
   presetSourceLabel,
 } from './featurePlugins';
+
+const pageSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'FeaturePluginsPage.tsx'),
+  'utf8',
+);
 
 describe('feature plugin payload parsing', () => {
   test('keeps default sources when building an empty payload', () => {
@@ -43,7 +54,33 @@ describe('feature plugin payload parsing', () => {
     expect(parsed?.slots.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
   });
 
-  test('shows the npm spec without the protocol prefix on preset chips', () => {
+  test('shows the default package name without the npm protocol prefix', () => {
     expect(presetSourceLabel('npm:@narumitw/pi-goal')).toBe('@narumitw/pi-goal');
+    expect(featurePluginPackageLabel('goal')).toBe('@narumitw/pi-goal');
+    expect(featurePluginPackageLabel('plan')).toBe('@narumitw/pi-plan-mode');
+    expect(featurePluginPackageLabel('mcp')).toBe('pi-mcp-adapter');
+    expect(featurePluginPackageLabel('subagents')).toBe('pi-subagents');
+  });
+
+  test('keeps Settings search IDs on the four slot cards', () => {
+    expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
+      'feature-plugins.goal',
+      'feature-plugins.plan',
+      'feature-plugins.mcp',
+      'feature-plugins.subagents',
+    ]);
+  });
+
+  test('Feature Plugins page has no text inputs and anchors search on each card', () => {
+    expect(pageSource.includes('<Input')).toBe(false);
+    expect(pageSource.includes('SettingsChipGroup')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.field.source')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.field.command')).toBe(false);
+    expect(pageSource.includes('@xl:grid-cols-2')).toBe(true);
+    expect(/(?:^|[^@\w])(?:sm|lg):/.test(pageSource)).toBe(false);
+    expect(pageSource.includes('data-settings-item={copy.settingsItem}')).toBe(true);
+    for (const slot of FEATURE_PLUGIN_SLOTS) {
+      expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
+    }
   });
 });
