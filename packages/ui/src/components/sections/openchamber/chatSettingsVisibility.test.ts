@@ -3,7 +3,7 @@ import { chatKernelSettings } from './chatSettingsVisibility';
 
 describe('chatKernelSettings', () => {
   test('keeps Session Goal and omits Session Assist on Pi', () => {
-    expect(chatKernelSettings(true)).toEqual(['sessionGoal']);
+    expect(chatKernelSettings(true)).toEqual([]);
   });
 
   test('keeps Session Goal and Session Assist on OpenCode', () => {

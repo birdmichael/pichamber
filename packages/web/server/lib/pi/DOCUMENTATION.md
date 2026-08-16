@@ -157,3 +157,29 @@ When the slot is on:
 - Authorize dispatches the live session `/mcp-auth` command. Isolated
   `createMcpAdapter({ config })` in-memory mode is not used. Host-config
   discovery stays off. The `/mcp` TUI panel is not implemented.
+
+## Desktop `ctx.ui`
+
+Every live `AgentSession` is bound with `bindExtensions({ uiContext, mode: "rpc" })`
+after create, hydrate, replace, and `piSession.reload()`. The controller lives
+in `extension-ui.js` and speaks `pi.ui.asked` / `pi.ui.settled` / `pi.ui.notify`.
+
+- `GET /api/pi/ui?session=` lists pending prompts for that session.
+- `POST /api/pi/ui/:id/reply` and `/cancel` resolve the waiting extension
+  promise. Confirm uses a desktop dialog; select / input / editor render as
+  in-chat cards. Notify is a desktop toast.
+- This is not OpenCode `/api/question` or `sdk.question.reply`.
+
+`@narumitw/pi-goal` can call `ctx.ui.confirm` when replacing an existing goal.
+
+## Composer Goal start
+
+The configured Goal command (default `goal`) is a command-channel start, not
+chat:
+
+1. Empty arguments — 400. Bare `/goal` is the TUI manager and Desktop cannot
+   draw it.
+2. Live extension command missing — 404. Do not `promptAsync` the slash as a
+   user bubble.
+3. Live extension command present — `record.piSession.prompt("/goal <objective>")`
+   so `registerCommand` runs.

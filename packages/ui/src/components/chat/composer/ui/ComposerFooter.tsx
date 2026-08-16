@@ -13,6 +13,7 @@
 
 import React from 'react';
 
+import { PiGoalButton } from '@/components/chat/PiGoalButton';
 import { SessionGoalButton, SessionGoalObjectiveCounter } from '@/components/chat/SessionGoalButton';
 import { ComposerDictation } from '@/components/dictation/ComposerDictation';
 import { Icon } from '@/components/icon/Icon';
@@ -168,6 +169,12 @@ export function ComposerFooter(props: ComposerFooterProps) {
                               </>
                             ) : null}
                             <PiPlanModeToggle />
+                            <PiGoalButton
+                                sessionId={currentSessionId}
+                                directory={directory}
+                                footerIconButtonClass={footerIconButtonClass}
+                                iconSizeClass={iconSizeClass}
+                            />
                         </div>
                         <div className="flex items-center min-w-0 gap-x-1 justify-end">
                             <div className="flex items-center gap-x-1 flex-shrink-0">
@@ -250,6 +257,13 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         <SessionGoalObjectiveCounter length={messageLength} />
                           </>
                         ) : null}
+                        <PiGoalButton
+                            sessionId={currentSessionId}
+                            directory={directory}
+                            footerIconButtonClass={footerIconButtonClass}
+                            iconSizeClass={iconSizeClass}
+                            withTooltip
+                        />
                     </div>
                     <div className={cn('flex items-center flex-1 justify-end', footerGapClass, 'md:gap-x-3')}>
                         {isPiKernel ? <ContextUsageChip sessionId={currentSessionId} /> : null}

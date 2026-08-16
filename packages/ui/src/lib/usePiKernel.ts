@@ -11,14 +11,11 @@ export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
 }
 
 /**
- * Session Goal is a Pichamber product feature, not an OpenCode leftover.
- * `isPiKernel` must not hide the composer target button, objective counter,
- * or Settings Chat sessionGoal group. VS Code still hides the entry point
- * because the loop runs in the web server.
+ * OpenChamber Session Goal stays hidden on the Pi kernel. The composer Goal
+ * button is the installed `@narumitw/pi-goal` plugin, not this leftover.
  */
 export function isSessionGoalVisibleOnPiKernel(isPiKernel: boolean): boolean {
-  void isPiKernel;
-  return true;
+  return !isPiKernel;
 }
 
 export function usePiKernel(): boolean {

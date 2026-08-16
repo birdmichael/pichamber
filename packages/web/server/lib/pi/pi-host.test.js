@@ -757,11 +757,56 @@ describe('createPiHost', () => {
     const record = await host.createSession({ directory: '/tmp/project', title: 'Goal confirm' });
     const confirmed = host.getExtensionUI(record.id).context.confirm('Replace goal?', 'Replace the current goal?');
     const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(prompt.kind).toBe('confirm');
     expect(host.cancelExtensionUI(record.id, prompt.id)).toBe(true);
     await expect(confirmed).resolves.toBe(false);
     expect(host.getSession(record.id).id).toBe(record.id);
     expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
     host.dispose();
+  });
+  it('rejects bare /goal and missing live goal without promptAsync', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: '' }))
+        .rejects.toMatchObject({ status: 400 });
+      expect(promptAsyncCalls).toBe(0);
+      expect(host.getMessages(record.id)).toEqual([]);
+
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'implement snake game' }))
+        .rejects.toMatchObject({
+          status: 404,
+          message: 'Command /goal is not available on this session',
+        });
+      expect(promptAsyncCalls).toBe(0);
+      expect(host.getMessages(record.id)).toEqual([]);
+
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      record.piSession.registerCommand('goal', async () => {}, { description: 'Set a goal' });
+      await host.runCommand(record.id, { command: 'goal', arguments: 'implement snake game' });
+      expect(prompted).toEqual(['/goal implement snake game']);
+      expect(promptAsyncCalls).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 });
 

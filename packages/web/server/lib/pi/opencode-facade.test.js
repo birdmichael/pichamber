@@ -1222,4 +1222,21 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('rejects bare /goal on the command channel', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await kernel.host.createSession({ directory: '/tmp/project', title: 'Goal' });
+      const response = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'goal', arguments: '' }),
+      });
+      expect(response.status).toBe(400);
+      expect(kernel.host.getMessages(created.id)).toEqual([]);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });

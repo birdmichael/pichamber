@@ -9,9 +9,14 @@ belongs to one of them.
 
 On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
 
-Session Goal is a Pichamber feature. `ComposerFooter` shows `SessionGoalButton`
-and the objective counter on the Pi kernel (`isSessionGoalVisibleOnPiKernel`);
-it still hides OpenCode-only permission auto-accept, revert, and `/shell`.
+OpenChamber Session Goal stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
+When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows
+one `PiGoalButton` in that same cluster. Click opens a modal; a non-empty
+objective submits `/goal <objective>` (or the configured command) through
+`session.command` / `piSession.prompt`, not `promptAsync`. Bare `/goal` is
+rejected. A missing live command errors and does not send chat. Disable or
+uninstall hides the button. `ComposerFooter` still hides OpenCode-only
+permission auto-accept, revert, and `/shell`.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 When the Pi Plan plugin is installed and enabled, that slot is **Agent | Plan**

@@ -1815,6 +1815,24 @@ export const createPiHost = ({
         );
       }
 
+      const goalCommand = readFeaturePlugins(home).goal?.command || 'goal';
+      if (name === goalCommand) {
+        if (!argument) {
+          const error = new Error(
+            `/${name} requires an objective. Bare /${name} is the TUI manager and is not supported on Desktop.`,
+          );
+          error.status = 400;
+          throw error;
+        }
+        const liveGoal = findLiveSessionCommand(record.piSession, name);
+        if (!liveGoal || !isExtensionCommandSource(liveGoal.source)) {
+          const error = new Error(`Command /${name} is not available on this session`);
+          error.status = 404;
+          throw error;
+        }
+        return dispatchLiveSessionCommand();
+      }
+
       const liveCommand = findLiveSessionCommand(record.piSession, name);
       if (liveCommand && isExtensionCommandSource(liveCommand.source)) {
         return dispatchLiveSessionCommand();
