@@ -208,13 +208,19 @@ describe('useMultiRunStore', () => {
     expect(ensureChildCalls).toEqual([{ directory: '/repo', bootstrap: false }]);
     expect(childState.session.map((session) => session.id)).toEqual(['ses_multirun_1']);
     expect(modelPatchCalls).toEqual([]);
-    expect(routeMessageCalls).toEqual([expect.objectContaining({
+    expect(routeMessageCalls.map((call) => ({
+      sessionId: call.sessionId,
+      directory: call.directory,
+      content: call.content,
+      providerID: call.providerID,
+      modelID: call.modelID,
+    }))).toEqual([{
       sessionId: 'ses_multirun_1',
       directory: '/repo',
       content: 'Fix it',
       providerID: 'anthropic',
       modelID: 'claude-sonnet-4-5',
-    })]);
+    }]);
   });
 
   test('uses fast background worktree creation for isolated runs', async () => {
@@ -281,19 +287,24 @@ describe('useMultiRunStore', () => {
       { sessionId: 'ses_multirun_1', model: 'anthropic/claude-sonnet-4-5' },
       { sessionId: 'ses_multirun_2', model: 'openai/gpt-5' },
     ]);
-    expect(routeMessageCalls).toEqual([
-      expect.objectContaining({
+    expect(routeMessageCalls.map((call) => ({
+      sessionId: call.sessionId,
+      content: call.content,
+      providerID: call.providerID,
+      modelID: call.modelID,
+    }))).toEqual([
+      {
         sessionId: 'ses_multirun_1',
         content: 'Compare these approaches',
         providerID: 'anthropic',
         modelID: 'claude-sonnet-4-5',
-      }),
-      expect.objectContaining({
+      },
+      {
         sessionId: 'ses_multirun_2',
         content: 'Compare these approaches',
         providerID: 'openai',
         modelID: 'gpt-5',
-      }),
+      },
     ]);
     expect(operationOrder).toEqual([
       'createSession:/repo',

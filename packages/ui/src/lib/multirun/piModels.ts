@@ -1,7 +1,7 @@
 import type { ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
-export type PiRuntimeModelsLoad =
+type PiRuntimeModelsLoad =
   | { ok: true; providers: ModelPickerProvider[]; enabledModels: string[] }
   | { ok: false };
 
