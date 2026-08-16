@@ -991,14 +991,39 @@ export const createPiHost = ({
     return readyPromise;
   };
 
+  const emitTranslated = (record, piEvent) => {
+    const ocEvents = record.translator.translate(piEvent);
+    for (const ocEvent of ocEvents) {
+      applyEventToStore(record, ocEvent);
+      record.info.time.updated = Date.now();
+      emit(record.directory, ocEvent);
+    }
+    return ocEvents;
+  };
+
+  const sessionIsLive = (record) => (
+    Boolean(record?.piSession?.isStreaming) || Boolean(record?.piSession?.isCompacting)
+  );
+
+  const settleRecordIfStuck = (record) => {
+    if (!record || sessionIsLive(record)) return false;
+    if (record.status?.type !== 'busy' && record.status?.type !== 'retry') return false;
+    emitTranslated(record, { type: 'agent_settled' });
+    return true;
+  };
+
+  const forceSettleRecord = (record) => {
+    if (!record) return;
+    try {
+      record.extensionUI?.cancelAll?.();
+    } catch {
+    }
+    emitTranslated(record, { type: 'agent_settled' });
+  };
+
   const attachSession = (record) => {
     const unsubscribe = record.piSession.subscribe((piEvent) => {
-      const ocEvents = record.translator.translate(piEvent);
-      for (const ocEvent of ocEvents) {
-        applyEventToStore(record, ocEvent);
-        record.info.time.updated = Date.now();
-        emit(record.directory, ocEvent);
-      }
+      emitTranslated(record, piEvent);
     });
     const detachMcpStatus = attachMcpStatusListener(record);
     record.unsubscribe = () => {
@@ -1996,6 +2021,8 @@ export const createPiHost = ({
             properties: { sessionID, error: { message: error?.message || String(error) } },
           });
           emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
+        } finally {
+          settleRecordIfStuck(record);
         }
       };
 
@@ -2004,7 +2031,17 @@ export const createPiHost = ({
     },
     async abort(sessionID) {
       const record = await ensureRecord(sessionID);
-      await record.piSession.abort();
+      try {
+        record.extensionUI?.cancelAll?.();
+      } catch {
+      }
+      try {
+        await record.piSession.abort();
+      } catch {
+      }
+      // Pi abort is a no-op when the kernel is no longer streaming. Always
+      // publish idle so Stop cannot stay armed after a finished or hung turn.
+      forceSettleRecord(record);
       return true;
     },
     async cloneSession(sessionID) {
@@ -2228,6 +2265,7 @@ export const createPiHost = ({
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
         }
+        settleRecordIfStuck(record);
         const assistantID = createMessageId();
         return {
           info: {
@@ -2306,6 +2344,103 @@ export const createPiHost = ({
           throw error;
         }
         return dispatchLiveSessionCommand();
+      }
+
+      if (name === 'run') {
+        if (!isSubagentsSlotActive(this.getFeaturePlugins())) {
+          const error = new Error('Command /run is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        if (!argument) {
+          return reply(
+            '/run needs an agent and a task, for example `/run scout Inspect the README`. Bare /run is the TUI launcher and is not supported on Desktop.',
+          );
+        }
+        const liveRun = findLiveSessionCommand(record.piSession, name);
+        if (!liveRun || !isExtensionCommandSource(liveRun.source)) {
+          const error = new Error('Command /run is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        record.status = { type: 'busy' };
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.status',
+          properties: { sessionID: record.id, status: { type: 'busy' } },
+        });
+        const findOpenableChild = async () => {
+          const { runs } = await this.listSubagentRuns(record.id);
+          return (runs || []).find((run) => (
+            typeof run.sessionID === 'string'
+            && run.sessionID
+            && run.sessionID !== record.id
+          ));
+        };
+        const missingChildReply = () => completeLocalReply(
+          record,
+          body,
+          userText,
+          'Could not start a subagent run. Check that Subagents is installed and enabled, then retry `/run <agent> <task>`.',
+        );
+        // Do not wait for the whole scout turn. Poll for an openable child
+        // while prompt is in flight so a hung createHook still gets a Work
+        // Status row, or an error instead of a silent parent hang.
+        const waitMs = mock ? 400 : 12_000;
+        const finishRun = async () => {
+          const promptTask = Promise.resolve()
+            .then(() => record.piSession.prompt(userText))
+            .then(() => 'done');
+          const started = Date.now();
+          try {
+            while (true) {
+              const child = await findOpenableChild();
+              if (child) {
+                forceSettleRecord(record);
+                return;
+              }
+              const remaining = waitMs - (Date.now() - started);
+              if (remaining <= 0) {
+                missingChildReply();
+                try {
+                  await record.piSession.abort();
+                } catch {
+                }
+                return;
+              }
+              const outcome = await Promise.race([
+                promptTask,
+                sleep(Math.min(50, remaining)).then(() => 'wait'),
+              ]);
+              if (outcome === 'done') {
+                if (!await findOpenableChild()) missingChildReply();
+                return;
+              }
+            }
+          } catch (error) {
+            completeLocalReply(
+              record,
+              body,
+              userText,
+              error?.message || 'Could not start a subagent run.',
+            );
+          } finally {
+            settleRecordIfStuck(record);
+          }
+        };
+        void finishRun();
+        const assistantID = createMessageId();
+        return {
+          info: {
+            id: assistantID,
+            sessionID: record.id,
+            role: 'assistant',
+            time: { created: Date.now(), completed: Date.now() },
+            agent: 'pi',
+            finish: 'stop',
+          },
+          parts: [],
+        };
       }
 
       const liveCommand = findLiveSessionCommand(record.piSession, name);

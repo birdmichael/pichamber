@@ -164,9 +164,15 @@ export function routeMessage(params: {
     // match a skill's bare name, so this falls through to sendMessage and
     // AgentSession.prompt expands `/skill:name` to the skill body.
     // Unknown `/name` also falls through to sendMessage (product: may be chat).
+    // Feature-plugin slashes are registered on GET /api/command before a
+    // session exists. Route them through session.command even when the
+    // directory/store lists have not caught up yet — /run must not become a
+    // dead chat bubble (#109).
+    const isFeaturePluginSlash = cmdName === 'run' || cmdName === 'plan' || cmdName === 'goal'
     const isCommand = syncCommands.find((c) => c.name === cmdName)
       || storeCommands.find((c) => c.name === cmdName)
       || useSkillsStore.getState().skills.some((s) => s.name === cmdName)
+      || isFeaturePluginSlash
 
     if (isCommand) {
       return optimisticSend({

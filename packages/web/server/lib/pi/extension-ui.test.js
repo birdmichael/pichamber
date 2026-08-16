@@ -50,6 +50,21 @@ describe('Desktop ExtensionUIContext', () => {
     expect(controller.list()).toEqual([]);
   });
 
+  it('cancelAll settles every waiting prompt without disposing the controller', async () => {
+    const { controller } = createController();
+    const select = controller.context.select('Pick one', ['A', 'B']);
+    const confirm = controller.context.confirm('Replace goal?', 'The current goal will be replaced.');
+    controller.cancelAll();
+    await expect(select).resolves.toBeUndefined();
+    await expect(confirm).resolves.toBe(false);
+    expect(controller.list()).toEqual([]);
+    const later = controller.context.select('Still bound', ['Yes']);
+    const [prompt] = controller.list();
+    expect(prompt.title).toBe('Still bound');
+    expect(controller.reply(prompt.id, 'Yes')).toBe(true);
+    await expect(later).resolves.toBe('Yes');
+  });
+
   it('wires confirm, input, editor, and notify', async () => {
     const { controller, events } = createController();
 

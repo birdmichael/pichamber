@@ -7,6 +7,7 @@ import {
   planBuildAvailable,
   planToggleAction,
   sessionPlanHasMarkdown,
+  sessionPlanViewAvailable,
 } from './pi-session-plan';
 import {
   applySessionPlan,
@@ -70,6 +71,8 @@ describe('plan toggle and build dispatch', () => {
     expect(planBuildAvailable('implementing')).toBe(false);
     expect(sessionPlanHasMarkdown({ status: 'ready', planMarkdown: '# Plan' })).toBe(true);
     expect(sessionPlanHasMarkdown({ status: 'active', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanViewAvailable({ status: 'active', planMarkdown: '' })).toBe(true);
+    expect(sessionPlanViewAvailable({ status: 'off', planMarkdown: '' })).toBe(false);
     expect(isFooterPlanSelected('active')).toBe(true);
     expect(isFooterPlanSelected('saved')).toBe(false);
     expect(isFooterPlanSelected('implementing')).toBe(false);

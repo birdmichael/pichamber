@@ -109,21 +109,25 @@ export function PiSessionPlanView() {
       <div className="flex-1 min-h-0 min-w-0 relative">
         <ScrollableOverlay outerClassName="h-full min-w-0" className="h-full min-w-0">
           <div className="h-full overflow-auto p-3">
-            {mdViewMode === 'preview' ? (
-              <ErrorBoundary
-                fallback={
-                  <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2">
-                    <div className="mb-1 font-medium text-destructive">{t('planView.error.previewUnavailable')}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {t('planView.error.switchToEditMode')}
+            {content.trim() ? (
+              mdViewMode === 'preview' ? (
+                <ErrorBoundary
+                  fallback={
+                    <div className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2">
+                      <div className="mb-1 font-medium text-destructive">{t('planView.error.previewUnavailable')}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {t('planView.error.switchToEditMode')}
+                      </div>
                     </div>
-                  </div>
-                }
-              >
-                <SimpleMarkdownRenderer content={content} className="typography-markdown-body" enableFileReferences={false} />
-              </ErrorBoundary>
+                  }
+                >
+                  <SimpleMarkdownRenderer content={content} className="typography-markdown-body" enableFileReferences={false} />
+                </ErrorBoundary>
+              ) : (
+                <pre className="typography-markdown-body whitespace-pre-wrap break-words">{content}</pre>
+              )
             ) : (
-              <pre className="typography-markdown-body whitespace-pre-wrap break-words">{content}</pre>
+              <div className="typography-ui text-muted-foreground">{t('planView.state.noPlanYet')}</div>
             )}
           </div>
         </ScrollableOverlay>

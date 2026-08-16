@@ -644,6 +644,21 @@ describe('routeMessage skill invocation', () => {
     expect(sendCommandCalls[0].arguments).toBe('focus on auth');
   });
 
+  test('routes /run through session.command even before the store lists it', async () => {
+    await routeMessage({
+      sessionId: 'session-run',
+      directory: '/skills/project',
+      content: '/run scout 只回复一个词：ok',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls).toHaveLength(1);
+    expect(sendCommandCalls[0].command).toBe('run');
+    expect(sendCommandCalls[0].arguments).toBe('scout 只回复一个词：ok');
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
   test('sends an unknown slash token as a plain message', async () => {
     await routeMessage({
       sessionId: 'session-skill',

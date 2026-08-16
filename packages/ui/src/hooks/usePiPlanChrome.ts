@@ -8,6 +8,7 @@ import {
   isFooterPlanSelected,
   planBuildAvailable,
   sessionPlanHasMarkdown,
+  sessionPlanViewAvailable,
 } from '@/sync/pi-session-plan';
 import { refreshSessionPlan, useSessionPlan } from '@/sync/pi-session-plan-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -44,7 +45,7 @@ export function usePiPlanChrome(sessionID?: string | null) {
     showToggle: canShowPiPlanToggle(available, resolvedSessionId, draftOpen),
     footerPlanSelected: available && isFooterPlanSelected(plan?.status),
     showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
-    showViewPlan: available && sessionPlanHasMarkdown(plan),
+    showViewPlan: available && sessionPlanViewAvailable(plan),
     implementing: plan?.status === 'implementing',
   };
 }

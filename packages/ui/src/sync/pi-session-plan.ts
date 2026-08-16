@@ -37,6 +37,15 @@ export const sessionPlanHasMarkdown = (plan: SessionPlan | null | undefined): bo
     && plan.planMarkdown.trim().length > 0;
 };
 
+/** View Plan / Discard while Plan is on, even before the model writes markdown. */
+export const sessionPlanViewAvailable = (plan: SessionPlan | null | undefined): boolean => {
+  if (!plan) return false;
+  return plan.status === 'active'
+    || plan.status === 'ready'
+    || plan.status === 'saved'
+    || plan.status === 'implementing';
+};
+
 export const PLAN_MODE_ENABLED_NOTIFY =
   'Plan mode enabled. I will explore and plan, but not modify files.';
 

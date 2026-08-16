@@ -11,7 +11,7 @@ const plugins = (installed: boolean, enabled: boolean) => {
 };
 
 describe('resolvePlanRailEnabled', () => {
-  test('on Pi requires the Plan plugin and live markdown', () => {
+  test('on Pi requires the Plan plugin and a live Plan session, including empty active plans', () => {
     expect(resolvePlanRailEnabled({
       isPiKernel: true,
       featurePlugins: plugins(true, true),
@@ -22,6 +22,12 @@ describe('resolvePlanRailEnabled', () => {
       isPiKernel: true,
       featurePlugins: plugins(true, true),
       plan: { status: 'active', planMarkdown: '' },
+      planModeExperimentalEnabled: true,
+    })).toBe(true);
+    expect(resolvePlanRailEnabled({
+      isPiKernel: true,
+      featurePlugins: plugins(true, true),
+      plan: { status: 'off', planMarkdown: '' },
       planModeExperimentalEnabled: true,
     })).toBe(false);
     expect(resolvePlanRailEnabled({

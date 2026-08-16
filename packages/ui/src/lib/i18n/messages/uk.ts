@@ -1456,6 +1456,7 @@ export const dict: Record<I18nKey, string> = {
   "planView.actions.sendToNewWorktreeSession": "Надіслати до нової сесії в worktree",
   "planView.actions.copyPlanContents": "Скопіювати вміст плану",
   "planView.state.loading": "Завантаження...",
+  "planView.state.noPlanYet": "Плану ще немає",
   "diffView.binary.unavailable": "Вміст цього файлу не можна переглянути.",
   "diffView.change.untracked": "Невідстежуваний файл",
   "diffView.change.new": "Новий файл",

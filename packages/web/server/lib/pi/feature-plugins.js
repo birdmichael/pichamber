@@ -239,13 +239,24 @@ const slotPresets = (slot) => ([
 
 /** Slash entries that must appear even before a live session calls getCommands(). */
 export const listFeaturePluginSlashCommands = (payload) => {
+  const listed = [];
   const plan = payload?.slots?.plan;
-  if (!plan?.installed || !plan.enabled) return [];
-  return [{
-    name: 'plan',
-    description: 'Plan mode',
-    source: 'extension',
-  }];
+  if (plan?.installed && plan.enabled) {
+    listed.push({
+      name: 'plan',
+      description: 'Plan mode',
+      source: 'extension',
+    });
+  }
+  const subagents = payload?.slots?.subagents;
+  if (subagents?.installed && subagents.enabled) {
+    listed.push({
+      name: 'run',
+      description: 'Run one subagent through workflowScript',
+      source: 'extension',
+    });
+  }
+  return listed;
 };
 
 export const toFeaturePluginsPayload = ({

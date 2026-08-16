@@ -307,4 +307,115 @@ describe('Pi host subagent runs', () => {
     expect(await host.listSessionChildren(parent.id)).toEqual([]);
     expect(host.listSessions('/tmp/project').map((record) => record.id)).toEqual(before);
   });
+
+  it('lists /run from the Subagents slot and never treats the parent as the child', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    expect(host.listCommands('/tmp/project').some((command) => (
+      command.name === 'run' && command.source === 'extension'
+    ))).toBe(true);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.piSession.registerCommand('run', async (args) => {
+      parent.messages.push({
+        info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+        parts: [{
+          id: 'prt_sub',
+          type: 'tool',
+          tool: 'subagent',
+          callID: 'call_run',
+          state: {
+            status: 'error',
+            input: { agent: 'scout', sessionId: parent.id, task: args },
+            output: 'NotImplementedError: node:v8 createHook is not yet implemented in Bun',
+          },
+        }],
+      });
+    }, { description: 'Run one subagent through workflowScript' });
+    const result = await host.runCommand(parent.id, {
+      command: 'run',
+      arguments: 'scout 只回复一个词：ok',
+    });
+    expect(result.info.role).toBe('assistant');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const listed = await host.listSubagentRuns(parent.id);
+    expect(listed.runs.every((run) => run.sessionID !== parent.id)).toBe(true);
+    const texts = host.getMessages(parent.id).flatMap((entry) => (
+      (entry.parts || []).map((part) => part.text).filter(Boolean)
+    ));
+    expect(texts.some((text) => text.includes('Could not start a subagent run'))).toBe(true);
+    expect(host.getStatus()[parent.id]).toBeUndefined();
+    host.dispose();
+  });
+
+  it('surfaces an error for bare /run and missing live /run instead of a silent chat turn', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const bare = await host.runCommand(parent.id, { command: 'run', arguments: '' });
+    expect(bare.parts[0].text).toMatch(/needs an agent and a task/);
+    expect(host.getMessages(parent.id).some((entry) => (
+      entry.parts?.some((part) => part.text === '/run')
+    ))).toBe(true);
+    await expect(host.runCommand(parent.id, { command: 'run', arguments: 'scout ok' }))
+      .rejects.toMatchObject({ status: 404, message: 'Command /run is not available on this session' });
+    host.dispose();
+  });
+
+  it('surfaces an error when /run hangs without creating a child', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.piSession.registerCommand('run', async () => new Promise(() => {}), {
+      description: 'Run one subagent through workflowScript',
+    });
+    await host.runCommand(parent.id, { command: 'run', arguments: 'scout say ok' });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const texts = host.getMessages(parent.id).flatMap((entry) => (
+      (entry.parts || []).map((part) => part.text).filter(Boolean)
+    ));
+    expect(texts.some((text) => text.includes('Could not start a subagent run'))).toBe(true);
+    expect(host.getStatus()[parent.id]).toBeUndefined();
+    host.dispose();
+  });
+
+  it('surfaces an error when /run finishes without creating a child', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.piSession.registerCommand('run', async () => {}, {
+      description: 'Run one subagent through workflowScript',
+    });
+    await host.runCommand(parent.id, { command: 'run', arguments: 'scout say ok' });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const texts = host.getMessages(parent.id).flatMap((entry) => (
+      (entry.parts || []).map((part) => part.text).filter(Boolean)
+    ));
+    expect(texts.some((text) => text.includes('Could not start a subagent run'))).toBe(true);
+    expect(host.getStatus()[parent.id]).toBeUndefined();
+    host.dispose();
+  });
 });

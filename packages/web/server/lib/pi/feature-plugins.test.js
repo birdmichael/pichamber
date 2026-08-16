@@ -99,7 +99,7 @@ describe('feature plugin defaults and persist', () => {
 });
 
 describe('feature plugin slash commands', () => {
-  it('lists /plan for the slash menu when the Plan slot is installed and enabled', () => {
+  it('lists /plan and /run for the slash menu when those slots are installed and enabled', () => {
     expect(listFeaturePluginSlashCommands({
       slots: { plan: { installed: true, enabled: true } },
     })).toEqual([{ name: 'plan', description: 'Plan mode', source: 'extension' }]);
@@ -108,6 +108,16 @@ describe('feature plugin slash commands', () => {
     })).toEqual([]);
     expect(listFeaturePluginSlashCommands({
       slots: { plan: { installed: false, enabled: true } },
+    })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { subagents: { installed: true, enabled: true } },
+    })).toEqual([{
+      name: 'run',
+      description: 'Run one subagent through workflowScript',
+      source: 'extension',
+    }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { subagents: { installed: true, enabled: false } },
     })).toEqual([]);
   });
 });

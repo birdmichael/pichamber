@@ -1456,6 +1456,7 @@ export const dict: Record<I18nKey, string> = {
   'planView.actions.sendToNewWorktreeSession': '发送到新 worktree 会话',
   'planView.actions.copyPlanContents': '复制计划内容',
   'planView.state.loading': '加载中...',
+  'planView.state.noPlanYet': '还没有计划',
   'diffView.binary.unavailable': '该文件内容无法查看。',
   'diffView.change.untracked': '未跟踪文件',
   'diffView.change.new': '新文件',
