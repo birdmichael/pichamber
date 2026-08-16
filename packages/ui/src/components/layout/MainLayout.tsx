@@ -25,6 +25,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUpdatePolling } from '@/hooks/useUpdatePolling';
 import { useDeviceInfo } from '@/lib/device';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 
@@ -61,10 +62,11 @@ export const MainLayout: React.FC = () => {
             setSettingsWindowMounted(true);
         }
     }, [isSettingsDialogOpen]);
-    const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
+    const isPiKernel = usePiKernel();
+    const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen) && !isPiKernel;
     const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
     const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
-    const isScheduledTasksPageOpen = useUIStore((state) => state.isScheduledTasksDialogOpen);
+    const isScheduledTasksPageOpen = useUIStore((state) => state.isScheduledTasksDialogOpen) && !isPiKernel;
     const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
     const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
     // Any full-page surface replacing the chat area. While open, the chat and
@@ -72,6 +74,12 @@ export const MainLayout: React.FC = () => {
     // floating chrome bleeds through, and selecting a session / draft / main
     // tab anywhere closes the surface.
     const isSurfacePageOpen = isScheduledTasksPageOpen || isArchivePageOpen || Boolean(worktreesPageProjectId) || isMultiRunLauncherOpen;
+
+    React.useEffect(() => {
+        if (!isPiKernel) return;
+        const { isMultiRunLauncherOpen: leftoverOpen, setMultiRunLauncherOpen: closeLeftover } = useUIStore.getState();
+        if (leftoverOpen) closeLeftover(false);
+    }, [isPiKernel]);
 
     React.useEffect(() => {
         const closeSurfacePages = () => useUIStore.getState().closeMainSurfaces();

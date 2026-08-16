@@ -45,6 +45,7 @@ import { createProjectPlanFile } from '@/lib/openchamberConfig';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { extractLoopbackUrls } from '@/lib/url';
 import { useDeviceInfo } from '@/lib/device';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
@@ -1222,9 +1223,10 @@ const AssistantMessageBody = React.memo(({
 
     const openContextPreview = useUIStore((state) => state.openContextPreview);
     const isVSCode = isVSCodeRuntime();
+    const isPiKernel = usePiKernel();
     const isMiniChatSurface = chatSurfaceMode === 'mini-chat';
     const canUseProjectPlanActions = !isVSCode && !isMiniChatSurface && !isMobile;
-    const canShowMultiRunAction = !isVSCode && !isMiniChatSurface && !isMobile;
+    const canShowMultiRunAction = !isVSCode && !isMiniChatSurface && !isMobile && !isPiKernel;
 
     const messagePreviewUrl = React.useMemo(() => {
         if (isVSCode || isMobile || isMiniChatSurface) {

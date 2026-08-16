@@ -173,6 +173,7 @@ describe('filterPiSlashCommands', () => {
       { name: 'pr-review' },
       { name: 'model' },
       { name: 'thinking' },
+      { name: 'schedule-task', isOpenChamber: true },
       { name: 'catch-up', isOpenChamber: true },
       { name: 'clack-cli-patterns', isSkill: true },
     ];
