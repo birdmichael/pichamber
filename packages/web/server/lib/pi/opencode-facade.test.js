@@ -554,7 +554,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('rejects /reload as a user command and persists thinking defaults', async () => {>>>>>>> f0dbbe4e8 (Hide /reload from Pi slash commands and Settings.)
+  it('rejects /reload as a user command and persists thinking defaults', async () => {
     const { url, close, kernel } = await startFacade();
     try {
       const created = await (await fetch(`${url}/api/session`, {
@@ -588,6 +588,53 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(thinking.status).toBe(200);
       const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
       expect(defaults.thinking).toBe('high');
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('lists and runs live extension commands without turning them into chat', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Extension commands' }),
+      })).json();
+      const record = kernel.host.getSession(created.id);
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      record.piSession.registerCommand('plan', async () => {}, { description: 'Enter plan mode' });
+
+      const listed = await (await fetch(`${url}/api/command`)).json();
+      expect(listed.some((command) => command.name === 'plan' && command.source === 'extension')).toBe(true);
+      expect(listed.some((command) => command.name === 'reload')).toBe(false);
+      const pinned = await (await fetch(`${url}/api/command?session=${encodeURIComponent(created.id)}`)).json();
+      expect(pinned.some((command) => command.name === 'plan')).toBe(true);
+
+      const command = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'plan', arguments: 'start' }),
+      });
+      expect(command.status).toBe(200);
+      expect(prompted).toEqual(['/plan start']);
+      const messages = await (await fetch(`${url}/api/session/${created.id}/message`)).json();
+      const texts = messages.flatMap((entry) => (entry.parts || []).map((part) => part.text).filter(Boolean));
+      expect(texts).not.toContain('/plan start');
+
+      const unknown = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'not-a-command', arguments: '' }),
+      });
+      expect(unknown.status).toBe(404);
+      expect(await unknown.json()).toMatchObject({ error: 'Unknown command: /not-a-command' });
     } finally {
       kernel.dispose();
       await close();
