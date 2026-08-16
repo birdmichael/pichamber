@@ -94,11 +94,6 @@ export const consumePiExtensionUiEditorStash = (sessionID: string): string | nul
   return stash.text;
 };
 
-export const getPiExtensionUiPrompts = (sessionID: string | null | undefined): PiExtensionUiPrompt[] => {
-  if (!sessionID) return empty;
-  return usePiExtensionUiStore.getState().promptsBySession[sessionID] ?? empty;
-};
-
 export const usePiExtensionUiPrompts = (sessionID: string | null | undefined): PiExtensionUiPrompt[] => (
   usePiExtensionUiStore((state) => (sessionID ? state.promptsBySession[sessionID] ?? empty : empty))
 );

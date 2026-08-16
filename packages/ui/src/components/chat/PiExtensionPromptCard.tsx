@@ -88,7 +88,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
   const customTextRef = React.useRef(prompt.prefill ?? '');
   const [customFilled, setCustomFilled] = React.useState(() => Boolean((prompt.prefill ?? '').trim()));
 
-  const options = prompt.options ?? [];
+  const options = React.useMemo(() => prompt.options ?? [], [prompt.options]);
   const isMultiple = prompt.multiple;
   const isTextPrompt = prompt.kind === 'input' || prompt.kind === 'editor';
   const settled = prompt.status !== 'pending';

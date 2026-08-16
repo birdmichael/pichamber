@@ -1,10 +1,7 @@
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
-export const PI_EXTENSION_UI_KINDS = ['select', 'confirm', 'input', 'editor'] as const;
-export type PiExtensionUiKind = (typeof PI_EXTENSION_UI_KINDS)[number];
-
-export const PI_EXTENSION_UI_STATUSES = ['pending', 'replied', 'cancelled'] as const;
-export type PiExtensionUiStatus = (typeof PI_EXTENSION_UI_STATUSES)[number];
+export type PiExtensionUiKind = 'select' | 'confirm' | 'input' | 'editor';
+export type PiExtensionUiStatus = 'pending' | 'replied' | 'cancelled';
 
 export type PiExtensionUiPrompt = {
   id: string;
@@ -21,7 +18,7 @@ export type PiExtensionUiPrompt = {
   value?: unknown;
 };
 
-export type PiExtensionUiNotify = {
+type PiExtensionUiNotify = {
   sessionID: string;
   directory?: string;
   message: string;

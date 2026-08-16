@@ -4,8 +4,6 @@ const UI_ASKED = 'pi.ui.asked';
 const UI_SETTLED = 'pi.ui.settled';
 const UI_NOTIFY = 'pi.ui.notify';
 
-const SELECT_KINDS = new Set(['select', 'confirm', 'input', 'editor']);
-
 const noop = () => {};
 
 const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -212,8 +210,6 @@ export const createExtensionUIController = ({
     },
   };
 };
-
-export const isExtensionUiKind = (kind) => SELECT_KINDS.has(kind);
 
 export const EXTENSION_UI_EVENTS = {
   asked: UI_ASKED,
