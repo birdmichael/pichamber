@@ -28,6 +28,11 @@ export type ContextSurfaceDescriptor = {
    * until one exists.
    */
   availability: 'always' | 'has-content';
+  /**
+   * Extra tab modes that also reveal this `has-content` surface. Walkthrough
+   * is the reading surface for a diff, so a diff tab is enough to offer it.
+   */
+  revealedByModes?: readonly ContextPanelMode[];
   /** Short tooltip explanation shown on the rail. */
   descriptionKey: I18nKey;
   /**
@@ -63,7 +68,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'pr',
     icon: 'github',
     labelKey: 'contextPanel.mode.pr',
-    availability: 'always',
+    availability: 'has-content',
   },
   {
     id: 'diff',
@@ -81,7 +86,8 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'walkthrough',
     icon: 'route',
     labelKey: 'contextPanel.mode.walkthrough',
-    availability: 'always',
+    availability: 'has-content',
+    revealedByModes: ['diff'],
   },
   {
     id: 'editor',
@@ -217,7 +223,9 @@ export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOption
       return false;
     }
     if (surface.availability === 'has-content') {
-      return options.tabs.some((tab) => tab.mode === surface.mode);
+      return options.tabs.some((tab) => (
+        tab.mode === surface.mode || (surface.revealedByModes?.includes(tab.mode) ?? false)
+      ));
     }
     return true;
   });

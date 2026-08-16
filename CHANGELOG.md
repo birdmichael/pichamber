@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Work status: the provider quota block is hidden on Pi, where that API does not exist. Session context percentage and cost stay visible.
+- UI: a new session no longer shows empty Pull request and Walkthrough context tabs. Those surfaces appear when there is a pull request, a diff, or you ask for a walkthrough.
 - **Settings/Providers:** custom OpenAI-compatible providers can now be edited after save, keep the provider list current after save, fetch their remote `/models` list in an inline picker (re-click cancels; closing the list keeps it), collapse known vendor aliases, hide wildcard IDs, filter by Claude Code (including Opus / Sonnet / Haiku) / GPT / Grok / DeepSeek / other, and add only the models you choose.
 - Git: the pull request panel now follows the current open PR for the branch instead of keeping a merged or closed one after reload or a later open PR (thanks to @makeittech).
 - **Usage/Claude:** Claude plan limits now work when you are signed in through Claude Code, without also signing into Anthropic in OpenCode; the account is read from Claude Code's own login on macOS, Linux, and WSL. The page shows your session and weekly limits again, adds per-model weekly limits and extra usage spending, and names your plan. Limits are kept on screen instead of disappearing when Anthropic temporarily blocks refreshes.

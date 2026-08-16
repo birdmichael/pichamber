@@ -11,9 +11,13 @@ edge (`components/layout/ContextPanelRail.tsx`) and rendered by
 
 - A surface maps 1:1 to a `ContextPanelMode` tab mode in `useUIStore`.
 - `availability: 'always'` surfaces are always present on the rail.
-  `availability: 'has-content'` surfaces (chat) are hidden from the
-  rail until a tab of their mode exists, and stay visible for as long as one
-  does — they must not disappear while in use.
+  `availability: 'has-content'` surfaces (chat, pull request, walkthrough)
+  are hidden from the rail until a tab of their mode exists, and stay
+  visible for as long as one does — they must not disappear while in use.
+  Walkthrough also appears when a diff tab exists (`revealedByModes`), so a
+  blank draft does not advertise an empty review surface. Pull request and
+  walkthrough still open through `openContextSurface` from Git, a real PR,
+  a diff, or an explicit generate action.
 - `defaultWidthFraction` is the panel width as a fraction of the content area,
   used until the user manually resizes that surface (manual widths are stored
   per mode in `useUIStore.contextPanelByDirectory[dir].widthByMode`).
@@ -24,15 +28,16 @@ edge (`components/layout/ContextPanelRail.tsx`) and rendered by
   rail and the global surface-switch shortcut (`switch_context_surface` in
   `lib/shortcuts.ts`): it drops the plan surface unless plan mode is enabled,
   drops the walkthrough on VS Code and below `WALKTHROUGH_MIN_WIDTH`, and hides
-  `has-content` surfaces until a tab of their mode exists. Both consumers use
-  it so the digit shown on a rail badge always maps to the same surface the
-  shortcut opens.
+  `has-content` surfaces until a tab of their mode (or a `revealedByModes`
+  mode) exists. Both consumers use it so the digit shown on a rail badge
+  always maps to the same surface the shortcut opens.
 
 ## Adding a surface
 
 1. Add a `ContextPanelMode` value in `useUIStore` (type union plus the
    sanitizer whitelist in `sanitizeContextPanelTabs`).
-2. Register a descriptor here (icon, label key, availability, width fraction).
+2. Register a descriptor here (icon, label key, availability, optional
+   `revealedByModes`, width fraction).
 3. Render the mode in `ContextPanel.tsx` (content dispatch, label, icon).
 4. Add label/hint i18n keys to every locale dictionary.
 

@@ -68,6 +68,16 @@ describe('useUIStore openContextSurface', () => {
     expect(useUIStore.getState().contextPanelByDirectory[directory]).toBe(undefined);
   });
 
+  test('still opens pull request and walkthrough when those surfaces are invoked', () => {
+    useUIStore.getState().openContextSurface(directory, 'pr');
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.tabs.map((tab) => tab.mode)).toEqual(['pr']);
+
+    useUIStore.getState().openContextSurface(directory, 'walkthrough');
+    const tabs = useUIStore.getState().contextPanelByDirectory[directory]?.tabs ?? [];
+    expect(tabs.map((tab) => tab.mode)).toEqual(['pr', 'walkthrough']);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.activeTabId).toBe('walkthrough');
+  });
+
   test('opens an empty editor tab that a real file later replaces', () => {
     useUIStore.getState().openContextSurface(directory, 'file');
 
