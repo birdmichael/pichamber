@@ -1,38 +1,7 @@
 import { createEventId, createMessageId, createPartId } from './ids.js';
-import { toPiImageContent } from './session-transfer.js';
+import { mapPiUsageToOpenCodeTokens, toPiImageContent } from './session-transfer.js';
 
-const toNonNegativeNumber = (value) => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    return 0;
-  }
-  return value;
-};
-
-/** Map Pi assistant `usage` onto the OpenCode message token/cost shape. */
-export const mapPiUsageToOpenCodeTokens = (usage) => {
-  if (!usage || typeof usage !== 'object') {
-    return {
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
-    };
-  }
-  const costValue = usage.cost;
-  const cost = typeof costValue === 'number'
-    ? toNonNegativeNumber(costValue)
-    : toNonNegativeNumber(costValue?.total);
-  return {
-    cost,
-    tokens: {
-      input: toNonNegativeNumber(usage.input),
-      output: toNonNegativeNumber(usage.output),
-      reasoning: toNonNegativeNumber(usage.reasoning),
-      cache: {
-        read: toNonNegativeNumber(usage.cacheRead ?? usage.cache?.read),
-        write: toNonNegativeNumber(usage.cacheWrite ?? usage.cache?.write),
-      },
-    },
-  };
-};
+export { mapPiUsageToOpenCodeTokens } from './session-transfer.js';
 
 const toolText = (value) => {
   if (!value) return '';

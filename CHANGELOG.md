@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Desktop:** opening a Pi session that already has a Subagents result no longer freezes the window or ignores Quit.
 - Chat: on Pi, reopening or refreshing a session that used Read, Skill, or Bash keeps those calls as tool rows. File contents are no longer shown as user messages.
 - Chat: on Pi, an attached image stays on the user message after send, quit and reopen, or sidebar Refresh.
+- Chat/Desktop: on Pi, reopening or refreshing a session still shows the model that ran on the assistant footer, plus tokens and cost when they were recorded, instead of only `pi`.
 - Chat: typing an unknown `/name` and pressing Enter now sends it as a normal message. The empty command popup no longer swallows the first Enter.
 - **CLI/Updates:** the published package is now `@pichamber/web` and the typed command is `pichamber` only. `pichamber update`, the install script, and Desktop SSH install that package from npm. Version checks use GitHub `birdmichael/pichamber` and npm `@pichamber/web`, never OpenChamber’s API or `@openchamber/web`. Until the first Pichamber release and npm publish exist, a check reports no update instead of OpenChamber 1.18.4.
 - **Sessions:** on Pi, a Refresh button in the sidebar footer (after Shortcuts) reloads skills, prompts, and extensions, and also refreshes the session list and the open chat from disk. The current session stays selected. It is disabled while that session is composing, streaming, or compacting.

@@ -9,6 +9,15 @@ import {
   piMessagesFromFacadeEntry,
 } from './session-transfer.js';
 
+const exampleAssistantUsage = {
+  input: 1200,
+  output: 80,
+  cacheRead: 40,
+  cacheWrite: 0,
+  reasoning: 10,
+  cost: { total: 0.002 },
+};
+
 describe('session-transfer', () => {
   it('round-trips facade messages through Pi-compatible JSONL', () => {
     const record = {
@@ -130,6 +139,94 @@ describe('session-transfer', () => {
       { role: 'user', types: ['text', 'file'] },
       { role: 'assistant', types: ['reasoning', 'text', 'tool'] },
     ]);
+  });
+
+  it('copies Pi assistant model and usage onto facade info', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'hello' }] },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'hi' }],
+          provider: 'example-provider',
+          model: 'example-model',
+          usage: exampleAssistantUsage,
+        },
+      },
+    ], 'ses_usage');
+
+    expect(messages).toHaveLength(2);
+    expect(messages[1].info).toMatchObject({
+      id: 'a1',
+      sessionID: 'ses_usage',
+      role: 'assistant',
+      parentID: 'u1',
+      agent: 'pi',
+      mode: 'pi',
+      modelID: 'example-model',
+      providerID: 'example-provider',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+      cost: 0.002,
+      tokens: {
+        input: 1200,
+        output: 80,
+        reasoning: 10,
+        cache: { read: 40, write: 0 },
+      },
+    });
+    expect(messages[0].info.modelID).toBeUndefined();
+    expect(messages[0].info.tokens).toBeUndefined();
+    expect(messages[0].info.cost).toBeUndefined();
+  });
+
+  it('omits tokens and cost when the Pi assistant has no usage', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'no usage' }],
+          provider: 'example-provider',
+          model: 'example-model',
+        },
+      },
+    ], 'ses_no_usage');
+
+    expect(messages[0].info).toMatchObject({
+      modelID: 'example-model',
+      providerID: 'example-provider',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+    });
+    expect(messages[0].info.tokens).toBeUndefined();
+    expect(messages[0].info.cost).toBeUndefined();
+  });
+
+  it('omits invented model and usage when the Pi assistant has neither', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'bare' }],
+        },
+      },
+    ], 'ses_bare');
+
+    expect(messages[0].info.modelID).toBeUndefined();
+    expect(messages[0].info.providerID).toBeUndefined();
+    expect(messages[0].info.model).toBeUndefined();
+    expect(messages[0].info.tokens).toBeUndefined();
+    expect(messages[0].info.cost).toBeUndefined();
+    expect(messages[0].info.agent).toBe('pi');
   });
 
   it('maps Pi session entries onto facade messages', () => {
@@ -451,6 +548,79 @@ describe('session-transfer', () => {
       content: [{ type: 'text', text: 'hello persist' }],
     }]);
     expect(persistFacadeMessages({}, [{ info: { role: 'user' }, parts: [{ type: 'text', text: 'x' }] }])).toBe(false);
+  });
+
+  it('keeps facade model and usage on persist and JSONL export', () => {
+    const entry = {
+      info: {
+        id: 'a1',
+        role: 'assistant',
+        parentID: 'u1',
+        time: { created: 1_700_000_000_200 },
+        modelID: 'example-model',
+        providerID: 'example-provider',
+        model: { providerID: 'example-provider', modelID: 'example-model' },
+        cost: 0.002,
+        tokens: {
+          input: 1200,
+          output: 80,
+          reasoning: 10,
+          cache: { read: 40, write: 0 },
+        },
+      },
+      parts: [{ type: 'text', text: 'hi' }],
+    };
+
+    expect(piMessagesFromFacadeEntry(entry)).toEqual([{
+      role: 'assistant',
+      timestamp: 1_700_000_000_200,
+      content: [{ type: 'text', text: 'hi' }],
+      provider: 'example-provider',
+      model: 'example-model',
+      usage: {
+        input: 1200,
+        output: 80,
+        reasoning: 10,
+        cacheRead: 40,
+        cacheWrite: 0,
+        cost: { total: 0.002 },
+      },
+    }]);
+
+    const jsonl = buildSessionJsonl({
+      id: 'ses_export_usage',
+      directory: '/tmp/project',
+      info: { id: 'ses_export_usage', title: 'Usage', time: { created: 1_700_000_000_000 } },
+      messages: [entry],
+    });
+    const assistant = jsonl
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((row) => row.message?.role === 'assistant');
+    expect(assistant.message).toMatchObject({
+      provider: 'example-provider',
+      model: 'example-model',
+      usage: {
+        input: 1200,
+        output: 80,
+        cost: { total: 0.002 },
+      },
+    });
+
+    const remapped = facadeMessagesFromPiEntries([assistant], 'ses_export_usage');
+    expect(remapped[0].info).toMatchObject({
+      modelID: 'example-model',
+      providerID: 'example-provider',
+      cost: 0.002,
+      tokens: {
+        input: 1200,
+        output: 80,
+        reasoning: 10,
+        cache: { read: 40, write: 0 },
+      },
+    });
   });
 
   it('imports a Pi jsonl skill-reading turn as one user and one assistant with a tool part', () => {

@@ -169,8 +169,13 @@ the same shape live SSE already emits in `event-translator.js`.
 (`mimeType` + `data`, or a `source` payload) becomes a facade `file` part
 (`mime` + `url: data:...`). `promptAsync` keeps those file/image parts on
 the user message and forwards Pi-native `{ type: "image", data, mimeType }`
-to `session.prompt`. Do not invent a second session store. Live SSE is
-unchanged.
+to `session.prompt`. Assistant `provider` / `model` / `usage` copy onto
+facade `info` as `providerID`, `modelID`, `model`, `tokens`, and `cost`
+(the same mapping live SSE uses in `mapPiUsageToOpenCodeTokens`). Missing
+usage stays omitted; do not invent numbers or a hardcoded model.
+`piMessagesFromFacadeEntry` writes those fields back when they already
+exist so persist and JSONL export keep them. Do not invent a second
+session store. Live SSE is unchanged.
 
 Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
 entry: `{ archived: ms | 0 }`. `updateSession` writes that value (including
@@ -185,7 +190,8 @@ through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /
 `toolCall` / `toolResult` / `image` entries so a new host hydrates the
 same transcript. JSONL export (`buildSessionJsonl`) writes those same
 entries from facade messages so export → import (or a new host) keeps
-tool, image, thinking, and text parts. HTML export stays text-only.
+tool, image, thinking, text, and assistant model/usage when they already
+exist. HTML export stays text-only.
 Clone/fork `parentID` is `{ parentID }` on `pichamber.metadata`. Hydrate,
 disk list, and sidebar Refresh read it onto `info.parentID`.
 
