@@ -66,6 +66,7 @@ export const createInMemoryPiSession = ({
   let aborted = false;
   let reloadCount = 0;
   const messages = [];
+  const extensionCommands = new Map();
 
   const emit = (event) => {
     for (const listener of Array.from(listeners)) {
@@ -117,6 +118,17 @@ export const createInMemoryPiSession = ({
     streaming = false;
   };
 
+  const tryExecuteExtensionCommand = async (text) => {
+    if (typeof text !== 'string' || !text.startsWith('/')) return false;
+    const spaceIndex = text.indexOf(' ');
+    const commandName = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex);
+    const args = spaceIndex === -1 ? '' : text.slice(spaceIndex + 1);
+    const command = extensionCommands.get(commandName);
+    if (!command) return false;
+    await command.handler(args);
+    return true;
+  };
+
   return {
     sessionId,
     get isStreaming() {
@@ -132,9 +144,26 @@ export const createInMemoryPiSession = ({
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    async prompt(text) {
+    getCommands() {
+      return Array.from(extensionCommands.values()).map(({ handler: _handler, ...info }) => info);
+    },
+    registerCommand(name, handler, { description } = {}) {
+      const commandName = typeof name === 'string' ? name.replace(/^\//, '').trim() : '';
+      if (!commandName) return;
+      extensionCommands.set(commandName, {
+        name: commandName,
+        description: typeof description === 'string' && description.trim() ? description.trim() : `/${commandName}`,
+        source: 'extension',
+        handler: typeof handler === 'function' ? handler : async () => {},
+      });
+    },
+    async prompt(text, options = {}) {
       if (streaming) {
         throw new Error('Already streaming; use steer or followUp');
+      }
+      const expandPromptTemplates = options?.expandPromptTemplates ?? true;
+      if (expandPromptTemplates && await tryExecuteExtensionCommand(text)) {
+        return;
       }
       await runPrompt(text);
     },
@@ -181,6 +210,7 @@ export const createInMemoryPiSession = ({
       }
     },
     async reload() {
+      // Keep registered commands. Real AgentSession.reload() reloads extensions in place.
       reloadCount += 1;
     },
     get reloadCount() {
@@ -522,6 +552,70 @@ const expandPromptTemplate = (template, argument) => {
     .replaceAll('$@', args)
     .replaceAll('$1', args);
 };
+
+const commandNameOf = (command) => (
+  typeof command?.name === 'string' ? command.name.trim() : ''
+);
+
+const isExtensionCommandSource = (source) => (
+  source !== 'prompt' && source !== 'skill' && source !== 'builtin'
+);
+
+/** Live session getCommands() / extensionRunner.registerCommand results. */
+export const readLiveSessionCommands = (piSession) => {
+  if (!piSession || typeof piSession !== 'object') return [];
+  if (typeof piSession.getCommands === 'function') {
+    try {
+      const commands = piSession.getCommands();
+      return Array.isArray(commands) ? commands : [];
+    } catch {
+      return [];
+    }
+  }
+  const registered = piSession.extensionRunner?.getRegisteredCommands?.();
+  if (!Array.isArray(registered)) return [];
+  return registered.map((command) => ({
+    name: command.invocationName || command.name,
+    description: command.description || '',
+    source: command.source || 'extension',
+  }));
+};
+
+export const toFacadeExtensionCommand = (command) => {
+  const name = commandNameOf(command);
+  if (!name || name === 'reload' || !isExtensionCommandSource(command?.source)) return null;
+  return {
+    name,
+    description: typeof command.description === 'string' && command.description.trim()
+      ? command.description.trim()
+      : `/${name}`,
+    source: 'extension',
+    template: '',
+    agent: 'pi',
+  };
+};
+
+export const mergeLiveExtensionCommands = (listed, live) => {
+  const merged = Array.isArray(listed) ? [...listed] : [];
+  const indexByName = new Map(merged.map((item, index) => [item.name, index]));
+  for (const command of Array.isArray(live) ? live : []) {
+    const entry = toFacadeExtensionCommand(command);
+    if (!entry) continue;
+    const existingIndex = indexByName.get(entry.name);
+    if (existingIndex == null) {
+      indexByName.set(entry.name, merged.length);
+      merged.push(entry);
+      continue;
+    }
+    if (merged[existingIndex].source === 'builtin') continue;
+    merged[existingIndex] = entry;
+  }
+  return merged;
+};
+
+const findLiveSessionCommand = (piSession, name) => (
+  readLiveSessionCommands(piSession).find((item) => commandNameOf(item) === name)
+);
 
 const createLocalReply = (emit) => (record, body, userText, assistantText) => {
   const sessionID = record.id;
@@ -1061,8 +1155,17 @@ export const createPiHost = ({
     listPrompts(directory) {
       return listPiPrompts({ home, directory: directory || defaultDirectory });
     },
-    listCommands(directory) {
-      return listPiCommands({ home, directory: directory || defaultDirectory });
+    listCommands(directory, options = {}) {
+      const cwd = directory || defaultDirectory;
+      const listed = listPiCommands({ home, directory: cwd });
+      const sessionID = typeof options.sessionID === 'string' ? options.sessionID.trim() : '';
+      const live = [];
+      for (const record of sessions.values()) {
+        if (sessionID && record.id !== sessionID) continue;
+        if (!sessionID && record.directory !== cwd) continue;
+        live.push(...readLiveSessionCommands(record.piSession));
+      }
+      return mergeLiveExtensionCommands(listed, live);
     },
     writeCommand(directory, name, config = {}) {
       return writePiPrompt({
@@ -1422,7 +1525,34 @@ export const createPiHost = ({
       const argument = typeof body.arguments === 'string' ? body.arguments.trim() : '';
       const userText = `/${[name, argument].filter(Boolean).join(' ')}`;
 
+      if (!name) {
+        const error = new Error('Command name is required');
+        error.status = 400;
+        throw error;
+      }
+
       const reply = async (assistantText) => completeLocalReply(record, body, userText, assistantText);
+
+      const dispatchLiveSessionCommand = async () => {
+        if (typeof record.piSession?.prompt !== 'function') {
+          const error = new Error(`Command /${name} is not available on this session`);
+          error.status = 500;
+          throw error;
+        }
+        await record.piSession.prompt(userText);
+        const assistantID = createMessageId();
+        return {
+          info: {
+            id: assistantID,
+            sessionID: record.id,
+            role: 'assistant',
+            time: { created: Date.now(), completed: Date.now() },
+            agent: 'pi',
+            finish: 'stop',
+          },
+          parts: [],
+        };
+      };
 
       if (name === 'reload') {
         const error = new Error('reload is not a user command');
@@ -1472,6 +1602,11 @@ export const createPiHost = ({
         );
       }
 
+      const liveCommand = findLiveSessionCommand(record.piSession, name);
+      if (liveCommand && isExtensionCommandSource(liveCommand.source)) {
+        return dispatchLiveSessionCommand();
+      }
+
       const listed = listPiCommands({ home, directory: record.directory });
       const found = listed.find((item) => item.name === name && item.source === 'prompt' && item.template);
       if (found) {
@@ -1482,10 +1617,13 @@ export const createPiHost = ({
         });
       }
 
-      return this.promptAsync(sessionID, {
-        ...body,
-        parts: [{ type: 'text', text: userText }],
-      });
+      if (liveCommand) {
+        return dispatchLiveSessionCommand();
+      }
+
+      const error = new Error(`Unknown command: /${name}`);
+      error.status = 404;
+      throw error;
     },
     listExtensions(directory) {
       return listPiExtensions({ home, directory: directory || defaultDirectory });

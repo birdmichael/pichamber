@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** on Pi, slash commands from installed extensions now run as commands instead of being sent as a chat message. After a session reload, the slash menu can list those extension commands.
 - **Settings/Git:** Connect GitHub now authorizes the Pichamber OAuth app. An existing OpenChamber GitHub login is treated as disconnected, so you will be asked to connect again.
 - **Desktop/UI:** the app mark is now the open-top chamber with Pi’s pixel “pi” on the top face — Dock, tray, favicon, About, empty chat, and splash no longer show the leftover OpenCode O. Dev builds use the same mark with a small amber badge.
 - **Chat:** a new empty session on Pi shows the welcome starter chips again, including Catch me up and Start feature planning. Clicking a chip sends that prompt in the current Pi session.

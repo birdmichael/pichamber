@@ -163,6 +163,7 @@ export function routeMessage(params: {
     // Pi kernel: the slash menu inserts `/skill:name`. That token does not
     // match a skill's bare name, so this falls through to sendMessage and
     // AgentSession.prompt expands `/skill:name` to the skill body.
+    // Unknown `/name` also falls through to sendMessage (product: may be chat).
     const isCommand = syncCommands.find((c) => c.name === cmdName)
       || storeCommands.find((c) => c.name === cmdName)
       || useSkillsStore.getState().skills.some((s) => s.name === cmdName)

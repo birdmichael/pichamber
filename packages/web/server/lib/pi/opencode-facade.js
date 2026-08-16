@@ -315,7 +315,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/command', handle(async (req, res) => {
-    json(res, 200, host.listCommands(resolveDirectory(req)));
+    const sessionID = typeof req.query?.session === 'string' ? req.query.session.trim() : '';
+    json(res, 200, host.listCommands(resolveDirectory(req), sessionID ? { sessionID } : {}));
   }));
 
   app.get('/api/config/commands/:name', handle(async (req, res) => {

@@ -3,7 +3,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createInMemoryPiSession, createPiHost, isPlaceholderSessionTitle, mapPiModelsToProviders, normalizePiSessionUsage, resolvePromptModelRef, titleFromUserText } from './pi-host.js';
+import { writePiPrompt } from './pi-resources.js';
+import {
+  createInMemoryPiSession,
+  createPiHost,
+  isPlaceholderSessionTitle,
+  mapPiModelsToProviders,
+  mergeLiveExtensionCommands,
+  normalizePiSessionUsage,
+  readLiveSessionCommands,
+  resolvePromptModelRef,
+  titleFromUserText,
+} from './pi-host.js';
 
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
@@ -354,7 +365,7 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
-  it('runCommand /reload is not a user command and does not reload', async () => {>>>>>>> f0dbbe4e8 (Hide /reload from Pi slash commands and Settings.)
+  it('runCommand /reload is not a user command and does not reload', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-cmd-'));
     try {
       const host = createPiHost({
@@ -375,6 +386,108 @@ describe('createPiHost', () => {
       });
       expect(reloads).toBe(0);
       expect(host.getMessages(record.id)).toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('dispatches live extension commands through session.prompt, not promptAsync', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-ext-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      let receivedArgs = null;
+      record.piSession.registerCommand('plan', async (args) => {
+        receivedArgs = args;
+      }, { description: 'Enter plan mode' });
+
+      const before = host.getMessages(record.id);
+      const result = await host.runCommand(record.id, { command: 'plan', arguments: 'start' });
+      expect(receivedArgs).toBe('start');
+      expect(prompted).toEqual(['/plan start']);
+      expect(promptAsyncCalls).toBe(0);
+      expect(result.info.role).toBe('assistant');
+      expect(result.parts).toEqual([]);
+      const texts = host.getMessages(record.id).flatMap((entry) => (
+        (entry.parts || []).map((part) => part.text).filter(Boolean)
+      ));
+      expect(texts).not.toContain('/plan start');
+      expect(host.getMessages(record.id)).toHaveLength(before.length);
+      expect(host.listCommands('/tmp/project').some((command) => (
+        command.name === 'plan' && command.source === 'extension'
+      ))).toBe(true);
+      expect(host.listCommands('/tmp/project').some((command) => command.name === 'reload')).toBe(false);
+      await host.reload();
+      expect(host.listCommands('/tmp/project').some((command) => (
+        command.name === 'plan' && command.source === 'extension'
+      ))).toBe(true);
+      expect(host.listCommands('/tmp/project').some((command) => command.name === 'reload')).toBe(false);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects unknown slash names instead of sending them as chat', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-unknown-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+      await expect(host.runCommand(record.id, { command: 'not-a-command', arguments: 'please' }))
+        .rejects.toMatchObject({ status: 404, message: 'Unknown command: /not-a-command' });
+      expect(promptAsyncCalls).toBe(0);
+      expect(host.getMessages(record.id)).toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('still expands markdown prompt commands through promptAsync', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-prompt-cmd-'));
+    try {
+      writePiPrompt({
+        home,
+        name: 'ship',
+        description: 'Ship it',
+        template: 'Prepare the change: $ARGUMENTS',
+      });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      const result = await host.runCommand(record.id, { command: 'ship', arguments: 'the docs' });
+      expect(result.info.role).toBe('user');
+      expect(result.parts[0].text).toBe('Prepare the change: the docs');
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
@@ -520,6 +633,45 @@ describe('createPiHost', () => {
       provider: 'anthropic',
     });
     host.dispose();
+  });
+});
+
+describe('live session command helpers', () => {
+  it('reads getCommands() and falls back to extensionRunner', () => {
+    expect(readLiveSessionCommands({
+      getCommands: () => [{ name: 'plan', source: 'extension', description: 'Plan' }],
+    })).toEqual([{ name: 'plan', source: 'extension', description: 'Plan' }]);
+    expect(readLiveSessionCommands({
+      extensionRunner: {
+        getRegisteredCommands: () => [{ invocationName: 'goal', description: 'Set a goal' }],
+      },
+    })).toEqual([{ name: 'goal', description: 'Set a goal', source: 'extension' }]);
+    expect(readLiveSessionCommands({})).toEqual([]);
+  });
+
+  it('merges live extension commands over prompts without replacing builtins', () => {
+    const merged = mergeLiveExtensionCommands(
+      [
+        { name: 'compact', source: 'builtin', agent: 'pi' },
+        { name: 'plan', source: 'prompt', template: 'old', agent: 'pi' },
+      ],
+      [
+        { name: 'compact', source: 'extension', description: 'Nope' },
+        { name: 'plan', source: 'extension', description: 'Enter plan mode' },
+        { name: 'goal', source: 'extension', description: 'Set a goal' },
+        { name: 'reload', source: 'extension', description: 'Host only' },
+        { name: 'skill:review', source: 'skill', description: 'Skill' },
+      ],
+    );
+    expect(merged.find((command) => command.name === 'compact').source).toBe('builtin');
+    expect(merged.find((command) => command.name === 'plan')).toMatchObject({
+      source: 'extension',
+      description: 'Enter plan mode',
+      agent: 'pi',
+    });
+    expect(merged.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);
+    expect(merged.some((command) => command.name === 'reload')).toBe(false);
+    expect(merged.some((command) => command.name === 'skill:review')).toBe(false);
   });
 });
 
