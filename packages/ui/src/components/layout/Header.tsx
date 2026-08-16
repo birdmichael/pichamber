@@ -76,7 +76,7 @@ import {
 } from '@/lib/desktopCurrentHost';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { getRuntimeBearerTokenSync } from '@/lib/runtime-auth';
 import { getRuntimeApiBaseUrl, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
@@ -490,6 +490,7 @@ export const Header: React.FC<HeaderProps> = ({
   streamPerfCount('ui.header.render');
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const canShareSession = canOfferOpenCodeSessionStub(isPiKernel);
   const setSessionSwitcherOpen = useUIStore((state) => state.setSessionSwitcherOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
@@ -2053,7 +2054,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <DropdownMenuItem onClick={() => { pendingHeaderRenameRef.current = true; }}><Icon name="pencil-ai" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.rename')}</DropdownMenuItem>
                     <DropdownMenuItem onClick={copyCurrentSessionId}><Icon name="file-copy" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.copyId')}</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {!isPiKernel ? (
+                    {canShareSession ? (
                       currentSession?.shareUrl ? (
                         <>
                           <DropdownMenuItem onClick={copyCurrentSessionShareUrl}><Icon name="file-copy" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.copyLink')}</DropdownMenuItem>

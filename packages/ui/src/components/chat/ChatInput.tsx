@@ -75,7 +75,7 @@ import { usePermissionStore } from '@/stores/permissionStore';
 import { togglePermissionAutoAccept } from './permissionAutoAccept';
 import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
 import { wrapSystemReminder } from '@/lib/systemReminder';
@@ -240,6 +240,7 @@ const resolveChatDraftIdentity = (sessionId: string | null): ChatDraftIdentity |
 const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollToBottom, active = true }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
+    const canUseOpenCodeSessionStubs = canOfferOpenCodeSessionStub(isPiKernel);
     // Track if we restored a draft on mount (for text selection)
     const initialDraftRef = React.useRef<string | null>(null);
     const initialDraftIdentityRef = React.useRef<ChatDraftIdentity | null>(null);
@@ -1138,19 +1139,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             composerRef.current?.blur();
         }
 
-        // Local slash commands, normal mode only.
-        const parsedCommand = inputMode === 'normal' ? parseSlashCommand(primaryText) : null;
+        // Local slash commands, normal mode only. Composer shell is OpenCode-only.
+        const sendInputMode = canUseOpenCodeSessionStubs ? inputMode : 'normal';
+        const parsedCommand = sendInputMode === 'normal' ? parseSlashCommand(primaryText) : null;
         if (parsedCommand) {
             const { name: commandName, argument } = parsedCommand;
 
             // Commands that manipulate session state or open UI rather than
             // sending a message.
-            if (commandName === 'undo' && currentSessionId) {
+            if (canUseOpenCodeSessionStubs && commandName === 'undo' && currentSessionId) {
                 await useSessionUIStore.getState().handleSlashUndo(currentSessionId);
                 scrollToBottom?.();
                 return;
             }
-            if (commandName === 'redo' && currentSessionId) {
+            if (canUseOpenCodeSessionStubs && commandName === 'redo' && currentSessionId) {
                 await useSessionUIStore.getState().handleSlashRedo(currentSessionId);
                 scrollToBottom?.();
                 return;
@@ -1198,7 +1200,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                         agentMentionName,
                         [{ text: instructionsText, synthetic: true }],
                         variantToSend,
-                        inputMode,
+                        sendInputMode,
                         sendMessageOptions,
                     );
                     scrollToBottom?.();
@@ -1246,7 +1248,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             agentMentionName,
             additionalParts.length > 0 ? additionalParts : undefined,
             variantToSend,
-            inputMode,
+            sendInputMode,
             sendMessageOptions,
         );
         const restoreConsumedDrafts = () => {
@@ -1441,7 +1443,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         // Enter shell mode before CodeMirror inserts the trigger. Keeping the
         // document unchanged also keeps the caret at the start for the first
         // command character.
-        if (inputMode === 'normal' && e.key === '!') {
+        if (canUseOpenCodeSessionStubs && inputMode === 'normal' && e.key === '!') {
             const selection = composerRef.current?.getSelection();
             if (selection?.start === 0 && selection.end === 0) {
                 e.preventDefault();
@@ -1787,7 +1789,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         // Mobile keyboards and paste may update the document without a usable
         // keydown, so consume the trigger in the same editor transaction rather
         // than moving the caret in a later frame against stale text.
-        if (inputMode === 'normal' && value.startsWith('!')) {
+        if (canUseOpenCodeSessionStubs && inputMode === 'normal' && value.startsWith('!')) {
             const shellCommand = value.slice(1);
             const nextCursor = Math.max(0, selection.start - 1);
             setInputMode('shell');
@@ -2592,10 +2594,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                         onRemove={() => setLinkedPr(null)}
                     />
                 ) : null}
+                {canUseOpenCodeSessionStubs ? (
                 <RevertedMessageDock
                     sessionId={currentSessionId}
                     directory={currentSessionDirectoryForSync ?? currentDirectory}
                 />
+                ) : null}
                 <MemoStatusRow
                     showAbortStatus={showAbortStatus}
                     showAssistantStatus={false}

@@ -22,7 +22,7 @@ import { isSessionPinned, type SessionPinnedTarget } from '@/stores/useSessionPi
 import { Icon } from "@/components/icon/Icon";
 import { buildExportFilename, downloadAsMarkdown, downloadTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionPermissions, useSessionQuestionCount } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
@@ -408,6 +408,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   const directoryStore = useDirectoryStore(sessionDirectory ?? undefined, { bootstrap: false });
   const sync = useSync();
   const isPiKernel = usePiKernel();
+  const canShareSession = canOfferOpenCodeSessionStub(isPiKernel);
 
   const selectionModeEnabled = useSessionMultiSelectStore((state) => state.enabled);
   const isRowSelected = useSessionMultiSelectStore(
@@ -960,7 +961,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         {isPinnedSession ? <Icon name="unpin" className="mr-1 h-4 w-4" /> : <Icon name="pushpin" className="mr-1 h-4 w-4" />}
         {isPinnedSession ? t('sessions.sidebar.session.menu.unpin') : t('sessions.sidebar.session.menu.pin')}
       </Item>
-      {!isPiKernel ? (
+      {canShareSession ? (
         !resolvedSession.share ? (
           <Item onClick={() => handleShareSession(resolvedSession)} className="[&>svg]:mr-1">
             <Icon name="share-2" className="mr-1 h-4 w-4" />
