@@ -49,7 +49,7 @@ So:
 | `session-ui-store.ts` | Session selection, draft lifecycle, abort prompts, worktree metadata, SDK-facing action entrypoints | App UI state |
 | `pi-extension-ui-store.ts` | Pending/settled Pi `ctx.ui` prompts (`select` / `confirm` / `input` / `editor`) and `pi.ui.notify` toasts for the current runtime | One runtime; prompts keyed by Pi session ID. Not OpenCode `question`. Opening a session hydrates `GET /api/pi/ui`; fetch failure does not clear local cards. Notify toasts present on the shared Sonner surface when the event is applied, not only from a later React effect. |
 | `pi-session-plan-store.ts` | Live Pi plan-mode status (`off` / `active` / `ready` / `saved` / `implementing`) from `GET /api/pi/session/:id/plan` | One runtime; keyed by Pi session ID. Fetch failure does not become empty `off` |
-| `pi-feature-plugins-store.ts` | Feature Plugins payload for composer/rail gates (`plan` installed+enabled) | One runtime. Fetch failure does not become an empty disabled snapshot |
+| `pi-feature-plugins-store.ts` | Feature Plugins payload for composer/rail gates (`plan` and `goal` installed+enabled) | One runtime. Fetch failure does not become an empty disabled snapshot. Enable of an installed Goal slot reloads idle sessions; the composer Goal button may mint a draft session before `session.command`. |
 | `useGlobalSessionsStore.ts` | Global active sessions, global archived sessions, `sessionsByDirectory` | All opened project/worktree session lists |
 | `viewport-store.ts` | Scroll anchors, session memory, loading indicators | App UI state |
 | `attachment-files.ts` | Attachment picker allowlists, MIME/content validation, structured-text sanitization, and HEIC conversion | Local chat attachments across shared UI runtimes |

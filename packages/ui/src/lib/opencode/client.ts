@@ -931,8 +931,8 @@ class OpencodeService {
   async sendCommand(params: {
     runtimeKey?: string;
     id: string;
-    providerID: string;
-    modelID: string;
+    providerID?: string;
+    modelID?: string;
     command: string;
     arguments?: string;
     agent?: string;
@@ -954,13 +954,16 @@ class OpencodeService {
 
     const requestDirectory = this.normalizeCandidatePath(params.directory ?? null) ?? this.currentDirectory;
     this.assertRuntimeUnchanged(params.runtimeKey);
+    const model = params.providerID && params.modelID
+      ? `${params.providerID}/${params.modelID}`
+      : undefined;
 
     const response = await this.client.session.command({
       sessionID: params.id,
       ...(requestDirectory ? { directory: requestDirectory } : {}),
       command: params.command,
       arguments: params.arguments ?? '',
-      model: `${params.providerID}/${params.modelID}`,
+      ...(model ? { model } : {}),
       agent: params.agent,
       variant: params.variant,
       ...(parts.length > 0 ? { parts } : {}),

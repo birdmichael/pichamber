@@ -315,8 +315,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/command', handle(async (req, res) => {
+    const directory = resolveDirectory(req);
     const sessionID = typeof req.query?.session === 'string' ? req.query.session.trim() : '';
-    json(res, 200, host.listCommands(resolveDirectory(req), sessionID ? { sessionID } : {}));
+    if (sessionID && typeof host.ensureSession === 'function') {
+      try {
+        await host.ensureSession(sessionID, directory);
+      } catch (error) {
+        if (error?.status !== 404) throw error;
+      }
+    }
+    json(res, 200, host.listCommands(directory, sessionID ? { sessionID } : {}));
   }));
 
   app.get('/api/config/commands/:name', handle(async (req, res) => {
@@ -421,7 +429,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.patch('/api/pi/feature-plugins', parseJson, handle(async (req, res) => {
-    json(res, 200, host.setFeaturePlugins(req.body || {}));
+    const apply = typeof host.applyFeaturePluginPatch === 'function'
+      ? host.applyFeaturePluginPatch.bind(host)
+      : async (patch) => host.setFeaturePlugins(patch);
+    json(res, 200, await apply(req.body || {}));
   }));
 
   app.post('/api/pi/feature-plugins/:slot/install', parseJson, handle(async (req, res) => {

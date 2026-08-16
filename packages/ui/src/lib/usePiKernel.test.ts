@@ -12,8 +12,8 @@ describe('canOfferOpenCodeSessionStub', () => {
 });
 
 describe('isSessionGoalVisibleOnPiKernel', () => {
-  test('keeps Session Goal visible on the Pi kernel', () => {
-    expect(isSessionGoalVisibleOnPiKernel(true)).toBe(true);
+  test('hides Session Goal on the Pi kernel', () => {
+    expect(isSessionGoalVisibleOnPiKernel(true)).toBe(false);
   });
 
   test('keeps Session Goal visible on OpenCode', () => {

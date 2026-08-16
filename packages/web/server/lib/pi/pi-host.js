@@ -1360,6 +1360,9 @@ export const createPiHost = ({
     listPrompts(directory) {
       return listPiPrompts({ home, directory: directory || defaultDirectory });
     },
+    async ensureSession(sessionID, directory) {
+      return ensureRecord(sessionID, directory);
+    },
     listCommands(directory, options = {}) {
       const cwd = directory || defaultDirectory;
       const listed = listPiCommands({ home, directory: cwd });
@@ -1815,6 +1818,24 @@ export const createPiHost = ({
         );
       }
 
+      const goalCommand = readFeaturePlugins(home).goal?.command || 'goal';
+      if (name === goalCommand) {
+        if (!argument) {
+          const error = new Error(
+            `/${name} requires an objective. Bare /${name} is the TUI manager and is not supported on Desktop.`,
+          );
+          error.status = 400;
+          throw error;
+        }
+        const liveGoal = findLiveSessionCommand(record.piSession, name);
+        if (!liveGoal || !isExtensionCommandSource(liveGoal.source)) {
+          const error = new Error(`Command /${name} is not available on this session`);
+          error.status = 404;
+          throw error;
+        }
+        return dispatchLiveSessionCommand();
+      }
+
       const liveCommand = findLiveSessionCommand(record.piSession, name);
       if (liveCommand && isExtensionCommandSource(liveCommand.source)) {
         return dispatchLiveSessionCommand();
@@ -2017,6 +2038,21 @@ export const createPiHost = ({
         kernel: 'pi',
         nativeFlow: true,
         sessionID: record.id,
+      };
+    },
+    async applyFeaturePluginPatch(patch) {
+      const payload = this.setFeaturePlugins(patch);
+      const shouldReload = Object.entries(patch && typeof patch === 'object' ? patch : {}).some(([slot, entry]) => (
+        isFeaturePluginSlot(slot)
+        && entry
+        && typeof entry === 'object'
+        && entry.enabled === true
+        && payload.slots[slot].installed
+      ));
+      if (!shouldReload) return payload;
+      return {
+        ...payload,
+        reload: await this.reloadIdleSessions(),
       };
     },
     async reloadIdleSessions(directory) {

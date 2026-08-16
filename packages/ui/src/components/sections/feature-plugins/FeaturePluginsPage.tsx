@@ -98,17 +98,24 @@ export const FeaturePluginsPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ [slot]: patch }),
       });
-      const parsed = parseFeaturePluginsPayload(await readJson(response));
+      const raw = await readJson(response) as (FeaturePluginsPayload & { reload?: FeaturePluginsReloadResult }) | null;
+      const parsed = parseFeaturePluginsPayload(raw);
       if (!response.ok || !parsed) {
         reportSettingsSaveState('error');
         return;
       }
       applyPayload(parsed);
       reportSettingsSaveState('saved');
+      if ('enabled' in patch && parsed.slots[slot].installed) {
+        await refreshSessionTitleReloadLists();
+        if ((raw?.reload?.skipped?.length ?? 0) > 0) {
+          toast.error(t('settings.featurePlugins.toast.reloadPartial'));
+        }
+      }
     } catch {
       reportSettingsSaveState('error');
     }
-  }, [applyPayload]);
+  }, [applyPayload, t]);
 
   const updateDraft = React.useCallback((
     slot: FeaturePluginSlot,
