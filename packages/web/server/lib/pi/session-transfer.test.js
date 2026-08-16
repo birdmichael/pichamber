@@ -5,6 +5,8 @@ import {
   cloneImportedMessages,
   facadeMessagesFromPiEntries,
   parseSessionImport,
+  persistFacadeMessages,
+  piMessagesFromFacadeEntry,
 } from './session-transfer.js';
 
 describe('session-transfer', () => {
@@ -296,5 +298,113 @@ describe('session-transfer', () => {
       url: 'data:image/png;base64,AAAA',
     });
     expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('orphan dump')))).toBe(false);
+  });
+
+  it('maps facade text, tool, and image parts to Pi appendMessage payloads', () => {
+    const messages = piMessagesFromFacadeEntry({
+      info: { id: 'a1', role: 'assistant', time: { created: 1_700_000_000_200 } },
+      parts: [
+        { type: 'text', text: 'reading' },
+        {
+          type: 'tool',
+          callID: 'c1',
+          tool: 'read',
+          state: { status: 'completed', input: { path: 'SKILL.md' }, output: 'skill body' },
+        },
+      ],
+    });
+    expect(messages).toEqual([
+      {
+        role: 'assistant',
+        timestamp: 1_700_000_000_200,
+        content: [
+          { type: 'text', text: 'reading' },
+          { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+        ],
+      },
+      {
+        role: 'toolResult',
+        toolName: 'read',
+        toolCallId: 'c1',
+        content: [{ type: 'text', text: 'skill body' }],
+        timestamp: 1_700_000_000_200,
+      },
+    ]);
+
+    const user = piMessagesFromFacadeEntry({
+      info: { role: 'user', time: { created: 1_700_000_000_100 } },
+      parts: [
+        { type: 'text', text: 'see this' },
+        { type: 'file', mime: 'image/png', url: 'data:image/png;base64,AAAA' },
+      ],
+    });
+    expect(user).toEqual([{
+      role: 'user',
+      timestamp: 1_700_000_000_100,
+      content: [
+        { type: 'text', text: 'see this' },
+        { type: 'image', data: 'AAAA', mimeType: 'image/png' },
+      ],
+    }]);
+  });
+
+  it('appends mapped Pi messages through SessionManager.appendMessage', () => {
+    const appended = [];
+    const ok = persistFacadeMessages({
+      appendMessage(message) {
+        appended.push(message);
+      },
+    }, [{
+      info: { role: 'user', time: { created: 1 } },
+      parts: [{ type: 'text', text: 'hello persist' }],
+    }]);
+    expect(ok).toBe(true);
+    expect(appended).toEqual([{
+      role: 'user',
+      timestamp: 1,
+      content: [{ type: 'text', text: 'hello persist' }],
+    }]);
+    expect(persistFacadeMessages({}, [{ info: { role: 'user' }, parts: [{ type: 'text', text: 'x' }] }])).toBe(false);
+  });
+
+  it('imports a Pi jsonl skill-reading turn as one user and one assistant with a tool part', () => {
+    const jsonl = [
+      JSON.stringify({ type: 'session', cwd: '/tmp/project' }),
+      JSON.stringify({
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'read the skill' }] },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'reading' },
+            { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 't1',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{ type: 'text', text: '---\nname: using-superpowers\n---\n' }],
+        },
+      }),
+    ].join('\n');
+    const parsed = parseSessionImport(jsonl);
+    expect(parsed.messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(parsed.messages[1].parts.map((part) => part.type)).toEqual(['text', 'tool']);
+    expect(parsed.messages[1].parts[1]).toMatchObject({
+      type: 'tool',
+      callID: 'c1',
+      tool: 'read',
+      state: { status: 'completed', output: '---\nname: using-superpowers\n---\n' },
+    });
   });
 });

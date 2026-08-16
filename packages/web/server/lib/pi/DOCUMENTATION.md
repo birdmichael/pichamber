@@ -180,6 +180,13 @@ read it onto `info.time.archived`. `0` is restored, not archived.
 rows unless `archived=true`. Last-session restore must not open an archived
 id. One unreadable session file does not drop other complete sessions.
 
+Clone, fork, and import copy facade messages in memory and persist them
+through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /
+`toolCall` / `toolResult` / `image` entries so a new host hydrates the
+same transcript. Clone/fork `parentID` is `{ parentID }` on
+`pichamber.metadata`. Hydrate, disk list, and sidebar Refresh read it
+onto `info.parentID`.
+
 ## MCP adapter
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot

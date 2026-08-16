@@ -277,6 +277,73 @@ const piContentFromFacadeParts = (parts) => {
   return content;
 };
 
+const toolResultFromFacadePart = (part, timestamp) => {
+  if (!part || part.type !== 'tool') return null;
+  const callID = asTrimmedString(part.callID);
+  if (!callID) return null;
+  const status = asTrimmedString(part.state?.status);
+  const output = typeof part.state?.output === 'string' ? part.state.output : '';
+  if (status !== 'completed' && status !== 'error' && !output) return null;
+  return {
+    role: 'toolResult',
+    toolName: asTrimmedString(part.tool) || 'tool',
+    toolCallId: callID,
+    content: [{ type: 'text', text: output }],
+    timestamp,
+    ...(status === 'error' ? { isError: true } : {}),
+  };
+};
+
+/** Persist-only: facade parts → Pi-native messages for SessionManager.appendMessage. */
+export const piMessagesFromFacadeEntry = (entry) => {
+  const role = entry?.info?.role === 'assistant' ? 'assistant' : 'user';
+  const timestamp = millisFromUnknown(entry?.info?.time?.created);
+  const content = [];
+  const toolResults = [];
+  for (const part of Array.isArray(entry?.parts) ? entry.parts : []) {
+    if (!part || typeof part !== 'object') continue;
+    if (part.type === 'reasoning' && typeof part.text === 'string') {
+      content.push({ type: 'thinking', thinking: part.text });
+      continue;
+    }
+    if (part.type === 'text' && typeof part.text === 'string') {
+      content.push({ type: 'text', text: part.text });
+      continue;
+    }
+    if (part.type === 'tool') {
+      const callID = asTrimmedString(part.callID);
+      content.push({
+        type: 'toolCall',
+        id: callID,
+        name: asTrimmedString(part.tool) || 'tool',
+        arguments: isRecord(part.state?.input) ? part.state.input : {},
+      });
+      const toolResult = toolResultFromFacadePart(part, timestamp);
+      if (toolResult) toolResults.push(toolResult);
+      continue;
+    }
+    if (part.type === 'file' || part.type === 'image') {
+      const image = toPiImageContent(part);
+      if (image) content.push(image);
+    }
+  }
+  if (content.length === 0 && toolResults.length === 0) return [];
+  return [
+    { role, content, timestamp },
+    ...toolResults,
+  ];
+};
+
+export const persistFacadeMessages = (manager, messages) => {
+  if (typeof manager?.appendMessage !== 'function') return false;
+  for (const entry of Array.isArray(messages) ? messages : []) {
+    for (const message of piMessagesFromFacadeEntry(entry)) {
+      manager.appendMessage(message);
+    }
+  }
+  return true;
+};
+
 export const sanitizeExportBasename = (title) => {
   const base = asTrimmedString(title) || 'session';
   const safe = base
@@ -471,7 +538,7 @@ export const parseSessionImport = (raw) => {
   let cwd = '';
   const messages = [];
 
-  const ingest = (entry) => {
+  const ingestMeta = (entry) => {
     if (!entry || typeof entry !== 'object') return;
     if (entry.type === 'session') {
       cwd = asTrimmedString(entry.cwd) || cwd;
@@ -479,10 +546,23 @@ export const parseSessionImport = (raw) => {
     }
     if (entry.type === 'session_info' && asTrimmedString(entry.name)) {
       title = asTrimmedString(entry.name);
-      return;
     }
+  };
+
+  const ingestFacade = (entry) => {
+    ingestMeta(entry);
     const facade = facadeFromUnknown(entry);
     if (facade) messages.push(facade);
+  };
+
+  const ingestEntries = (entries) => {
+    for (const entry of entries) ingestMeta(entry);
+    const mapped = facadeMessagesFromPiEntries(entries);
+    if (mapped.length > 0) {
+      messages.push(...mapped);
+      return;
+    }
+    for (const entry of entries) ingestFacade(entry);
   };
 
   if (source.startsWith('[')) {
@@ -499,19 +579,21 @@ export const parseSessionImport = (raw) => {
       error.status = 400;
       throw error;
     }
-    for (const entry of parsed) ingest(entry);
+    ingestEntries(parsed);
   } else {
+    const entries = [];
     for (const line of source.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        ingest(JSON.parse(trimmed));
+        entries.push(JSON.parse(trimmed));
       } catch {
         const error = new Error('Invalid JSONL session import');
         error.status = 400;
         throw error;
       }
     }
+    ingestEntries(entries);
   }
 
   if (messages.length === 0) {

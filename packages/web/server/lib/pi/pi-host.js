@@ -56,6 +56,7 @@ import {
 import {
   persistSessionMetadata,
   readPersistedArchivedTimestamp,
+  readPersistedParentID,
   readPersistedSessionMetadata,
   readPersistedSessionMetadataFromFile,
   sessionTimeWithArchived,
@@ -86,6 +87,7 @@ import {
   facadeFilePartFromUnknown,
   facadeMessagesFromPiEntries,
   parseSessionImport,
+  persistFacadeMessages,
   sanitizeExportBasename,
 } from './session-transfer.js';
 
@@ -1110,7 +1112,13 @@ export const createPiHost = ({
       ? piSession.sessionId.trim()
       : undefined;
     const sessionID = persistedId || liveId || id || createSessionId();
-    if (metadata) persistSessionMetadata(sessionManager, metadata);
+    const resolvedParentID = typeof parentID === 'string' && parentID.trim() ? parentID.trim() : undefined;
+    const sessionMetadata = {
+      ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {}),
+      ...(resolvedParentID ? { parentID: resolvedParentID } : {}),
+    };
+    const hasMetadata = Object.keys(sessionMetadata).length > 0;
+    if (hasMetadata) persistSessionMetadata(sessionManager, sessionMetadata);
     const record = {
       id: sessionID,
       directory: cwd,
@@ -1122,8 +1130,8 @@ export const createPiHost = ({
         id: sessionID,
         directory: cwd,
         title,
-        parentID,
-        metadata,
+        parentID: resolvedParentID || readPersistedParentID(sessionMetadata),
+        metadata: hasMetadata ? sessionMetadata : undefined,
         projectID: cwd,
       }),
       messages: [],
@@ -1141,6 +1149,16 @@ export const createPiHost = ({
       properties: { info: record.info },
     });
     return record;
+  };
+
+  const persistRecordMessages = (record) => {
+    if (!record?.sessionManager) return;
+    if ((record.messages || []).length === 0) return;
+    if (!persistFacadeMessages(record.sessionManager, record.messages)) {
+      const error = new Error('Cannot persist session messages');
+      error.status = 500;
+      throw error;
+    }
   };
 
   const missingSession = (sessionID) => {
@@ -1223,6 +1241,7 @@ export const createPiHost = ({
           id: sessionID,
           directory: cwd,
           title,
+          parentID: readPersistedParentID(metadata),
           projectID: cwd,
           metadata,
         }),
@@ -1349,7 +1368,7 @@ export const createPiHost = ({
         title: title
           || (typeof manager?.getSessionName === 'function' && manager.getSessionName())
           || 'Subagent',
-        parentID,
+        parentID: parentID || readPersistedParentID(persistedMetadata),
         metadata: {
           ...(persistedMetadata || {}),
           ...(metadata || {}),
@@ -1533,12 +1552,14 @@ export const createPiHost = ({
     const id = item?.id || item?.path;
     if (!id) return null;
     const metadata = readPersistedSessionMetadataFromFile(item.path);
+    const parentID = readPersistedParentID(metadata);
     return {
       id,
       projectID: item.cwd || directory || 'pi',
       directory: item.cwd || directory,
       title: item.name || item.firstMessage || 'Pi session',
       version: 'pi',
+      ...(parentID ? { parentID } : {}),
       time: sessionTimeWithArchived({
         created: item.created ? new Date(item.created).getTime() : Date.now(),
         updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
@@ -1589,6 +1610,8 @@ export const createPiHost = ({
       if (metadata) {
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
       }
+      const parentID = readPersistedParentID(metadata || record.info.metadata);
+      if (parentID) record.info.parentID = parentID;
       const persisted = await findPersistedSession(record.id, record.directory);
       const updated = persisted?.modified ? new Date(persisted.modified).getTime() : undefined;
       record.info.time = sessionTimeWithArchived({
@@ -1991,10 +2014,8 @@ export const createPiHost = ({
         title: source.info.title ? `${source.info.title} (copy)` : 'Cloned session',
         parentID: source.id,
       });
-      record.messages = source.messages.map((entry) => ({
-        info: { ...entry.info, sessionID: record.id },
-        parts: (entry.parts || []).map((part) => ({ ...part, sessionID: record.id })),
-      }));
+      record.messages = cloneImportedMessages(source.messages, record.id);
+      persistRecordMessages(record);
       record.info.time.updated = Date.now();
       return record;
     },
@@ -2609,10 +2630,8 @@ export const createPiHost = ({
           messages = source.messages.slice(0, index + 1);
         }
       }
-      record.messages = messages.map((entry) => ({
-        info: { ...entry.info, sessionID: record.id },
-        parts: (entry.parts || []).map((part) => ({ ...part, sessionID: record.id })),
-      }));
+      record.messages = cloneImportedMessages(messages, record.id);
+      persistRecordMessages(record);
       record.info.time.updated = Date.now();
       return record;
     },
@@ -2729,6 +2748,7 @@ export const createPiHost = ({
         title: (typeof title === 'string' && title.trim()) ? title.trim() : parsed.title,
       });
       record.messages = cloneImportedMessages(parsed.messages, record.id);
+      persistRecordMessages(record);
       record.info.time.updated = Date.now();
       return record;
     },

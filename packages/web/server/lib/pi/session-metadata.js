@@ -2,7 +2,8 @@
 // (and any other facade metadata) survives reload of the same UUID jsonl
 // under ~/.pi/agent/sessions. Custom entries are not LLM context.
 // Archive is a Pichamber-only flag: `{ archived: ms | 0 }` on this entry.
-// `0` means restored. Do not invent a second session store.
+// `0` means restored. Clone/fork `parentID` is the same entry:
+// `{ parentID: "<source session id>" }`. Do not invent a second session store.
 
 import fs from 'node:fs';
 
@@ -38,6 +39,12 @@ export const readPersistedSessionMetadataFromFile = (file) => {
     }
   }
   return readPersistedSessionMetadata(entries);
+};
+
+export const readPersistedParentID = (metadata) => {
+  if (!isRecord(metadata)) return undefined;
+  const parentID = typeof metadata.parentID === 'string' ? metadata.parentID.trim() : '';
+  return parentID || undefined;
 };
 
 export const readPersistedArchivedTimestamp = (metadata) => {

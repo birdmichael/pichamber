@@ -292,4 +292,181 @@ describe('persisted Pi sessions', () => {
     expect(restoredRecord.info.time.archived).toBe(0);
     restoredHost.dispose();
   });
+
+  it('cloneSession persists messages and parentID so a new host hydrates the same transcript', async () => {
+    const home = tempDir('pi-persist-clone-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const manager = SessionManager.create(cwd, sessionDir);
+    const file = manager.getSessionFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'session',
+      version: CURRENT_SESSION_VERSION,
+      id: manager.getSessionId(),
+      timestamp: new Date().toISOString(),
+      cwd: manager.getCwd(),
+    })}\n`);
+    const opened = SessionManager.open(file, sessionDir);
+    opened.appendSessionInfo('Clone source');
+    opened.appendMessage({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'see this' },
+        { type: 'image', mimeType: 'image/png', data: 'AAAA' },
+      ],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'assistant',
+      content: [
+        { type: 'text', text: 'reading' },
+        { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+      ],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'toolResult',
+      toolName: 'read',
+      toolCallId: 'c1',
+      content: [{ type: 'text', text: 'skill body' }],
+      timestamp: Date.now(),
+    });
+    const sourceId = opened.getSessionId();
+
+    const first = createHost({ home, cwd });
+    await first.ensureSession(sourceId, cwd);
+    const cloned = await first.cloneSession(sourceId);
+    expect(cloned.id).not.toBe(sourceId);
+    expect(cloned.info.parentID).toBe(sourceId);
+    expect(cloned.messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    const cloneId = cloned.id;
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const loaded = await restarted.ensureSession(cloneId, cwd);
+    expect(loaded.info.parentID).toBe(sourceId);
+    expect(loaded.info.metadata?.parentID).toBe(sourceId);
+    const messages = restarted.getMessages(cloneId);
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(messages[0].parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(messages[0].parts[0].text).toBe('see this');
+    expect(messages[0].parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
+    expect(messages[1].parts.map((part) => part.type)).toEqual(['text', 'tool']);
+    expect(messages[1].parts[0].text).toBe('reading');
+    expect(messages[1].parts[1]).toMatchObject({
+      type: 'tool',
+      callID: 'c1',
+      tool: 'read',
+      state: { status: 'completed', input: { path: 'SKILL.md' }, output: 'skill body' },
+    });
+    const listed = await restarted.listSessionInfos(cwd);
+    expect(listed.find((session) => session.id === cloneId)?.parentID).toBe(sourceId);
+    restarted.dispose();
+  });
+
+  it('forkSession persists only the prefix so a new host hydrates that prefix and parentID', async () => {
+    const home = tempDir('pi-persist-fork-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'Fork source',
+      userText: 'first question',
+      assistantText: 'first answer',
+    });
+    const opened = SessionManager.open(persisted.path, sessionDirForCwd(cwd, home));
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'second question' }],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'second answer' }],
+      timestamp: Date.now(),
+    });
+
+    const first = createHost({ home, cwd });
+    await first.ensureSession(persisted.id, cwd);
+    const sourceMessages = first.getMessages(persisted.id);
+    expect(sourceMessages).toHaveLength(4);
+    const forkAt = sourceMessages[0].info.id;
+    const forked = await first.forkSession(persisted.id, forkAt);
+    expect(forked.info.parentID).toBe(persisted.id);
+    expect(forked.messages.map((entry) => entry.parts?.[0]?.text)).toEqual(['first question']);
+    const forkId = forked.id;
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const loaded = await restarted.ensureSession(forkId, cwd);
+    expect(loaded.info.parentID).toBe(persisted.id);
+    const messages = restarted.getMessages(forkId);
+    expect(messages.map((entry) => entry.parts?.[0]?.text)).toEqual(['first question']);
+    expect(messages.some((entry) => entry.parts?.some((part) => part.text === 'second question'))).toBe(false);
+    restarted.dispose();
+  });
+
+  it('importSession writes a Pi jsonl transcript so a new host still has those messages', async () => {
+    const home = tempDir('pi-persist-import-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const jsonl = [
+      JSON.stringify({ type: 'session', cwd, version: CURRENT_SESSION_VERSION }),
+      JSON.stringify({
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'imported hello' }] },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'imported reply' },
+            { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 't1',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{ type: 'text', text: 'imported skill' }],
+        },
+      }),
+    ].join('\n');
+
+    const first = createHost({ home, cwd });
+    const imported = await first.importSession({ jsonl, directory: cwd, title: 'Imported chat' });
+    expect(imported.messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    const importedId = imported.id;
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const loaded = await restarted.ensureSession(importedId, cwd);
+    expect(loaded.info.title).toBe('Imported chat');
+    const messages = restarted.getMessages(importedId);
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(messages[0].parts[0].text).toBe('imported hello');
+    expect(messages[1].parts.map((part) => part.type)).toEqual(['text', 'tool']);
+    expect(messages[1].parts[0].text).toBe('imported reply');
+    expect(messages[1].parts[1]).toMatchObject({
+      type: 'tool',
+      callID: 'c1',
+      tool: 'read',
+      state: { status: 'completed', output: 'imported skill' },
+    });
+    restarted.dispose();
+  });
 });
