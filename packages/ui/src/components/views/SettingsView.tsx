@@ -15,6 +15,7 @@ import { AgentsPage } from '@/components/sections/agents/AgentsPage';
 import { resolvePiDefaultAgentSelection } from '@/components/sections/agents/piAgentSelection';
 import { BehaviorPage } from '@/components/sections/behavior/BehaviorPage';
 import { ExtensionsPage } from '@/components/sections/extensions/ExtensionsPage';
+import { FeaturePluginsPage } from '@/components/sections/feature-plugins/FeaturePluginsPage';
 import { CommandsSidebar } from '@/components/sections/commands/CommandsSidebar';
 import { CommandsPage } from '@/components/sections/commands/CommandsPage';
 import { McpSidebar } from '@/components/sections/mcp/McpSidebar';
@@ -118,6 +119,7 @@ const pageOrder: SettingsPageSlug[] = [
   'mcp',
   'plugins',
   'extensions',
+  'feature-plugins',
   // 'content' group — Library
   'magic-prompts',
   'snippets',
@@ -391,6 +393,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
         return t('settings.page.plugins.title');
       case 'extensions':
         return t('settings.page.extensions.title');
+      case 'feature-plugins':
+        return t('settings.page.featurePlugins.title');
       case 'skills.installed':
         return t('settings.page.skills.title');
       case 'skills.catalog':
@@ -679,6 +683,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
         return <PluginsPage />;
       case 'extensions':
         return <ExtensionsPage />;
+      case 'feature-plugins':
+        return <FeaturePluginsPage />;
       case 'skills.installed':
         return <SkillsPage view="installed" />;
       case 'skills.catalog':

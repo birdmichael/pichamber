@@ -793,4 +793,82 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('lists default feature plugin slots without installing', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const response = await fetch(`${url}/api/pi/feature-plugins`);
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.slots.goal.source).toBe('npm:@narumitw/pi-goal');
+      expect(body.slots.plan.source).toBe('npm:@narumitw/pi-plan-mode');
+      expect(body.slots.mcp.source).toBe('npm:pi-mcp-adapter');
+      expect(body.slots.subagents.source).toBe('npm:pi-subagents');
+      expect(body.slots.goal.command).toBe('goal');
+      expect(body.slots.plan.command).toBeUndefined();
+      expect(body.slots.goal.installed).toBe(false);
+      expect(body.slots.plan.installed).toBe(false);
+      const home = kernel.host.getPath().home;
+      expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('persists feature plugin enable flags and installs through settings.json packages', async () => {
+    const idle = createInMemoryPiSession();
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => idle,
+    });
+    try {
+      const created = await kernel.host.createSession({ directory: '/tmp/project', title: 'Idle' });
+      expect(created.id).toBeTruthy();
+
+      const patched = await fetch(`${url}/api/pi/feature-plugins`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          goal: { enabled: true, command: 'goal' },
+          plan: { source: 'npm:@narumitw/pi-plan-mode', enabled: true },
+        }),
+      });
+      expect(patched.status).toBe(200);
+      const patchedBody = await patched.json();
+      expect(patchedBody.slots.goal.enabled).toBe(true);
+      expect(patchedBody.slots.plan.enabled).toBe(true);
+      expect(patchedBody.slots.goal.installed).toBe(false);
+
+      const installed = await fetch(`${url}/api/pi/feature-plugins/goal/install`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(installed.status).toBe(200);
+      const installedBody = await installed.json();
+      expect(installedBody.slots.goal.installed).toBe(true);
+      expect(installedBody.reload.reloaded).toContain(created.id);
+      expect(idle.reloadCount).toBe(1);
+
+      const home = kernel.host.getPath().home;
+      const settings = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+      expect(settings.packages).toContain('npm:@narumitw/pi-goal');
+      const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
+      expect(chamber.featurePlugins.goal.enabled).toBe(true);
+
+      const removed = await fetch(`${url}/api/pi/feature-plugins/goal/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(removed.status).toBe(200);
+      expect((await removed.json()).slots.goal.installed).toBe(false);
+      const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+      expect(after.packages || []).not.toContain('npm:@narumitw/pi-goal');
+      expect(idle.reloadCount).toBe(2);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });
