@@ -564,6 +564,106 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('reloads session records without emitting server.connected', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-records-'));
+    tempHomes.push(directory);
+    const events = [];
+    const { url, close, kernel } = await startFacade({
+      directory,
+      mock: false,
+      createSession: async ({ sessionManager }) => ({
+        sessionId: typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+        isStreaming: false,
+        subscribe() { return () => {}; },
+        async prompt() {},
+        async abort() {},
+        async reload() {},
+        dispose() {},
+      }),
+    });
+    kernel.bus.subscribeEvent((event) => events.push(event.payload || event));
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Open row' }),
+      })).json();
+      const record = kernel.host.getSession(created.id);
+      const opened = SessionManager.open(record.sessionFile, sessionDirForCwd(directory, kernel.host.getPath().home));
+      opened.appendMessage({
+        role: 'user',
+        content: [{ type: 'text', text: 'written after create' }],
+        timestamp: Date.now(),
+      });
+      events.length = 0;
+      const response = await fetch(`${url}/api/pi/sessions/reload`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id }),
+      });
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        success: true,
+        reloaded: true,
+        kernel: 'pi',
+        sessionID: created.id,
+      });
+      expect(payload.sessions.map((item) => item.id)).toContain(created.id);
+      expect(payload.messages.some((entry) => entry.parts?.[0]?.text === 'written after create')).toBe(true);
+      const listed = await (await fetch(`${url}/api/session`)).json();
+      expect(listed.some((item) => item.id === created.id)).toBe(true);
+      const messages = await (await fetch(`${url}/api/session/${created.id}/message`)).json();
+      expect(messages.some((entry) => entry.parts?.[0]?.text === 'written after create')).toBe(true);
+      expect(events.map((event) => event.type)).not.toContain('server.connected');
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('returns 409 from session-record reload while the target is streaming', async () => {
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => createInMemoryPiSession({
+        chunks: ['one ', 'two ', 'three'],
+        chunkDelayMs: 40,
+      }),
+    });
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Busy' }),
+      })).json();
+      const sibling = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Idle sibling' }),
+      })).json();
+      void fetch(`${url}/api/session/${created.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parts: [{ type: 'text', text: 'go' }] }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const response = await fetch(`${url}/api/pi/sessions/reload`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id }),
+      });
+      expect(response.status).toBe(409);
+      const payload = await response.json();
+      expect(payload.error).toBe('Wait for the current response to finish before reloading.');
+      const listed = await (await fetch(`${url}/api/session`)).json();
+      expect(listed.map((item) => item.id).sort()).toEqual([created.id, sibling.id].sort());
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('rejects /reload as a user command and persists thinking defaults', async () => {
     const { url, close, kernel } = await startFacade();
     try {

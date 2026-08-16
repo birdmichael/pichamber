@@ -146,6 +146,16 @@ leaves extensions `ui_unavailable`.
 Reload does not emit `server.connected`. The UI treats that event as a full
 re-bootstrap onto a new-session draft.
 
+`host.reloadSessionRecords({ sessionID })` / `POST /api/pi/sessions/reload`
+is the sidebar Refresh path. It reloads Pi in place (skills, prompts,
+extensions, and model runtime when no live session is busy) **and** re-reads
+persisted session records: the merged session list plus messages for the
+targeted session. A busy target is 409 and leaves siblings untouched. Idle
+siblings can still refresh; busy siblings are skipped. One unreadable session
+file does not remove other complete sessions. This path also does not emit
+`server.connected`. Title-refresh `POST /api/session/:id/reload` stays
+skills/prompts/extensions only.
+
 ## MCP adapter
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot
