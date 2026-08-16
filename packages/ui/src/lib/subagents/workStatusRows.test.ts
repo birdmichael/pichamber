@@ -87,14 +87,36 @@ describe('buildWorkStatusSubagentRows', () => {
     }]);
   });
 
-  test('keeps a row as status-only when no session id exists', () => {
+  test('keeps a live row as status-only when no session id exists yet', () => {
     const rows = buildWorkStatusSubagentRows({
-      runs: [run()],
+      runs: [run({ state: 'queued' })],
       transcriptIds: [],
       directory: '/repo',
       untitledLabel: 'Subagent',
     });
+    expect(rows).toHaveLength(1);
     expect(rows[0]?.openable).toBe(false);
     expect(rows[0]?.sessionID).toBeNull();
+  });
+
+  test('drops terminal ghost rows that have no child session id', () => {
+    const rows = buildWorkStatusSubagentRows({
+      runs: [
+        run({ runId: 'ghost_1', state: 'done' }),
+        run({ runId: 'ghost_2', state: 'failed', mode: 'background' }),
+        run({ runId: 'call_1', sessionID: null, openable: false }),
+      ],
+      transcriptIds: [{ runId: 'call_1', sessionID: 'child-1' }],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(rows).toEqual([{
+      id: 'call_1',
+      label: 'List the README filename',
+      sessionID: 'child-1',
+      openable: true,
+      mode: 'foreground',
+      status: 'done',
+    }]);
   });
 });

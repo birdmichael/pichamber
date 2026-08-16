@@ -90,7 +90,7 @@ which requests only providers enabled for this panel.
 | Branch, ahead/behind, attention | `useGitStore` directory state | warmed via `runBackgroundNetworkTask(ensureStatus)` and refreshed from Git mutation hints |
 | Changed files | `useGitStore` status `files` + `diffStats` | working tree, not session-authored edits |
 | PR + checks | `usePrVisualSummary` | **read-only** |
-| Subagents | Pi: adapter runs + parent-transcript `subagent` session ids. OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card |
+| Subagents | Pi: host run list (live `subagent` tool-call session id, not leftover status-file ghosts). OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card. Terminal rows without an id are omitted. |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
 | Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | OpenCode provider quotas only. Hidden on Pi (`isWorkStatusSectionAvailable`); session context % / cost stay in the Session block |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |

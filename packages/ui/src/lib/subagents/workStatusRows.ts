@@ -121,8 +121,8 @@ export const buildWorkStatusSubagentRows = ({
   directory?: string | null;
   effectiveDirectory?: string | null;
   untitledLabel: string;
-}): WorkStatusSubagentRow[] => (
-  assignTranscriptSessionIds(runs, transcriptIds).map((run) => {
+}): WorkStatusSubagentRow[] => {
+  const rows = assignTranscriptSessionIds(runs, transcriptIds).map((run) => {
     const opened = resolveWorkStatusSubagentOpen({
       sessionID: run.sessionID,
       directory,
@@ -144,5 +144,11 @@ export const buildWorkStatusSubagentRows = ({
               ? 'failed'
               : 'done',
     };
-  })
-);
+  });
+  return rows.filter((row) => (
+    row.openable
+    || row.status === 'working'
+    || row.status === 'blocked'
+    || row.status === 'paused'
+  ));
+};

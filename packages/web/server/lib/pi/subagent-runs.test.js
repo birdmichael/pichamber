@@ -15,6 +15,7 @@ import {
   normalizeSubagentRunState,
   parentSessionMatches,
   readSessionIdFromSessionFile,
+  reconcileParentSubagentRuns,
   toPublicSubagentRun,
 } from './subagent-runs.js';
 
@@ -163,6 +164,63 @@ describe('tool-part extraction', () => {
     });
   });
 
+  it('reads sessionId and childSessionId from tool input/output like the transcript card', () => {
+    expect(extractSubagentRunFromToolPart({
+      tool: 'subagent',
+      callID: 'call_input',
+      state: {
+        status: 'error',
+        input: { agent: 'scout', sessionId: 'child-from-input' },
+        output: 'NotImplementedError: node:v8 createHook is not yet implemented in Bun',
+      },
+    }, 'parent-1')).toMatchObject({
+      runId: 'call_input',
+      sessionID: 'child-from-input',
+    });
+    expect(extractSubagentRunFromToolPart({
+      tool: 'subagent',
+      callID: 'call_child',
+      state: {
+        status: 'error',
+        input: { agent: 'scout', childSessionId: 'child-from-field' },
+        output: 'failed',
+      },
+    }, 'parent-1')).toMatchObject({
+      runId: 'call_child',
+      sessionID: 'child-from-field',
+    });
+  });
+
+  it('reads a child session id from an assistant toolCall argument block', () => {
+    const runs = extractRunsFromPiEntries([{
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'toolCall',
+          id: 'call_args',
+          name: 'subagent',
+          arguments: { agent: 'scout', sessionId: 'child-from-call', task: 'List the README filename' },
+        }],
+      },
+    }, {
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call_args',
+        content: [{ type: 'text', text: 'NotImplementedError: createHook' }],
+        isError: true,
+      },
+    }], 'parent-1');
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'call_args',
+      sessionID: 'child-from-call',
+      state: 'failed',
+    });
+  });
+
   it('reads a child session file from Pi toolResult details', () => {
     const dir = makeTemp();
     const childFile = path.join(dir, 'child.jsonl');
@@ -209,6 +267,48 @@ describe('tool-part extraction', () => {
       tool: 'task',
       state: { input: { subagent_type: 'explore' } },
     }, 'parent-1')).toBeNull();
+  });
+});
+
+describe('reconcileParentSubagentRuns', () => {
+  it('prefers the live tool-call session id and drops terminal ghost files', () => {
+    const reconciled = reconcileParentSubagentRuns(
+      Array.from({ length: 10 }, (_, index) => ({
+        runId: `ghost_${index}`,
+        name: 'subagent',
+        title: 'subagent',
+        mode: index === 9 ? 'background' : 'foreground',
+        state: index === 9 ? 'failed' : 'done',
+        sessionID: null,
+      })),
+      [{
+        runId: 'call_live',
+        name: 'scout',
+        title: 'List the README filename',
+        mode: 'foreground',
+        state: 'failed',
+        sessionID: 'child-live',
+        toolCallId: 'call_live',
+      }],
+    );
+    expect(reconciled).toEqual([expect.objectContaining({
+      runId: 'call_live',
+      sessionID: 'child-live',
+    })]);
+    expect(toPublicSubagentRun(reconciled[0]).openable).toBe(true);
+  });
+
+  it('keeps a queued file run without an id as status-only', () => {
+    const reconciled = reconcileParentSubagentRuns([{
+      runId: 'run_early',
+      name: 'reviewer',
+      title: 'reviewer',
+      mode: 'background',
+      state: 'queued',
+      sessionID: null,
+    }], []);
+    expect(reconciled).toHaveLength(1);
+    expect(toPublicSubagentRun(reconciled[0]).openable).toBe(false);
   });
 });
 

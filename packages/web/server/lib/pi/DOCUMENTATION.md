@@ -202,18 +202,21 @@ add a second install path. Opening Feature Plugins or installing
 
 When the slot is on:
 
-- `GET /api/session/:id/subagent-runs` lists `pi-subagents` adapter runs
-  (async status files, parent-transcript `subagent` tool parts, and Pi
-  `toolResult.details.sessionFile` entries). Each public run is
+- `GET /api/session/:id/subagent-runs` lists this parent's fleet. Live
+  `subagent` tool-call input/output (`sessionId` / `childSessionId`) and
+  assistant `toolCall` arguments win over leftover adapter `status.json`
+  files. Each public run is
   `{ runId, sessionID, name, role, mode, state, title, openable }`.
-  Work Status uses that id (or the same transcript metadata the card reads)
-  so a row click opens the same writable child tab.
+  A tool that recorded a child id is `openable: true` so Work Status and
+  the transcript card open the same writable tab.
+- Terminal adapter files with no child id are dropped (not a pile of
+  untitled ghosts). Status-only is only for a still-queued/running/blocked
+  run whose id is not ready yet.
 - A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
   Follow-ups stay on the child; the parent transcript is unchanged.
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.
-- A run without an openable session id is status-only.
 
 When the slot is off, both lists are empty. Leftover OpenCode `parentID`
 children are not a Pi fleet. OpenCode kernel routes are unchanged.

@@ -218,7 +218,17 @@ const readSessionIdFromRecord = (value) => {
   if (!isRecord(value)) return '';
   return asTrimmedString(value.childSessionId)
     || asTrimmedString(value.sessionID)
-    || asTrimmedString(value.sessionId);
+    || asTrimmedString(value.sessionId)
+    || (isRecord(value.details) ? readSessionIdFromRecord(value.details) : '');
+};
+
+const readSessionIdFromOutputText = (value) => {
+  const text = asTrimmedString(value);
+  if (!text) return '';
+  const parsed = parseJsonValue(text);
+  if (parsed) return readSessionIdFromRecord(parsed);
+  const sessionMatch = text.match(/session(?:Id|_id|[_\s-]id)\s*[:=]\s*["']?([^\s<"']+)/i);
+  return asTrimmedString(sessionMatch?.[1]);
 };
 
 const readSessionFileFromText = (value) => {
@@ -243,6 +253,37 @@ const resolveChildSessionId = ({
   return readSessionIdFromSessionFile(sessionFile) || null;
 };
 
+/** Same fields the transcript card reads: tool input/output sessionId and childSessionId. */
+const readChildSessionIdFromToolFields = ({
+  parentID,
+  input,
+  output,
+  metadata,
+  details,
+  sessionFile,
+} = {}) => resolveChildSessionId({
+  parentID,
+  sessionFile,
+  candidates: [
+    readSessionIdFromRecord(input),
+    readSessionIdFromRecord(metadata),
+    readSessionIdFromRecord(details),
+    readSessionIdFromRecord(output),
+    readSessionIdFromOutputText(typeof output === 'string' ? output : ''),
+    readSessionIdFromOutputText(typeof details === 'string' ? details : ''),
+  ],
+});
+
+const isLiveRunState = (state) => (
+  state === 'queued' || state === 'running' || state === 'blocked' || state === 'paused'
+);
+
+const sameSubagentRun = (left, right) => (
+  Boolean(left?.runId && left.runId === right?.runId)
+  || Boolean(left?.toolCallId && left.toolCallId === right?.toolCallId)
+  || Boolean(left?.sessionID && left.sessionID === right?.sessionID)
+);
+
 export const extractSubagentRunFromToolPart = (part, parentID) => {
   if (!isRecord(part) || asTrimmedString(part.tool).toLowerCase() !== 'subagent') return null;
   const state = isRecord(part.state) ? part.state : {};
@@ -264,15 +305,13 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   const rawOutput = typeof state.output === 'string' ? state.output : (typeof part.output === 'string' ? part.output : '');
   const sessionFile = asTrimmedString(details.sessionFile || input.sessionFile || metadata.sessionFile)
     || readSessionFileFromText(rawOutput);
-  const childSessionID = resolveChildSessionId({
+  const childSessionID = readChildSessionIdFromToolFields({
     parentID,
+    input,
+    output: state.output ?? part.output ?? output,
+    metadata,
+    details,
     sessionFile,
-    candidates: [
-      readSessionIdFromRecord(metadata),
-      readSessionIdFromRecord(details),
-      readSessionIdFromRecord(output),
-      readSessionIdFromRecord(input),
-    ],
   });
   const toolStatus = asTrimmedString(state.status).toLowerCase();
   const stateFromOutput = asTrimmedString(details.state || output.state);
@@ -297,31 +336,79 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   };
 };
 
+const upsertSubagentRun = (byId, run) => {
+  if (!run?.runId) return;
+  const existing = byId.get(run.runId);
+  if (!existing) {
+    byId.set(run.runId, run);
+    return;
+  }
+  byId.set(run.runId, {
+    ...existing,
+    ...run,
+    sessionID: run.sessionID || existing.sessionID,
+    sessionFile: run.sessionFile || existing.sessionFile,
+    name: run.name && run.name !== 'subagent' ? run.name : existing.name,
+    role: run.role && run.role !== 'subagent' ? run.role : existing.role,
+    title: run.title && run.title !== run.name ? run.title : existing.title,
+  });
+};
+
 export const extractRunsFromPiEntries = (entries, parentID) => {
-  const runs = [];
-  const seen = new Set();
+  const byId = new Map();
   for (const entry of Array.isArray(entries) ? entries : []) {
     const message = isRecord(entry?.message) ? entry.message : entry;
-    if (!isRecord(message) || asTrimmedString(message.role) !== 'toolResult') continue;
+    if (!isRecord(message)) continue;
+
+    if (asTrimmedString(message.role) === 'assistant' && Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (!isRecord(block) || asTrimmedString(block.type) !== 'toolCall') continue;
+        if (asTrimmedString(block.name).toLowerCase() !== 'subagent') continue;
+        const args = isRecord(block.arguments) ? block.arguments : {};
+        const runId = asTrimmedString(block.id || args.runId || args.id);
+        if (!runId) continue;
+        const sessionFile = asTrimmedString(args.sessionFile) || null;
+        upsertSubagentRun(byId, {
+          runId,
+          parentID: asTrimmedString(parentID),
+          sessionID: readChildSessionIdFromToolFields({ parentID, input: args, sessionFile }),
+          sessionFile,
+          name: asTrimmedString(args.agent || args.role || args.subagent_type) || 'subagent',
+          role: asTrimmedString(args.role || args.agent) || 'subagent',
+          mode: normalizeSubagentRunMode(args.mode, args.async === true ? 'background' : 'foreground'),
+          state: 'running',
+          title: asTrimmedString(args.task || args.description || args.goal) || asTrimmedString(args.agent) || 'subagent',
+          toolCallId: asTrimmedString(block.id) || null,
+          asyncDir: null,
+          startedAt: null,
+          endedAt: null,
+        });
+      }
+      continue;
+    }
+
+    if (asTrimmedString(message.role) !== 'toolResult') continue;
     const toolName = asTrimmedString(message.toolName || message.name).toLowerCase();
     if (toolName !== 'subagent') continue;
     const details = isRecord(message.details) ? message.details : {};
     const runId = asTrimmedString(details.runId || details.id || message.toolCallId || entry.id);
-    if (!runId || seen.has(runId)) continue;
-    const sessionFile = asTrimmedString(details.sessionFile) || readSessionFileFromText(message.content);
-    const childSessionID = resolveChildSessionId({
-      parentID,
-      sessionFile,
-      candidates: [
-        readSessionIdFromRecord(details),
-        readSessionIdFromRecord(message),
-      ],
-    });
-    seen.add(runId);
-    runs.push({
+    if (!runId) continue;
+    const rawContent = typeof message.content === 'string'
+      ? message.content
+      : Array.isArray(message.content)
+        ? message.content.map((item) => (typeof item?.text === 'string' ? item.text : '')).join('')
+        : '';
+    const sessionFile = asTrimmedString(details.sessionFile) || readSessionFileFromText(rawContent);
+    upsertSubagentRun(byId, {
       runId,
       parentID: asTrimmedString(parentID),
-      sessionID: childSessionID,
+      sessionID: readChildSessionIdFromToolFields({
+        parentID,
+        input: details,
+        output: rawContent,
+        details,
+        sessionFile,
+      }),
       sessionFile: sessionFile || null,
       name: asTrimmedString(details.agent || details.role) || 'subagent',
       role: asTrimmedString(details.role || details.agent) || 'subagent',
@@ -334,7 +421,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       endedAt: null,
     });
   }
-  return runs;
+  return [...byId.values()];
 };
 
 export const extractRunsFromFacadeMessages = (messages, parentID) => {
@@ -392,6 +479,38 @@ export const mergeSubagentRuns = (...lists) => {
     const byState = runRank(left.state) - runRank(right.state);
     if (byState !== 0) return byState;
     return (right.startedAt || 0) - (left.startedAt || 0);
+  });
+};
+
+/**
+ * Live tool-call runs win. Stale adapter status files without a child id are
+ * dropped; status-only stays only while a run is still queued/running/blocked.
+ */
+export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
+  const live = mergeSubagentRuns(liveRuns);
+  const extras = [];
+  for (const file of Array.isArray(fileRuns) ? fileRuns : []) {
+    if (!file?.runId) continue;
+    const match = live.find((run) => sameSubagentRun(run, file));
+    if (match) {
+      match.sessionID = match.sessionID || file.sessionID;
+      match.sessionFile = match.sessionFile || file.sessionFile;
+      if (!match.name || match.name === 'subagent') match.name = file.name;
+      if (!match.title || match.title === match.name) match.title = file.title || match.title;
+      if (file.mode) match.mode = file.mode;
+      continue;
+    }
+    if (file.sessionID || isLiveRunState(file.state)) extras.push(file);
+  }
+
+  const combined = mergeSubagentRuns(live, extras);
+  const visible = combined.filter((run) => run.sessionID || isLiveRunState(run.state));
+  const seenSession = new Set();
+  return visible.filter((run) => {
+    if (!run.sessionID) return true;
+    if (seenSession.has(run.sessionID)) return false;
+    seenSession.add(run.sessionID);
+    return true;
   });
 };
 

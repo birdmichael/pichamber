@@ -72,8 +72,8 @@ import {
   findAdapterRunByChildSessionId,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
-  mergeSubagentRuns,
   readSessionIdFromSessionFile,
+  reconcileParentSubagentRuns,
   toPublicSubagentRun,
 } from './subagent-runs.js';
 import {
@@ -1367,12 +1367,14 @@ export const createPiHost = ({
       parent,
       projectDir: parent.directory,
     });
-    const toolRuns = extractRunsFromFacadeMessages(parent.messages, parent.id);
-    const entryRuns = extractRunsFromPiEntries(
-      typeof parent.sessionManager?.getEntries === 'function' ? parent.sessionManager.getEntries() : [],
-      parent.id,
-    );
-    return mergeSubagentRuns(fileRuns, toolRuns, entryRuns);
+    const liveRuns = [
+      ...extractRunsFromFacadeMessages(parent.messages, parent.id),
+      ...extractRunsFromPiEntries(
+        typeof parent.sessionManager?.getEntries === 'function' ? parent.sessionManager.getEntries() : [],
+        parent.id,
+      ),
+    ];
+    return reconcileParentSubagentRuns(fileRuns, liveRuns);
   };
 
   const attachSubagentRun = async (parent, run) => {

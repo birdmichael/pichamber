@@ -60,5 +60,6 @@ describe('card fields', () => {
       { agent: 'scout' },
       JSON.stringify({ details: { sessionId: 'child-1' } }),
     )).toBe('child-1');
+    expect(readSubagentChildSessionId({ childSessionId: 'child-from-input' }, 'failed')).toBe('child-from-input');
   });
 });

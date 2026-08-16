@@ -56,7 +56,11 @@ export const readSubagentChildSessionId = (
   input?: Record<string, unknown> | null,
   output?: unknown,
 ): string | null => {
-  const fromInput = typeof input?.sessionId === 'string' ? input.sessionId.trim() : '';
+  const fromInput = typeof input?.sessionId === 'string'
+    ? input.sessionId.trim()
+    : typeof input?.childSessionId === 'string'
+      ? input.childSessionId.trim()
+      : '';
   if (fromInput) return fromInput;
   if (typeof output === 'string' && output.trim()) {
     try {

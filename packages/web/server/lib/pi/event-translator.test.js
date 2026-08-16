@@ -99,6 +99,29 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.state.output).toBe('ok');
   });
 
+  it('copies tool result details onto part metadata so subagent session ids survive', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_sub',
+      toolName: 'subagent',
+      args: { agent: 'scout' },
+    });
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_sub',
+      toolName: 'subagent',
+      args: { agent: 'scout' },
+      result: {
+        content: [{ type: 'text', text: 'createHook is not yet implemented' }],
+        details: { sessionId: 'child-from-details' },
+      },
+      isError: true,
+    });
+    expect(end[0].properties.part.state.metadata).toEqual({ sessionId: 'child-from-details' });
+  });
+
 
   it('attaches parentID, agent, model, and stable time to assistant info', () => {
     const t = translator();

@@ -124,6 +124,57 @@ describe('Pi host subagent runs', () => {
     }
   });
 
+  it('fills sessionID from the live subagent tool and drops leftover ghost files', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const tmpdir = path.join(home, 'tmp');
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    for (let index = 0; index < 10; index += 1) {
+      const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', `ghost_${index}`);
+      fs.mkdirSync(runDir, { recursive: true });
+      fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+        runId: `ghost_${index}`,
+        sessionId: parent.id,
+        state: index === 9 ? 'failed' : 'complete',
+        mode: index === 9 ? 'async' : 'sync',
+      }));
+    }
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_sub',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_live',
+        state: {
+          status: 'error',
+          input: { agent: 'scout', sessionId: 'child-live', task: 'List the README filename' },
+          output: 'NotImplementedError: node:v8 createHook is not yet implemented in Bun',
+        },
+      }],
+    });
+    try {
+      const listed = await host.listSubagentRuns(parent.id);
+      expect(listed.runs).toEqual([expect.objectContaining({
+        runId: 'call_live',
+        sessionID: 'child-live',
+        openable: true,
+        name: 'scout',
+      })]);
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+    }
+  });
+
   it('does not invent an openable session when the run has no child id', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);
