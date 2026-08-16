@@ -644,6 +644,9 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   const listSessionInfos = async (directory) => {
+    if (typeof host.listSessionInfos === 'function') {
+      return host.listSessionInfos(directory || undefined);
+    }
     const live = host.listSessions(directory || undefined).map((record) => record.info);
     const seen = new Set(live.map((info) => info.id));
     if (typeof host.listPersistedSessions === 'function') {
@@ -745,6 +748,30 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       ...result,
     });
   }));
+
+  const piReloadSessionRecords = async (req, res) => {
+    if (typeof host.reloadSessionRecords !== 'function') {
+      const error = new Error('Session record reload is not available');
+      error.status = 501;
+      throw error;
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const sessionID = typeof body.sessionID === 'string' && body.sessionID.trim()
+      ? body.sessionID.trim()
+      : (typeof req.params?.sessionID === 'string' ? req.params.sessionID.trim() : '');
+    const result = await host.reloadSessionRecords({
+      sessionID,
+      directory: resolveDirectory(req),
+    });
+    json(res, 200, {
+      success: true,
+      kernel: 'pi',
+      reloaded: true,
+      ...result,
+    });
+  };
+  app.post('/api/pi/sessions/reload', parseJson, handle(piReloadSessionRecords));
+  app.post('/api/session/:sessionID/reload-records', parseJson, handle(piReloadSessionRecords));
 
   app.post('/api/session/:sessionID/command', parseJson, handle(async (req, res) => {
     if (typeof host.runCommand === 'function') {

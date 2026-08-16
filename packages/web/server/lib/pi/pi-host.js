@@ -1527,6 +1527,110 @@ export const createPiHost = ({
     readyPromise = null;
   };
 
+  const reloadLiveRecord = async (record) => {
+    const blocked = sessionBlocksPiReload(record);
+    if (blocked) {
+      const error = new Error(blocked);
+      error.status = 409;
+      throw error;
+    }
+    record.unsubscribe?.();
+    if (typeof record.piSession?.reload === 'function') {
+      await record.piSession.reload();
+    } else {
+      try {
+        record.extensionUI?.dispose?.();
+        record.piSession?.dispose?.();
+      } catch {
+      }
+      const factory = await resolveCreateSession();
+      record.piSession = await factory({
+        cwd: record.directory,
+        modelRuntime,
+      });
+    }
+    attachSession(record);
+    await bindDesktopExtensionUI(record);
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.updated',
+      properties: { info: record.info },
+    });
+  };
+
+  const toPersistedSessionInfo = (item, directory) => {
+    const id = item?.id || item?.path;
+    if (!id) return null;
+    return {
+      id,
+      projectID: item.cwd || directory || 'pi',
+      directory: item.cwd || directory,
+      title: item.name || item.firstMessage || 'Pi session',
+      version: 'pi',
+      time: {
+        created: item.created ? new Date(item.created).getTime() : Date.now(),
+        updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
+      },
+    };
+  };
+
+  const collectSessionInfos = async (directory) => {
+    const live = Array.from(sessions.values())
+      .filter((record) => !directory || record.directory === directory)
+      .map((record) => record.info);
+    const seen = new Set(live.map((info) => info.id));
+    if (mock) return live;
+    try {
+      const persisted = await (async () => {
+        const pi = await loadPiSdk();
+        if (typeof pi.SessionManager?.list !== 'function') return [];
+        const cwd = directory || defaultDirectory;
+        return await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
+      })();
+      for (const item of persisted || []) {
+        const info = toPersistedSessionInfo(item, directory);
+        if (!info || seen.has(info.id)) continue;
+        seen.add(info.id);
+        live.push(info);
+      }
+    } catch {
+      // Persisted listing failed: keep live sessions. Do not return empty success.
+    }
+    return live;
+  };
+
+  const refreshRecordMessagesFromDisk = async (record) => {
+    const file = record?.sessionFile;
+    if (!file || !fs.existsSync(file)) return false;
+    try {
+      const pi = await loadPiSdk();
+      if (typeof pi.SessionManager?.open !== 'function') {
+        refreshChildMessagesFromFile(record);
+        return true;
+      }
+      const manager = pi.SessionManager.open(file);
+      const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
+      record.messages = facadeMessagesFromPiEntries(entries, record.id);
+      const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
+      if (title) record.info.title = title;
+      const metadata = readPersistedSessionMetadata(entries);
+      if (metadata) {
+        record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
+      }
+      const persisted = await findPersistedSession(record.id, record.directory);
+      if (persisted?.modified) {
+        const updated = new Date(persisted.modified).getTime();
+        if (Number.isFinite(updated)) {
+          record.info.time = { ...(record.info.time || {}), updated };
+        }
+      }
+      return true;
+    } catch (error) {
+      console.warn(`[pi-host] session record refresh failed for ${record.id}:`, error?.message || error);
+      return false;
+    }
+  };
+
   return {
     ready,
     isMock() {
@@ -1921,6 +2025,9 @@ export const createPiHost = ({
         return [];
       }
     },
+    async listSessionInfos(directory) {
+      return collectSessionInfos(directory);
+    },
     async reload(options) {
       const target = typeof options === 'string'
         ? { directory: options }
@@ -1928,40 +2035,9 @@ export const createPiHost = ({
       const sessionID = typeof target.sessionID === 'string' ? target.sessionID.trim() : '';
       const directory = typeof target.directory === 'string' ? target.directory : undefined;
 
-      const reloadRecord = async (record) => {
-        const blocked = sessionBlocksPiReload(record);
-        if (blocked) {
-          const error = new Error(blocked);
-          error.status = 409;
-          throw error;
-        }
-        record.unsubscribe?.();
-        if (typeof record.piSession?.reload === 'function') {
-          await record.piSession.reload();
-        } else {
-          try {
-            record.extensionUI?.dispose?.();
-            record.piSession?.dispose?.();
-          } catch {
-          }
-          const factory = await resolveCreateSession();
-          record.piSession = await factory({
-            cwd: record.directory,
-            modelRuntime,
-          });
-        }
-        attachSession(record);
-        await bindDesktopExtensionUI(record);
-        emit(record.directory, {
-          id: createEventId(),
-          type: 'session.updated',
-          properties: { info: record.info },
-        });
-      };
-
       if (sessionID) {
         const record = await ensureRecord(sessionID, directory);
-        await reloadRecord(record);
+        await reloadLiveRecord(record);
         const skills = listPiSkills({ home, directory: record.directory });
         const commands = listPiCommands({ home, directory: record.directory });
         return {
@@ -2003,7 +2079,7 @@ export const createPiHost = ({
       for (const record of sessions.values()) {
         if (directory && record.directory !== directory) continue;
         try {
-          await reloadRecord(record);
+          await reloadLiveRecord(record);
         } catch (error) {
           console.warn(`[pi-host] reload failed for session ${record.id}:`, error?.message || error);
         }
@@ -2024,6 +2100,102 @@ export const createPiHost = ({
         sessions: sessions.size,
         skills: skills.length,
         commands: commands.length,
+      };
+    },
+    async reloadSessionRecords(options = {}) {
+      const target = options && typeof options === 'object' ? options : {};
+      const sessionID = typeof target.sessionID === 'string' ? target.sessionID.trim() : '';
+      const directory = typeof target.directory === 'string' ? target.directory : undefined;
+
+      let targeted = null;
+      if (sessionID) {
+        targeted = await ensureRecord(sessionID, directory);
+        const blocked = sessionBlocksPiReload(targeted);
+        if (blocked) {
+          const error = new Error(blocked);
+          error.status = 409;
+          throw error;
+        }
+      }
+
+      const anyBusy = Array.from(sessions.values()).some((record) => (
+        (!directory || record.directory === directory) && sessionBlocksPiReload(record)
+      ));
+      if (!anyBusy) {
+        modelRuntime = null;
+        modelRuntimeError = null;
+        readyPromise = null;
+        for (const runtime of directoryRuntimes.values()) {
+          try {
+            runtime.dispose?.();
+          } catch {
+          }
+        }
+        directoryRuntimes.clear();
+        try {
+          await ensureModelRuntime();
+        } catch {
+        }
+      }
+
+      const liveReloaded = [];
+      const skipped = [];
+      const failed = [];
+      for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          skipped.push({ sessionID: record.id, reason: blocked });
+          continue;
+        }
+        try {
+          await reloadLiveRecord(record);
+          liveReloaded.push(record.id);
+        } catch (error) {
+          failed.push({
+            sessionID: record.id,
+            reason: error?.message || 'reload failed',
+          });
+          console.warn(`[pi-host] session-records reload failed for ${record.id}:`, error?.message || error);
+        }
+      }
+
+      if (targeted) {
+        const refreshed = await refreshRecordMessagesFromDisk(targeted);
+        if (!refreshed && targeted.sessionFile) {
+          failed.push({
+            sessionID: targeted.id,
+            reason: 'session record refresh failed',
+          });
+        }
+      }
+
+      if (!anyBusy) {
+        try {
+          await ready();
+        } catch {
+        }
+      }
+
+      const cwd = directory || targeted?.directory || defaultDirectory;
+      const listed = await collectSessionInfos(directory || targeted?.directory);
+      const skills = listPiSkills({ home, directory: cwd });
+      const commands = listPiCommands({ home, directory: cwd });
+      // Refresh skills/prompts/extensions and re-read persisted session records.
+      // Do not emit server.connected — the UI treats that as a full re-bootstrap
+      // and would drop the open session onto a new-session draft.
+
+      return {
+        reloaded: true,
+        kernel: 'pi',
+        sessionID: targeted?.id,
+        sessions: listed,
+        messages: targeted ? targeted.messages : [],
+        skills: skills.length,
+        commands: commands.length,
+        liveReloaded,
+        skipped,
+        failed,
       };
     },
     async runCommand(sessionID, body = {}) {

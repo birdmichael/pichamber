@@ -409,6 +409,83 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('reloadSessionRecords does not emit server.connected', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stay' });
+    events.length = 0;
+    const result = await host.reloadSessionRecords({ sessionID: record.id });
+    expect(result).toMatchObject({
+      reloaded: true,
+      kernel: 'pi',
+      sessionID: record.id,
+    });
+    expect(result.sessions.map((item) => item.id)).toContain(record.id);
+    expect(events.map((event) => event.type)).not.toContain('server.connected');
+    expect(host.listSessions()).toHaveLength(1);
+    host.dispose();
+  });
+
+  it('reloadSessionRecords 409s a busy target without clearing siblings', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({ compacting: true });
+    const created = [];
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => {
+        const next = created.length === 0 ? idleSession : busySession;
+        created.push(next);
+        return next;
+      },
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    const busy = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    await expect(host.reloadSessionRecords({ sessionID: busy.id })).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for compaction to finish before reloading.',
+    });
+    expect(host.listSessions().map((item) => item.id).sort()).toEqual([busy.id, idle.id].sort());
+    expect(host.getSession(idle.id).info.title).toBe('Idle');
+    expect(busySession.reloadCount).toBe(0);
+    expect(idleSession.reloadCount).toBe(0);
+    host.dispose();
+  });
+
+  it('reloadSessionRecords refreshes an idle session while a sibling is busy', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({ compacting: true });
+    const created = [];
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => {
+        const next = created.length === 0 ? idleSession : busySession;
+        created.push(next);
+        return next;
+      },
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    const busy = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    events.length = 0;
+    const result = await host.reloadSessionRecords({ sessionID: idle.id });
+    expect(result.sessionID).toBe(idle.id);
+    expect(result.sessions.map((item) => item.id).sort()).toEqual([busy.id, idle.id].sort());
+    expect(idleSession.reloadCount).toBe(1);
+    expect(busySession.reloadCount).toBe(0);
+    expect(result.skipped.some((item) => item.sessionID === busy.id)).toBe(true);
+    expect(events.map((event) => event.type)).not.toContain('server.connected');
+    host.dispose();
+  });
+
   it('runCommand /reload is not a user command and does not reload', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-cmd-'));
     try {

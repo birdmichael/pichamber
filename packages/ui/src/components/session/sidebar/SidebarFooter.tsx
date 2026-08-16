@@ -11,6 +11,12 @@ type Props = {
   onOpenUpdate: () => void;
   showRuntimeButtons?: boolean;
   showUpdateButton?: boolean;
+  showRefreshButton?: boolean;
+  onRefresh?: () => void;
+  refreshDisabled?: boolean;
+  refreshInFlight?: boolean;
+  refreshAriaLabel?: string;
+  refreshTooltip?: string;
 };
 
 const footerButtonClassName = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-interactive-hover/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
@@ -22,6 +28,12 @@ export function SidebarFooter({
   onOpenUpdate,
   showRuntimeButtons = true,
   showUpdateButton = true,
+  showRefreshButton = false,
+  onRefresh,
+  refreshDisabled = false,
+  refreshInFlight = false,
+  refreshAriaLabel,
+  refreshTooltip,
 }: Props): React.ReactNode {
   const { t } = useI18n();
 
@@ -49,6 +61,27 @@ export function SidebarFooter({
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}><p>{t('sessions.sidebar.footer.actions.shortcuts')}</p></TooltipContent>
           </Tooltip>
+          {showRefreshButton ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={refreshDisabled}
+                  className={`${footerButtonClassName} disabled:pointer-events-none disabled:opacity-50`}
+                  aria-label={refreshAriaLabel ?? t('sessions.sidebar.footer.refresh.aria')}
+                >
+                  <Icon
+                    name={refreshInFlight ? 'loader-4' : 'refresh'}
+                    className={`h-4.5 w-4.5${refreshInFlight ? ' animate-spin' : ''}`}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4}>
+                <p>{refreshTooltip ?? t('sessions.sidebar.footer.refresh.tooltip')}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <button type="button" onClick={onOpenAbout} className={footerButtonClassName} aria-label={t('sessions.sidebar.footer.actions.aboutOpenChamber')}>

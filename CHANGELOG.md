@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Sessions:** on Pi, a Refresh button in the sidebar footer (after Shortcuts) reloads skills, prompts, and extensions, and also refreshes the session list and the open chat from disk. The current session stays selected. It is disabled while that session is composing, streaming, or compacting.
 - **Desktop:** the cube splash no longer stays on screen after the app has already started, including when a restored session-chat panel first loads in development.
 - **Settings/Providers:** custom models can now set an input context window. Fetch keeps a provider-reported size when `/models` includes one; typing a known id prefills that model’s published window (`gpt-4o` 128k, `gpt-4.1` 1M, current Claude / Grok / Gemini / DeepSeek ids). A family guess is labeled and only used when both miss. Usage and the context panel use the stored window instead of the generic 200k fallback.
 - **Chat:** on Pi, Plan and other extension prompts now appear in the current chat (option cards, Other text, confirm dialogs, and toasts) instead of hanging or failing as unavailable. Opening a session shows a prompt that is already waiting. `/plan start` confirms with a toast. Dismissing a prompt cancels that question only.

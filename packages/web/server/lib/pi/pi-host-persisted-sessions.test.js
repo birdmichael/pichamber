@@ -140,6 +140,80 @@ describe('persisted Pi sessions', () => {
     restarted.dispose();
   });
 
+  it('reloadSessionRecords re-lists disk sessions and re-reads the open transcript', async () => {
+    const home = tempDir('pi-persist-records-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const open = writePersistedSession({
+      home,
+      cwd,
+      title: 'Open row',
+      userText: 'original question',
+      assistantText: 'original answer',
+    });
+    const host = createHost({ home, cwd });
+    await host.ensureSession(open.id, cwd);
+    expect(host.getMessages(open.id)).toHaveLength(2);
+
+    const sibling = writePersistedSession({
+      home,
+      cwd,
+      title: 'Sibling from disk',
+      userText: 'another client wrote this',
+    });
+    const opened = SessionManager.open(open.path, sessionDirForCwd(cwd, home));
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'appended on disk' }],
+      timestamp: Date.now(),
+    });
+
+    const result = await host.reloadSessionRecords({ sessionID: open.id, directory: cwd });
+    expect(result.reloaded).toBe(true);
+    expect(result.kernel).toBe('pi');
+    expect(result.sessionID).toBe(open.id);
+    expect(result.sessions.map((item) => item.id)).toEqual(expect.arrayContaining([open.id, sibling.id]));
+    expect(result.messages.map((entry) => entry.parts?.[0]?.text)).toContain('appended on disk');
+    expect(host.getMessages(open.id).map((entry) => entry.parts?.[0]?.text)).toContain('appended on disk');
+    expect(host.listSessions(cwd).map((item) => item.id)).toContain(open.id);
+    host.dispose();
+  });
+
+  it('reloadSessionRecords keeps a complete sibling when another session file is unreadable', async () => {
+    const home = tempDir('pi-persist-partial-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const good = writePersistedSession({
+      home,
+      cwd,
+      title: 'Good session',
+      userText: 'keep this transcript',
+      assistantText: 'still here',
+    });
+    const bad = writePersistedSession({
+      home,
+      cwd,
+      title: 'Broken session',
+      userText: 'will be corrupted',
+    });
+    const host = createHost({ home, cwd });
+    await host.ensureSession(good.id, cwd);
+    await host.ensureSession(bad.id, cwd);
+    const before = host.getMessages(good.id);
+    expect(before).toHaveLength(2);
+    fs.writeFileSync(bad.path, '{not-json\n');
+
+    const result = await host.reloadSessionRecords({ sessionID: good.id, directory: cwd });
+    expect(result.sessionID).toBe(good.id);
+    expect(host.getMessages(good.id).map((entry) => entry.parts?.[0]?.text)).toEqual([
+      'keep this transcript',
+      'still here',
+    ]);
+    expect(host.listSessions(cwd).map((item) => item.id).sort()).toEqual([bad.id, good.id].sort());
+    expect(host.getSession(bad.id).info.title).toBe('Broken session');
+    host.dispose();
+  });
+
   it('persists Session Goal metadata on the Pi session and restores it after reload', async () => {
     const home = tempDir('pi-persist-goal-');
     const cwd = path.join(home, 'project');

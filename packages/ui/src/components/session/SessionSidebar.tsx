@@ -7,7 +7,8 @@ import { isDesktopShell } from '@/lib/desktop';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { formatDirectoryName, cn } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useChildStoreManager } from '@/sync/sync-context';
+import { useChildStoreManager, useGlobalSessionStatus } from '@/sync/sync-context';
+import { getImperativeSessionMessageLoader } from '@/sync/session-message-loader';
 import { getAllSyncSessionMap } from '@/sync/sync-refs';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useSync } from '@/sync/use-sync';
@@ -41,6 +42,15 @@ import { SidebarHeader } from './sidebar/SidebarHeader';
 import { SidebarNav } from './sidebar/SidebarNav';
 import { SidebarActivitySections } from './sidebar/SidebarActivitySections';
 import { SidebarFooter } from './sidebar/SidebarFooter';
+import {
+  getSessionRecordsReloadBlockReason,
+  isSessionTitleReloadBlocked,
+  isSessionTitleReloadOutputting,
+  isSidebarSessionRecordsReloadVisible,
+  reloadPiSessionRecords,
+  sessionRecordsReloadAriaKey,
+  sessionRecordsReloadTooltipKey,
+} from './sidebar/sidebarSessionRecordsReload';
 import { SidebarProjectsList } from './sidebar/SidebarProjectsList';
 import { SessionNodeItem } from './sidebar/SessionNodeItem';
 import type { SessionNodeRenderExtras } from './sidebar/sessionNodeItemUtils';
@@ -93,6 +103,9 @@ import {
 import { useGitHubAuthStore } from '@/stores/useGitHubAuthStore';
 import { useNotificationStore } from '@/sync/notification-store';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
+import { useAssistantStatus } from '@/hooks/useAssistantStatus';
+import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { getGitHubPrStatusKey, useGitHubPrStatusStore } from '@/stores/useGitHubPrStatusStore';
 import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents';
 import { buildSessionBootstrapDemands } from './sidebar/sessionBootstrapDemands';
@@ -466,6 +479,8 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     liveFallbackCacheRef.current = { signature, sessions: candidates };
     return candidates;
   })();
+  const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
+  const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);
   const shareSession = useSessionUIStore((state) => state.shareSession);
@@ -822,6 +837,74 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     }
     setSettingsDialogOpen(true);
   }, [mobileVariant, setSessionSwitcherOpen, setSettingsDialogOpen]);
+
+  const isPiKernel = usePiKernel();
+  const targetedSessionId = currentSessionId && !isNewSessionDraftOpen ? currentSessionId : null;
+  const currentSessionStatus = useGlobalSessionStatus(targetedSessionId ?? '');
+  const { phase: sessionPhase } = useCurrentSessionActivity();
+  const assistantStatus = useAssistantStatus();
+  const sessionRecordsReloadIsOutputting = isSessionTitleReloadOutputting({
+    sessionPhase,
+    sessionIsWorking: sessionPhase !== 'idle',
+    assistantIsWorking: assistantStatus.working.isWorking,
+    assistantIsStreaming: assistantStatus.working.isStreaming,
+    assistantIsForming: assistantStatus.forming.isActive,
+    assistantCanAbort: assistantStatus.working.canAbort,
+    assistantStatusText: assistantStatus.working.statusText,
+  });
+  const sessionRecordsReloadIsCompacting = assistantStatus.working.compactionDeadline != null;
+  const sessionRecordsReloadLiveBlocked = Boolean(targetedSessionId) && isSessionTitleReloadBlocked({
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionRecordsReloadIsOutputting,
+    isCompacting: sessionRecordsReloadIsCompacting,
+  });
+  const [sessionRecordsReloadInFlight, setSessionRecordsReloadInFlight] = React.useState(false);
+  const sessionRecordsReloadInFlightRef = React.useRef(false);
+  const showSessionRecordsReload = isSidebarSessionRecordsReloadVisible({ isPiKernel });
+  const isSessionRecordsReloadInFlight = sessionRecordsReloadInFlight;
+  const sessionRecordsReloadBlockReason = getSessionRecordsReloadBlockReason({
+    hasTargetedSession: Boolean(targetedSessionId),
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionRecordsReloadIsOutputting,
+    isCompacting: sessionRecordsReloadIsCompacting,
+    isReloadInFlight: sessionRecordsReloadInFlight,
+  });
+  const isSessionRecordsReloadDisabled = sessionRecordsReloadBlockReason !== null;
+  const reloadSessionRecords = React.useCallback(() => {
+    if (sessionRecordsReloadLiveBlocked || sessionRecordsReloadInFlightRef.current) return;
+    const sessionID = useSessionUIStore.getState().currentSessionId;
+    const isDraft = Boolean(useSessionUIStore.getState().newSessionDraft?.open);
+    const targetSessionID = sessionID && !isDraft ? sessionID : null;
+    const directory = targetSessionID
+      ? useSessionUIStore.getState().getDirectoryForSession(targetSessionID)
+      : useSessionUIStore.getState().currentSessionDirectory;
+    sessionRecordsReloadInFlightRef.current = true;
+    setSessionRecordsReloadInFlight(true);
+    void reloadPiSessionRecords({
+      sessionID: targetSessionID,
+      directory,
+      requestBootstrap: (demand) => {
+        childStores.requestBootstrap(demand);
+      },
+      refreshGlobalSessions: () => refreshGlobalSessions(),
+      refreshMessages: async (target) => {
+        await getImperativeSessionMessageLoader()?.ensure(target, { force: true });
+      },
+    })
+      .then(() => {
+        toast.success(t('sessions.sidebar.footer.refresh.success'));
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error && error.message.trim()
+          ? error.message
+          : t('sessions.sidebar.footer.refresh.failed');
+        toast.error(message);
+      })
+      .finally(() => {
+        sessionRecordsReloadInFlightRef.current = false;
+        setSessionRecordsReloadInFlight(false);
+      });
+  }, [childStores, sessionRecordsReloadLiveBlocked, t]);
 
   const showSidebarUpdateButton =
     updateStore.available &&
@@ -1939,6 +2022,12 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         onOpenUpdate={handleOpenUpdateDialog}
         showRuntimeButtons={!isVSCode}
         showUpdateButton={showSidebarUpdateButton}
+        showRefreshButton={showSessionRecordsReload}
+        onRefresh={reloadSessionRecords}
+        refreshDisabled={isSessionRecordsReloadDisabled}
+        refreshInFlight={isSessionRecordsReloadInFlight}
+        refreshAriaLabel={t(sessionRecordsReloadAriaKey(sessionRecordsReloadBlockReason))}
+        refreshTooltip={t(sessionRecordsReloadTooltipKey(sessionRecordsReloadBlockReason))}
       />
 
       <UpdateDialog
