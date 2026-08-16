@@ -51,6 +51,13 @@ describe('computeContextUsage', () => {
     expect(usage?.percent).toBe(10);
   });
 
+  test('uses the stored window instead of the 200k fallback', () => {
+    const usage = computeContextUsage([assistant({ input: 64_000, output: 0, reasoning: 0 })], 128_000);
+    expect(usage?.limit).toBe(128_000);
+    expect(usage?.limit).not.toBe(DEFAULT_CONTEXT_LIMIT);
+    expect(usage?.percent).toBe(50);
+  });
+
   test('returns null when no message carries usable tokens', () => {
     expect(computeContextUsage([], 1000)).toBeNull();
     expect(computeContextUsage([{ id: 'u', role: 'user' }], 1000)).toBeNull();

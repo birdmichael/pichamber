@@ -400,6 +400,37 @@ description: >
     })).toThrow(/API key or \{env:VAR\}/);
   });
 
+  it('persists contextWindow on models.json and round-trips it on the public config', () => {
+    const home = makeTemp();
+    writePiProviderAuth('acme', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    const upserted = upsertPiProviderConfig({
+      home,
+      providerId: 'acme',
+      config: {
+        name: 'Acme',
+        options: { baseURL: 'https://api.acme.test/v1' },
+        models: {
+          'gpt-4o': { name: 'GPT-4o', contextWindow: 128000 },
+          mystery: { name: 'Mystery' },
+        },
+      },
+    });
+    expect(upserted.config.models).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(stored.providers.acme.models).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+    expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+  });
+
   it('writes and removes provider auth in the Pi auth.json shape', () => {
     const home = makeTemp();
     const other = writePiProviderAuth('other-provider', { type: 'api', key: 'sk-keep-me' }, { home });

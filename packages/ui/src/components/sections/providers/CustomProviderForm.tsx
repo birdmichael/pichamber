@@ -8,20 +8,27 @@ import {
   SETTINGS_HELPER_CLASS,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_CONTROL_CLUSTER_CLASS,
+  SETTINGS_NUMBER_STEPPER_ROW_CLASS,
+  SETTINGS_NUMBER_UNIT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/components/ui';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import {
   addRemoteModelsToForm,
+  applyModelContextChange,
+  applyModelIdChange,
   buildFetchRemoteModelsRequest,
   createEmptyCustomProviderForm,
   createHeaderRow,
   createModelRow,
   fetchRemoteModelsErrorKey,
+  isInferredModelContext,
   parseRemoteProviderModelsPayload,
   prepareRemoteModelPicker,
   remoteModelAlreadyAdded,
@@ -143,13 +150,27 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   const setModel = (index: number, key: 'id' | 'name', value: string) => {
     setForm((prev) => ({
       ...prev,
-      models: prev.models.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)),
+      models: prev.models.map((row, rowIndex) => {
+        if (rowIndex !== index) {
+          return row;
+        }
+        return key === 'id' ? applyModelIdChange(row, value) : { ...row, [key]: value };
+      }),
     }));
     setModelErrors((prev) => {
       const next = [...prev];
       next[index] = { ...(next[index] ?? {}), [key]: undefined };
       return next;
     });
+  };
+
+  const setModelContext = (index: number, contextWindow: number | undefined) => {
+    setForm((prev) => ({
+      ...prev,
+      models: prev.models.map((row, rowIndex) => (
+        rowIndex === index ? applyModelContextChange(row, contextWindow) : row
+      )),
+    }));
   };
 
   const setHeader = (index: number, key: 'key' | 'value', value: string) => {
@@ -409,6 +430,38 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
                   />
                   {modelErrors[index]?.name ? (
                     <p className="mt-1 typography-meta text-[var(--status-error)]">{modelErrors[index]?.name}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <label className={SETTINGS_FIELD_LABEL_CLASS}>
+                      {t('settings.providers.page.custom.models.contextLabel')}
+                    </label>
+                    <SettingsInfoHint>
+                      {t('settings.providers.page.custom.models.contextInfo')}
+                    </SettingsInfoHint>
+                  </div>
+                  <div className={`${SETTINGS_NUMBER_STEPPER_ROW_CLASS} mt-1`}>
+                    <NumberInput
+                      value={model.contextWindow}
+                      onValueChange={(value) => setModelContext(index, value)}
+                      onClear={() => setModelContext(index, undefined)}
+                      min={1}
+                      step={1000}
+                      inputMode="numeric"
+                      placeholder="—"
+                      emptyLabel="—"
+                      className="w-24 tabular-nums"
+                      aria-label={t('settings.providers.page.custom.models.contextAria')}
+                    />
+                    <span className={SETTINGS_NUMBER_UNIT_CLASS}>
+                      {t('settings.providers.page.custom.models.contextUnit')}
+                    </span>
+                  </div>
+                  {isInferredModelContext(model) ? (
+                    <p className={`mt-1 ${SETTINGS_HELPER_CLASS}`}>
+                      {t('settings.providers.page.custom.models.contextInferred')}
+                    </p>
                   ) : null}
                 </div>
               </div>

@@ -70,6 +70,22 @@ describe('remote-provider-models', () => {
     ]);
   });
 
+  it('keeps a provider-reported context and ignores non-positive values', () => {
+    expect(parseRemoteModelsPayload({
+      data: [
+        { id: 'gpt-4o', name: 'GPT-4o', context_length: 64000 },
+        { id: 'local-llm', max_model_len: '8192' },
+        { id: 'other', context_window: 256000 },
+        { id: 'zeroed', context_length: 0 },
+      ],
+    })).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000 },
+      { id: 'local-llm', name: 'local-llm', contextWindow: 8192 },
+      { id: 'other', name: 'other', contextWindow: 256000 },
+      { id: 'zeroed', name: 'zeroed' },
+    ]);
+  });
+
   it('fetches models with a bearer key and never returns the key', async () => {
     const calls = [];
     const result = await fetchRemoteProviderModels({

@@ -240,6 +240,34 @@ const normalizeHeaders = (headers) => {
   return next;
 };
 
+const REMOTE_CONTEXT_KEYS = [
+  'context_length',
+  'max_model_len',
+  'context_window',
+  'contextWindow',
+  'max_input_tokens',
+  'maxInputTokens',
+  'context',
+];
+
+const readRemoteContextWindow = (item) => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+  for (const key of REMOTE_CONTEXT_KEYS) {
+    const numeric = Number(item[key]);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.round(numeric);
+    }
+  }
+  const limit = item.limit;
+  if (limit && typeof limit === 'object' && !Array.isArray(limit)) {
+    const nested = Number(limit.context);
+    if (Number.isFinite(nested) && nested > 0) {
+      return Math.round(nested);
+    }
+  }
+  return undefined;
+};
+
 export const parseRemoteModelsPayload = (body) => {
   const list = Array.isArray(body)
     ? body
@@ -262,7 +290,12 @@ export const parseRemoteModelsPayload = (body) => {
     const name = item && typeof item === 'object' && typeof item.name === 'string' && item.name.trim()
       ? item.name.trim()
       : id;
-    models.push({ id, name });
+    const contextWindow = readRemoteContextWindow(item);
+    models.push({
+      id,
+      name,
+      ...(contextWindow !== undefined ? { contextWindow } : {}),
+    });
   }
   return models;
 };
