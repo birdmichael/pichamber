@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createInMemoryPiSession, createPiHost, mapPiModelsToProviders, normalizePiSessionUsage } from './pi-host.js';
+import { createInMemoryPiSession, createPiHost, isPlaceholderSessionTitle, mapPiModelsToProviders, normalizePiSessionUsage, titleFromUserText } from './pi-host.js';
 
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
@@ -54,6 +54,38 @@ describe('normalizePiSessionUsage', () => {
       contextWindow: 200000,
       percent: null,
     });
+  });
+});
+
+
+describe('session conversation titles', () => {
+  it('treats empty and default labels as placeholders', () => {
+    expect(isPlaceholderSessionTitle('')).toBe(true);
+    expect(isPlaceholderSessionTitle('New session')).toBe(true);
+    expect(isPlaceholderSessionTitle('Pi session')).toBe(true);
+    expect(isPlaceholderSessionTitle('nihao')).toBe(false);
+  });
+
+  it('uses the first line of the user message as the title', () => {
+    expect(titleFromUserText('  nihao\nsecond line  ')).toBe('nihao second line');
+    expect(titleFromUserText('x'.repeat(80))).toBe(`${'x'.repeat(57)}...`);
+  });
+
+  it('renames a placeholder session from the first prompt and keeps a custom title', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const untitled = await host.createSession({ directory: '/tmp/project' });
+    expect(untitled.info.title).toBe('New session');
+
+    await host.promptAsync(untitled.id, { parts: [{ type: 'text', text: 'nihao' }] });
+    expect(host.getSession(untitled.id).info.title).toBe('nihao');
+
+    await host.promptAsync(untitled.id, { parts: [{ type: 'text', text: 'yuedu wo diannao de mulu' }] });
+    expect(host.getSession(untitled.id).info.title).toBe('nihao');
+
+    const named = await host.createSession({ directory: '/tmp/project', title: 'Keep me' });
+    await host.promptAsync(named.id, { parts: [{ type: 'text', text: 'should not replace' }] });
+    expect(host.getSession(named.id).info.title).toBe('Keep me');
+    host.dispose();
   });
 });
 

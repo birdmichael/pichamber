@@ -178,6 +178,37 @@ const createSessionInfo = ({
   };
 };
 
+const PLACEHOLDER_SESSION_TITLES = new Set(['new session', 'pi session', 'untitled']);
+
+export const isPlaceholderSessionTitle = (title) => {
+  const trimmed = typeof title === 'string' ? title.trim() : '';
+  return !trimmed || PLACEHOLDER_SESSION_TITLES.has(trimmed.toLowerCase());
+};
+
+export const titleFromUserText = (text) => {
+  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!line) return '';
+  return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
+};
+
+const firstUserText = (store) => {
+  for (const entry of store.messages || []) {
+    if (entry?.info?.role !== 'user') continue;
+    const part = (entry.parts || []).find((item) => item?.type === 'text' && typeof item.text === 'string' && item.text.trim());
+    if (part) return part.text;
+  }
+  return '';
+};
+
+const maybeApplyConversationTitle = (record) => {
+  if (!record?.info || !isPlaceholderSessionTitle(record.info.title)) return false;
+  const next = titleFromUserText(firstUserText(record));
+  if (!next) return false;
+  record.info.title = next;
+  record.info.time = { ...(record.info.time || {}), updated: Date.now() };
+  return true;
+};
+
 const lastUserMessage = (store) => {
   for (let index = store.messages.length - 1; index >= 0; index -= 1) {
     const entry = store.messages[index];
@@ -633,9 +664,17 @@ export const createPiHost = ({
       return getRecord(sessionID);
     },
     listSessions(directory) {
-      const items = Array.from(sessions.values());
-      if (!directory) return items;
-      return items.filter((record) => record.directory === directory);
+      const items = Array.from(sessions.values()).filter((record) => !directory || record.directory === directory);
+      for (const record of items) {
+        if (maybeApplyConversationTitle(record)) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
+      }
+      return items;
     },
     deleteSession(sessionID) {
       const record = getRecord(sessionID);
@@ -822,6 +861,13 @@ export const createPiHost = ({
         ...(body.model ? { model: body.model } : {}),
       };
       record.messages.push({ info: userInfo, parts: [userPart] });
+      if (maybeApplyConversationTitle(record)) {
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      }
       emit(record.directory, {
         id: createEventId(),
         type: 'message.updated',
