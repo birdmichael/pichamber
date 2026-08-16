@@ -1492,6 +1492,7 @@ export const dict: Record<I18nKey, string> = {
   'planView.actions.sendToNewWorktreeSession': '새 워크트리 세션으로 보내기',
   'planView.actions.copyPlanContents': '플랜 내용 복사',
   'planView.state.loading': '로드 중…',
+  'planView.state.noPlanYet': '아직 계획이 없습니다',
   'diffView.binary.unavailable': '이 파일의 콘텐츠는 볼 수 없습니다.',
   'diffView.change.untracked': '추적되지 않은 파일',
   'diffView.change.new': '새 파일',

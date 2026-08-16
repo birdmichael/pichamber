@@ -1,5 +1,5 @@
 import { isPiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
-import { sessionPlanHasMarkdown, type SessionPlan } from '@/sync/pi-session-plan';
+import { sessionPlanViewAvailable, type SessionPlan } from '@/sync/pi-session-plan';
 import type { FeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 
 export function resolvePlanRailEnabled(options: {
@@ -9,7 +9,7 @@ export function resolvePlanRailEnabled(options: {
   planModeExperimentalEnabled: boolean;
 }): boolean {
   if (options.isPiKernel) {
-    return isPiPlanPluginAvailable(options.featurePlugins) && sessionPlanHasMarkdown(options.plan);
+    return isPiPlanPluginAvailable(options.featurePlugins) && sessionPlanViewAvailable(options.plan);
   }
   return options.planModeExperimentalEnabled;
 }

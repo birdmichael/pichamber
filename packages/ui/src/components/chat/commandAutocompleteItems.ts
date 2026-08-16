@@ -158,17 +158,29 @@ export function commandMatchesPiSlashQuery(command: { name: string }, query: str
 /** Live PI `/plan` must stay visible next to `/plan-feature`, including empty drafts. */
 export function ensureLivePlanSlashCommand<T extends PiSlashCommandItem>(
   commands: T[],
-  options: { isPiKernel: boolean; planPluginAvailable: boolean },
+  options: { isPiKernel: boolean; planPluginAvailable: boolean; subagentsPluginAvailable?: boolean },
 ): T[] {
-  if (!options.isPiKernel || !options.planPluginAvailable) return commands;
-  if (commands.some((command) => command.name === 'plan')) return commands;
-  return [
-    ...commands,
-    {
-      name: 'plan',
-      agent: 'pi',
-    } as T,
-  ];
+  return ensureLiveFeatureSlashCommands(commands, options);
+}
+
+/** Feature-plugin slashes that must appear before a live session lists them. */
+export function ensureLiveFeatureSlashCommands<T extends PiSlashCommandItem>(
+  commands: T[],
+  options: {
+    isPiKernel: boolean;
+    planPluginAvailable: boolean;
+    subagentsPluginAvailable?: boolean;
+  },
+): T[] {
+  if (!options.isPiKernel) return commands;
+  const next = [...commands];
+  if (options.planPluginAvailable && !next.some((command) => command.name === 'plan')) {
+    next.push({ name: 'plan', agent: 'pi' } as T);
+  }
+  if (options.subagentsPluginAvailable && !next.some((command) => command.name === 'run')) {
+    next.push({ name: 'run', agent: 'pi' } as T);
+  }
+  return next;
 }
 
 /**

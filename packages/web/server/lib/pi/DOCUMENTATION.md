@@ -31,7 +31,7 @@ unbound sessions stay `ui_unavailable`.
 | `notify` | Toast via `pi.ui.notify` |
 | TUI-only (`custom`, widgets, terminal input) | No-op |
 
-Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session.
+Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session. Composer **Stop** calls `host.abort()`, which cancels every waiting `ctx.ui` prompt on that session **and** force-publishes `session.idle` even when Pi `abort()` is a no-op (the turn already finished or never emitted `agent_settled`).
 
 ## Protocol
 
@@ -81,6 +81,9 @@ Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) is gated on the Pi
 kernel **and** Feature Plugins `plan` installed+enabled. Missing/disabled
 hides those surfaces. `planModeExperimentalEnabled` does not gate this on Pi.
+View Plan / Discard stay visible while status is `active` even if
+`planMarkdown` is still empty (empty "no plan yet" state). Build still
+requires ready/saved markdown.
 
 ## Slash command dispatch
 
@@ -117,7 +120,8 @@ Resolution order:
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
 - Feature Plugins slash names that must appear before a session exists
-  (Plan slot installed+enabled → `/plan`)
+  (Plan slot installed+enabled → `/plan`; Subagents slot
+  installed+enabled → `/run`)
 
 Optional `?session=` hydrates that session if needed, then pins the live
 `getCommands()` list. After Feature Plugins install, or enable of an already
@@ -260,6 +264,13 @@ add a second install path. Opening Feature Plugins or installing
 
 When the slot is on:
 
+- `/run` is a command-channel start, not chat. Bare `/run` replies with
+  usage (TUI launcher is unsupported on Desktop). A missing live command
+  is 404 and is not `promptAsync`'d. `/run <agent> <task>` starts
+  `session.prompt("/run …")` without blocking the HTTP response and
+  polls for an openable child. If none appears (including a hung scout),
+  the host writes an assistant error and idles the parent. Parent
+  session id is never treated as the child.
 - `GET /api/session/:id/subagent-runs` lists this parent's fleet. Live
   `subagent` tool-call input/output (`sessionId` / `childSessionId`) and
   assistant `toolCall` arguments win over leftover adapter `status.json`

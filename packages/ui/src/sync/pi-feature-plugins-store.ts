@@ -62,3 +62,11 @@ export const isPiPlanPluginAvailable = (payload: FeaturePluginsPayload | null | 
 export const usePiPlanPluginAvailable = (): boolean => (
   usePiFeaturePluginsStore((state) => isPiPlanPluginAvailable(state.payload))
 );
+
+export const isPiSubagentsPluginAvailable = (payload: FeaturePluginsPayload | null | undefined): boolean => (
+  Boolean(payload?.slots.subagents.installed && payload.slots.subagents.enabled)
+);
+
+export const usePiSubagentsPluginAvailable = (): boolean => (
+  usePiFeaturePluginsStore((state) => isPiSubagentsPluginAvailable(state.payload))
+);

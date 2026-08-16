@@ -2608,6 +2608,7 @@ export const dict: Record<I18nKey, string> = {
   'planView.error.writePlanFileFailed': 'Nie udało się zapisać pliku planu ({status})',
   'planView.file.defaultName': 'plan',
   'planView.state.loading': 'Loading...',
+  'planView.state.noPlanYet': 'Nie ma jeszcze planu',
   'planView.title.default': 'Plan',
   'projectActions.actions.addAction': 'Dodaj akcję',
   'projectActions.actions.addActionAria': 'Dodaj akcję',

@@ -4,6 +4,7 @@ import {
   commandHasPiSlashPrefix,
   commandMatchesPiSlashQuery,
   commandMatchesSearch,
+  ensureLiveFeatureSlashCommands,
   ensureLivePlanSlashCommand,
   filterPiSettingsCommands,
   filterPiSlashCommands,
@@ -192,6 +193,10 @@ describe('filterPiSlashCommands', () => {
       filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
       { isPiKernel: true, planPluginAvailable: true },
     ).map((item) => item.name)).toEqual(['plan-feature', 'plan']);
+    expect(ensureLiveFeatureSlashCommands(
+      filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
+      { isPiKernel: true, planPluginAvailable: true, subagentsPluginAvailable: true },
+    ).map((item) => item.name)).toEqual(['plan-feature', 'plan', 'run']);
   });
 
   test('keeps Pichamber starters and injected skills, and still hides leftovers', () => {

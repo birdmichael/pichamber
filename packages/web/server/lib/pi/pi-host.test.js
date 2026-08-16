@@ -300,6 +300,96 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('settles a finished prompt that never emitted agent_settled', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+      createSession: async () => {
+        const listeners = new Set();
+        const emit = (event) => {
+          for (const listener of Array.from(listeners)) listener(event);
+        };
+        return {
+          isStreaming: false,
+          isCompacting: false,
+          subscribe(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          async prompt() {
+            emit({ type: 'agent_start' });
+            emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+            emit({
+              type: 'message_update',
+              assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '1' },
+            });
+            emit({
+              type: 'message_end',
+              message: { role: 'assistant', content: [{ type: 'text', text: '1' }] },
+            });
+            emit({ type: 'agent_end', messages: [], willRetry: false });
+          },
+          async abort() {},
+          dispose() { listeners.clear(); },
+        };
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'count' }] });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    expect(events.some((event) => event.type === 'session.idle')).toBe(true);
+    host.dispose();
+  });
+
+  it('force-idles when abort is a no-op after the turn is already done', async () => {
+    const events = [];
+    let streaming = true;
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+      createSession: async () => {
+        const listeners = new Set();
+        const emit = (event) => {
+          for (const listener of Array.from(listeners)) listener(event);
+        };
+        return {
+          get isStreaming() {
+            return streaming;
+          },
+          isCompacting: false,
+          subscribe(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          async prompt() {
+            emit({ type: 'agent_start' });
+            await new Promise((resolve) => setTimeout(resolve, 40));
+          },
+          async abort() {},
+          dispose() { listeners.clear(); },
+        };
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(host.getStatus()[record.id]).toEqual({ type: 'busy' });
+    streaming = false;
+    await host.abort(record.id);
+    await prompt;
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    expect(events.filter((event) => event.type === 'session.idle').length).toBeGreaterThan(0);
+    host.dispose();
+  });
+
   it('reload keeps live sessions and re-reads Pi resources', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-reload-'));
     try {

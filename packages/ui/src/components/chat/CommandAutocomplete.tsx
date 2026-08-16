@@ -10,9 +10,9 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
-import { usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
+import { usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLivePlanSlashCommand, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -71,6 +71,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
   const planPluginAvailable = usePiPlanPluginAvailable();
+  const subagentsPluginAvailable = usePiSubagentsPluginAvailable();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const sessionMessages = useSessionMessages(currentSessionId ?? '');
   const hasMessagesInCurrentSession = sessionMessages.length > 0;
@@ -207,9 +208,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
             : []
           ),
         ];
-        const allCommands = ensureLivePlanSlashCommand(
+        const allCommands = ensureLiveFeatureSlashCommands(
           filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel),
-          { isPiKernel, planPluginAvailable },
+          { isPiKernel, planPluginAvailable, subagentsPluginAvailable },
         );
 
         const allowInitCommand = !hasMessagesInCurrentSession;
@@ -290,9 +291,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           ),
         ];
 
-        const fallbackCommands = ensureLivePlanSlashCommand(
+        const fallbackCommands = ensureLiveFeatureSlashCommands(
           filterPiSlashCommands(builtInCommands, isPiKernel),
-          { isPiKernel, planPluginAvailable },
+          { isPiKernel, planPluginAvailable, subagentsPluginAvailable },
         );
         const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
         const filtered = (searchQuery
@@ -306,7 +307,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     };
 
     loadCommands();
-  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel, planPluginAvailable]);
+  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel, planPluginAvailable, subagentsPluginAvailable]);
 
   React.useEffect(() => {
     setSelectedIndex(0);

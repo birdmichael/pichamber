@@ -1255,6 +1255,7 @@ export const dict = {
   'planView.actions.sendToNewWorktreeSession': 'Envoyer à une nouvelle session Worktree',
   'planView.actions.copyPlanContents': 'Copier le contenu du plan',
   'planView.state.loading': 'Chargement...',
+  'planView.state.noPlanYet': 'Pas encore de plan',
   'diffView.binary.unavailable': 'Le contenu de ce fichier ne peut pas être visualisé.',
   'diffView.change.untracked': 'Fichier non suivi',
   'diffView.change.new': 'Nouveau fichier',

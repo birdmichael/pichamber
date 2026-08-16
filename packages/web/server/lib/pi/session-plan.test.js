@@ -8,6 +8,7 @@ import {
   resumeSavedPlanState,
   sessionPlanFromState,
   sessionPlanHasMarkdown,
+  sessionPlanViewAvailable,
   titleFromPlanMarkdown,
 } from './session-plan.js';
 
@@ -127,10 +128,13 @@ describe('session-plan', () => {
     expect(() => parseSessionPlanAction({ action: 'tools' })).toThrow(/start, save, implement, exit, or resume/);
   });
 
-  it('treats only ready/saved/implementing markdown as viewable', () => {
+  it('treats only ready/saved/implementing markdown as buildable, and shows View Plan while Plan is on', () => {
     expect(sessionPlanHasMarkdown({ status: 'active', planMarkdown: '' })).toBe(false);
     expect(sessionPlanHasMarkdown({ status: 'ready', planMarkdown: '# Plan' })).toBe(true);
     expect(sessionPlanHasMarkdown({ status: 'ready', planMarkdown: '   ' })).toBe(false);
+    expect(sessionPlanViewAvailable({ status: 'active', planMarkdown: '' })).toBe(true);
+    expect(sessionPlanViewAvailable({ status: 'off', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanViewAvailable({ status: 'ready', planMarkdown: '# Plan' })).toBe(true);
     expect(titleFromPlanMarkdown('')).toBeUndefined();
   });
 });

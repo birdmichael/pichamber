@@ -203,10 +203,13 @@ export const createExtensionUIController = ({
       const item = pending.get(id);
       return settle(id, 'cancelled', item?.cancelValue);
     },
-    dispose() {
+    cancelAll() {
       for (const id of Array.from(pending.keys())) {
         this.cancel(id);
       }
+    },
+    dispose() {
+      this.cancelAll();
     },
   };
 };
