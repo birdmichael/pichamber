@@ -37,6 +37,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useModelLists } from '@/hooks/useModelLists';
 import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
+import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PI_THINKING_LEVELS, parsePiThinkingLevel, resolvePiThinkingChipPresentation } from './piThinking';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
@@ -574,6 +575,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const selectableDesktopAgents = React.useMemo(() => {
         return agents.filter((agent) => isPrimaryMode(agent.mode));
     }, [agents]);
+    const showComposerAgentChip = shouldShowComposerAgentChip(selectableDesktopAgents);
 
     const sortedAndFilteredAgents = React.useMemo(() => {
         const sorted = [...selectableDesktopAgents].sort((a, b) => a.name.localeCompare(b.name));
@@ -1503,7 +1505,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderMobileAgentTooltip = () => {
-        if (!isCompact || mobileTooltipOpen !== 'agent' || !currentAgent) return null;
+        if (!showComposerAgentChip || !isCompact || mobileTooltipOpen !== 'agent' || !currentAgent) return null;
 
         const hasCustomPrompt = Boolean(currentAgent.prompt && currentAgent.prompt.trim().length > 0);
         const hasModelConfig = currentAgent.model?.providerID && currentAgent.model?.modelID;
@@ -2088,7 +2090,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderMobileAgentPanel = () => {
-        if (!isCompact) return null;
+        if (!isCompact || !showComposerAgentChip) return null;
  
         return (
             <MobileOverlayPanel
@@ -2826,6 +2828,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderAgentSelector = () => {
+        if (!showComposerAgentChip) {
+            return null;
+        }
         if (!isCompact) {
             return (
                 <div className="flex items-center gap-2 min-w-0">

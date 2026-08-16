@@ -10,6 +10,9 @@ belongs to one of them.
 Session Goal is a Pichamber feature. `ComposerFooter` shows `SessionGoalButton`
 and the objective counter on the Pi kernel (`isSessionGoalVisibleOnPiKernel`);
 it still hides OpenCode-only permission auto-accept, revert, and `/shell`.
+`ModelControls` hides the agent chip when the only selectable agent is the
+synthetic Pi default (`shouldShowComposerAgentChip`); model and thinking chips
+stay. OpenCode `build` / `plan` / custom agents still show.
 
 ## Layers
 
