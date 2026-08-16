@@ -20,4 +20,19 @@ describe("findProjectFiles",()=>{
     expect(findProjectFiles(root,{query:"app",type:"file"})).toEqual(["src/app.ts"]);
     expect(findProjectFiles(root,{query:"src",type:"directory",includeDirs:true})).toEqual(["src"]);
   });
+
+  it("matches package.json for pack and package queries",()=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),"pi-find-pack-"));
+    temps.push(root);
+    fs.writeFileSync(path.join(root,"package.json"),"{}\n");
+    fs.writeFileSync(path.join(root,"README.md"),"hi\n");
+    fs.mkdirSync(path.join(root,"docs"),{recursive:true});
+    fs.writeFileSync(path.join(root,"docs","guide.md"),"docs\n");
+    fs.mkdirSync(path.join(root,"node_modules","x"),{recursive:true});
+    fs.writeFileSync(path.join(root,"node_modules","x","package.json"),"{}\n");
+    expect(findProjectFiles(root,{query:"pack",type:"file"})).toEqual(["package.json"]);
+    expect(findProjectFiles(root,{query:"package",type:"file"})).toEqual(["package.json"]);
+    expect(findProjectFiles(root,{query:"package.json",type:"file"})).toEqual(["package.json"]);
+    expect(findProjectFiles(root,{query:"pack",type:"file"}).join("|")).not.toContain("node_modules");
+  });
 });
