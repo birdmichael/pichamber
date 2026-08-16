@@ -227,7 +227,9 @@ When the slot is on:
   files. Each public run is
   `{ runId, sessionID, name, role, mode, state, title, openable }`.
   A tool that recorded a child id is `openable: true` so Work Status and
-  the transcript card open the same writable tab.
+  the transcript card open the same writable tab. Scraping a `.jsonl`
+  session path from tool text is a length-capped linear scan so listing
+  stays cheap on the HTTP thread.
 - Terminal adapter files with no child id are dropped (not a pile of
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet.

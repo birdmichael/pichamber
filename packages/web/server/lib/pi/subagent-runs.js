@@ -242,13 +242,51 @@ const readSessionIdFromOutputText = (value) => {
   return asTrimmedString(sessionMatch?.[1]);
 };
 
-const readSessionFileFromText = (value) => {
+const SESSION_FILE_TEXT_LIMIT = 32 * 1024;
+const JSONL_SUFFIX = '.jsonl';
+
+const isSessionPathStop = (ch) => (
+  ch === ' '
+  || ch === '\t'
+  || ch === '\n'
+  || ch === '\r'
+  || ch === '"'
+  || ch === "'"
+  || ch === '<'
+  || ch === '>'
+);
+
+/** Linear scan: find `/…jsonl` without nested-quantifier backtracking. */
+const findAbsoluteJsonlPath = (text) => {
+  let from = 0;
+  while (from < text.length) {
+    const suffixAt = text.indexOf(JSONL_SUFFIX, from);
+    if (suffixAt === -1) return '';
+    const end = suffixAt + JSONL_SUFFIX.length;
+    const next = text[end];
+    if (next && !isSessionPathStop(next)) {
+      from = end;
+      continue;
+    }
+    let start = suffixAt;
+    while (start > 0 && !isSessionPathStop(text[start - 1])) {
+      start -= 1;
+    }
+    if (text[start] === '/') return text.slice(start, end);
+    from = end;
+  }
+  return '';
+};
+
+export const readSessionFileFromText = (value) => {
   const text = asTrimmedString(value);
   if (!text) return '';
-  const labeled = text.match(/(?:sessionFile|session_file|session file)\s*[:=]\s*["']?(\S+\.jsonl)/i);
+  const haystack = text.length > SESSION_FILE_TEXT_LIMIT
+    ? text.slice(0, SESSION_FILE_TEXT_LIMIT)
+    : text;
+  const labeled = haystack.match(/(?:sessionFile|session_file|session file)\s*[:=]\s*["']?(\S+\.jsonl)/i);
   if (labeled?.[1]) return labeled[1];
-  const pathMatch = text.match(/(\/(?:[^\s"'<>]+)+\.jsonl)/);
-  return pathMatch?.[1] || '';
+  return findAbsoluteJsonlPath(haystack);
 };
 
 const resolveChildSessionId = ({
