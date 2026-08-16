@@ -33,6 +33,7 @@ import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
+import { usePiKernel } from '@/lib/usePiKernel';
 import {
     useDraftStarters,
     type ResolvedStarter,
@@ -335,5 +336,7 @@ const DraftPresetChipsContent: React.FC<DraftPresetChipsProps> = ({ onSubmit, cl
 
 export const DraftPresetChips: React.FC<DraftPresetChipsProps> = (props) => {
     const visible = useUIStore((state) => state.draftStartersVisible);
-    return visible ? <DraftPresetChipsContent {...props} /> : null;
+    const isPiKernel = usePiKernel();
+    if (isPiKernel || !visible) return null;
+    return <DraftPresetChipsContent {...props} />;
 };
