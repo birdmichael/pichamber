@@ -286,6 +286,41 @@ export const createInMemoryPiSession = ({
   };
 
   session.registerCommand('plan', async (args) => {
+    const command = typeof args === 'string' ? args.trim().toLowerCase() : '';
+    const ui = session.extensionBindings?.uiContext;
+    // Real @narumitw/pi-plan-mode: `/plan start` enters and notifies.
+    // It does not call select/confirm. Bare `/plan` and `/plan tools` do.
+    if (command === 'start') {
+      planState = applyMockPlanCommand(planState, command);
+      persistPlanState();
+      ui?.notify?.('Plan mode enabled. I will explore and plan, but not modify files.', 'info');
+      return;
+    }
+    if (command === 'tools') {
+      if (typeof ui?.select === 'function') {
+        await ui.select('Plan-mode tools', [
+          'bash',
+          'find',
+          'grep',
+          'ls',
+          'read',
+          'Done — start Plan mode',
+          'Back',
+        ], { multiple: true });
+      }
+      return;
+    }
+    if (!command) {
+      if (typeof ui?.select === 'function') {
+        await ui.select('Plan mode\nStatus: Off…', [
+          'Start Plan mode',
+          'Choose tools, then start…',
+          'Settings',
+          'How Plan mode works',
+        ]);
+      }
+      return;
+    }
     planState = applyMockPlanCommand(planState, args);
     persistPlanState();
   }, { description: 'Enter or manage Plan mode' });

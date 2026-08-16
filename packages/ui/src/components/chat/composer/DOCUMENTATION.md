@@ -16,11 +16,12 @@ it still hides OpenCode-only permission auto-accept, revert, and `/shell`.
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 When the Pi Plan plugin is installed and enabled, that slot is **Agent | Plan**
 instead — not a fake OpenCode agent, and not Build/Plan. Plan enters through
-`/plan start` (or resume of a saved plan); leaving a ready plan uses
-`/plan save`. Model and thinking chips stay. OpenCode `build` / `plan` /
-custom agents still show. A Build row (session model + `/plan implement` in
-this session) appears when a ready or saved plan exists, even if the View
-Plan rail is closed.
+`/plan start` (toast only — the plugin does not ask a select) or resume of a
+saved plan; leaving a ready plan uses `/plan save`. Typing listed `/plan` in
+the composer still sends empty arguments and opens the plugin launch card.
+Model and thinking chips stay. OpenCode `build` / `plan` / custom agents still
+show. A Build row (session model + `/plan implement` in this session) appears
+when a ready or saved plan exists, even if the View Plan rail is closed.
 
 ## Layers
 

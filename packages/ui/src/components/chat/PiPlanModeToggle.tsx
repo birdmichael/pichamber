@@ -18,6 +18,8 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
   const disabled = chrome.busy || pending;
 
   const select = async (side: 'agent' | 'plan') => {
+    // Plan side is `/plan start` (notify only). Bare `/plan` stays the
+    // composer/slash launch menu and still queues a ctx.ui select card.
     const action = planToggleAction(chrome.status, side);
     if (!action || !chrome.sessionID) return;
     setPending(true);

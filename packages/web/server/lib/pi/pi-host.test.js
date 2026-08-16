@@ -16,6 +16,16 @@ import {
   titleFromUserText,
 } from './pi-host.js';
 
+const waitForExtensionPrompts = async (host, sessionID) => {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    const prompts = host.listExtensionUIPrompts(sessionID);
+    if (prompts.length > 0) return prompts;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Timed out waiting for Desktop ctx.ui prompts');
+};
+
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
     const providers = mapPiModelsToProviders([
@@ -868,6 +878,70 @@ describe('session plan status and actions', () => {
     expect(prompted).toEqual(['/plan start']);
     expect(record.piSession.reloadCount).toBe(1);
     expect(record.piSession.bindCount).toBe(2);
+    host.dispose();
+  });
+
+  it('treats /plan start as notify-only and queues a select for bare /plan', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan menus' });
+
+    const started = await host.runCommand(record.id, { command: 'plan', arguments: 'start' });
+    expect(started.info.role).toBe('assistant');
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+    expect(events.some((event) => event.type === 'pi.ui.notify')).toBe(true);
+    expect(events.some((event) => event.type === 'pi.ui.asked')).toBe(false);
+
+    record.piSession.setPlanModeState({ enabled: false, awaitingAction: false });
+
+    const launch = host.runCommand(record.id, { command: 'plan', arguments: '' });
+    const launchPrompts = await waitForExtensionPrompts(host, record.id);
+    expect(launchPrompts).toHaveLength(1);
+    expect(launchPrompts[0]).toMatchObject({
+      kind: 'select',
+      title: 'Plan mode\nStatus: Off…',
+      options: [
+        'Start Plan mode',
+        'Choose tools, then start…',
+        'Settings',
+        'How Plan mode works',
+      ],
+    });
+    expect(host.replyExtensionUI(record.id, launchPrompts[0].id, 'Start Plan mode')).toBe(true);
+    await launch;
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+
+    const tools = host.runCommand(record.id, { command: 'plan', arguments: 'tools' });
+    const toolPrompts = await waitForExtensionPrompts(host, record.id);
+    expect(toolPrompts[0]).toMatchObject({
+      kind: 'select',
+      title: 'Plan-mode tools',
+      multiple: true,
+    });
+    expect(toolPrompts[0].options).toEqual(expect.arrayContaining([
+      'bash',
+      'find',
+      'grep',
+      'ls',
+      'read',
+      'Done — start Plan mode',
+      'Back',
+    ]));
+    expect(host.replyExtensionUI(record.id, toolPrompts[0].id, ['bash', 'read'])).toBe(true);
+    await tools;
+
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
     host.dispose();
   });
 

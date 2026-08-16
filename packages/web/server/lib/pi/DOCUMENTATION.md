@@ -37,7 +37,17 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
 ## Plan questions
 
-`plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. v1 does not add `/plan` TUI menus, tool pickers, or a Settings sheet.
+`plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. Those cards appear during a planning turn after Plan is on — not from `/plan start`.
+
+`@narumitw/pi-plan-mode` command vs UI (measured; do not invent a second menu):
+
+| Invocation | Host result |
+|---|---|
+| `/plan start` | Enter Plan + `ctx.ui.notify`. `GET /api/pi/ui` stays `[]`. Not a question-card probe. |
+| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. |
+| `/plan tools` | Tools `ctx.ui.select`. |
+
+Desktop chrome uses `/plan start` for the Agent \| Plan footer. Composer `/plan` (listed extension command, empty args) still goes through `session.command` → `session.prompt("/plan")` so the launch card still appears. Do not intercept bare `/plan` as a toast-only start.
 
 ## Session plan status
 
