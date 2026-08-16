@@ -150,7 +150,7 @@ const listAsyncRunDirs = (root) => {
   }
 };
 
-export const listAsyncSubagentRunRoots = ({
+const listAsyncSubagentRunRoots = ({
   tmpdir = process.env.TMPDIR || os.tmpdir(),
   projectDir,
 } = {}) => {

@@ -1,5 +1,4 @@
 import {
-  emptyFeaturePluginsPayload,
   parseFeaturePluginsPayload,
   type FeaturePluginSlot,
   type FeaturePluginsPayload,
@@ -17,7 +16,3 @@ export const parseFeaturePluginSlotActive = (
   const parsed = parseFeaturePluginsPayload(value);
   return isFeaturePluginSlotActive(parsed, slot);
 };
-
-export const featurePluginsOrEmpty = (value: unknown): FeaturePluginsPayload => (
-  parseFeaturePluginsPayload(value) ?? emptyFeaturePluginsPayload()
-);

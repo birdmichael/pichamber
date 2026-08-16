@@ -37,6 +37,21 @@ export const readSubagentCardAgent = (input?: Record<string, unknown> | null): s
   return type || 'subagent';
 };
 
+const readSessionIdField = (value: unknown): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const record = value as { sessionId?: unknown; childSessionId?: unknown; details?: unknown };
+  if (typeof record.childSessionId === 'string' && record.childSessionId.trim()) {
+    return record.childSessionId.trim();
+  }
+  if (typeof record.sessionId === 'string' && record.sessionId.trim()) {
+    return record.sessionId.trim();
+  }
+  if (record.details && typeof record.details === 'object' && !Array.isArray(record.details)) {
+    return readSessionIdField(record.details);
+  }
+  return '';
+};
+
 export const readSubagentChildSessionId = (
   input?: Record<string, unknown> | null,
   output?: unknown,
@@ -45,23 +60,12 @@ export const readSubagentChildSessionId = (
   if (fromInput) return fromInput;
   if (typeof output === 'string' && output.trim()) {
     try {
-      const parsed = JSON.parse(output) as { details?: { sessionId?: unknown; childSessionId?: unknown }; sessionId?: unknown };
-      const details = parsed?.details && typeof parsed.details === 'object' ? parsed.details : parsed;
-      const id = typeof details?.childSessionId === 'string'
-        ? details.childSessionId.trim()
-        : (typeof details?.sessionId === 'string' ? details.sessionId.trim() : '');
+      const id = readSessionIdField(JSON.parse(output));
       if (id) return id;
     } catch {
+      return null;
     }
   }
-  if (output && typeof output === 'object' && !Array.isArray(output)) {
-    const record = output as { sessionId?: unknown; childSessionId?: unknown; details?: { sessionId?: unknown } };
-    const id = typeof record.childSessionId === 'string'
-      ? record.childSessionId.trim()
-      : (typeof record.sessionId === 'string'
-        ? record.sessionId.trim()
-        : (typeof record.details?.sessionId === 'string' ? record.details.sessionId.trim() : ''));
-    if (id) return id;
-  }
-  return null;
+  const fromOutput = readSessionIdField(output);
+  return fromOutput || null;
 };

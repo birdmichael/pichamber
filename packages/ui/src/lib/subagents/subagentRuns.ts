@@ -18,7 +18,7 @@ const MODES = new Set<SubagentRunMode>(['foreground', 'background']);
 
 const asTrimmed = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-export const parseSubagentRun = (value: unknown): SubagentRun | null => {
+const parseSubagentRun = (value: unknown): SubagentRun | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const runId = asTrimmed(record.runId);

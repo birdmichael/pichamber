@@ -1,4 +1,4 @@
-export type OpenSubagentChildSessionInput = {
+type OpenSubagentChildSessionInput = {
   sessionID?: string | null;
   directory?: string | null;
   label: string;
