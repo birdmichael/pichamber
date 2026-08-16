@@ -3,6 +3,7 @@ import {
   commandHasPiSlashPrefix,
   commandMatchesPiSlashQuery,
   commandMatchesSearch,
+  filterPiSettingsCommands,
   filterPiSlashCommands,
   mergeCommandAutocompleteItems,
   toPiSkillSlashName,
@@ -211,6 +212,44 @@ describe('toPiSkillSlashName', () => {
   test('prefixes a bare skill name once', () => {
     expect(toPiSkillSlashName('clack-cli-patterns')).toBe('skill:clack-cli-patterns');
     expect(toPiSkillSlashName('skill:clack-cli-patterns')).toBe('skill:clack-cli-patterns');
+  });
+});
+
+describe('filterPiSettingsCommands', () => {
+  test('leaves OpenCode lists unchanged', () => {
+    const commands = [
+      { name: 'model' },
+      { name: 'thinking' },
+      { name: 'ship' },
+    ];
+    expect(filterPiSettingsCommands(commands, false)).toEqual(commands);
+  });
+
+  test('hides chip-owned builtins and keeps custom prompts', () => {
+    const commands = [
+      { name: 'compact' },
+      { name: 'reload' },
+      { name: 'login' },
+      { name: 'model' },
+      { name: 'thinking' },
+      { name: 'ship' },
+    ];
+    expect(filterPiSettingsCommands(commands, true).map((item) => item.name)).toEqual([
+      'compact',
+      'reload',
+      'login',
+      'ship',
+    ]);
+  });
+
+  test('does not hide skills', () => {
+    const commands = [
+      { name: 'clack-cli-patterns', isSkill: true },
+      { name: 'model' },
+    ];
+    expect(filterPiSettingsCommands(commands, true).map((item) => item.name)).toEqual([
+      'clack-cli-patterns',
+    ]);
   });
 });
 
