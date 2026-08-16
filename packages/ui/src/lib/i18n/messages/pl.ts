@@ -2392,6 +2392,7 @@ export const dict: Record<I18nKey, string> = {
   'header.services.remoteUpdate.actions.open': 'Aktualizuj',
   'header.services.open': 'Otwórz instancję, użycie i MCP',
   'header.services.openWithCurrent': 'Otwórz instancję, użycie i MCP (bieżąca: {current})',
+  'header.services.openWithCurrentPi': 'Przełącz instancję lokalną lub zdalną (bieżąca: {current})',
   'header.services.rateLimits': 'Limity użycia',
   'header.services.refreshRateLimitsAria': 'Odśwież limity użycia',
   'header.services.remaining': 'Pozostało',

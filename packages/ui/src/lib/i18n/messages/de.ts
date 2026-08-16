@@ -1457,6 +1457,7 @@ export const dict = {
   'header.github.accountSource.oauth': 'OAuth',
   'header.github.accountSource.cli': 'CLI',
   'header.services.openWithCurrent': 'Instanz öffnen, Nutzung und MCP (aktuell: {current})',
+  'header.services.openWithCurrentPi': 'Lokale oder entfernte Instanz wechseln (aktuell: {current})',
   'header.services.open': 'Dienste öffnen, Nutzung und MCP',
   'header.services.title': 'Dienste',
   'header.services.viewAria': 'Dienste anzeigen',
