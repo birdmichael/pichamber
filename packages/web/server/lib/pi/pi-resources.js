@@ -183,6 +183,15 @@ const providerMap = (models) => (
     : {}
 );
 
+const authMethodType = (entry) => {
+  const rawType = entry && typeof entry === 'object' && typeof entry.type === 'string'
+    ? entry.type.toLowerCase()
+    : 'api';
+  return rawType === 'oauth' ? 'oauth' : 'api';
+};
+
+const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API Key');
+
 export const getPiAuthMethods = (home = os.homedir()) => {
   const auth = readJsonObject(resolvePiAuthPath(home));
   const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
@@ -190,14 +199,10 @@ export const getPiAuthMethods = (home = os.homedir()) => {
   const result = {};
   for (const id of ids) {
     if (!id) continue;
-    const entry = auth[id];
-    const rawType = entry && typeof entry === 'object' && typeof entry.type === 'string'
-      ? entry.type.toLowerCase()
-      : 'api';
-    const methodType = rawType === 'oauth' ? 'oauth' : 'api';
+    const methodType = authMethodType(auth[id]);
     result[id] = [{
       type: methodType,
-      label: methodType === 'oauth' ? 'OAuth' : 'API Key',
+      label: authMethodLabel(methodType),
     }];
   }
   return result;
@@ -221,6 +226,105 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
       custom: { exists: false, path: null },
     },
   };
+};
+
+const sanitizeProviderId = (value) => {
+  const id = typeof value === 'string' ? value.trim() : '';
+  if (!id || id.includes('/') || id.includes('\\') || id.includes('..') || id.includes('\0')) {
+    const error = new Error('Provider ID is required');
+    error.status = 400;
+    throw error;
+  }
+  return id;
+};
+
+const readPiAuthFile = (filePath) => {
+  if (!isFile(filePath)) return {};
+  const text = readText(filePath).trim();
+  if (!text) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const error = new Error('Failed to read Pi auth.json');
+    error.status = 500;
+    throw error;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const error = new Error('Invalid Pi auth.json: expected an object');
+    error.status = 500;
+    throw error;
+  }
+  return parsed;
+};
+
+const writePiAuthFile = (filePath, data) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(filePath, 0o600);
+    } catch {
+    }
+  }
+  return data;
+};
+
+export const normalizePiAuthCredential = (body = {}) => {
+  const source = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body.auth && typeof body.auth === 'object' && !Array.isArray(body.auth) ? body.auth : body)
+    : {};
+  const rawType = typeof source.type === 'string' ? source.type.toLowerCase() : '';
+  if (rawType === 'oauth') {
+    const access = typeof source.access === 'string' ? source.access : '';
+    const refresh = typeof source.refresh === 'string' ? source.refresh : '';
+    const expires = Number(source.expires);
+    if (!access || !refresh || !Number.isFinite(expires)) {
+      const error = new Error('OAuth credentials need access, refresh, and expires');
+      error.status = 400;
+      throw error;
+    }
+    const credential = { type: 'oauth', access, refresh, expires };
+    if (typeof source.accountId === 'string' && source.accountId) credential.accountId = source.accountId;
+    if (typeof source.enterpriseUrl === 'string' && source.enterpriseUrl) credential.enterpriseUrl = source.enterpriseUrl;
+    return credential;
+  }
+  const key = typeof source.key === 'string' && source.key.trim()
+    ? source.key.trim()
+    : (typeof source.token === 'string' ? source.token.trim() : '');
+  if (!key) {
+    const error = new Error('API key is required');
+    error.status = 400;
+    throw error;
+  }
+  return { type: 'api_key', key };
+};
+
+export const writePiProviderAuth = (providerId, body, { home = os.homedir() } = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const credential = normalizePiAuthCredential(body);
+  const filePath = resolvePiAuthPath(home);
+  const current = readPiAuthFile(filePath);
+  writePiAuthFile(filePath, { ...current, [id]: credential });
+  const methodType = authMethodType(credential);
+  return {
+    providerId: id,
+    type: methodType,
+    methods: [{ type: methodType, label: authMethodLabel(methodType) }],
+  };
+};
+
+export const removePiProviderAuth = (providerId, { home = os.homedir() } = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const filePath = resolvePiAuthPath(home);
+  const current = readPiAuthFile(filePath);
+  const removed = Object.prototype.hasOwnProperty.call(current, id);
+  if (removed) {
+    const next = { ...current };
+    delete next[id];
+    writePiAuthFile(filePath, next);
+  }
+  return { providerId: id, removed };
 };
 
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {

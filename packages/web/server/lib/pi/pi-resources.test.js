@@ -13,6 +13,8 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  writePiProviderAuth,
+  removePiProviderAuth,
   listPiExtensions,
   listPiPackages,
   filterProvidersByEnabledModels,
@@ -113,6 +115,55 @@ describe('pi-resources', () => {
     expect(sources.sources.auth.exists).toBe(true);
     expect(sources.sources.user.exists).toBe(true);
     expect(sources.sources.auth.path).toContain(path.join('.pi', 'agent', 'auth.json'));
+  });
+
+  it('writes and removes provider auth in the Pi auth.json shape', () => {
+    const home = makeTemp();
+    const other = writePiProviderAuth('other-provider', { type: 'api', key: 'sk-keep-me' }, { home });
+    expect(other).toMatchObject({
+      providerId: 'other-provider',
+      type: 'api',
+      methods: [{ type: 'api', label: 'API Key' }],
+    });
+    const saved = writePiProviderAuth('example-provider', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(saved.providerId).toBe('example-provider');
+    expect(saved.methods).toEqual(getPiAuthMethods(home)['example-provider']);
+
+    const authPath = path.join(home, '.pi', 'agent', 'auth.json');
+    const stored = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(stored['example-provider']).toEqual({ type: 'api_key', key: 'sk-test-do-not-leak' });
+    expect(stored['other-provider']).toEqual({ type: 'api_key', key: 'sk-keep-me' });
+    expect(getPiProviderSources('example-provider', { home }).sources.auth.exists).toBe(true);
+    expect(JSON.stringify(getPiAuthMethods(home))).not.toContain('sk-test');
+
+    writePiProviderAuth('example-provider', { auth: { type: 'api', key: 'sk-rotated' } }, { home });
+    const rotated = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(rotated['example-provider']).toEqual({ type: 'api_key', key: 'sk-rotated' });
+    expect(rotated['other-provider'].key).toBe('sk-keep-me');
+
+    const removed = removePiProviderAuth('example-provider', { home });
+    expect(removed).toEqual({ providerId: 'example-provider', removed: true });
+    const after = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(after['example-provider']).toBeUndefined();
+    expect(after['other-provider']).toEqual({ type: 'api_key', key: 'sk-keep-me' });
+    expect(getPiProviderSources('example-provider', { home }).sources.auth.exists).toBe(false);
+    expect(removePiProviderAuth('example-provider', { home }).removed).toBe(false);
+  });
+
+  it('rejects empty provider ids and missing API keys without creating auth.json', () => {
+    const home = makeTemp();
+    expect(() => writePiProviderAuth('', { type: 'api', key: 'sk-x' }, { home })).toThrow(/Provider ID/);
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: '   ' }, { home })).toThrow(/API key/);
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'auth.json'))).toBe(false);
+  });
+
+  it('refuses to overwrite a malformed auth.json', () => {
+    const home = makeTemp();
+    const agent = path.join(home, '.pi', 'agent');
+    fs.mkdirSync(agent, { recursive: true });
+    fs.writeFileSync(path.join(agent, 'auth.json'), '{not-json');
+    expect(() => writePiProviderAuth('example-provider', { type: 'api', key: 'sk-x' }, { home })).toThrow(/auth\.json/);
+    expect(fs.readFileSync(path.join(agent, 'auth.json'), 'utf8')).toBe('{not-json');
   });
 
   it('persists compaction and retry objects without wiping other agent settings', () => {
