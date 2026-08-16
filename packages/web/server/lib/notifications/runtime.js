@@ -111,6 +111,11 @@ export const createNotificationTriggerRuntime = (deps) => {
   const notifiedPermissionRequests = new Set();
   const lastReadyNotificationAt = new Map();
   const lastErrorNotificationAt = new Map();
+  // Latest completed assistant hop per session. Pi emits message_end (mapped to
+  // message.updated finish:stop) for every LLM call, including thinking/tool
+  // hops. Ready copy still wants that hop's model/agent, but the trigger must
+  // wait for session.idle / agent_settled.
+  const lastAssistantStopInfoBySession = new Map();
 
   const sessionParentIdCache = new Map();
   const SESSION_PARENT_CACHE_TTL_MS = 60 * 1000;
@@ -314,12 +319,19 @@ export const createNotificationTriggerRuntime = (deps) => {
       const errorText = typeof error?.message === 'string'
         ? error.message
         : typeof error === 'string' ? error : '';
+      const cachedInfo = lastAssistantStopInfoBySession.get(sessionId);
       await maybeSendPushForTrigger({
         ...payload,
         type: 'message.updated',
+        // Intermediate assistant hops also arrive as message.updated finish:stop.
+        // Only session.idle / session.error mean the user turn settled.
+        sessionSettled: true,
         properties: {
           ...payload.properties,
           info: {
+            ...(payload.type === 'session.idle' && cachedInfo && typeof cachedInfo === 'object'
+              ? cachedInfo
+              : {}),
             sessionID: sessionId,
             role: 'assistant',
             finish: payload.type === 'session.error' ? 'error' : 'stop',
@@ -333,6 +345,12 @@ export const createNotificationTriggerRuntime = (deps) => {
     if (payload.type === 'message.updated') {
       const info = payload.properties?.info;
       if (info?.role === 'assistant' && info?.finish === 'stop' && sessionId) {
+        lastAssistantStopInfoBySession.set(sessionId, info);
+        // Pi maps every assistant message_end to finish:stop, including the
+        // first thinking/tool hop. Ready notifications wait for session.idle.
+        if (payload.sessionSettled !== true) {
+          return;
+        }
         const settings = await readSettingsFromDisk();
 
         if (settings.notifyOnSubtasks === false) {

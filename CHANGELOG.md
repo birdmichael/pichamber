@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop/Notifications:** Agent Completion no longer fires after thinking or a single tool step. The native “completed the task” banner waits until the session is actually done.
 - **Desktop:** opening a Pi session that already has a Subagents result no longer freezes the window or ignores Quit.
 - Chat: on Pi, reopening or refreshing a session that used Read, Skill, or Bash keeps those calls as tool rows. File contents are no longer shown as user messages.
 - Chat: typing an unknown `/name` and pressing Enter now sends it as a normal message. The empty command popup no longer swallows the first Enter.
