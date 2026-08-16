@@ -22,9 +22,9 @@ export const WORK_STATUS_SECTION_IDS = [
   'contextSources',
 ] as const;
 
-export type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
+type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
 
-export type WorkStatusSectionContext = {
+type WorkStatusSectionContext = {
   /** Pi has no provider-quota API; the OpenCode usage section is unavailable. */
   isPiKernel?: boolean;
 };
