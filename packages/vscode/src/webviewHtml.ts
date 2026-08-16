@@ -77,11 +77,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
   // Use VS Code CSS variables for proper theme integration
   // These variables are automatically provided by VS Code to webviews
   // 
-  // Logo geometry matches OpenChamberLogo.tsx:
-  // edge=48, cos30=0.866, sin30=0.5, centerY=50
-  // top=(50, 2), left=(8.432, 26), right=(91.568, 26), center=(50, 50)
-  // bottomLeft=(8.432, 74), bottomRight=(91.568, 74), bottom=(50, 98)
-  // topFaceCenterY = (2 + 26 + 50 + 26) / 4 = 26
+  // Logo geometry matches OpenChamberLogo.tsx / pichamber-mark.ts.
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -114,7 +110,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
       opacity: 0;
       pointer-events: none;
     }
-    /* Glow pulse on the OpenCode mark on the cube's top face — signals loading without text. */
+    /* Glow pulse on the Pi glyph on the cube's top face — signals loading without text. */
     @keyframes oc-logo-glow {
       0%, 100% { filter: drop-shadow(0 0 0 transparent); }
       50% { filter: drop-shadow(0 0 4px var(--vscode-foreground)); }
@@ -155,20 +151,15 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
   <title>OpenChamber</title>
 </head>
 <body>
-  <!-- Initial loading screen with simplified OpenChamber logo -->
+  <!-- Initial loading screen with the Pichamber chamber + Pi glyph. -->
   <div id="initial-loading">
     <svg class="logo" width="70" height="70" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Left face -->
       <path class="logo-fill logo-stroke" d="M50 50 L8.432 26 L8.432 74 L50 98 Z" stroke-width="2" stroke-linejoin="round"/>
-      <!-- Right face -->
       <path class="logo-fill logo-stroke" d="M50 50 L91.568 26 L91.568 74 L50 98 Z" stroke-width="2" stroke-linejoin="round"/>
-      <!-- Top face (no fill, stroke only) -->
       <path class="logo-stroke" d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke-width="2" stroke-linejoin="round"/>
-      
-      <!-- OpenCode logo on top face -->
-      <g class="logo-inner" transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.75)">
-        <path class="logo-fill-solid" fill-rule="evenodd" clip-rule="evenodd" d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z"/>
-        <path class="logo-fill-dim" d="M-8 -4 L8 -4 L8 12 L-8 12 Z"/>
+      <g class="logo-inner logo-fill-solid" transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)">
+        <path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/>
+        <path d="M117.36 0 H234.72 V234.72 H117.36 Z"/>
       </g>
     </svg>
     <!-- Status text stays empty while things are fine; populated only on error. -->

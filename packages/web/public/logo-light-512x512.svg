@@ -1,16 +1,9 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <!-- OpenChamber logo - simplified, no background (for light backgrounds) -->
-  <g transform="translate(256, 256) scale(4)">
-    <!-- Left face - simplified, no grid cells -->
-    <path d="M0 0 L-41.568 -24 L-41.568 24 L0 48 Z" fill="black" fill-opacity="0.2" stroke="black" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Right face - simplified, no grid cells -->
-    <path d="M0 0 L41.568 -24 L41.568 24 L0 48 Z" fill="black" fill-opacity="0.35" stroke="black" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Top face - open -->
-    <path d="M0 -48 L-41.568 -24 L0 0 L41.568 -24 Z" fill="none" stroke="black" stroke-width="3" stroke-linejoin="round"/>
-    <!-- OpenCode logo on top face -->
-    <g transform="matrix(0.866, 0.5, -0.866, 0.5, 0, -24) scale(0.75)">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z" fill="black"/>
-      <path d="M-8 -4 L8 -4 L8 12 L-8 12 Z" fill="black" fill-opacity="0.4"/>
-    </g>
+<svg width="512" height="512" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="#000" fill-opacity="0.2" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="#000" fill-opacity="0.35" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+  <g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)">
+    <path fill="#000" fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/>
+    <path fill="#000" d="M117.36 0 H234.72 V234.72 H117.36 Z"/>
   </g>
 </svg>

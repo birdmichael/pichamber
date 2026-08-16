@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop/UI:** the app mark is now the open-top chamber with Pi’s pixel “pi” on the top face — Dock, tray, favicon, About, empty chat, and splash no longer show the leftover OpenCode O. Dev builds use the same mark with a small amber badge.
 - **Chat:** a new empty session on Pi shows the welcome starter chips again, including Catch me up and Start feature planning. Clicking a chip sends that prompt in the current Pi session.
 - **Chat:** Session Goal is available on the Pi kernel again. The composer target button and Settings Chat toggle stay visible, and a goal set on a session still shows after reload.
 - Settings/Skills: on Pi, new skills, commands, and snippets write to `~/.pi/agent` and `.pi` (plus `.agents` compatibility). Leftover OpenCode folders are no longer listed or offered as Pi locations.

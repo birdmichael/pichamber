@@ -126,6 +126,12 @@ bunx vitest run server/lib/pi
 bun test --cwd packages/electron ./kernel-env.test.mjs
 ```
 
+## Product mark
+
+Pichamber is the desktop client for Pi. The mark is OpenChamber's isometric open-top cube (the chamber) with the official Pi pixel-art "pi" wordmark in the **same top-face slot** as the old OpenCode O (`scale(0.068)`, isometric center). Not a copy of `pi.dev/favicon.svg`, not a Greek π, not a window/traffic-light, and not the rejected inside-the-volume `scale(0.115)` / `ty=6` placement.
+
+SVG masters and the generator live in `packages/electron/resources/icons` and `packages/electron/scripts/generate-product-icons.mjs`. See `packages/electron/README.md`.
+
 ## Branch and version
 
 Pichamber is a new product line on this fork. Versioning starts at **1.0.0** and is independent of upstream OpenChamber 1.18.x.
