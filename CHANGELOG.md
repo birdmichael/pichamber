@@ -35,6 +35,7 @@ All notable changes to this project will be documented in this file.
 - Settings: on Pi, Agents now opens the built-in `pi` agent instead of asking you to create one.
 - Settings: Extensions no longer leads with a “no extensions found” empty state when installed Pi packages are listed.
 - Chat: empty-session titles now use native wording in Chinese and other translated locales instead of leftover English.
+- UI: git worktree labels now keep the English term in Chinese, Polish, and other locales that had translated it as “tree.” File-tree copy such as 文件树 and Tree View is unchanged.
 - UI: the command palette now says it searches sessions, actions, and files, matching the groups it actually shows.
 - Settings: Commands no longer lists `/model` or `/thinking` on Pi — those stay on the composer chips and Session Defaults. Custom prompts still appear in Commands and in the slash menu.
 - Chat: `/reload` is no longer a Pi slash command or Settings → Commands builtin. Applying settings still reloads skills and prompts.

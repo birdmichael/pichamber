@@ -1148,7 +1148,7 @@ export const settingsDict = {
   'settings.projects.sidebar.actions.addProject': 'Projekt hinzufügen',
   'settings.projects.page.empty.noProjects': 'Keine Projekte verfügbar.',
   'settings.projects.page.title.default': 'Projekt-Einstellungen',
-  'settings.projects.page.section.worktree': 'Arbeitsbaum',
+  'settings.projects.page.section.worktree': 'Worktree',
   'settings.projects.page.field.projectName': 'Projektname',
   'settings.projects.page.field.projectNamePlaceholder': 'Projektname',
   'settings.projects.page.field.defaultModel': 'Standardmodell für neue Chats',
