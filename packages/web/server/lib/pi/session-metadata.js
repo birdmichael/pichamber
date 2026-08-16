@@ -25,3 +25,27 @@ export const persistSessionMetadata = (manager, metadata) => {
     return false;
   }
 };
+
+export const archiveTimeFromMetadata = (metadata) => {
+  if (!isRecord(metadata) || !isRecord(metadata.time)) return undefined;
+  const archived = metadata.time.archived;
+  return typeof archived === 'number' && Number.isFinite(archived) ? archived : undefined;
+};
+
+export const sessionMetadataWithoutArchive = (metadata) => {
+  if (!isRecord(metadata)) return undefined;
+  const { time: _time, ...rest } = metadata;
+  return Object.keys(rest).length > 0 ? rest : undefined;
+};
+
+export const readPersistedArchiveTime = (entries) => (
+  archiveTimeFromMetadata(readPersistedSessionMetadata(entries))
+);
+
+export const persistSessionArchive = (manager, archived, existingMetadata) => {
+  const metadata = isRecord(existingMetadata) ? { ...existingMetadata } : {};
+  metadata.time = {
+    archived: typeof archived === 'number' && Number.isFinite(archived) ? archived : 0,
+  };
+  return persistSessionMetadata(manager, metadata);
+};

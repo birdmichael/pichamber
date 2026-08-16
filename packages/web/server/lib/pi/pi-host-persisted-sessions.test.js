@@ -116,6 +116,62 @@ describe('persisted Pi sessions', () => {
     restarted.dispose();
   });
 
+  it('hydrates persisted toolCall and toolResult as assistant tool parts, not user text', async () => {
+    const home = tempDir('pi-persist-tools-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const manager = SessionManager.create(cwd, sessionDir);
+    const file = manager.getSessionFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'session',
+      version: CURRENT_SESSION_VERSION,
+      id: manager.getSessionId(),
+      timestamp: new Date().toISOString(),
+      cwd: manager.getCwd(),
+    })}\n`);
+    const opened = SessionManager.open(file, sessionDir);
+    opened.appendSessionInfo('Tool hydrate');
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'read the skill' }],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'load skills' },
+        { type: 'text', text: '先按仓库规则加载相关技能。' },
+        { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+      ],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'toolResult',
+      toolName: 'read',
+      toolCallId: 'c1',
+      content: [{ type: 'text', text: '---\nname: using-superpowers\n---\n' }],
+      timestamp: Date.now(),
+    });
+    const sessionID = opened.getSessionId();
+
+    const host = createHost({ home, cwd });
+    await host.ensureSession(sessionID, cwd);
+    const messages = host.getMessages(sessionID);
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(messages[1].parts.map((part) => part.type)).toEqual(['reasoning', 'text', 'tool']);
+    expect(messages[1].parts[2]).toMatchObject({
+      type: 'tool',
+      tool: 'read',
+      callID: 'c1',
+      state: expect.objectContaining({
+        output: expect.stringContaining('using-superpowers'),
+      }),
+    });
+    host.dispose();
+  });
+
   it('creates a session with a stable Pi UUID that survives a simulated restart', async () => {
     const home = tempDir('pi-persist-create-');
     const cwd = path.join(home, 'project');
@@ -211,6 +267,58 @@ describe('persisted Pi sessions', () => {
     ]);
     expect(host.listSessions(cwd).map((item) => item.id).sort()).toEqual([bad.id, good.id].sort());
     expect(host.getSession(bad.id).info.title).toBe('Broken session');
+    host.dispose();
+  });
+
+  it('persists archive time on the Pi session and restores it after a new host instance', async () => {
+    const home = tempDir('pi-persist-archive-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd, title: 'Archive me' });
+    const archivedAt = 1_700_000_123_000;
+    const archived = await first.updateSession(created.id, { time: { archived: archivedAt } }, cwd);
+    expect(archived.info.time.archived).toBe(archivedAt);
+    const createdId = created.id;
+    const listedWhileLive = await first.listSessionInfos(cwd);
+    expect(listedWhileLive.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const listed = await restarted.listSessionInfos(cwd);
+    const row = listed.find((session) => session.id === createdId);
+    expect(row?.time.archived).toBe(archivedAt);
+    const loaded = await restarted.ensureSession(createdId, cwd);
+    expect(loaded.info.time.archived).toBe(archivedAt);
+    await restarted.updateSession(createdId, { time: { archived: 0 } }, cwd);
+    expect(restarted.getSession(createdId).info.time.archived).toBe(0);
+    restarted.dispose();
+
+    const restoredHost = createHost({ home, cwd });
+    const restoredList = await restoredHost.listSessionInfos(cwd);
+    expect(restoredList.find((session) => session.id === createdId)?.time.archived).toBe(0);
+    restoredHost.dispose();
+  });
+
+  it('keeps a newer in-memory archive when disk no longer has the flag', async () => {
+    const home = tempDir('pi-persist-archive-overlay-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+
+    const host = createHost({ home, cwd });
+    const created = await host.createSession({ directory: cwd, title: 'Keep archived in memory' });
+    const archivedAt = Date.now();
+    await host.updateSession(created.id, { time: { archived: archivedAt } }, cwd);
+    const file = created.sessionFile;
+    const kept = fs.readFileSync(file, 'utf8')
+      .split(/\n/)
+      .filter((line) => line.trim() && !line.includes('"customType":"pichamber.metadata"'))
+      .join('\n');
+    fs.writeFileSync(file, kept.endsWith('\n') ? kept : `${kept}\n`);
+
+    const listed = await host.listSessionInfos(cwd);
+    expect(listed.find((session) => session.id === created.id)?.time.archived).toBe(archivedAt);
     host.dispose();
   });
 
