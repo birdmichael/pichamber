@@ -99,6 +99,7 @@ describe('useSkillsStore directory resolution', () => {
       description: 'Repository local',
       group: undefined,
       renamable: false,
+      injected: true,
     }]);
   });
 
@@ -117,10 +118,14 @@ describe('useSkillsStore directory resolution', () => {
     });
 
     expect(await useSkillsStore.getState().loadSkills()).toBe(true);
-    expect(useSkillsStore.getState().skills[0]).toMatchObject({
+    expect(useSkillsStore.getState().skills[0]).toEqual({
       name: 'blank-row-skill',
+      path: `${activeProjectPath}/.agents/skills/blank-row-skill/SKILL.md`,
       scope: 'project',
       source: 'agents',
+      description: 'Has a path but no name',
+      group: undefined,
+      renamable: false,
       injected: false,
     });
   });
@@ -159,6 +164,7 @@ describe('useSkillsStore directory resolution', () => {
         description: 'Managed',
         group: undefined,
         renamable: true,
+        injected: true,
       },
       {
         name: 'cache-skill',
@@ -168,6 +174,7 @@ describe('useSkillsStore directory resolution', () => {
         description: 'Cache',
         group: 'hash',
         renamable: false,
+        injected: true,
       },
     ]);
   });
