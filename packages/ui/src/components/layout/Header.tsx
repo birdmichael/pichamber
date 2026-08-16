@@ -25,7 +25,7 @@ import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSession
 import { useSync } from '@/sync/use-sync';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
-import { useGitBranchLabel } from '@/stores/useGitStore';
+import { useGitBranchLabel, useGitStore } from '@/stores/useGitStore';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
@@ -1078,8 +1078,13 @@ export const Header: React.FC<HeaderProps> = ({
     return null;
   });
 
+  const ensureGitStatus = useGitStore((state) => state.ensureStatus);
   const gitBranchForDirectory = useGitBranchLabel(openDirectory || null);
-  const currentBranchLabel = gitBranchForDirectory || currentSessionWorktreeBranch || catalogWorktreeBranch;
+  React.useEffect(() => {
+    if (!openDirectory) return;
+    void ensureGitStatus(openDirectory, runtimeApis.git).catch(() => {});
+  }, [ensureGitStatus, openDirectory, runtimeApis.git]);
+  const currentBranchLabel = gitBranchForDirectory || currentSessionWorktreeBranch || (isNewSessionDraftOpen ? null : catalogWorktreeBranch);
 
   // Whether the title carries a second line under it. Hoisted because the
   // session menu's vertical alignment depends on the same answer.

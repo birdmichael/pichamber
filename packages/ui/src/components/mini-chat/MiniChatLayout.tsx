@@ -132,7 +132,7 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
     return segments.at(-1) ?? project.path;
   }, [activeProject, directoryLabel, pathMatchedProject]);
   const gitBranchForDirectory = useGitBranchLabel(openDirectory || null);
-  const rawBranchLabel = gitBranchForDirectory || worktreeMetadataBranch || sessionWorktreeMetadata?.branch?.trim() || worktreeAttachment?.branch?.trim() || catalogWorktreeBranch;
+  const rawBranchLabel = gitBranchForDirectory || worktreeMetadataBranch || sessionWorktreeMetadata?.branch?.trim() || worktreeAttachment?.branch?.trim() || ((draftOpen || mode === 'draft') ? null : catalogWorktreeBranch);
   const branchLabel = rawBranchLabel && rawBranchLabel !== 'HEAD' ? rawBranchLabel : null;
   const currentModel = getCurrentModel();
   const latestAssistantModel = React.useMemo(() => {
