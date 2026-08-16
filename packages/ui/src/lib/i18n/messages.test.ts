@@ -81,4 +81,42 @@ describe('i18n dictionaries', () => {
       expect(dictionary['commandPalette.input.placeholder']).not.toBe('Search files, sessions, commands...');
     }
   });
+
+  test('Chinese locales keep git worktree as a loanword', () => {
+    const worktreeTerm = /\bworktrees?\b/i;
+    const workingTreeTerm = /working[-\s]?tree/i;
+    const chineseTreeCalque = /工作树|工作樹/;
+    const polishTreeCalque = /drzewo pracy|drzewa pracy|drzewie pracy/i;
+
+    const worktreeKeys = Object.keys(enDict).filter((key) => {
+      const english = enDict[key as keyof typeof enDict];
+      return worktreeTerm.test(english) && !workingTreeTerm.test(english);
+    });
+
+    expect(worktreeKeys.length).toBeGreaterThan(20);
+
+    for (const key of worktreeKeys) {
+      const typedKey = key as keyof typeof enDict;
+      expect(zhCnDict[typedKey], `zh-CN ${key}`).not.toMatch(chineseTreeCalque);
+      expect(zhTwDict[typedKey], `zh-TW ${key}`).not.toMatch(chineseTreeCalque);
+      expect(zhCnDict[typedKey], `zh-CN ${key}`).toMatch(/worktree/i);
+      expect(zhTwDict[typedKey], `zh-TW ${key}`).toMatch(/worktree/i);
+      expect(plDict[typedKey], `pl ${key}`).not.toMatch(polishTreeCalque);
+    }
+
+    expect(zhCnDict['chat.chatInput.worktrees']).toBe('worktree');
+    expect(zhCnDict['chat.chatInput.worktreeNew']).toBe('+ 新建');
+    expect(zhCnDict['sessions.sidebar.project.actions.newWorktree']).toBe('新建 worktree');
+    expect(zhCnDict['sessions.sidebar.session.menu.moveToWorktree']).toBe('移至新 worktree');
+    expect(zhCnDict['settings.projects.page.section.worktree']).toBe('worktree');
+    expect(zhCnDict['mobile.projectEdit.worktreesTitle']).toBe('worktree');
+    expect(zhTwDict['sessions.sidebar.session.menu.moveToWorktree']).toBe('移至新 worktree');
+
+    expect(zhCnDict['contextRail.editorTree.toggle']).toBe('切换文件树');
+    expect(zhCnDict['contextPanel.editorEmpty.description']).toContain('文件树');
+    expect(zhCnDict['filesView.editor.pickFileFromTree']).toContain('文件树');
+    expect(enDict['contextRail.editorTree.toggle']).toBe('Toggle file tree');
+    expect(enDict['settings.openchamber.git.option.treeView']).toBe('Tree View');
+    expect(zhCnDict['settings.openchamber.git.option.treeView']).toBe('树形视图');
+  });
 });

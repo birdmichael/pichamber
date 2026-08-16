@@ -1057,7 +1057,7 @@ export const dict: Record<I18nKey, string> = {
   "gitView.pullRequest.createHint": "Crea y gestiona PR desde esta rama.",
   "gitView.pullRequest.availableOnFeatureBranches": "Disponible cuando la rama actual puede abrir un PR.",
   "gitView.pullRequest.title": "PR",
-  "gitView.tabs.worktree": "Árbol de trabajo",
+  "gitView.tabs.worktree": "Worktree",
   "gitView.toast.abortOperationFailed": "No se pudo abortar la operación",
   "gitView.toast.appliedIdentity": "Identidad aplicada: {name}",
   "gitView.toast.applyIdentityFailed": "No se pudo aplicar la identidad",

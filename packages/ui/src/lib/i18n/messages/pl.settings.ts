@@ -840,7 +840,7 @@ export const settingsDict = {
   'settings.openchamber.keyboardShortcuts.action.toggle_prompt_navigator.label': 'Przełącz nawigator promptów',
   'settings.openchamber.keyboardShortcuts.action.focus_input.label': 'Skup pole wprowadzania',
   'settings.openchamber.keyboardShortcuts.action.new_chat.label': 'Nowa sesja',
-  'settings.openchamber.keyboardShortcuts.action.new_chat_worktree.label': 'Nowy szkic obszaru roboczego',
+  'settings.openchamber.keyboardShortcuts.action.new_chat_worktree.label': 'Nowy szkic worktree',
   'settings.openchamber.keyboardShortcuts.action.new_mini_chat.label': 'Nowe okno Mini Chat',
   'settings.openchamber.keyboardShortcuts.action.open_command_palette.label': 'Otwórz paletę poleceń',
   'settings.openchamber.keyboardShortcuts.action.open_go_to_line.label': 'Przejdź do linii (edytor plików)',
