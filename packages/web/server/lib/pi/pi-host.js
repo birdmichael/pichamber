@@ -259,6 +259,35 @@ const applyEventToStore = (store, ocEvent) => {
   }
 };
 
+
+export const normalizePiSessionUsage = (contextUsage, sessionStats) => {
+  const usage = (contextUsage && typeof contextUsage === 'object')
+    ? contextUsage
+    : (sessionStats?.contextUsage && typeof sessionStats.contextUsage === 'object'
+      ? sessionStats.contextUsage
+      : undefined);
+  if (!usage && !sessionStats) {
+    return { available: false };
+  }
+
+  const rawTokens = usage?.tokens;
+  const tokens = typeof rawTokens === 'number' && Number.isFinite(rawTokens) ? rawTokens : null;
+  const contextLimit = [usage?.contextWindow, usage?.contextLimit]
+    .find((value) => typeof value === 'number' && Number.isFinite(value) && value > 0) ?? 0;
+  const rawPercent = usage?.percent;
+  const percent = typeof rawPercent === 'number' && Number.isFinite(rawPercent)
+    ? rawPercent
+    : (tokens != null && contextLimit > 0 ? (tokens / contextLimit) * 100 : null);
+
+  return {
+    available: true,
+    tokens,
+    contextLimit,
+    contextWindow: contextLimit || undefined,
+    percent,
+  };
+};
+
 export const mapPiModelsToProviders = (models) => {
   const byProvider = new Map();
   for (const model of models || []) {
@@ -273,13 +302,23 @@ export const mapPiModelsToProviders = (models) => {
       });
     }
     const provider = byProvider.get(providerID);
+    const contextWindow = Number(model.contextWindow);
+    const maxTokens = Number(model.maxTokens);
+    const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
+    const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
     provider.models[model.id] = {
       id: model.id,
       name: model.name || model.id,
       reasoning: Boolean(model.reasoning),
-      contextWindow: model.contextWindow,
-      maxTokens: model.maxTokens,
+      ...(hasContext ? { contextWindow } : {}),
+      ...(hasOutput ? { maxTokens } : {}),
       cost: model.cost,
+      ...(hasContext || hasOutput ? {
+        limit: {
+          ...(hasContext ? { context: contextWindow } : {}),
+          ...(hasOutput ? { output: maxTokens } : {}),
+        },
+      } : {}),
     };
   }
   return Array.from(byProvider.values());
@@ -1089,16 +1128,21 @@ export const createPiHost = ({
     },
     getSessionUsage(sessionID) {
       const record = getRecord(sessionID);
+      let contextUsage;
+      let sessionStats;
       try {
         if (typeof record.piSession?.getContextUsage === "function") {
-          return { available: true, ...record.piSession.getContextUsage() };
-        }
-        if (typeof record.piSession?.getSessionStats === "function") {
-          return { available: true, ...record.piSession.getSessionStats() };
+          contextUsage = record.piSession.getContextUsage();
         }
       } catch {
       }
-      return { available: false };
+      try {
+        if (typeof record.piSession?.getSessionStats === "function") {
+          sessionStats = record.piSession.getSessionStats();
+        }
+      } catch {
+      }
+      return normalizePiSessionUsage(contextUsage, sessionStats);
     },
     async compactSession(sessionID, instructions) {
       const record = getRecord(sessionID);
