@@ -211,7 +211,73 @@ describe('Pi host subagent runs', () => {
     }
   });
 
-  it('mints a writable facade child for a live tool-call that never got a child id', async () => {
+  it('does not list or mint a child for a management list call', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_list',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_list',
+        state: {
+          status: 'completed',
+          input: { action: 'list' },
+          output: JSON.stringify({ details: { mode: 'management', results: [] } }),
+        },
+      }],
+    });
+    const before = host.listSessions('/tmp/project').map((record) => record.id);
+    const listed = await host.listSubagentRuns(parent.id);
+    expect(listed.runs).toEqual([]);
+    expect(await host.listSessionChildren(parent.id)).toEqual([]);
+    expect(host.listSessions('/tmp/project').map((record) => record.id)).toEqual(before);
+  });
+
+  it('keeps an in-flight execution without a child id as status-only', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_sub',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_live',
+        state: {
+          status: 'running',
+          input: { agent: 'scout', task: 'List the README filename' },
+        },
+      }],
+    });
+    const before = host.listSessions('/tmp/project').map((record) => record.id);
+    const listed = await host.listSubagentRuns(parent.id);
+    expect(listed.runs).toEqual([expect.objectContaining({
+      runId: 'call_live',
+      name: 'scout',
+      sessionID: null,
+      openable: false,
+    })]);
+    expect(await host.listSessionChildren(parent.id)).toEqual([]);
+    expect(host.listSessions('/tmp/project').map((record) => record.id)).toEqual(before);
+  });
+
+  it('does not mint an empty chat for a finished tool-call that never got a child id', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);
     const host = createPiHost({
@@ -235,18 +301,10 @@ describe('Pi host subagent runs', () => {
         },
       }],
     });
+    const before = host.listSessions('/tmp/project').map((record) => record.id);
     const listed = await host.listSubagentRuns(parent.id);
-    expect(listed.runs).toHaveLength(1);
-    expect(listed.runs[0].openable).toBe(true);
-    expect(listed.runs[0].sessionID).toBeTruthy();
-    expect(listed.runs[0].sessionID).not.toBe(parent.id);
-    const again = await host.listSubagentRuns(parent.id);
-    expect(again.runs[0].sessionID).toBe(listed.runs[0].sessionID);
-    const child = await host.ensureSession(listed.runs[0].sessionID, '/tmp/project');
-    expect(child.info.parentID).toBe(parent.id);
-    await host.promptAsync(listed.runs[0].sessionID, { text: 'also list the test entry points' });
-    expect(host.getMessages(parent.id).some((entry) => (
-      entry.parts?.some((part) => part.text === 'also list the test entry points')
-    ))).toBe(false);
+    expect(listed.runs).toEqual([]);
+    expect(await host.listSessionChildren(parent.id)).toEqual([]);
+    expect(host.listSessions('/tmp/project').map((record) => record.id)).toEqual(before);
   });
 });

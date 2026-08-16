@@ -40,6 +40,7 @@ export const normalizeSubagentRunState = (value) => {
 
 export const normalizeSubagentRunMode = (value, fallback = 'foreground') => {
   const mode = asTrimmedString(value).toLowerCase();
+  if (mode === 'management') return null;
   if (mode === 'background' || mode === 'async' || mode === 'detached') return 'background';
   if (mode === 'foreground' || mode === 'sync') return 'foreground';
   if (mode === 'workflow' || mode === 'chain' || mode === 'parallel') return 'background';
@@ -122,6 +123,9 @@ export const mapStatusToSubagentRun = (status, {
   asyncDir,
 } = {}) => {
   if (!isRecord(status)) return null;
+  if (isSubagentManagementCall({ input: status, details: status, status, mode: status.mode })) {
+    return null;
+  }
   const runId = asTrimmedString(status.runId || status.id);
   if (!runId) return null;
   const sessionFile = asTrimmedString(status.sessionFile) || firstStepSessionFile(status);
@@ -133,6 +137,7 @@ export const mapStatusToSubagentRun = (status, {
   const agent = firstAgentName(status) || 'subagent';
   const state = normalizeSubagentRunState(status.state);
   const mode = normalizeSubagentRunMode(status.mode, sessionFile ? 'background' : 'foreground');
+  if (!mode) return null;
   return {
     runId,
     parentID: asTrimmedString(parentID),
@@ -223,6 +228,62 @@ const parseJsonValue = (value) => {
   } catch {
     return null;
   }
+};
+
+const hasSubagentExecutionPayload = (value) => {
+  if (!isRecord(value)) return false;
+  if (asTrimmedString(value.task) || asTrimmedString(value.workflowScript)) return true;
+  if (Array.isArray(value.tasks) && value.tasks.length > 0) return true;
+  if (Array.isArray(value.chain) && value.chain.length > 0) return true;
+  return false;
+};
+
+const readSubagentAction = (...values) => {
+  for (const value of values) {
+    if (!isRecord(value)) continue;
+    const action = asTrimmedString(value.action);
+    if (action) return action.toLowerCase();
+  }
+  return '';
+};
+
+const readSubagentDeclaredMode = (...values) => {
+  for (const value of values) {
+    if (!isRecord(value)) continue;
+    const mode = asTrimmedString(value.mode);
+    if (mode) return mode.toLowerCase();
+  }
+  return '';
+};
+
+/**
+ * Catalog / CRUD / status calls are not fleet children. pi-subagents marks
+ * those results `mode: "management"` and omits execution fields (`task`,
+ * `tasks`, `chain`, `workflowScript`).
+ */
+export const isSubagentManagementCall = (payload = {}) => {
+  const input = isRecord(payload.input) ? payload.input : {};
+  const details = isRecord(payload.details) ? payload.details : {};
+  const output = isRecord(payload.output) ? payload.output : (parseJsonValue(payload.output) || {});
+  const outputDetails = isRecord(output.details) ? output.details : output;
+  const status = isRecord(payload.status) ? payload.status : {};
+  if (hasSubagentExecutionPayload(input)
+    || hasSubagentExecutionPayload(details)
+    || hasSubagentExecutionPayload(outputDetails)
+    || hasSubagentExecutionPayload(status)
+    || hasSubagentExecutionPayload(payload)) {
+    return false;
+  }
+  const mode = readSubagentDeclaredMode(
+    payload,
+    input,
+    details,
+    outputDetails,
+    output,
+    status,
+  );
+  if (mode === 'management') return true;
+  return Boolean(readSubagentAction(input, details, outputDetails, output, status, payload));
 };
 
 const readSessionIdFromRecord = (value) => {
@@ -342,6 +403,15 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   const metadata = isRecord(state.metadata) ? state.metadata : (isRecord(part.metadata) ? part.metadata : {});
   const output = parseJsonValue(state.output) || parseJsonValue(part.output) || {};
   const details = isRecord(output.details) ? output.details : output;
+  if (isSubagentManagementCall({
+    input,
+    details,
+    output: state.output ?? part.output ?? output,
+    metadata,
+    mode: details.mode || input.mode || metadata.mode,
+  })) {
+    return null;
+  }
   const agent = asTrimmedString(input.agent || details.agent || metadata.agent || input.subagent_type) || 'subagent';
   const runId = asTrimmedString(
     details.runId
@@ -367,6 +437,11 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   const toolStatus = asTrimmedString(state.status).toLowerCase();
   const stateFromOutput = asTrimmedString(details.state || output.state);
   const running = !toolStatus || toolStatus === 'pending' || toolStatus === 'running';
+  const mode = normalizeSubagentRunMode(
+    details.mode || input.mode || metadata.mode || (input.async === true ? 'background' : 'foreground'),
+    input.async === true ? 'background' : 'foreground',
+  );
+  if (!mode) return null;
   return {
     runId,
     parentID: asTrimmedString(parentID),
@@ -374,10 +449,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     sessionFile: sessionFile || null,
     name: agent,
     role: asTrimmedString(input.role) || agent,
-    mode: normalizeSubagentRunMode(
-      details.mode || input.mode || metadata.mode || (input.async === true ? 'background' : 'foreground'),
-      input.async === true ? 'background' : 'foreground',
-    ),
+    mode,
     state: normalizeSubagentRunState(stateFromOutput || (running ? 'running' : 'done')),
     title: asTrimmedString(input.task || input.description || details.goal) || agent,
     toolCallId: asTrimmedString(part.callID || part.id) || null,
@@ -416,9 +488,14 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         if (!isRecord(block) || asTrimmedString(block.type) !== 'toolCall') continue;
         if (asTrimmedString(block.name).toLowerCase() !== 'subagent') continue;
         const args = isRecord(block.arguments) ? block.arguments : {};
+        if (isSubagentManagementCall({ input: args, details: args, mode: args.mode })) {
+          continue;
+        }
         const runId = asTrimmedString(block.id || args.runId || args.id);
         if (!runId) continue;
         const sessionFile = asTrimmedString(args.sessionFile) || null;
+        const mode = normalizeSubagentRunMode(args.mode, args.async === true ? 'background' : 'foreground');
+        if (!mode) continue;
         upsertSubagentRun(byId, {
           runId,
           parentID: asTrimmedString(parentID),
@@ -426,7 +503,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
           sessionFile,
           name: asTrimmedString(args.agent || args.role || args.subagent_type) || 'subagent',
           role: asTrimmedString(args.role || args.agent) || 'subagent',
-          mode: normalizeSubagentRunMode(args.mode, args.async === true ? 'background' : 'foreground'),
+          mode,
           state: 'running',
           title: asTrimmedString(args.task || args.description || args.goal) || asTrimmedString(args.agent) || 'subagent',
           toolCallId: asTrimmedString(block.id) || null,
@@ -449,7 +526,21 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       : Array.isArray(message.content)
         ? message.content.map((item) => (typeof item?.text === 'string' ? item.text : '')).join('')
         : '';
+    if (isSubagentManagementCall({
+      input: details,
+      details,
+      output: rawContent,
+      mode: details.mode,
+    })) {
+      byId.delete(runId);
+      continue;
+    }
     const sessionFile = asTrimmedString(details.sessionFile) || readSessionFileFromText(rawContent);
+    const mode = normalizeSubagentRunMode(details.mode, sessionFile ? 'background' : 'foreground');
+    if (!mode) {
+      byId.delete(runId);
+      continue;
+    }
     upsertSubagentRun(byId, {
       runId,
       parentID: asTrimmedString(parentID),
@@ -463,7 +554,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       sessionFile: sessionFile || null,
       name: asTrimmedString(details.agent || details.role) || 'subagent',
       role: asTrimmedString(details.role || details.agent) || 'subagent',
-      mode: normalizeSubagentRunMode(details.mode, sessionFile ? 'background' : 'foreground'),
+      mode,
       state: normalizeSubagentRunState(details.state || (message.isError ? 'failed' : 'done')),
       title: asTrimmedString(details.goal || details.task) || asTrimmedString(details.agent) || 'subagent',
       toolCallId: asTrimmedString(message.toolCallId || entry.id) || null,
@@ -536,8 +627,8 @@ export const mergeSubagentRuns = (...lists) => {
 /**
  * Live tool-call runs win. Stale adapter status files without a child id are
  * dropped; status-only stays only while a run is still queued/running/blocked.
- * Terminal tool-calls without a child stay only as the newest one, so attach
- * can mint a writable facade without flooding Work Status.
+ * A finished tool-call without a child is not kept so attach cannot mint an
+ * empty chat just to make the row clickable.
  */
 export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
   const live = mergeSubagentRuns(liveRuns);
@@ -557,20 +648,10 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
     if (childId || isLiveRunState(file.state)) extras.push({ ...file, sessionID: childId });
   }
 
-  const combined = mergeSubagentRuns(live, extras);
-  const withChildOrLive = combined.filter((run) => (
+  const visible = mergeSubagentRuns(live, extras).filter((run) => (
     asChildSessionId(run.sessionID, run.parentID)
     || isLiveRunState(run.state)
   ));
-  const kept = new Set(withChildOrLive);
-  const mintable = combined
-    .filter((run) => !kept.has(run) && run.toolCallId)
-    .sort((left, right) => {
-      const byTime = (right.startedAt || 0) - (left.startedAt || 0);
-      if (byTime !== 0) return byTime;
-      return combined.indexOf(right) - combined.indexOf(left);
-    });
-  const visible = mintable[0] ? [...withChildOrLive, mintable[0]] : withChildOrLive;
   const seenSession = new Set();
   return visible.filter((run) => {
     if (!run.sessionID) return true;

@@ -48,6 +48,19 @@ describe('collectTranscriptSubagentSessionIds', () => {
       }],
     }])).toEqual([{ runId: 'call_1', sessionID: 'child-from-meta' }]);
   });
+
+  test('does not invent a child id from a management list call', () => {
+    expect(collectTranscriptSubagentSessionIds([{
+      parts: [{
+        tool: 'subagent',
+        callID: 'call_list',
+        state: {
+          input: { action: 'list' },
+          output: JSON.stringify({ details: { mode: 'management', results: [] } }),
+        },
+      }],
+    }])).toEqual([]);
+  });
 });
 
 describe('assignTranscriptSessionIds', () => {

@@ -7,6 +7,7 @@ import {
   extractRunsFromFacadeMessages,
   extractRunsFromPiEntries,
   extractSubagentRunFromToolPart,
+  isSubagentManagementCall,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
   mapStatusToSubagentRun,
@@ -50,6 +51,33 @@ describe('normalize helpers', () => {
     expect(normalizeSubagentRunState('failed')).toBe('failed');
     expect(normalizeSubagentRunMode('async')).toBe('background');
     expect(normalizeSubagentRunMode('sync')).toBe('foreground');
+    expect(normalizeSubagentRunMode('management')).toBeNull();
+    expect(normalizeSubagentRunMode('management', 'foreground')).toBeNull();
+  });
+});
+
+describe('isSubagentManagementCall', () => {
+  it('treats catalog and action-only calls as management', () => {
+    expect(isSubagentManagementCall({ input: { action: 'list' } })).toBe(true);
+    expect(isSubagentManagementCall({
+      input: { action: 'list' },
+      details: { mode: 'management', results: [] },
+    })).toBe(true);
+    expect(isSubagentManagementCall({ details: { mode: 'management', results: [] } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'status' } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'get', agent: 'scout' } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'models' } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'guide', topic: 'workflows' } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'children.list' } })).toBe(true);
+  });
+
+  it('keeps a real scout/worker launch as a fleet run', () => {
+    expect(isSubagentManagementCall({
+      input: { agent: 'scout', task: 'Inspect the repo' },
+    })).toBe(false);
+    expect(isSubagentManagementCall({
+      input: { action: 'run', agent: 'reviewer', task: 'Review the diff' },
+    })).toBe(false);
   });
 });
 
@@ -344,6 +372,51 @@ describe('tool-part extraction', () => {
       state: { input: { subagent_type: 'explore' } },
     }, 'parent-1')).toBeNull();
   });
+
+  it('does not treat a management list call as a fleet run', () => {
+    expect(extractSubagentRunFromToolPart({
+      tool: 'subagent',
+      callID: 'call_list',
+      state: {
+        status: 'completed',
+        input: { action: 'list' },
+        output: JSON.stringify({ details: { mode: 'management', results: [] } }),
+      },
+    }, 'parent-1')).toBeNull();
+    expect(extractRunsFromPiEntries([{
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'toolCall',
+          id: 'call_list',
+          name: 'subagent',
+          arguments: { action: 'list' },
+        }],
+      },
+    }, {
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call_list',
+        content: 'Executable agents: scout, worker, reviewer',
+        details: { mode: 'management', results: [] },
+        isError: false,
+      },
+    }], 'parent-1')).toEqual([]);
+    expect(extractRunsFromFacadeMessages([{
+      parts: [{
+        tool: 'subagent',
+        callID: 'call_list',
+        state: {
+          status: 'completed',
+          input: { action: 'list' },
+          output: JSON.stringify({ mode: 'management', results: [] }),
+        },
+      }],
+    }], 'parent-1')).toEqual([]);
+  });
 });
 
 describe('reconcileParentSubagentRuns', () => {
@@ -387,7 +460,7 @@ describe('reconcileParentSubagentRuns', () => {
     expect(toPublicSubagentRun(reconciled[0]).openable).toBe(false);
   });
 
-  it('keeps only the newest terminal tool-call without a child', () => {
+  it('drops finished tool-calls without a child instead of keeping one to mint', () => {
     const reconciled = reconcileParentSubagentRuns([], [
       {
         runId: 'old_done',
@@ -424,9 +497,9 @@ describe('reconcileParentSubagentRuns', () => {
     ]);
     expect(reconciled.map((run) => run.runId).sort()).toEqual([
       'has_child',
-      'newer_failed',
       'still_running',
     ]);
+    expect(toPublicSubagentRun(reconciled.find((run) => run.runId === 'still_running')).openable).toBe(false);
   });
 });
 
@@ -455,5 +528,14 @@ describe('mergeSubagentRuns', () => {
 describe('mapStatusToSubagentRun', () => {
   it('returns null without a run id', () => {
     expect(mapStatusToSubagentRun({ state: 'running' })).toBeNull();
+  });
+
+  it('returns null for a management catalog status', () => {
+    expect(mapStatusToSubagentRun({
+      runId: 'call_list',
+      mode: 'management',
+      state: 'complete',
+      results: [],
+    })).toBeNull();
   });
 });

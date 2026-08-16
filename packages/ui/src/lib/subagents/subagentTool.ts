@@ -52,6 +52,59 @@ const readSessionIdField = (value: unknown): string => {
   return '';
 };
 
+const asTrimmed = (value: unknown): string => (
+  typeof value === 'string' && value.trim() ? value.trim() : ''
+);
+
+const hasSubagentExecutionPayload = (value?: Record<string, unknown> | null): boolean => {
+  if (!value) return false;
+  if (asTrimmed(value.task) || asTrimmed(value.workflowScript)) return true;
+  if (Array.isArray(value.tasks) && value.tasks.length > 0) return true;
+  if (Array.isArray(value.chain) && value.chain.length > 0) return true;
+  return false;
+};
+
+const readOutputRecord = (output?: unknown): Record<string, unknown> | null => {
+  if (output && typeof output === 'object' && !Array.isArray(output)) {
+    return output as Record<string, unknown>;
+  }
+  if (typeof output === 'string' && output.trim()) {
+    try {
+      const parsed = JSON.parse(output) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+export const isSubagentManagementCall = (
+  input?: Record<string, unknown> | null,
+  output?: unknown,
+): boolean => {
+  const parsed = readOutputRecord(output);
+  const details = parsed?.details && typeof parsed.details === 'object' && !Array.isArray(parsed.details)
+    ? parsed.details as Record<string, unknown>
+    : parsed;
+  if (hasSubagentExecutionPayload(input) || hasSubagentExecutionPayload(details)) return false;
+  const mode = asTrimmed(input?.mode || details?.mode || parsed?.mode).toLowerCase();
+  if (mode === 'management') return true;
+  return Boolean(asTrimmed(input?.action || details?.action || parsed?.action));
+};
+
+export const shouldOfferSubagentChildOpen = ({
+  childSessionId,
+  input,
+  output,
+}: {
+  childSessionId?: string | null;
+  input?: Record<string, unknown> | null;
+  output?: unknown;
+}): boolean => Boolean(asTrimmed(childSessionId)) && !isSubagentManagementCall(input, output);
+
 export const readSubagentChildSessionId = (
   input?: Record<string, unknown> | null,
   output?: unknown,

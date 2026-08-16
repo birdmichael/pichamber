@@ -243,9 +243,15 @@ When the slot is on:
   the transcript card open the same writable tab. Scraping a `.jsonl`
   session path from tool text is a length-capped linear scan so listing
   stays cheap on the HTTP thread.
+- Management / action-only `subagent` calls (`list`, `status`, `get`,
+  `models`, `guide`, `children.list`, and `details.mode === "management"`)
+  are not fleet runs. They do not appear in Work Status and do not mint a
+  facade session or child jsonl. `mode: "management"` is never treated as
+  foreground.
 - Terminal adapter files with no child id are dropped (not a pile of
   untitled ghosts). Status-only is only for a still-queued/running/blocked
-  run whose id is not ready yet.
+  run whose id is not ready yet. A finished tool-call without a child is
+  not minted into an empty chat just to make the row clickable.
 - A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
   Follow-ups stay on the child; the parent transcript is unchanged.

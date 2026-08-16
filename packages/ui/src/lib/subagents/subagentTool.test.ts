@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  isSubagentManagementCall,
   readSubagentCardAgent,
   readSubagentChildSessionId,
+  shouldOfferSubagentChildOpen,
   shouldRenderDedicatedSubagentCard,
   shouldRenderOpenCodeSubtaskChrome,
   shouldShowPiFromSubagentLabel,
@@ -61,5 +63,23 @@ describe('card fields', () => {
       JSON.stringify({ details: { sessionId: 'child-1' } }),
     )).toBe('child-1');
     expect(readSubagentChildSessionId({ childSessionId: 'child-from-input' }, 'failed')).toBe('child-from-input');
+  });
+
+  test('does not treat a management list as an open-child card', () => {
+    expect(isSubagentManagementCall({ action: 'list' }, JSON.stringify({
+      details: { mode: 'management', results: [] },
+    }))).toBe(true);
+    expect(readSubagentChildSessionId({ action: 'list' }, JSON.stringify({
+      details: { mode: 'management', results: [] },
+    }))).toBeNull();
+    expect(shouldOfferSubagentChildOpen({
+      childSessionId: null,
+      input: { action: 'list' },
+      output: JSON.stringify({ details: { mode: 'management', results: [] } }),
+    })).toBe(false);
+    expect(shouldOfferSubagentChildOpen({
+      childSessionId: 'child-1',
+      input: { agent: 'scout', task: 'Inspect the repo' },
+    })).toBe(true);
   });
 });

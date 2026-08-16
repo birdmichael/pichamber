@@ -1400,19 +1400,9 @@ export const createPiHost = ({
     return reconcileParentSubagentRuns(fileRuns, liveRuns);
   };
 
-  const findMintedSubagentChild = (parent, run) => {
-    for (const record of sessions.values()) {
-      const meta = record.info?.metadata?.pichamber?.subagentRun;
-      if (meta?.runId === run.runId && record.info?.parentID === parent.id) {
-        return record;
-      }
-    }
-    return null;
-  };
-
   const attachSubagentRun = async (parent, run) => {
     const childId = run?.sessionID && run.sessionID !== parent.id ? run.sessionID : null;
-    if (!run?.sessionFile && !childId && !run?.toolCallId) return run;
+    if (!run?.sessionFile && !childId) return run;
     try {
       if (run.sessionFile) {
         const record = await attachSessionFromFile(run.sessionFile, {
@@ -1451,29 +1441,6 @@ export const createPiHost = ({
       }
       if (childId) {
         return { ...run, sessionID: childId };
-      }
-      if (run.toolCallId) {
-        const existing = findMintedSubagentChild(parent, run);
-        if (existing) return { ...run, sessionID: existing.id };
-        const record = await createFacadeSession({
-          directory: parent.directory,
-          title: run.title || run.name,
-          parentID: parent.id,
-          metadata: {
-            pichamber: {
-              subagentRun: {
-                runId: run.runId,
-                parentSessionID: parent.id,
-                mode: run.mode,
-                state: run.state,
-                name: run.name,
-                role: run.role,
-              },
-            },
-          },
-        });
-        record.subagentRun = run;
-        return { ...run, sessionID: record.id };
       }
     } catch (error) {
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
