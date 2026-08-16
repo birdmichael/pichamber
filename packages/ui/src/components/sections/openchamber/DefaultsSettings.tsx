@@ -529,6 +529,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={200000}
                       step={1024}
+                      className="w-20 tabular-nums"
                       aria-label={t('settings.openchamber.defaults.field.reserveTokensAria')}
                     />
                   </div>
@@ -555,6 +556,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={200000}
                       step={1024}
+                      className="w-20 tabular-nums"
                       aria-label={t('settings.openchamber.defaults.field.keepRecentTokensAria')}
                     />
                   </div>

@@ -20,6 +20,9 @@
  */
 
 import { describe, expect, mock, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -557,3 +560,46 @@ describe("NumberInput rapid-click stepper", () => {
     });
   });
 });
+
+describe("NumberInput 5-digit width (compaction reserve tokens)", () => {
+  test("markup: 16384 renders in full and honors a wider className", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(NumberInput, {
+          value: 16384,
+          min: 0,
+          max: 200000,
+          step: 1024,
+          className: "w-20 tabular-nums",
+          onValueChange: () => {},
+        }),
+      ),
+    );
+    expect(markup).toContain('value="16384"');
+    expect(markup).toContain("w-20");
+    expect(markup).not.toContain("maxLength");
+  });
+
+  test("DefaultsSettings compaction NumberInputs override the default w-10 clip", () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "..", "sections", "openchamber", "DefaultsSettings.tsx"),
+      "utf-8",
+    );
+    const reserveIdx = source.indexOf('settingsItem="sessions.compaction-reserve"');
+    const keepIdx = source.indexOf('settingsItem="sessions.compaction-keep"');
+    const retryIdx = source.indexOf('settingsItem="sessions.retry"');
+    expect(reserveIdx).toBeGreaterThan(-1);
+    expect(keepIdx).toBeGreaterThan(reserveIdx);
+    expect(retryIdx).toBeGreaterThan(keepIdx);
+
+    const reserveBlock = source.slice(reserveIdx, keepIdx);
+    const keepBlock = source.slice(keepIdx, retryIdx);
+    // NumberInput defaults to w-10 + overflow-x-hidden, which clips 16384 to 163.
+    expect(reserveBlock).toContain('className="w-20 tabular-nums"');
+    expect(keepBlock).toContain('className="w-20 tabular-nums"');
+    expect(source).toContain("useState(16384)");
+  });
+});
+
