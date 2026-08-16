@@ -1,5 +1,5 @@
 import express from 'express';
-import { resolveActiveProjectDirectory } from './pi-resources.js';
+import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
 import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 
@@ -354,7 +354,15 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/pi/defaults', handle(async (_req, res) => {
-    json(res, 200, host.getDefaults());
+    const defaults = host.getDefaults();
+    let resolvedModel = typeof defaults.model === 'string' ? defaults.model.trim() : '';
+    try {
+      const catalog = await host.getProviders();
+      resolvedModel = resolvePiDefaultModel(defaults.model, catalog?.providers || []);
+    } catch {
+      // Keep the stored model when the catalog is unavailable.
+    }
+    json(res, 200, { ...defaults, resolvedModel });
   }));
 
   app.patch('/api/pi/defaults', parseJson, handle(async (req, res) => {
@@ -449,14 +457,17 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']);
   }));
 
-  app.get('/api/find/files', handle(async (req, res) => {
+  const handleFindFiles = handle(async (req, res) => {
     const directory = resolveDirectory(req);
     const query = typeof req.query?.query === 'string' ? req.query.query : '';
     const limit = Number(req.query?.limit);
     const includeDirs = req.query?.dirs !== 'false';
     const type = req.query?.type === 'directory' || req.query?.type === 'file' ? req.query.type : null;
     json(res, 200, findProjectFiles(directory, { query, limit, includeDirs, type }));
-  }));
+  });
+  // OpenCode SDK v2 find.files hits /find/file (rewritten to /api/find/file).
+  app.get('/api/find/files', handleFindFiles);
+  app.get('/api/find/file', handleFindFiles);
 
 
   app.get('/api/session/status', handle(async (req, res) => {

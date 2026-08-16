@@ -261,7 +261,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     // At most one picker is open at a time; the prompt language decides which.
     const [openAutocomplete, setOpenAutocomplete] = React.useState<AutocompleteKind | null>(null);
     const [autocompleteQuery, setAutocompleteQuery] = React.useState('');
-    const closeAutocomplete = React.useCallback(() => setOpenAutocomplete(null), []);
+    const dismissedAutocompleteKindRef = React.useRef<AutocompleteKind | null>(null);
+    const closeAutocomplete = React.useCallback(() => {
+        setOpenAutocomplete((current) => {
+            dismissedAutocompleteKindRef.current = current;
+            return null;
+        });
+    }, []);
     const [mobileControlsPanel, setMobileControlsPanel] = React.useState<MobileControlsPanel>(null);
     const [mobileAttachMenuOpen, setMobileAttachMenuOpen] = React.useState(false);
     const [mobileDraftPicker, setMobileDraftPicker] = React.useState<'project' | 'branch' | null>(null);
@@ -1670,6 +1676,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             inputSource,
             insertedText,
         });
+        if (trigger?.kind && trigger.kind === dismissedAutocompleteKindRef.current) {
+            setOpenAutocomplete(null);
+            setAutocompleteQuery(trigger.query);
+            return;
+        }
+        dismissedAutocompleteKindRef.current = null;
         setOpenAutocomplete(trigger?.kind ?? null);
         setAutocompleteQuery(trigger?.query ?? '');
     }, [inputMode]);

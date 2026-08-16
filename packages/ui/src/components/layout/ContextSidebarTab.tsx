@@ -19,6 +19,8 @@ import {
 } from './rawMessagePreview';
 import type { TimeFormatPreference } from '@/stores/useUIStore';
 import { formatDateTimeForPreference } from '@/lib/timeFormat';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { mergePiSessionUsage, readPiSessionUsage, type PiSessionUsage } from './contextPanelUsage';
 
 type SessionMessage = { info: Message; parts: Part[] };
 
@@ -26,6 +28,7 @@ type ProviderModelLike = {
   id?: string;
   name?: string;
   limit?: { context?: number };
+  contextWindow?: number;
 };
 
 type ProviderLike = {
@@ -263,7 +266,9 @@ const resolveProviderAndModel = (
   return {
     providerName: provider?.name || providerID || '-',
     modelName: model?.name || modelID || '-',
-    contextLimit: typeof model?.limit?.context === 'number' ? model.limit.context : null,
+    contextLimit: typeof model?.limit?.context === 'number' && model.limit.context > 0
+      ? model.limit.context
+      : (typeof model?.contextWindow === 'number' && model.contextWindow > 0 ? model.contextWindow : null),
   };
 };
 
@@ -281,6 +286,10 @@ export const ContextPanelContent: React.FC = () => {
     currentSessionDirectory ?? undefined,
   );
   const providers = useConfigStore((state) => state.providers);
+  const [piSessionUsage, setPiSessionUsage] = React.useState<PiSessionUsage | null>(null);
+  const lastMessageId = sessionMessages.length > 0
+    ? sessionMessages[sessionMessages.length - 1]?.info?.id
+    : null;
 
   React.useEffect(() => {
     if (copyResetTimeoutRef.current !== null) {
@@ -289,7 +298,36 @@ export const ContextPanelContent: React.FC = () => {
     }
     setExpandedRawMessages((prev) => (Object.keys(prev).length > 0 ? {} : prev));
     setCopiedRawMessageId(null);
+    setPiSessionUsage((prev) => (prev === null ? prev : null));
   }, [currentSessionDirectory, currentSessionId]);
+
+  React.useEffect(() => {
+    if (!currentSessionId) {
+      setPiSessionUsage((prev) => (prev === null ? prev : null));
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await runtimeFetch(`/api/session/${currentSessionId}/usage`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const data = readPiSessionUsage(await response.json());
+        if (!cancelled) {
+          setPiSessionUsage(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setPiSessionUsage((prev) => (prev === null ? prev : null));
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentSessionId, lastMessageId]);
 
   React.useEffect(() => {
     return () => {
@@ -375,6 +413,12 @@ export const ContextPanelContent: React.FC = () => {
       ? sessionMessages[sessionMessages.length - 1]?.info?.time?.created
       : null;
 
+    const contextUsage = mergePiSessionUsage(piSessionUsage, {
+      total: tokenBreakdown.total,
+      contextLimit,
+      percent: usagePercent,
+    });
+
     return {
       sessionTitle: currentSession?.title || t('contextSidebar.session.untitled'),
       messagesCount: sessionMessages.length,
@@ -384,10 +428,12 @@ export const ContextPanelContent: React.FC = () => {
       lastActivityAt: (lastMessageTs ?? currentSession?.time?.created ?? null) as number | null,
       providerModel,
       tokenBreakdown,
-      usagePercent,
+      usagePercent: contextUsage.percent,
       cacheHitRate,
       totalAssistantCost,
-      contextLimit,
+      contextLimit: contextUsage.contextLimit,
+      contextTokens: contextUsage.total,
+      contextUnavailable: contextUsage.unavailable,
       breakdown: {
         user: userTokens,
         assistant: assistantTokens,
@@ -396,7 +442,7 @@ export const ContextPanelContent: React.FC = () => {
       },
       breakdownTotal,
     };
-  }, [currentSessionId, providers, sessionMessages, sessions, t]);
+  }, [currentSessionId, piSessionUsage, providers, sessionMessages, sessions, t]);
 
   if (!currentSessionId) {
     return (
@@ -436,12 +482,13 @@ export const ContextPanelContent: React.FC = () => {
           <div className="flex items-baseline justify-between">
             <span className="typography-micro text-muted-foreground">{t('contextSidebar.section.context')}</span>
             <span className="typography-micro tabular-nums text-muted-foreground/70">
-              {formatNumber(viewModel.tokenBreakdown.total)}
-              {viewModel.contextLimit ? ` / ${formatNumber(viewModel.contextLimit)}` : ''}
+              {viewModel.contextUnavailable
+                ? '—'
+                : `${formatNumber(viewModel.contextTokens)}${viewModel.contextLimit ? ` / ${formatNumber(viewModel.contextLimit)}` : ''}`}
             </span>
           </div>
           <div className="mt-2.5 flex h-1 w-full overflow-hidden rounded-full bg-[var(--surface-subtle)]">
-            {viewModel.usagePercent > 0 && (
+            {!viewModel.contextUnavailable && viewModel.usagePercent > 0 && (
               <div
                 className="rounded-full transition-all duration-300"
                 style={{
@@ -452,7 +499,9 @@ export const ContextPanelContent: React.FC = () => {
             )}
           </div>
           <div className="mt-1.5 typography-micro font-medium tabular-nums text-foreground/80">
-            {t('contextSidebar.context.percentUsed', { percent: viewModel.usagePercent.toFixed(1) })}
+            {viewModel.contextUnavailable
+              ? '—'
+              : t('contextSidebar.context.percentUsed', { percent: viewModel.usagePercent.toFixed(1) })}
           </div>
         </div>
 

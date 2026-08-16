@@ -183,6 +183,37 @@ const createSessionInfo = ({
   };
 };
 
+const PLACEHOLDER_SESSION_TITLES = new Set(['new session', 'pi session', 'untitled']);
+
+export const isPlaceholderSessionTitle = (title) => {
+  const trimmed = typeof title === 'string' ? title.trim() : '';
+  return !trimmed || PLACEHOLDER_SESSION_TITLES.has(trimmed.toLowerCase());
+};
+
+export const titleFromUserText = (text) => {
+  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!line) return '';
+  return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
+};
+
+const firstUserText = (store) => {
+  for (const entry of store.messages || []) {
+    if (entry?.info?.role !== 'user') continue;
+    const part = (entry.parts || []).find((item) => item?.type === 'text' && typeof item.text === 'string' && item.text.trim());
+    if (part) return part.text;
+  }
+  return '';
+};
+
+const maybeApplyConversationTitle = (record) => {
+  if (!record?.info || !isPlaceholderSessionTitle(record.info.title)) return false;
+  const next = titleFromUserText(firstUserText(record));
+  if (!next) return false;
+  record.info.title = next;
+  record.info.time = { ...(record.info.time || {}), updated: Date.now() };
+  return true;
+};
+
 const lastUserMessage = (store) => {
   for (let index = store.messages.length - 1; index >= 0; index -= 1) {
     const entry = store.messages[index];
@@ -267,13 +298,23 @@ const applyEventToStore = (store, ocEvent) => {
 const toProviderModelRecord = (model) => {
   const id = typeof model?.id === 'string' ? model.id.trim() : '';
   if (!id) return null;
+  const contextWindow = Number(model.contextWindow);
+  const maxTokens = Number(model.maxTokens);
+  const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
+  const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
   return {
     id,
     name: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id,
     reasoning: Boolean(model.reasoning),
-    contextWindow: model.contextWindow,
-    maxTokens: model.maxTokens,
+    ...(hasContext ? { contextWindow } : {}),
+    ...(hasOutput ? { maxTokens } : {}),
     cost: model.cost,
+    ...(hasContext || hasOutput ? {
+      limit: {
+        ...(hasContext ? { context: contextWindow } : {}),
+        ...(hasOutput ? { output: maxTokens } : {}),
+      },
+    } : {}),
   };
 };
 
@@ -311,6 +352,34 @@ const applyPublicProviderConfig = (provider, config) => {
     }
   }
   return provider;
+};
+
+export const normalizePiSessionUsage = (contextUsage, sessionStats) => {
+  const usage = (contextUsage && typeof contextUsage === 'object')
+    ? contextUsage
+    : (sessionStats?.contextUsage && typeof sessionStats.contextUsage === 'object'
+      ? sessionStats.contextUsage
+      : undefined);
+  if (!usage && !sessionStats) {
+    return { available: false };
+  }
+
+  const rawTokens = usage?.tokens;
+  const tokens = typeof rawTokens === 'number' && Number.isFinite(rawTokens) ? rawTokens : null;
+  const contextLimit = [usage?.contextWindow, usage?.contextLimit]
+    .find((value) => typeof value === 'number' && Number.isFinite(value) && value > 0) ?? 0;
+  const rawPercent = usage?.percent;
+  const percent = typeof rawPercent === 'number' && Number.isFinite(rawPercent)
+    ? rawPercent
+    : (tokens != null && contextLimit > 0 ? (tokens / contextLimit) * 100 : null);
+
+  return {
+    available: true,
+    tokens,
+    contextLimit,
+    contextWindow: contextLimit || undefined,
+    percent,
+  };
 };
 
 export const mapPiModelsToProviders = (models, { configs = {} } = {}) => {
@@ -664,9 +733,17 @@ export const createPiHost = ({
       return getRecord(sessionID);
     },
     listSessions(directory) {
-      const items = Array.from(sessions.values());
-      if (!directory) return items;
-      return items.filter((record) => record.directory === directory);
+      const items = Array.from(sessions.values()).filter((record) => !directory || record.directory === directory);
+      for (const record of items) {
+        if (maybeApplyConversationTitle(record)) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
+      }
+      return items;
     },
     deleteSession(sessionID) {
       const record = getRecord(sessionID);
@@ -888,6 +965,13 @@ export const createPiHost = ({
         ...(body.model ? { model: body.model } : {}),
       };
       record.messages.push({ info: userInfo, parts: [userPart] });
+      if (maybeApplyConversationTitle(record)) {
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      }
       emit(record.directory, {
         id: createEventId(),
         type: 'message.updated',
@@ -1194,16 +1278,21 @@ export const createPiHost = ({
     },
     getSessionUsage(sessionID) {
       const record = getRecord(sessionID);
+      let contextUsage;
+      let sessionStats;
       try {
         if (typeof record.piSession?.getContextUsage === "function") {
-          return { available: true, ...record.piSession.getContextUsage() };
-        }
-        if (typeof record.piSession?.getSessionStats === "function") {
-          return { available: true, ...record.piSession.getSessionStats() };
+          contextUsage = record.piSession.getContextUsage();
         }
       } catch {
       }
-      return { available: false };
+      try {
+        if (typeof record.piSession?.getSessionStats === "function") {
+          sessionStats = record.piSession.getSessionStats();
+        }
+      } catch {
+      }
+      return normalizePiSessionUsage(contextUsage, sessionStats);
     },
     async compactSession(sessionID, instructions) {
       const record = getRecord(sessionID);

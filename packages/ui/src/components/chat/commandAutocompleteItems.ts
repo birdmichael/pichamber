@@ -68,3 +68,37 @@ export function commandMatchesSearch(command: CommandAutocompleteSearchItem, que
     || Boolean(command.description && fuzzyMatch(command.description, query))
     || Boolean(command.searchAliases?.some((alias) => fuzzyMatch(alias, query)));
 }
+
+export interface PiSlashCommandItem {
+  name: string;
+  agent?: string;
+  isOpenChamber?: boolean;
+  isSkill?: boolean;
+}
+
+/** OpenChamber leftovers plus composer chips that already cover the same action. */
+const PI_HIDDEN_SLASH_COMMANDS = new Set([
+  'init', 'undo', 'redo', 'timeline', 'summary',
+  'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
+  'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
+  'model', 'thinking',
+]);
+
+export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
+  if (!isPiKernel) return commands;
+  return commands.filter((command) => {
+    if (command.isOpenChamber) return false;
+    if (command.isSkill) return false;
+    if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) return false;
+    const agent = typeof command.agent === 'string' ? command.agent.toLowerCase() : '';
+    if (agent === 'openchamber' && command.name !== 'compact') return false;
+    return true;
+  });
+}
+
+/** Pi slash search is name-only. Fuzzy-matching descriptions re-ranks the whole list. */
+export function commandMatchesPiSlashQuery(command: { name: string }, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return command.name.toLowerCase().startsWith(needle);
+}

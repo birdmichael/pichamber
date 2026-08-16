@@ -1,5 +1,38 @@
 import { createEventId, createMessageId, createPartId } from './ids.js';
 
+const toNonNegativeNumber = (value) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+  return value;
+};
+
+/** Map Pi assistant `usage` onto the OpenCode message token/cost shape. */
+export const mapPiUsageToOpenCodeTokens = (usage) => {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+  }
+  const costValue = usage.cost;
+  const cost = typeof costValue === 'number'
+    ? toNonNegativeNumber(costValue)
+    : toNonNegativeNumber(costValue?.total);
+  return {
+    cost,
+    tokens: {
+      input: toNonNegativeNumber(usage.input),
+      output: toNonNegativeNumber(usage.output),
+      reasoning: toNonNegativeNumber(usage.reasoning),
+      cache: {
+        read: toNonNegativeNumber(usage.cacheRead ?? usage.cache?.read),
+        write: toNonNegativeNumber(usage.cacheWrite ?? usage.cache?.write),
+      },
+    },
+  };
+};
+
 const toolText = (value) => {
   if (!value) return '';
   if (typeof value === 'string') return value;
@@ -44,6 +77,7 @@ export const createEventTranslator = ({
   let userMessageID = null;
   let agent = 'pi';
   let model = undefined;
+  let lastUsage = undefined;
 
   const event = (type, properties) => createOpenCodeEvent(type, properties, {
     id: nextEventId(),
@@ -73,6 +107,7 @@ export const createEventTranslator = ({
     textParts.clear();
     reasoningParts.clear();
     toolParts.clear();
+    lastUsage = undefined;
     return assistantMessageID;
   };
 
@@ -83,13 +118,15 @@ export const createEventTranslator = ({
     return assistantMessageID;
   };
 
-  const assistantInfo = ({ completed = false, model: modelOverride } = {}) => {
+  const assistantInfo = ({ completed = false, model: modelOverride, usage } = {}) => {
     ensureAssistantMessage();
     const created = assistantCreatedAt ?? now();
     const resolvedModel = modelOverride || model;
     const modelID = resolvedModel?.modelID || resolvedModel?.id || 'pi';
     const providerID = resolvedModel?.providerID || resolvedModel?.provider || 'pi';
     const cwd = directory || '';
+    if (usage) lastUsage = usage;
+    const mapped = mapPiUsageToOpenCodeTokens(usage || lastUsage);
     return {
       id: assistantMessageID,
       sessionID,
@@ -102,8 +139,8 @@ export const createEventTranslator = ({
       mode: agent || 'pi',
       agent,
       path: { cwd, root: cwd },
-      cost: 0,
-      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      cost: mapped.cost,
+      tokens: mapped.tokens,
       time: completed ? { created, completed: now() } : { created },
       ...(resolvedModel ? { model: resolvedModel } : {}),
       ...(completed ? { finish: 'stop' } : {}),
@@ -320,15 +357,27 @@ export const createEventTranslator = ({
           model = message.model;
         }
         beginAssistantMessage(message?.id && typeof message.id === 'string' ? message.id : undefined);
-        return [messageUpdated(assistantInfo())];
+        return [messageUpdated(assistantInfo({ usage: message?.usage }))];
       }
 
       case 'message_update':
+        if (piEvent.message?.usage) {
+          lastUsage = piEvent.message.usage;
+        }
+        if (piEvent.message?.model) {
+          model = piEvent.message.model;
+        }
         return translateAssistantDelta(piEvent.assistantMessageEvent);
 
       case 'message_end': {
         if (!assistantMessageID) return [];
-        const events = [messageUpdated(assistantInfo({ completed: true }))];
+        if (piEvent.message?.model) {
+          model = piEvent.message.model;
+        }
+        const events = [messageUpdated(assistantInfo({
+          completed: true,
+          usage: piEvent.message?.usage,
+        }))];
         return events;
       }
 

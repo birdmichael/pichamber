@@ -176,6 +176,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(auth.authenticated).toBe(true);
       expect(auth.disabled).toBe(true);
 
+      const emptyDefaults = await (await fetch(`${url}/api/pi/defaults`)).json();
+      expect(emptyDefaults.model).toBe('');
+      expect(emptyDefaults.resolvedModel).toBe('pi-mock/mock');
+
       const patched = await (await fetch(`${url}/api/pi/defaults`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
@@ -461,6 +465,12 @@ describe('OpenCode facade HTTP/SSE', () => {
       const bare = await fetch(`${url}/find/files?query=README&${dirQ}`);
       expect(bare.status).toBe(200);
       expect(await bare.json()).toEqual(['README.md']);
+      const sdkPath = await fetch(`${url}/find/file?query=composer&type=file&${dirQ}`);
+      expect(sdkPath.status).toBe(200);
+      expect(await sdkPath.json()).toEqual(['src/composer.ts']);
+      fs.writeFileSync(path.join(project, 'package.json'), '{}');
+      const pack = await (await fetch(`${url}/api/find/files?query=pack&type=file&${dirQ}`)).json();
+      expect(pack).toEqual(['package.json']);
     } finally {
       kernel.dispose();
       await close();

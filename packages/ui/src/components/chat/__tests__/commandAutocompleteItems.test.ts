@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { commandMatchesSearch, mergeCommandAutocompleteItems } from '../commandAutocompleteItems';
+import { commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from '../commandAutocompleteItems';
 
 interface Item {
   name: string;
@@ -153,5 +153,47 @@ describe('mergeCommandAutocompleteItems', () => {
 
   test('handles empty inputs', () => {
     expect(mergeCommandAutocompleteItems([], [], [])).toEqual([]);
+  });
+});
+
+describe('filterPiSlashCommands', () => {
+  test('leaves OpenCode lists unchanged', () => {
+    const commands = [
+      { name: 'model', isSkill: false },
+      { name: 'catch-up', isOpenChamber: true },
+    ];
+    expect(filterPiSlashCommands(commands, false)).toEqual(commands);
+  });
+
+  test('hides chip-covered commands, leftover OpenChamber commands, and skills', () => {
+    const commands = [
+      { name: 'compact' },
+      { name: 'reload' },
+      { name: 'login' },
+      { name: 'pr-review' },
+      { name: 'model' },
+      { name: 'thinking' },
+      { name: 'catch-up', isOpenChamber: true },
+      { name: 'clack-cli-patterns', isSkill: true },
+    ];
+    expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
+      'compact',
+      'reload',
+      'login',
+      'pr-review',
+    ]);
+  });
+});
+
+describe('commandMatchesPiSlashQuery', () => {
+  test('matches a name prefix and ignores description text', () => {
+    const compact = { name: 'compact', description: 'think about the session' };
+    expect(commandMatchesPiSlashQuery(compact, 'co')).toBe(true);
+    expect(commandMatchesPiSlashQuery(compact, 'th')).toBe(false);
+    expect(commandMatchesPiSlashQuery(compact, 'catch')).toBe(false);
+  });
+
+  test('empty query keeps every remaining command', () => {
+    expect(commandMatchesPiSlashQuery({ name: 'reload' }, '')).toBe(true);
   });
 });
