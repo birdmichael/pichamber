@@ -188,6 +188,22 @@ export const lookupExactContextWindow = (modelId: string): number | undefined =>
 };
 
 /**
+ * Window to write on a custom-model persist. A typed number wins.
+ * Empty on a known id uses the published table. Empty on an unknown id
+ * stays omitted — family inference is display-only and is not persisted.
+ */
+export const resolvePersistedContextWindow = (input: {
+  id: string;
+  contextWindow?: unknown;
+}): number | undefined => {
+  const user = readPositiveContextWindow(input.contextWindow);
+  if (user !== undefined) {
+    return user;
+  }
+  return lookupExactContextWindow(input.id);
+};
+
+/**
  * Conservative family inference. Used only when catalog and exact id miss.
  * GPT and Grok have no family number — same prefix, different published windows.
  */

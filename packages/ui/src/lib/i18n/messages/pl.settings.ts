@@ -1551,7 +1551,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': 'Okno kontekstu',
   'settings.providers.page.custom.models.contextAria': 'Okno kontekstu w tokenach',
   'settings.providers.page.custom.models.contextUnit': 'tokeny',
-  'settings.providers.page.custom.models.contextInfo': 'Liczba tokenów wejściowych, które ten model może przyjąć. Zostaw puste, jeśli nie wiesz. Zapasowe 200k na wyświetlaniu jest używane tylko wtedy, gdy nie ustawiono wartości.',
+  'settings.providers.page.custom.models.contextInfo': 'Liczba tokenów wejściowych, które ten model może przyjąć. Zostaw puste, jeśli nie wiesz. Znane id zapisuje opublikowane okno tego modelu. Zapasowe 200k na wyświetlaniu jest używane tylko wtedy, gdy nie zapisano wartości.',
   'settings.providers.page.custom.models.contextInferred': 'Wartość wywnioskowana z rodziny modelu. Zapisz, aby ją zachować, albo wyczyść pole, jeśli nie jesteś pewien.',
   'settings.providers.page.custom.headers.title': 'Nagłówki',
   'settings.providers.page.custom.headers.description': 'Opcjonalne nagłówki żądania wysyłane przy każdym wywołaniu.',

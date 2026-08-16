@@ -1310,7 +1310,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': '上下文視窗',
   'settings.providers.page.custom.models.contextAria': '以 token 計的上下文視窗',
   'settings.providers.page.custom.models.contextUnit': 'tokens',
-  'settings.providers.page.custom.models.contextInfo': '此模型可接受的輸入 token 數。不知道就留空。只有未設定數值時，介面才會用 200k 作為顯示後備。',
+  'settings.providers.page.custom.models.contextInfo': '此模型可接受的輸入 token 數。不知道就留空。已知 id 會儲存該模型的公開視窗。只有未儲存數值時，介面才會用 200k 作為顯示後備。',
   'settings.providers.page.custom.models.contextInferred': '依模型系列推斷。儲存即保留此值；不確定請清空。',
   'settings.providers.page.custom.headers.title': '標頭',
   'settings.providers.page.custom.headers.description': '每次呼叫可選擇傳送的請求標頭。',

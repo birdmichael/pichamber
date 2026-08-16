@@ -199,7 +199,7 @@ describe('validateCustomProvider', () => {
     expect(result.err.providerID).toEqual(undefined);
   });
 
-  test('writes contextWindow when set and omits it when empty', () => {
+  test('writes a user-set contextWindow and the published window for a known empty id', () => {
     const withContext = validateCustomProvider({
       form: baseForm({
         models: [{ row: 'm0', id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 }],
@@ -211,15 +211,64 @@ describe('validateCustomProvider', () => {
       'gpt-4o': { name: 'GPT-4o', contextWindow: 128000 },
     });
 
-    const withoutContext = validateCustomProvider({
+    const knownEmpty = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          contextTouched: true,
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(knownEmpty.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000 },
+    });
+
+    const unknownEmpty = validateCustomProvider({
       form: baseForm({
         models: [{ row: 'm0', id: 'mystery', name: 'Mystery' }],
       }),
       t,
       existingProviderIDs: new Set(),
     });
-    expect(withoutContext.result?.config.models).toEqual({
+    expect(unknownEmpty.result?.config.models).toEqual({
       mystery: { name: 'Mystery' },
+    });
+
+    const clearedFamily = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'claude-unknown-99',
+          name: 'Unknown Claude',
+          contextTouched: true,
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(clearedFamily.result?.config.models).toEqual({
+      'claude-unknown-99': { name: 'Unknown Claude' },
+    });
+
+    const userOverride = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          contextWindow: 64000,
+          contextTouched: true,
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(userOverride.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000 },
     });
   });
 });
@@ -591,6 +640,16 @@ describe('fetch remote models request', () => {
 
     const edited = applyModelContextChange(switched, 64000);
     expect(applyModelIdChange(edited, 'gpt-4o').contextWindow).toBe(64000);
+    const afterFetch = addRemoteModelsToForm([edited], [
+      { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1_047_576 },
+    ]);
+    expect(afterFetch[0]?.contextWindow).toBe(64000);
+    const persistedOverride = validateCustomProvider({
+      form: baseForm({ models: afterFetch }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(persistedOverride.result?.config.models['gpt-4.1']?.contextWindow).toBe(64000);
 
     const family = applyModelIdChange({ row: 'm1', id: '', name: '' }, 'claude-unknown-99');
     expect(family.contextWindow).toBe(200000);

@@ -1455,7 +1455,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': '上下文窗口',
   'settings.providers.page.custom.models.contextAria': '以 token 计的上下文窗口',
   'settings.providers.page.custom.models.contextUnit': 'tokens',
-  'settings.providers.page.custom.models.contextInfo': '该模型可接受的输入 token 数。不知道就留空。仅在未设置数值时，界面才会用 200k 作为显示回退。',
+  'settings.providers.page.custom.models.contextInfo': '该模型可接受的输入 token 数。不知道就留空。已知 id 会保存该模型的公开窗口。仅在未保存数值时，界面才会用 200k 作为显示回退。',
   'settings.providers.page.custom.models.contextInferred': '根据模型系列推断。保存即保留该值；不确定请清空。',
   'settings.providers.page.custom.headers.title': '请求头',
   'settings.providers.page.custom.headers.description': '每次调用可选发送的请求头。',

@@ -6,6 +6,7 @@ import {
   PUBLISHED_INPUT_CONTEXT_WINDOWS,
   readCatalogContextWindow,
   resolveContextWindow,
+  resolvePersistedContextWindow,
   VENDOR_MODEL_ID_PREFIXES,
   type ContextWindowSource,
   type ResolvedContextWindow,
@@ -108,6 +109,31 @@ describe('resolveContextWindow', () => {
       allowFamilyFallback: false,
     })).toEqual({ source: 'none' });
     expect(resolveContextWindow({ id: 'mystery-model' })).toEqual({ source: 'none' });
+  });
+});
+
+describe('resolvePersistedContextWindow', () => {
+  test('writes the published window when a known id is left empty', () => {
+    expect(resolvePersistedContextWindow({ id: 'grok-4.6' })).toBe(500_000);
+    expect(resolvePersistedContextWindow({ id: 'x-ai/grok-4.6', contextWindow: '' })).toBe(500_000);
+    expect(resolvePersistedContextWindow({ id: 'gpt-4.1' })).toBe(1_047_576);
+  });
+
+  test('does not invent a window for an unknown id left empty', () => {
+    expect(resolvePersistedContextWindow({ id: 'mystery-model' })).toEqual(undefined);
+    expect(resolvePersistedContextWindow({ id: 'claude-unknown-99' })).toEqual(undefined);
+    expect(resolvePersistedContextWindow({ id: 'grok-unknown-99', contextWindow: 0 })).toEqual(undefined);
+  });
+
+  test('keeps a user-typed window instead of the published table', () => {
+    expect(resolvePersistedContextWindow({
+      id: 'grok-4.6',
+      contextWindow: 64_000,
+    })).toBe(64_000);
+    expect(resolvePersistedContextWindow({
+      id: 'mystery-model',
+      contextWindow: '8192',
+    })).toBe(8192);
   });
 });
 

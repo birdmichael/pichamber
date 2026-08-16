@@ -1371,7 +1371,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': 'Fenêtre de contexte',
   'settings.providers.page.custom.models.contextAria': 'Fenêtre de contexte en jetons',
   'settings.providers.page.custom.models.contextUnit': 'jetons',
-  'settings.providers.page.custom.models.contextInfo': 'Jetons d’entrée que ce modèle peut accepter. Laissez vide si vous ne savez pas. Le repli d’affichage de 200k ne s’applique que lorsqu’aucune valeur n’est définie.',
+  'settings.providers.page.custom.models.contextInfo': 'Jetons d’entrée que ce modèle peut accepter. Laissez vide si vous ne savez pas. Un identifiant connu enregistre la fenêtre publiée de ce modèle. Le repli d’affichage de 200k ne s’applique que lorsqu’aucune valeur n’est enregistrée.',
   'settings.providers.page.custom.models.contextInferred': 'Déduit de la famille du modèle. Enregistrez pour le conserver, ou videz le champ en cas de doute.',
   'settings.providers.page.custom.headers.title': 'En-têtes',
   'settings.providers.page.custom.headers.description': 'En-têtes de requête optionnels envoyés à chaque appel.',

@@ -1488,7 +1488,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': 'コンテキストウィンドウ',
   'settings.providers.page.custom.models.contextAria': 'トークン単位のコンテキストウィンドウ',
   'settings.providers.page.custom.models.contextUnit': 'トークン',
-  'settings.providers.page.custom.models.contextInfo': 'このモデルが受け取れる入力トークン数です。不明な場合は空のままにします。200k の表示フォールバックは、値が未設定のときだけ使われます。',
+  'settings.providers.page.custom.models.contextInfo': 'このモデルが受け取れる入力トークン数です。不明な場合は空のままにします。既知の ID では、そのモデルの公開ウィンドウが保存されます。200k の表示フォールバックは、値が未保存のときだけ使われます。',
   'settings.providers.page.custom.models.contextInferred': 'モデルファミリーから推定しています。保存するとこの値を保持します。確信がなければフィールドを空にしてください。',
   'settings.providers.page.custom.headers.title': 'ヘッダー',
   'settings.providers.page.custom.headers.description': '各リクエストに付ける任意のヘッダーです。',

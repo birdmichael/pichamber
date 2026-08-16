@@ -1484,7 +1484,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': 'Context window',
   'settings.providers.page.custom.models.contextAria': 'Context window in tokens',
   'settings.providers.page.custom.models.contextUnit': 'tokens',
-  'settings.providers.page.custom.models.contextInfo': 'Input tokens this model can take. Leave empty if you do not know. The 200k display fallback is only used when no value is set.',
+  'settings.providers.page.custom.models.contextInfo': 'Input tokens this model can take. Leave empty if you do not know. A known id stores that model\'s published window. The 200k display fallback is only used when no value is stored.',
   'settings.providers.page.custom.models.contextInferred': 'Inferred from the model family. Save to keep it, or clear the field if you are not sure.',
   'settings.providers.page.custom.headers.title': 'Headers',
   'settings.providers.page.custom.headers.description': 'Optional request headers sent with every call.',
