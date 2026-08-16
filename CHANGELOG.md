@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **Settings/Integrations:** a new Integrations settings page lists Claude Code, Command Code, and Cursor plugins with install, update, setup, and remove actions, plus Discord and Telegram Coming soon placeholders.
 - Chat: opening a busy subagent in the context panel now shows its history instead of only the working-status line (thanks to @makeittech).
 - Desktop: on Pi, the header instance control no longer mentions Usage or MCP; it still names the current Local or remote instance.
+- Settings/Skills: installed skills inside symlink folders now appear, YAML block descriptions show their real text instead of `|`, and opening your home folder as the project no longer lists each user skill twice.
 
 ## [1.18.4] - 2026-08-14
 

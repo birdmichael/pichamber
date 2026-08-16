@@ -53,6 +53,37 @@ describe('pi-resources', () => {
     expect(parsed.body).toBe('Look at the change.');
   });
 
+  it('parses YAML block scalar skill descriptions instead of storing "|"', () => {
+    const parsed = parseMarkdownFrontmatter(`---
+name: claude-to-im
+description: |
+  This skill bridges Claude Code to IM platforms.
+  Second line stays in the blurb.
+---
+Use this skill to relay messages.
+`);
+    expect(parsed.attributes.name).toBe('claude-to-im');
+    expect(parsed.attributes.description).not.toBe('|');
+    expect(parsed.attributes.description).toContain('This skill bridges Claude Code to IM platforms.');
+    expect(parsed.attributes.description).toContain('Second line stays in the blurb.');
+    expect(parsed.body).toBe('Use this skill to relay messages.');
+  });
+
+  it('parses folded YAML descriptions and keeps quoted single-line values', () => {
+    const folded = parseMarkdownFrontmatter(`---
+description: >
+  Folded
+  into one line.
+---
+`);
+    expect(folded.attributes.description).not.toBe('>');
+    expect(folded.attributes.description).toMatch(/Folded into one line/);
+
+    const quoted = parseMarkdownFrontmatter('---\ndescription: "Hello: world"\n---\nBody.\n');
+    expect(quoted.attributes.description).toBe('Hello: world');
+    expect(quoted.body).toBe('Body.');
+  });
+
   it('lists Pi skills and prompt commands from conventional directories', () => {
     const home = makeTemp();
     const project = makeTemp();
@@ -66,14 +97,93 @@ describe('pi-resources', () => {
     fs.mkdirSync(path.join(project, '.pi', 'skills', 'local'), { recursive: true });
     fs.writeFileSync(path.join(project, '.pi', 'skills', 'local', 'SKILL.md'), '---\ndescription: Local skill\n---\n');
 
+    fs.mkdirSync(path.join(home, '.agents', 'skills', 'claude-to-im'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.agents', 'skills', 'claude-to-im', 'SKILL.md'),
+      '---\nname: claude-to-im\ndescription: |\n  This skill bridges Claude Code to IM platforms.\n---\nRelay the message.\n',
+    );
+
     const skills = listPiSkills({ home, directory: project });
-    expect(skills.map((skill) => skill.name).sort()).toEqual(['local', 'review']);
+    expect(skills.map((skill) => skill.name).sort()).toEqual(['claude-to-im', 'local', 'review']);
     expect(skills.find((skill) => skill.name === 'review').scope).toBe('user');
     expect(skills.find((skill) => skill.name === 'local').scope).toBe('project');
+    expect(skills.find((skill) => skill.name === 'claude-to-im').description).toContain(
+      'This skill bridges Claude Code to IM platforms.',
+    );
+    expect(skills.find((skill) => skill.name === 'claude-to-im').description).not.toBe('|');
 
     const commands = listPiCommands({ home, directory: project });
     expect(commands.some((command) => command.name === 'compact' && command.source === 'builtin')).toBe(true);
     expect(commands.some((command) => command.name === 'ship' && command.template.includes('Prepare the change'))).toBe(true);
+  });
+
+  it('follows skill directory symlinks, finds nested SKILL.md, and does not hang on cycles', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    const realSkills = path.join(home, 'codex', 'superpowers', 'skills');
+    fs.mkdirSync(path.join(realSkills, 'brainstorming'), { recursive: true });
+    fs.writeFileSync(
+      path.join(realSkills, 'brainstorming', 'SKILL.md'),
+      '---\nname: brainstorming\ndescription: Brainstorm approaches\n---\n',
+    );
+    fs.mkdirSync(path.join(realSkills, 'nested', 'debugging'), { recursive: true });
+    fs.writeFileSync(
+      path.join(realSkills, 'nested', 'debugging', 'SKILL.md'),
+      '---\nname: debugging\ndescription: Debug a failure\n---\n',
+    );
+    fs.symlinkSync(realSkills, path.join(realSkills, 'loop'));
+    fs.mkdirSync(path.join(home, '.agents', 'skills'), { recursive: true });
+    fs.symlinkSync(realSkills, path.join(home, '.agents', 'skills', 'superpowers'));
+    fs.symlinkSync(path.join(home, 'missing-skill-pack'), path.join(home, '.agents', 'skills', 'broken'));
+
+    const started = Date.now();
+    const skills = listPiSkills({ home, directory: project });
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(skills.map((skill) => skill.name).sort()).toEqual(['brainstorming', 'debugging']);
+    expect(skills.every((skill) => skill.scope === 'user')).toBe(true);
+  });
+
+  it('dedupes the same skill path when the project directory is $HOME', () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.agents', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.agents', 'skills', 'review', 'SKILL.md'),
+      '---\ndescription: Review code\n---\n',
+    );
+
+    const skills = listPiSkills({ home, directory: home });
+    expect(skills).toHaveLength(1);
+    expect(skills[0]).toMatchObject({ name: 'review', scope: 'user' });
+
+    const payload = toConfigSkillsPayload(skills, { home, directory: home });
+    expect(payload.skills).toHaveLength(1);
+    expect(payload.skills[0].injected).toBe(true);
+  });
+
+  it('keeps user and project skills that share a name when roots differ', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    fs.mkdirSync(path.join(home, '.agents', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.agents', 'skills', 'review', 'SKILL.md'),
+      '---\ndescription: User review\n---\n',
+    );
+    fs.mkdirSync(path.join(project, '.agents', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(
+      path.join(project, '.agents', 'skills', 'review', 'SKILL.md'),
+      '---\ndescription: Project review\n---\n',
+    );
+
+    const skills = listPiSkills({ home, directory: project });
+    const reviews = skills.filter((skill) => skill.name === 'review');
+    expect(reviews).toHaveLength(2);
+    expect(reviews.map((skill) => skill.scope).sort()).toEqual(['project', 'user']);
+    expect(reviews.find((skill) => skill.scope === 'user').description).toBe('User review');
+    expect(reviews.find((skill) => skill.scope === 'project').description).toBe('Project review');
+
+    const payload = toConfigSkillsPayload(skills, { home, directory: project });
+    expect(payload.skills.find((skill) => skill.scope === 'user').injected).toBe(true);
+    expect(payload.skills.find((skill) => skill.scope === 'project').injected).toBe(false);
   });
 
   it('reads and writes Pi defaults without touching auth.json', () => {
