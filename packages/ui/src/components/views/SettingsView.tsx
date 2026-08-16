@@ -9,7 +9,6 @@ import { useSnippetsStore } from '@/stores/useSnippetsStore';
 import { useSkillsStore } from '@/stores/useSkillsStore';
 import { useSkillsCatalogStore } from '@/stores/useSkillsCatalogStore';
 import { useConfigStore } from '@/stores/useConfigStore';
-import { Tooltip, TooltipTrigger } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { AgentsSidebar } from '@/components/sections/agents/AgentsSidebar';
 import { AgentsPage } from '@/components/sections/agents/AgentsPage';
@@ -65,6 +64,11 @@ import {
   type SettingsPageMeta,
 } from '@/lib/settings/metadata';
 import { buildSettingsSearchResults, type SettingsSearchResult } from '@/lib/settings/search';
+import {
+  resolveSettingsSearchHighlightId,
+  scheduleSettingsSearchHighlight,
+  settingsSearchPreparesEntityDraft,
+} from '@/lib/settings/chrome';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
 // UI Kit: fixed settings navigation width
@@ -432,6 +436,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   }, [getPageTitle, isWindowsArm64, isDesktopLocalOrigin, isMac, isWindows, isLinux, runtimeCtx, settingsSearchQuery, t, visiblePageSlugs]);
 
   const prepareSettingsSearchTarget = React.useCallback((result: SettingsSearchResult): string => {
+    if (!settingsSearchPreparesEntityDraft(result)) {
+      return resolveSettingsSearchHighlightId(result);
+    }
+
     if (result.id.startsWith('agents.')) {
       const store = useAgentsStore.getState();
       if (isPiKernel) {
@@ -444,7 +452,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       const name = nextUniqueName('new-agent', store.agents.map((agent) => agent.name));
       store.setAgentDraft({ name, scope: 'user' });
       store.setSelectedAgent(name);
-      return result.id === 'agents.create' ? 'agents.name' : result.id;
+      return resolveSettingsSearchHighlightId(result);
     }
 
     if (result.id.startsWith('commands.')) {
@@ -452,7 +460,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       const name = nextUniqueName('new-command', store.commands.map((command) => command.name));
       store.setCommandDraft({ name, scope: 'user' });
       store.setSelectedCommand(name);
-      return result.id === 'commands.create' ? 'commands.name' : result.id;
+      return resolveSettingsSearchHighlightId(result);
     }
 
     if (result.id.startsWith('mcp.')) {
@@ -475,7 +483,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
         enabled: true,
       });
       store.setSelectedMcp(name);
-      return result.id === 'mcp.create' ? 'mcp.server' : result.id;
+      return resolveSettingsSearchHighlightId(result);
     }
 
     if (result.id.startsWith('snippets.')) {
@@ -483,7 +491,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       const name = nextUniqueName('new-snippet', store.snippets.map((snippet) => snippet.name));
       store.setSnippetDraft({ name, scope: 'global' });
       store.setSelectedSnippet(name);
-      return result.id === 'snippets.create' ? 'snippets.content' : result.id;
+      return resolveSettingsSearchHighlightId(result);
     }
 
     if (result.id.startsWith('skills.')) {
@@ -491,18 +499,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       const name = nextUniqueName('new-skill', store.skills.map((skill) => skill.name));
       store.setSkillDraft({ name, scope: 'user', source: 'opencode', description: '', instructions: '' });
       store.setSelectedSkill(name);
-      return result.id === 'skills.create' ? 'skills.basic-information' : result.id;
+      return resolveSettingsSearchHighlightId(result);
     }
 
     if (result.id === 'providers.connect') {
       useConfigStore.getState().setSelectedProvider(ADD_PROVIDER_SETTINGS_ID);
     }
 
-    if (result.id === 'plugins.create') {
-      return 'plugins.spec';
-    }
-
-    return result.id;
+    return resolveSettingsSearchHighlightId(result);
   }, [isPiKernel]);
 
   const groupedSettingsSearchResults = React.useMemo(() => {
@@ -542,12 +546,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   }, [activeSearchResultIndex, settingsSearchResults.length]);
 
   const openSearchResult = React.useCallback((result: SettingsSearchResult) => {
-    const targetId = prepareSettingsSearchTarget(result);
-    setPendingSearchItemId(targetId);
+    // Switch the content pane first so a draft/store failure cannot leave
+    // the user on the previous page after they chose a search hit.
     openPage(result.page);
     if (isMobile) {
       setMobileStage('page-content');
     }
+    let targetId = resolveSettingsSearchHighlightId(result);
+    try {
+      targetId = prepareSettingsSearchTarget(result);
+    } catch {
+      targetId = resolveSettingsSearchHighlightId(result);
+    }
+    setPendingSearchItemId(targetId);
     if (result.id === 'plugins.create' && typeof window !== 'undefined') {
       window.setTimeout(() => {
         window.dispatchEvent(new CustomEvent('openchamber:settings-open-plugin-add'));
@@ -600,30 +611,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       return;
     }
 
-    let cancelled = false;
-    const frame = window.requestAnimationFrame(() => {
-      if (cancelled) {
-        return;
-      }
-      const escapedId = typeof CSS !== 'undefined' && CSS.escape
-        ? CSS.escape(targetId)
-        : targetId.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-      const target = containerRef.current?.querySelector<HTMLElement>(`[data-settings-item="${escapedId}"]`);
-      if (!target) {
-        return;
-      }
-      setPendingSearchItemId(null);
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      target.setAttribute('data-settings-search-highlight', 'true');
-      window.setTimeout(() => {
-        target.removeAttribute('data-settings-search-highlight');
-      }, 1600);
+    return scheduleSettingsSearchHighlight({
+      container: () => containerRef.current,
+      targetId,
+      onFound: () => setPendingSearchItemId(null),
     });
-
-    return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frame);
-    };
   }, [pendingSearchItemId, settingsSlug]);
 
   const renderUnavailable = React.useCallback(() => {
@@ -841,8 +833,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     const hasSearchQuery = settingsSearchQuery.trim().length > 0;
 
     return (
-      <div className="flex h-full flex-col overflow-hidden">
-        <div className="px-4 pt-3">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="shrink-0 px-4 pt-3">
           <div className="flex h-10 items-center gap-1.5 rounded-md border border-border bg-background/70 px-2 text-muted-foreground focus-within:ring-2 focus-within:ring-primary/40 sm:h-8">
             <Icon name="search" className="h-4 w-4 shrink-0" />
             <input
@@ -866,8 +858,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
           </div>
         </div>
 
-        {/* Scrollable nav items */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        {/* Scrollable nav items. This element is the only clip for the rail so
+            rows below the fold keep real layout boxes (overflow:hidden ancestors
+            collapse off-screen buttons to a 0×0 AX/hit rect). */}
+        <nav
+          aria-label={t('settings.view.home.title')}
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        >
           <div className="flex flex-col gap-0.5 px-4 pt-4 pb-2">
             {hasSearchQuery ? (
               settingsSearchResults.length > 0 ? (() => {
@@ -895,8 +892,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                           }}
                           onClick={() => openSearchResult(result)}
                           className={cn(
-                            'flex w-full flex-col rounded-md px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                            hasDescription ? 'min-h-11 py-1.5' : 'py-2',
+                            'flex w-full shrink-0 flex-col rounded-md px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                            hasDescription ? 'min-h-11 py-1.5' : 'min-h-8 py-2',
                             active ? 'bg-interactive-selection' : 'hover:bg-interactive-hover'
                           )}
                         >
@@ -949,43 +946,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                     if (!iconName && page.slug !== 'mcp') return null;
 
                     return (
-                      <Tooltip key={page.slug}>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => openPage(page.slug)}
-                            aria-current={selected ? 'page' : undefined}
-                            className={cn(
-                              'flex h-11 w-full items-center gap-2.5 rounded-md px-3 overflow-hidden sm:h-8 sm:gap-2 sm:px-2',
-                              selected
-                                ? 'bg-interactive-selection text-foreground'
-                                : 'text-foreground hover:bg-interactive-hover'
-                            )}
-                          >
-                            {page.slug === 'mcp'
-                              ? <McpIcon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
-                              : <Icon name={iconName!} className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />}
-                            <span className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden transition-opacity duration-150 opacity-100">
-                              <span className="typography-ui-label font-normal truncate">{getPageTitle(page.slug)}</span>
-                              {page.slug === 'tunnel' && (
-                                <span className="shrink-0 typography-micro px-1 rounded leading-none pb-px text-[var(--status-warning)] bg-[var(--status-warning)]/10">
-                                  {t('settings.view.badge.beta')}
-                                </span>
-                              )}
+                      <button
+                        key={page.slug}
+                        type="button"
+                        data-settings-nav={page.slug}
+                        onClick={() => openPage(page.slug)}
+                        aria-current={selected ? 'page' : undefined}
+                        className={cn(
+                          'flex h-11 min-h-11 w-full shrink-0 items-center gap-2.5 rounded-md px-3 sm:h-8 sm:min-h-8 sm:gap-2 sm:px-2',
+                          selected
+                            ? 'bg-interactive-selection text-foreground'
+                            : 'text-foreground hover:bg-interactive-hover'
+                        )}
+                      >
+                        {page.slug === 'mcp'
+                          ? <McpIcon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />
+                          : <Icon name={iconName!} className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" />}
+                        <span className="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
+                          <span className="typography-ui-label font-normal truncate">{getPageTitle(page.slug)}</span>
+                          {page.slug === 'tunnel' && (
+                            <span className="shrink-0 typography-micro px-1 rounded leading-none pb-px text-[var(--status-warning)] bg-[var(--status-warning)]/10">
+                              {t('settings.view.badge.beta')}
                             </span>
-                          </button>
-                        </TooltipTrigger>
-                      </Tooltip>
+                          )}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
               ));
             })()}
           </div>
-        </div>
+        </nav>
 
         {/* Footer */}
-        <div className="overflow-hidden transition-opacity duration-150 opacity-100">
+        <div className="shrink-0 overflow-hidden">
           <div className="border-t border-border bg-background px-4 py-1.5 space-y-0.5 sm:bg-sidebar">
             {(!runtimeCtx.isVSCode || pendingRestartCount > 0) && (
               <OpenCodeReloadFooterAction />
@@ -1016,13 +1011,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
         // No sidebar available; fall back to direct content.
         const fallback = renderPageContent(settingsSlug);
         return (
-          <div className="flex-1 min-h-0 overflow-y-scroll overflow-x-hidden bg-background">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
             <ErrorBoundary>{fallback}</ErrorBoundary>
           </div>
         );
       }
       return (
-        <div className="flex-1 min-h-0 overflow-y-scroll overflow-x-hidden bg-background">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
           <ErrorBoundary>
             {renderPageSidebar(settingsSlug, { onItemSelect: handleMobilePageSidebarItemSelect })}
           </ErrorBoundary>
@@ -1034,7 +1029,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     const content = renderPageContent(settingsSlug);
 
     return (
-      <div className="flex-1 min-h-0 overflow-y-scroll overflow-x-hidden bg-background">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <ErrorBoundary>{content}</ErrorBoundary>
       </div>
     );
@@ -1048,10 +1043,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     if (activePageMeta.kind === 'split') {
       return (
         <div className="flex h-full min-h-0 overflow-hidden">
-          <div className={cn('border-r', runtimeCtx.isVSCode ? 'bg-background' : 'bg-sidebar')} style={{ width: SETTINGS_SPLIT_SIDEBAR_WIDTH, minWidth: SETTINGS_SPLIT_SIDEBAR_WIDTH, borderColor: 'var(--interactive-border)' }}>
+          <div className={cn('min-h-0 overflow-hidden border-r', runtimeCtx.isVSCode ? 'bg-background' : 'bg-sidebar')} style={{ width: SETTINGS_SPLIT_SIDEBAR_WIDTH, minWidth: SETTINGS_SPLIT_SIDEBAR_WIDTH, borderColor: 'var(--interactive-border)' }}>
             <ErrorBoundary>{renderPageSidebar(settingsSlug, {})}</ErrorBoundary>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-scroll overflow-x-hidden bg-background">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
             <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>
           </div>
         </div>
@@ -1059,7 +1054,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     }
 
     return (
-      <div className="h-full min-h-0 overflow-y-scroll overflow-x-hidden bg-background">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
         <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>
       </div>
     );
@@ -1175,7 +1170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
               </ErrorBoundary>
             </div>
 
-            <div className="flex-1 overflow-hidden bg-background">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
               {renderDesktopContent()}
             </div>
           </>

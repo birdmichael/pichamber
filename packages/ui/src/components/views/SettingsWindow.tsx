@@ -47,7 +47,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
           <Dialog.Popup
             aria-describedby={descriptionId}
             className={cn(
-              'relative pointer-events-auto',
+              'relative flex min-h-0 flex-col pointer-events-auto',
               'w-[90vw] max-w-[1200px] h-[85vh] max-h-[900px]',
               'rounded-xl border shadow-none overflow-hidden origin-center',
               'bg-background',
@@ -62,7 +62,11 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
             <Dialog.Description id={descriptionId} className="sr-only">
               {t('settings.window.description')}
             </Dialog.Description>
-            <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+            {open ? (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+              </div>
+            ) : null}
           </Dialog.Popup>
         </div>
       </Dialog.Portal>

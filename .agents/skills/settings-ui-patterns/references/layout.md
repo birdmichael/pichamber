@@ -58,6 +58,12 @@ Exception: `SettingsView` navigation chrome (outside the pane) uses viewport
 `sm:` to give phones 44px touch rows and plain `bg-background`; keep that
 pattern when touching nav.
 
+The left rail’s `overflow-y-auto` scrollport must be the only clip for nav
+rows, inside a definite-height flex column (`SettingsWindow` / `h-full
+min-h-0`). The content pane is a containing block, not a second scroller —
+pages already scroll through `SettingsPageLayout`. Nested scrollers
+duplicate the accessibility tree.
+
 ## Spacing
 
 - Sections own vertical rhythm: divider + `py-8` come from `SettingsSection`.
