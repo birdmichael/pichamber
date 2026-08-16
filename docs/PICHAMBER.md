@@ -67,7 +67,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 
 ## What the Pi facade implements
 
-- Session CRUD, `prompt_async` / `prompt`, abort, messages, status
+- Session CRUD, `prompt_async` / `prompt`, abort, messages, status. New sessions use Pi's persisted UUID under `~/.pi/agent/sessions`; `GET /api/session/:id` and `.../message` open a listed disk session after restart (same id as `pi` CLI for that cwd).
 - Providers from `ModelRuntime.getAvailable()` (or a mock provider)
 - Provider auth and custom providers: `PUT /api/auth/:id` (and `/auth/:id`) writes `~/.pi/agent/auth.json`; `PUT /api/provider` writes `~/.pi/agent/models.json`; `GET /api/provider` includes `options.baseURL` from `models.json` and `env` from `$VAR` so Settings can edit a saved custom provider; `POST /api/provider/models` lists remote OpenAI-compatible models from the form base URL (stored keys only go to the saved provider origin; never returns the key; does not follow redirects); `DELETE /api/provider/:id/auth` disconnects
 - Event mapping: `text_delta` → `message.part.delta` field `text`; `thinking_delta` → reasoning; `tool_execution_*` → tool parts; `agent_start` → busy; `agent_settled` → idle

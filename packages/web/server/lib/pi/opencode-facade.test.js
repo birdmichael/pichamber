@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-coding-agent';
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
+import { sessionDirForCwd } from './pi-host.js';
 
 const tempHomes = [];
 afterEach(() => {
@@ -27,15 +29,20 @@ const listen = (app) => new Promise((resolve) => {
   });
 });
 
-const startFacade = async ({ directory = '/tmp/project' } = {}) => {
+const startFacade = async ({ directory = '/tmp/project', mock = true, createSession } = {}) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-home-'));
   tempHomes.push(home);
   const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
   process.env.OPENCHAMBER_DATA_DIR = home;
   const kernel = createPiKernel({
-    mock: true,
+    mock,
     defaultDirectory: directory,
     home,
+    ...(createSession ? {
+      createSession,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+    } : {}),
   });
   const app = express();
   app.use(express.json());
@@ -599,6 +606,63 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(messages[0].info.role).toBe('user');
       expect(messages[0].parts[0].text).toBe('prefix hello');
       expect(messages[0].info.sessionID).toBe(info.id);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('loads a persisted Pi session id after a cold start', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-cwd-'));
+    tempHomes.push(directory);
+    const { url, close, kernel } = await startFacade({
+      directory,
+      mock: false,
+      createSession: async ({ sessionManager }) => ({
+        sessionId: typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+        isStreaming: false,
+        subscribe() { return () => {}; },
+        async prompt() {},
+        async abort() {},
+        dispose() {},
+      }),
+    });
+    try {
+      const home = kernel.host.getPath().home;
+      const sessionDir = sessionDirForCwd(directory, home);
+      const manager = SessionManager.create(directory, sessionDir);
+      const file = manager.getSessionFile();
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `${JSON.stringify({
+        type: 'session',
+        version: CURRENT_SESSION_VERSION,
+        id: manager.getSessionId(),
+        timestamp: new Date().toISOString(),
+        cwd: manager.getCwd(),
+      })}\n`);
+      const opened = SessionManager.open(file, sessionDir);
+      opened.appendSessionInfo('Cold start row');
+      opened.appendMessage({
+        role: 'user',
+        content: [{ type: 'text', text: 'open me after restart' }],
+        timestamp: Date.now(),
+      });
+      const sessionID = opened.getSessionId();
+      const dirQ = `directory=${encodeURIComponent(directory)}`;
+
+      const listed = await (await fetch(`${url}/api/session?${dirQ}`)).json();
+      expect(listed.map((item) => item.id)).toContain(sessionID);
+
+      const getRes = await fetch(`${url}/api/session/${sessionID}?${dirQ}`);
+      expect(getRes.status).toBe(200);
+      expect((await getRes.json()).id).toBe(sessionID);
+
+      const messageRes = await fetch(`${url}/api/session/${sessionID}/message?${dirQ}`);
+      expect(messageRes.status).toBe(200);
+      const messages = await messageRes.json();
+      expect(messages[0].parts[0].text).toBe('open me after restart');
     } finally {
       kernel.dispose();
       await close();

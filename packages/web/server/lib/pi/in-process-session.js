@@ -44,11 +44,15 @@ export const dispatchPiSessionRequest = async (host, fetchPath, {
   const sessionId = decodeSegment(match[1]);
   const rest = match[2] || '';
 
+  if (typeof host.ensureSession === 'function') {
+    await host.ensureSession(sessionId, directory);
+  }
+
   if (!rest && verb === 'GET') {
     return host.getSession(sessionId).info;
   }
   if (!rest && verb === 'PATCH') {
-    return host.updateSession(sessionId, body || {}).info;
+    return (await host.updateSession(sessionId, body || {})).info;
   }
   if (rest === 'message' && verb === 'GET') {
     const messages = host.getMessages(sessionId);

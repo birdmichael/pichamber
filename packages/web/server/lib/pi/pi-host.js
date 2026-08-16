@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -31,6 +32,7 @@ import {
   buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
+  facadeMessagesFromPiEntries,
   parseSessionImport,
   sanitizeExportBasename,
 } from './session-transfer.js';
@@ -160,6 +162,54 @@ export const createInMemoryPiSession = ({
 };
 
 const defaultHome = () => os.homedir();
+
+export const sessionDirForCwd = (cwd, home = defaultHome()) => {
+  const resolvedCwd = path.resolve(cwd || process.cwd());
+  const safePath = `--${resolvedCwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`;
+  return path.join(home, '.pi', 'agent', 'sessions', safePath);
+};
+
+const findSessionFileById = (sessionID, home) => {
+  const id = typeof sessionID === 'string' ? sessionID.trim() : '';
+  if (!id) return undefined;
+  const root = path.join(home, '.pi', 'agent', 'sessions');
+  if (!fs.existsSync(root)) return undefined;
+  let projects;
+  try {
+    projects = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+  for (const project of projects) {
+    if (!project.isDirectory() && !project.isSymbolicLink()) continue;
+    const dir = path.join(root, project.name);
+    let files;
+    try {
+      files = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    const match = files.find((name) => name.endsWith('.jsonl') && name.includes(id));
+    if (match) return path.join(dir, match);
+  }
+  return undefined;
+};
+
+const writeSessionHeaderIfMissing = (manager, { version } = {}) => {
+  const file = typeof manager?.getSessionFile === 'function' ? manager.getSessionFile() : undefined;
+  if (!file) return undefined;
+  if (fs.existsSync(file)) return file;
+  const header = {
+    type: 'session',
+    ...(version != null ? { version } : {}),
+    id: manager.getSessionId(),
+    timestamp: new Date().toISOString(),
+    cwd: typeof manager.getCwd === 'function' ? manager.getCwd() : undefined,
+  };
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(header)}\n`);
+  return file;
+};
 
 const createSessionInfo = ({
   id,
@@ -520,10 +570,12 @@ export const createPiHost = ({
   mock = false,
 } = {}) => {
   const sessions = new Map();
+  const hydrating = new Map();
   const directoryRuntimes = new Map();
   let modelRuntime = null;
   let modelRuntimeError = null;
   let readyPromise = null;
+  const agentDir = path.join(home, '.pi', 'agent');
 
   const emit = (directory, ocEvent) => {
     if (typeof onEvent === 'function') {
@@ -539,12 +591,13 @@ export const createPiHost = ({
     }
     try {
       const pi = await loadPiSdk();
-      return async ({ cwd, modelRuntime: runtime, model }) => {
+      return async ({ cwd, modelRuntime: runtime, model, sessionManager }) => {
         const { session } = await pi.createAgentSession({
           cwd,
+          agentDir,
           modelRuntime: runtime,
           ...(model ? { model } : {}),
-          sessionManager: pi.SessionManager.inMemory(cwd),
+          sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
         });
         return session;
       };
@@ -604,7 +657,7 @@ export const createPiHost = ({
       };
       const runtime = await pi.createAgentSessionRuntime(factory, {
         cwd: directory,
-        agentDir: typeof pi.getAgentDir === 'function' ? pi.getAgentDir() : undefined,
+        agentDir,
         sessionManager: pi.SessionManager.inMemory(directory),
       });
       directoryRuntimes.set(directory, runtime);
@@ -646,11 +699,7 @@ export const createPiHost = ({
     record.unsubscribe = unsubscribe;
   };
 
-  const createFacadeSession = async ({ directory, title, parentID, metadata, id } = {}) => {
-    const cwd = directory || defaultDirectory;
-    await ensureDirectoryRuntime(cwd);
-    const factory = await resolveCreateSession();
-    let model;
+  const resolvePreferredModel = async () => {
     try {
       const runtime = await ensureModelRuntime();
       const defaults = readPiDefaults(home);
@@ -658,21 +707,52 @@ export const createPiHost = ({
         const available = await runtime.getAvailable();
         if (defaults.model && Array.isArray(available)) {
           const [providerID, modelID] = defaults.model.split('/');
-          model = available.find((item) => (
+          return available.find((item) => (
             (item.id === defaults.model)
             || (item.id === modelID && (!providerID || item.provider === providerID))
           )) || available[0];
-        } else {
-          model = Array.isArray(available) && available.length > 0 ? available[0] : undefined;
         }
+        return Array.isArray(available) && available.length > 0 ? available[0] : undefined;
       }
     } catch {
     }
+    return undefined;
+  };
+
+  const createPersistedSessionManager = async (cwd, { title } = {}) => {
+    try {
+      const pi = await loadPiSdk();
+      if (typeof pi.SessionManager?.create !== 'function') return null;
+      const sessionDir = sessionDirForCwd(cwd, home);
+      let manager = pi.SessionManager.create(cwd, sessionDir);
+      const file = writeSessionHeaderIfMissing(manager, {
+        version: pi.CURRENT_SESSION_VERSION,
+      });
+      if (file && typeof pi.SessionManager.open === 'function') {
+        manager = pi.SessionManager.open(file, sessionDir);
+      }
+      if (title && !isPlaceholderSessionTitle(title) && typeof manager.appendSessionInfo === 'function') {
+        manager.appendSessionInfo(title);
+      }
+      return manager;
+    } catch (error) {
+      console.warn('[pi-host] SessionManager persist unavailable:', error?.message || error);
+      return null;
+    }
+  };
+
+  const createFacadeSession = async ({ directory, title, parentID, metadata, id } = {}) => {
+    const cwd = directory || defaultDirectory;
+    await ensureDirectoryRuntime(cwd);
+    const factory = await resolveCreateSession();
+    const model = await resolvePreferredModel();
+    const sessionManager = mock ? null : await createPersistedSessionManager(cwd, { title });
 
     const piSession = await factory({
       cwd,
       modelRuntime,
       model,
+      sessionManager,
     });
     try {
       const defaults = readPiDefaults(home);
@@ -688,10 +768,20 @@ export const createPiHost = ({
       }
     } catch {
     }
-    const sessionID = id || createSessionId();
+    const persistedId = typeof sessionManager?.getSessionId === 'function'
+      ? sessionManager.getSessionId()
+      : undefined;
+    const liveId = typeof piSession?.sessionId === 'string' && piSession.sessionId.trim()
+      ? piSession.sessionId.trim()
+      : undefined;
+    const sessionID = persistedId || liveId || id || createSessionId();
     const record = {
       id: sessionID,
       directory: cwd,
+      sessionFile: typeof sessionManager?.getSessionFile === 'function'
+        ? sessionManager.getSessionFile()
+        : (typeof piSession?.sessionFile === 'string' ? piSession.sessionFile : undefined),
+      sessionManager,
       info: createSessionInfo({
         id: sessionID,
         directory: cwd,
@@ -716,14 +806,116 @@ export const createPiHost = ({
     return record;
   };
 
+  const missingSession = (sessionID) => {
+    const error = new Error(`Session not found: ${sessionID}`);
+    error.status = 404;
+    return error;
+  };
+
   const getRecord = (sessionID) => {
     const record = sessions.get(sessionID);
     if (!record) {
-      const error = new Error(`Session not found: ${sessionID}`);
-      error.status = 404;
-      throw error;
+      throw missingSession(sessionID);
     }
     return record;
+  };
+
+  const findPersistedSession = async (sessionID, directory) => {
+    const pi = await loadPiSdk();
+    if (typeof pi.SessionManager?.list !== 'function') return null;
+    const seen = new Set();
+    for (const cwd of [directory, defaultDirectory]) {
+      if (!cwd || seen.has(cwd)) continue;
+      seen.add(cwd);
+      try {
+        const listed = await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
+        const found = (listed || []).find((item) => item?.id === sessionID);
+        if (found) return found;
+      } catch {
+      }
+    }
+    const file = findSessionFileById(sessionID, home);
+    if (!file) return null;
+    return { id: sessionID, path: file };
+  };
+
+  const hydratePersistedSession = async (sessionID, directory) => {
+    const persisted = await findPersistedSession(sessionID, directory);
+    const file = persisted?.path || findSessionFileById(sessionID, home);
+    if (!file || !fs.existsSync(file)) {
+      throw missingSession(sessionID);
+    }
+    const pi = await loadPiSdk();
+    if (typeof pi.SessionManager?.open !== 'function') {
+      throw missingSession(sessionID);
+    }
+    const manager = pi.SessionManager.open(file);
+    const cwd = (typeof manager.getCwd === 'function' && manager.getCwd())
+      || persisted?.cwd
+      || directory
+      || defaultDirectory;
+    const factory = await resolveCreateSession();
+    const model = await resolvePreferredModel();
+    let piSession;
+    try {
+      piSession = await factory({
+        cwd,
+        modelRuntime,
+        model,
+        sessionManager: manager,
+      });
+    } catch (error) {
+      console.warn(`[pi-host] failed to attach live Pi session ${sessionID}:`, error?.message || error);
+      piSession = createInMemoryPiSession({ sessionId: sessionID });
+    }
+    const title = (typeof manager.getSessionName === 'function' && manager.getSessionName())
+      || persisted?.name
+      || persisted?.firstMessage
+      || 'Pi session';
+    const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
+    const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
+    const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
+    const record = {
+      id: sessionID,
+      directory: cwd,
+      sessionFile: file,
+      sessionManager: manager,
+      info: {
+        ...createSessionInfo({
+          id: sessionID,
+          directory: cwd,
+          title,
+          projectID: cwd,
+        }),
+        time: {
+          created: Number.isFinite(created) ? created : Date.now(),
+          updated: Number.isFinite(updated) ? updated : Date.now(),
+        },
+      },
+      messages: facadeMessagesFromPiEntries(entries, sessionID),
+      status: { type: 'idle' },
+      piSession,
+      translator: createEventTranslator({ sessionID, directory: cwd }),
+      unsubscribe: null,
+    };
+    attachSession(record);
+    sessions.set(sessionID, record);
+    return record;
+  };
+
+  const ensureRecord = async (sessionID, directory) => {
+    const existing = sessions.get(sessionID);
+    if (existing) return existing;
+    if (mock) {
+      throw missingSession(sessionID);
+    }
+    const pending = hydrating.get(sessionID);
+    if (pending) return pending;
+    const task = hydratePersistedSession(sessionID, directory).finally(() => {
+      hydrating.delete(sessionID);
+    });
+    hydrating.set(sessionID, task);
+    return task;
   };
 
   const invalidateModelRuntime = () => {
@@ -744,6 +936,9 @@ export const createPiHost = ({
     getSession(sessionID) {
       return getRecord(sessionID);
     },
+    async ensureSession(sessionID, directory) {
+      return ensureRecord(sessionID, directory);
+    },
     listSessions(directory) {
       const items = Array.from(sessions.values()).filter((record) => !directory || record.directory === directory);
       for (const record of items) {
@@ -757,24 +952,36 @@ export const createPiHost = ({
       }
       return items;
     },
-    deleteSession(sessionID) {
-      const record = getRecord(sessionID);
+    async deleteSession(sessionID, directory) {
+      const record = await ensureRecord(sessionID, directory);
       try {
         record.unsubscribe?.();
         record.piSession?.dispose?.();
       } catch {
       }
       sessions.delete(sessionID);
+      if (record.sessionFile) {
+        try {
+          fs.unlinkSync(record.sessionFile);
+        } catch {
+        }
+      }
       emit(record.directory, {
         type: 'session.deleted',
         properties: { info: record.info, sessionID },
       });
       return true;
     },
-    updateSession(sessionID, patch = {}) {
-      const record = getRecord(sessionID);
+    async updateSession(sessionID, patch = {}, directory) {
+      const record = await ensureRecord(sessionID, directory);
       if (typeof patch.title === 'string') {
         record.info.title = patch.title;
+        if (typeof record.sessionManager?.appendSessionInfo === 'function' && patch.title.trim()) {
+          try {
+            record.sessionManager.appendSessionInfo(patch.title);
+          } catch {
+          }
+        }
       }
       if (patch.metadata && typeof patch.metadata === 'object') {
         record.info.metadata = { ...(record.info.metadata || {}), ...patch.metadata };
@@ -951,7 +1158,7 @@ export const createPiHost = ({
       }
     },
     async promptAsync(sessionID, body = {}) {
-      const record = getRecord(sessionID);
+      const record = await ensureRecord(sessionID);
       const modelRef = resolvePromptModelRef(body.model);
       if (modelRef) {
         await this.setSessionModel(sessionID, modelRef);
@@ -1040,12 +1247,12 @@ export const createPiHost = ({
       return { info: userInfo, parts: [userPart] };
     },
     async abort(sessionID) {
-      const record = getRecord(sessionID);
+      const record = await ensureRecord(sessionID);
       await record.piSession.abort();
       return true;
     },
     async cloneSession(sessionID) {
-      const source = getRecord(sessionID);
+      const source = await ensureRecord(sessionID);
       const record = await createFacadeSession({
         directory: source.directory,
         title: source.info.title ? `${source.info.title} (copy)` : 'Cloned session',
@@ -1063,7 +1270,8 @@ export const createPiHost = ({
       try {
         const pi = await loadPiSdk();
         if (typeof pi.SessionManager?.list !== 'function') return [];
-        return await pi.SessionManager.list(directory || defaultDirectory);
+        const cwd = directory || defaultDirectory;
+        return await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
       } catch {
         return [];
       }
@@ -1133,7 +1341,7 @@ export const createPiHost = ({
       };
     },
     async runCommand(sessionID, body = {}) {
-      const record = getRecord(sessionID);
+      const record = await ensureRecord(sessionID);
       const rawName = typeof body.command === 'string' ? body.command : '';
       const name = rawName.replace(/^\//, '').trim();
       const argument = typeof body.arguments === 'string' ? body.arguments.trim() : '';
@@ -1226,7 +1434,7 @@ export const createPiHost = ({
       });
     },
     async forkSession(sessionID, messageID) {
-      const source = getRecord(sessionID);
+      const source = await ensureRecord(sessionID);
       const record = await createFacadeSession({
         directory: source.directory,
         title: source.info.title,
@@ -1247,7 +1455,7 @@ export const createPiHost = ({
       return record;
     },
     async setSessionThinking(sessionID, level) {
-      const record = getRecord(sessionID);
+      const record = await ensureRecord(sessionID);
       if (typeof record.piSession?.setThinkingLevel !== "function") {
         return { applied: false, thinking: level };
       }
@@ -1269,7 +1477,7 @@ export const createPiHost = ({
       return { applied: true, thinking: next };
     },
     async setSessionModel(sessionID, modelRef) {
-      const record = getRecord(sessionID);
+      const record = await ensureRecord(sessionID);
       if (typeof record.piSession?.setModel !== "function") {
         return { applied: false, model: modelRef };
       }
