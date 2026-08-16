@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn, fuzzyMatch } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionMessages } from '@/sync/sync-context';
 import { useCommandsStore } from '@/stores/useCommandsStore';
@@ -11,7 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandMatchesSearch, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
+import { commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -52,23 +52,6 @@ const NEUTRAL_BADGE_CLASS = cn(
 );
 
 
-const PI_HIDDEN_SLASH_COMMANDS = new Set([
-  'init', 'undo', 'redo', 'timeline', 'summary',
-  'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
-  'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
-]);
-
-const filterPiSlashCommands = (commands: CommandInfo[], isPiKernel: boolean) => {
-  if (!isPiKernel) return commands;
-  return commands.filter((command) => {
-    if (command.isOpenChamber) return false;
-    if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) return false;
-    const agent = typeof command.agent === "string" ? command.agent.toLowerCase() : "";
-    if (agent === "openchamber" && command.name !== "compact") return false;
-    return true;
-  });
-};
-
 interface CommandAutocompleteProps {
   searchQuery: string;
   onCommandSelect: (command: CommandInfo) => void;
@@ -104,7 +87,12 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   const keyboardNavigationRef = React.useRef(false);
   const itemRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const mobileMaxHeight = useMobileAutocompleteMaxHeight(containerRef, isMobile);
+  const availableMaxHeight = useMobileAutocompleteMaxHeight(containerRef, true);
+  const popupMaxHeight = availableMaxHeight === undefined
+    ? undefined
+    : isMobile
+      ? availableMaxHeight
+      : Math.min(256, availableMaxHeight);
   const ignoreClickRef = React.useRef(false);
   const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const pointerMovedRef = React.useRef(false);
@@ -216,8 +204,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         const allCommands = filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel);
 
         const allowInitCommand = !hasMessagesInCurrentSession;
+        const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
         const filtered = (searchQuery
-          ? allCommands.filter(cmd => commandMatchesSearch(cmd, searchQuery))
+          ? allCommands.filter(cmd => matchesQuery(cmd, searchQuery))
           : allCommands).filter(cmd => allowInitCommand || cmd.name !== 'init');
 
         filtered.sort((a, b) => {
@@ -289,11 +278,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         ];
 
         const fallbackCommands = filterPiSlashCommands(builtInCommands, isPiKernel);
+        const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
         const filtered = (searchQuery
-          ? fallbackCommands.filter(cmd =>
-              fuzzyMatch(cmd.name, searchQuery) ||
-              (cmd.description && fuzzyMatch(cmd.description, searchQuery))
-            )
+          ? fallbackCommands.filter(cmd => matchesQuery(cmd, searchQuery))
           : fallbackCommands).filter(cmd => allowInitCommand || cmd.name !== 'init');
 
         setCommands(filtered);
@@ -383,8 +370,8 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   return (
     <div
       ref={containerRef}
-      className="absolute z-[100] min-w-0 w-full max-w-[450px] max-h-64 bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col"
-      style={mobileMaxHeight !== undefined ? { ...style, maxHeight: mobileMaxHeight } : style}
+      className="absolute z-[100] min-w-0 w-full max-w-[450px] max-h-64 overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col"
+      style={popupMaxHeight !== undefined ? { ...style, maxHeight: popupMaxHeight } : style}
     >
       <ScrollableOverlay preventOverscroll outerClassName="flex-1 min-h-0" className="px-0 pb-2">
         {loading ? (
