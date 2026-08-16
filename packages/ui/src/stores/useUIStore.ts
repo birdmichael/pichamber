@@ -1200,9 +1200,10 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          // Content-driven modes need a payload (a session to split); the rail
-          // renders them disabled until content exists. 'file' opens an empty
-          // editor whose embedded tree picks the first file.
+          // Chat needs a session payload; the rail hides it until a tab exists.
+          // Pull request and walkthrough are also rail-hidden until content or
+          // a related diff tab exists, but Git / diff / generate still open
+          // an empty singleton through this action.
           if (mode === 'chat') {
             return;
           }

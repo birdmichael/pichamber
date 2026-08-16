@@ -27,13 +27,35 @@ describe('getVisibleContextRailSurfaces', () => {
   });
 
   test('hides the walkthrough on VS Code and below the min width', () => {
-    expect(getVisibleContextRailSurfaces({ ...baseOptions, isVSCode: true }).some((s) => s.id === 'walkthrough')).toBe(false);
+    const withWalkthroughTab = { ...baseOptions, tabs: [{ mode: 'walkthrough' as const }] };
+    expect(getVisibleContextRailSurfaces({ ...withWalkthroughTab, isVSCode: true }).some((s) => s.id === 'walkthrough')).toBe(false);
     expect(
-      getVisibleContextRailSurfaces({ ...baseOptions, screenWidth: WALKTHROUGH_MIN_WIDTH - 1 }).some((s) => s.id === 'walkthrough'),
+      getVisibleContextRailSurfaces({ ...withWalkthroughTab, screenWidth: WALKTHROUGH_MIN_WIDTH - 1 }).some((s) => s.id === 'walkthrough'),
     ).toBe(false);
     expect(
-      getVisibleContextRailSurfaces({ ...baseOptions, screenWidth: WALKTHROUGH_MIN_WIDTH }).some((s) => s.id === 'walkthrough'),
+      getVisibleContextRailSurfaces({ ...withWalkthroughTab, screenWidth: WALKTHROUGH_MIN_WIDTH }).some((s) => s.id === 'walkthrough'),
     ).toBe(true);
+  });
+
+  test('hides empty pull request and walkthrough chrome on a blank session', () => {
+    const surfaces = getVisibleContextRailSurfaces(baseOptions);
+    expect(surfaces.some((surface) => surface.id === 'pr')).toBe(false);
+    expect(surfaces.some((surface) => surface.id === 'walkthrough')).toBe(false);
+    expect(surfaces.some((surface) => surface.id === 'context')).toBe(true);
+  });
+
+  test('shows the pull request surface after a PR tab exists', () => {
+    const pr = CONTEXT_SURFACES.find((surface) => surface.id === 'pr');
+    expect(pr?.availability).toBe('has-content');
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'pr' }] }).some((s) => s.id === 'pr')).toBe(true);
+  });
+
+  test('shows the walkthrough when a walkthrough or diff tab exists', () => {
+    const walkthrough = CONTEXT_SURFACES.find((surface) => surface.id === 'walkthrough');
+    expect(walkthrough?.availability).toBe('has-content');
+    expect(walkthrough?.revealedByModes).toEqual(['diff']);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'walkthrough' }] }).some((s) => s.id === 'walkthrough')).toBe(true);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'diff' }] }).some((s) => s.id === 'walkthrough')).toBe(true);
   });
 
   test('offers no browser surface inside VS Code', () => {
