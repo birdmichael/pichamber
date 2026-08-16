@@ -354,7 +354,12 @@ describe('provider edit helpers', () => {
       options: { baseURL: 'https://llm.example.edu/v1' },
       models: { 'gpt-4o': { name: 'GPT-4o', limit: { context: 128000 } } },
     });
-    expect(fromLimitOnly.models[0]).toMatchObject({ id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 });
+    expect(fromLimitOnly.models[0]).toEqual({
+      row: fromLimitOnly.models[0]!.row,
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      contextWindow: 128000,
+    });
   });
 
   test('requires a config-layer source before treating a provider as editable custom', () => {
@@ -592,6 +597,6 @@ describe('fetch remote models request', () => {
     expect(isInferredModelContext(family)).toBe(true);
 
     const unknown = applyModelIdChange({ row: 'm2', id: '', name: '' }, 'mystery-model');
-    expect(unknown.contextWindow).toBeUndefined();
+    expect(unknown.contextWindow).toEqual(undefined);
   });
 });

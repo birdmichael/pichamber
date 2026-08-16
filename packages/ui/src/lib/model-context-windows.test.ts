@@ -3,8 +3,12 @@ import {
   inferFamilyContextWindow,
   lookupExactContextWindow,
   normalizeModelId,
+  PUBLISHED_INPUT_CONTEXT_WINDOWS,
   readCatalogContextWindow,
   resolveContextWindow,
+  VENDOR_MODEL_ID_PREFIXES,
+  type ContextWindowSource,
+  type ResolvedContextWindow,
 } from './model-context-windows';
 
 describe('normalizeModelId', () => {
@@ -25,6 +29,9 @@ describe('normalizeModelId', () => {
 
 describe('lookupExactContextWindow', () => {
   test('prefills the published window for that exact id, not a family average', () => {
+    expect(VENDOR_MODEL_ID_PREFIXES).toContain('openai/');
+    expect(PUBLISHED_INPUT_CONTEXT_WINDOWS['gpt-4o']).toBe(128_000);
+    expect(PUBLISHED_INPUT_CONTEXT_WINDOWS['gpt-4.1']).toBe(1_047_576);
     expect(lookupExactContextWindow('gpt-4o')).toBe(128_000);
     expect(lookupExactContextWindow('gpt-4.1')).toBe(1_047_576);
     expect(lookupExactContextWindow('GPT-4O')).toBe(128_000);
@@ -45,9 +52,9 @@ describe('lookupExactContextWindow', () => {
   });
 
   test('returns undefined for unknown exact ids', () => {
-    expect(lookupExactContextWindow('gpt-unknown-99')).toBeUndefined();
-    expect(lookupExactContextWindow('claude-*')).toBeUndefined();
-    expect(lookupExactContextWindow('')).toBeUndefined();
+    expect(lookupExactContextWindow('gpt-unknown-99')).toEqual(undefined);
+    expect(lookupExactContextWindow('claude-*')).toEqual(undefined);
+    expect(lookupExactContextWindow('')).toEqual(undefined);
   });
 });
 
@@ -59,18 +66,21 @@ describe('inferFamilyContextWindow', () => {
   });
 
   test('does not invent a GPT or Grok family average', () => {
-    expect(inferFamilyContextWindow('gpt-unknown-99')).toBeUndefined();
-    expect(inferFamilyContextWindow('grok-unknown-99')).toBeUndefined();
-    expect(inferFamilyContextWindow('composer-2.5')).toBeUndefined();
+    expect(inferFamilyContextWindow('gpt-unknown-99')).toEqual(undefined);
+    expect(inferFamilyContextWindow('grok-unknown-99')).toEqual(undefined);
+    expect(inferFamilyContextWindow('composer-2.5')).toEqual(undefined);
   });
 });
 
 describe('resolveContextWindow', () => {
   test('uses a provider catalog value before the exact-id table', () => {
-    expect(resolveContextWindow({
+    const catalog: ResolvedContextWindow = resolveContextWindow({
       id: 'gpt-4o',
       catalogContextWindow: 64_000,
-    })).toEqual({ contextWindow: 64_000, source: 'catalog' });
+    });
+    const source: ContextWindowSource = catalog.source;
+    expect(source).toBe('catalog');
+    expect(catalog).toEqual({ contextWindow: 64_000, source: 'catalog' });
     expect(resolveContextWindow({
       id: 'gpt-4o',
       catalogContextWindow: { context_length: 96_000 },
@@ -108,8 +118,8 @@ describe('readCatalogContextWindow', () => {
     expect(readCatalogContextWindow({ context_window: 256_000 })).toBe(256_000);
     expect(readCatalogContextWindow({ max_input_tokens: 200_000 })).toBe(200_000);
     expect(readCatalogContextWindow({ limit: { context: 128_000 } })).toBe(128_000);
-    expect(readCatalogContextWindow({ context_length: 0 })).toBeUndefined();
-    expect(readCatalogContextWindow({ context_length: -1 })).toBeUndefined();
-    expect(readCatalogContextWindow(null)).toBeUndefined();
+    expect(readCatalogContextWindow({ context_length: 0 })).toEqual(undefined);
+    expect(readCatalogContextWindow({ context_length: -1 })).toEqual(undefined);
+    expect(readCatalogContextWindow(null)).toEqual(undefined);
   });
 });
