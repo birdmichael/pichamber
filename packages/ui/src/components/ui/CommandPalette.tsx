@@ -397,7 +397,11 @@ export const CommandPalette: React.FC = () => {
 
   const scoredSessions = React.useMemo(() => {
     if (!hasQuery) return orderedActiveSessions.slice(0, 5).map((item) => ({ item, score: 0 }));
-    return scoreByFuzzyQuery(orderedActiveSessions, liveTrimmed, (s) => s.title || '', {
+    return scoreByFuzzyQuery(orderedActiveSessions, liveTrimmed, (s) => {
+      const title = s.title || '';
+      const directory = resolveGlobalSessionDirectory(s) || '';
+      return directory ? `${title} ${directory}` : title;
+    }, {
       limit: 7,
       threshold: 0.2,
     });
