@@ -25,11 +25,17 @@ import { useSkillsCatalogStore } from '@/stores/useSkillsCatalogStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { InstallConflictsDialog, type ConflictDecision, type SkillConflict } from './InstallConflictsDialog';
 import {
-  SKILL_LOCATION_OPTIONS,
+  defaultSkillSource,
+  getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
+  skillLocationDescriptionKey,
+  skillLocationLabelKey,
   type SkillLocationValue,
 } from '../skillLocations';
+import { usePiKernel } from '@/lib/usePiKernel';
+
+type SkillInstallSource = 'pi' | 'opencode' | 'agents';
 
 interface InstallSkillDialogProps {
   open: boolean;
@@ -39,10 +45,12 @@ interface InstallSkillDialogProps {
 
 export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, onOpenChange, item }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const locationOptions = getSkillLocationOptions(isPiKernel);
   const installSkills = useSkillsCatalogStore((s) => s.installSkills);
   const isInstalling = useSkillsCatalogStore((s) => s.isInstalling);
   const [scope, setScope] = React.useState<'user' | 'project'>('user');
-  const [targetSource, setTargetSource] = React.useState<'opencode' | 'agents'>('opencode');
+  const [targetSource, setTargetSource] = React.useState<SkillInstallSource>(defaultSkillSource(isPiKernel));
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const [targetProjectId, setTargetProjectId] = React.useState<string | null>(null);
@@ -52,7 +60,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
     source: string;
     subpath?: string;
     scope: 'user' | 'project';
-    targetSource: 'opencode' | 'agents';
+    targetSource: SkillInstallSource;
     skillDir: string;
     directoryOverride?: string | null;
   } | null>(null);
@@ -60,38 +68,20 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
   React.useEffect(() => {
     if (!open) return;
     setScope('user');
-    setTargetSource('opencode');
+    setTargetSource(defaultSkillSource(isPiKernel));
     setTargetProjectId(activeProjectId);
     setConflictsOpen(false);
     setConflicts([]);
     setBaseRequest(null);
-  }, [open, activeProjectId]);
+  }, [open, activeProjectId, isPiKernel]);
 
-  const locationLabelText = React.useCallback((value: SkillLocationValue) => {
-    switch (value) {
-      case 'project-opencode':
-        return t('settings.skills.location.option.projectOpencode.label');
-      case 'user-agents':
-        return t('settings.skills.location.option.userAgents.label');
-      case 'project-agents':
-        return t('settings.skills.location.option.projectAgents.label');
-      default:
-        return t('settings.skills.location.option.userOpencode.label');
-    }
-  }, [t]);
+  const locationLabelText = React.useCallback((value: SkillLocationValue) => (
+    t(skillLocationLabelKey(value))
+  ), [t]);
 
-  const locationDescriptionText = React.useCallback((value: SkillLocationValue) => {
-    switch (value) {
-      case 'project-opencode':
-        return t('settings.skills.location.option.projectOpencode.description');
-      case 'user-agents':
-        return t('settings.skills.location.option.userAgents.description');
-      case 'project-agents':
-        return t('settings.skills.location.option.projectAgents.description');
-      default:
-        return t('settings.skills.location.option.userOpencode.description');
-    }
-  }, [t]);
+  const locationDescriptionText = React.useCallback((value: SkillLocationValue) => (
+    t(skillLocationDescriptionKey(value))
+  ), [t]);
 
   const resolvedTargetProjectId = React.useMemo(() => {
     if (projects.length === 0) {
@@ -122,7 +112,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
     source: string;
     subpath?: string;
     scope: 'user' | 'project';
-    targetSource: 'opencode' | 'agents';
+    targetSource: SkillInstallSource;
     skillDir: string;
     directoryOverride?: string | null;
     conflictDecisions?: Record<string, ConflictDecision>;
@@ -204,7 +194,9 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
                 onValueChange={(v) => {
                   const next = locationPartsFrom(v as SkillLocationValue);
                   setScope(next.scope);
-                  setTargetSource(next.source === 'agents' ? 'agents' : 'opencode');
+                  if (next.source === 'agents' || next.source === 'pi' || next.source === 'opencode') {
+                    setTargetSource(next.source);
+                  }
                 }}
               >
                 <SelectTrigger className="w-fit gap-1.5">
@@ -213,7 +205,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
                   <span>{locationLabelText(locationValueFrom(scope, targetSource))}</span>
                 </SelectTrigger>
                 <SelectContent align="start">
-                  {SKILL_LOCATION_OPTIONS.map((option) => (
+                  {locationOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value} className="pr-2 [&>span:first-child]:hidden">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">

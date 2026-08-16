@@ -160,7 +160,83 @@ describe('skill-routes directory soft fallback', () => {
     expect(payload.skills.map((skill) => skill.name)).toContain('manual-repo-skill');
   });
 
-  it('marks managed-root skills renamable and cache skills not renamable', async () => {
+  it('on Pi lists .pi skills as managed and ignores leftover OpenCode and cache roots', async () => {
+    projectRoot = createTempProject();
+    const managedDir = path.join(projectRoot, '.pi', 'skills', 'managed-list-skill');
+    fs.mkdirSync(managedDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(managedDir, 'SKILL.md'),
+      [
+        '---',
+        'name: managed-list-skill',
+        'description: Managed list skill',
+        '---',
+        '',
+        'Managed body',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const leftoverDir = path.join(projectRoot, '.opencode', 'skills', 'leftover-list-skill');
+    fs.mkdirSync(leftoverDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(leftoverDir, 'SKILL.md'),
+      [
+        '---',
+        'name: leftover-list-skill',
+        'description: Leftover OpenCode skill',
+        '---',
+        '',
+        'Leftover body',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const cacheStamp = `oc-skill-routes-${Date.now()}`;
+    const cacheDir = path.join(os.homedir(), '.cache', 'opencode', 'skills', cacheStamp, 'cache-list-skill');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(cacheDir, 'SKILL.md'),
+      [
+        '---',
+        'name: cache-list-skill',
+        'description: Cache list skill',
+        '---',
+        '',
+        'Cache body',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    try {
+      appHandle = startSkillsApp({ projectRoot });
+      const listResponse = await fetch(
+        `${appHandle.baseUrl}/api/config/skills?directory=${encodeURIComponent(projectRoot)}`,
+      );
+      expect(listResponse.status).toBe(200);
+      const payload = await listResponse.json();
+
+      const managed = payload.skills.find((entry) => entry.name === 'managed-list-skill');
+      expect(managed).toBeTruthy();
+      expect(managed.source).toBe('pi');
+      expect(managed.scope).toBe('project');
+      expect(managed.renamable).toBe(true);
+      expect(payload.skills.find((entry) => entry.name === 'leftover-list-skill')).toBeUndefined();
+      expect(payload.skills.find((entry) => entry.name === 'cache-list-skill')).toBeUndefined();
+    } finally {
+      fs.rmSync(path.join(os.homedir(), '.cache', 'opencode', 'skills', cacheStamp), {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  it('on the OpenCode kernel marks managed-root skills renamable and cache skills not renamable', async () => {
+    const previousKernel = process.env.OPENCHAMBER_KERNEL;
+    process.env.OPENCHAMBER_KERNEL = 'opencode';
     projectRoot = createTempProject();
     const managedDir = path.join(projectRoot, '.opencode', 'skills', 'managed-list-skill');
     fs.mkdirSync(managedDir, { recursive: true });
@@ -211,6 +287,8 @@ describe('skill-routes directory soft fallback', () => {
       expect(cached).toBeTruthy();
       expect(cached.renamable).toBe(false);
     } finally {
+      if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+      else process.env.OPENCHAMBER_KERNEL = previousKernel;
       fs.rmSync(path.join(os.homedir(), '.cache', 'opencode', 'skills', cacheStamp), {
         recursive: true,
         force: true,

@@ -14,7 +14,13 @@ import { noteDeferredRestartFromPayload } from "@/lib/opencode/deferredRestart";
 import { useProjectsStore } from "@/stores/useProjectsStore";
 
 import { opencodeClient } from '@/lib/opencode/client';
-import { filterSkillsByRuntimeFlags } from './skillVisibility';
+import { filterSkillsByRuntimeFlags, resolveSkillRoot } from './skillVisibility';
+
+const inferSkillSourceFromPath = (filePath: string): SkillSource => {
+  const root = resolveSkillRoot(filePath);
+  if (root === 'claude' || root === 'agents' || root === 'pi') return root;
+  return 'opencode';
+};
 
 // Prefer the active project path so Settings/Skills discovery matches the
 // project selector (and Commands/Agents). Falling back only to the session
@@ -41,7 +47,7 @@ const getRequestDirectory = (): string | null => {
 };
 
 export type SkillScope = 'user' | 'project';
-export type SkillSource = 'opencode' | 'claude' | 'agents';
+export type SkillSource = 'pi' | 'opencode' | 'claude' | 'agents';
 
 export interface SupportingFile {
   name: string;
@@ -211,7 +217,7 @@ const upsertSkillLocal = (
     name,
     path,
     scope: config.scope ?? existing?.scope ?? 'user',
-    source: config.source ?? existing?.source ?? 'opencode',
+    source: config.source ?? existing?.source ?? inferSkillSourceFromPath(path),
     description: config.description ?? existing?.description ?? '',
     group: parseSkillGroup(path),
   };
@@ -299,7 +305,7 @@ export const useSkillsStore = create<SkillsStore>()(
                   name: (typeof s.name === 'string' ? s.name.trim() : '') || skillNameFromPath(s.path || ''),
                   path: s.path,
                   scope: s.scope ?? 'user',
-                  source: s.source ?? 'opencode',
+                  source: s.source ?? inferSkillSourceFromPath(s.path || ''),
                   description: s.sources?.md?.description || '',
                   group: parseSkillGroup(s.path),
                   renamable: s.renamable === true,

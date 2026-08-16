@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { CodeMirrorEditor } from '@/components/ui/CodeMirrorEditor';
 import { toast } from '@/components/ui';
-import { useSkillsStore, type SkillConfig, type SkillScope, type SupportingFile, type PendingFile } from '@/stores/useSkillsStore';
+import { useSkillsStore, type SkillConfig, type SkillScope, type SkillSource, type SupportingFile, type PendingFile } from '@/stores/useSkillsStore';
 import { usePendingOpenCodeRestartStore } from '@/stores/usePendingOpenCodeRestartStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
@@ -37,11 +37,15 @@ import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { PreviewToggleButton } from '@/components/views/PreviewToggleButton';
 import { SkillsCatalogPage } from './catalog/SkillsCatalogPage';
 import {
-  SKILL_LOCATION_OPTIONS,
+  defaultSkillSource,
+  getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
+  skillLocationDescriptionKey,
+  skillLocationLabelKey,
   type SkillLocationValue,
 } from './skillLocations';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useI18n } from '@/lib/i18n';
 import { languageByExtension } from '@/lib/codemirror/languageByExtension';
 import { createFlexokiCodeMirrorTheme } from '@/lib/codemirror/flexokiTheme';
@@ -112,6 +116,8 @@ const replaceSkillMarkdownDescription = (value: string, description: string): st
 
 const SkillsInstalledPage: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const locationOptions = getSkillLocationOptions(isPiKernel);
   const { currentTheme } = useThemeSystem();
   const {
     selectedSkillName,
@@ -150,7 +156,7 @@ const SkillsInstalledPage: React.FC = () => {
 
   const [draftName, setDraftName] = React.useState('');
   const [draftScope, setDraftScope] = React.useState<SkillScope>('user');
-  const [draftSource, setDraftSource] = React.useState<'opencode' | 'agents'>('opencode');
+  const [draftSource, setDraftSource] = React.useState<SkillSource>('pi');
   const [description, setDescription] = React.useState('');
   const [instructions, setInstructions] = React.useState('');
   const [skillMarkdown, setSkillMarkdown] = React.useState(() => buildSkillMarkdown('', ''));
@@ -180,39 +186,13 @@ const SkillsInstalledPage: React.FC = () => {
     ? newFileContent !== originalFileContent
     : newFileName.trim() !== '';
 
-  const locationLabelText = React.useCallback((value: SkillLocationValue) => {
-    switch (value) {
-      case 'project-opencode':
-        return t('settings.skills.location.option.projectOpencode.label');
-      case 'user-claude':
-        return t('settings.skills.location.option.userClaude.label');
-      case 'project-claude':
-        return t('settings.skills.location.option.projectClaude.label');
-      case 'user-agents':
-        return t('settings.skills.location.option.userAgents.label');
-      case 'project-agents':
-        return t('settings.skills.location.option.projectAgents.label');
-      default:
-        return t('settings.skills.location.option.userOpencode.label');
-    }
-  }, [t]);
+  const locationLabelText = React.useCallback((value: SkillLocationValue) => (
+    t(skillLocationLabelKey(value))
+  ), [t]);
 
-  const locationDescriptionText = React.useCallback((value: SkillLocationValue) => {
-    switch (value) {
-      case 'project-opencode':
-        return t('settings.skills.location.option.projectOpencode.description');
-      case 'user-claude':
-        return t('settings.skills.location.option.userClaude.description');
-      case 'project-claude':
-        return t('settings.skills.location.option.projectClaude.description');
-      case 'user-agents':
-        return t('settings.skills.location.option.userAgents.description');
-      case 'project-agents':
-        return t('settings.skills.location.option.projectAgents.description');
-      default:
-        return t('settings.skills.location.option.userOpencode.description');
-    }
-  }, [t]);
+  const locationDescriptionText = React.useCallback((value: SkillLocationValue) => (
+    t(skillLocationDescriptionKey(value))
+  ), [t]);
 
   React.useEffect(() => {
     const loadSkillDetails = async () => {
@@ -221,7 +201,7 @@ const SkillsInstalledPage: React.FC = () => {
         const nextInstructions = skillDraft.instructions || '';
         setDraftName(skillDraft.name || '');
         setDraftScope(skillDraft.scope || 'user');
-        setDraftSource(skillDraft.source === 'agents' ? 'agents' : 'opencode');
+        setDraftSource(skillDraft.source || defaultSkillSource(isPiKernel));
         setDescription(nextDescription);
         setInstructions(nextInstructions);
         setSkillMarkdown(buildSkillMarkdown(nextDescription, nextInstructions));
@@ -253,7 +233,7 @@ const SkillsInstalledPage: React.FC = () => {
     };
 
     loadSkillDetails();
-  }, [selectedSkill, isNewSkill, selectedSkillName, skills, skillDraft, getSkillDetail]);
+  }, [selectedSkill, isNewSkill, selectedSkillName, skills, skillDraft, getSkillDetail, isPiKernel]);
 
   const editorFontSize = useUIStore((state) => state.editorFontSize);
 
@@ -559,7 +539,7 @@ const SkillsInstalledPage: React.FC = () => {
                   onValueChange={(v) => {
                     const next = locationPartsFrom(v as SkillLocationValue);
                     setDraftScope(next.scope);
-                    setDraftSource(next.source === 'agents' ? 'agents' : 'opencode');
+                    setDraftSource(next.source);
                   }}
                 >
                   <SelectTrigger size={SETTINGS_SELECT_SIZE} className="w-fit gap-1.5">
@@ -572,7 +552,7 @@ const SkillsInstalledPage: React.FC = () => {
                     <span>{locationLabelText(locationValueFrom(draftScope, draftSource))}</span>
                   </SelectTrigger>
                   <SelectContent align="start">
-                    {SKILL_LOCATION_OPTIONS.map((option) => (
+                    {locationOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         <div className="flex flex-col gap-0.5">
                           <div className="flex items-center gap-2">

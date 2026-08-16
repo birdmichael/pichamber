@@ -26,7 +26,9 @@ import { SettingsProjectSelector } from '@/components/sections/shared/SettingsPr
 import { SidebarGroup } from '@/components/sections/shared/SidebarGroup';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { SETTINGS_PANEL_TITLE_CLASS } from '@/components/sections/shared/SettingsSection';
+import { defaultSkillSource, skillSourceBadgeKey } from './skillLocations';
 
 interface SkillsSidebarProps {
   onItemSelect?: () => void;
@@ -41,6 +43,7 @@ const isRenamableSkill = (skill: DiscoveredSkill | null | undefined): boolean =>
 
 export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const [renameDialogSkill, setRenameDialogSkill] = React.useState<DiscoveredSkill | null>(null);
   const [renameNewName, setRenameNewName] = React.useState('');
   const [deleteDialogSkill, setDeleteDialogSkill] = React.useState<DiscoveredSkill | null>(null);
@@ -80,7 +83,7 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
     }
 
     // Set draft and open the page for editing
-    setSkillDraft({ name: newName, scope: 'user', source: 'opencode', description: '' });
+    setSkillDraft({ name: newName, scope: 'user', source: defaultSkillSource(isPiKernel), description: '' });
     setSelectedSkill(newName);
     onItemSelect?.();
 
@@ -134,7 +137,7 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
       setSkillDraft({
         name: newName,
         scope: skill.scope || 'user',
-        source: skill.source || 'opencode',
+        source: skill.source || defaultSkillSource(isPiKernel),
         description: detail.sources.md.fields.includes('description') ? '' : '', // Will be populated from page
         instructions: '',
       });
@@ -444,11 +447,7 @@ const SkillListItem: React.FC<SkillListItemProps> = ({
 }) => {
   const { t } = useI18n();
   const isMobile = isMobileDeviceViaCSS();
-  const sourceLabel = skill.source === 'claude'
-    ? t('settings.skills.sidebar.badge.claude')
-    : skill.source === 'agents'
-      ? t('settings.skills.sidebar.badge.agents')
-      : t('settings.skills.sidebar.badge.opencode');
+  const sourceLabel = t(skillSourceBadgeKey(skill.source));
   const badgeClassName = 'typography-micro text-muted-foreground bg-[var(--surface-muted)] px-1 rounded flex-shrink-0 leading-none pb-px border border-[var(--interactive-border)]/50';
   const isBuiltIn = isBuiltInSkill(skill);
   const canRename = isRenamableSkill(skill);

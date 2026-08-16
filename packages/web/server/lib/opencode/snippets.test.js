@@ -20,11 +20,16 @@ function writeSnippet(relativePath, content) {
 }
 
 describe('snippets', () => {
+  const previousKernel = process.env.OPENCHAMBER_KERNEL;
+
   beforeEach(() => {
+    process.env.OPENCHAMBER_KERNEL = 'opencode';
     projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-snippets-'));
   });
 
   afterEach(() => {
+    if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+    else process.env.OPENCHAMBER_KERNEL = previousKernel;
     fs.rmSync(projectDir, { recursive: true, force: true });
   });
 
@@ -93,5 +98,38 @@ describe('snippets', () => {
 
   test('rejects invalid snippet names', () => {
     expect(() => createSnippet('../bad', { content: '' }, projectDir, 'project')).toThrow('Snippet name');
+  });
+});
+
+describe('snippets on the Pi kernel', () => {
+  const previousKernel = process.env.OPENCHAMBER_KERNEL;
+  let projectDir;
+
+  beforeEach(() => {
+    delete process.env.OPENCHAMBER_KERNEL;
+    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pichamber-pi-snippets-'));
+  });
+
+  afterEach(() => {
+    if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+    else process.env.OPENCHAMBER_KERNEL = previousKernel;
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  test('creates project snippets under .pi/snippets and does not write .opencode', () => {
+    expect(createSnippet('custom-one', { content: 'Body', aliases: ['co'] }, projectDir, 'project')).toEqual(
+      expect.objectContaining({ name: 'custom-one', content: 'Body', aliases: ['co'] }),
+    );
+    expect(fs.existsSync(path.join(projectDir, '.pi', 'snippets', 'custom-one.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projectDir, '.opencode'))).toBe(false);
+    expect(listSnippets(projectDir).map((snippet) => snippet.name)).toEqual(['custom-one']);
+  });
+
+  test('does not list leftover .opencode snippets as first-class Pi snippets', () => {
+    const leftover = path.join(projectDir, '.opencode', 'snippets', 'leftover.md');
+    fs.mkdirSync(path.dirname(leftover), { recursive: true });
+    fs.writeFileSync(leftover, 'Leftover OpenCode snippet', 'utf8');
+    expect(listSnippets(projectDir)).toEqual([]);
+    expect(getSnippet('leftover', projectDir)).toBeNull();
   });
 });

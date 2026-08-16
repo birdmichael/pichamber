@@ -32,11 +32,14 @@ type SkillLike = { name: string; path: string };
 const CLAUDE_ROOT = /(^|\/)\.claude\//;
 const AGENTS_ROOT = /(^|\/)\.agents\//;
 
-type SkillRoot = 'claude' | 'agents' | 'opencode';
+const PI_ROOT = /(^|\/)\.pi\/(agent\/)?skills\//;
+
+type SkillRoot = 'claude' | 'agents' | 'pi' | 'opencode';
 
 export const resolveSkillRoot = (skillPath: string): SkillRoot => {
   if (CLAUDE_ROOT.test(skillPath)) return 'claude';
   if (AGENTS_ROOT.test(skillPath)) return 'agents';
+  if (PI_ROOT.test(skillPath)) return 'pi';
   return 'opencode';
 };
 
@@ -50,7 +53,7 @@ export const filterSkillsByRuntimeFlags = <T extends SkillLike>(
 
   const allowed = skills.filter((skill) => {
     const root = resolveSkillRoot(skill.path);
-    if (root === 'opencode') return true;
+    if (root === 'opencode' || root === 'pi') return true;
     if (flags.allDisabled) return false;
     if (root === 'claude') return !flags.claudeDisabled;
     return true;

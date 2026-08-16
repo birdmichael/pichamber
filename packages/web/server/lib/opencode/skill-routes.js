@@ -1,5 +1,7 @@
 import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 import { buildDeferredRestartResponse } from './config-mutation-response.js';
+import { inferSkillScopeAndSourceFromPath } from './skills.js';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 
 /**
  * Matches how OpenCode reads its own boolean env flags: any value other than
@@ -52,81 +54,6 @@ export const registerSkillRoutes = (app, dependencies) => {
     getProfile,
     getPiHost,
   } = dependencies;
-
-  const findWorktreeRootForSkills = (workingDirectory) => {
-    if (!workingDirectory) return null;
-    let current = path.resolve(workingDirectory);
-    while (true) {
-      if (fs.existsSync(path.join(current, '.git'))) {
-        return current;
-      }
-      const parent = path.dirname(current);
-      if (parent === current) {
-        return null;
-      }
-      current = parent;
-    }
-  };
-
-  const getSkillProjectAncestors = (workingDirectory) => {
-    if (!workingDirectory) return [];
-    const result = [];
-    let current = path.resolve(workingDirectory);
-    const stop = findWorktreeRootForSkills(workingDirectory) || current;
-    while (true) {
-      result.push(current);
-      if (current === stop) break;
-      const parent = path.dirname(current);
-      if (parent === current) break;
-      current = parent;
-    }
-    return result;
-  };
-
-  const isPathInside = (candidatePath, parentPath) => {
-    if (!candidatePath || !parentPath) return false;
-    const normalizedCandidate = path.resolve(candidatePath);
-    const normalizedParent = path.resolve(parentPath);
-    return normalizedCandidate === normalizedParent || normalizedCandidate.startsWith(`${normalizedParent}${path.sep}`);
-  };
-
-  const inferSkillScopeAndSourceFromPath = (skillPath, workingDirectory) => {
-    const resolvedPath = typeof skillPath === 'string' ? path.resolve(skillPath) : '';
-    const home = os.homedir();
-    const source = resolvedPath.includes(`${path.sep}.agents${path.sep}skills${path.sep}`)
-      ? 'agents'
-      : resolvedPath.includes(`${path.sep}.claude${path.sep}skills${path.sep}`)
-        ? 'claude'
-        : 'opencode';
-
-    const projectAncestors = getSkillProjectAncestors(workingDirectory);
-    const isProjectScoped = projectAncestors.some((ancestor) => {
-      const candidates = [
-        path.join(ancestor, '.opencode'),
-        path.join(ancestor, '.claude', 'skills'),
-        path.join(ancestor, '.agents', 'skills'),
-      ];
-      return candidates.some((candidate) => isPathInside(resolvedPath, candidate));
-    });
-
-    if (isProjectScoped) {
-      return { scope: SKILL_SCOPE.PROJECT, source };
-    }
-
-    const userRoots = [
-      path.join(home, '.config', 'opencode'),
-      path.join(home, '.opencode'),
-      path.join(home, '.claude', 'skills'),
-      path.join(home, '.agents', 'skills'),
-      process.env.OPENCODE_CONFIG_DIR ? path.resolve(process.env.OPENCODE_CONFIG_DIR) : null,
-    ].filter(Boolean);
-
-    if (userRoots.some((root) => isPathInside(resolvedPath, root))) {
-      return { scope: SKILL_SCOPE.USER, source };
-    }
-
-    return { scope: SKILL_SCOPE.USER, source };
-  };
 
   const findListedSkill = (skills, skillName) => {
     if (!Array.isArray(skills)) return null;
@@ -513,7 +440,9 @@ export const registerSkillRoutes = (app, dependencies) => {
           scope,
           targetSource,
           workingDirectory,
-          userSkillDir: SKILL_DIR,
+          userSkillDir: isPiKernelEnabled()
+            ? path.join(os.homedir(), '.pi', 'agent', 'skills')
+            : SKILL_DIR,
           selections,
           conflictPolicy,
           conflictDecisions,
@@ -552,7 +481,9 @@ export const registerSkillRoutes = (app, dependencies) => {
         scope,
         targetSource,
         workingDirectory,
-        userSkillDir: SKILL_DIR,
+        userSkillDir: isPiKernelEnabled()
+          ? path.join(os.homedir(), '.pi', 'agent', 'skills')
+          : SKILL_DIR,
         selections,
         conflictPolicy,
         conflictDecisions,
@@ -677,9 +608,11 @@ export const registerSkillRoutes = (app, dependencies) => {
       console.log('[Server] Scope:', scope, 'Working directory:', directory);
 
       createSkill(skillName, { ...config, source: skillSource }, directory, scope);
-      res.json(buildDeferredRestartResponse(
-        `Skill ${skillName} created successfully. Restart OpenCode to apply.`,
-      ));
+      res.json(isPiKernelEnabled()
+        ? { success: true, message: `Skill ${skillName} created successfully.` }
+        : buildDeferredRestartResponse(
+          `Skill ${skillName} created successfully. Restart OpenCode to apply.`,
+        ));
     } catch (error) {
       console.error('Failed to create skill:', error);
       res.status(500).json({ error: error.message || 'Failed to create skill' });

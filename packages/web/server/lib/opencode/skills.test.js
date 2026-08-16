@@ -3,7 +3,9 @@ import fs from 'fs';
 import fsPromises from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { discoverSkills, getSkillSources, mergeDiscoveredSkills, renameSkill } from './skills.js';
+import { createSkill, discoverSkills, getSkillSources, inferSkillScopeAndSourceFromPath, isManagedSkillPath, mergeDiscoveredSkills, renameSkill } from './skills.js';
+import { createCommand } from './commands.js';
+import { ensureDirs } from './shared.js';
 
 describe('skills', () => {
   it('merges locally discovered skills missing from OpenCode live discovery', () => {
@@ -225,7 +227,7 @@ describe('skills', () => {
   it('renames a skill directory while preserving SKILL.md body and supporting files', async () => {
     const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-skills-rename-'));
     const projectRoot = path.join(tempRoot, 'project');
-    const skillDir = path.join(projectRoot, '.opencode', 'skills', 'original-skill');
+    const skillDir = path.join(projectRoot, '.pi', 'skills', 'original-skill');
     const skillPath = path.join(skillDir, 'SKILL.md');
     const supportPath = path.join(skillDir, 'notes.md');
     const body = [
@@ -259,7 +261,7 @@ describe('skills', () => {
 
       renameSkill('original-skill', 'renamed-skill', projectRoot);
 
-      const renamedDir = path.join(projectRoot, '.opencode', 'skills', 'renamed-skill');
+      const renamedDir = path.join(projectRoot, '.pi', 'skills', 'renamed-skill');
       const renamedPath = path.join(renamedDir, 'SKILL.md');
       const renamedSupportPath = path.join(renamedDir, 'notes.md');
 
@@ -271,7 +273,7 @@ describe('skills', () => {
         name: 'renamed-skill',
         path: renamedPath,
         scope: 'project',
-        source: 'opencode',
+        source: 'pi',
         description: 'fallback',
       });
 
@@ -292,7 +294,7 @@ describe('skills', () => {
   it('rolls back the directory rename when frontmatter write fails', async () => {
     const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-skills-rename-rollback-'));
     const projectRoot = path.join(tempRoot, 'project');
-    const skillDir = path.join(projectRoot, '.opencode', 'skills', 'rollback-skill');
+    const skillDir = path.join(projectRoot, '.pi', 'skills', 'rollback-skill');
     const skillPath = path.join(skillDir, 'SKILL.md');
     const body = '# Rollback body\n\nMust remain in the original directory.';
 
@@ -316,7 +318,7 @@ describe('skills', () => {
       expect(() => renameSkill('rollback-skill', 'rollback-skill-renamed', projectRoot)).toThrow();
 
       expect(fs.existsSync(skillDir)).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, '.opencode', 'skills', 'rollback-skill-renamed'))).toBe(false);
+      expect(fs.existsSync(path.join(projectRoot, '.pi', 'skills', 'rollback-skill-renamed'))).toBe(false);
       expect(await fsPromises.readFile(skillPath, 'utf8')).toContain(body);
     } finally {
       try {
@@ -331,9 +333,9 @@ describe('skills', () => {
   it('rejects invalid names, missing skills, conflicts, unmanaged paths, and frontmatter mismatches', async () => {
     const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-skills-rename-reject-'));
     const projectRoot = path.join(tempRoot, 'project');
-    const managedDir = path.join(projectRoot, '.opencode', 'skills', 'managed-skill');
-    const conflictDir = path.join(projectRoot, '.opencode', 'skills', 'taken-name');
-    const mismatchDir = path.join(projectRoot, '.opencode', 'skills', 'folder-name');
+    const managedDir = path.join(projectRoot, '.pi', 'skills', 'managed-skill');
+    const conflictDir = path.join(projectRoot, '.pi', 'skills', 'taken-name');
+    const mismatchDir = path.join(projectRoot, '.pi', 'skills', 'folder-name');
     const cacheStamp = `oc-rename-${Date.now()}`;
     const cacheDir = path.join(os.homedir(), '.cache', 'opencode', 'skills', cacheStamp, 'cache-skill');
 
@@ -402,17 +404,159 @@ describe('skills', () => {
       expect(() => renameSkill('missing-skill', 'new-skill', projectRoot)).toThrow(/not found/);
       expect(() => renameSkill('managed-skill', 'taken-name', projectRoot)).toThrow(/already exists/);
       expect(() => renameSkill('folder-name', 'renamed-mismatch', projectRoot)).toThrow(/does not match/);
-      expect(() => renameSkill('cache-skill', 'cache-skill-renamed', projectRoot)).toThrow(/managed skill directories/);
+      expect(() => renameSkill('cache-skill', 'cache-skill-renamed', projectRoot)).toThrow(/not found/);
 
       expect(fs.existsSync(managedDir)).toBe(true);
       expect(fs.existsSync(cacheDir)).toBe(true);
-      expect(fs.existsSync(path.join(projectRoot, '.opencode', 'skills', 'renamed-mismatch'))).toBe(false);
+      expect(fs.existsSync(path.join(projectRoot, '.pi', 'skills', 'renamed-mismatch'))).toBe(false);
     } finally {
       await fsPromises.rm(tempRoot, { recursive: true, force: true });
       await fsPromises.rm(path.join(os.homedir(), '.cache', 'opencode', 'skills', cacheStamp), {
         recursive: true,
         force: true,
       });
+    }
+  });
+
+  it('on Pi discovers only Pi and .agents roots and tags them correctly', async () => {
+    const previousKernel = process.env.OPENCHAMBER_KERNEL;
+    delete process.env.OPENCHAMBER_KERNEL;
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-pi-skill-roots-'));
+    const project = path.join(tempRoot, 'project');
+    const writeSkill = async (dir, name, description) => {
+      await fsPromises.mkdir(dir, { recursive: true });
+      await fsPromises.writeFile(
+        path.join(dir, 'SKILL.md'),
+        `---\nname: ${name}\ndescription: ${description}\n---\nbody\n`,
+        'utf8',
+      );
+    };
+
+    try {
+      await fsPromises.mkdir(path.join(project, '.git'), { recursive: true });
+      const piProjectDir = path.join(project, '.pi', 'skills', 'demo');
+      const agentsProjectDir = path.join(project, '.agents', 'skills', 'compat');
+      const leftoverProjectDir = path.join(project, '.opencode', 'skills', 'leftover');
+      await writeSkill(piProjectDir, 'demo', 'from .pi');
+      await writeSkill(agentsProjectDir, 'compat', 'from .agents');
+      await writeSkill(leftoverProjectDir, 'leftover', 'from leftover opencode');
+
+      const leftoverUserDir = path.join(os.homedir(), '.config', 'opencode', 'skills', `pi-root-leftover-${Date.now()}`);
+      const leftoverHomeDir = path.join(os.homedir(), '.opencode', 'skills', `pi-root-home-${Date.now()}`);
+      await writeSkill(leftoverUserDir, 'codex', 'leftover config');
+      await writeSkill(leftoverHomeDir, 'frontend-design', 'leftover home');
+
+      try {
+        const discovered = discoverSkills(project);
+        expect(discovered.find((skill) => skill.name === 'demo')).toMatchObject({
+          scope: 'project',
+          source: 'pi',
+          path: path.join(piProjectDir, 'SKILL.md'),
+        });
+        expect(discovered.find((skill) => skill.name === 'compat')).toMatchObject({
+          scope: 'project',
+          source: 'agents',
+        });
+        expect(discovered.find((skill) => skill.name === 'leftover')).toBeUndefined();
+        expect(discovered.find((skill) => skill.name === 'codex')).toBeUndefined();
+        expect(discovered.find((skill) => skill.name === 'frontend-design')).toBeUndefined();
+        expect(isManagedSkillPath(path.join(leftoverProjectDir, 'SKILL.md'), project)).toBe(false);
+        expect(isManagedSkillPath(path.join(piProjectDir, 'SKILL.md'), project)).toBe(true);
+      } finally {
+        await fsPromises.rm(leftoverUserDir, { recursive: true, force: true });
+        await fsPromises.rm(leftoverHomeDir, { recursive: true, force: true });
+      }
+    } finally {
+      if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+      else process.env.OPENCHAMBER_KERNEL = previousKernel;
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('infers project/user Pi paths instead of leftover opencode', () => {
+    const previousKernel = process.env.OPENCHAMBER_KERNEL;
+    delete process.env.OPENCHAMBER_KERNEL;
+    try {
+      const project = '/tmp/pichamber-pi-skill';
+      expect(inferSkillScopeAndSourceFromPath(`${project}/.pi/skills/demo/SKILL.md`, project)).toEqual({
+        scope: 'project',
+        source: 'pi',
+      });
+      expect(inferSkillScopeAndSourceFromPath(`${os.homedir()}/.pi/agent/skills/review/SKILL.md`, project)).toEqual({
+        scope: 'user',
+        source: 'pi',
+      });
+      expect(inferSkillScopeAndSourceFromPath(`${os.homedir()}/.config/opencode/skills/codex/SKILL.md`, project)).toEqual({
+        scope: 'user',
+        source: 'opencode',
+      });
+      expect(inferSkillScopeAndSourceFromPath(`${project}/.agents/skills/compat/SKILL.md`, project)).toEqual({
+        scope: 'project',
+        source: 'agents',
+      });
+    } finally {
+      if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+      else process.env.OPENCHAMBER_KERNEL = previousKernel;
+    }
+  });
+
+  it('creates Pi project skills under .pi and does not mkdir leftover OpenCode dirs', async () => {
+    const previousKernel = process.env.OPENCHAMBER_KERNEL;
+    delete process.env.OPENCHAMBER_KERNEL;
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-pi-create-skill-'));
+    const project = path.join(tempRoot, 'project');
+
+    try {
+      await fsPromises.mkdir(path.join(project, '.git'), { recursive: true });
+      createSkill('demo-skill', { description: 'Created on Pi', source: 'pi' }, project, 'project');
+      createCommand('demo-cmd', { description: 'Created on Pi', template: 'Do the work' }, project, 'project');
+
+      expect(fs.existsSync(path.join(project, '.pi', 'skills', 'demo-skill', 'SKILL.md'))).toBe(true);
+      expect(fs.existsSync(path.join(project, '.pi', 'prompts', 'demo-cmd.md'))).toBe(true);
+      expect(fs.existsSync(path.join(project, '.opencode'))).toBe(false);
+      expect(discoverSkills(project).find((skill) => skill.name === 'demo-skill')).toMatchObject({
+        scope: 'project',
+        source: 'pi',
+      });
+
+      ensureDirs();
+      const leftoverSkill = path.join(os.homedir(), '.config', 'opencode', 'skills', 'ensure-dirs-should-not-create');
+      expect(fs.existsSync(leftoverSkill)).toBe(false);
+    } finally {
+      if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+      else process.env.OPENCHAMBER_KERNEL = previousKernel;
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('on the OpenCode kernel still discovers and writes .opencode roots', async () => {
+    const previousKernel = process.env.OPENCHAMBER_KERNEL;
+    process.env.OPENCHAMBER_KERNEL = 'opencode';
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-opencode-skill-roots-'));
+    const project = path.join(tempRoot, 'project');
+
+    try {
+      await fsPromises.mkdir(path.join(project, '.git'), { recursive: true });
+      createSkill('oc-skill', { description: 'Created on OpenCode', source: 'opencode' }, project, 'project');
+      expect(fs.existsSync(path.join(project, '.opencode', 'skills', 'oc-skill', 'SKILL.md'))).toBe(true);
+      expect(fs.existsSync(path.join(project, '.pi'))).toBe(false);
+
+      const leftoverDir = path.join(project, '.opencode', 'skills', 'manual');
+      await fsPromises.mkdir(leftoverDir, { recursive: true });
+      await fsPromises.writeFile(
+        path.join(leftoverDir, 'SKILL.md'),
+        '---\nname: manual\ndescription: leftover listed on OpenCode\n---\n',
+        'utf8',
+      );
+      const discovered = discoverSkills(project);
+      expect(discovered.find((skill) => skill.name === 'manual')).toMatchObject({
+        scope: 'project',
+        source: 'opencode',
+      });
+    } finally {
+      if (previousKernel === undefined) delete process.env.OPENCHAMBER_KERNEL;
+      else process.env.OPENCHAMBER_KERNEL = previousKernel;
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
     }
   });
 });
