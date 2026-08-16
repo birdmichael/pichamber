@@ -44,15 +44,15 @@ export const resolvePiDefaultModel = (stored, providers = []) => {
   return keys[0] || pinned || '';
 };
 
-/** Invokable Pi slash entries. Model and thinking stay on composer chips / Session Defaults. */
+/** Invokable Pi slash entries. Model and thinking stay on composer chips / Session Defaults. Reload is host-only. */
 export const BUILTIN_COMMANDS = [
   { name: 'compact', description: 'Compact session context', source: 'builtin', template: '' },
-  { name: 'reload', description: 'Reload skills, prompts, and context files', source: 'builtin', template: '' },
   { name: 'login', description: 'Authenticate a provider', source: 'builtin', template: '' },
 ];
 
-/** Reserved so custom prompts cannot collide with chip-owned actions. */
+/** Reserved so custom prompts cannot collide with chip-owned or host-only actions. */
 const CHIP_OWNED_COMMAND_NAMES = new Set(['model', 'thinking']);
+const HOST_ONLY_COMMAND_NAMES = new Set(['reload']);
 
 const isDirectory = (value) => {
   try {
@@ -1195,6 +1195,7 @@ const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 export const isBuiltinCommandName = (name) => (
   BUILTIN_COMMANDS.some((command) => command.name === name)
   || CHIP_OWNED_COMMAND_NAMES.has(name)
+  || HOST_ONLY_COMMAND_NAMES.has(name)
 );
 
 const sanitizeCommandName = (name) => {

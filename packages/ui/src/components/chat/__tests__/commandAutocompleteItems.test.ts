@@ -195,7 +195,6 @@ describe('filterPiSlashCommands', () => {
     ];
     expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
       'compact',
-      'reload',
       'login',
       'pr-review',
       'schedule-task',
@@ -257,7 +256,6 @@ describe('filterPiSettingsCommands', () => {
     ];
     expect(filterPiSettingsCommands(commands, true).map((item) => item.name)).toEqual([
       'compact',
-      'reload',
       'login',
       'ship',
     ]);
@@ -292,6 +290,19 @@ describe('commandMatchesPiSlashQuery', () => {
   });
 
   test('empty query keeps every remaining command', () => {
-    expect(commandMatchesPiSlashQuery({ name: 'reload' }, '')).toBe(true);
+    expect(commandMatchesPiSlashQuery({ name: 'login' }, '')).toBe(true);
+  });
+
+  test('prefix /re does not suggest /reload', () => {
+    const commands = filterPiSlashCommands([
+      { name: 'compact' },
+      { name: 'reload' },
+      { name: 'login' },
+      { name: 'review-pr' },
+    ], true);
+    expect(commands.map((item) => item.name)).toEqual(['compact', 'login', 'review-pr']);
+    expect(commands.filter((item) => commandMatchesPiSlashQuery(item, 're')).map((item) => item.name)).toEqual([
+      'review-pr',
+    ]);
   });
 });

@@ -1425,10 +1425,9 @@ export const createPiHost = ({
       const reply = async (assistantText) => completeLocalReply(record, body, userText, assistantText);
 
       if (name === 'reload') {
-        const result = await this.reload(record.directory);
-        return reply(
-          `Reloaded Pi skills, prompts, and context files (${result.skills} skills, ${result.commands} commands).`,
-        );
+        const error = new Error('reload is not a user command');
+        error.status = 400;
+        throw error;
       }
       if (name === 'compact') {
         if (typeof record.piSession?.compact === 'function') {
