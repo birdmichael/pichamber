@@ -11,6 +11,7 @@ import { RemoteConnectionForm } from './RemoteConnectionForm';
 import { desktopHostsGet, desktopHostsSet } from '@/lib/desktopHosts';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { isLocalKernelReady } from '@/lib/kernelHealth';
 
 const INSTALL_COMMAND = 'curl -fsSL https://opencode.ai/install | bash';
 const DOCS_URL = 'https://opencode.ai/docs';
@@ -109,7 +110,7 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
       const response = await runtimeFetch('/health');
       if (!response.ok) return false;
       const data = await response.json();
-      return data.openCodeRunning === true || data.isOpenCodeReady === true;
+      return isLocalKernelReady(data);
     } catch {
       return false;
     }

@@ -48,7 +48,7 @@ import {
 } from './lib/event-stream/index.js';
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
-import { createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
+import { buildHealthSnapshot, createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
 import { createOpenCodeEnvRuntime } from './lib/opencode/env-runtime.js';
 import { resolveOpenCodeEnvConfig } from './lib/opencode/env-config.js';
 import { createHmrStateRuntime } from './lib/opencode/hmr-state-runtime.js';
@@ -1579,33 +1579,36 @@ async function main(options = {}) {
       const launchSpec = resolvedOpencodeBinary && !useWslForOpencode
         ? resolveManagedOpenCodeLaunchSpec(resolvedOpencodeBinary)
         : null;
-      return {
+      return buildHealthSnapshot({
         kernel: piKernelEnabled ? 'pi' : 'opencode',
         piMock: Boolean(piKernel?.mock),
+        piReady: Boolean(piKernel),
         openCodePort,
-        openCodeRunning: piKernelEnabled ? true : Boolean(openCodePort && isOpenCodeReady && !isRestartingOpenCode),
-        openCodeSecureConnection: isOpenCodeConnectionSecure(),
-        openCodeAuthSource: openCodeAuthSource || null,
-        openCodeApiPrefix: '',
-        openCodeApiPrefixDetected: true,
         isOpenCodeReady,
-        lastOpenCodeError,
-        lastOpenCodeLaunchDiagnostics,
-        opencodeBinaryResolved: resolvedOpencodeBinary || null,
-        opencodeBinarySource: resolvedOpencodeBinarySource || null,
-        opencodeLaunchBinary: launchSpec?.binary || null,
-        opencodeLaunchArgs: launchSpec?.args || [],
-        opencodeLaunchWrapperType: launchSpec?.wrapperType || null,
-        opencodeViaWsl: useWslForOpencode,
-        opencodeWslBinary: resolvedWslBinary || null,
-        opencodeWslPath: resolvedWslOpencodePath || null,
-        opencodeWslDistro: resolvedWslDistro || null,
-        nodeBinaryResolved: resolvedNodeBinary || null,
-        bunBinaryResolved: resolvedBunBinary || null,
-        desktopNotifyEnabled: ENV_DESKTOP_NOTIFY,
-        planModeExperimentalEnabled: PLAN_MODE_EXPERIMENT_ENABLED,
-        apiOnly,
-      };
+        isRestartingOpenCode,
+        extras: {
+          openCodeSecureConnection: isOpenCodeConnectionSecure(),
+          openCodeAuthSource: openCodeAuthSource || null,
+          openCodeApiPrefix: '',
+          openCodeApiPrefixDetected: true,
+          lastOpenCodeError,
+          lastOpenCodeLaunchDiagnostics,
+          opencodeBinaryResolved: resolvedOpencodeBinary || null,
+          opencodeBinarySource: resolvedOpencodeBinarySource || null,
+          opencodeLaunchBinary: launchSpec?.binary || null,
+          opencodeLaunchArgs: launchSpec?.args || [],
+          opencodeLaunchWrapperType: launchSpec?.wrapperType || null,
+          opencodeViaWsl: useWslForOpencode,
+          opencodeWslBinary: resolvedWslBinary || null,
+          opencodeWslPath: resolvedWslOpencodePath || null,
+          opencodeWslDistro: resolvedWslDistro || null,
+          nodeBinaryResolved: resolvedNodeBinary || null,
+          bunBinaryResolved: resolvedBunBinary || null,
+          desktopNotifyEnabled: ENV_DESKTOP_NOTIFY,
+          planModeExperimentalEnabled: PLAN_MODE_EXPERIMENT_ENABLED,
+          apiOnly,
+        },
+      });
     },
     // Port this instance serves on and the active tunnel's public URL (if
     // any), for /api/system/info. Resolved lazily because the tunnel runtime
