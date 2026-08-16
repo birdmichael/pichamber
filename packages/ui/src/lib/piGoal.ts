@@ -20,6 +20,10 @@ export type PiGoalStartResult =
   | { ok: false; reason: 'missing-command'; command: string }
   | { ok: false; reason: 'failed'; command: string; status?: number };
 
+export type PiGoalSessionResolution =
+  | { ok: true; sessionID: string; minted: boolean }
+  | { ok: false; reason: 'no-session' };
+
 export function isPiGoalPluginAvailable(payload: FeaturePluginsPayload | null | undefined): boolean {
   return Boolean(payload?.slots.goal.installed && payload.slots.goal.enabled);
 }
@@ -38,6 +42,22 @@ export function getPiGoalCommand(payload: FeaturePluginsPayload | null | undefin
 
 export function canSubmitPiGoalObjective(objective: string): boolean {
   return objective.trim().length > 0;
+}
+
+export async function resolvePiGoalSession(input: {
+  sessionID: string | null | undefined;
+  draftOpen?: boolean;
+  createSession?: () => Promise<{ id: string } | null | undefined>;
+}): Promise<PiGoalSessionResolution> {
+  const sessionID = typeof input.sessionID === 'string' ? input.sessionID.trim() : '';
+  if (sessionID) return { ok: true, sessionID, minted: false };
+  if (!input.draftOpen || typeof input.createSession !== 'function') {
+    return { ok: false, reason: 'no-session' };
+  }
+  const created = await input.createSession();
+  const mintedID = typeof created?.id === 'string' ? created.id.trim() : '';
+  if (!mintedID) return { ok: false, reason: 'no-session' };
+  return { ok: true, sessionID: mintedID, minted: true };
 }
 
 export function buildPiGoalStartCommand(command: string, objective: string): PiGoalStartCommand | { error: 'empty' } {

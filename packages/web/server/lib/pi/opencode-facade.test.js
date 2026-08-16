@@ -860,6 +860,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(installedBody.reload.reloaded).toContain(created.id);
       expect(idle.reloadCount).toBe(1);
 
+      idle.registerCommand('goal', async () => {}, { description: 'Goal' });
+      const listed = await (await fetch(`${url}/api/command?session=${created.id}`)).json();
+      expect(listed.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);
+
       const home = kernel.host.getPath().home;
       const settings = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
       expect(settings.packages).toContain('npm:@narumitw/pi-goal');
@@ -876,6 +880,54 @@ describe('OpenCode facade HTTP/SSE', () => {
       const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
       expect(after.packages || []).not.toContain('npm:@narumitw/pi-goal');
       expect(idle.reloadCount).toBe(2);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reloads idle sessions when an installed Goal slot is enabled', async () => {
+    const idle = createInMemoryPiSession();
+    idle.registerCommand('goal', async () => {}, { description: 'Goal' });
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => idle,
+    });
+    try {
+      const created = await kernel.host.createSession({ directory: '/tmp/project', title: 'Empty' });
+      const installed = await fetch(`${url}/api/pi/feature-plugins/goal/install`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(installed.status).toBe(200);
+      expect(idle.reloadCount).toBe(1);
+
+      const enabled = await fetch(`${url}/api/pi/feature-plugins`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ goal: { enabled: true } }),
+      });
+      expect(enabled.status).toBe(200);
+      const enabledBody = await enabled.json();
+      expect(enabledBody.slots.goal.installed).toBe(true);
+      expect(enabledBody.slots.goal.enabled).toBe(true);
+      expect(enabledBody.reload.reloaded).toContain(created.id);
+      expect(idle.reloadCount).toBe(2);
+
+      const listed = await (await fetch(`${url}/api/command?session=${created.id}`)).json();
+      expect(listed.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('keeps builtin commands when GET /api/command pins a missing session', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const listed = await (await fetch(`${url}/api/command?session=ses_missing`)).json();
+      expect(listed.some((command) => command.name === 'compact')).toBe(true);
+      expect(listed.some((command) => command.name === 'goal')).toBe(false);
     } finally {
       kernel.dispose();
       await close();

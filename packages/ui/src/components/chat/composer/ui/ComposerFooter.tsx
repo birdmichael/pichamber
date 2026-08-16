@@ -172,6 +172,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <PiGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
+                                draftOpen={newSessionDraftOpen}
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
                             />
@@ -260,6 +261,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         <PiGoalButton
                             sessionId={currentSessionId}
                             directory={directory}
+                            draftOpen={newSessionDraftOpen}
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
                             withTooltip

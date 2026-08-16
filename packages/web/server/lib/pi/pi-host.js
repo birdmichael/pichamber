@@ -1360,6 +1360,9 @@ export const createPiHost = ({
     listPrompts(directory) {
       return listPiPrompts({ home, directory: directory || defaultDirectory });
     },
+    async ensureSession(sessionID, directory) {
+      return ensureRecord(sessionID, directory);
+    },
     listCommands(directory, options = {}) {
       const cwd = directory || defaultDirectory;
       const listed = listPiCommands({ home, directory: cwd });
@@ -2035,6 +2038,21 @@ export const createPiHost = ({
         kernel: 'pi',
         nativeFlow: true,
         sessionID: record.id,
+      };
+    },
+    async applyFeaturePluginPatch(patch) {
+      const payload = this.setFeaturePlugins(patch);
+      const shouldReload = Object.entries(patch && typeof patch === 'object' ? patch : {}).some(([slot, entry]) => (
+        isFeaturePluginSlot(slot)
+        && entry
+        && typeof entry === 'object'
+        && entry.enabled === true
+        && payload.slots[slot].installed
+      ));
+      if (!shouldReload) return payload;
+      return {
+        ...payload,
+        reload: await this.reloadIdleSessions(),
       };
     },
     async reloadIdleSessions(directory) {

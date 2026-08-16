@@ -7,6 +7,7 @@ import {
   getPiGoalCommand,
   isPiGoalComposerButtonVisible,
   isPiGoalPluginAvailable,
+  resolvePiGoalSession,
   startPiGoalCommand,
 } from './piGoal';
 
@@ -97,6 +98,29 @@ describe('Pi Goal start command', () => {
     expect(result).toEqual({ ok: false, reason: 'empty' });
     expect(sendCommandCalls).toEqual([]);
     expect(sendMessageCalls).toEqual([]);
+  });
+
+  test('mints a draft session instead of treating an empty composer as no-session', async () => {
+    let created = 0;
+    expect(await resolvePiGoalSession({
+      sessionID: 'ses_existing',
+      draftOpen: true,
+      createSession: async () => {
+        created += 1;
+        return { id: 'ses_minted' };
+      },
+    })).toEqual({ ok: true, sessionID: 'ses_existing', minted: false });
+    expect(created).toBe(0);
+
+    expect(await resolvePiGoalSession({
+      sessionID: null,
+      draftOpen: true,
+      createSession: async () => ({ id: 'ses_minted' }),
+    })).toEqual({ ok: true, sessionID: 'ses_minted', minted: true });
+    expect(await resolvePiGoalSession({ sessionID: '  ', draftOpen: false })).toEqual({
+      ok: false,
+      reason: 'no-session',
+    });
   });
 
   test('missing live command errors without a chat send', async () => {

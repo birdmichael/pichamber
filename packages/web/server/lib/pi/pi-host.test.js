@@ -555,6 +555,32 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('applyFeaturePluginPatch reloads idle sessions only when enabling an installed slot', async () => {
+    const idleSession = createInMemoryPiSession();
+    idleSession.registerCommand('goal', async () => {}, { description: 'Goal' });
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => idleSession,
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    const enabledMissing = await host.applyFeaturePluginPatch({ goal: { enabled: true } });
+    expect(enabledMissing.slots.goal.enabled).toBe(true);
+    expect(enabledMissing.slots.goal.installed).toBe(false);
+    expect(enabledMissing.reload).toBeUndefined();
+    expect(idleSession.reloadCount).toBe(0);
+
+    await host.installFeaturePlugin('goal', {});
+    expect(idleSession.reloadCount).toBe(1);
+    const enabledInstalled = await host.applyFeaturePluginPatch({ goal: { enabled: true } });
+    expect(enabledInstalled.slots.goal.installed).toBe(true);
+    expect(enabledInstalled.reload.reloaded).toEqual([idle.id]);
+    expect(idleSession.reloadCount).toBe(2);
+    expect(host.listCommands('/tmp/project', { sessionID: idle.id }).some((command) => (
+      command.name === 'goal' && command.source === 'extension'
+    ))).toBe(true);
+    host.dispose();
+  });
+
   it('setDefaults persists thinking for session settings', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-defaults-'));
     try {

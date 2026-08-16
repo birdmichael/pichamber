@@ -110,9 +110,12 @@ Resolution order:
 - Feature Plugins slash names that must appear before a session exists
   (Plan slot installed+enabled → `/plan`)
 
-Optional `?session=` pins the live session. After `host.reload()` /
-`POST /api/session/:id/reload`, the next list read sees whatever the live
-session `getCommands()` reports. `reload` is never merged in.
+Optional `?session=` hydrates that session if needed, then pins the live
+`getCommands()` list. After Feature Plugins install, or enable of an already
+installed slot, idle sessions reload through `host.reloadIdleSessions()` /
+`POST /api/session/:id/reload` / `piSession.reload()`. The next list read
+sees whatever the live session `getCommands()` reports. `reload` is never
+merged in. Do not emit `server.connected`.
 
 The OpenCode command shape holds extension entries (`name`, `description`,
 `source`, `agent`). A dedicated `GET /api/pi/commands` is not required.
@@ -183,3 +186,9 @@ chat:
    user bubble.
 3. Live extension command present — `record.piSession.prompt("/goal <objective>")`
    so `registerCommand` runs.
+
+A new empty session lists `goal` on `GET /api/command?session=` after
+install/enable because that GET hydrates the session and idle sessions were
+reloaded. The composer Goal button may mint a draft session before
+`session.command`. Start failures stay in the modal. Do not require a
+provider/model for this command-only start.

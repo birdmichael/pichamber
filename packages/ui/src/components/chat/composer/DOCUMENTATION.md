@@ -13,9 +13,12 @@ OpenChamber Session Goal stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
 When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows
 one `PiGoalButton` in that same cluster. Click opens a modal; a non-empty
 objective submits `/goal <objective>` (or the configured command) through
-`session.command` / `piSession.prompt`, not `promptAsync`. Bare `/goal` is
-rejected. A missing live command errors and does not send chat. Disable or
-uninstall hides the button. `ComposerFooter` still hides OpenCode-only
+`session.command` / `piSession.prompt`, not `promptAsync`. A new-session draft
+mints a real session first. Start does not require a provider/model from the
+config store. Failures (no session, missing live command, send error) render
+inside the modal — Desktop dialogs sit on the top layer, so toasts are not
+visible while it is open. Bare `/goal` is rejected. Disable or uninstall
+hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).

@@ -10,12 +10,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/components/ui';
 import { useI18n } from '@/lib/i18n';
 import { opencodeClient } from '@/lib/opencode/client';
-import { canSubmitPiGoalObjective, startPiGoalCommand } from '@/lib/piGoal';
+import { canSubmitPiGoalObjective, resolvePiGoalSession, startPiGoalCommand } from '@/lib/piGoal';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { useConfigStore } from '@/stores/useConfigStore';
+import { useSessionUIStore } from '@/sync/session-ui-store';
 
 interface PiGoalDialogProps {
   open: boolean;
@@ -23,6 +22,7 @@ interface PiGoalDialogProps {
   sessionId: string | null;
   directory?: string;
   command: string;
+  draftOpen?: boolean;
 }
 
 export function PiGoalDialog({
@@ -31,14 +31,17 @@ export function PiGoalDialog({
   sessionId,
   directory,
   command,
+  draftOpen = false,
 }: PiGoalDialogProps) {
   const { t } = useI18n();
   const [objective, setObjective] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
     setObjective('');
+    setError(null);
   }, [open]);
 
   const trimmed = objective.trim();
@@ -47,21 +50,32 @@ export function PiGoalDialog({
   const submit = async () => {
     if (!canSubmitPiGoalObjective(objective)) return;
     setBusy(true);
+    setError(null);
     try {
-      const { currentProviderId, currentModelId } = useConfigStore.getState();
+      const resolved = await resolvePiGoalSession({
+        sessionID: sessionId,
+        draftOpen,
+        createSession: async () => {
+          const created = await useSessionUIStore.getState().createSession(
+            undefined,
+            directory ?? null,
+          );
+          if (!created?.id) return null;
+          useSessionUIStore.getState().setCurrentSession(created.id, created.directory ?? directory ?? null);
+          return created;
+        },
+      });
+      if (!resolved.ok) {
+        setError(t('chat.piGoal.error.noSession'));
+        return;
+      }
+
       const result = await startPiGoalCommand({
-        request: { sessionID: sessionId, command, objective },
+        request: { sessionID: resolved.sessionID, command, objective },
         sendCommand: async (params) => {
-          if (!currentProviderId || !currentModelId) {
-            const error = new Error('No model is selected') as Error & { status?: number };
-            error.status = 400;
-            throw error;
-          }
           await opencodeClient.sendCommand({
             runtimeKey: getRuntimeKey(),
             id: params.id,
-            providerID: currentProviderId,
-            modelID: currentModelId,
             command: params.command,
             arguments: params.arguments,
             directory: directory ?? null,
@@ -73,18 +87,18 @@ export function PiGoalDialog({
         return;
       }
       if (result.reason === 'empty') {
-        toast.error(t('chat.piGoal.error.empty'));
+        setError(t('chat.piGoal.error.empty'));
         return;
       }
       if (result.reason === 'no-session') {
-        toast.error(t('chat.piGoal.error.noSession'));
+        setError(t('chat.piGoal.error.noSession'));
         return;
       }
       if (result.reason === 'missing-command') {
-        toast.error(t('chat.piGoal.error.missingCommand', { command: result.command }));
+        setError(t('chat.piGoal.error.missingCommand', { command: result.command }));
         return;
       }
-      toast.error(t('chat.piGoal.error.failed'));
+      setError(t('chat.piGoal.error.failed'));
     } finally {
       setBusy(false);
     }
@@ -99,12 +113,27 @@ export function PiGoalDialog({
         </DialogHeader>
         <Textarea
           value={objective}
-          onChange={(event) => setObjective(event.target.value)}
+          onChange={(event) => {
+            setObjective(event.target.value);
+            if (error) setError(null);
+          }}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canSubmit) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
           placeholder={t('chat.piGoal.dialog.objectivePlaceholder')}
           aria-label={t('chat.piGoal.dialog.objectiveLabel')}
+          aria-invalid={Boolean(error)}
           disabled={busy}
           rows={4}
         />
+        {error ? (
+          <p role="alert" className="typography-meta text-[var(--status-error)]">
+            {error}
+          </p>
+        ) : null}
         <DialogFooter className="w-full sm:justify-end">
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onOpenChange(false)}>

@@ -12,6 +12,7 @@ import { refreshFeaturePlugins, usePiFeaturePluginsStore } from '@/sync/pi-featu
 interface PiGoalButtonProps {
   sessionId: string | null;
   directory?: string;
+  draftOpen?: boolean;
   footerIconButtonClass: string;
   iconSizeClass: string;
   withTooltip?: boolean;
@@ -20,6 +21,7 @@ interface PiGoalButtonProps {
 export const PiGoalButton: React.FC<PiGoalButtonProps> = React.memo(({
   sessionId,
   directory,
+  draftOpen = false,
   footerIconButtonClass,
   iconSizeClass,
   withTooltip = false,
@@ -67,6 +69,7 @@ export const PiGoalButton: React.FC<PiGoalButtonProps> = React.memo(({
         sessionId={sessionId}
         directory={directory}
         command={command}
+        draftOpen={draftOpen}
       />
     </>
   );
