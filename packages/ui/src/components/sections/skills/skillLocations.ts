@@ -33,14 +33,11 @@ export const OPENCODE_SKILL_LOCATION_OPTIONS: Array<{
   { value: 'project-agents', scope: 'project', source: 'agents' },
 ];
 
-/** Product default is the Pi kernel. OpenCode kernel callers must pass `false`. */
-export const SKILL_LOCATION_OPTIONS = PI_SKILL_LOCATION_OPTIONS;
-
 export function getSkillLocationOptions(isPiKernel: boolean) {
   return isPiKernel ? PI_SKILL_LOCATION_OPTIONS : OPENCODE_SKILL_LOCATION_OPTIONS;
 }
 
-export function defaultSkillSource(isPiKernel: boolean): SkillSource {
+export function defaultSkillSource(isPiKernel: boolean): 'pi' | 'opencode' {
   return isPiKernel ? 'pi' : 'opencode';
 }
 

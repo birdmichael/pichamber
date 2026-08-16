@@ -893,7 +893,4 @@ export {
   renameSkill,
   isManagedSkillPath,
   inferSkillScopeAndSourceFromPath,
-  inferSkillSourceFromPath,
-  getPrimarySkillSource,
-  normalizeRequestedSkillSource,
 };

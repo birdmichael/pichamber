@@ -34,7 +34,8 @@ import {
   type SkillLocationValue,
 } from '../skillLocations';
 import { usePiKernel } from '@/lib/usePiKernel';
-import type { SkillSource } from '@/stores/useSkillsStore';
+
+type SkillInstallSource = 'pi' | 'opencode' | 'agents';
 
 interface InstallSkillDialogProps {
   open: boolean;
@@ -49,7 +50,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
   const installSkills = useSkillsCatalogStore((s) => s.installSkills);
   const isInstalling = useSkillsCatalogStore((s) => s.isInstalling);
   const [scope, setScope] = React.useState<'user' | 'project'>('user');
-  const [targetSource, setTargetSource] = React.useState<SkillSource>(defaultSkillSource(isPiKernel));
+  const [targetSource, setTargetSource] = React.useState<SkillInstallSource>(defaultSkillSource(isPiKernel));
   const projects = useProjectsStore((s) => s.projects);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const [targetProjectId, setTargetProjectId] = React.useState<string | null>(null);
@@ -59,7 +60,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
     source: string;
     subpath?: string;
     scope: 'user' | 'project';
-    targetSource: SkillSource;
+    targetSource: SkillInstallSource;
     skillDir: string;
     directoryOverride?: string | null;
   } | null>(null);
@@ -111,7 +112,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
     source: string;
     subpath?: string;
     scope: 'user' | 'project';
-    targetSource: SkillSource;
+    targetSource: SkillInstallSource;
     skillDir: string;
     directoryOverride?: string | null;
     conflictDecisions?: Record<string, ConflictDecision>;
@@ -193,7 +194,9 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
                 onValueChange={(v) => {
                   const next = locationPartsFrom(v as SkillLocationValue);
                   setScope(next.scope);
-                  setTargetSource(next.source);
+                  if (next.source === 'agents' || next.source === 'pi' || next.source === 'opencode') {
+                    setTargetSource(next.source);
+                  }
                 }}
               >
                 <SelectTrigger className="w-fit gap-1.5">
