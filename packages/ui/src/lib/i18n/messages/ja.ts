@@ -506,6 +506,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.tooltip': 'スキル、プロンプト、拡張機能を再読み込み',
   'header.sessionReload.aria': 'スキル、プロンプト、拡張機能を再読み込み',
   'header.sessionReload.disabledBusy': 'セッションの応答中は再読み込みできません',
+  'header.sessionReload.disabledCompacting': '圧縮の完了まで再読み込みできません',
   'header.sessionReload.disabledInFlight': 'スキル、プロンプト、拡張機能を再読み込みしています',
   'header.sessionReload.failed': 'スキル、プロンプト、拡張機能の再読み込みに失敗しました',
   'header.sessionReload.success': 'スキル、プロンプト、拡張機能を再読み込みしました',

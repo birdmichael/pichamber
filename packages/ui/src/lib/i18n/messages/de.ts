@@ -2881,6 +2881,7 @@ export const dict = {
   'header.sessionReload.tooltip': 'Skills, Prompts und Erweiterungen neu laden',
   'header.sessionReload.aria': 'Skills, Prompts und Erweiterungen neu laden',
   'header.sessionReload.disabledBusy': 'Neu laden nicht verfügbar, während die Sitzung antwortet',
+  'header.sessionReload.disabledCompacting': 'Neu laden nicht verfügbar, während die Kompaktierung läuft',
   'header.sessionReload.disabledInFlight': 'Skills, Prompts und Erweiterungen werden neu geladen',
   'header.sessionReload.failed': 'Skills, Prompts und Erweiterungen konnten nicht neu geladen werden',
   'header.sessionReload.success': 'Skills, Prompts und Erweiterungen neu geladen',

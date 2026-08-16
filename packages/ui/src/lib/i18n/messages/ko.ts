@@ -506,6 +506,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.tooltip': '스킬, 프롬프트, 확장을 다시 로드',
   'header.sessionReload.aria': '스킬, 프롬프트, 확장을 다시 로드',
   'header.sessionReload.disabledBusy': '세션이 응답 중일 때는 다시 로드할 수 없습니다',
+  'header.sessionReload.disabledCompacting': '압축이 끝날 때까지 다시 로드할 수 없습니다',
   'header.sessionReload.disabledInFlight': '스킬, 프롬프트, 확장을 다시 로드하는 중',
   'header.sessionReload.failed': '스킬, 프롬프트, 확장을 다시 로드하지 못했습니다',
   'header.sessionReload.success': '스킬, 프롬프트, 확장을 다시 로드했습니다',

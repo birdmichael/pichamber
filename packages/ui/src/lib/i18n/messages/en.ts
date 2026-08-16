@@ -505,6 +505,7 @@ export const dict = {
   'header.sessionReload.tooltip': 'Reload skills, prompts, and extensions',
   'header.sessionReload.aria': 'Reload skills, prompts, and extensions',
   'header.sessionReload.disabledBusy': 'Reload unavailable while the session is responding',
+  'header.sessionReload.disabledCompacting': 'Reload unavailable while compaction is running',
   'header.sessionReload.disabledInFlight': 'Reloading skills, prompts, and extensions',
   'header.sessionReload.failed': 'Failed to reload skills, prompts, and extensions',
   'header.sessionReload.success': 'Reloaded skills, prompts, and extensions',

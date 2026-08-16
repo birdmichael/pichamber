@@ -506,6 +506,7 @@ export const dict: Record<I18nKey, string> = {
   "header.sessionReload.tooltip": "Recargar skills, prompts y extensiones",
   "header.sessionReload.aria": "Recargar skills, prompts y extensiones",
   "header.sessionReload.disabledBusy": "Recarga no disponible mientras la sesión responde",
+  "header.sessionReload.disabledCompacting": "Recarga no disponible mientras se compacta el contexto",
   "header.sessionReload.disabledInFlight": "Recargando skills, prompts y extensiones",
   "header.sessionReload.failed": "Error al recargar skills, prompts y extensiones",
   "header.sessionReload.success": "Skills, prompts y extensiones recargados",

@@ -336,6 +336,7 @@ export const dict = {
   'header.sessionReload.tooltip': 'Recharger les skills, prompts et extensions',
   'header.sessionReload.aria': 'Recharger les skills, prompts et extensions',
   'header.sessionReload.disabledBusy': 'Rechargement indisponible pendant que la session répond',
+  'header.sessionReload.disabledCompacting': 'Rechargement indisponible pendant la compaction',
   'header.sessionReload.disabledInFlight': 'Rechargement des skills, prompts et extensions',
   'header.sessionReload.failed': 'Échec du rechargement des skills, prompts et extensions',
   'header.sessionReload.success': 'Skills, prompts et extensions rechargés',

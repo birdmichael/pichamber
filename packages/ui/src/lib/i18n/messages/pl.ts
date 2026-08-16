@@ -299,6 +299,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.tooltip': 'Odśwież skille, prompty i rozszerzenia',
   'header.sessionReload.aria': 'Odśwież skille, prompty i rozszerzenia',
   'header.sessionReload.disabledBusy': 'Odświeżanie niedostępne, gdy sesja odpowiada',
+  'header.sessionReload.disabledCompacting': 'Odświeżanie niedostępne podczas kompaktowania',
   'header.sessionReload.disabledInFlight': 'Odświeżanie skilli, promptów i rozszerzeń',
   'header.sessionReload.failed': 'Nie udało się odświeżyć skilli, promptów i rozszerzeń',
   'header.sessionReload.success': 'Odświeżono skille, prompty i rozszerzenia',

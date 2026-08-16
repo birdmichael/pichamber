@@ -43,13 +43,26 @@ import {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const RELOAD_WAIT_FOR_RESPONSE = 'Wait for the current response to finish before reloading.';
+const RELOAD_WAIT_FOR_COMPACTION = 'Wait for compaction to finish before reloading.';
+
+export const sessionBlocksPiReload = (record) => {
+  if (record?.piSession?.isStreaming) return RELOAD_WAIT_FOR_RESPONSE;
+  if (record?.piSession?.isCompacting) return RELOAD_WAIT_FOR_COMPACTION;
+  const statusType = record?.status?.type;
+  if (statusType === 'busy' || statusType === 'retry') return RELOAD_WAIT_FOR_RESPONSE;
+  return null;
+};
+
 export const createInMemoryPiSession = ({
   sessionId = createSessionId(),
   chunks = ['Hello from ', 'the Pi mock kernel.'],
   chunkDelayMs = 5,
+  compacting = false,
 } = {}) => {
   const listeners = new Set();
   let streaming = false;
+  let compactingFlag = compacting === true;
   let aborted = false;
   const messages = [];
 
@@ -108,6 +121,9 @@ export const createInMemoryPiSession = ({
     get isStreaming() {
       return streaming;
     },
+    get isCompacting() {
+      return compactingFlag;
+    },
     get messages() {
       return messages;
     },
@@ -155,8 +171,13 @@ export const createInMemoryPiSession = ({
       return { tokens: 0, contextLimit: 128000, percent: 0 };
     },
     async compact(instructions) {
-      emit({ type: 'compaction_start', instructions: instructions || '' });
-      emit({ type: 'compaction_end' });
+      compactingFlag = true;
+      try {
+        emit({ type: 'compaction_start', instructions: instructions || '' });
+        emit({ type: 'compaction_end' });
+      } finally {
+        compactingFlag = false;
+      }
     },
     dispose() {
       listeners.clear();
@@ -1285,6 +1306,16 @@ export const createPiHost = ({
       }
     },
     async reload(directory) {
+      for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          const error = new Error(blocked);
+          error.status = 409;
+          throw error;
+        }
+      }
+
       modelRuntime = null;
       modelRuntimeError = null;
       readyPromise = null;
@@ -1334,11 +1365,9 @@ export const createPiHost = ({
       const cwd = directory || defaultDirectory;
       const skills = listPiSkills({ home, directory: cwd });
       const commands = listPiCommands({ home, directory: cwd });
-      emit(cwd, {
-        id: createEventId(),
-        type: 'server.connected',
-        properties: { kernel: 'pi', reloaded: true },
-      });
+      // In-place TUI-style reload: refresh skills/prompts/extensions only.
+      // Do not emit server.connected — the UI treats that as a full re-bootstrap
+      // and would drop the open session onto a new-session draft.
 
       return {
         reloaded: true,

@@ -2,13 +2,14 @@ import type { I18nKey } from '@/lib/i18n';
 import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
 import { usePluginsStore } from '@/stores/usePluginsStore';
 
-export type SessionTitleReloadBlockReason = 'busy' | 'inFlight';
+export type SessionTitleReloadBlockReason = 'busy' | 'compacting' | 'inFlight';
 
 /**
  * Desktop session_status types are idle | busy | retry.
  * Pi TUI `/reload` also refuses while compacting. The Pi facade maps
  * `compaction_start` to `session.status { type: 'busy' }` (plus `session.compact`).
- * There is no separate compacting status channel — busy already covers it.
+ * Global status is often missing on Pi while the composer is still outputting,
+ * so callers must also pass the live activity the stop button uses.
  */
 export const SESSION_TITLE_RELOAD_BLOCKING_STATUS_TYPES = ['busy', 'retry'] as const;
 
@@ -31,23 +32,62 @@ export function isSessionTitleReloadBlockedByStatus(statusType: string | null | 
   return statusType === 'busy' || statusType === 'retry';
 }
 
+/**
+ * Same live signals ChatInput uses for the stop button (`useCurrentSessionActivity`
+ * + `useAssistantStatus`): composing, streaming, tool-calling, retry.
+ */
+export function isSessionTitleReloadOutputting(input: {
+  sessionPhase?: string | null;
+  sessionIsWorking?: boolean;
+  assistantIsWorking?: boolean;
+  assistantIsStreaming?: boolean;
+  assistantIsForming?: boolean;
+  assistantCanAbort?: boolean;
+}): boolean {
+  return (
+    (input.sessionPhase != null && input.sessionPhase !== 'idle')
+    || input.sessionIsWorking === true
+    || input.assistantIsWorking === true
+    || input.assistantIsStreaming === true
+    || input.assistantIsForming === true
+    || input.assistantCanAbort === true
+  );
+}
+
+export function isSessionTitleReloadBlocked(input: {
+  statusType?: string | null;
+  isOutputting?: boolean;
+  isCompacting?: boolean;
+}): boolean {
+  return (
+    isSessionTitleReloadBlockedByStatus(input.statusType)
+    || input.isOutputting === true
+    || input.isCompacting === true
+  );
+}
+
 export function getSessionTitleReloadBlockReason(input: {
   statusType?: string | null;
+  isOutputting?: boolean;
+  isCompacting?: boolean;
   isReloadInFlight: boolean;
 }): SessionTitleReloadBlockReason | null {
   if (input.isReloadInFlight) return 'inFlight';
-  if (isSessionTitleReloadBlockedByStatus(input.statusType)) return 'busy';
+  if (input.isCompacting) return 'compacting';
+  if (isSessionTitleReloadBlocked(input)) return 'busy';
   return null;
 }
 
 export function sessionTitleReloadAriaKey(reason: SessionTitleReloadBlockReason | null): I18nKey {
   if (reason === 'busy') return 'header.sessionReload.disabledBusy';
+  if (reason === 'compacting') return 'header.sessionReload.disabledCompacting';
   if (reason === 'inFlight') return 'header.sessionReload.disabledInFlight';
   return 'header.sessionReload.aria';
 }
 
 export function sessionTitleReloadTooltipKey(reason: SessionTitleReloadBlockReason | null): I18nKey {
   if (reason === 'busy') return 'header.sessionReload.disabledBusy';
+  if (reason === 'compacting') return 'header.sessionReload.disabledCompacting';
   if (reason === 'inFlight') return 'header.sessionReload.disabledInFlight';
   return 'header.sessionReload.tooltip';
 }

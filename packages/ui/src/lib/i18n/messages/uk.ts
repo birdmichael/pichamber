@@ -506,6 +506,7 @@ export const dict: Record<I18nKey, string> = {
   "header.sessionReload.tooltip": "Перезавантажити навички, промпти та розширення",
   "header.sessionReload.aria": "Перезавантажити навички, промпти та розширення",
   "header.sessionReload.disabledBusy": "Перезавантаження недоступне, поки сесія відповідає",
+  "header.sessionReload.disabledCompacting": "Перезавантаження недоступне, поки триває ущільнення",
   "header.sessionReload.disabledInFlight": "Перезавантаження навичок, промптів і розширень",
   "header.sessionReload.failed": "Не вдалося перезавантажити навички, промпти та розширення",
   "header.sessionReload.success": "Навички, промпти та розширення перезавантажено",

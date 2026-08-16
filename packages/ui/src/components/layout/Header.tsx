@@ -31,7 +31,9 @@ import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 
 import { useGitHubAuthStore } from '@/stores/useGitHubAuthStore';
+import { useAssistantStatus } from '@/hooks/useAssistantStatus';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
+import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useDesktopWindowControlsLayout } from '@/hooks/useDesktopWindowControlsLayout';
 import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
@@ -66,6 +68,8 @@ import { OpenInAppButton } from '@/components/desktop/OpenInAppButton';
 import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCopy';
 import {
   getSessionTitleReloadBlockReason,
+  isSessionTitleReloadBlocked,
+  isSessionTitleReloadOutputting,
   isSessionTitleReloadVisible,
   reloadPiSessionTitleConfig,
   sessionTitleReloadAriaKey,
@@ -1240,6 +1244,22 @@ export const Header: React.FC<HeaderProps> = ({
   }, [currentSession?.title, currentSessionId, headerDirectoryStore, openDirectory, sync, t]);
 
   const isCurrentSessionActive = currentSessionStatus?.type === 'busy' || currentSessionStatus?.type === 'retry';
+  const { phase: sessionActivityPhase, isWorking: sessionActivityIsWorking } = useCurrentSessionActivity();
+  const assistantStatus = useAssistantStatus();
+  const sessionTitleReloadIsOutputting = isSessionTitleReloadOutputting({
+    sessionPhase: sessionActivityPhase,
+    sessionIsWorking: sessionActivityIsWorking,
+    assistantIsWorking: assistantStatus.working.isWorking,
+    assistantIsStreaming: assistantStatus.working.isStreaming,
+    assistantIsForming: assistantStatus.forming.isActive,
+    assistantCanAbort: assistantStatus.working.canAbort,
+  });
+  const sessionTitleReloadIsCompacting = assistantStatus.working.compactionDeadline != null;
+  const sessionTitleReloadLiveBlocked = isSessionTitleReloadBlocked({
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionTitleReloadIsOutputting,
+    isCompacting: sessionTitleReloadIsCompacting,
+  });
   const [isPiReloadInFlight, setIsPiReloadInFlight] = React.useState(false);
   const isPiReloadInFlightRef = React.useRef(false);
   const showSessionTitleReload = isSessionTitleReloadVisible({
@@ -1250,11 +1270,13 @@ export const Header: React.FC<HeaderProps> = ({
   });
   const sessionTitleReloadBlockReason = getSessionTitleReloadBlockReason({
     statusType: currentSessionStatus?.type,
+    isOutputting: sessionTitleReloadIsOutputting,
+    isCompacting: sessionTitleReloadIsCompacting,
     isReloadInFlight: isPiReloadInFlight,
   });
   const isSessionTitleReloadDisabled = sessionTitleReloadBlockReason !== null;
   const reloadPiKernel = React.useCallback(() => {
-    if (isCurrentSessionActive || isPiReloadInFlightRef.current) return;
+    if (sessionTitleReloadLiveBlocked || isPiReloadInFlightRef.current) return;
     isPiReloadInFlightRef.current = true;
     setIsPiReloadInFlight(true);
     void reloadPiSessionTitleConfig({
@@ -1273,7 +1295,7 @@ export const Header: React.FC<HeaderProps> = ({
         isPiReloadInFlightRef.current = false;
         setIsPiReloadInFlight(false);
       });
-  }, [isCurrentSessionActive, t]);
+  }, [sessionTitleReloadLiveBlocked, t]);
   const moveCurrentSessionToWorktree = React.useCallback(() => {
     if (!currentSessionId || !sessionDirectory || isCurrentSessionActive || isCurrentSessionMovingToWorktree) return;
     const sessions = useGlobalSessionsStore.getState().activeSessions;

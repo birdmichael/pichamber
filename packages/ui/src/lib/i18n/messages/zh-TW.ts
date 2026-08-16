@@ -519,6 +519,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.tooltip': '重新載入技能、提示詞和擴充功能',
   'header.sessionReload.aria': '重新載入技能、提示詞和擴充功能',
   'header.sessionReload.disabledBusy': '工作階段正在回覆，無法重新載入',
+  'header.sessionReload.disabledCompacting': '正在壓縮上下文，無法重新載入',
   'header.sessionReload.disabledInFlight': '正在重新載入技能、提示詞和擴充功能',
   'header.sessionReload.failed': '重新載入技能、提示詞和擴充功能失敗',
   'header.sessionReload.success': '已重新載入技能、提示詞和擴充功能',

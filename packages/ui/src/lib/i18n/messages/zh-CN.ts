@@ -506,6 +506,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.tooltip': '重新加载技能、提示词和扩展',
   'header.sessionReload.aria': '重新加载技能、提示词和扩展',
   'header.sessionReload.disabledBusy': '会话正在回复，无法重新加载',
+  'header.sessionReload.disabledCompacting': '正在压缩上下文，无法重新加载',
   'header.sessionReload.disabledInFlight': '正在重新加载技能、提示词和扩展',
   'header.sessionReload.failed': '重新加载技能、提示词和扩展失败',
   'header.sessionReload.success': '已重新加载技能、提示词和扩展',
