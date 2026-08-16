@@ -156,6 +156,19 @@ file does not remove other complete sessions. This path also does not emit
 `server.connected`. Title-refresh `POST /api/session/:id/reload` stays
 skills/prompts/extensions only.
 
+## Session hydrate
+
+Attach and sidebar Refresh assign
+`record.messages = facadeMessagesFromPiEntries(jsonl entries)`.
+Walk `type: "message"` entries in order. `thinking` → `reasoning` and
+`text` → `text` stay as they are. An assistant `toolCall` plus a later
+`toolResult` with the same `toolCallId` become one assistant `type: "tool"`
+part (`callID`, `tool`, `state.input`, `state.output`, `state.status`) —
+the same shape live SSE already emits in `event-translator.js`.
+`role: "toolResult"` is never a user message. `image` blocks stay dropped
+until a later slice. Do not invent a second session store. Live SSE is
+unchanged.
+
 ## MCP adapter
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot

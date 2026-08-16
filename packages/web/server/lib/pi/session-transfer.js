@@ -4,6 +4,8 @@ const PI_SESSION_VERSION = 3;
 
 const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
 
+const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
 const escapeHtml = (value) => String(value ?? '')
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -46,6 +48,67 @@ const textFromPiContent = (content) => {
     .join('\n');
 };
 
+const textFromToolContent = (content) => {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (isRecord(item) && typeof item.text === 'string') return item.text;
+        return '';
+      })
+      .filter(Boolean)
+      .join('');
+  }
+  if (isRecord(content)) {
+    if (typeof content.text === 'string') return content.text;
+    if (Array.isArray(content.content)) return textFromToolContent(content.content);
+  }
+  return '';
+};
+
+const toolInputFromCall = (item) => {
+  if (isRecord(item?.arguments)) return item.arguments;
+  if (isRecord(item?.args)) return item.args;
+  return {};
+};
+
+const facadeToolPart = (item, sessionID, messageID) => {
+  const callID = asTrimmedString(item?.id);
+  return {
+    id: createPartId(),
+    sessionID,
+    messageID,
+    type: 'tool',
+    callID,
+    tool: asTrimmedString(item?.name) || 'tool',
+    state: {
+      status: 'pending',
+      input: toolInputFromCall(item),
+    },
+  };
+};
+
+const applyToolResultToPart = (part, message) => {
+  if (!part || !isRecord(message)) return;
+  const output = textFromToolContent(message.content);
+  const isError = message.isError === true;
+  const details = isRecord(message.details) ? message.details : undefined;
+  const input = isRecord(part.state?.input) ? part.state.input : {};
+  const toolName = asTrimmedString(message.toolName || message.name);
+  if (toolName && (!part.tool || part.tool === 'tool')) {
+    part.tool = toolName;
+  }
+  part.state = {
+    status: isError ? 'error' : 'completed',
+    input,
+    output,
+    ...(isError ? { error: output || 'tool error' } : {}),
+    ...(details ? { metadata: details } : {}),
+  };
+};
+
 const partsFromPiContent = (content, sessionID, messageID) => {
   if (typeof content === 'string' && content) {
     return [{
@@ -68,6 +131,10 @@ const partsFromPiContent = (content, sessionID, messageID) => {
         type: 'reasoning',
         text: typeof item.thinking === 'string' ? item.thinking : String(item.text || ''),
       });
+      continue;
+    }
+    if (item.type === 'toolCall') {
+      parts.push(facadeToolPart(item, sessionID, messageID));
       continue;
     }
     if (typeof item.text === 'string') {
@@ -206,6 +273,7 @@ ${blocks}
 
 const facadeFromPiMessage = (entry) => {
   const message = entry?.message && typeof entry.message === 'object' ? entry.message : {};
+  if (message.role === 'toolResult') return null;
   const role = message.role === 'assistant' ? 'assistant' : 'user';
   const messageID = asTrimmedString(entry?.id) || createMessageId();
   const created = millisFromUnknown(entry?.timestamp ?? message.timestamp);
@@ -221,13 +289,31 @@ const facadeFromPiMessage = (entry) => {
   };
 };
 
+const registerToolParts = (parts, toolPartsByCallID) => {
+  for (const part of parts) {
+    const callID = asTrimmedString(part?.callID);
+    if (part?.type === 'tool' && callID) {
+      toolPartsByCallID.set(callID, part);
+    }
+  }
+};
+
 export const facadeMessagesFromPiEntries = (entries, sessionID) => {
   const id = asTrimmedString(sessionID);
   const messages = [];
+  const toolPartsByCallID = new Map();
   for (const entry of Array.isArray(entries) ? entries : []) {
     if (entry?.type && entry.type !== 'message') continue;
     if (!entry?.message) continue;
+    const message = entry.message;
+    if (message.role === 'toolResult') {
+      const callID = asTrimmedString(message.toolCallId);
+      const part = callID ? toolPartsByCallID.get(callID) : null;
+      if (part) applyToolResultToPart(part, message);
+      continue;
+    }
     const facade = facadeFromPiMessage(entry);
+    if (!facade) continue;
     if (id) {
       facade.info.sessionID = id;
       facade.parts = facade.parts.map((part) => ({
@@ -236,6 +322,7 @@ export const facadeMessagesFromPiEntries = (entries, sessionID) => {
         messageID: facade.info.id,
       }));
     }
+    registerToolParts(facade.parts, toolPartsByCallID);
     messages.push(facade);
   }
   return messages;
@@ -252,6 +339,7 @@ const facadeFromUnknown = (entry) => {
     return facadeFromPiMessage(entry);
   }
   if (entry?.role && (entry.content !== undefined || Array.isArray(entry.parts))) {
+    if (entry.role === 'toolResult') return null;
     const messageID = asTrimmedString(entry.id) || createMessageId();
     return {
       info: {
