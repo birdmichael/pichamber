@@ -59,7 +59,7 @@ function firstFocusable(target: HTMLElement): HTMLElement {
   ) ?? target;
 }
 
-export function focusSettingsSearchTarget(target: HTMLElement): void {
+function focusSettingsSearchTarget(target: HTMLElement): void {
   target.scrollIntoView({ block: 'center', behavior: 'smooth' });
   target.setAttribute('data-settings-search-highlight', 'true');
   const focusable = firstFocusable(target);
