@@ -31,7 +31,9 @@ import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 
 import { useGitHubAuthStore } from '@/stores/useGitHubAuthStore';
+import { useAssistantStatus } from '@/hooks/useAssistantStatus';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
+import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useDesktopWindowControlsLayout } from '@/hooks/useDesktopWindowControlsLayout';
 import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
@@ -64,6 +66,16 @@ import type { SessionContextUsage } from '@/stores/types/sessionTypes';
 import { DesktopHostSwitcherDialog } from '@/components/desktop/DesktopHostSwitcher';
 import { OpenInAppButton } from '@/components/desktop/OpenInAppButton';
 import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCopy';
+import {
+  getSessionTitleReloadBlockReason,
+  isSessionTitleReloadBlocked,
+  isSessionTitleReloadInFlightForSession,
+  isSessionTitleReloadOutputting,
+  isSessionTitleReloadVisible,
+  reloadPiSessionTitleConfig,
+  sessionTitleReloadAriaKey,
+  sessionTitleReloadTooltipKey,
+} from '@/components/layout/headerSessionReload';
 import { ProjectActionsButton } from '@/components/layout/ProjectActionsButton';
 import { SessionSwitcherDropdown } from '@/components/session/SessionSwitcherDropdown';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, startDesktopWindowDrag, type UpdateInfo } from '@/lib/desktop';
@@ -101,6 +113,7 @@ type HeaderIconActionButtonProps = {
   Icon: IconName;
   iconClassName?: string;
   pressed?: boolean;
+  disabled?: boolean;
 };
 
 const HeaderIconActionButton = React.memo(function HeaderIconActionButton({
@@ -112,26 +125,39 @@ const HeaderIconActionButton = React.memo(function HeaderIconActionButton({
   Icon: iconName,
   iconClassName,
   pressed = false,
+  disabled = false,
 }: HeaderIconActionButtonProps) {
   if (!visible) {
     return null;
   }
 
+  const button = (
+    <button
+      type="button"
+      onClick={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+        onClick(event);
+      }}
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      aria-label={ariaLabel}
+      aria-pressed={pressed}
+      className={cn(
+        className ?? DESKTOP_HEADER_ICON_BUTTON_CLASS,
+        pressed && 'bg-interactive-selection text-interactive-selection-foreground'
+      )}
+    >
+      <Icon name={iconName} className={iconClassName ?? 'h-[18px] w-[18px]'} />
+    </button>
+  );
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          aria-label={ariaLabel}
-          aria-pressed={pressed}
-          className={cn(
-            className ?? DESKTOP_HEADER_ICON_BUTTON_CLASS,
-            pressed && 'bg-interactive-selection text-interactive-selection-foreground'
-          )}
-        >
-          <Icon name={iconName} className={iconClassName ?? 'h-[18px] w-[18px]'} />
-        </button>
+        {disabled ? <span className="inline-flex">{button}</span> : button}
       </TooltipTrigger>
       <TooltipContent>
         <p>{title}</p>
@@ -1219,6 +1245,67 @@ export const Header: React.FC<HeaderProps> = ({
   }, [currentSession?.title, currentSessionId, headerDirectoryStore, openDirectory, sync, t]);
 
   const isCurrentSessionActive = currentSessionStatus?.type === 'busy' || currentSessionStatus?.type === 'retry';
+  // Same live signals as the composer: ChatInput `canAbort` and StatusRow "Composing ...".
+  const { phase: sessionPhase } = useCurrentSessionActivity();
+  const assistantStatus = useAssistantStatus();
+  const canAbort = sessionPhase !== 'idle';
+  const sessionTitleReloadIsOutputting = isSessionTitleReloadOutputting({
+    sessionPhase,
+    sessionIsWorking: canAbort,
+    assistantIsWorking: assistantStatus.working.isWorking,
+    assistantIsStreaming: assistantStatus.working.isStreaming,
+    assistantIsForming: assistantStatus.forming.isActive,
+    assistantCanAbort: assistantStatus.working.canAbort,
+    assistantStatusText: assistantStatus.working.statusText,
+  });
+  const sessionTitleReloadIsCompacting = assistantStatus.working.compactionDeadline != null;
+  const sessionTitleReloadLiveBlocked = isSessionTitleReloadBlocked({
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionTitleReloadIsOutputting,
+    isCompacting: sessionTitleReloadIsCompacting,
+  });
+  const [reloadingSessionIds, setReloadingSessionIds] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const reloadingSessionIdsRef = React.useRef<Set<string>>(new Set());
+  const isPiReloadInFlight = isSessionTitleReloadInFlightForSession(
+    currentSessionId,
+    reloadingSessionIds,
+  );
+  const showSessionTitleReload = isSessionTitleReloadVisible({
+    isPiKernel,
+    hasCurrentSession: Boolean(currentSessionId),
+    isNewSessionDraftOpen,
+    isRenamingSession: isRenamingHeaderSession,
+  });
+  const sessionTitleReloadBlockReason = getSessionTitleReloadBlockReason({
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionTitleReloadIsOutputting,
+    isCompacting: sessionTitleReloadIsCompacting,
+    isReloadInFlight: isPiReloadInFlight,
+  });
+  const isSessionTitleReloadDisabled = sessionTitleReloadBlockReason !== null;
+  const reloadPiKernel = React.useCallback(() => {
+    if (!currentSessionId || sessionTitleReloadLiveBlocked) return;
+    if (reloadingSessionIdsRef.current.has(currentSessionId)) return;
+    const sessionID = currentSessionId;
+    reloadingSessionIdsRef.current.add(sessionID);
+    setReloadingSessionIds(new Set(reloadingSessionIdsRef.current));
+    void reloadPiSessionTitleConfig({ sessionID })
+      .then(() => {
+        toast.success(t('header.sessionReload.success'));
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error && error.message.trim()
+          ? error.message
+          : t('header.sessionReload.failed');
+        toast.error(message);
+      })
+      .finally(() => {
+        reloadingSessionIdsRef.current.delete(sessionID);
+        setReloadingSessionIds(new Set(reloadingSessionIdsRef.current));
+      });
+  }, [currentSessionId, sessionTitleReloadLiveBlocked, t]);
   const moveCurrentSessionToWorktree = React.useCallback(() => {
     if (!currentSessionId || !sessionDirectory || isCurrentSessionActive || isCurrentSessionMovingToWorktree) return;
     const sessions = useGlobalSessionsStore.getState().activeSessions;
@@ -2029,11 +2116,22 @@ export const Header: React.FC<HeaderProps> = ({
               ) : null}
             </div>
             <div className={cn(
-              'flex h-[18px] shrink-0 items-center justify-center',
+              'flex h-[18px] shrink-0 items-center justify-center gap-0.5',
               // Top-aligned only when the title has a metadata line under it;
               // alone, the title is centred and the button must follow.
               showHeaderMetaRow ? 'self-start' : 'self-center',
             )}>
+              {showSessionTitleReload ? (
+                <HeaderIconActionButton
+                  title={t(sessionTitleReloadTooltipKey(sessionTitleReloadBlockReason))}
+                  ariaLabel={t(sessionTitleReloadAriaKey(sessionTitleReloadBlockReason))}
+                  disabled={isSessionTitleReloadDisabled}
+                  onClick={reloadPiKernel}
+                  className="app-region-no-drag inline-flex h-[18px] w-6 items-center justify-center rounded-md text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50 hover:bg-transparent hover:text-foreground transition-colors"
+                  Icon={isPiReloadInFlight ? 'loader-4' : 'refresh'}
+                  iconClassName={cn('size-4', isPiReloadInFlight && 'animate-spin')}
+                />
+              ) : null}
               {currentSessionId && !isNewSessionDraftOpen && !isRenamingHeaderSession ? (
                 <DropdownMenu
                   open={isHeaderSessionMenuOpen}

@@ -248,21 +248,110 @@ describe('createPiHost', () => {
   it('reload keeps live sessions and re-reads Pi resources', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-reload-'));
     try {
+      const events = [];
       const host = createPiHost({
         mock: true,
         home,
         defaultDirectory: '/tmp/project',
+        onEvent(_directory, event) {
+          events.push(event);
+        },
       });
       const record = await host.createSession({ directory: '/tmp/project', title: 'Keep me' });
+      events.length = 0;
       const result = await host.reload();
       expect(result.reloaded).toBe(true);
       expect(result.kernel).toBe('pi');
       expect(host.getSession(record.id).info.title).toBe('Keep me');
       expect(host.listSessions()).toHaveLength(1);
+      expect(events.some((event) => event.type === 'server.connected')).toBe(false);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it('host.reload() does not emit type: server.connected', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    await host.createSession({ directory: '/tmp/project', title: 'Stay' });
+    events.length = 0;
+    const result = await host.reload();
+    expect(result).toMatchObject({ reloaded: true, kernel: 'pi' });
+    expect(result.skills).toBeDefined();
+    expect(result.commands).toBeDefined();
+    expect(events.map((event) => event.type)).not.toContain('server.connected');
+    expect(events.some((event) => event.type === 'session.updated')).toBe(true);
+    host.dispose();
+  });
+
+  it('reload({ sessionID }) only reloads that session and ignores a busy sibling', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({ compacting: true });
+    const created = [];
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => {
+        const next = created.length === 0 ? idleSession : busySession;
+        created.push(next);
+        return next;
+      },
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    const busy = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    const result = await host.reload({ sessionID: idle.id });
+    expect(result).toMatchObject({
+      reloaded: true,
+      kernel: 'pi',
+      sessionID: idle.id,
+    });
+    expect(idleSession.reloadCount).toBe(1);
+    expect(busySession.reloadCount).toBe(0);
+    await expect(host.reload({ sessionID: busy.id })).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for compaction to finish before reloading.',
+    });
+    expect(busySession.reloadCount).toBe(0);
+    host.dispose();
+  });
+
+  it('reload refuses while a session is streaming', async () => {
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => createInMemoryPiSession({
+        chunks: ['one ', 'two ', 'three'],
+        chunkDelayMs: 40,
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await expect(host.reload()).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for the current response to finish before reloading.',
+    });
+    await host.abort(record.id);
+    await prompt;
+    host.dispose();
+  });
+
+  it('reload refuses while a session is compacting', async () => {
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => createInMemoryPiSession({ compacting: true }),
+    });
+    await host.createSession({ directory: '/tmp/project' });
+    await expect(host.reload()).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for compaction to finish before reloading.',
+    });
+    host.dispose();
   });
 
   it('runCommand /reload invokes reload and replies in-process', async () => {

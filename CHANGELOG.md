@@ -31,6 +31,7 @@ All notable changes to this project will be documented in this file.
 - UI: the command palette now says it searches sessions, actions, and files, matching the groups it actually shows.
 - Settings: Commands no longer lists `/model` or `/thinking` on Pi — those stay on the composer chips and Session Defaults. Custom prompts still appear in Commands and in the slash menu.
 - Chat: on the Pi kernel, message Revert and composer shell / `/shell` are hidden because those actions are not implemented yet. Share stays hidden. OpenCode still offers revert and shell.
+- Chat: on Pi, a refresh button next to the session title reloads skills, prompts, and extensions for that session only. You can still switch sessions while it runs. Slash and Settings lists update afterward, and a short toast confirms the reload. It is disabled while that session is composing, streaming, or compacting.
 
 ## [1.18.4] - 2026-08-14
 

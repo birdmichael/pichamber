@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-coding-agent';
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
-import { sessionDirForCwd } from './pi-host.js';
+import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
 
 const tempHomes = [];
 afterEach(() => {
@@ -471,6 +471,82 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(reloads).toBe(1);
       const listed = await (await fetch(`${url}/api/session`)).json();
       expect(listed.some((item) => item.id === created.id)).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('returns 409 from config reload while a session is streaming', async () => {
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => createInMemoryPiSession({
+        chunks: ['one ', 'two ', 'three'],
+        chunkDelayMs: 40,
+      }),
+    });
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Busy' }),
+      })).json();
+      void fetch(`${url}/api/session/${created.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parts: [{ type: 'text', text: 'go' }] }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const response = await fetch(`${url}/api/config/reload`, { method: 'POST' });
+      expect(response.status).toBe(409);
+      const payload = await response.json();
+      expect(payload.error).toBe('Wait for the current response to finish before reloading.');
+      const listed = await (await fetch(`${url}/api/session`)).json();
+      expect(listed.some((item) => item.id === created.id)).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reloads one session while a sibling is streaming', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({
+      chunks: ['one ', 'two ', 'three'],
+      chunkDelayMs: 40,
+    });
+    let createdCount = 0;
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => {
+        createdCount += 1;
+        return createdCount === 1 ? idleSession : busySession;
+      },
+    });
+    try {
+      const idle = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Idle' }),
+      })).json();
+      const busy = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Busy' }),
+      })).json();
+      void fetch(`${url}/api/session/${busy.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ parts: [{ type: 'text', text: 'go' }] }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const response = await fetch(`${url}/api/session/${idle.id}/reload`, { method: 'POST' });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        success: true,
+        reloaded: true,
+        sessionID: idle.id,
+      });
+      expect(idleSession.reloadCount).toBe(1);
+      expect(busySession.reloadCount).toBe(0);
     } finally {
       kernel.dispose();
       await close();

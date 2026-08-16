@@ -43,14 +43,28 @@ import {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const RELOAD_WAIT_FOR_RESPONSE = 'Wait for the current response to finish before reloading.';
+const RELOAD_WAIT_FOR_COMPACTION = 'Wait for compaction to finish before reloading.';
+
+const sessionBlocksPiReload = (record) => {
+  if (record?.piSession?.isStreaming) return RELOAD_WAIT_FOR_RESPONSE;
+  if (record?.piSession?.isCompacting) return RELOAD_WAIT_FOR_COMPACTION;
+  const statusType = record?.status?.type;
+  if (statusType === 'busy' || statusType === 'retry') return RELOAD_WAIT_FOR_RESPONSE;
+  return null;
+};
+
 export const createInMemoryPiSession = ({
   sessionId = createSessionId(),
   chunks = ['Hello from ', 'the Pi mock kernel.'],
   chunkDelayMs = 5,
+  compacting = false,
 } = {}) => {
   const listeners = new Set();
   let streaming = false;
+  let compactingFlag = compacting === true;
   let aborted = false;
+  let reloadCount = 0;
   const messages = [];
 
   const emit = (event) => {
@@ -108,6 +122,9 @@ export const createInMemoryPiSession = ({
     get isStreaming() {
       return streaming;
     },
+    get isCompacting() {
+      return compactingFlag;
+    },
     get messages() {
       return messages;
     },
@@ -155,8 +172,19 @@ export const createInMemoryPiSession = ({
       return { tokens: 0, contextLimit: 128000, percent: 0 };
     },
     async compact(instructions) {
-      emit({ type: 'compaction_start', instructions: instructions || '' });
-      emit({ type: 'compaction_end' });
+      compactingFlag = true;
+      try {
+        emit({ type: 'compaction_start', instructions: instructions || '' });
+        emit({ type: 'compaction_end' });
+      } finally {
+        compactingFlag = false;
+      }
+    },
+    async reload() {
+      reloadCount += 1;
+    },
+    get reloadCount() {
+      return reloadCount;
     },
     dispose() {
       listeners.clear();
@@ -1284,7 +1312,66 @@ export const createPiHost = ({
         return [];
       }
     },
-    async reload(directory) {
+    async reload(options) {
+      const target = typeof options === 'string'
+        ? { directory: options }
+        : (options && typeof options === 'object' ? options : {});
+      const sessionID = typeof target.sessionID === 'string' ? target.sessionID.trim() : '';
+      const directory = typeof target.directory === 'string' ? target.directory : undefined;
+
+      const reloadRecord = async (record) => {
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          const error = new Error(blocked);
+          error.status = 409;
+          throw error;
+        }
+        record.unsubscribe?.();
+        if (typeof record.piSession?.reload === 'function') {
+          await record.piSession.reload();
+        } else {
+          try {
+            record.piSession?.dispose?.();
+          } catch {
+          }
+          const factory = await resolveCreateSession();
+          record.piSession = await factory({
+            cwd: record.directory,
+            modelRuntime,
+          });
+        }
+        attachSession(record);
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      };
+
+      if (sessionID) {
+        const record = await ensureRecord(sessionID, directory);
+        await reloadRecord(record);
+        const skills = listPiSkills({ home, directory: record.directory });
+        const commands = listPiCommands({ home, directory: record.directory });
+        return {
+          reloaded: true,
+          kernel: 'pi',
+          sessionID: record.id,
+          skills: skills.length,
+          commands: commands.length,
+        };
+      }
+
+      for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          const error = new Error(blocked);
+          error.status = 409;
+          throw error;
+        }
+      }
+
       modelRuntime = null;
       modelRuntimeError = null;
       readyPromise = null;
@@ -1297,33 +1384,15 @@ export const createPiHost = ({
       }
       directoryRuntimes.clear();
 
-      const factory = await resolveCreateSession();
       try {
         await ensureModelRuntime();
       } catch {
       }
 
       for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
         try {
-          record.unsubscribe?.();
-          if (typeof record.piSession?.reload === 'function') {
-            await record.piSession.reload();
-          } else {
-            try {
-              record.piSession?.dispose?.();
-            } catch {
-            }
-            record.piSession = await factory({
-              cwd: record.directory,
-              modelRuntime,
-            });
-          }
-          attachSession(record);
-          emit(record.directory, {
-            id: createEventId(),
-            type: 'session.updated',
-            properties: { info: record.info },
-          });
+          await reloadRecord(record);
         } catch (error) {
           console.warn(`[pi-host] reload failed for session ${record.id}:`, error?.message || error);
         }
@@ -1334,11 +1403,9 @@ export const createPiHost = ({
       const cwd = directory || defaultDirectory;
       const skills = listPiSkills({ home, directory: cwd });
       const commands = listPiCommands({ home, directory: cwd });
-      emit(cwd, {
-        id: createEventId(),
-        type: 'server.connected',
-        properties: { kernel: 'pi', reloaded: true },
-      });
+      // In-place TUI-style reload: refresh skills/prompts/extensions only.
+      // Do not emit server.connected — the UI treats that as a full re-bootstrap
+      // and would drop the open session onto a new-session draft.
 
       return {
         reloaded: true,
