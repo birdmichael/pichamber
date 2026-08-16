@@ -22,16 +22,16 @@ hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
-When the Pi Plan plugin is installed and enabled, that slot is **Agent | Plan**
-instead — not a fake OpenCode agent, and not Build/Plan. The chips show on an
-idle empty session or new-session draft (status defaults to `off`) and do not
-wait for a plan fetch. Plan enters through `/plan start` (toast only — the
-plugin does not ask a select) or resume of a saved plan. Leaving a ready plan
-uses `/plan save`. Leaving Plan while it is on and there is no document uses
-`/plan exit`. Typing listed `/plan` in the composer still sends empty
-arguments and opens the plugin launch card. The slash menu must offer live
-`/plan` next to `/plan-feature`; selecting it completes to `/plan`, not
-`/plan start`.
+When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**
+dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
+trigger shows the current side only. The control shows on an idle empty session
+or new-session draft (status defaults to `off`) and does not wait for a plan
+fetch. Plan enters through `/plan start` (toast only — the plugin does not ask
+a select) or resume of a saved plan. Leaving a ready plan uses `/plan save`.
+Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
+listed `/plan` in the composer still sends empty arguments and opens the plugin
+launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
+selecting it completes to `/plan`, not `/plan start`.
 Model and thinking chips stay. OpenCode `build` / `plan` / custom agents still
 show. A Build row (session model + `/plan implement` in this session) appears
 when a ready or saved plan exists, even if the View Plan rail is closed.
