@@ -2,21 +2,35 @@ import { create } from 'zustand';
 
 import {
   isBlockingPiExtensionUiKind,
+  parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
   type PiExtensionUiPrompt,
 } from './pi-extension-ui';
 
 const MAX_SETTLED_PER_SESSION = 20;
+const MAX_NOTIFIES = 20;
 
 type EditorStash = {
   sessionID: string;
   text: string;
 };
 
+type PiExtensionUiNotifyItem = {
+  id: string;
+  sessionID: string;
+  directory?: string;
+  message: string;
+  level: 'info' | 'warning' | 'error';
+};
+
 type PiExtensionUiState = {
   promptsBySession: Record<string, PiExtensionUiPrompt[]>;
+  notifies: PiExtensionUiNotifyItem[];
   editorStash: EditorStash | null;
 };
+
+let notifySeq = 0;
+const nextNotifyId = (): string => `pin_${Date.now()}_${++notifySeq}`;
 
 const empty: PiExtensionUiPrompt[] = [];
 
@@ -39,11 +53,12 @@ const upsertPrompt = (
 
 export const usePiExtensionUiStore = create<PiExtensionUiState>(() => ({
   promptsBySession: {},
+  notifies: [],
   editorStash: null,
 }));
 
 export const resetPiExtensionUiStore = (): void => {
-  usePiExtensionUiStore.setState({ promptsBySession: {}, editorStash: null });
+  usePiExtensionUiStore.setState({ promptsBySession: {}, notifies: [], editorStash: null });
 };
 
 export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | null => {
@@ -62,6 +77,37 @@ export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | 
     };
   });
   return prompt;
+};
+
+export const applyPiExtensionUiNotify = (value: unknown): PiExtensionUiNotifyItem | null => {
+  const notify = parsePiExtensionUiNotify(value);
+  if (!notify) return null;
+  const item: PiExtensionUiNotifyItem = {
+    id: nextNotifyId(),
+    sessionID: notify.sessionID,
+    directory: notify.directory,
+    message: notify.message,
+    level: notify.level,
+  };
+  usePiExtensionUiStore.setState((state) => ({
+    ...state,
+    notifies: [...state.notifies, item].slice(-MAX_NOTIFIES),
+  }));
+  return item;
+};
+
+export const consumePiExtensionUiNotify = (id: string): void => {
+  consumePiExtensionUiNotifies([id]);
+};
+
+export const consumePiExtensionUiNotifies = (ids: readonly string[]): void => {
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+  usePiExtensionUiStore.setState((state) => {
+    const next = state.notifies.filter((item) => !idSet.has(item.id));
+    if (next.length === state.notifies.length) return state;
+    return { ...state, notifies: next };
+  });
 };
 
 export const reconcilePiExtensionUiPrompts = (

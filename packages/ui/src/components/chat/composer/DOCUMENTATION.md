@@ -7,7 +7,7 @@ everything between typing and sending.
 own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
-On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. This is not OpenCode `question.reply`.
+On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
 
 Session Goal is a Pichamber feature. `ComposerFooter` shows `SessionGoalButton`
 and the objective counter on the Pi kernel (`isSessionGoalVisibleOnPiKernel`);

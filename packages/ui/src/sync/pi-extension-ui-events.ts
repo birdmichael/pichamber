@@ -1,10 +1,9 @@
-import { toast } from '@/components/ui';
 import {
-  parsePiExtensionUiNotify,
   replyPiExtensionUi,
   type PiExtensionUiPrompt,
 } from './pi-extension-ui';
 import {
+  applyPiExtensionUiNotify,
   applyPiExtensionUiPrompt,
   consumePiExtensionUiEditorStash,
   usePiExtensionUiStore,
@@ -30,11 +29,7 @@ export const handlePiExtensionUiEvent = (payload: { type?: unknown; properties?:
   if (!isPiExtensionUiEventType(payload.type)) return false;
 
   if (payload.type === 'pi.ui.notify') {
-    const notify = parsePiExtensionUiNotify(payload.properties);
-    if (!notify) return true;
-    if (notify.level === 'error') toast.error(notify.message);
-    else if (notify.level === 'warning') toast.warning(notify.message);
-    else toast.info(notify.message);
+    applyPiExtensionUiNotify(payload.properties) || applyPiExtensionUiNotify(payload);
     return true;
   }
 

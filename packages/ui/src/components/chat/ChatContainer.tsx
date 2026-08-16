@@ -24,6 +24,7 @@ import {
     useHasPendingPiExtensionUiPrompt,
     usePiExtensionUiPrompts,
 } from '@/sync/pi-extension-ui-store';
+import { sessionTranscriptHasChrome } from './sessionTranscriptChrome';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { StatusRowContainer } from './StatusRowContainer';
 import { SessionRecapNote } from '@/components/chat/SessionRecapSpacer';
@@ -664,6 +665,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const isPiKernel = usePiKernel();
     const hasPendingPiExtensionUi = useHasPendingPiExtensionUiPrompt(currentSessionId);
     const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
+    const [piUiHydratedSession, setPiUiHydratedSession] = React.useState<string | null>(null);
+    const transcriptPiPromptCount = React.useMemo(
+        () => selectTranscriptPiExtensionUiPrompts(piExtensionPrompts).length,
+        [piExtensionPrompts],
+    );
+    const waitingForPiUi = Boolean(
+        active && isPiKernel && currentSessionId && piUiHydratedSession !== currentSessionId,
+    );
 
     const hasUnreconciledQuestionTool = React.useMemo(
         () => !sessionQuestions.some((question) => question.sessionID === currentSessionId)
@@ -687,10 +696,12 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
     React.useEffect(() => {
         if (!active || !isPiKernel || !currentSessionId) return;
+        const sessionID = currentSessionId;
         let cancelled = false;
-        void listPiExtensionUiPrompts(currentSessionId).then((prompts) => {
+        void listPiExtensionUiPrompts(sessionID).then((prompts) => {
             if (cancelled) return;
-            reconcilePiExtensionUiPrompts(currentSessionId, prompts);
+            reconcilePiExtensionUiPrompts(sessionID, prompts);
+            setPiUiHydratedSession(sessionID);
         });
         return () => {
             cancelled = true;
@@ -714,6 +725,21 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number',
         );
     }, [currentSessionId, hasPendingPiExtensionUi, sessionMessages, sessionPermissions.length, sessionQuestions.length, sessionStatusForCurrent.type]);
+    const hasOverlayChrome = sessionTranscriptHasChrome({
+        messageCount: 0,
+        sessionIsWorking: false,
+        questionCount: sessionQuestions.length,
+        permissionCount: sessionPermissions.length,
+        transcriptPromptCount: transcriptPiPromptCount,
+    });
+    const hasTranscriptChrome = sessionTranscriptHasChrome({
+        messageCount: sessionMessages.length,
+        sessionIsWorking,
+        questionCount: sessionQuestions.length,
+        permissionCount: sessionPermissions.length,
+        transcriptPromptCount: transcriptPiPromptCount,
+        waitingForAuthoritativePrompts: waitingForPiUi,
+    });
     const activeRetryStatus = React.useMemo(() => {
         if (!currentSessionId || sessionStatusForCurrent.type !== 'retry') {
             return null;
@@ -1189,7 +1215,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         return null;
     }
 
-	if (isSessionHydrating && sessionMessages.length === 0 && !sessionIsWorking) {
+	if (isSessionHydrating && sessionMessages.length === 0 && !sessionIsWorking && !hasOverlayChrome) {
 		if (sessionMessageLoadState.status === 'error') {
 			return (
 				<div data-composer-bound className="relative flex h-full flex-col bg-background">
@@ -1267,7 +1293,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         );
     }
 
-	if (sessionMessages.length === 0 && !sessionIsWorking) {
+	if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome) {
 		return (
 			// No transform here either — same fixed-positioning constraint as the
 			// draft branch above.

@@ -47,7 +47,7 @@ So:
 | `session-ordering.ts` | Ephemeral lifecycle rank used by every user-visible session list | All known sessions in the active runtime |
 | `session-activity-timing.ts` | Elapsed time of the running turn and of the turn that just finished, plus the persisted starts that survive a reload | All known sessions in the active runtime |
 | `session-ui-store.ts` | Session selection, draft lifecycle, abort prompts, worktree metadata, SDK-facing action entrypoints | App UI state |
-| `pi-extension-ui-store.ts` | Pending/settled Pi `ctx.ui` prompts (`select` / `confirm` / `input` / `editor`) for the current runtime | One runtime; keyed by Pi session ID. Not OpenCode `question` |
+| `pi-extension-ui-store.ts` | Pending/settled Pi `ctx.ui` prompts (`select` / `confirm` / `input` / `editor`) and `pi.ui.notify` toasts for the current runtime | One runtime; prompts keyed by Pi session ID. Not OpenCode `question`. Opening a session hydrates `GET /api/pi/ui`; fetch failure does not clear local cards. Notify toasts render on the shared Sonner surface. |
 | `pi-session-plan-store.ts` | Live Pi plan-mode status (`off` / `active` / `ready` / `saved` / `implementing`) from `GET /api/pi/session/:id/plan` | One runtime; keyed by Pi session ID. Fetch failure does not become empty `off` |
 | `pi-feature-plugins-store.ts` | Feature Plugins payload for composer/rail gates (`plan` installed+enabled) | One runtime. Fetch failure does not become an empty disabled snapshot |
 | `useGlobalSessionsStore.ts` | Global active sessions, global archived sessions, `sessionsByDirectory` | All opened project/worktree session lists |

@@ -3,12 +3,15 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import {
   displaySelectOption,
   isFreeformOtherOption,
+  parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
   parsePiExtensionUiPromptList,
 } from './pi-extension-ui';
 import {
+  applyPiExtensionUiNotify,
   applyPiExtensionUiPrompt,
   consumePiExtensionUiEditorStash,
+  consumePiExtensionUiNotify,
   reconcilePiExtensionUiPrompts,
   resetPiExtensionUiStore,
   selectPendingConfirmPrompt,
@@ -16,6 +19,7 @@ import {
   stashPiExtensionUiEditorText,
   usePiExtensionUiStore,
 } from './pi-extension-ui-store';
+import { handlePiExtensionUiEvent } from './pi-extension-ui-events';
 
 afterEach(() => {
   resetPiExtensionUiStore();
@@ -138,6 +142,47 @@ describe('pi extension UI store', () => {
       'pui_local',
       'pui_live',
     ]);
+  });
+
+  test('queues ctx.ui.notify without requiring sessionID and accepts title aliases', () => {
+    expect(parsePiExtensionUiNotify({
+      message: 'Plan mode enabled. I will explore and plan, but not modify files.',
+      level: 'info',
+    })).toMatchObject({
+      sessionID: '',
+      message: 'Plan mode enabled. I will explore and plan, but not modify files.',
+      level: 'info',
+    });
+    expect(parsePiExtensionUiNotify({
+      sessionID: 'ses_1',
+      title: 'Plan mode enabled. I will explore and plan, but not modify files.',
+    })?.message).toBe('Plan mode enabled. I will explore and plan, but not modify files.');
+    expect(parsePiExtensionUiNotify({
+      type: 'pi.ui.notify',
+      properties: {
+        sessionID: 'ses_1',
+        message: 'Plan mode enabled. I will explore and plan, but not modify files.',
+        level: 'info',
+      },
+    })).toMatchObject({
+      sessionID: 'ses_1',
+      message: 'Plan mode enabled. I will explore and plan, but not modify files.',
+    });
+
+    handlePiExtensionUiEvent({
+      type: 'pi.ui.notify',
+      properties: {
+        sessionID: 'ses_1',
+        message: 'Plan mode enabled. I will explore and plan, but not modify files.',
+        level: 'info',
+      },
+    });
+    const queued = usePiExtensionUiStore.getState().notifies;
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.message).toBe('Plan mode enabled. I will explore and plan, but not modify files.');
+    consumePiExtensionUiNotify(queued[0]!.id);
+    expect(usePiExtensionUiStore.getState().notifies).toEqual([]);
+    expect(applyPiExtensionUiNotify({ message: '' })).toBeNull();
   });
 
   test('hands Other text to the next editor for that session', () => {

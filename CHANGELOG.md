@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- **Chat:** on Pi, Plan and other extension prompts now appear in the current chat (option cards, Other text, confirm dialogs, and toasts) instead of hanging or failing as unavailable. Dismissing a prompt cancels that question only.
+- **Chat:** on Pi, Plan and other extension prompts now appear in the current chat (option cards, Other text, confirm dialogs, and toasts) instead of hanging or failing as unavailable. Opening a session shows a prompt that is already waiting. `/plan start` confirms with a toast. Dismissing a prompt cancels that question only.
 - **Chat:** on Pi, when the Plan plugin is installed and enabled, the composer shows Agent | Plan. Starting Plan turns Plan on with a toast; typing `/plan` still opens the in-chat launch menu. Leaving a ready plan saves it, Build runs `/plan implement` in this session with the current (or picked) model, and View Plan appears on the right rail only when a plan exists. Discard is a confirmed action on that panel, not from the footer.
 - **Settings:** on Pi, a Feature Plugins page sits next to Extensions with Goal, Plan, MCP, and Subagents slots. You can edit the source, use a preset to fill the field, then install, uninstall, enable, or disable. Nothing is installed just by opening the page. After install or uninstall, idle sessions reload so commands and extensions refresh.
 - **Chat:** on Pi, slash commands from installed extensions now run as commands instead of being sent as a chat message. After a session reload, the slash menu can list those extension commands.

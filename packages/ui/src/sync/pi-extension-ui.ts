@@ -72,14 +72,28 @@ export const parsePiExtensionUiPromptList = (value: unknown): PiExtensionUiPromp
 export const parsePiExtensionUiNotify = (value: unknown): PiExtensionUiNotify | null => {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
-  const sessionID = asOptionalString(raw.sessionID);
-  const message = asOptionalString(raw.message);
-  if (!sessionID || !message) return null;
+  const nested = raw.properties && typeof raw.properties === 'object'
+    ? raw.properties as Record<string, unknown>
+    : null;
+  const source = nested ?? raw;
+  const message = asOptionalString(source.message)
+    ?? asOptionalString(source.title)
+    ?? asOptionalString(source.text)
+    ?? asOptionalString(source.body)
+    ?? asOptionalString(raw.message)
+    ?? asOptionalString(raw.title);
+  if (!message) return null;
   return {
-    sessionID,
-    directory: asOptionalString(raw.directory),
+    sessionID: asOptionalString(source.sessionID)
+      ?? asOptionalString(source.sessionId)
+      ?? asOptionalString(raw.sessionID)
+      ?? asOptionalString(raw.sessionId)
+      ?? '',
+    directory: asOptionalString(source.directory) ?? asOptionalString(raw.directory),
     message,
-    level: raw.level === 'warning' || raw.level === 'error' ? raw.level : 'info',
+    level: source.level === 'warning' || source.level === 'error'
+      ? source.level
+      : raw.level === 'warning' || raw.level === 'error' ? raw.level : 'info',
   };
 };
 
