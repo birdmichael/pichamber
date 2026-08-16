@@ -74,6 +74,104 @@ const toolInputFromCall = (item) => {
   return {};
 };
 
+const filenameFromMime = (mime) => {
+  const subtype = asTrimmedString(mime).split('/')[1]?.split(';')[0]?.toLowerCase();
+  if (!subtype) return 'image';
+  const ext = subtype === 'jpeg' ? 'jpg' : subtype.replace(/[^a-z0-9]+/g, '') || 'bin';
+  return `image.${ext}`;
+};
+
+const imagePayloadFromDataUrl = (url, fallbackMime) => {
+  const value = asTrimmedString(url);
+  if (!value.startsWith('data:')) return null;
+  const comma = value.indexOf(',');
+  if (comma === -1) return null;
+  const header = value.slice(5, comma);
+  const data = value.slice(comma + 1);
+  if (!data) return null;
+  const mime = asTrimmedString(header.split(';')[0]) || asTrimmedString(fallbackMime);
+  if (!mime) return null;
+  return { mime, data };
+};
+
+const imagePayloadFromUnknown = (item) => {
+  if (!isRecord(item)) return null;
+
+  if (typeof item.url === 'string') {
+    const fromUrl = imagePayloadFromDataUrl(item.url, item.mime || item.mimeType);
+    if (fromUrl) return fromUrl;
+  }
+
+  if (typeof item.data === 'string' && item.data.startsWith('data:')) {
+    const fromDataUrl = imagePayloadFromDataUrl(item.data, item.mimeType || item.mime);
+    if (fromDataUrl) return fromDataUrl;
+  }
+
+  const source = isRecord(item.source) ? item.source : null;
+  const sourceMime = asTrimmedString(
+    source?.mediaType || source?.mimeType || item.mimeType || item.mime,
+  );
+  if (source) {
+    if (typeof source.url === 'string') {
+      const fromSourceUrl = imagePayloadFromDataUrl(source.url, sourceMime);
+      if (fromSourceUrl) return fromSourceUrl;
+    }
+    const sourceData = typeof source.data === 'string' ? source.data : '';
+    if (sourceData.startsWith('data:')) {
+      const fromSourceDataUrl = imagePayloadFromDataUrl(sourceData, sourceMime);
+      if (fromSourceDataUrl) return fromSourceDataUrl;
+    }
+    if (sourceData && sourceMime) {
+      return { mime: sourceMime, data: sourceData };
+    }
+  }
+
+  const mime = asTrimmedString(item.mimeType || item.mime);
+  const data = typeof item.data === 'string' ? item.data : '';
+  if (mime && data) return { mime, data };
+  return null;
+};
+
+/** Normalize a Pi image block or facade file/image part to Pi ImageContent. */
+export const toPiImageContent = (item) => {
+  const payload = imagePayloadFromUnknown(item);
+  if (!payload) return null;
+  if (!payload.mime.startsWith('image/')) return null;
+  return {
+    type: 'image',
+    data: payload.data,
+    mimeType: payload.mime,
+  };
+};
+
+export const facadeFilePartFromUnknown = (item, sessionID, messageID) => {
+  if (!isRecord(item)) return null;
+  const payload = imagePayloadFromUnknown(item);
+  if (payload) {
+    return {
+      id: createPartId(),
+      sessionID,
+      messageID,
+      type: 'file',
+      mime: payload.mime,
+      url: `data:${payload.mime};base64,${payload.data}`,
+      filename: asTrimmedString(item.filename) || filenameFromMime(payload.mime),
+    };
+  }
+  if (item.type === 'file' && (asTrimmedString(item.mime) || typeof item.url === 'string')) {
+    return {
+      id: createPartId(),
+      sessionID,
+      messageID,
+      type: 'file',
+      mime: asTrimmedString(item.mime) || 'application/octet-stream',
+      url: typeof item.url === 'string' ? item.url : '',
+      ...(asTrimmedString(item.filename) ? { filename: item.filename } : {}),
+    };
+  }
+  return null;
+};
+
 const facadeToolPart = (item, sessionID, messageID) => {
   const callID = asTrimmedString(item?.id);
   return {
@@ -135,6 +233,11 @@ const partsFromPiContent = (content, sessionID, messageID) => {
     }
     if (item.type === 'toolCall') {
       parts.push(facadeToolPart(item, sessionID, messageID));
+      continue;
+    }
+    if (item.type === 'image') {
+      const file = facadeFilePartFromUnknown(item, sessionID, messageID);
+      if (file) parts.push(file);
       continue;
     }
     if (typeof item.text === 'string') {

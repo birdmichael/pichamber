@@ -83,6 +83,7 @@ import {
   buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
+  facadeFilePartFromUnknown,
   facadeMessagesFromPiEntries,
   parseSessionImport,
   sanitizeExportBasename,
@@ -1901,13 +1902,18 @@ export const createPiHost = ({
         agent: userAgent,
         model: body.model,
       });
-      const userPart = {
+      const userParts = [{
         id: createPartId(),
         sessionID,
         messageID: userMessageID,
         type: 'text',
         text,
-      };
+      }];
+      for (const part of Array.isArray(body.parts) ? body.parts : []) {
+        if (!part || part.type === 'text') continue;
+        const file = facadeFilePartFromUnknown(part, sessionID, userMessageID);
+        if (file) userParts.push(file);
+      }
       const userInfo = {
         id: userMessageID,
         sessionID,
@@ -1916,7 +1922,7 @@ export const createPiHost = ({
         agent: userAgent,
         ...(body.model ? { model: body.model } : {}),
       };
-      record.messages.push({ info: userInfo, parts: [userPart] });
+      record.messages.push({ info: userInfo, parts: userParts });
       if (maybeApplyConversationTitle(record)) {
         emit(record.directory, {
           id: createEventId(),
@@ -1929,11 +1935,13 @@ export const createPiHost = ({
         type: 'message.updated',
         properties: { sessionID, info: userInfo },
       });
-      emit(record.directory, {
-        id: createEventId(),
-        type: 'message.part.updated',
-        properties: { sessionID, part: userPart, time: Date.now() },
-      });
+      for (const part of userParts) {
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'message.part.updated',
+          properties: { sessionID, part, time: Date.now() },
+        });
+      }
 
       const images = extractPromptImages(body.parts);
       const promptOptions = {
@@ -1945,15 +1953,15 @@ export const createPiHost = ({
       const run = async () => {
         try {
           if (isStreaming && delivery === 'steer' && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text);
+            await record.piSession.steer(text, images);
             return;
           }
           if (isStreaming && (delivery === 'followUp' || delivery === 'follow_up') && typeof record.piSession.followUp === 'function') {
-            await record.piSession.followUp(text);
+            await record.piSession.followUp(text, images);
             return;
           }
           if (isStreaming && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text);
+            await record.piSession.steer(text, images);
             return;
           }
           await record.piSession.prompt(text, promptOptions);
@@ -1969,7 +1977,7 @@ export const createPiHost = ({
       };
 
       void run();
-      return { info: userInfo, parts: [userPart] };
+      return { info: userInfo, parts: userParts };
     },
     async abort(sessionID) {
       const record = await ensureRecord(sessionID);

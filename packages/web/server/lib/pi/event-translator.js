@@ -1,4 +1,5 @@
 import { createEventId, createMessageId, createPartId } from './ids.js';
+import { toPiImageContent } from './session-transfer.js';
 
 const toNonNegativeNumber = (value) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
@@ -477,20 +478,8 @@ export const extractPromptImages = (parts) => {
   if (!Array.isArray(parts)) return [];
   const images = [];
   for (const part of parts) {
-    if (!part || part.type !== 'file' || typeof part.url !== 'string') continue;
-    if (!part.mime || !String(part.mime).startsWith('image/')) continue;
-    const url = part.url;
-    if (!url.startsWith('data:')) continue;
-    const comma = url.indexOf(',');
-    if (comma === -1) continue;
-    images.push({
-      type: 'image',
-      source: {
-        type: 'base64',
-        mediaType: part.mime,
-        data: url.slice(comma + 1),
-      },
-    });
+    const image = toPiImageContent(part);
+    if (image) images.push(image);
   }
   return images;
 };
