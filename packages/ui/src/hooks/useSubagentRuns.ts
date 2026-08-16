@@ -22,27 +22,34 @@ export const useSubagentRuns = (
     }
 
     let cancelled = false;
-    const load = () => runBackgroundNetworkTask(async () => {
-      try {
-        const response = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/subagent-runs`, {
-          headers: { Accept: 'application/json' },
-        });
-        const parsed = parseSubagentRunsPayload(await response.json().catch(() => null));
-        if (cancelled) return;
-        if (!response.ok || !parsed) {
+    let inFlight = false;
+    const load = () => {
+      if (inFlight) return;
+      inFlight = true;
+      void runBackgroundNetworkTask(async () => {
+        try {
+          const response = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/subagent-runs`, {
+            headers: { Accept: 'application/json' },
+          });
+          const parsed = parseSubagentRunsPayload(await response.json().catch(() => null));
+          if (cancelled) return;
+          if (!response.ok || !parsed) {
+            setState((current) => (
+              current.status === 'ready' ? current : { status: 'error', runs: current.runs }
+            ));
+            return;
+          }
+          setState({ status: 'ready', runs: parsed });
+        } catch {
+          if (cancelled) return;
           setState((current) => (
             current.status === 'ready' ? current : { status: 'error', runs: current.runs }
           ));
-          return;
+        } finally {
+          inFlight = false;
         }
-        setState({ status: 'ready', runs: parsed });
-      } catch {
-        if (cancelled) return;
-        setState((current) => (
-          current.status === 'ready' ? current : { status: 'error', runs: current.runs }
-        ));
-      }
-    });
+      });
+    };
 
     setState((current) => (
       current.status === 'ready' ? current : { status: 'loading', runs: current.runs }

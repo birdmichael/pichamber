@@ -14,6 +14,7 @@ import {
   normalizeSubagentRunMode,
   normalizeSubagentRunState,
   parentSessionMatches,
+  readSessionFileFromText,
   readSessionIdFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
@@ -49,6 +50,40 @@ describe('normalize helpers', () => {
     expect(normalizeSubagentRunState('failed')).toBe('failed');
     expect(normalizeSubagentRunMode('async')).toBe('background');
     expect(normalizeSubagentRunMode('sync')).toBe('foreground');
+  });
+});
+
+describe('readSessionFileFromText', () => {
+  it('extracts a labeled or absolute jsonl session path', () => {
+    expect(readSessionFileFromText('sessionFile: /tmp/pi-child/session.jsonl')).toBe('/tmp/pi-child/session.jsonl');
+    expect(readSessionFileFromText('Wrote /Users/me/.pi/agent/sessions/child.jsonl for follow-up')).toBe(
+      '/Users/me/.pi/agent/sessions/child.jsonl',
+    );
+    expect(readSessionFileFromText(`/${'a/'.repeat(40)}${'a'.repeat(80)} /tmp/pi-child/session.jsonl`)).toBe(
+      '/tmp/pi-child/session.jsonl',
+    );
+  });
+
+  it('finishes instantly on slash-heavy tool output without a jsonl path', () => {
+    const catastrophic = `/${'a/'.repeat(40)}${'a'.repeat(200)}`;
+    const oversized = `/${'a/'.repeat(200)}${'a'.repeat(4000)}`;
+    const started = performance.now();
+    expect(readSessionFileFromText(catastrophic)).toBe('');
+    expect(readSessionFileFromText(oversized)).toBe('');
+    expect(extractRunsFromPiEntries([{
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call_redos',
+        content: catastrophic,
+        isError: false,
+      },
+    }], 'parent-1')[0]).toMatchObject({
+      runId: 'call_redos',
+      sessionFile: null,
+    });
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });
 
@@ -237,6 +272,28 @@ describe('tool-part extraction', () => {
       runId: 'call_args',
       sessionID: 'child-from-call',
       state: 'failed',
+    });
+  });
+
+  it('reads a child session file from Pi toolResult text', () => {
+    const dir = makeTemp();
+    const childFile = path.join(dir, 'child.jsonl');
+    fs.writeFileSync(childFile, `${JSON.stringify({ type: 'session', id: 'pi-child-text' })}\n`);
+    const runs = extractRunsFromPiEntries([{
+      type: 'message',
+      id: 'tool_text',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call_text',
+        content: `Session written to ${childFile}`,
+        isError: false,
+      },
+    }], 'parent-1');
+    expect(runs[0]).toMatchObject({
+      runId: 'call_text',
+      sessionID: 'pi-child-text',
+      sessionFile: childFile,
     });
   });
 
