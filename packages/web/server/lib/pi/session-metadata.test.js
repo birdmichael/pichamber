@@ -8,6 +8,7 @@ import {
   PICHAMBER_METADATA_CUSTOM_TYPE,
   persistSessionMetadata,
   readPersistedArchivedTimestamp,
+  readPersistedParentID,
   readPersistedSessionMetadata,
   readPersistedSessionMetadataFromFile,
   sessionTimeWithArchived,
@@ -61,6 +62,16 @@ describe('Pi session metadata persistence', () => {
         throw new Error('disk full');
       },
     }, goalMetadata)).toBe(false);
+  });
+
+  it('reads clone/fork parentID from pichamber.metadata and ignores empty values', () => {
+    expect(readPersistedParentID({ parentID: 'source-session' })).toBe('source-session');
+    expect(readPersistedParentID({ parentID: '  child-parent  ' })).toBe('child-parent');
+    expect(readPersistedParentID({ parentID: '' })).toBeUndefined();
+    expect(readPersistedParentID({ parentID: '   ' })).toBeUndefined();
+    expect(readPersistedParentID({})).toBeUndefined();
+    expect(readPersistedParentID(undefined)).toBeUndefined();
+    expect(readPersistedParentID({ parentID: 12 })).toBeUndefined();
   });
 
   it('reads archived: ms | 0 from pichamber.metadata and ignores invalid values', () => {
