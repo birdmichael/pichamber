@@ -39,6 +39,25 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'integrations.third-party.opencode-cursor-oauth')).toBe(true);
   });
 
+  test('opens Skills and Commands pages from their titles', () => {
+    const skillsResults = buildSettingsSearchResults({
+      query: 'skills',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle: (page) => page,
+    });
+    expect(skillsResults.some((result) => result.page === 'skills.installed')).toBe(true);
+    expect(skillsResults.some((result) => result.page === 'skills.catalog')).toBe(true);
+
+    const commandResults = buildSettingsSearchResults({
+      query: 'commands',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle: (page) => page,
+    });
+    expect(commandResults.some((result) => result.page === 'commands')).toBe(true);
+  });
+
   test('finds coming-soon messenger placeholders', () => {
     const results = buildSettingsSearchResults({
       query: 'discord',
