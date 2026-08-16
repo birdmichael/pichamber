@@ -927,4 +927,72 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('exposes session plan status and dispatches plan actions', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan chrome' }),
+      })).json();
+
+      const missing = await fetch(`${url}/api/pi/session/ses_missing/plan`);
+      expect(missing.status).toBe(404);
+
+      const off = await (await fetch(`${url}/api/pi/session/${created.id}/plan`)).json();
+      expect(off).toEqual({ status: 'off', planMarkdown: '' });
+
+      const started = await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      expect(started.status).toBe(200);
+      expect(await started.json()).toEqual({ status: 'active', planMarkdown: '' });
+
+      kernel.host.getSession(created.id).piSession.setPlanModeState({
+        enabled: true,
+        latestPlan: '# Build the rail\n\nUse live state.',
+        awaitingAction: true,
+      });
+      const ready = await (await fetch(`${url}/api/pi/session/${created.id}/plan`)).json();
+      expect(ready).toMatchObject({
+        status: 'ready',
+        planMarkdown: '# Build the rail\n\nUse live state.',
+        title: 'Build the rail',
+      });
+
+      const saved = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'save' }),
+      })).json();
+      expect(saved.status).toBe('saved');
+
+      const resumed = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'resume' }),
+      })).json();
+      expect(resumed.status).toBe('ready');
+
+      const built = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'implement' }),
+      })).json();
+      expect(built.status).toBe('implementing');
+
+      const discarded = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'exit' }),
+      })).json();
+      expect(discarded).toEqual({ status: 'off', planMarkdown: '' });
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });

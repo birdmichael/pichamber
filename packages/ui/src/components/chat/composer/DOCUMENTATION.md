@@ -12,9 +12,15 @@ On the Pi kernel, composer Enter does not send a normal chat turn while a Deskto
 Session Goal is a Pichamber feature. `ComposerFooter` shows `SessionGoalButton`
 and the objective counter on the Pi kernel (`isSessionGoalVisibleOnPiKernel`);
 it still hides OpenCode-only permission auto-accept, revert, and `/shell`.
-`ModelControls` hides the agent chip when the only selectable agent is the
-synthetic Pi default (`shouldShowComposerAgentChip`); model and thinking chips
-stay. OpenCode `build` / `plan` / custom agents still show.
+`ModelControls` hides the leftover OpenCode agent chip when the only
+selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
+When the Pi Plan plugin is installed and enabled, that slot is **Agent | Plan**
+instead — not a fake OpenCode agent, and not Build/Plan. Plan enters through
+`/plan start` (or resume of a saved plan); leaving a ready plan uses
+`/plan save`. Model and thinking chips stay. OpenCode `build` / `plan` /
+custom agents still show. A Build row (session model + `/plan implement` in
+this session) appears when a ready or saved plan exists, even if the View
+Plan rail is closed.
 
 ## Layers
 

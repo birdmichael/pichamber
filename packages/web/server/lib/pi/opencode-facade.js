@@ -530,6 +530,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.cancelExtensionUI(sessionID, req.params.requestID));
   }));
 
+  app.get('/api/pi/session/:sessionID/plan', handle(async (req, res) => {
+    await loadSession(req);
+    json(res, 200, await host.getSessionPlan(req.params.sessionID));
+  }));
+
+  app.post('/api/pi/session/:sessionID/plan', parseJson, handle(async (req, res) => {
+    await loadSession(req);
+    json(res, 200, await host.runPlanAction(req.params.sessionID, req.body || {}));
+  }));
+
   app.get('/api/permission', handle(async (_req, res) => {
     json(res, 200, []);
   }));

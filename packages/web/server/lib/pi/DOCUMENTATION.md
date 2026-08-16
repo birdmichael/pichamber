@@ -39,6 +39,29 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
 `plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. v1 does not add `/plan` TUI menus, tool pickers, or a Settings sheet.
 
+## Session plan status
+
+`GET /api/pi/session/:id/plan` returns
+`{ status: off|active|ready|saved|implementing, planMarkdown, title? }`
+from the live `plan-mode-state` custom entry (same mapping as
+`pi-plan-mode` `formatStatus`). It does not scrape TUI widgets or read
+`.opencode/plans`. Fetch failure is an HTTP error, not an empty `off`.
+
+`POST /api/pi/session/:id/plan` `{ action, model? }`:
+
+| action | Dispatch |
+|---|---|
+| `start` | `session.prompt("/plan start")` |
+| `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
+| `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
+| `exit` | `session.prompt("/plan exit")` — discard only |
+| `resume` | rewrite saved → ready `plan-mode-state`, then `reload({ sessionID })`. Do not send `/plan start` (that errors while a saved plan exists) |
+
+Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
+Desktop chrome (Agent \| Plan, View Plan rail, Build) is gated on the Pi
+kernel **and** Feature Plugins `plan` installed+enabled. Missing/disabled
+hides those surfaces. `planModeExperimentalEnabled` does not gate this on Pi.
+
 ## Slash command dispatch
 
 `POST /api/session/:id/command` (`host.runCommand`) is the command channel on

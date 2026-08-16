@@ -19,6 +19,8 @@ import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { isSessionGoalVisibleOnPiKernel, usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
+import { PiPlanBuildRow } from '../../PiPlanBuildRow';
+import { PiPlanModeToggle } from '../../PiPlanModeToggle';
 import { ModelControls } from '../../ModelControls';
 import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
@@ -114,9 +116,9 @@ export function ComposerFooter(props: ComposerFooterProps) {
     return (
         <div
             className={cn(
-                'bg-transparent flex-shrink-0',
+                'bg-transparent flex-shrink-0 flex flex-col',
                 footerPaddingClass,
-                isMobile ? 'flex items-center gap-x-1.5' : cn('flex items-center justify-between', footerGapClass)
+                footerGapClass,
             )}
             style={{
                 borderBottomLeftRadius: chatInputRadius,
@@ -124,6 +126,12 @@ export function ComposerFooter(props: ComposerFooterProps) {
             }}
             data-chat-input-footer="true"
         >
+            <PiPlanBuildRow className="w-full justify-end" />
+            <div
+                className={cn(
+                    isMobile ? 'flex items-center gap-x-1.5' : cn('flex items-center justify-between', footerGapClass)
+                )}
+            >
             {isMobile ? (
                 <>
                     <div className="flex w-full items-center justify-between gap-x-1.5">
@@ -159,6 +167,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <SessionGoalObjectiveCounter length={messageLength} />
                               </>
                             ) : null}
+                            <PiPlanModeToggle />
                         </div>
                         <div className="flex items-center min-w-0 gap-x-1 justify-end">
                             <div className="flex items-center gap-x-1 flex-shrink-0">
@@ -284,6 +293,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                     </div>
                 </>
             )}
+            </div>
             {isPiKernel ? (
               <SessionTreeDialog open={treeOpen} onOpenChange={setTreeOpen} sessionId={currentSessionId} />
             ) : null}

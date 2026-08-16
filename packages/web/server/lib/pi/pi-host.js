@@ -43,6 +43,14 @@ import {
 } from './session-metadata.js';
 import { createExtensionUIController } from './extension-ui.js';
 import {
+  PLAN_MODE_STATE_ENTRY_TYPE,
+  applyMockPlanCommand,
+  parseSessionPlanAction,
+  restoreSessionPlanState,
+  resumeSavedPlanState,
+  sessionPlanFromState,
+} from './session-plan.js';
+import {
   buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
@@ -69,6 +77,7 @@ export const createInMemoryPiSession = ({
   chunks = ['Hello from ', 'the Pi mock kernel.'],
   chunkDelayMs = 5,
   compacting = false,
+  planModeState = null,
 } = {}) => {
   const listeners = new Set();
   let streaming = false;
@@ -77,6 +86,19 @@ export const createInMemoryPiSession = ({
   let reloadCount = 0;
   const messages = [];
   const extensionCommands = new Map();
+  const sessionEntries = [];
+  let planState = planModeState && typeof planModeState === 'object'
+    ? { ...planModeState }
+    : { enabled: false, awaitingAction: false };
+
+  const persistPlanState = () => {
+    sessionEntries.push({
+      type: 'custom',
+      customType: PLAN_MODE_STATE_ENTRY_TYPE,
+      data: planState,
+    });
+  };
+  persistPlanState();
 
   const emit = (event) => {
     for (const listener of Array.from(listeners)) {
@@ -139,7 +161,7 @@ export const createInMemoryPiSession = ({
     return true;
   };
 
-  return {
+  const session = {
     sessionId,
     get isStreaming() {
       return streaming;
@@ -166,6 +188,28 @@ export const createInMemoryPiSession = ({
         source: 'extension',
         handler: typeof handler === 'function' ? handler : async () => {},
       });
+    },
+    getPlanModeState() {
+      return planState;
+    },
+    setPlanModeState(next) {
+      planState = next && typeof next === 'object' ? { ...next } : { enabled: false, awaitingAction: false };
+      persistPlanState();
+      return planState;
+    },
+    sessionManager: {
+      getEntries() {
+        return sessionEntries.slice();
+      },
+      getBranch() {
+        return sessionEntries.slice();
+      },
+      appendCustomEntry(customType, data) {
+        sessionEntries.push({ type: 'custom', customType, data });
+        if (customType === PLAN_MODE_STATE_ENTRY_TYPE && data && typeof data === 'object') {
+          planState = { ...data };
+        }
+      },
     },
     async prompt(text, options = {}) {
       if (streaming) {
@@ -240,6 +284,13 @@ export const createInMemoryPiSession = ({
       this.extensionBindings = bindings;
     },
   };
+
+  session.registerCommand('plan', async (args) => {
+    planState = applyMockPlanCommand(planState, args);
+    persistPlanState();
+  }, { description: 'Enter or manage Plan mode' });
+
+  return session;
 };
 
 const defaultHome = () => os.homedir();
@@ -1083,6 +1134,36 @@ export const createPiHost = ({
     return record;
   };
 
+  const readRecordPlan = (record) => {
+    if (typeof record?.piSession?.getPlanModeState === 'function') {
+      return sessionPlanFromState(record.piSession.getPlanModeState());
+    }
+    const manager = record?.sessionManager;
+    const entries = typeof manager?.getEntries === 'function'
+      ? manager.getEntries()
+      : (typeof manager?.getBranch === 'function' ? manager.getBranch() : []);
+    return sessionPlanFromState(restoreSessionPlanState(entries));
+  };
+
+  const persistRecordPlanState = (record, next) => {
+    if (typeof record?.piSession?.setPlanModeState === 'function') {
+      record.piSession.setPlanModeState(next);
+    }
+    if (typeof record?.sessionManager?.appendCustomEntry === 'function') {
+      record.sessionManager.appendCustomEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+    } else if (typeof record?.piSession?.appendEntry === 'function') {
+      record.piSession.appendEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+    }
+  };
+
+  const emitPlanUpdated = (record, plan) => {
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'pi.plan.updated',
+      properties: { sessionID: record.id, plan },
+    });
+  };
+
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
     if (existing) return existing;
@@ -1678,6 +1759,54 @@ export const createPiHost = ({
       const error = new Error(`Unknown command: /${name}`);
       error.status = 404;
       throw error;
+    },
+    async getSessionPlan(sessionID) {
+      const record = await ensureRecord(sessionID);
+      return readRecordPlan(record);
+    },
+    async runPlanAction(sessionID, body = {}) {
+      const record = await ensureRecord(sessionID);
+      const { action, model } = parseSessionPlanAction(body);
+      const blocked = sessionBlocksPiReload(record);
+      if (blocked) {
+        const error = new Error(blocked);
+        error.status = 409;
+        throw error;
+      }
+
+      if (action === 'resume') {
+        const current = typeof record.piSession?.getPlanModeState === 'function'
+          ? record.piSession.getPlanModeState()
+          : restoreSessionPlanState(
+            typeof record.sessionManager?.getEntries === 'function'
+              ? record.sessionManager.getEntries()
+              : [],
+          );
+        const next = resumeSavedPlanState(current);
+        if (!next) {
+          const error = new Error('No saved plan to resume');
+          error.status = 409;
+          throw error;
+        }
+        persistRecordPlanState(record, next);
+        await this.reload({ sessionID: record.id });
+        const reloaded = await ensureRecord(record.id);
+        const plan = readRecordPlan(reloaded);
+        emitPlanUpdated(reloaded, plan);
+        return plan;
+      }
+
+      if (action === 'implement' && model) {
+        await this.setSessionModel(sessionID, model);
+      }
+
+      await this.runCommand(sessionID, {
+        command: 'plan',
+        arguments: action === 'exit' ? 'exit' : action,
+      });
+      const plan = readRecordPlan(record);
+      emitPlanUpdated(record, plan);
+      return plan;
     },
     listExtensions(directory) {
       return listPiExtensions({ home, directory: directory || defaultDirectory });

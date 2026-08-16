@@ -45,6 +45,9 @@ import { Icon } from "@/components/icon/Icon";
 import { useMessageTTS } from '@/hooks/useMessageTTS';
 import { renderMagicPrompt } from '@/lib/magicPrompts';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
+import { PiSessionPlanView } from './PiSessionPlanView';
 
 type PlanViewProps = {
   targetPath?: string | null;
@@ -151,6 +154,16 @@ type SelectedLineRange = {
 };
 
 export const PlanView: React.FC<PlanViewProps> = ({ targetPath = null, onNavigatedToChat }) => {
+  const isPiKernel = usePiKernel();
+  const planPluginAvailable = usePiPlanPluginAvailable();
+  if (isPiKernel && planPluginAvailable && !targetPath) {
+    return <PiSessionPlanView />;
+  }
+
+  return <OpenCodePlanView targetPath={targetPath} onNavigatedToChat={onNavigatedToChat} />;
+};
+
+const OpenCodePlanView: React.FC<PlanViewProps> = ({ targetPath = null, onNavigatedToChat }) => {
   const { t } = useI18n();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const createSession = useSessionUIStore((state) => state.createSession);

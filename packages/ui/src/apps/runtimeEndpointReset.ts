@@ -19,6 +19,8 @@ import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
 import { resetSessionOrdering } from '@/sync/session-ordering';
 import { resetSessionActivityTiming } from '@/sync/session-activity-timing';
 import { resetPiExtensionUiStore } from '@/sync/pi-extension-ui-store';
+import { resetPiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
+import { resetPiSessionPlanStore } from '@/sync/pi-session-plan-store';
 import { syncDesktopSettings } from '@/lib/persistence';
 
 // Same-device transport switch (LAN⇄relay for one paired device): rebind the SDK
@@ -62,6 +64,8 @@ export const resetAppForRuntimeEndpointChange = (detail: RuntimeEndpointChangedD
   // restarts the resume window so the switch is treated as a fresh load.
   resetSessionActivityTiming();
   resetPiExtensionUiStore();
+  resetPiFeaturePluginsStore();
+  resetPiSessionPlanStore();
   usePermissionStore.getState().reset();
   useFileSearchStore.getState().resetForRuntimeSwitch();
   useGitStore.getState().resetForRuntimeSwitch(detail.runtimeKey);

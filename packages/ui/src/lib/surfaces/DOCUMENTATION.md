@@ -26,11 +26,15 @@ edge (`components/layout/ContextPanelRail.tsx`) and rendered by
   registry's default order and appends any missing surfaces.
 - `getVisibleContextRailSurfaces` is the single visibility filter shared by the
   rail and the global surface-switch shortcut (`switch_context_surface` in
-  `lib/shortcuts.ts`): it drops the plan surface unless plan mode is enabled,
-  drops the walkthrough on VS Code and below `WALKTHROUGH_MIN_WIDTH`, and hides
-  `has-content` surfaces until a tab of their mode (or a `revealedByModes`
-  mode) exists. Both consumers use it so the digit shown on a rail badge
-  always maps to the same surface the shortcut opens.
+  `lib/shortcuts.ts`): it drops the plan surface unless the caller passes
+  `planModeEnabled`. On Pi that flag is Feature Plugins `plan` installed+enabled
+  **and** live plan markdown (`ready` / `saved` / `implementing`);
+  `planModeExperimentalEnabled` must not gate it. On OpenCode it stays the
+  experimental plan-mode flag. It also drops the walkthrough on VS Code and
+  below `WALKTHROUGH_MIN_WIDTH`, and hides `has-content` surfaces until a tab
+  of their mode (or a `revealedByModes` mode) exists. Both consumers use it so
+  the digit shown on a rail badge always maps to the same surface the shortcut
+  opens.
 
 ## Adding a surface
 

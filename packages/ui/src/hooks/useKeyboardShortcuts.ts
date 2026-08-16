@@ -17,7 +17,11 @@ import {
   getEffectiveShortcutPrefix,
   normalizeCombo,
 } from '@/lib/shortcuts';
+import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import { getVisibleContextRailSurfaces } from '@/lib/surfaces/registry';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
+import { usePiSessionPlanStore } from '@/sync/pi-session-plan-store';
 import { readEmbeddedThemeSearchParams } from '@/contexts/theme-embedded-bootstrap';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -71,6 +75,7 @@ export const useKeyboardShortcuts = () => {
   const activeProject = useProjectsStore((s) => s.getActiveProject());
   const { themeMode, setThemeMode } = useThemeSystem();
   const { phase: sessionPhase } = useCurrentSessionActivity();
+  const isPiKernel = usePiKernel();
   const abortPrimedUntilRef = React.useRef<number | null>(null);
   const abortPrimedTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const themeModeRef = React.useRef(themeMode);
@@ -499,9 +504,15 @@ export const useKeyboardShortcuts = () => {
         }
         const directory = normalizeContextPanelDirectoryKey(effectiveDirectory);
         const panelState = state.contextPanelByDirectory[directory];
+        const sessionId = useSessionUIStore.getState().currentSessionId;
         const visibleSurfaces = getVisibleContextRailSurfaces({
           railOrder: state.contextRailOrder,
-          planModeEnabled: useFeatureFlagsStore.getState().planModeEnabled,
+          planModeEnabled: resolvePlanRailEnabled({
+            isPiKernel,
+            featurePlugins: usePiFeaturePluginsStore.getState().payload,
+            plan: sessionId ? usePiSessionPlanStore.getState().plansBySession[sessionId] ?? null : null,
+            planModeExperimentalEnabled: useFeatureFlagsStore.getState().planModeEnabled,
+          }),
           isVSCode: isVSCodeRuntime(),
           screenWidth: window.innerWidth,
           tabs: panelState?.tabs ?? [],
@@ -705,6 +716,7 @@ export const useKeyboardShortcuts = () => {
     armAbortPrompt,
     resetAbortPriming,
     currentSessionId,
+    isPiKernel,
     currentDirectory,
     effectiveDirectory,
     activeProject?.id,

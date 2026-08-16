@@ -779,3 +779,110 @@ describe('resolvePromptModelRef', () => {
     expect(resolvePromptModelRef(null)).toBe('');
   });
 });
+
+describe('session plan status and actions', () => {
+  it('reads live plan-mode-state and dispatches start/save/implement/exit', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan' });
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'off', planMarkdown: '' });
+
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(prompted).toEqual(['/plan start']);
+
+    record.piSession.setPlanModeState({
+      enabled: true,
+      latestPlan: '# Ready plan\n\nDo the work.',
+      awaitingAction: true,
+    });
+    expect(await host.getSessionPlan(record.id)).toMatchObject({
+      status: 'ready',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+      title: 'Ready plan',
+    });
+
+    expect(await host.runPlanAction(record.id, { action: 'save' })).toMatchObject({
+      status: 'saved',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+    });
+    expect(prompted).toEqual(['/plan start', '/plan save']);
+
+    expect(await host.runPlanAction(record.id, { action: 'implement' })).toMatchObject({
+      status: 'implementing',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+    });
+    expect(prompted).toEqual(['/plan start', '/plan save', '/plan implement']);
+    expect(events.some((event) => event.type === 'pi.plan.updated')).toBe(true);
+
+    expect(await host.runPlanAction(record.id, { action: 'exit' })).toEqual({
+      status: 'off',
+      planMarkdown: '',
+    });
+    expect(prompted.at(-1)).toBe('/plan exit');
+    host.dispose();
+  });
+
+  it('resumes a saved plan without sending /plan start', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Resume' });
+    record.piSession.setPlanModeState({
+      enabled: false,
+      savedPlan: { plan: '# Saved\n\nKeep this.', source: 'plan_mode_complete' },
+    });
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(prompted).toEqual([]);
+
+    const plan = await host.runPlanAction(record.id, { action: 'resume' });
+    expect(plan).toMatchObject({
+      status: 'ready',
+      planMarkdown: '# Saved\n\nKeep this.',
+    });
+    expect(prompted).toEqual([]);
+    expect(record.piSession.reloadCount).toBe(1);
+    expect(record.piSession.bindCount).toBe(2);
+    host.dispose();
+  });
+
+  it('refuses plan actions while the session is busy', async () => {
+    const busy = createInMemoryPiSession({ compacting: true });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => busy,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
+      status: 409,
+    });
+    host.dispose();
+  });
+});
+
