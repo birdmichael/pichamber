@@ -21,7 +21,7 @@ type BridgeMessageInput = {
 type SystemRuntimeDeps = {
   resolveUserPath: (value: string, baseDirectory: string) => string;
   fetchModelsMetadata: () => Promise<unknown>;
-  updateCheckUrl: string;
+  updateCheckUrl?: string;
   clientReloadDelayMs: number;
 };
 
@@ -329,6 +329,15 @@ export async function handleSystemBridgeMessage(
           instanceMode,
           reportUsage,
         };
+
+        if (!deps.updateCheckUrl) {
+          return {
+            id,
+            type,
+            success: true,
+            data: { updateAvailable: false, latestVersion: currentVersion },
+          };
+        }
 
         const response = await fetch(deps.updateCheckUrl, {
           method: 'POST',

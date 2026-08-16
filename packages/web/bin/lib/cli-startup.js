@@ -167,8 +167,16 @@ function resolveCliEntrypoint() {
   }
 }
 
+function resolveStartupPrefix() {
+  const pichamber = searchPathFor('pichamber');
+  if (typeof pichamber === 'string' && pichamber.trim().length > 0) {
+    return [pichamber.trim()];
+  }
+  return [process.execPath, resolveCliEntrypoint()];
+}
+
 function buildStartupArgs(options = {}) {
-  const args = [resolveCliEntrypoint(), 'serve', '--foreground', '--port', String(options.port || DEFAULT_PORT)];
+  const args = [...resolveStartupPrefix(), 'serve', '--foreground', '--port', String(options.port || DEFAULT_PORT)];
   if (typeof options.host === 'string' && options.host.length > 0) {
     args.push('--host', options.host);
   }
@@ -182,7 +190,7 @@ function writeMacosStartupWrapper(options = {}) {
   const wrapperPath = getMacosStartupWrapperPath();
   const args = buildStartupArgs(options).map(startupShellQuote).join(' ');
   const content = `#!/bin/sh
-exec ${startupShellQuote(process.execPath)} ${args}
+exec ${args}
 `;
   fs.mkdirSync(path.dirname(wrapperPath), { recursive: true, mode: 0o700 });
   fs.writeFileSync(wrapperPath, content, { mode: 0o700 });
@@ -226,7 +234,8 @@ ${envXml}  <key>ProcessType</key>
 }
 
 function buildSystemdUserService(options = {}) {
-  const args = buildStartupArgs(options).map((arg) => `"${systemdEscapeArg(arg)}"`).join(' ');
+  const [executable, ...rest] = buildStartupArgs(options);
+  const args = rest.map((arg) => `"${systemdEscapeArg(arg)}"`).join(' ');
   const envFilePath = getStartupEnvFilePath();
   return `[Unit]
 Description=OpenChamber web server
@@ -235,7 +244,7 @@ After=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-${systemdEscapeArg(envFilePath)}
-ExecStart="${systemdEscapeArg(process.execPath)}" ${args}
+ExecStart="${systemdEscapeArg(executable)}" ${args}
 WorkingDirectory=${systemdUnitPath(os.homedir())}
 Restart=always
 RestartSec=5
@@ -319,11 +328,12 @@ function enableStartupService(options = {}) {
   }
 
   const envFilePath = writeStartupEnvFile(options);
-  const startupArgs = buildStartupArgs(options).map(powershellQuote).join(', ');
+  const [executable, ...rest] = buildStartupArgs(options);
+  const startupArgs = rest.map(powershellQuote).join(', ');
   const powerShellCommand = [
     `$envFile=${powershellQuote(envFilePath)}`,
     `if (Test-Path $envFile) { Get-Content $envFile | ForEach-Object { if ($_ -match '^([^=]+)=(.*)$') { $v=$matches[2]; if ($v.StartsWith("'") -and $v.EndsWith("'")) { $v=$v.Substring(1,$v.Length-2).Replace("'\\''","'") }; [Environment]::SetEnvironmentVariable($matches[1], $v, 'Process') } } }`,
-    `& ${powershellQuote(process.execPath)} ${startupArgs}`,
+    `& ${powershellQuote(executable)} ${startupArgs}`,
   ].join('; ');
   const taskArgs = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "${powerShellCommand.replace(/"/g, '\\"')}"`;
   runStartupCommand('schtasks.exe', [

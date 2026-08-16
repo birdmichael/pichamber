@@ -8,18 +8,28 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PACKAGE_NAME = '@openchamber/web';
+const PACKAGE_NAME = '@pichamber/web';
+const LEFTOVER_PACKAGE_NAME = '@openchamber/web';
 const PACKAGE_PATH_SEGMENTS = PACKAGE_NAME.split('/');
+const LEFTOVER_PACKAGE_PATH_SEGMENTS = LEFTOVER_PACKAGE_NAME.split('/');
 const NPM_REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE_NAME}`;
-const CHANGELOG_URL = 'https://raw.githubusercontent.com/openchamber/openchamber/main/CHANGELOG.md';
-const GITHUB_RELEASES_URL = 'https://github.com/openchamber/openchamber/releases';
-const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/openchamber/openchamber/releases';
+const CHANGELOG_URL = 'https://raw.githubusercontent.com/birdmichael/pichamber/main/CHANGELOG.md';
+const GITHUB_RELEASES_URL = 'https://github.com/birdmichael/pichamber/releases';
+const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/birdmichael/pichamber/releases';
+const UPDATE_COMMAND = 'pichamber update';
 let cachedDetectedPm = null;
 
 function getSpawnSyncBaseOptions() {
   return process.platform === 'win32' ? { windowsHide: true } : {};
 }
-const UPDATE_CHECK_URL = process.env.OPENCHAMBER_UPDATE_API_URL || 'https://api.openchamber.dev/v1/update/check';
+
+function getUpdateCheckApiUrl() {
+  const preferred = process.env.PICHAMBER_UPDATE_API_URL?.trim();
+  if (preferred) return preferred;
+  const deprecated = process.env.OPENCHAMBER_UPDATE_API_URL?.trim();
+  if (deprecated) return deprecated;
+  return null;
+}
 
 function getOpenChamberConfigDir() {
   if (process.platform === 'win32') {
@@ -99,7 +109,7 @@ async function resolveAndroidApkUrl(version, candidateUrl) {
     const response = await fetch(`${GITHUB_RELEASES_API_URL}/tags/v${version}`, {
       headers: {
         Accept: 'application/vnd.github+json',
-        'User-Agent': 'openchamber-update-check',
+        'User-Agent': 'pichamber-update-check',
       },
       signal: AbortSignal.timeout(10000),
     });
@@ -113,14 +123,15 @@ async function resolveAndroidApkUrl(version, candidateUrl) {
         && typeof asset.browser_download_url === 'string'
       ))
       : [];
-    const canonicalAsset = apkAssets.find((asset) => /^OpenChamber-.+-android\.apk$/i.test(asset.name));
+    const canonicalAsset = apkAssets.find((asset) => /^(?:Pichamber|OpenChamber)-.+-android\.apk$/i.test(asset.name));
     return (canonicalAsset || apkAssets[0])?.browser_download_url;
   } catch {
     return undefined;
   }
 }
 
-async function checkForUpdatesFromApi(currentVersion, options = {}) {
+async function checkForUpdatesFromApi(currentVersion, options = {}, updateCheckUrl) {
+  if (!updateCheckUrl) return null;
   try {
     const appType = normalizeAppType(options.appType);
     const hostPlatform = mapPlatform(process.platform);
@@ -141,7 +152,7 @@ async function checkForUpdatesFromApi(currentVersion, options = {}) {
       reportUsage,
     };
 
-    const response = await fetch(UPDATE_CHECK_URL, {
+    const response = await fetch(updateCheckUrl, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -223,9 +234,12 @@ function getCurrentPackagePath() {
   return path.resolve(__dirname, '..', '..');
 }
 
-function getPackagePathForGlobalRoot(rootPath) {
+function getPackagePathForGlobalRoot(rootPath, packageName = PACKAGE_NAME) {
   if (!rootPath) return null;
-  return path.join(rootPath, ...PACKAGE_PATH_SEGMENTS);
+  const segments = packageName === LEFTOVER_PACKAGE_NAME
+    ? LEFTOVER_PACKAGE_PATH_SEGMENTS
+    : packageName.split('/');
+  return path.join(rootPath, ...segments);
 }
 
 function getUniquePaths(paths) {
@@ -343,15 +357,19 @@ function getGlobalNodeModulesRoots(pm) {
 
 function getOwnedPackagePathsFromGlobalBins(pm) {
   const packagePaths = [];
+  const binaryNames = process.platform === 'win32'
+    ? ['pichamber.cmd', 'openchamber.cmd']
+    : ['pichamber', 'openchamber'];
   for (const binDir of getGlobalBinDirs(pm)) {
-    const binaryName = process.platform === 'win32' ? 'openchamber.cmd' : 'openchamber';
-    const binaryPath = path.join(binDir, binaryName);
-    if (!fs.existsSync(binaryPath)) continue;
+    for (const binaryName of binaryNames) {
+      const binaryPath = path.join(binDir, binaryName);
+      if (!fs.existsSync(binaryPath)) continue;
 
-    try {
-      const realBinaryPath = fs.realpathSync.native ? fs.realpathSync.native(binaryPath) : fs.realpathSync(binaryPath);
-      packagePaths.push(path.resolve(realBinaryPath, '..', '..'));
-    } catch {
+      try {
+        const realBinaryPath = fs.realpathSync.native ? fs.realpathSync.native(binaryPath) : fs.realpathSync(binaryPath);
+        packagePaths.push(path.resolve(realBinaryPath, '..', '..'));
+      } catch {
+      }
     }
   }
 
@@ -365,7 +383,10 @@ function detectPackageManagerFromCurrentInstallPath() {
 function packageManagerOwnsCurrentInstall(pm) {
   const currentPackagePaths = getComparablePaths(getCurrentPackagePath());
   const candidatePackagePaths = [
-    ...getGlobalNodeModulesRoots(pm).map(getPackagePathForGlobalRoot),
+    ...getGlobalNodeModulesRoots(pm).flatMap((root) => [
+      getPackagePathForGlobalRoot(root),
+      getPackagePathForGlobalRoot(root, LEFTOVER_PACKAGE_NAME),
+    ]),
     ...getOwnedPackagePathsFromGlobalBins(pm),
   ];
 
@@ -645,7 +666,10 @@ function isPackageInstalledWith(pm) {
     });
 
     if (result.status !== 0) return false;
-    return result.stdout.includes(PACKAGE_NAME) || result.stdout.includes('openchamber');
+    return result.stdout.includes(PACKAGE_NAME)
+      || result.stdout.includes('pichamber')
+      || result.stdout.includes(LEFTOVER_PACKAGE_NAME)
+      || result.stdout.includes('openchamber');
   } catch {
     return false;
   }
@@ -681,25 +705,63 @@ export function getCurrentVersion() {
   }
 }
 
-/**
- * Fetch latest version from npm registry
- */
-async function getLatestVersion() {
+async function fetchJsonResource(url, { headers } = {}) {
   try {
-    const response = await fetch(NPM_REGISTRY_URL, {
-      headers: { Accept: 'application/json' },
+    const response = await fetch(url, {
+      headers,
       signal: AbortSignal.timeout(10000),
     });
-
-    if (!response.ok) {
-      throw new Error(`Registry responded with ${response.status}`);
+    if (response.status === 404 || response.status === 204) {
+      return { status: 'empty' };
     }
-
-    const data = await response.json();
-    return data['dist-tags']?.latest || null;
+    if (!response.ok) {
+      return { status: 'error', error: `Request failed with ${response.status}` };
+    }
+    return { status: 'ok', data: await response.json() };
   } catch (error) {
-    return null;
+    return { status: 'error', error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+async function getLatestGitHubRelease() {
+  const result = await fetchJsonResource(`${GITHUB_RELEASES_API_URL}/latest`, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'pichamber-update-check',
+    },
+  });
+  if (result.status !== 'ok') return result;
+  const tagName = typeof result.data?.tag_name === 'string' ? result.data.tag_name : '';
+  const version = tagName.replace(/^v/, '').trim();
+  if (!version) return { status: 'empty' };
+  return {
+    status: 'ok',
+    version,
+    body: typeof result.data.body === 'string' ? result.data.body : undefined,
+    releaseUrl: typeof result.data.html_url === 'string'
+      ? result.data.html_url
+      : `${GITHUB_RELEASES_URL}/tag/v${version}`,
+  };
+}
+
+async function getLatestNpmVersion() {
+  const result = await fetchJsonResource(NPM_REGISTRY_URL, {
+    headers: { Accept: 'application/json' },
+  });
+  if (result.status !== 'ok') return result;
+  const version = result.data?.['dist-tags']?.latest;
+  if (typeof version !== 'string' || !version.trim()) return { status: 'empty' };
+  return { status: 'ok', version: version.trim() };
+}
+
+function pickLatestPichamberVersion(github, npm) {
+  const candidates = [];
+  if (github.status === 'ok') candidates.push(github);
+  if (npm.status === 'ok') candidates.push(npm);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, candidate) => (
+    compareVersions(candidate.version, latest.version) > 0 ? candidate : latest
+  ));
 }
 
 /**
@@ -772,27 +834,42 @@ export async function checkForUpdates(options = {}) {
   const pm = detectPackageManager();
   const appType = normalizeAppType(options.appType);
   const platform = normalizePlatform(options.platform);
+  const updateCheckUrl = getUpdateCheckApiUrl();
 
-  if (currentVersion !== 'unknown') {
-    const remote = await checkForUpdatesFromApi(currentVersion, options);
+  if (updateCheckUrl && currentVersion !== 'unknown') {
+    const remote = await checkForUpdatesFromApi(currentVersion, options, updateCheckUrl);
     if (remote) {
-      if (remote.available && appType === 'web') {
-        const npmLatest = await getLatestVersion();
-        if (!npmLatest || compareVersions(npmLatest, remote.version) < 0) {
-          remote.available = false;
-        }
-      }
       return {
         ...remote,
         packageManager: pm,
-        updateCommand: 'openchamber update',
+        updateCommand: UPDATE_COMMAND,
       };
     }
   }
 
-  const latestVersion = await getLatestVersion();
+  const [github, npm] = await Promise.all([
+    getLatestGitHubRelease(),
+    getLatestNpmVersion(),
+  ]);
+  const latest = pickLatestPichamberVersion(github, npm);
 
-  if (!latestVersion || currentVersion === 'unknown') {
+  if (!latest) {
+    if (github.status === 'error' || npm.status === 'error') {
+      return {
+        available: false,
+        currentVersion,
+        error: github.error || npm.error || 'Unable to determine versions',
+      };
+    }
+    return {
+      available: false,
+      currentVersion,
+      packageManager: pm,
+      updateCommand: UPDATE_COMMAND,
+    };
+  }
+
+  if (currentVersion === 'unknown') {
     return {
       available: false,
       currentVersion,
@@ -800,26 +877,27 @@ export async function checkForUpdates(options = {}) {
     };
   }
 
-  const available = compareVersions(latestVersion, currentVersion) > 0;
-  let changelog;
+  const available = compareVersions(latest.version, currentVersion) > 0;
+  let changelog = latest.body;
   let downloadUrl;
   if (available) {
-    changelog = await fetchChangelogNotes(currentVersion, latestVersion);
+    if (!changelog) {
+      changelog = await fetchChangelogNotes(currentVersion, latest.version);
+    }
     if (appType === 'mobile-capacitor' && platform === 'android') {
-      downloadUrl = await resolveAndroidApkUrl(latestVersion);
+      downloadUrl = await resolveAndroidApkUrl(latest.version);
     }
   }
 
   return {
     available,
-    version: latestVersion,
+    version: latest.version,
     currentVersion,
     body: changelog,
-    releaseUrl: `${GITHUB_RELEASES_URL}/tag/v${latestVersion}`,
+    releaseUrl: latest.releaseUrl || `${GITHUB_RELEASES_URL}/tag/v${latest.version}`,
     downloadUrl,
     packageManager: pm,
-    // Show our CLI command, not raw package manager command
-    updateCommand: 'openchamber update',
+    updateCommand: UPDATE_COMMAND,
   };
 }
 
