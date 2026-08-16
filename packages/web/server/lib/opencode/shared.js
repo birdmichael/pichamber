@@ -372,7 +372,17 @@ function walkSkillMdFiles(rootDir) {
   if (!rootDir || !fs.existsSync(rootDir)) return [];
 
   const results = [];
+  const seen = new Set();
   const walk = (dir) => {
+    let realDir = '';
+    try {
+      realDir = fs.realpathSync(dir);
+    } catch {
+      return;
+    }
+    if (seen.has(realDir)) return;
+    seen.add(realDir);
+
     let entries = [];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -382,11 +392,20 @@ function walkSkillMdFiles(rootDir) {
 
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      let isDir = false;
+      let isRegularFile = false;
+      try {
+        const stat = fs.statSync(fullPath);
+        isDir = stat.isDirectory();
+        isRegularFile = stat.isFile();
+      } catch {
+        continue;
+      }
+      if (isDir) {
         walk(fullPath);
         continue;
       }
-      if (entry.isFile() && entry.name === 'SKILL.md') {
+      if (isRegularFile && entry.name === 'SKILL.md') {
         results.push(fullPath);
       }
     }
@@ -404,9 +423,11 @@ function addSkillFromMdFile(skillsMap, skillMdPath, scope, source) {
     return;
   }
 
-  const name = typeof parsed.frontmatter?.name === 'string'
+  const frontmatterName = typeof parsed.frontmatter?.name === 'string'
     ? parsed.frontmatter.name.trim()
     : '';
+  const directoryName = path.basename(path.dirname(skillMdPath));
+  const name = frontmatterName || directoryName;
   const description = typeof parsed.frontmatter?.description === 'string'
     ? parsed.frontmatter.description
     : '';

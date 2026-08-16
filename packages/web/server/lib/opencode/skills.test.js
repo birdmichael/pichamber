@@ -109,6 +109,79 @@ describe('skills', () => {
     expect(sources.md.instructions).toBe('');
   });
 
+  it('loads nested symlink skills and YAML block descriptions from the walked SKILL.md', async () => {
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-nested-symlink-skill-'));
+    const realSkills = path.join(tempRoot, 'pack', 'skills');
+    const skillDir = path.join(realSkills, 'brainstorming');
+    const skillPath = path.join(tempRoot, '.agents', 'skills', 'superpowers', 'brainstorming', 'SKILL.md');
+    const original = [
+      '---',
+      'name: brainstorming',
+      'description: |',
+      '  This skill brainstorms approaches.',
+      '  Second line stays in the blurb.',
+      '---',
+      '',
+      'Ask clarifying questions first.',
+      '',
+    ].join('\n');
+
+    try {
+      await fsPromises.mkdir(skillDir, { recursive: true });
+      await fsPromises.mkdir(path.join(tempRoot, '.git'));
+      await fsPromises.writeFile(path.join(skillDir, 'SKILL.md'), original, 'utf8');
+      await fsPromises.mkdir(path.join(tempRoot, '.agents', 'skills'), { recursive: true });
+      await fsPromises.symlink(realSkills, path.join(tempRoot, '.agents', 'skills', 'superpowers'));
+
+      const discovered = discoverSkills(tempRoot);
+      const listed = discovered.find((skill) => skill.name === 'brainstorming');
+      expect(listed?.path).toBe(skillPath);
+      expect(listed?.description).toContain('This skill brainstorms approaches.');
+      expect(listed?.description).not.toBe('|');
+
+      const sources = getSkillSources('brainstorming', tempRoot);
+      expect(sources.md.exists).toBe(true);
+      expect(sources.md.path).toBe(skillPath);
+      expect(sources.md.description).toContain('This skill brainstorms approaches.');
+      expect(sources.md.description).toContain('Second line stays in the blurb.');
+      expect(sources.md.description).not.toBe('|');
+      expect(sources.md.instructions).toBe('Ask clarifying questions first.');
+      expect(await fsPromises.readFile(path.join(skillDir, 'SKILL.md'), 'utf8')).toBe(original);
+    } finally {
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the SKILL.md directory name when frontmatter has no name', async () => {
+    const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-unnamed-skill-'));
+    const skillDir = path.join(tempRoot, '.agents', 'skills', 'repo-unnamed-skill');
+    const skillPath = path.join(skillDir, 'SKILL.md');
+
+    try {
+      await fsPromises.mkdir(skillDir, { recursive: true });
+      await fsPromises.mkdir(path.join(tempRoot, '.git'));
+      await fsPromises.writeFile(
+        skillPath,
+        [
+          '---',
+          'description: Project skill without a name field',
+          '---',
+          '',
+          'Do the work.',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const discovered = discoverSkills(tempRoot);
+      const match = discovered.find((skill) => skill.path === skillPath);
+      expect(match?.name).toBe('repo-unnamed-skill');
+      expect(match?.description).toBe('Project skill without a name field');
+    } finally {
+      await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it('enriches discovered skills when their location is a real markdown file', async () => {
     const tempRoot = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'oc-skills-'));
     const skillDir = path.join(tempRoot, 'example-skill');

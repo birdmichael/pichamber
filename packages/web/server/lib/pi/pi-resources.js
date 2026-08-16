@@ -658,11 +658,16 @@ export const listPiSkills = ({ home = os.homedir(), directory } = {}) => {
       seenRoots.add(realRoot);
     }
     for (const skillPath of walkFiles(root, (name) => name === 'SKILL.md')) {
-      const name = path.basename(path.dirname(skillPath));
       const key = resolveExistingPath(skillPath) || path.resolve(skillPath);
-      if (!name || seen.has(key)) continue;
+      if (seen.has(key)) continue;
       seen.add(key);
       const parsed = parseMarkdownFrontmatter(readText(skillPath));
+      const directoryName = path.basename(path.dirname(skillPath));
+      const frontmatterName = typeof parsed.attributes.name === 'string'
+        ? parsed.attributes.name.trim()
+        : '';
+      const name = frontmatterName || directoryName;
+      if (!name) continue;
       skills.push({
         name,
         path: skillPath,
@@ -689,6 +694,86 @@ export const listPiSkills = ({ home = os.homedir(), directory } = {}) => {
     }
   }
   return skills;
+};
+
+const emptyPiSkillDetail = (skillName) => ({
+  name: skillName,
+  sources: {
+    md: {
+      exists: false,
+      path: null,
+      dir: null,
+      fields: [],
+      supportingFiles: [],
+      name: skillName,
+      description: '',
+      instructions: '',
+    },
+  },
+  scope: null,
+  source: null,
+  exists: false,
+});
+
+const listImmediateSkillFiles = (skillDir) => {
+  if (!isDirectory(skillDir)) return [];
+  let entries = [];
+  try {
+    entries = fs.readdirSync(skillDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files = [];
+  for (const entry of entries) {
+    if (entry.name === 'SKILL.md') continue;
+    const fullPath = path.join(skillDir, entry.name);
+    if (!isFile(fullPath)) continue;
+    files.push({
+      name: entry.name,
+      path: entry.name,
+      fullPath,
+    });
+  }
+  return files;
+};
+
+export const getPiSkillDetail = ({ home = os.homedir(), directory, name } = {}) => {
+  const skillName = typeof name === 'string' ? name.trim() : '';
+  if (!skillName) return emptyPiSkillDetail('');
+
+  const match = listPiSkills({ home, directory }).find((skill) => skill.name === skillName);
+  if (!match?.path || !isFile(match.path)) {
+    return emptyPiSkillDetail(skillName);
+  }
+
+  const parsed = parseMarkdownFrontmatter(readText(match.path));
+  const description = parsed.attributes.description || '';
+  const instructions = parsed.body || '';
+  const fields = Object.keys(parsed.attributes);
+  if (instructions && !fields.includes('instructions')) {
+    fields.push('instructions');
+  }
+
+  return {
+    name: match.name,
+    sources: {
+      md: {
+        exists: true,
+        path: match.path,
+        dir: path.dirname(match.path),
+        fields,
+        scope: match.scope,
+        source: match.source,
+        supportingFiles: listImmediateSkillFiles(path.dirname(match.path)),
+        name: parsed.attributes.name || match.name,
+        description,
+        instructions,
+      },
+    },
+    scope: match.scope,
+    source: match.source,
+    exists: true,
+  };
 };
 
 export const listPiPrompts = ({ home = os.homedir(), directory } = {}) => {
