@@ -54,8 +54,11 @@ import {
   getRememberedMcpStatusSnapshot,
 } from './mcp-status.js';
 import {
+  persistSessionArchive,
   persistSessionMetadata,
+  readPersistedArchiveTime,
   readPersistedSessionMetadata,
+  sessionMetadataWithoutArchive,
 } from './session-metadata.js';
 import { createExtensionUIController } from './extension-ui.js';
 import {
@@ -403,6 +406,41 @@ const findSessionFileById = (sessionID, home) => {
     if (match) return path.join(dir, match);
   }
   return undefined;
+};
+
+const readSessionFileEntries = (file) => {
+  if (!file || !fs.existsSync(file)) return [];
+  try {
+    return fs.readFileSync(file, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line)];
+        } catch {
+          return [];
+        }
+      });
+  } catch {
+    return [];
+  }
+};
+
+const applyPersistedArchiveTime = (info, entries) => {
+  const archived = readPersistedArchiveTime(entries);
+  if (archived === undefined) return;
+  info.time = { ...(info.time || {}), archived };
+};
+
+const persistRecordCustomMetadata = (record) => {
+  const archived = record?.info?.time && Object.prototype.hasOwnProperty.call(record.info.time, 'archived')
+    ? record.info.time.archived
+    : undefined;
+  if (archived !== undefined) {
+    persistSessionArchive(record.sessionManager, archived, record.info.metadata);
+    return;
+  }
+  if (record?.info?.metadata) persistSessionMetadata(record.sessionManager, record.info.metadata);
 };
 
 const writeSessionHeaderIfMissing = (manager, { version } = {}) => {
@@ -1208,7 +1246,7 @@ export const createPiHost = ({
     const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
     const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
     const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
-    const metadata = readPersistedSessionMetadata(entries);
+    const metadata = sessionMetadataWithoutArchive(readPersistedSessionMetadata(entries));
     const record = {
       id: sessionID,
       directory: cwd,
@@ -1233,6 +1271,7 @@ export const createPiHost = ({
       translator: createEventTranslator({ sessionID, directory: cwd }),
       unsubscribe: null,
     };
+    applyPersistedArchiveTime(record.info, entries);
     attachSession(record);
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
@@ -1333,7 +1372,7 @@ export const createPiHost = ({
       piSession = createInMemoryPiSession({ sessionId: resolvedId });
     }
     const entries = typeof manager?.getEntries === 'function' ? manager.getEntries() : fileEntries;
-    const persistedMetadata = readPersistedSessionMetadata(entries);
+    const persistedMetadata = sessionMetadataWithoutArchive(readPersistedSessionMetadata(entries));
     const record = {
       id: resolvedId,
       directory: cwd,
@@ -1358,6 +1397,7 @@ export const createPiHost = ({
       translator: createEventTranslator({ sessionID: resolvedId, directory: cwd }),
       unsubscribe: null,
     };
+    applyPersistedArchiveTime(record.info, entries);
     attachSession(record);
     sessions.set(resolvedId, record);
     emit(cwd, {
@@ -1561,7 +1601,7 @@ export const createPiHost = ({
   const toPersistedSessionInfo = (item, directory) => {
     const id = item?.id || item?.path;
     if (!id) return null;
-    return {
+    const info = {
       id,
       projectID: item.cwd || directory || 'pi',
       directory: item.cwd || directory,
@@ -1572,6 +1612,8 @@ export const createPiHost = ({
         updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
       },
     };
+    applyPersistedArchiveTime(info, readSessionFileEntries(item.path));
+    return info;
   };
 
   const collectSessionInfos = async (directory) => {
@@ -1613,10 +1655,11 @@ export const createPiHost = ({
       record.messages = facadeMessagesFromPiEntries(entries, record.id);
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
       if (title) record.info.title = title;
-      const metadata = readPersistedSessionMetadata(entries);
+      const metadata = sessionMetadataWithoutArchive(readPersistedSessionMetadata(entries));
       if (metadata) {
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
       }
+      applyPersistedArchiveTime(record.info, entries);
       const persisted = await findPersistedSession(record.id, record.directory);
       if (persisted?.modified) {
         const updated = new Date(persisted.modified).getTime();
@@ -1693,10 +1736,14 @@ export const createPiHost = ({
       }
       if (patch.metadata && typeof patch.metadata === 'object') {
         record.info.metadata = { ...(record.info.metadata || {}), ...patch.metadata };
-        persistSessionMetadata(record.sessionManager, record.info.metadata);
+        persistRecordCustomMetadata(record);
       }
-      if (patch.time?.archived) {
-        record.info.time = { ...record.info.time, archived: patch.time.archived };
+      if (patch.time && Object.prototype.hasOwnProperty.call(patch.time, 'archived')) {
+        const archived = patch.time.archived;
+        if (typeof archived === 'number' && Number.isFinite(archived)) {
+          record.info.time = { ...record.info.time, archived };
+          persistRecordCustomMetadata(record);
+        }
       }
       record.info.time.updated = Date.now();
       emit(record.directory, {

@@ -904,6 +904,32 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('excludes archived sessions from the active list unless archived=true', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Archive filter' }),
+      })).json();
+      await fetch(`${url}/api/session/${created.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ time: { archived: Date.now() } }),
+      });
+
+      const active = await (await fetch(`${url}/api/experimental/session?archived=false`)).json();
+      expect(active.map((item) => item.id)).not.toContain(created.id);
+
+      const inclusive = await (await fetch(`${url}/api/experimental/session?archived=true`)).json();
+      const row = inclusive.find((item) => item.id === created.id);
+      expect(row?.time?.archived).toBeGreaterThan(0);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('lists default feature plugin slots without installing', async () => {
     const { url, close, kernel } = await startFacade();
     try {

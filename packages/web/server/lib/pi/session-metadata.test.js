@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PICHAMBER_METADATA_CUSTOM_TYPE,
+  persistSessionArchive,
   persistSessionMetadata,
+  readPersistedArchiveTime,
   readPersistedSessionMetadata,
+  sessionMetadataWithoutArchive,
 } from './session-metadata.js';
 
 const goalMetadata = {
@@ -54,5 +57,34 @@ describe('Pi session metadata persistence', () => {
         throw new Error('disk full');
       },
     }, goalMetadata)).toBe(false);
+  });
+
+  it('reads archive time from the latest pichamber.metadata entry', () => {
+    expect(readPersistedArchiveTime([
+      { type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { time: { archived: 10 } } },
+      { type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { ...goalMetadata, time: { archived: 20 } } },
+    ])).toBe(20);
+    expect(readPersistedArchiveTime([
+      { type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: goalMetadata },
+    ])).toBeUndefined();
+    expect(sessionMetadataWithoutArchive({
+      ...goalMetadata,
+      time: { archived: 20 },
+    })).toEqual(goalMetadata);
+  });
+
+  it('appends archive time without dropping existing goal metadata', () => {
+    const appended = [];
+    const ok = persistSessionArchive({
+      appendCustomEntry(customType, data) {
+        appended.push({ customType, data });
+        return 'entry_2';
+      },
+    }, 1_700_000_000_000, goalMetadata);
+    expect(ok).toBe(true);
+    expect(appended).toEqual([{
+      customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+      data: { ...goalMetadata, time: { archived: 1_700_000_000_000 } },
+    }]);
   });
 });

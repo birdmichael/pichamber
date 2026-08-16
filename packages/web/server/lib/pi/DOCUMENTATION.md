@@ -156,6 +156,23 @@ file does not remove other complete sessions. This path also does not emit
 `server.connected`. Title-refresh `POST /api/session/:id/reload` stays
 skills/prompts/extensions only.
 
+## Session persist and hydrate
+
+`facadeMessagesFromPiEntries` is the hydrate mapper for disk jsonl. Assistant
+`toolCall` blocks become facade `tool` parts. A following `role: "toolResult"`
+entry attaches to that part's output. It is not a user message. Export
+(`buildSessionJsonl`) writes the same Pi-native pair so a live in-memory
+transcript with tools round-trips.
+
+Archive rides `pichamber.metadata` (`time.archived`) on the same custom entry
+as Session Goal. `updateSession` persists a finite `patch.time.archived`,
+including `0` for restore. `listSessionInfos` / `toPersistedSessionInfo` restore
+that field for disk-only rows. A live record already in memory wins over a
+disk row that is missing the flag (same overlay as title).
+`GET /api/session` and `GET /api/experimental/session` omit truthy
+`time.archived` unless `archived=true`. Last-session restore reads the active
+list, so an archived row is not reopened as the current chat.
+
 ## MCP adapter
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot

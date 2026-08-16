@@ -643,40 +643,52 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getStatus(requestDirectory(req) || undefined));
   }));
 
-  const listSessionInfos = async (directory) => {
+  const includeArchivedSessions = (value) => (
+    value === true || value === 'true' || value === '1'
+  );
+
+  const listSessionInfos = async (directory, { includeArchived = false } = {}) => {
+    let infos;
     if (typeof host.listSessionInfos === 'function') {
-      return host.listSessionInfos(directory || undefined);
-    }
-    const live = host.listSessions(directory || undefined).map((record) => record.info);
-    const seen = new Set(live.map((info) => info.id));
-    if (typeof host.listPersistedSessions === 'function') {
-      const persisted = await host.listPersistedSessions(directory || undefined);
-      for (const item of persisted || []) {
-        const id = item.id || item.path;
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        live.push({
-          id,
-          projectID: item.cwd || directory || 'pi',
-          directory: item.cwd || directory,
-          title: item.name || item.firstMessage || 'Pi session',
-          version: 'pi',
-          time: {
-            created: item.created ? new Date(item.created).getTime() : Date.now(),
-            updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
-          },
-        });
+      infos = await host.listSessionInfos(directory || undefined);
+    } else {
+      const live = host.listSessions(directory || undefined).map((record) => record.info);
+      const seen = new Set(live.map((info) => info.id));
+      if (typeof host.listPersistedSessions === 'function') {
+        const persisted = await host.listPersistedSessions(directory || undefined);
+        for (const item of persisted || []) {
+          const id = item.id || item.path;
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          live.push({
+            id,
+            projectID: item.cwd || directory || 'pi',
+            directory: item.cwd || directory,
+            title: item.name || item.firstMessage || 'Pi session',
+            version: 'pi',
+            time: {
+              created: item.created ? new Date(item.created).getTime() : Date.now(),
+              updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
+            },
+          });
+        }
       }
+      infos = live;
     }
-    return live;
+    if (includeArchived) return infos;
+    return (infos || []).filter((info) => !info?.time?.archived);
   };
 
   app.get('/api/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfos(requestDirectory(req)));
+    json(res, 200, await listSessionInfos(requestDirectory(req), {
+      includeArchived: includeArchivedSessions(req.query?.archived),
+    }));
   }));
 
   app.get('/api/experimental/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfos(requestDirectory(req)));
+    json(res, 200, await listSessionInfos(requestDirectory(req), {
+      includeArchived: includeArchivedSessions(req.query?.archived),
+    }));
   }));
 
   app.post('/api/session', parseJson, handle(async (req, res) => {

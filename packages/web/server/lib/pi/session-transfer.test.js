@@ -68,6 +68,111 @@ describe('session-transfer', () => {
     });
   });
 
+  it('maps Pi toolCall and toolResult onto one assistant tool part', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'read the skill' }] },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'load skills' },
+            { type: 'text', text: '先按仓库规则加载相关技能。' },
+            { type: 'toolCall', id: 'c1', name: 'read', arguments: { path: 'SKILL.md' } },
+          ],
+        },
+      },
+      {
+        type: 'message',
+        id: 't1',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{
+            type: 'text',
+            text: '---\nname: using-superpowers\ndescription: Use when starting any conversation\n---\n',
+          }],
+        },
+      },
+    ], 'ses_repro');
+
+    expect(messages.map((entry) => ({
+      role: entry.info.role,
+      types: entry.parts.map((part) => part.type),
+    }))).toEqual([
+      { role: 'user', types: ['text'] },
+      { role: 'assistant', types: ['reasoning', 'text', 'tool'] },
+    ]);
+    expect(messages[0].parts[0].text).toBe('read the skill');
+    expect(messages[1].parts[2]).toMatchObject({
+      type: 'tool',
+      tool: 'read',
+      callID: 'c1',
+      state: expect.objectContaining({
+        status: 'completed',
+        input: { path: 'SKILL.md' },
+        output: expect.stringContaining('name: using-superpowers'),
+      }),
+    });
+  });
+
+  it('round-trips live tool parts through Pi-native JSONL without flattening them to user text', () => {
+    const record = {
+      id: 'ses_tools',
+      directory: '/tmp/project',
+      info: { id: 'ses_tools', title: 'Tool chat', time: { created: 1_700_000_000_000 } },
+      messages: [
+        {
+          info: { id: 'msg_user', role: 'user', time: { created: 1_700_000_000_100 } },
+          parts: [{ id: 'prt_1', type: 'text', text: 'read the skill' }],
+        },
+        {
+          info: { id: 'msg_asst', role: 'assistant', parentID: 'msg_user', time: { created: 1_700_000_000_200 } },
+          parts: [
+            { id: 'prt_2', type: 'reasoning', text: 'load skills' },
+            { id: 'prt_3', type: 'text', text: '先按仓库规则加载相关技能。' },
+            {
+              id: 'prt_4',
+              type: 'tool',
+              callID: 'c1',
+              tool: 'read',
+              state: {
+                status: 'completed',
+                input: { path: 'SKILL.md' },
+                output: '---\nname: using-superpowers\n---\n',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const jsonl = buildSessionJsonl(record);
+    expect(jsonl).toContain('"type":"toolCall"');
+    expect(jsonl).toContain('"role":"toolResult"');
+    expect(jsonl).toContain('using-superpowers');
+
+    const parsed = parseSessionImport(jsonl);
+    expect(parsed.messages).toHaveLength(2);
+    expect(parsed.messages[0].info.role).toBe('user');
+    expect(parsed.messages[1].info.role).toBe('assistant');
+    expect(parsed.messages[1].parts.map((part) => part.type)).toEqual(['reasoning', 'text', 'tool']);
+    expect(parsed.messages[1].parts[2]).toMatchObject({
+      type: 'tool',
+      tool: 'read',
+      callID: 'c1',
+      state: expect.objectContaining({
+        output: expect.stringContaining('using-superpowers'),
+      }),
+    });
+  });
+
   it('rejects empty or message-less imports', () => {
     expect(() => parseSessionImport('')).toThrow(/empty/i);
     expect(() => parseSessionImport('{"type":"session","id":"ses_x","cwd":"/tmp"}\n')).toThrow(/messages/i);
