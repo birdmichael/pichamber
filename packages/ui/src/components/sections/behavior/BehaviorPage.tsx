@@ -293,7 +293,7 @@ export const BehaviorPage: React.FC = () => {
       description={t('settings.page.behavior.description')}
       showSaveStatus
     >
-      {!isVSCode && (
+      {!isVSCode && !isPiKernel && (
         <SettingsSection
           title={t('settings.behavior.page.section.systemPromptOptimization')}
           divider={false}
