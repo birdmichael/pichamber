@@ -1,3 +1,4 @@
+import { isPichamberStarterSlashCommand } from '@/lib/draftStarters';
 import { fuzzyMatch } from '@/lib/utils';
 
 export interface CommandAutocompleteSearchItem {
@@ -83,18 +84,12 @@ const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
   'model', 'thinking',
 ]);
 
-/** OpenChamber leftovers plus composer chips that already cover the same action. */
+/** OpenCode leftovers plus composer chips that already cover the same action. */
 const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'init', 'undo', 'redo', 'timeline', 'summary',
-  'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
-  'catch-up', 'debug', 'weigh', 'explore',
+  'handoff-review',
   ...PI_CHIP_OWNED_SLASH_COMMANDS,
   'shell',
-]);
-
-/** Pichamber scheduler command — not an OpenCode leftover. */
-const PI_ALLOWED_OPENCHAMBER_SLASH_COMMANDS = new Set([
-  'schedule-task',
 ]);
 
 /** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */
@@ -115,15 +110,16 @@ export function filterPiSettingsCommands<T extends { name: string }>(commands: T
 /**
  * Pi slash menu: builtins and custom prompts stay as `/name`. Installed,
  * injected skills become `/skill:name` so AgentSession expands them.
- * Untrusted project skills and leftover OpenChamber / chip commands stay out.
- * `/schedule-task` stays: Scheduled Tasks is a Pichamber scheduler, not an
- * OpenCode leftover.
+ * Untrusted project skills, OpenCode leftovers, and chip-owned commands stay
+ * out. In-app Pichamber starters (`/catch-up`, `/plan-feature`, and the rest
+ * of the empty-session chips) stay: they send magic prompts through the Pi
+ * session host, not leftover OpenCode flows.
  */
 export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
   const kept: T[] = [];
   for (const command of commands) {
-    if (command.isOpenChamber && !PI_ALLOWED_OPENCHAMBER_SLASH_COMMANDS.has(command.name)) continue;
+    if (command.isOpenChamber && !isPichamberStarterSlashCommand(command.name)) continue;
     if (command.isSkill) {
       if (command.injected === false) continue;
       const slashName = toPiSkillSlashName(command.name);

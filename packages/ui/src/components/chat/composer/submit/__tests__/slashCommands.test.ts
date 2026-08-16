@@ -76,6 +76,16 @@ describe('canRunCommand', () => {
         expect(canRunCommand(explore, { hasSession: true, hasDraft: false })).toBe(true);
     });
 
+    test('catch-up and plan-feature chips send a magic prompt from an empty draft', () => {
+        for (const name of ['catch-up', 'plan-feature'] as const) {
+            const parsed = parseSlashCommand(`/${name}`);
+            expect(parsed?.name).toBe(name);
+            const command = findMagicPromptCommand(parsed!.name);
+            expect(command?.name).toBe(name);
+            expect(canRunCommand(command!, { hasSession: false, hasDraft: true })).toBe(true);
+        }
+    });
+
     test('nothing runs with neither', () => {
         expect(canRunCommand(explore, { hasSession: false, hasDraft: false })).toBe(false);
         expect(canRunCommand(summary, { hasSession: false, hasDraft: false })).toBe(false);

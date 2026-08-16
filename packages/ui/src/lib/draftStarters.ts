@@ -13,8 +13,9 @@ export type DraftStarterRef = {
     name: string;
 };
 
-// Our built-in openchamber commands (Session magic prompts). They are always
-// available to pin, keep their bespoke icons, and seed the default global set.
+// In-app Pichamber session magic prompts. They are always available to pin,
+// keep their bespoke icons, and seed the default global set. These are product
+// starters, not OpenCode leftovers — they stay visible on the Pi kernel.
 export type BuiltInStarter = {
     name: string;
     icon: IconName;
@@ -32,6 +33,28 @@ export const BUILTIN_STARTERS: readonly BuiltInStarter[] = [
     { name: 'debug', icon: 'bug', labelKey: 'chat.draftPresets.debug.label', command: '/debug' },
     { name: 'review', icon: 'search-eye', labelKey: 'chat.draftPresets.review.label', command: '/workspace-review' },
 ];
+
+const slashNameFromCommand = (command: string): string => command.replace(/^\//, '');
+
+/** Slash names for in-app Pichamber starters. These stay available on Pi. */
+export const PICHAMBER_STARTER_SLASH_COMMANDS: ReadonlySet<string> = new Set(
+    BUILTIN_STARTERS.map((starter) => slashNameFromCommand(starter.command)),
+);
+
+export function isPichamberStarterSlashCommand(name: string): boolean {
+    return PICHAMBER_STARTER_SLASH_COMMANDS.has(name);
+}
+
+/**
+ * Empty-session welcome chips are Pichamber product starters.
+ * Pi keeps the row; only the user visibility setting hides it.
+ */
+export function areDraftPresetChipsVisible(options: {
+    visible: boolean;
+    isPiKernel?: boolean;
+}): boolean {
+    return options.visible;
+}
 
 const BUILTIN_BY_NAME = new Map<string, BuiltInStarter>(BUILTIN_STARTERS.map((s) => [s.name, s]));
 
