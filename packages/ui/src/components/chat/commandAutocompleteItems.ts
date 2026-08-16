@@ -87,7 +87,7 @@ const PI_HIDDEN_SLASH_COMMANDS = new Set([
 ]);
 
 /** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */
-export const PI_SKILL_SLASH_PREFIX = 'skill:';
+const PI_SKILL_SLASH_PREFIX = 'skill:';
 
 export function toPiSkillSlashName(name: string): string {
   const trimmed = name.trim();
