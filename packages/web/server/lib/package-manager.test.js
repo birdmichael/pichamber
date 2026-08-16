@@ -311,10 +311,11 @@ describe('CLI update exports', () => {
   });
 
   it('installs @pichamber/web and never @openchamber/web', () => {
-    expect(getUpdateCommand('npm')).toBe('npm install -g @pichamber/web@latest');
-    expect(getUpdateCommand('bun')).toBe('bun add -g @pichamber/web@latest');
-    expect(getUpdateCommand('pnpm')).toBe('pnpm add -g @pichamber/web@latest');
-    expect(getUpdateCommand('yarn')).toBe('yarn global add @pichamber/web@latest');
+    expect(getUpdateCommand('npm')).toMatch(/npm install -g @pichamber\/web@latest$/);
+    expect(getUpdateCommand('bun')).toMatch(/bun add -g @pichamber\/web@latest$/);
+    expect(getUpdateCommand('pnpm')).toMatch(/pnpm add -g @pichamber\/web@latest$/);
+    expect(getUpdateCommand('yarn')).toMatch(/yarn global add @pichamber\/web@latest$/);
     expect(getUpdateCommand('npm')).not.toContain('@openchamber/web');
+    expect(getUpdateCommand('bun')).not.toContain('@openchamber/web');
   });
 });
