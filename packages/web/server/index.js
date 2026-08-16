@@ -1793,6 +1793,7 @@ async function main(options = {}) {
     getOpenChamberEventClients: () => uiOpenChamberEventClients,
     writeSseEvent,
     permissionAutoAcceptRuntime,
+    getPiHost: () => piKernel?.host,
   });
 
   const startupPipelineResult = await startupPipelineRuntime.run({
