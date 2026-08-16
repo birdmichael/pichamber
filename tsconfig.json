@@ -14,7 +14,7 @@
     "resolveJsonModule": true,
     "paths": {
       "@openchamber/ui/*": ["./packages/ui/src/*"],
-      "@openchamber/web/*": ["./packages/web/src/*"]
+      "@pichamber/web/*": ["./packages/web/src/*"]
     }
   }
 }

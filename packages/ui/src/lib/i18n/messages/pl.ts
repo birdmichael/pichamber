@@ -2928,7 +2928,7 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.actions.openMobileUpdate': 'Otwórz aktualizację',
   'updateDialog.actions.restartToUpdate': 'Uruchom ponownie, aby zaktualizować',
   'updateDialog.actions.updateNow': 'Aktualizuj teraz',
-  'updateDialog.error.takingLonger': 'Aktualizacja trwa dłużej niż oczekiwano. Poczekaj chwilę i odśwież albo uruchom: openchamber update',
+  'updateDialog.error.takingLonger': 'Aktualizacja trwa dłużej niż oczekiwano. Poczekaj chwilę i odśwież albo uruchom: pichamber update',
   'updateDialog.error.updateFailed': 'Aktualizacja nie powiodła się',
   'mobileUpdate.toast.available.title': 'Dostępna aktualizacja OpenChamber',
   'mobileUpdate.toast.available.description': 'Wersja {version} jest gotowa dla Androida.',

@@ -2768,7 +2768,7 @@ export const dict = {
   'updateDialog.actions.openMobileUpdate': 'Update öffnen',
   'updateDialog.status.updating': 'Aktualisierung läuft...',
   'updateDialog.error.updateFailed': 'Aktualisierung fehlgeschlagen',
-  'updateDialog.error.takingLonger': 'Die Aktualisierung dauert länger als erwartet. Warten Sie einen Moment und aktualisieren Sie die Seite oder führen Sie folgenden Befehl aus: openchamber update',
+  'updateDialog.error.takingLonger': 'Die Aktualisierung dauert länger als erwartet. Warten Sie einen Moment und aktualisieren Sie die Seite oder führen Sie folgenden Befehl aus: pichamber update',
   'mobileUpdate.toast.available.title': 'OpenChamber-Update verfügbar',
   'mobileUpdate.toast.available.description': 'Version {version} ist für Android bereit.',
   'mobileUpdate.toast.actions.download': 'Herunterladen',

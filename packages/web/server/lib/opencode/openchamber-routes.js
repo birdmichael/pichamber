@@ -133,7 +133,7 @@ export const registerOpenChamberRoutes = (app, dependencies) => {
       if (isForegroundService) {
         if (!systemdServiceUnit) {
           return res.status(409).json({
-            error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run openchamber update and restart the service.',
+            error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run pichamber update and restart the service.',
           });
         }
 

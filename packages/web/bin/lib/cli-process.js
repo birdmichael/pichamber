@@ -127,12 +127,12 @@ function isOpenchamberCmdline(cmdline) {
   if (typeof cmdline !== 'string' || cmdline.length === 0) {
     return false;
   }
-  // Every install path contains the "openchamber" segment — the npm package
-  // (@openchamber/web) and the source checkout both do, for the foreground
-  // (bin/cli.js) and daemon (server/index.js) entrypoints alike. Matching the
-  // path segment (not a generic "cli.js") keeps a recycled stranger such as
-  // "npm-cli.js" or "agentmemory" from being mistaken for us.
-  return cmdline.toLowerCase().includes('openchamber');
+  // Match the current bin/package (`pichamber`, `@pichamber/web`) and leftover
+  // OpenChamber installs (`openchamber`, `@openchamber/web`) so old PIDs are
+  // not treated as strangers. Matching a path segment (not a generic "cli.js")
+  // keeps a recycled process such as "npm-cli.js" or "agentmemory" out.
+  const lower = cmdline.toLowerCase();
+  return lower.includes('pichamber') || lower.includes('openchamber');
 }
 
 // Liveness + identity — "is the OpenChamber instance recorded in a pid file
