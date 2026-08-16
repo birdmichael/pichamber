@@ -16,6 +16,7 @@ import {
   listPiExtensions,
   listPiPackages,
   filterProvidersByEnabledModels,
+  resolvePiDefaultModel,
   readPiProjectTrust,
   writePiProjectTrust,
   setPiProjectTrust,
@@ -216,5 +217,25 @@ describe('pi-resources', () => {
     expect(cleared.enabledModels).toEqual([]);
     const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
     expect(after.enabledModels).toBeUndefined();
+  });
+});
+
+describe('resolvePiDefaultModel', () => {
+  const catalog = [
+    { id: 'bmlab', models: { 'grok-4.6': { id: 'grok-4.6', name: 'Grok 4.6' } } },
+    { id: 'other', models: { beta: { id: 'beta', name: 'Beta' } } },
+  ];
+
+  it('uses the first catalog model when the stored default is empty', () => {
+    expect(resolvePiDefaultModel('', catalog)).toBe('bmlab/grok-4.6');
+    expect(resolvePiDefaultModel('   ', catalog)).toBe('bmlab/grok-4.6');
+  });
+
+  it('keeps a pinned model that is still in the catalog', () => {
+    expect(resolvePiDefaultModel('other/beta', catalog)).toBe('other/beta');
+  });
+
+  it('falls back to the first catalog model when the pin is gone', () => {
+    expect(resolvePiDefaultModel('missing/gone', catalog)).toBe('bmlab/grok-4.6');
   });
 });

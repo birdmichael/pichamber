@@ -25,6 +25,24 @@ export const DEFAULT_PI_SETTINGS = {
   retrySettings: { ...DEFAULT_RETRY_SETTINGS },
 };
 
+/** Model a new session will actually start with: pinned default if it is in the catalog, else the first catalog model. */
+export const resolvePiDefaultModel = (stored, providers = []) => {
+  const keys = [];
+  for (const provider of providers) {
+    if (!provider?.id || !provider.models || typeof provider.models !== 'object') continue;
+    for (const modelId of Object.keys(provider.models)) {
+      if (modelId) keys.push(`${provider.id}/${modelId}`);
+    }
+  }
+  const pinned = typeof stored === 'string' ? stored.trim() : '';
+  if (pinned) {
+    if (keys.includes(pinned)) return pinned;
+    const byId = keys.find((key) => key.endsWith(`/${pinned}`) || key === pinned);
+    if (byId) return byId;
+  }
+  return keys[0] || pinned || '';
+};
+
 export const BUILTIN_COMMANDS = [
   { name: 'compact', description: 'Compact session context', source: 'builtin', template: '' },
   { name: 'reload', description: 'Reload skills, prompts, and context files', source: 'builtin', template: '' },

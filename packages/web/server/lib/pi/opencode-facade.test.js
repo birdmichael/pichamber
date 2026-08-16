@@ -176,6 +176,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(auth.authenticated).toBe(true);
       expect(auth.disabled).toBe(true);
 
+      const emptyDefaults = await (await fetch(`${url}/api/pi/defaults`)).json();
+      expect(emptyDefaults.model).toBe('');
+      expect(emptyDefaults.resolvedModel).toBe('pi-mock/mock');
+
       const patched = await (await fetch(`${url}/api/pi/defaults`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
