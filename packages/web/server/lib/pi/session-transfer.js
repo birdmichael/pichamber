@@ -221,6 +221,26 @@ const facadeFromPiMessage = (entry) => {
   };
 };
 
+export const facadeMessagesFromPiEntries = (entries, sessionID) => {
+  const id = asTrimmedString(sessionID);
+  const messages = [];
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (entry?.type && entry.type !== 'message') continue;
+    if (!entry?.message) continue;
+    const facade = facadeFromPiMessage(entry);
+    if (id) {
+      facade.info.sessionID = id;
+      facade.parts = facade.parts.map((part) => ({
+        ...part,
+        sessionID: id,
+        messageID: facade.info.id,
+      }));
+    }
+    messages.push(facade);
+  }
+  return messages;
+};
+
 const facadeFromUnknown = (entry) => {
   if (entry?.info && Array.isArray(entry.parts)) {
     return {

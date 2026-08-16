@@ -341,8 +341,12 @@ describe('createPiHost', () => {
         },
       };
     };
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-usage-'));
     const host = createPiHost({
+      home,
       defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
       createSession: async () => createUsageSession(),
     });
     const record = await host.createSession({ directory: '/tmp/project' });
@@ -358,11 +362,16 @@ describe('createPiHost', () => {
     expect(assistant.info.cost).toBe(0.003);
     expect(host.getSessionUsage(record.id).percent).toBe(1.75);
     host.dispose();
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
   it('getSessionUsage returns normalized Pi context usage', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-usage2-'));
     const host = createPiHost({
+      home,
       defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
       createSession: async () => ({
         isStreaming: false,
         subscribe() { return () => {}; },
@@ -381,6 +390,7 @@ describe('createPiHost', () => {
       percent: 2,
     });
     host.dispose();
+    fs.rmSync(home, { recursive: true, force: true });
   });
 
   it('forkSession copies messages up to the chosen user message', async () => {

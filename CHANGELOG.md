@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** sessions from Pi or an earlier Pichamber run now open after a restart instead of showing a load error.
 - **Sessions:** Scheduled Tasks is a Pichamber scheduler on Pi. The sidebar calendar and `/schedule-task` are available again; Run now and due timers start a real Pi session with the task prompt. The OpenCode kernel still uses its existing execution path.
 - **Sessions:** New multi-run is available on the Pi kernel again. The sidebar merge-arrows button opens the launcher, you pick 1–5 models from your live Pi catalog, and Start creates a real Pi session per model (with an isolated worktree when you ask).
 - **Chat:** typing `/` now lists installed, trusted skills as `/skill:name` next to Pi builtins, matching the Pi CLI. Untrusted project skills stay out of the menu. `/model` and `/thinking` remain on the chips.

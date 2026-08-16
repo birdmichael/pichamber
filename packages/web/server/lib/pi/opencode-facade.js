@@ -63,6 +63,14 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
 
   const resolveDirectory = (req) => requestDirectory(req) || resolveActiveProjectDirectory() || defaultDirectory;
+  const loadSession = async (req) => {
+    const sessionID = req.params.sessionID;
+    const directory = resolveDirectory(req);
+    if (typeof host.ensureSession === 'function') {
+      return host.ensureSession(sessionID, directory);
+    }
+    return host.getSession(sessionID);
+  };
   const parseJson = express.json({ limit: '50mb' });
 
   const handle = (fn) => async (req, res, next) => {
@@ -532,19 +540,20 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/session/:sessionID', handle(async (req, res) => {
-    json(res, 200, host.getSession(req.params.sessionID).info);
+    json(res, 200, (await loadSession(req)).info);
   }));
 
   app.delete('/api/session/:sessionID', parseJson, handle(async (req, res) => {
-    json(res, 200, host.deleteSession(req.params.sessionID));
+    json(res, 200, await host.deleteSession(req.params.sessionID, resolveDirectory(req)));
   }));
 
   app.patch('/api/session/:sessionID', parseJson, handle(async (req, res) => {
-    const record = host.updateSession(req.params.sessionID, req.body || {});
+    const record = await host.updateSession(req.params.sessionID, req.body || {}, resolveDirectory(req));
     json(res, 200, record.info);
   }));
 
   app.get('/api/session/:sessionID/message', handle(async (req, res) => {
+    await loadSession(req);
     json(res, 200, host.getMessages(req.params.sessionID));
   }));
 
@@ -590,10 +599,12 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/session/:sessionID/tree', handle(async (req, res) => {
+    await loadSession(req);
     json(res, 200, host.getSessionTree(req.params.sessionID));
   }));
 
   app.get('/api/session/:sessionID/usage', handle(async (req, res) => {
+    await loadSession(req);
     json(res, 200, host.getSessionUsage(req.params.sessionID));
   }));
 
@@ -612,8 +623,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     const record = typeof host.forkSession === 'function'
       ? await host.forkSession(req.params.sessionID, messageID)
       : await host.createSession({
-        directory: host.getSession(req.params.sessionID).directory,
-        title: host.getSession(req.params.sessionID).info.title,
+        directory: (await loadSession(req)).directory,
+        title: (await loadSession(req)).info.title,
         parentID: req.params.sessionID,
       });
     json(res, 200, record.info);
@@ -624,7 +635,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, record.info);
   }));
 
-  const sendSessionExport = (req, res) => {
+  const sendSessionExport = async (req, res) => {
+    await loadSession(req);
     const format = typeof req.query?.format === 'string' ? req.query.format.toLowerCase() : (req.body?.format || 'jsonl');
     const exported = host.exportSession(req.params.sessionID, format);
     res.setHeader('Content-Type', exported.mime);
@@ -632,10 +644,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     res.status(200).send(exported.content);
   };
   app.get('/api/session/:sessionID/export', handle(async (req, res) => {
-    sendSessionExport(req, res);
+    await sendSessionExport(req, res);
   }));
   app.post('/api/session/:sessionID/export', parseJson, handle(async (req, res) => {
-    sendSessionExport(req, res);
+    await sendSessionExport(req, res);
   }));
 
   app.post('/api/session/import', parseJson, handle(async (req, res) => {
