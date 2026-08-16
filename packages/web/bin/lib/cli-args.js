@@ -694,14 +694,14 @@ EXAMPLES:
 
 function showConnectUrlHelp() {
   console.log(`
- OpenChamber Connect URL
+ Pichamber Connect URL
 
 USAGE:
   openchamber connect-url [OPTIONS]
 
 DESCRIPTION:
-  Generate an openchamber:// connection link for adding this server to another
-  OpenChamber app. If no server is running on the selected port, it starts one.
+  Generate a pichamber:// connection link for adding this server to another
+  Pichamber app. If no server is running on the selected port, it starts one.
 
 OPTIONS:
   -p, --port <port>       Server port to use or start (default: ${DEFAULT_PORT})

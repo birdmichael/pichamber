@@ -47,7 +47,8 @@ describe('MCP OAuth browser callback route', () => {
 
     expect(response.text).toContain('Authorization Complete');
     // Started from the desktop shell: the page hands control back via deep link.
-    expect(response.text).toContain('openchamber://focus/mcp-auth');
+    expect(response.text).toContain('pichamber://focus/mcp-auth');
+    expect(response.text).not.toContain('openchamber://');
 
     await request(app).get('/api/mcp/auth/pending').query({ state: 'state-1' }).expect(404);
   });
@@ -76,6 +77,7 @@ describe('MCP OAuth browser callback route', () => {
       .query({ state: 'state-web', code: 'auth-code' })
       .expect(200);
 
+    expect(response.text).not.toContain('pichamber://');
     expect(response.text).not.toContain('openchamber://');
   });
 

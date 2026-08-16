@@ -190,7 +190,7 @@ async function serveCommand(options) {
       }
 
       if (!isQuietMode(options)) {
-        console.log(`Starting OpenChamber on port ${targetPort === 0 ? 'auto' : targetPort} (foreground)`);
+        console.log(`Starting Pichamber on port ${targetPort === 0 ? 'auto' : targetPort} (foreground)`);
       }
 
       const { startWebUiServer } = await import(pathToFileURL(serverPath).href);
@@ -293,7 +293,7 @@ async function serveCommand(options) {
     });
 
     child.unref();
-    serveSpin?.start(`Starting OpenChamber on port ${targetPort === 0 ? 'auto' : targetPort}...`);
+    serveSpin?.start(`Starting Pichamber on port ${targetPort === 0 ? 'auto' : targetPort}...`);
 
     let resolvedPort;
     try {

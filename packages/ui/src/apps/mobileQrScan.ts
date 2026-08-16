@@ -68,7 +68,7 @@ export const parseConnectionPayload = (raw: string): MobileConnectionPayload | M
 const resultFromRawValue = (raw: string, options?: { pairingStringFallback?: boolean }): QrScanResult => {
   const payload = parseConnectionPayload(raw);
   if (!payload && options?.pairingStringFallback) {
-    // Old Android WebViews resolve openchamber://… with hostname "" / pathname "//connect",
+    // Old Android WebViews resolve pichamber://… with hostname "" / pathname "//connect",
     // so the URL-based parse above fails even though the scanned string is intact. Retry
     // with the URL-API-free string parser before declaring the scan invalid.
     const pairing = parsePairingConnectionPayloadString(raw);

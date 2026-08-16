@@ -43,10 +43,19 @@ const APP_DISPLAY_NAME = 'Pichamber';
 applyDesktopKernelEnv(process.env);
 const electronStartupStartedAt = performance.now();
 
-const DEEP_LINK_PROTOCOL = 'openchamber';
-const UI_PROTOCOL = 'openchamber-ui';
-const PACKAGED_APP_USER_MODEL_ID = 'dev.openchamber.desktop';
-const DEV_APP_USER_MODEL_ID = 'dev.openchamber.desktop.dev';
+const DEEP_LINK_PROTOCOL = 'pichamber';
+const LEGACY_DEEP_LINK_PROTOCOL = 'openchamber';
+const UI_PROTOCOL = 'pichamber-ui';
+const LEGACY_UI_PROTOCOL = 'openchamber-ui';
+const PACKAGED_APP_USER_MODEL_ID = 'dev.pichamber.desktop';
+const DEV_APP_USER_MODEL_ID = 'dev.pichamber.desktop.dev';
+const isDeepLinkProtocol = (protocol) =>
+  protocol === `${DEEP_LINK_PROTOCOL}:` || protocol === `${LEGACY_DEEP_LINK_PROTOCOL}:`;
+const isUiProtocol = (protocol) =>
+  protocol === `${UI_PROTOCOL}:` || protocol === `${LEGACY_UI_PROTOCOL}:`;
+const isDeepLinkArg = (arg) =>
+  typeof arg === 'string'
+  && (arg.startsWith(`${DEEP_LINK_PROTOCOL}://`) || arg.startsWith(`${LEGACY_DEEP_LINK_PROTOCOL}://`));
 const APP_USER_MODEL_ID = app.isPackaged ? PACKAGED_APP_USER_MODEL_ID : DEV_APP_USER_MODEL_ID;
 const BACKGROUND_START_ARG = '--background';
 
@@ -106,6 +115,15 @@ if (shouldIgnoreLoopbackConnectionLimit({
 protocol.registerSchemesAsPrivileged([
   {
     scheme: UI_PROTOCOL,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+  {
+    scheme: LEGACY_UI_PROTOCOL,
     privileges: {
       standard: true,
       secure: true,
@@ -183,8 +201,10 @@ try {
 }
 
 try {
-  if (!app.isDefaultProtocolClient(DEEP_LINK_PROTOCOL)) {
-    app.setAsDefaultProtocolClient(DEEP_LINK_PROTOCOL);
+  for (const scheme of [DEEP_LINK_PROTOCOL, LEGACY_DEEP_LINK_PROTOCOL]) {
+    if (!app.isDefaultProtocolClient(scheme)) {
+      app.setAsDefaultProtocolClient(scheme);
+    }
   }
 } catch (error) {
   // log.* not yet initialized at this point; fall back to console.
@@ -1216,7 +1236,7 @@ const hardenBrowserPanelSession = () => {
 
 const registerPackagedUiProtocol = () => {
   if (!shouldUsePackagedUi()) return;
-  protocol.handle(UI_PROTOCOL, async (request) => {
+  const handlePackagedUiRequest = async (request) => {
     const distPath = resolveWebDistDir();
     let requestedPath = '/index.html';
     try {
@@ -1267,7 +1287,9 @@ const registerPackagedUiProtocol = () => {
     const html = await fsp.readFile(indexPath, 'utf8');
     const body = injectRuntimeConfigIntoHtml(html);
     return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-  });
+  };
+  protocol.handle(UI_PROTOCOL, handlePackagedUiRequest);
+  protocol.handle(LEGACY_UI_PROTOCOL, handlePackagedUiRequest);
 };
 
 const normalizeNotificationInput = (raw) => {
@@ -2025,7 +2047,7 @@ const parseDeepLink = (raw) => {
   if (!trimmed) return null;
   try {
     const url = new URL(trimmed);
-    if (url.protocol !== `${DEEP_LINK_PROTOCOL}:`) return null;
+    if (!isDeepLinkProtocol(url.protocol)) return null;
     const type = url.hostname;
     if (!type) return null;
     const segments = url.pathname.split('/').filter(Boolean);
@@ -2052,7 +2074,7 @@ const parseConnectPairingDeepLinkPayload = (raw) => {
   if (typeof raw !== 'string') return null;
   try {
     const url = new URL(raw.trim());
-    if (url.protocol !== `${DEEP_LINK_PROTOCOL}:` || url.hostname !== 'connect') return null;
+    if (!isDeepLinkProtocol(url.protocol) || url.hostname !== 'connect') return null;
     if (url.searchParams.get('v') !== '2') return null;
     const payload = decodeBase64UrlJson(url.searchParams.get('p') || '');
     if (!payload || payload.v !== 2 || typeof payload !== 'object') return null;
@@ -2323,7 +2345,7 @@ const handleDeepLinks = (urls) => {
 };
 
 const extractInitialDeepLinks = () =>
-  process.argv.filter((arg) => typeof arg === 'string' && arg.startsWith(`${DEEP_LINK_PROTOCOL}://`));
+  process.argv.filter((arg) => isDeepLinkArg(arg));
 
 const dispatchDomEventToWindow = (browserWindow, event, detail) => {
   if (!browserWindow || browserWindow.isDestroyed()) return;
@@ -2590,7 +2612,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     try {
       const url = new URL(raw);
       if (url.protocol === 'devtools:') return true;
-      if (url.protocol === `${UI_PROTOCOL}:`) return true;
+      if (isUiProtocol(url.protocol)) return true;
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
       // In development the renderer is served by Vite while state.localOrigin
       // remains the separate local API server. Permit same-origin reloads from
@@ -5004,7 +5026,7 @@ const isLocalSender = (webContents) => {
     const raw = typeof webContents?.getURL === 'function' ? webContents.getURL() : '';
     if (!raw) return false;
     const url = new URL(raw);
-    if (url.protocol === `${UI_PROTOCOL}:` && url.hostname === 'app') return true;
+    if (isUiProtocol(url.protocol) && url.hostname === 'app') return true;
     // Electron dev renders from Vite while the local API is served on a
     // separate port. This exact loopback HMR origin is trusted only in dev.
     if (isDev && url.origin === `http://127.0.0.1:${process.env.OPENCHAMBER_HMR_UI_PORT || '5173'}`) return true;
@@ -5388,7 +5410,7 @@ app.on('before-quit', (event) => {
 
 app.on('second-instance', (_event, argv) => {
   const urls = Array.isArray(argv)
-    ? argv.filter((arg) => typeof arg === 'string' && arg.startsWith(`${DEEP_LINK_PROTOCOL}://`))
+    ? argv.filter((arg) => isDeepLinkArg(arg))
     : [];
   if (urls.length > 0) handleDeepLinks(urls);
   if (BrowserWindow.getAllWindows().length > 0) {

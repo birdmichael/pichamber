@@ -60,7 +60,8 @@ const isLoopbackOrigin = (origin) => {
   }
 };
 const isLocalPage = currentOrigin !== 'null'
-  && (currentOrigin === 'openchamber-ui://app'
+  && (currentOrigin === 'pichamber-ui://app'
+  || currentOrigin === 'openchamber-ui://app'
   || (localOrigin && currentOrigin === localOrigin)
   || (uiOrigin && currentOrigin === uiOrigin)
   || (apiBaseUrl && isLoopbackOrigin(currentOrigin)));

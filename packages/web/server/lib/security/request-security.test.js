@@ -11,6 +11,15 @@ describe('request security runtime', () => {
 
     await expect(runtime.isRequestOriginAllowed({
       headers: {
+        origin: 'pichamber-ui://app',
+        host: '192.168.1.130:1202',
+      },
+      socket: {},
+    })).resolves.toBe(true);
+
+    // Leftover packaged desktop origin from an already-running upgrade window.
+    await expect(runtime.isRequestOriginAllowed({
+      headers: {
         origin: 'openchamber-ui://app',
         host: '192.168.1.130:1202',
       },

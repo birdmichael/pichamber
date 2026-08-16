@@ -6,7 +6,7 @@ import { createApnsRuntime } from './apns-runtime.js';
 // A real P-256 key so the ES256 signing path (direct mode) runs for real.
 const { privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const P8 = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
-const APNS_CONFIG = { keyId: 'KEY123', teamId: 'TEAM123', p8: P8, bundleId: 'com.openchamber.app', environment: 'sandbox' };
+const APNS_CONFIG = { keyId: 'KEY123', teamId: 'TEAM123', p8: P8, bundleId: 'com.pichamber.app', environment: 'sandbox' };
 
 // In-memory fs so add-then-read reflects within a test.
 const createMemoryFs = () => {

@@ -91,7 +91,7 @@ binding table is created by `migrations/0002_push_tokens.sql` (applied on deploy
 ## Apple setup (one-time)
 
 1. Apple **Keys** (not Certificates) → create an **APNs Auth Key** (`.p8`) → Key ID + Team ID;
-   enable **Push Notifications** on App ID `com.openchamber.app`.
+   enable **Push Notifications** on App ID `com.pichamber.app`.
 2. In the **openchamber-website** repo → Actions secrets: `APNS_P8` (PEM), `APNS_KEY_ID`,
    `APNS_TEAM_ID`. Push to `main` → relay deploys, secrets sync, D1 migrations apply.
 3. Xcode: confirm the Push Notifications capability; Clean Build Folder; run on device.

@@ -33,7 +33,7 @@ read. Skill loading is a required part of the task, not optional guidance.
 
 The UI still speaks `@opencode-ai/sdk/v2` HTTP/SSE. On the default kernel those routes are implemented by the Pi facade (`packages/web/server/lib/pi`). Pichamber-owned capabilities use `RuntimeAPIs`, `runtimeFetch`, and shared browser/realtime transport helpers.
 
-Electron starts the Pichamber backend in-process, never as a sidecar. Development may load loopback/HMR UI; packaged builds load staged assets through `openchamber-ui://` while the loopback server remains the API backend. Keep domain backends in web/runtime modules unless behavior is inherently native.
+Electron starts the Pichamber backend in-process, never as a sidecar. Development may load loopback/HMR UI; packaged builds load staged assets through `pichamber-ui://` while the loopback server remains the API backend. Keep domain backends in web/runtime modules unless behavior is inherently native.
 
 Pi config and auth live in `~/.pi/agent` (`auth.json`, `models.json`, `pichamber.json`, `AGENTS.md`, `skills/`, `prompts/`). Project skills live under `.agents/skills` and `.pi/skills`. Project commands/prompts live under `.pi/prompts`. Do not treat `.opencode` as the skills/commands location.
 

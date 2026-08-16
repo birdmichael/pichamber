@@ -174,8 +174,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          cp app/build/outputs/bundle/release/*.aab "release-assets/OpenChamber-${VERSION_NAME}-${BUILD_NUMBER}-android.aab"
-          cp app/build/outputs/apk/release/*.apk "release-assets/OpenChamber-${VERSION_NAME}-${BUILD_NUMBER}-android.apk"
+          cp app/build/outputs/bundle/release/*.aab "release-assets/Pichamber-${VERSION_NAME}-${BUILD_NUMBER}-android.aab"
+          cp app/build/outputs/apk/release/*.apk "release-assets/Pichamber-${VERSION_NAME}-${BUILD_NUMBER}-android.apk"
           files=(
             app/build/outputs/bundle/release/*.aab
             app/build/outputs/apk/release/*.apk
@@ -277,17 +277,17 @@ jobs:
           const releaseBlockPattern = /\n\t\t[^\n]+ \/\* Release \*\/ = \{\n\t\t\tisa = XCBuildConfiguration;[\s\S]*?\n\t\t\tname = Release;\n\t\t\};/g;
           const replacements = [
             {
-              bundle: 'com.openchamber.app',
+              bundle: 'com.pichamber.app',
               profile: process.env.IOS_APP_PROFILE_NAME,
               uuid: process.env.IOS_APP_PROFILE_UUID,
             },
             {
-              bundle: 'com.openchamber.app.OpenChamberWidget',
+              bundle: 'com.pichamber.app.PichamberWidget',
               profile: process.env.IOS_WIDGET_PROFILE_NAME,
               uuid: process.env.IOS_WIDGET_PROFILE_UUID,
             },
             {
-              bundle: 'com.openchamber.app.OpenChamberNotificationService',
+              bundle: 'com.pichamber.app.PichamberNotificationService',
               profile: process.env.IOS_NSE_PROFILE_NAME,
               uuid: process.env.IOS_NSE_PROFILE_UUID,
             },
@@ -330,7 +330,7 @@ jobs:
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/OpenChamber.xcarchive" \
+            -archivePath "$RUNNER_TEMP/Pichamber.xcarchive" \
             "OTHER_CODE_SIGN_FLAGS=--keychain $RUNNER_TEMP/app-signing.keychain-db"
         working-directory: ${{ env.IOS_PROJECT_DIR }}
 
@@ -363,11 +363,11 @@ jobs:
             <string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.openchamber.app</key>
+              <key>com.pichamber.app</key>
               <string>$IOS_APP_PROFILE_NAME</string>
-              <key>com.openchamber.app.OpenChamberWidget</key>
+              <key>com.pichamber.app.PichamberWidget</key>
               <string>$IOS_WIDGET_PROFILE_NAME</string>
-              <key>com.openchamber.app.OpenChamberNotificationService</key>
+              <key>com.pichamber.app.PichamberNotificationService</key>
               <string>$IOS_NSE_PROFILE_NAME</string>
             </dict>
             <key>uploadSymbols</key>
@@ -376,8 +376,8 @@ jobs:
           </plist>
           PLIST
           xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/OpenChamber.xcarchive" \
-            -exportPath "$RUNNER_TEMP/OpenChamberExport" \
+            -archivePath "$RUNNER_TEMP/Pichamber.xcarchive" \
+            -exportPath "$RUNNER_TEMP/PichamberExport" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
         working-directory: ${{ env.IOS_PROJECT_DIR }}
 
@@ -385,7 +385,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: openchamber-ios-${{ needs.resolve-version.outputs.version_name }}-${{ needs.resolve-version.outputs.build_number }}
-          path: ${{ runner.temp }}/OpenChamberExport/*.ipa
+          path: ${{ runner.temp }}/PichamberExport/*.ipa
           if-no-files-found: error
 
       - name: Upload to TestFlight
@@ -400,6 +400,6 @@ jobs:
           printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 -D > "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           xcrun altool --upload-app \
             --type ios \
-            --file "$RUNNER_TEMP/OpenChamberExport/App.ipa" \
+            --file "$RUNNER_TEMP/PichamberExport/App.ipa" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" \
             --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"

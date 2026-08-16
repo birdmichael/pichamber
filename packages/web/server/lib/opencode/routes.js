@@ -60,7 +60,7 @@ export const registerOpenCodeRoutes = (app, dependencies) => {
 
   // Self-contained page for the OAuth return leg: the system browser has no UI
   // session, so it cannot load the SPA behind the auth gate — everything it
-  // needs ships inline. `openchamber://focus/mcp-auth` raises the desktop app;
+  // needs ships inline. `pichamber://focus/mcp-auth` raises the desktop app;
   // the link stays visible because some browsers only follow custom-protocol
   // URLs from a user gesture.
   const renderMcpOAuthCallbackPage = ({ title, message, desktopReturn }) => `<!doctype html>
@@ -68,7 +68,7 @@ export const registerOpenCodeRoutes = (app, dependencies) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)} — OpenChamber</title>
+<title>${escapeHtml(title)} — Pichamber</title>
 <style>
   :root { color-scheme: light dark; }
   body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -85,8 +85,8 @@ export const registerOpenCodeRoutes = (app, dependencies) => {
 <main>
 <h1>${escapeHtml(title)}</h1>
 <p>${escapeHtml(message)}</p>
-${desktopReturn ? `<a class="return" href="openchamber://focus/mcp-auth">Return to OpenChamber</a>
-<script>window.location.href = 'openchamber://focus/mcp-auth';</script>` : ''}
+${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to Pichamber</a>
+<script>window.location.href = 'pichamber://focus/mcp-auth';</script>` : ''}
 </main>
 </body>
 </html>`;
