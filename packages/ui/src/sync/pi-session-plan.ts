@@ -1,7 +1,7 @@
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
-export const SESSION_PLAN_STATUSES = ['off', 'active', 'ready', 'saved', 'implementing'] as const;
-export const SESSION_PLAN_ACTIONS = ['start', 'save', 'implement', 'exit', 'resume'] as const;
+const SESSION_PLAN_STATUSES = ['off', 'active', 'ready', 'saved', 'implementing'] as const;
+const SESSION_PLAN_ACTIONS = ['start', 'save', 'implement', 'exit', 'resume'] as const;
 
 export type SessionPlanStatus = (typeof SESSION_PLAN_STATUSES)[number];
 export type SessionPlanAction = (typeof SESSION_PLAN_ACTIONS)[number];
@@ -12,7 +12,7 @@ export type SessionPlan = {
   title?: string;
 };
 
-export type SessionPlanSide = 'agent' | 'plan';
+type SessionPlanSide = 'agent' | 'plan';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -31,11 +31,11 @@ export const parseSessionPlan = (value: unknown): SessionPlan | null => {
     : { status: status as SessionPlanStatus, planMarkdown };
 };
 
-export const sessionPlanHasMarkdown = (plan: SessionPlan | null | undefined): boolean => (
-  Boolean(plan)
-  && (plan.status === 'ready' || plan.status === 'saved' || plan.status === 'implementing')
-  && plan.planMarkdown.trim().length > 0
-);
+export const sessionPlanHasMarkdown = (plan: SessionPlan | null | undefined): boolean => {
+  if (!plan) return false;
+  return (plan.status === 'ready' || plan.status === 'saved' || plan.status === 'implementing')
+    && plan.planMarkdown.trim().length > 0;
+};
 
 export const isFooterPlanSelected = (status: SessionPlanStatus | null | undefined): boolean => (
   status === 'active' || status === 'ready'

@@ -858,14 +858,14 @@ describe('session plan status and actions', () => {
     await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
       status: 409,
     });
-    expect(prompted).toEqual([]);
+    expect(prompted).toEqual(['/plan start']);
 
     const plan = await host.runPlanAction(record.id, { action: 'resume' });
     expect(plan).toMatchObject({
       status: 'ready',
       planMarkdown: '# Saved\n\nKeep this.',
     });
-    expect(prompted).toEqual([]);
+    expect(prompted).toEqual(['/plan start']);
     expect(record.piSession.reloadCount).toBe(1);
     expect(record.piSession.bindCount).toBe(2);
     host.dispose();

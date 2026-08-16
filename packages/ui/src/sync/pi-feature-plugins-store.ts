@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 
 import {
-  emptyFeaturePluginsPayload,
   parseFeaturePluginsPayload,
   type FeaturePluginsPayload,
 } from '@/components/sections/feature-plugins/featurePlugins';
@@ -63,5 +62,3 @@ export const isPiPlanPluginAvailable = (payload: FeaturePluginsPayload | null | 
 export const usePiPlanPluginAvailable = (): boolean => (
   usePiFeaturePluginsStore((state) => isPiPlanPluginAvailable(state.payload))
 );
-
-export const emptyFeaturePlugins = emptyFeaturePluginsPayload;

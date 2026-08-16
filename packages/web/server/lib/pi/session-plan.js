@@ -3,15 +3,8 @@
 // widgets or read leftover .opencode/plans files.
 
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
-export const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
-export const SESSION_PLAN_STATUSES = Object.freeze([
-  'off',
-  'active',
-  'ready',
-  'saved',
-  'implementing',
-]);
-export const SESSION_PLAN_ACTIONS = Object.freeze([
+const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
+const SESSION_PLAN_ACTIONS = Object.freeze([
   'start',
   'save',
   'implement',
