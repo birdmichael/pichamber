@@ -66,7 +66,7 @@ async function resolveTargetPort(options = {}, deps = {}) {
   }
 
   throw new TunnelCliError(
-    'No running OpenChamber server found. Start one with `openchamber serve`, or pass --port <port>.',
+    'No running OpenChamber server found. Start one with `pichamber serve`, or pass --port <port>.',
     EXIT_CODE.GENERAL_ERROR,
   );
 }

@@ -157,6 +157,10 @@ function removeStartupEnvFile() {
 }
 
 function resolveCliEntrypoint() {
+  const fromPath = searchPathFor('pichamber');
+  if (typeof fromPath === 'string' && fromPath.trim().length > 0) {
+    return fromPath;
+  }
   const entry = typeof process.argv[1] === 'string' && process.argv[1].trim().length > 0
     ? process.argv[1]
     : path.join(__dirname, 'cli.js');

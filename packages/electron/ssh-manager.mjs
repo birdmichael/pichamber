@@ -992,7 +992,7 @@ export class ElectronSshManager {
 
   async currentRemoteOpenChamberVersion(parsed, controlPath) {
     try {
-      const output = await this.runRemoteCommand(parsed, controlPath, 'openchamber --version 2>/dev/null || true');
+      const output = await this.runRemoteCommand(parsed, controlPath, 'pichamber --version 2>/dev/null || true');
       return parseVersionToken(output);
     } catch {
       return null;
@@ -1005,14 +1005,14 @@ export class ElectronSshManager {
     const commands = [];
 
     if (preferred === 'bun') {
-      if (hasBun) commands.push(`bun add -g @openchamber/web@${version}`);
-      if (hasNpm) commands.push(`npm install -g @openchamber/web@${version}`);
+      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
+      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
     } else if (preferred === 'npm') {
-      if (hasNpm) commands.push(`npm install -g @openchamber/web@${version}`);
-      if (hasBun) commands.push(`bun add -g @openchamber/web@${version}`);
+      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
+      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
     } else {
-      if (hasBun) commands.push(`bun add -g @openchamber/web@${version}`);
-      if (hasNpm) commands.push(`npm install -g @openchamber/web@${version}`);
+      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
+      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
     }
 
     if (commands.length === 0) {
@@ -1078,7 +1078,7 @@ export class ElectronSshManager {
     if (secret) {
       envPrefix += ` OPENCHAMBER_UI_PASSWORD=${shellQuote(secret)}`;
     }
-    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} openchamber serve --hostname 127.0.0.1 --port ${desiredPort}`);
+    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} pichamber serve --hostname 127.0.0.1 --port ${desiredPort}`);
     const port = output.split(/\s+/).map((token) => Number.parseInt(token, 10)).find((value) => Number.isFinite(value));
     return port || desiredPort;
   }
@@ -1088,7 +1088,7 @@ export class ElectronSshManager {
       await this.runRemoteCommand(
         parsed,
         controlPath,
-        `if command -v curl >/dev/null 2>&1; then curl -fsS -X POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; elif command -v wget >/dev/null 2>&1; then wget -qO- --method=POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; fi`,
+        `pichamber stop --port ${remotePort} >/dev/null 2>&1 || true; if command -v curl >/dev/null 2>&1; then curl -fsS -X POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; elif command -v wget >/dev/null 2>&1; then wget -qO- --method=POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; fi`,
       );
     } catch {
     }

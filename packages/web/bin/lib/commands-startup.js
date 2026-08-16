@@ -13,7 +13,7 @@ async function startupCommand(options, action = 'status') {
   const normalized = typeof action === 'string' ? action.trim().toLowerCase() : 'status';
   if (!['status', 'enable', 'disable'].includes(normalized)) {
     throw new TunnelCliError(
-      `Unknown startup subcommand '${action}'. Use 'openchamber startup --help'.`,
+      `Unknown startup subcommand '${action}'. Use 'pichamber startup --help'.`,
       EXIT_CODE.USAGE_ERROR
     );
   }
@@ -56,7 +56,7 @@ async function startupCommand(options, action = 'status') {
     logStatus(result.active ? 'success' : result.activeState === 'failed' ? 'error' : 'warning', `service ${result.activeState}`);
   }
   if (normalized === 'enable') {
-    logStatus('info', 'service command', 'openchamber serve --foreground');
+    logStatus('info', 'service command', 'pichamber serve --foreground');
   }
   clackOutro(normalized === 'status' ? 'status complete' : `${normalized} complete`);
 }

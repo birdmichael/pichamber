@@ -318,6 +318,18 @@ export async function handleSystemBridgeMessage(
           : os.arch();
         const reportUsage = body.reportUsage !== false;
 
+        if (!deps.updateCheckUrl) {
+          return {
+            id,
+            type,
+            success: true,
+            data: {
+              latestVersion: currentVersion,
+              updateAvailable: false,
+            },
+          };
+        }
+
         const requestBody = {
           appType: 'vscode',
           deviceClass,

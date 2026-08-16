@@ -948,7 +948,7 @@ describe('cli entry detection', () => {
   const moduleUrl = pathToFileURL(modulePath).href;
 
   it('resolves symlinked entry paths before comparing', () => {
-    const symlinkPath = '/usr/local/bin/openchamber';
+    const symlinkPath = '/usr/local/bin/pichamber';
     const realpath = (filePath) => {
       if (filePath === path.resolve(symlinkPath)) {
         return modulePath;
@@ -980,8 +980,8 @@ describe('cli entry detection', () => {
   });
 
   it('accepts wrapper binary name fallback when requested', () => {
-    const wrapperPath = '/home/user/.local/bin/openchamber';
-    expect(isModuleCliExecution(wrapperPath, moduleUrl, undefined, 'openchamber')).toBe(true);
+    const wrapperPath = '/home/user/.local/bin/pichamber';
+    expect(isModuleCliExecution(wrapperPath, moduleUrl, undefined, 'pichamber')).toBe(true);
   });
 
   it('normalizes direct paths when realpath fails', () => {
@@ -995,7 +995,10 @@ describe('cli entry detection', () => {
 });
 
 describe('isOpenchamberCmdline', () => {
-  it('accepts OpenChamber CLI and daemon cmdlines', () => {
+  it('accepts Pichamber CLI and leftover OpenChamber cmdlines', () => {
+    expect(isOpenchamberCmdline('node /usr/local/bin/pichamber serve')).toBe(true);
+    expect(isOpenchamberCmdline('node /x/@pichamber/web/bin/cli.js serve')).toBe(true);
+    expect(isOpenchamberCmdline('node /x/@pichamber/web/server/index.js --port 9090')).toBe(true);
     expect(isOpenchamberCmdline('node /x/@openchamber/web/bin/cli.js serve')).toBe(true);
     expect(isOpenchamberCmdline('node /x/@openchamber/web/server/index.js --port 9090')).toBe(true);
     expect(isOpenchamberCmdline('bun /home/u/projects/openchamber/packages/web/server/index.js --port 3001')).toBe(true);

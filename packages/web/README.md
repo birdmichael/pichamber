@@ -1,4 +1,4 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/birdmichael/pichamber/raw/HEAD/docs/references/badges/pichamber-logo-dark.svg"><img src="https://github.com/birdmichael/pichamber/raw/HEAD/docs/references/badges/pichamber-logo-light.svg" width="32" height="32" align="absmiddle" /></picture> @openchamber/web
+# <picture><source media="(prefers-color-scheme: dark)" srcset="https://github.com/birdmichael/pichamber/raw/HEAD/docs/references/badges/pichamber-logo-dark.svg"><img src="https://github.com/birdmichael/pichamber/raw/HEAD/docs/references/badges/pichamber-logo-light.svg" width="32" height="32" align="absmiddle" /></picture> @pichamber/web
 
 [![GitHub stars](https://img.shields.io/github/stars/openchamber/openchamber?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0iI2YxZWNlYyIgdmlld0JveD0iMCAwIDI1NiAyNTYiPjxwYXRoIGQ9Ik0yMjkuMDYsMTA4Ljc5bC00OC43LDQyLDE0Ljg4LDYyLjc5YTguNCw4LjQsMCwwLDEtMTIuNTIsOS4xN0wxMjgsMTg5LjA5LDczLjI4LDIyMi43NGE4LjQsOC40LDAsMCwxLTEyLjUyLTkuMTdsMTQuODgtNjIuNzktNDguNy00MkE4LjQ2LDguNDYsMCwwLDEsMzEuNzMsOTRMOTUuNjQsODguOGwyNC42Mi01OS42YTguMzYsOC4zNiwwLDAsMSwxNS40OCwwbDI0LjYyLDU5LjZMMjI0LjI3LDk0QTguNDYsOC40NiwwLDAsMSwyMjkuMDYsMTA4Ljc5WiIgb3BhY2l0eT0iMC4yIj48L3BhdGg%2BPHBhdGggZD0iTTIzOS4xOCw5Ny4yNkExNi4zOCwxNi4zOCwwLDAsMCwyMjQuOTIsODZsLTU5LTQuNzZMMTQzLjE0LDI2LjE1YTE2LjM2LDE2LjM2LDAsMCwwLTMwLjI3LDBMOTAuMTEsODEuMjMsMzEuMDgsODZhMTYuNDYsMTYuNDYsMCwwLDAtOS4zNywyOC44Nmw0NSwzOC44M0w1MywyMTEuNzVhMTYuMzgsMTYuMzgsMCwwLDAsMjQuNSwxNy44MkwxMjgsMTk4LjQ5bDUwLjUzLDMxLjA4QTE2LjQsMTYuNCwwLDAsMCwyMDMsMjExLjc1bC0xMy43Ni01OC4wNyw0NS0zOC44M0ExNi40MywxNi40MywwLDAsMCwyMzkuMTgsOTcuMjZabS0xNS4zNCw1LjQ3LTQ4LjcsNDJhOCw4LDAsMCwwLTIuNTYsNy45MWwxNC44OCw2Mi44YS4zNy4zNywwLDAsMS0uMTcuNDhjLS4xOC4xNC0uMjMuMTEtLjM4LDBsLTU0LjcyLTMzLjY1YTgsOCwwLDAsMC04LjM4LDBMNjkuMDksMjE1Ljk0Yy0uMTUuMDktLjE5LjEyLS4zOCwwYS4zNy4zNywwLDAsMS0uMTctLjQ4bDE0Ljg4LTYyLjhhOCw4LDAsMCwwLTIuNTYtNy45MWwtNDguNy00MmMtLjEyLS4xLS4yMy0uMTktLjEzLS41cy4xOC0uMjcuMzMtLjI5bDYzLjkyLTUuMTZBOCw4LDAsMCwwLDEwMyw5MS44NmwyNC42Mi01OS42MWMuMDgtLjE3LjExLS4yNS4zNS0uMjVzLjI3LjA4LjM1LjI1TDE1Myw5MS44NmE4LDgsMCwwLDAsNi43NSw0LjkybDYzLjkyLDUuMTZjLjE1LDAsLjI0LDAsLjMzLjI5UzIyNCwxMDIuNjMsMjIzLjg0LDEwMi43M1oiPjwvcGF0aD48L3N2Zz4%3D&logoColor=FFFCF0&labelColor=100F0F&color=66800B)](https://github.com/openchamber/openchamber/stargazers)
 [![GitHub release](https://img.shields.io/github/v/release/openchamber/openchamber?style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0iI2YxZWNlYyIgdmlld0JveD0iMCAwIDI1NiAyNTYiPjxwYXRoIGQ9Ik0xMjgsMTI5LjA5VjIzMmE4LDgsMCwwLDEtMy44NC0xbC04OC00OC4xOGE4LDgsMCwwLDEtNC4xNi03VjgwLjE4YTgsOCwwLDAsMSwuNy0zLjI1WiIgb3BhY2l0eT0iMC4yIj48L3BhdGg%2BPHBhdGggZD0iTTIyMy42OCw2Ni4xNSwxMzUuNjgsMThhMTUuODgsMTUuODgsMCwwLDAtMTUuMzYsMGwtODgsNDguMTdhMTYsMTYsMCwwLDAtOC4zMiwxNHY5NS42NGExNiwxNiwwLDAsMCw4LjMyLDE0bDg4LDQ4LjE3YTE1Ljg4LDE1Ljg4LDAsMCwwLDE1LjM2LDBsODgtNDguMTdhMTYsMTYsMCwwLDAsOC4zMi0xNFY4MC4xOEExNiwxNiwwLDAsMCwyMjMuNjgsNjYuMTVaTTEyOCwzMmw4MC4zNCw0NC0yOS43NywxNi4zLTgwLjM1LTQ0Wk0xMjgsMTIwLDQ3LjY2LDc2bDMzLjktMTguNTYsODAuMzQsNDRaTTQwLDkwbDgwLDQzLjc4djg1Ljc5TDQwLDE3NS44MlptMTc2LDg1Ljc4aDBsLTgwLDQzLjc5VjEzMy44MmwzMi0xNy41MVYxNTJhOCw4LDAsMCwwLDE2LDBWMTA3LjU1TDIxNiw5MHY4NS43N1oiPjwvcGF0aD48L3N2Zz4%3D&logoColor=FFFCF0&labelColor=100F0F&color=205EA6)](https://github.com/openchamber/openchamber/releases/latest)
@@ -11,46 +11,46 @@ Full project overview, screenshots, and all features: [github.com/openchamber/op
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/birdmichael/pichamber/main/scripts/install.sh | bash
 ```
 
-Or install manually: `bun add -g @openchamber/web` (or npm, pnpm, yarn).
+Or install manually: `bun add -g @pichamber/web` (or npm, pnpm, yarn).
 
 > **Prerequisites:** [OpenCode CLI](https://opencode.ai) installed, Node.js 22+.
 
 ## Usage
 
 ```bash
-openchamber                          # Start on port 3000
-openchamber --port 8080              # Custom port
-openchamber --lan --port 3000        # Listen on LAN (0.0.0.0)
-openchamber --ui-password secret     # Password-protect UI
-openchamber startup enable           # Start at login as a native service
-OPENCHAMBER_UI_PASSWORD=secret openchamber startup enable # Save service password env
-openchamber startup status           # Show startup service status
-openchamber startup disable          # Remove startup service
-openchamber tunnel help              # Tunnel lifecycle commands
-openchamber tunnel providers         # Show provider capabilities
-openchamber tunnel profile add --provider cloudflare --mode managed-remote --name prod-main --hostname app.example.com --token <token>
-openchamber tunnel start --profile prod-main
-openchamber tunnel start --provider cloudflare --mode quick --qr
-openchamber tunnel start --provider cloudflare --mode managed-local --config ~/.cloudflared/config.yml
-openchamber tunnel status --all      # Show tunnel state across instances
-openchamber tunnel stop --port 3000  # Stop tunnel only (server stays running)
-openchamber connect-url --port 3000  # Add this server to OpenChamber Desktop
-openchamber connect-url --server http://host:3000 --qr
-openchamber connect-url --port 3000 --qr
-openchamber logs                     # Follow latest instance logs
-OPENCODE_PORT=4096 OPENCODE_SKIP_START=true openchamber                    # Connect to external OpenCode server
-OPENCODE_HOST=https://myhost:4096 OPENCODE_SKIP_START=true openchamber  # Connect via custom host/HTTPS
-openchamber stop                     # Stop server
-openchamber update                   # Update to latest version
+pichamber                          # Start on port 3000
+pichamber --port 8080              # Custom port
+pichamber --lan --port 3000        # Listen on LAN (0.0.0.0)
+pichamber --ui-password secret     # Password-protect UI
+pichamber startup enable           # Start at login as a native service
+OPENCHAMBER_UI_PASSWORD=secret pichamber startup enable # Save service password env
+pichamber startup status           # Show startup service status
+pichamber startup disable          # Remove startup service
+pichamber tunnel help              # Tunnel lifecycle commands
+pichamber tunnel providers         # Show provider capabilities
+pichamber tunnel profile add --provider cloudflare --mode managed-remote --name prod-main --hostname app.example.com --token <token>
+pichamber tunnel start --profile prod-main
+pichamber tunnel start --provider cloudflare --mode quick --qr
+pichamber tunnel start --provider cloudflare --mode managed-local --config ~/.cloudflared/config.yml
+pichamber tunnel status --all      # Show tunnel state across instances
+pichamber tunnel stop --port 3000  # Stop tunnel only (server stays running)
+pichamber connect-url --port 3000  # Add this server to OpenChamber Desktop
+pichamber connect-url --server http://host:3000 --qr
+pichamber connect-url --port 3000 --qr
+pichamber logs                     # Follow latest instance logs
+OPENCODE_PORT=4096 OPENCODE_SKIP_START=true pichamber                    # Connect to external OpenCode server
+OPENCODE_HOST=https://myhost:4096 OPENCODE_SKIP_START=true pichamber  # Connect via custom host/HTTPS
+pichamber stop                     # Stop server
+pichamber update                   # Update to latest version
 ```
 
-`startup enable` snapshots your current environment into the native service so startup behaves like you launched `openchamber` from the same shell. This preserves provider tokens, PATH, SSH agent settings, and other CLI auth/config env vars. Use `--no-env-snapshot` for a minimal service env.
+`startup enable` snapshots your current environment into the native service so startup behaves like you launched `pichamber` from the same shell. This preserves provider tokens, PATH, SSH agent settings, and other CLI auth/config env vars. Use `--no-env-snapshot` for a minimal service env.
 
 When OpenChamber launches the local OpenCode server, it also registers a native
-`openchamber` agent tool for project, session, and scheduled-task orchestration.
+`pichamber` agent tool for project, session, and scheduled-task orchestration.
 The tool is not injected when connecting to an external OpenCode server.
 Behavior settings can optionally inject a managed system-prompt optimizer on
 the next OpenCode restart. It is disabled by default and is not available for
@@ -68,11 +68,11 @@ external OpenCode servers.
 Use `connect-url` when a web/API server should be added to OpenChamber Desktop or another OpenChamber app. If no server is running on the selected port, OpenChamber starts one first.
 
 ```bash
-openchamber connect-url --port 3000
-openchamber connect-url --port 3000 --qr
-openchamber connect-url --port 3000 --json
-openchamber connect-url --port 3000 --name "Workstation"
-openchamber connect-url --port 3000 --lan --server http://workstation.local:3000 --qr
+pichamber connect-url --port 3000
+pichamber connect-url --port 3000 --qr
+pichamber connect-url --port 3000 --json
+pichamber connect-url --port 3000 --name "Workstation"
+pichamber connect-url --port 3000 --lan --server http://workstation.local:3000 --qr
 ```
 
 ### Headless/API-only server for Desktop
@@ -80,7 +80,7 @@ openchamber connect-url --port 3000 --lan --server http://workstation.local:3000
 Use this on a remote machine when you want Pichamber running as a web/API server, then connect to it from Pichamber Desktop on another machine:
 
 ```bash
-openchamber connect-url --port 3000 --api-only --lan --server http://workstation.local:3000 --qr --ui-password your-password
+pichamber connect-url --port 3000 --api-only --lan --server http://workstation.local:3000 --qr --ui-password your-password
 ```
 
 `--api-only` starts API routes without serving browser UI assets. `--lan` binds the server so other machines can reach it. `--server` is the address saved into the Desktop connection link. `--ui-password` protects browser access if UI routes are enabled elsewhere; the generated client token is what Desktop uses for API access.
@@ -92,7 +92,7 @@ If the server was started with `--lan` or `--host 0.0.0.0`, `connect-url` automa
 If you are exposing the server beyond localhost, start it with a password:
 
 ```bash
-openchamber serve --lan --port 3000 --ui-password your-password
+pichamber serve --lan --port 3000 --ui-password your-password
 ```
 
 Generating a client token does not automatically password-protect the hosted browser UI. `--ui-password` protects browser access; the client token lets another Pichamber app connect to this server.
@@ -101,8 +101,8 @@ Generating a client token does not automatically password-protect the hosted bro
 <summary>Connect to external OpenCode server</summary>
 
 ```bash
-OPENCODE_PORT=4096 OPENCODE_SKIP_START=true openchamber
-OPENCODE_HOST=https://myhost:4096 OPENCODE_SKIP_START=true openchamber
+OPENCODE_PORT=4096 OPENCODE_SKIP_START=true pichamber
+OPENCODE_HOST=https://myhost:4096 OPENCODE_SKIP_START=true pichamber
 ```
 
 | Variable | Description |
@@ -123,7 +123,7 @@ OPENCODE_HOST=https://myhost:4096 OPENCODE_SKIP_START=true openchamber
 <summary>Bind managed OpenCode to LAN / Tailscale</summary>
 
 ```bash
-OPENCHAMBER_OPENCODE_HOSTNAME=0.0.0.0 openchamber --port 3000
+OPENCHAMBER_OPENCODE_HOSTNAME=0.0.0.0 pichamber --port 3000
 ```
 
 **Security note:** binding to `0.0.0.0` exposes the server on all network interfaces — use only on trusted networks and protect with firewall rules or `--ui-password`.
@@ -169,8 +169,8 @@ chown -R 1000:1000 data/
 <summary>Background & daemon mode</summary>
 
 ```bash
-openchamber             # Runs in background by default
-openchamber stop        # Stop background server
+pichamber             # Runs in background by default
+pichamber stop        # Stop background server
 ```
 
 </details>
@@ -211,7 +211,7 @@ After=opencode.service
 
 [Service]
 Type=simple
-ExecStart=openchamber serve --port 3000 --host 0.0.0.0 --ui-password your-password --foreground
+ExecStart=pichamber serve --port 3000 --host 0.0.0.0 --ui-password your-password --foreground
 Environment="OPENCODE_HOST=http://localhost:4095"
 Environment="OPENCODE_SKIP_START=true"
 Restart=on-failure

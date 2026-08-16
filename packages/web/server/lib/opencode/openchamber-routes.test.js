@@ -61,7 +61,7 @@ beforeEach(() => {
   packageManager.detectPackageManagerDetails.mockReturnValue({
     packageManager: 'npm',
   });
-  packageManager.getUpdateCommand.mockReturnValue('npm install -g @openchamber/web@latest');
+  packageManager.getUpdateCommand.mockReturnValue('npm install -g @pichamber/web@latest');
 });
 
 afterEach(() => {
@@ -76,7 +76,7 @@ describe('OpenChamber foreground update route', () => {
     await request(app)
       .post('/api/openchamber/update-install')
       .expect(409, {
-        error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run openchamber update and restart the service.',
+        error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run pichamber update and restart the service.',
       });
 
     expect(childProcess.spawnSync).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('OpenChamber foreground update route', () => {
     await request(app)
       .post('/api/openchamber/update-install')
       .expect(409, {
-        error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run openchamber update and restart the service.',
+        error: 'Foreground servers must be updated by their service manager. Set OPENCHAMBER_SYSTEMD_UNIT when running under systemd, or run pichamber update and restart the service.',
       });
 
     expect(childProcess.spawnSync).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe('OpenChamber foreground update route', () => {
       '--setenv=PATH=/home/syu/.npm-global/bin:/usr/bin:/bin',
       '/bin/sh',
       '-c',
-      "set -eu\nnpm install -g @openchamber/web@latest\nsystemctl --user restart 'openchamber@wsl.service'",
+      "set -eu\nnpm install -g @pichamber/web@latest\nsystemctl --user restart 'openchamber@wsl.service'",
     ], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

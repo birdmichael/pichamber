@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- About no longer asks OpenChamber’s hosted update API for the latest version. Until a Pichamber update API is configured, the leftover extension reports no update instead of OpenChamber 1.18.4.
 - Chat: on Pi, a Subagents Work Status row or transcript card opens that child session in place so you can send follow-ups there. The section stays hidden until the Subagents feature plugin is installed and enabled. Leftover adapter rows without a session id are not listed.
 - The activity bar, title bar, and loading splash now use the Pichamber chamber with Pi’s pixel “pi” on the top face instead of the leftover OpenCode O.
 - Settings: Skills, Skills Catalog, and Commands in the left rail stay clickable and keyboard-focusable without searching first. Choosing a search result (click or Enter) opens that page and focuses the matching field. Provider, agent, and skill rows are no longer announced twice by VoiceOver.
