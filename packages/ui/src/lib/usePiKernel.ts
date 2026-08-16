@@ -15,7 +15,8 @@ export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
  * or Settings Chat sessionGoal group. VS Code still hides the entry point
  * because the loop runs in the web server.
  */
-export function isSessionGoalVisibleOnPiKernel(_isPiKernel: boolean): boolean {
+export function isSessionGoalVisibleOnPiKernel(isPiKernel: boolean): boolean {
+  void isPiKernel;
   return true;
 }
 

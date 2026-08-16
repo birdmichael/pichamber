@@ -90,7 +90,7 @@ describe('settings search', () => {
   });
 
   test('keeps Session Goal settings searchable on Pi and hidden in VS Code', () => {
-    const query = 'session goal';
+    const query = 'goal';
     const getPageTitle = (page: string) => page;
     const piResults = buildSettingsSearchResults({
       query,
