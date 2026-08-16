@@ -56,7 +56,7 @@ export const parseConnectionPayload = (raw: string): MobileConnectionPayload | M
   const trimmed = raw.trim();
   if (!trimmed) return null;
 
-  if (/^openchamber:\/\//i.test(trimmed)) {
+  if (/^(?:pichamber|openchamber):\/\//i.test(trimmed)) {
     const pairing = parsePairingConnectionPayload(trimmed);
     return pairing ? { pairing } : null;
   }
