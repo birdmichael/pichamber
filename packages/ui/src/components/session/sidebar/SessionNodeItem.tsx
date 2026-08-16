@@ -960,24 +960,26 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         {isPinnedSession ? <Icon name="unpin" className="mr-1 h-4 w-4" /> : <Icon name="pushpin" className="mr-1 h-4 w-4" />}
         {isPinnedSession ? t('sessions.sidebar.session.menu.unpin') : t('sessions.sidebar.session.menu.pin')}
       </Item>
-      {!resolvedSession.share ? (
-        <Item onClick={() => handleShareSession(resolvedSession)} className="[&>svg]:mr-1">
-          <Icon name="share-2" className="mr-1 h-4 w-4" />
-          {t('sessions.sidebar.session.menu.share')}
-        </Item>
-      ) : (
-        <>
-          <Item onClick={() => { if (resolvedSession.share?.url) handleCopyShareUrl(resolvedSession.share.url, session.id); }} className="[&>svg]:mr-1">
-            {copiedSessionId === session.id
-              ? <><Icon name="check" className="mr-1 h-4 w-4"  style={{ color: 'var(--status-success)' }}/>{t('sessions.sidebar.session.menu.copied')}</>
-              : <><Icon name="file-copy" className="mr-1 h-4 w-4" />{t('sessions.sidebar.session.menu.copyLink')}</>}
+      {!isPiKernel ? (
+        !resolvedSession.share ? (
+          <Item onClick={() => handleShareSession(resolvedSession)} className="[&>svg]:mr-1">
+            <Icon name="share-2" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.share')}
           </Item>
-          <Item onClick={() => handleUnshareSession(session.id)} className="[&>svg]:mr-1">
-            <Icon name="link-unlink-m" className="mr-1 h-4 w-4" />
-            {t('sessions.sidebar.session.menu.unshare')}
-          </Item>
-        </>
-      )}
+        ) : (
+          <>
+            <Item onClick={() => { if (resolvedSession.share?.url) handleCopyShareUrl(resolvedSession.share.url, session.id); }} className="[&>svg]:mr-1">
+              {copiedSessionId === session.id
+                ? <><Icon name="check" className="mr-1 h-4 w-4"  style={{ color: 'var(--status-success)' }}/>{t('sessions.sidebar.session.menu.copied')}</>
+                : <><Icon name="file-copy" className="mr-1 h-4 w-4" />{t('sessions.sidebar.session.menu.copyLink')}</>}
+            </Item>
+            <Item onClick={() => handleUnshareSession(session.id)} className="[&>svg]:mr-1">
+              <Icon name="link-unlink-m" className="mr-1 h-4 w-4" />
+              {t('sessions.sidebar.session.menu.unshare')}
+            </Item>
+          </>
+        )
+      ) : null}
       <Item onClick={() => { void handleExportSession(); }} className="[&>svg]:mr-1">
         <Icon name="download" className="mr-1 h-4 w-4" />
         {t('sessions.sidebar.session.menu.exportMarkdown')}
