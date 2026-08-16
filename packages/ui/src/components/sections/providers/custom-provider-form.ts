@@ -4,7 +4,12 @@
  * can be defined from Settings without code changes.
  */
 
-import { readCatalogContextWindow, readPositiveContextWindow, resolveContextWindow } from '@/lib/model-context-windows';
+import {
+  readCatalogContextWindow,
+  readPositiveContextWindow,
+  resolveContextWindow,
+  resolvePersistedContextWindow,
+} from '@/lib/model-context-windows';
 
 export const CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
@@ -364,7 +369,10 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
   const modelsValid = modelErrors.every((entry) => !entry.id && !entry.name);
   const modelConfig = Object.fromEntries(
     input.form.models.map((model) => {
-      const contextWindow = readPositiveContextWindow(model.contextWindow);
+      const contextWindow = resolvePersistedContextWindow({
+        id: model.id.trim(),
+        contextWindow: model.contextWindow,
+      });
       return [
         model.id.trim(),
         {

@@ -1444,7 +1444,7 @@ export const settingsDict = {
   "settings.providers.page.custom.models.contextLabel": "Ventana de contexto",
   "settings.providers.page.custom.models.contextAria": "Ventana de contexto en tokens",
   "settings.providers.page.custom.models.contextUnit": "tokens",
-  "settings.providers.page.custom.models.contextInfo": "Tokens de entrada que puede admitir este modelo. Déjalo vacío si no lo sabes. El fallback de visualización de 200k solo se usa cuando no hay un valor.",
+  "settings.providers.page.custom.models.contextInfo": "Tokens de entrada que puede admitir este modelo. Déjalo vacío si no lo sabes. Un id conocido guarda la ventana publicada de ese modelo. El fallback de visualización de 200k solo se usa cuando no hay un valor guardado.",
   "settings.providers.page.custom.models.contextInferred": "Inferido a partir de la familia del modelo. Guarda para conservarlo o vacía el campo si no estás seguro.",
   "settings.providers.page.custom.headers.title": "Encabezados",
   "settings.providers.page.custom.headers.description": "Encabezados de solicitud opcionales enviados en cada llamada.",

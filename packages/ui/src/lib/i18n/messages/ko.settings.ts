@@ -1444,7 +1444,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': '컨텍스트 창',
   'settings.providers.page.custom.models.contextAria': '토큰 단위 컨텍스트 창',
   'settings.providers.page.custom.models.contextUnit': '토큰',
-  'settings.providers.page.custom.models.contextInfo': '이 모델이 받을 수 있는 입력 토큰 수입니다. 모르면 비워 두세요. 200k 표시 폴백은 값이 없을 때만 사용됩니다.',
+  'settings.providers.page.custom.models.contextInfo': '이 모델이 받을 수 있는 입력 토큰 수입니다. 모르면 비워 두세요. 알려진 ID는 해당 모델의 공개된 컨텍스트 창을 저장합니다. 200k 표시 폴백은 저장된 값이 없을 때만 사용됩니다.',
   'settings.providers.page.custom.models.contextInferred': '모델 계열에서 추정한 값입니다. 저장하면 유지되고, 확실하지 않으면 필드를 비우세요.',
   'settings.providers.page.custom.headers.title': '헤더',
   'settings.providers.page.custom.headers.description': '매 호출에 전송되는 선택적 요청 헤더입니다.',

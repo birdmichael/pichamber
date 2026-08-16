@@ -8,10 +8,13 @@ behavior is documented in `docs/PICHAMBER.md`.
 
 Settings → Providers custom-model rows persist Pi `contextWindow` on that
 model in `~/.pi/agent/models.json` (and project `.pi/models.json`). Save
-must not strip a user-set or provider-reported window. Empty is valid: the
-UI 200k fallback stays display-only. `toProviderModelRecord` exposes
-`limit.context` from that stored value for the composer chip, context
-panel, and work-status usage.
+must not strip a user-set or provider-reported window. Empty on a known
+id writes that id's published window from the UI table (`grok-4.6` =
+500k). Empty on an unknown id stays omitted — do not invent a window that
+pretends to be user-set. Family inference and the UI 200k fallback stay
+display-only. `toProviderModelRecord` exposes `limit.context` from that
+stored value for the composer chip, context panel, and work-status usage.
+Pi reads the stored field; a missing one becomes its 128k default.
 
 ## Desktop `ctx.ui`
 

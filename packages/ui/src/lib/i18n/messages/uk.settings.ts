@@ -1444,7 +1444,7 @@ export const settingsDict = {
   "settings.providers.page.custom.models.contextLabel": "Вікно контексту",
   "settings.providers.page.custom.models.contextAria": "Вікно контексту в токенах",
   "settings.providers.page.custom.models.contextUnit": "токени",
-  "settings.providers.page.custom.models.contextInfo": "Кількість вхідних токенів, які може прийняти ця модель. Залиште порожнім, якщо не знаєте. Запасні 200k для відображення використовуються лише коли значення не задано.",
+  "settings.providers.page.custom.models.contextInfo": "Кількість вхідних токенів, які може прийняти ця модель. Залиште порожнім, якщо не знаєте. Відомий id зберігає опубліковане вікно цієї моделі. Запасні 200k для відображення використовуються лише коли значення не збережено.",
   "settings.providers.page.custom.models.contextInferred": "Виведено з родини моделі. Збережіть, щоб залишити це значення, або очистіть поле, якщо не впевнені.",
   "settings.providers.page.custom.headers.title": "Заголовки",
   "settings.providers.page.custom.headers.description": "Необов’язкові заголовки запиту, що надсилаються з кожним викликом.",

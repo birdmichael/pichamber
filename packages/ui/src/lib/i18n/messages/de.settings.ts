@@ -1411,7 +1411,7 @@ export const settingsDict = {
   'settings.providers.page.custom.models.contextLabel': 'Kontextfenster',
   'settings.providers.page.custom.models.contextAria': 'Kontextfenster in Tokens',
   'settings.providers.page.custom.models.contextUnit': 'Tokens',
-  'settings.providers.page.custom.models.contextInfo': 'Eingabe-Tokens, die dieses Modell aufnehmen kann. Leer lassen, wenn unbekannt. Der 200k-Anzeigefallback gilt nur, wenn kein Wert gesetzt ist.',
+  'settings.providers.page.custom.models.contextInfo': 'Eingabe-Tokens, die dieses Modell aufnehmen kann. Leer lassen, wenn unbekannt. Eine bekannte ID speichert das veröffentlichte Fenster dieses Modells. Der 200k-Anzeigefallback gilt nur, wenn kein Wert gespeichert ist.',
   'settings.providers.page.custom.models.contextInferred': 'Aus der Modellfamilie abgeleitet. Speichern, um den Wert zu behalten, oder das Feld leeren, wenn Sie unsicher sind.',
   'settings.providers.page.custom.headers.title': 'Header',
   'settings.providers.page.custom.headers.description': 'Optionale Anfrage-Header, die bei jedem Aufruf gesendet werden.',

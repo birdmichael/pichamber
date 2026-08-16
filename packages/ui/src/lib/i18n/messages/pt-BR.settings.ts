@@ -1444,7 +1444,7 @@ export const settingsDict = {
   "settings.providers.page.custom.models.contextLabel": "Janela de contexto",
   "settings.providers.page.custom.models.contextAria": "Janela de contexto em tokens",
   "settings.providers.page.custom.models.contextUnit": "tokens",
-  "settings.providers.page.custom.models.contextInfo": "Tokens de entrada que este modelo pode aceitar. Deixe vazio se não souber. O fallback de exibição de 200k só é usado quando nenhum valor está definido.",
+  "settings.providers.page.custom.models.contextInfo": "Tokens de entrada que este modelo pode aceitar. Deixe vazio se não souber. Um id conhecido grava a janela publicada desse modelo. O fallback de exibição de 200k só é usado quando nenhum valor está gravado.",
   "settings.providers.page.custom.models.contextInferred": "Inferido da família do modelo. Salve para manter ou limpe o campo se não tiver certeza.",
   "settings.providers.page.custom.headers.title": "Cabeçalhos",
   "settings.providers.page.custom.headers.description": "Cabeçalhos de solicitação opcionais enviados em cada chamada.",
