@@ -639,6 +639,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={60000}
                       step={250}
+                      className="w-20 tabular-nums"
                       aria-label={t('settings.openchamber.defaults.field.baseDelayMsAria')}
                     />
                     <span className={SETTINGS_NUMBER_UNIT_CLASS}>{t('settings.openchamber.defaults.field.ms')}</span>
