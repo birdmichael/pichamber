@@ -1,8 +1,43 @@
-# Pi kernel host
+# Pi host and facade
 
-In-process Pi session host and OpenCode-shaped HTTP/SSE facade. Product
-behavior is documented in `docs/PICHAMBER.md`. This file owns the command
-dispatch and reload contracts.
+Owning module for the in-process Pi kernel: session host, OpenCode-shaped
+HTTP/SSE facade, Desktop `ctx.ui`, command dispatch, and reload. Product
+behavior is documented in `docs/PICHAMBER.md`.
+
+## Desktop `ctx.ui`
+
+Live `AgentSession` records call `bindExtensions({ uiContext, mode: "rpc" })`
+after create, hydrate, replace, and reload. Title-refresh `reload({ sessionID })`
+and process-wide `reload()` use that same bind after `piSession.reload()` (or
+factory replace). Attach-only leaves extensions `ui_unavailable`. Print-mode /
+unbound sessions stay `ui_unavailable`.
+
+`ExtensionUIContext` mapping:
+
+| `ctx.ui` | Desktop |
+|---|---|
+| `select` | In-chat option card (single, or multi when `opts.multiple`) |
+| `confirm` | Modal confirm / cancel → boolean |
+| `input` / `editor` | In-chat text field. Plan **Other** is a `select` option, then `editor` |
+| `notify` | Toast via `pi.ui.notify` |
+| TUI-only (`custom`, widgets, terminal input) | No-op |
+
+Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session.
+
+## Protocol
+
+Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
+
+- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
+- `GET /api/pi/ui?session=` — pending prompts. Fetch failure must not clear local cards.
+- `POST /api/pi/ui/:id/reply` `{ sessionID, value }`
+- `POST /api/pi/ui/:id/cancel` `{ sessionID }`
+
+`GET /api/question` stays `[]` on Pi.
+
+## Plan questions
+
+`plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. v1 does not add `/plan` TUI menus, tool pickers, or a Settings sheet.
 
 ## Slash command dispatch
 
@@ -55,6 +90,10 @@ the list. OpenCode kernel routes are unchanged.
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
 does not 409. Process-wide `host.reload()` / `POST /api/config/reload` still
 refuse with 409 while any targeted session is streaming or compacting.
+
+After `piSession.reload()` (or factory replace), the host calls the same
+`bindExtensions({ uiContext, mode: "rpc" })` used on create. Attach-only
+leaves extensions `ui_unavailable`.
 
 Reload does not emit `server.connected`. The UI treats that event as a full
 re-bootstrap onto a new-session draft.

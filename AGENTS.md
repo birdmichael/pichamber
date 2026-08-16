@@ -70,6 +70,7 @@ Before changing a module, search for the nearest `DOCUMENTATION.md`; before pack
 High-value anchors:
 
 - Pi kernel: `docs/PICHAMBER.md`
+- Pi host / Desktop `ctx.ui` / command dispatch: `packages/web/server/lib/pi/DOCUMENTATION.md`
 - Sync: `packages/ui/src/sync/DOCUMENTATION.md`
 - Stores: `packages/ui/src/stores/DOCUMENTATION.md`
 - CLI: `packages/web/bin/lib/DOCUMENTATION.md`

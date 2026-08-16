@@ -484,6 +484,52 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, true);
   }));
 
+  const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
+
+  const resolveExtensionUiSession = async (req, body = {}) => {
+    const sessionID = asTrimmedString(req.query?.session)
+      || asTrimmedString(body.sessionID)
+      || asTrimmedString(body.session);
+    if (!sessionID) {
+      const error = new Error('session is required');
+      error.status = 400;
+      throw error;
+    }
+    await loadSession({ ...req, params: { ...req.params, sessionID } });
+    return sessionID;
+  };
+
+  app.get('/api/pi/ui', handle(async (req, res) => {
+    const sessionID = asTrimmedString(req.query?.session);
+    if (sessionID) {
+      await resolveExtensionUiSession(req);
+      json(res, 200, typeof host.listExtensionUIPrompts === 'function'
+        ? host.listExtensionUIPrompts(sessionID)
+        : []);
+      return;
+    }
+    const directory = requestDirectory(req);
+    const prompts = typeof host.listExtensionUIPrompts === 'function'
+      ? host.listExtensionUIPrompts()
+      : [];
+    json(res, 200, directory
+      ? prompts.filter((prompt) => prompt.directory === directory)
+      : prompts);
+  }));
+
+  app.post('/api/pi/ui/:requestID/reply', parseJson, handle(async (req, res) => {
+    const sessionID = await resolveExtensionUiSession(req, req.body || {});
+    const value = req.body && Object.prototype.hasOwnProperty.call(req.body, 'value')
+      ? req.body.value
+      : undefined;
+    json(res, 200, host.replyExtensionUI(sessionID, req.params.requestID, value));
+  }));
+
+  app.post('/api/pi/ui/:requestID/cancel', parseJson, handle(async (req, res) => {
+    const sessionID = await resolveExtensionUiSession(req, req.body || {});
+    json(res, 200, host.cancelExtensionUI(sessionID, req.params.requestID));
+  }));
+
   app.get('/api/permission', handle(async (_req, res) => {
     json(res, 200, []);
   }));

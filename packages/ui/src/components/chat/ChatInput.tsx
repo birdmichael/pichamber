@@ -6,6 +6,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { createMessageQueueTarget, getMessageQueueKey, useMessageQueueStore, type QueuedMessage } from '@/stores/messageQueueStore';
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { useHasPendingPiExtensionUiPrompt } from '@/sync/pi-extension-ui-store';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useInputStore } from '@/sync/input-store';
 import {
@@ -832,6 +833,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
 
     // Session activity for queue availability and controls
     const { phase: sessionPhase } = useCurrentSessionActivity();
+    const hasPendingPiExtensionUi = useHasPendingPiExtensionUiPrompt(currentSessionId);
     const autoReviewRunning = useAutoReviewStore(React.useCallback((state) => {
         if (!currentSessionId) return false;
         const run = state.runsByOriginalSessionID[currentSessionId];
@@ -1594,6 +1596,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
 
         // Handle Enter/Ctrl+Enter based on selected follow-up behavior.
         if (e.key === 'Enter' && !e.shiftKey && (!isMobile || e.ctrlKey || e.metaKey)) {
+            if (hasPendingPiExtensionUi) {
+                e.preventDefault();
+                return;
+            }
             e.preventDefault();
 
             const isCtrlEnter = e.ctrlKey || e.metaKey;

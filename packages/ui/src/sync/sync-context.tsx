@@ -38,6 +38,7 @@ import { setSyncRefs, getAllSyncSessions } from "./sync-refs"
 import { useSessionUIStore } from "./session-ui-store"
 import { stripSessionDiffSnapshots } from "./sanitize"
 import { applySessionEventToGlobalSessions } from "./session-event-router"
+import { handlePiExtensionUiEvent, isPiExtensionUiEventType } from "./pi-extension-ui-events"
 import { syncDebug } from "./debug"
 import { getReconnectCandidateSessionIds, mergeBootstrapSessions } from "./reconnect-recovery"
 import { messagesBefore } from "./message-ordering"
@@ -746,6 +747,7 @@ const getSessionIdFromPayload = (event: Event): string | null => {
     || event.type === "question.asked"
     || event.type === "question.replied"
     || event.type === "question.rejected"
+    || isPiExtensionUiEventType(event.type)
   ) {
     const sessionID = props.sessionID
     return typeof sessionID === "string" && sessionID.length > 0 ? sessionID : null
@@ -1450,6 +1452,10 @@ export function handleEvent(
   }
 
   if (handleUiNotificationEvent(payload, directory)) {
+    return
+  }
+
+  if (handlePiExtensionUiEvent(payload)) {
     return
   }
 

@@ -13,7 +13,18 @@ import { useGlobalSyncStore } from '@/sync/global-sync-store';
 import MessageList, { type MessageListHandle } from './MessageList';
 import { PermissionCard } from './PermissionCard';
 import { QuestionCard } from './QuestionCard';
+import { PiExtensionPromptCard } from './PiExtensionPromptCard';
+import { PiExtensionConfirmDialog } from './PiExtensionConfirmDialog';
 import { hasActiveQuestionToolInCurrentTurn, recoverPendingQuestionWithRetry } from '@/sync/question-recovery';
+import { listPiExtensionUiPrompts } from '@/sync/pi-extension-ui';
+import {
+    reconcilePiExtensionUiPrompts,
+    selectPendingConfirmPrompt,
+    selectTranscriptPiExtensionUiPrompts,
+    useHasPendingPiExtensionUiPrompt,
+    usePiExtensionUiPrompts,
+} from '@/sync/pi-extension-ui-store';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { StatusRowContainer } from './StatusRowContainer';
 import { SessionRecapNote } from '@/components/chat/SessionRecapSpacer';
 import ScrollToBottomButton from './components/ScrollToBottomButton';
@@ -216,6 +227,15 @@ const ChatViewport = React.memo(({
     onLoadEarlierPrompts,
 }: ChatViewportProps) => {
     const { t } = useI18n();
+    const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
+    const transcriptPiPrompts = React.useMemo(
+        () => selectTranscriptPiExtensionUiPrompts(piExtensionPrompts),
+        [piExtensionPrompts],
+    );
+    const pendingPiConfirm = React.useMemo(
+        () => selectPendingConfirmPrompt(piExtensionPrompts),
+        [piExtensionPrompts],
+    );
     const promptPreviewsByTurnIdRef = React.useRef<Map<string, Part[]>>(new Map());
     // Cache normalized parts per source array so unchanged messages keep the
     // same reference and the memo below can bail out to the previous map.
@@ -368,16 +388,20 @@ const ChatViewport = React.memo(({
                             scrollRef={scrollRef}
                             directory={directory}
                         />
-                        {(sessionQuestions.length > 0 || sessionPermissions.length > 0) && (
+                        {(sessionQuestions.length > 0 || sessionPermissions.length > 0 || transcriptPiPrompts.length > 0) && (
                             <div>
                                 {sessionQuestions.map((question) => (
                                     <QuestionCard key={question.id} question={question} />
+                                ))}
+                                {transcriptPiPrompts.map((prompt) => (
+                                    <PiExtensionPromptCard key={prompt.id} prompt={prompt} />
                                 ))}
                                 {sessionPermissions.map((permission) => (
                                     <PermissionCard key={permission.id} permission={permission} />
                                 ))}
                             </div>
                         )}
+                        <PiExtensionConfirmDialog prompt={pendingPiConfirm} />
 
                         <SessionRecapNote sessionId={currentSessionId} directory={directory} isMobile={isMobile} />
 
@@ -637,6 +661,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     // the directory.
     const sessionPermissions = useScopedBlockingPermissions(currentSessionId, effectiveSessionDirectory);
     const sessionQuestions = useScopedBlockingQuestions(currentSessionId, effectiveSessionDirectory);
+    const isPiKernel = usePiKernel();
+    const hasPendingPiExtensionUi = useHasPendingPiExtensionUiPrompt(currentSessionId);
+    const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
 
     const hasUnreconciledQuestionTool = React.useMemo(
         () => !sessionQuestions.some((question) => question.sessionID === currentSessionId)
@@ -658,8 +685,20 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         };
     }, [active, currentSessionId, effectiveSessionDirectory, hasUnreconciledQuestionTool, sync]);
 
+    React.useEffect(() => {
+        if (!active || !isPiKernel || !currentSessionId) return;
+        let cancelled = false;
+        void listPiExtensionUiPrompts(currentSessionId).then((prompts) => {
+            if (cancelled) return;
+            reconcilePiExtensionUiPrompts(currentSessionId, prompts);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [active, currentSessionId, isPiKernel]);
+
     const sessionIsWorking = React.useMemo(() => {
-        if (!currentSessionId || sessionPermissions.length > 0 || sessionQuestions.length > 0) {
+        if (!currentSessionId || sessionPermissions.length > 0 || sessionQuestions.length > 0 || hasPendingPiExtensionUi) {
             return false;
         }
 
@@ -674,7 +713,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             && lastMessage.role === 'assistant'
             && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number',
         );
-    }, [currentSessionId, sessionMessages, sessionPermissions.length, sessionQuestions.length, sessionStatusForCurrent.type]);
+    }, [currentSessionId, hasPendingPiExtensionUi, sessionMessages, sessionPermissions.length, sessionQuestions.length, sessionStatusForCurrent.type]);
     const activeRetryStatus = React.useMemo(() => {
         if (!currentSessionId || sessionStatusForCurrent.type !== 'retry') {
             return null;
@@ -929,11 +968,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }, [timelineController.handleActiveTurnChange]);
 
     React.useEffect(() => {
-        if (sessionPermissions.length === 0 && sessionQuestions.length === 0) {
+        if (sessionPermissions.length === 0 && sessionQuestions.length === 0 && piExtensionPrompts.length === 0) {
             return;
         }
         handleMessageContentChange('permission');
-    }, [handleMessageContentChange, sessionPermissions, sessionQuestions]);
+    }, [handleMessageContentChange, piExtensionPrompts, sessionPermissions, sessionQuestions]);
 
     const navigation = useChatTurnNavigation({
         sessionId: currentSessionId,

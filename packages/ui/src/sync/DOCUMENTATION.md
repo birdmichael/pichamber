@@ -47,6 +47,7 @@ So:
 | `session-ordering.ts` | Ephemeral lifecycle rank used by every user-visible session list | All known sessions in the active runtime |
 | `session-activity-timing.ts` | Elapsed time of the running turn and of the turn that just finished, plus the persisted starts that survive a reload | All known sessions in the active runtime |
 | `session-ui-store.ts` | Session selection, draft lifecycle, abort prompts, worktree metadata, SDK-facing action entrypoints | App UI state |
+| `pi-extension-ui-store.ts` | Pending/settled Pi `ctx.ui` prompts (`select` / `confirm` / `input` / `editor`) for the current runtime | One runtime; keyed by Pi session ID. Not OpenCode `question` |
 | `useGlobalSessionsStore.ts` | Global active sessions, global archived sessions, `sessionsByDirectory` | All opened project/worktree session lists |
 | `viewport-store.ts` | Scroll anchors, session memory, loading indicators | App UI state |
 | `attachment-files.ts` | Attachment picker allowlists, MIME/content validation, structured-text sanitization, and HEIC conversion | Local chat attachments across shared UI runtimes |
@@ -367,6 +368,7 @@ Keep this in sync with `handleDirectoryEvent` in `sync-context.tsx`:
 | `vcs.branch.updated` | (none — mutates `draft.vcs` directly) |
 | `permission.asked/replied` | `permission` |
 | `question.asked/replied/rejected` | `question` |
+| `pi.ui.asked/settled/notify` | none (Pi `ctx.ui` store; early-return before the directory reducer) |
 | `lsp.updated` | `lsp` |
 
 ### Directory-less session events

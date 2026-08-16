@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** on Pi, Plan and other extension prompts now appear in the current chat (option cards, Other text, confirm dialogs, and toasts) instead of hanging or failing as unavailable. Dismissing a prompt cancels that question only.
 - **Settings:** on Pi, a Feature Plugins page sits next to Extensions with Goal, Plan, MCP, and Subagents slots. You can edit the source, use a preset to fill the field, then install, uninstall, enable, or disable. Nothing is installed just by opening the page. After install or uninstall, idle sessions reload so commands and extensions refresh.
 - **Chat:** on Pi, slash commands from installed extensions now run as commands instead of being sent as a chat message. After a session reload, the slash menu can list those extension commands.
 - **Settings/Git:** Connect GitHub now authorizes the Pichamber OAuth app. An existing OpenChamber GitHub login is treated as disconnected, so you will be asked to connect again.

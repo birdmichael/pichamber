@@ -662,6 +662,74 @@ describe('createPiHost', () => {
     });
     host.dispose();
   });
+
+  it('binds Desktop ctx.ui on every live session and resolves a fake select', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent: (directory, event) => events.push({ directory, event }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'UI bind' });
+    expect(record.piSession.extensionBindings?.mode).toBe('rpc');
+    expect(record.piSession.extensionBindings?.uiContext).toBeTruthy();
+    expect(host.getExtensionUI(record.id)).toBeTruthy();
+
+    const choice = host.getExtensionUI(record.id).context.select('Header: Ship now?', [
+      '1. Yes — smallest change',
+      '2. Other (free-form)',
+    ]);
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(prompt.kind).toBe('select');
+    expect(events.some((item) => item.event.type === 'pi.ui.asked')).toBe(true);
+    expect(events.some((item) => String(item.event.type).startsWith('question.'))).toBe(false);
+
+    expect(host.replyExtensionUI(record.id, prompt.id, '1. Yes — smallest change')).toBe(true);
+    await expect(choice).resolves.toBe('1. Yes — smallest change');
+    host.dispose();
+  });
+
+  it('reload({ sessionID }) re-binds Desktop ctx.ui after piSession.reload()', async () => {
+    const piSession = createInMemoryPiSession();
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => piSession,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Title refresh' });
+    expect(piSession.bindCount).toBe(1);
+    expect(piSession.extensionBindings?.mode).toBe('rpc');
+    const firstContext = host.getExtensionUI(record.id).context;
+
+    const result = await host.reload({ sessionID: record.id });
+    expect(result).toMatchObject({ reloaded: true, kernel: 'pi', sessionID: record.id });
+    expect(piSession.reloadCount).toBe(1);
+    expect(piSession.bindCount).toBe(2);
+    expect(piSession.extensionBindings?.mode).toBe('rpc');
+    expect(piSession.extensionBindings?.uiContext).toBeTruthy();
+    expect(host.getExtensionUI(record.id).context).not.toBe(firstContext);
+
+    const choice = host.getExtensionUI(record.id).context.select('Header: After reload?', [
+      '1. Yes — still bound',
+    ]);
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(prompt.kind).toBe('select');
+    expect(host.replyExtensionUI(record.id, prompt.id, '1. Yes — still bound')).toBe(true);
+    await expect(choice).resolves.toBe('1. Yes — still bound');
+    host.dispose();
+  });
+
+  it('cancels a waiting confirm without disposing the session', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Goal confirm' });
+    const confirmed = host.getExtensionUI(record.id).context.confirm('Replace goal?', 'Replace the current goal?');
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(host.cancelExtensionUI(record.id, prompt.id)).toBe(true);
+    await expect(confirmed).resolves.toBe(false);
+    expect(host.getSession(record.id).id).toBe(record.id);
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+    host.dispose();
+  });
 });
 
 describe('live session command helpers', () => {

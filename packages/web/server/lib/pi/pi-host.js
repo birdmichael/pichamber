@@ -41,6 +41,7 @@ import {
   persistSessionMetadata,
   readPersistedSessionMetadata,
 } from './session-metadata.js';
+import { createExtensionUIController } from './extension-ui.js';
 import {
   buildSessionHtml,
   buildSessionJsonl,
@@ -221,13 +222,22 @@ export const createInMemoryPiSession = ({
     async reload() {
       // Keep registered commands. Real AgentSession.reload() reloads extensions in place.
       reloadCount += 1;
+      // Real AgentSession.reload() rebuilds the runner; stored bindings are not live until re-bound.
+      this.extensionBindings = undefined;
     },
     get reloadCount() {
       return reloadCount;
     },
+    get bindCount() {
+      return this._bindCount || 0;
+    },
     dispose() {
       listeners.clear();
       streaming = false;
+    },
+    async bindExtensions(bindings = {}) {
+      this._bindCount = (this._bindCount || 0) + 1;
+      this.extensionBindings = bindings;
     },
   };
 };
@@ -835,6 +845,35 @@ export const createPiHost = ({
     record.unsubscribe = unsubscribe;
   };
 
+  const bindDesktopExtensionUI = async (record) => {
+    if (!record?.piSession || typeof record.piSession.bindExtensions !== 'function') {
+      return record;
+    }
+    try {
+      record.extensionUI?.dispose?.();
+    } catch {
+    }
+    record.extensionUI = createExtensionUIController({
+      sessionID: record.id,
+      directory: record.directory,
+      emit,
+    });
+    try {
+      await record.piSession.bindExtensions({
+        uiContext: record.extensionUI.context,
+        mode: 'rpc',
+      });
+    } catch (error) {
+      console.warn(`[pi-host] bindExtensions failed for ${record.id}:`, error?.message || error);
+    }
+    return record;
+  };
+
+  const getExtensionUI = (sessionID) => {
+    const record = sessions.get(sessionID);
+    return record?.extensionUI || null;
+  };
+
   const resolvePreferredModel = async () => {
     try {
       const runtime = await ensureModelRuntime();
@@ -934,6 +973,7 @@ export const createPiHost = ({
       unsubscribe: null,
     };
     attachSession(record);
+    await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
     emit(cwd, {
       id: createSessionId().replace('ses_', 'evt_'),
@@ -1038,6 +1078,7 @@ export const createPiHost = ({
       unsubscribe: null,
     };
     attachSession(record);
+    await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
     return record;
   };
@@ -1094,6 +1135,7 @@ export const createPiHost = ({
     async deleteSession(sessionID, directory) {
       const record = await ensureRecord(sessionID, directory);
       try {
+        record.extensionUI?.dispose?.();
         record.unsubscribe?.();
         record.piSession?.dispose?.();
       } catch {
@@ -1444,6 +1486,7 @@ export const createPiHost = ({
           await record.piSession.reload();
         } else {
           try {
+            record.extensionUI?.dispose?.();
             record.piSession?.dispose?.();
           } catch {
           }
@@ -1454,6 +1497,7 @@ export const createPiHost = ({
           });
         }
         attachSession(record);
+        await bindDesktopExtensionUI(record);
         emit(record.directory, {
           id: createEventId(),
           type: 'session.updated',
@@ -1904,9 +1948,50 @@ export const createPiHost = ({
       setPiProjectTrust(home, cwd, trusted);
       return readPiProjectTrust(home, cwd);
     },
+    getExtensionUI,
+    listExtensionUIPrompts(sessionID) {
+      if (sessionID) {
+        return getExtensionUI(sessionID)?.list() || [];
+      }
+      const prompts = [];
+      for (const record of sessions.values()) {
+        const items = record.extensionUI?.list?.() || [];
+        prompts.push(...items);
+      }
+      return prompts;
+    },
+    replyExtensionUI(sessionID, promptID, value) {
+      const ui = getExtensionUI(sessionID);
+      if (!ui) {
+        const error = new Error(`No Desktop ctx.ui is bound for session ${sessionID}`);
+        error.status = 404;
+        throw error;
+      }
+      if (!ui.reply(promptID, value)) {
+        const error = new Error(`Extension UI prompt not found: ${promptID}`);
+        error.status = 404;
+        throw error;
+      }
+      return true;
+    },
+    cancelExtensionUI(sessionID, promptID) {
+      const ui = getExtensionUI(sessionID);
+      if (!ui) {
+        const error = new Error(`No Desktop ctx.ui is bound for session ${sessionID}`);
+        error.status = 404;
+        throw error;
+      }
+      if (!ui.cancel(promptID)) {
+        const error = new Error(`Extension UI prompt not found: ${promptID}`);
+        error.status = 404;
+        throw error;
+      }
+      return true;
+    },
     dispose() {
       for (const record of sessions.values()) {
         try {
+          record.extensionUI?.dispose?.();
           record.unsubscribe?.();
           record.piSession?.dispose?.();
         } catch {

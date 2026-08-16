@@ -871,4 +871,60 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('replies to Desktop ctx.ui over /api/pi/ui and leaves OpenCode /api/question empty', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan question' }),
+      })).json();
+
+      const ui = kernel.host.getExtensionUI(created.id);
+      const select = ui.context.select('Scope: How wide?', [
+        '1. One file — keep the change local',
+        '2. Other (free-form)',
+      ]);
+      const listed = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      expect(listed).toHaveLength(1);
+      expect(listed[0].kind).toBe('select');
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+
+      const reply = await fetch(`${url}/api/pi/ui/${listed[0].id}/reply?session=${created.id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ value: '2. Other (free-form)' }),
+      });
+      expect(reply.status).toBe(200);
+      await expect(select).resolves.toBe('2. Other (free-form)');
+
+      const editor = ui.context.editor('How wide?', '');
+      const next = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      expect(next[0].kind).toBe('editor');
+      const editorReply = await fetch(`${url}/api/pi/ui/${next[0].id}/reply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id, value: 'Only the host module' }),
+      });
+      expect(editorReply.status).toBe(200);
+      await expect(editor).resolves.toBe('Only the host module');
+
+      ui.context.notify('Plan mode enabled.', 'info');
+
+      const cancelPrompt = ui.context.confirm('Replace goal?', 'Replace it?');
+      const pending = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      const cancelled = await fetch(`${url}/api/pi/ui/${pending[0].id}/cancel`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id }),
+      });
+      expect(cancelled.status).toBe(200);
+      await expect(cancelPrompt).resolves.toBe(false);
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });
