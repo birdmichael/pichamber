@@ -1870,31 +1870,61 @@ class OpencodeService {
       ? options.directory.trim()
       : this.currentDirectory;
     const normalizedDirectory = directory ? normalizeFsPath(directory) : null;
-    const scopedClient = directory ? this.getScopedApiClient(directory) : this.client;
 
     try {
-      const response = await scopedClient.find.files({
-        query,
-        limit: typeof options?.limit === 'number' && Number.isFinite(options.limit) ? options.limit : undefined,
-        dirs: options?.dirs === false || options?.type === 'file' ? 'false' : 'true',
-        type: options?.type,
+      // Pi kernel exposes GET /api/find/files. OpenCode SDK find.files still
+      // calls /find/file (singular), which 404s on this facade.
+      const params = new URLSearchParams();
+      if (typeof query === 'string' && query.trim().length > 0) {
+        params.set('query', query.trim());
+      }
+      if (normalizedDirectory) {
+        params.set('directory', normalizedDirectory);
+      }
+      if (typeof options?.limit === 'number' && Number.isFinite(options.limit)) {
+        params.set('limit', String(options.limit));
+      }
+      if (options?.dirs === false || options?.type === 'file') {
+        params.set('dirs', 'false');
+      } else if (options?.dirs === true || options?.type === 'directory') {
+        params.set('dirs', 'true');
+      }
+      if (options?.type === 'file' || options?.type === 'directory') {
+        params.set('type', options.type);
+      }
+
+      const qs = params.toString();
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (normalizedDirectory) {
+        headers['x-opencode-directory'] = normalizedDirectory;
+      }
+      const response = await runtimeFetch(`${this.baseUrl}/find/files${qs ? `?${qs}` : ''}`, {
+        method: 'GET',
+        headers,
       });
 
-      const items = Array.isArray(response?.data) ? response.data : [];
-      return items.map<ProjectFileSearchHit>((item) => {
-        const normalizedRelativePath = normalizeFsPath(item);
-        const name = normalizedRelativePath.split('/').filter(Boolean).pop() || normalizedRelativePath;
-        const normalizedPath = normalizedDirectory
-          ? normalizeFsPath(`${normalizedDirectory}/${normalizedRelativePath}`)
-          : normalizeFsPath(normalizedRelativePath);
+      if (!response.ok) {
+        throw new Error(`Failed to search files (${response.status})`);
+      }
 
-        return {
-          name,
-          path: normalizedPath,
-          relativePath: normalizedRelativePath,
-          extension: name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined,
-        };
-      });
+      const payload = await response.json();
+      const items = Array.isArray(payload) ? payload : [];
+      return items
+        .filter((item): item is string => typeof item === 'string' && item.length > 0)
+        .map<ProjectFileSearchHit>((item) => {
+          const normalizedRelativePath = normalizeFsPath(item);
+          const name = normalizedRelativePath.split('/').filter(Boolean).pop() || normalizedRelativePath;
+          const normalizedPath = normalizedDirectory
+            ? normalizeFsPath(`${normalizedDirectory}/${normalizedRelativePath}`)
+            : normalizeFsPath(normalizedRelativePath);
+
+          return {
+            name,
+            path: normalizedPath,
+            relativePath: normalizedRelativePath,
+            extension: name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined,
+          };
+        });
     } catch (error) {
       console.error('Failed to search files:', error);
       throw error;

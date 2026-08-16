@@ -361,6 +361,12 @@ describe('OpenCode facade HTTP/SSE', () => {
       const bare = await fetch(`${url}/find/files?query=README&${dirQ}`);
       expect(bare.status).toBe(200);
       expect(await bare.json()).toEqual(['README.md']);
+      const sdkPath = await fetch(`${url}/find/file?query=composer&type=file&${dirQ}`);
+      expect(sdkPath.status).toBe(200);
+      expect(await sdkPath.json()).toEqual(['src/composer.ts']);
+      fs.writeFileSync(path.join(project, 'package.json'), '{}');
+      const pack = await (await fetch(`${url}/api/find/files?query=pack&type=file&${dirQ}`)).json();
+      expect(pack).toEqual(['package.json']);
     } finally {
       kernel.dispose();
       await close();
