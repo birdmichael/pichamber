@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   extractRunsFromFacadeMessages,
+  extractRunsFromPiEntries,
   extractSubagentRunFromToolPart,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
@@ -143,6 +144,44 @@ describe('tool-part extraction', () => {
       mode: 'foreground',
       state: 'running',
       parentID: 'parent-1',
+    });
+  });
+
+  it('reads a child session id from tool metadata the transcript card uses', () => {
+    const run = extractSubagentRunFromToolPart({
+      tool: 'subagent',
+      callID: 'call_meta',
+      state: {
+        status: 'completed',
+        input: { agent: 'scout', task: 'List the README filename' },
+        metadata: { sessionID: 'child-from-meta' },
+      },
+    }, 'parent-1');
+    expect(run).toMatchObject({
+      runId: 'call_meta',
+      sessionID: 'child-from-meta',
+    });
+  });
+
+  it('reads a child session file from Pi toolResult details', () => {
+    const dir = makeTemp();
+    const childFile = path.join(dir, 'child.jsonl');
+    fs.writeFileSync(childFile, `${JSON.stringify({ type: 'session', id: 'pi-child' })}\n`);
+    const runs = extractRunsFromPiEntries([{
+      type: 'message',
+      id: 'tool_1',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call_pi',
+        details: { sessionFile: childFile, agent: 'scout' },
+        isError: false,
+      },
+    }], 'parent-1');
+    expect(runs[0]).toMatchObject({
+      runId: 'call_pi',
+      sessionID: 'pi-child',
+      sessionFile: childFile,
     });
   });
 

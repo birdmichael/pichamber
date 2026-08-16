@@ -203,8 +203,11 @@ add a second install path. Opening Feature Plugins or installing
 When the slot is on:
 
 - `GET /api/session/:id/subagent-runs` lists `pi-subagents` adapter runs
-  (async status files plus parent-transcript `subagent` tool parts). Each
-  public run is `{ runId, sessionID, name, role, mode, state, title, openable }`.
+  (async status files, parent-transcript `subagent` tool parts, and Pi
+  `toolResult.details.sessionFile` entries). Each public run is
+  `{ runId, sessionID, name, role, mode, state, title, openable }`.
+  Work Status uses that id (or the same transcript metadata the card reads)
+  so a row click opens the same writable child tab.
 - A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
   Follow-ups stay on the child; the parent transcript is unchanged.

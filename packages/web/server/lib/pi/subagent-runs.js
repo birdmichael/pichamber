@@ -214,37 +214,78 @@ const parseJsonValue = (value) => {
   }
 };
 
+const readSessionIdFromRecord = (value) => {
+  if (!isRecord(value)) return '';
+  return asTrimmedString(value.childSessionId)
+    || asTrimmedString(value.sessionID)
+    || asTrimmedString(value.sessionId);
+};
+
+const readSessionFileFromText = (value) => {
+  const text = asTrimmedString(value);
+  if (!text) return '';
+  const labeled = text.match(/(?:sessionFile|session_file|session file)\s*[:=]\s*["']?(\S+\.jsonl)/i);
+  if (labeled?.[1]) return labeled[1];
+  const pathMatch = text.match(/(\/(?:[^\s"'<>]+)+\.jsonl)/);
+  return pathMatch?.[1] || '';
+};
+
+const resolveChildSessionId = ({
+  parentID,
+  sessionFile,
+  candidates,
+} = {}) => {
+  const parent = asTrimmedString(parentID);
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const id = asTrimmedString(candidate);
+    if (id && id !== parent) return id;
+  }
+  return readSessionIdFromSessionFile(sessionFile) || null;
+};
+
 export const extractSubagentRunFromToolPart = (part, parentID) => {
   if (!isRecord(part) || asTrimmedString(part.tool).toLowerCase() !== 'subagent') return null;
   const state = isRecord(part.state) ? part.state : {};
   const input = isRecord(state.input) ? state.input : (isRecord(part.input) ? part.input : {});
+  const metadata = isRecord(state.metadata) ? state.metadata : (isRecord(part.metadata) ? part.metadata : {});
   const output = parseJsonValue(state.output) || parseJsonValue(part.output) || {};
   const details = isRecord(output.details) ? output.details : output;
-  const agent = asTrimmedString(input.agent || details.agent || input.subagent_type) || 'subagent';
+  const agent = asTrimmedString(input.agent || details.agent || metadata.agent || input.subagent_type) || 'subagent';
   const runId = asTrimmedString(
     details.runId
     || details.id
+    || metadata.runId
     || input.id
     || input.runId
     || part.callID
     || part.id,
   );
   if (!runId) return null;
-  const sessionFile = asTrimmedString(details.sessionFile || input.sessionFile);
-  const childSessionID = asTrimmedString(details.childSessionId || details.sessionId || input.sessionId)
-    || readSessionIdFromSessionFile(sessionFile);
+  const rawOutput = typeof state.output === 'string' ? state.output : (typeof part.output === 'string' ? part.output : '');
+  const sessionFile = asTrimmedString(details.sessionFile || input.sessionFile || metadata.sessionFile)
+    || readSessionFileFromText(rawOutput);
+  const childSessionID = resolveChildSessionId({
+    parentID,
+    sessionFile,
+    candidates: [
+      readSessionIdFromRecord(metadata),
+      readSessionIdFromRecord(details),
+      readSessionIdFromRecord(output),
+      readSessionIdFromRecord(input),
+    ],
+  });
   const toolStatus = asTrimmedString(state.status).toLowerCase();
   const stateFromOutput = asTrimmedString(details.state || output.state);
   const running = !toolStatus || toolStatus === 'pending' || toolStatus === 'running';
   return {
     runId,
     parentID: asTrimmedString(parentID),
-    sessionID: childSessionID && childSessionID !== parentID ? childSessionID : (readSessionIdFromSessionFile(sessionFile) || null),
+    sessionID: childSessionID,
     sessionFile: sessionFile || null,
     name: agent,
     role: asTrimmedString(input.role) || agent,
     mode: normalizeSubagentRunMode(
-      details.mode || input.mode || (input.async === true ? 'background' : 'foreground'),
+      details.mode || input.mode || metadata.mode || (input.async === true ? 'background' : 'foreground'),
       input.async === true ? 'background' : 'foreground',
     ),
     state: normalizeSubagentRunState(stateFromOutput || (running ? 'running' : 'done')),
@@ -254,6 +295,46 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     startedAt: typeof state.time?.start === 'number' ? state.time.start : null,
     endedAt: typeof state.time?.end === 'number' ? state.time.end : null,
   };
+};
+
+export const extractRunsFromPiEntries = (entries, parentID) => {
+  const runs = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const message = isRecord(entry?.message) ? entry.message : entry;
+    if (!isRecord(message) || asTrimmedString(message.role) !== 'toolResult') continue;
+    const toolName = asTrimmedString(message.toolName || message.name).toLowerCase();
+    if (toolName !== 'subagent') continue;
+    const details = isRecord(message.details) ? message.details : {};
+    const runId = asTrimmedString(details.runId || details.id || message.toolCallId || entry.id);
+    if (!runId || seen.has(runId)) continue;
+    const sessionFile = asTrimmedString(details.sessionFile) || readSessionFileFromText(message.content);
+    const childSessionID = resolveChildSessionId({
+      parentID,
+      sessionFile,
+      candidates: [
+        readSessionIdFromRecord(details),
+        readSessionIdFromRecord(message),
+      ],
+    });
+    seen.add(runId);
+    runs.push({
+      runId,
+      parentID: asTrimmedString(parentID),
+      sessionID: childSessionID,
+      sessionFile: sessionFile || null,
+      name: asTrimmedString(details.agent || details.role) || 'subagent',
+      role: asTrimmedString(details.role || details.agent) || 'subagent',
+      mode: normalizeSubagentRunMode(details.mode, sessionFile ? 'background' : 'foreground'),
+      state: normalizeSubagentRunState(details.state || (message.isError ? 'failed' : 'done')),
+      title: asTrimmedString(details.goal || details.task) || asTrimmedString(details.agent) || 'subagent',
+      toolCallId: asTrimmedString(message.toolCallId || entry.id) || null,
+      asyncDir: asTrimmedString(details.asyncDir) || null,
+      startedAt: null,
+      endedAt: null,
+    });
+  }
+  return runs;
 };
 
 export const extractRunsFromFacadeMessages = (messages, parentID) => {

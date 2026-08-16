@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
-import { useAllLiveSessions, useAllSessionStatuses, useDirectorySync } from '@/sync/sync-context';
+import { useAllLiveSessions, useAllSessionStatuses, useDirectorySync, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -9,10 +9,16 @@ import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusValue } from './
 import { useReportWorkStatusPresence } from './presenceContext';
 import type { State } from '@/sync/types';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useSubagentRuns } from '@/hooks/useSubagentRuns';
 import { openSubagentChildSession } from '@/lib/subagents/childSession';
-import type { SubagentRun } from '@/lib/subagents/subagentRuns';
+import {
+  buildWorkStatusSubagentRows,
+  collectTranscriptSubagentSessionIds,
+  resolveWorkStatusSubagentOpen,
+  type WorkStatusSubagentRow,
+} from '@/lib/subagents/workStatusRows';
 
 type Props = {
   sessionId: string | null;
@@ -21,14 +27,7 @@ type Props = {
 
 const SECTION_ID = 'subagents';
 
-type ChildRow = {
-  id: string;
-  label: string;
-  sessionID: string | null;
-  openable: boolean;
-  status: 'permission' | 'question' | 'working' | 'blocked' | 'failed' | 'paused' | 'done';
-  mode?: 'foreground' | 'background';
-};
+type ChildRow = WorkStatusSubagentRow;
 
 /**
  * Running subagents and, more importantly, their blockers: a permission request
@@ -43,10 +42,16 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   const isMobile = useUIStore((state) => state.isMobile);
   const isPiKernel = usePiKernel();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const effectiveDirectory = useEffectiveDirectory() ?? null;
 
   const liveSessions = useAllLiveSessions();
   const statuses = useAllSessionStatuses();
   const { runs } = useSubagentRuns(sessionId, isPiKernel && subagentsSlotActive);
+  const parentMessages = useSessionMessageRecords(
+    sessionId ?? '',
+    directory ?? effectiveDirectory ?? undefined,
+    { enabled: isPiKernel && subagentsSlotActive },
+  );
   const openCodeChildren = React.useMemo(
     () => (!isPiKernel && sessionId
       ? liveSessions.filter((candidate) => candidate.parentID === sessionId)
@@ -63,36 +68,32 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
 
   const rows = React.useMemo<ChildRow[]>(() => {
     if (isPiKernel) {
-      return runs.map((run: SubagentRun) => ({
-        id: run.runId,
-        label: run.title?.trim() || run.name || t('chat.workStatus.subagent.untitled'),
-        sessionID: run.sessionID,
-        openable: run.openable,
-        mode: run.mode,
-        status: run.state === 'running' || run.state === 'queued'
-          ? 'working'
-          : run.state === 'blocked'
-            ? 'blocked'
-            : run.state === 'paused'
-              ? 'paused'
-              : run.state === 'failed' || run.state === 'stopped'
-                ? 'failed'
-                : 'done',
-      }));
+      return buildWorkStatusSubagentRows({
+        runs,
+        transcriptIds: collectTranscriptSubagentSessionIds(parentMessages),
+        directory,
+        effectiveDirectory,
+        untitledLabel: t('chat.workStatus.subagent.untitled'),
+      });
     }
     return openCodeChildren.map((child) => {
       const blocked = (permissions[child.id]?.length ?? 0) > 0;
       const asked = (questions[child.id]?.length ?? 0) > 0;
       const busy = statuses[child.id]?.type === 'busy';
+      const opened = resolveWorkStatusSubagentOpen({
+        sessionID: child.id,
+        directory,
+        effectiveDirectory,
+      });
       return {
         id: child.id,
         label: child.title?.trim() || t('chat.workStatus.subagent.untitled'),
-        sessionID: child.id,
-        openable: Boolean(directory),
+        sessionID: opened.sessionID,
+        openable: opened.openable,
         status: blocked ? 'permission' : asked ? 'question' : busy ? 'working' : 'done',
       };
     });
-  }, [directory, isPiKernel, openCodeChildren, permissions, questions, runs, statuses, t]);
+  }, [directory, effectiveDirectory, isPiKernel, openCodeChildren, parentMessages, permissions, questions, runs, statuses, t]);
 
   const hadChildren = React.useRef(rows.length > 0);
   React.useEffect(() => {
@@ -105,7 +106,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     if (!row.openable) return;
     openSubagentChildSession({
       sessionID: row.sessionID,
-      directory,
+      directory: directory?.trim() || effectiveDirectory,
       label: row.label,
       readOnly: !isPiKernel,
       isMobile,
@@ -114,7 +115,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       setCurrentSession,
       openContextPanelTab,
     });
-  }, [directory, isMobile, isPiKernel, openContextPanelTab, setCurrentSession]);
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, setCurrentSession]);
 
   useReportWorkStatusPresence('subagents', rows.length > 0);
 

@@ -68,6 +68,7 @@ import {
 } from './session-plan.js';
 import {
   extractRunsFromFacadeMessages,
+  extractRunsFromPiEntries,
   findAdapterRunByChildSessionId,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
@@ -1367,7 +1368,11 @@ export const createPiHost = ({
       projectDir: parent.directory,
     });
     const toolRuns = extractRunsFromFacadeMessages(parent.messages, parent.id);
-    return mergeSubagentRuns(fileRuns, toolRuns);
+    const entryRuns = extractRunsFromPiEntries(
+      typeof parent.sessionManager?.getEntries === 'function' ? parent.sessionManager.getEntries() : [],
+      parent.id,
+    );
+    return mergeSubagentRuns(fileRuns, toolRuns, entryRuns);
   };
 
   const attachSubagentRun = async (parent, run) => {
