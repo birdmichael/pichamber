@@ -3,7 +3,9 @@ import {
   WORK_STATUS_SECTION_IDS,
   WORK_STATUS_SECTION_LABEL_KEYS,
   areAllWorkStatusSectionsHidden,
+  getAvailableWorkStatusSectionIds,
   getWorkStatusPanelPresentation,
+  isWorkStatusSectionAvailable,
   isWorkStatusSectionVisible,
   sanitizeWorkStatusHiddenSections,
 } from './sections';
@@ -14,6 +16,21 @@ describe('section registry', () => {
     // user cannot switch, or a switch for nothing.
     expect(Object.keys(WORK_STATUS_SECTION_LABEL_KEYS).sort())
       .toEqual([...WORK_STATUS_SECTION_IDS].sort());
+  });
+});
+
+describe('isWorkStatusSectionAvailable', () => {
+  test('hides the OpenCode provider-quota section on Pi', () => {
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('session', { isPiKernel: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: false })).toBe(true);
+    expect(isWorkStatusSectionAvailable('usage')).toBe(true);
+  });
+
+  test('keeps session context on the available list for Pi', () => {
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('usage');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: false })).toEqual(WORK_STATUS_SECTION_IDS);
   });
 });
 
@@ -29,6 +46,11 @@ describe('isWorkStatusSectionVisible', () => {
   test('hides exactly the listed section', () => {
     expect(isWorkStatusSectionVisible(['usage'], 'usage')).toBe(false);
     expect(isWorkStatusSectionVisible(['usage'], 'tasks')).toBe(true);
+  });
+
+  test('never shows provider usage on Pi, even when the hidden set is empty', () => {
+    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionVisible([], 'session', { isPiKernel: true })).toBe(true);
   });
 });
 
@@ -60,6 +82,13 @@ describe('areAllWorkStatusSectionsHidden', () => {
   test('returns true even with extra stale ids alongside all real ones', () => {
     const withExtra = [...WORK_STATUS_SECTION_IDS, 'removed_section'];
     expect(areAllWorkStatusSectionsHidden(withExtra)).toBe(true);
+  });
+
+  test('on Pi, ignores the unavailable provider-usage section', () => {
+    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage');
+    expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: true })).toBe(true);
+    expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: false })).toBe(false);
+    expect(areAllWorkStatusSectionsHidden([], { isPiKernel: true })).toBe(false);
   });
 });
 
