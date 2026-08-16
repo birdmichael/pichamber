@@ -656,6 +656,24 @@ describe('routeMessage skill invocation', () => {
     expect(sendMessageCalls).toHaveLength(1);
     expect(sendCommandCalls).toHaveLength(0);
   });
+
+  test('sends /skill:name as a prompt so Pi can expand it', async () => {
+    useSkillsStore.setState({
+      skills: [{ name: 'grill-with-docs', path: '/skills/grill-with-docs/SKILL.md', scope: 'user', source: 'pi' }],
+    });
+
+    await routeMessage({
+      sessionId: 'session-skill',
+      directory: '/skills/project',
+      content: '/skill:grill-with-docs focus on auth',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls).toHaveLength(1);
+    expect(sendMessageCalls[0].text).toBe('/skill:grill-with-docs focus on auth');
+    expect(sendCommandCalls).toHaveLength(0);
+  });
 });
 
 describe('archiveSessions option forwarding', () => {

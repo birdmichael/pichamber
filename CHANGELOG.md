@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** typing `/` now lists installed, trusted skills as `/skill:name` next to Pi builtins, matching the Pi CLI. Untrusted project skills stay out of the menu. `/model` and `/thinking` remain on the chips.
 - Work status: the provider quota block is hidden on Pi, where that API does not exist. Session context percentage and cost stay visible.
 - **Settings/Providers:** custom OpenAI-compatible providers can now be edited after save, keep the provider list current after save, fetch their remote `/models` list in an inline picker (re-click cancels; closing the list keeps it), collapse known vendor aliases, hide wildcard IDs, filter by Claude Code (including Opus / Sonnet / Haiku) / GPT / Grok / DeepSeek / other, and add only the models you choose.
 - Git: the pull request panel now follows the current open PR for the branch instead of keeping a merged or closed one after reload or a later open PR (thanks to @makeittech).

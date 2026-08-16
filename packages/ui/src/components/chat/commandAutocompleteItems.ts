@@ -74,6 +74,8 @@ export interface PiSlashCommandItem {
   agent?: string;
   isOpenChamber?: boolean;
   isSkill?: boolean;
+  /** False when a project skill is discovered but Pi will not inject it. */
+  injected?: boolean;
 }
 
 /** OpenChamber leftovers plus composer chips that already cover the same action. */
@@ -84,21 +86,52 @@ const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'model', 'thinking',
 ]);
 
+/** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */
+export const PI_SKILL_SLASH_PREFIX = 'skill:';
+
+export function toPiSkillSlashName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.startsWith(PI_SKILL_SLASH_PREFIX) ? trimmed : `${PI_SKILL_SLASH_PREFIX}${trimmed}`;
+}
+
+/**
+ * Pi slash menu: builtins and custom prompts stay as `/name`. Installed,
+ * injected skills become `/skill:name` so AgentSession expands them.
+ * Untrusted project skills and leftover OpenChamber / chip commands stay out.
+ */
 export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
-  return commands.filter((command) => {
-    if (command.isOpenChamber) return false;
-    if (command.isSkill) return false;
-    if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) return false;
+  const kept: T[] = [];
+  for (const command of commands) {
+    if (command.isOpenChamber) continue;
+    if (command.isSkill) {
+      if (command.injected === false) continue;
+      const slashName = toPiSkillSlashName(command.name);
+      kept.push(slashName === command.name ? command : { ...command, name: slashName });
+      continue;
+    }
+    if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) continue;
     const agent = typeof command.agent === 'string' ? command.agent.toLowerCase() : '';
-    if (agent === 'openchamber' && command.name !== 'compact') return false;
+    if (agent === 'openchamber' && command.name !== 'compact') continue;
+    kept.push(command);
+  }
+  return kept;
+}
+
+/** Prefix match on `/skill:name` or the bare skill name (`/clack` → `skill:clack-…`). */
+export function commandHasPiSlashPrefix(command: { name: string }, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const name = command.name.toLowerCase();
+  if (name.startsWith(needle)) return true;
+  if (name.startsWith(PI_SKILL_SLASH_PREFIX) && name.slice(PI_SKILL_SLASH_PREFIX.length).startsWith(needle)) {
     return true;
-  });
+  }
+  return false;
 }
 
 /** Pi slash search is name-only. Fuzzy-matching descriptions re-ranks the whole list. */
 export function commandMatchesPiSlashQuery(command: { name: string }, query: string): boolean {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  return command.name.toLowerCase().startsWith(needle);
+  return commandHasPiSlashPrefix(command, query);
 }

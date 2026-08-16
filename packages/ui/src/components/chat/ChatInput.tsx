@@ -91,6 +91,7 @@ import {
     scanMentions,
 } from './composer/language/mentions';
 import { collectKnownTokenNames } from './composer/language/prefixTokens';
+import { toPiSkillSlashName } from './commandAutocompleteItems';
 import { resolveAutocompleteTrigger, type AutocompleteKind } from './composer/language/triggers';
 import { type ComposerLanguageContext } from './composer/language/tokenize';
 import {
@@ -561,9 +562,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         ]);
         if (!isMobile && !isVSCodeRuntime()) names.add('handoff-review');
         for (const command of availableCommands) names.add(command.name.toLowerCase());
-        for (const skill of availableSkills) names.add(skill.name.toLowerCase());
+        for (const skill of availableSkills) {
+            if (skill.injected === false) continue;
+            names.add(skill.name.toLowerCase());
+            if (isPiKernel) names.add(toPiSkillSlashName(skill.name).toLowerCase());
+        }
         return names;
-    }, [availableCommands, availableSkills, isMobile]);
+    }, [availableCommands, availableSkills, isMobile, isPiKernel]);
 
     const availableSnippets = useSnippetsStore((s) => s.snippets);
     const knownSnippetTriggers = React.useMemo(() => {
@@ -1994,15 +1999,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         const cursorPosition = textarea?.getSelection().start ?? message.length;
         const textBeforeCursor = message.substring(0, cursorPosition);
         const lastSlashSymbol = textBeforeCursor.lastIndexOf('/');
+        const insertedName = isPiKernel ? toPiSkillSlashName(skillName) : skillName;
 
         if (lastSlashSymbol !== -1) {
             const newMessage =
                 message.substring(0, lastSlashSymbol) +
-                `/${skillName} ` +
+                `/${insertedName} ` +
                 message.substring(cursorPosition);
             setMessage(newMessage);
 
-            const nextCursor = lastSlashSymbol + skillName.length + 2;
+            const nextCursor = lastSlashSymbol + insertedName.length + 2;
             requestAnimationFrame(() => {
                 if (composerRef.current) {
                     composerRef.current.setSelection(nextCursor);
