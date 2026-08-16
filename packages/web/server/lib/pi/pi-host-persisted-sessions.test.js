@@ -139,4 +139,31 @@ describe('persisted Pi sessions', () => {
     expect(loaded.info.title).toBe('Keep this id');
     restarted.dispose();
   });
+
+  it('persists Session Goal metadata on the Pi session and restores it after reload', async () => {
+    const home = tempDir('pi-persist-goal-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const goal = {
+      id: 'goal_restore',
+      objective: 'Keep this goal',
+      objectiveFile: false,
+      status: 'active',
+    };
+
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd, title: 'Goal session' });
+    await first.updateSession(created.id, {
+      metadata: { openchamber: { goal } },
+    }, cwd);
+    expect(created.info.metadata.openchamber.goal).toMatchObject(goal);
+    const createdId = created.id;
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const loaded = await restarted.ensureSession(createdId, cwd);
+    expect(loaded.info.id).toBe(createdId);
+    expect(loaded.info.metadata?.openchamber?.goal).toMatchObject(goal);
+    restarted.dispose();
+  });
 });

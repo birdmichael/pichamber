@@ -29,6 +29,10 @@ import {
   removePiProviderAuth,
 } from './pi-resources.js';
 import {
+  persistSessionMetadata,
+  readPersistedSessionMetadata,
+} from './session-metadata.js';
+import {
   buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
@@ -775,6 +779,7 @@ export const createPiHost = ({
       ? piSession.sessionId.trim()
       : undefined;
     const sessionID = persistedId || liveId || id || createSessionId();
+    if (metadata) persistSessionMetadata(sessionManager, metadata);
     const record = {
       id: sessionID,
       directory: cwd,
@@ -875,6 +880,7 @@ export const createPiHost = ({
     const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
     const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
     const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
+    const metadata = readPersistedSessionMetadata(entries);
     const record = {
       id: sessionID,
       directory: cwd,
@@ -886,6 +892,7 @@ export const createPiHost = ({
           directory: cwd,
           title,
           projectID: cwd,
+          metadata,
         }),
         time: {
           created: Number.isFinite(created) ? created : Date.now(),
@@ -985,6 +992,7 @@ export const createPiHost = ({
       }
       if (patch.metadata && typeof patch.metadata === 'object') {
         record.info.metadata = { ...(record.info.metadata || {}), ...patch.metadata };
+        persistSessionMetadata(record.sessionManager, record.info.metadata);
       }
       if (patch.time?.archived) {
         record.info.time = { ...record.info.time, archived: patch.time.archived };

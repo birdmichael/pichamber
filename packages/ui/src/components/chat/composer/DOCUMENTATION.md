@@ -7,6 +7,10 @@ everything between typing and sending.
 own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
+Session Goal is a Pichamber feature. `ComposerFooter` shows `SessionGoalButton`
+and the objective counter on the Pi kernel (`isSessionGoalVisibleOnPiKernel`);
+it still hides OpenCode-only permission auto-accept, revert, and `/shell`.
+
 ## Layers
 
 | Directory | Owns |

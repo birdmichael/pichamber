@@ -9,6 +9,16 @@ export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
   return !isPiKernel;
 }
 
+/**
+ * Session Goal is a Pichamber product feature, not an OpenCode leftover.
+ * `isPiKernel` must not hide the composer target button, objective counter,
+ * or Settings Chat sessionGoal group. VS Code still hides the entry point
+ * because the loop runs in the web server.
+ */
+export function isSessionGoalVisibleOnPiKernel(_isPiKernel: boolean): boolean {
+  return true;
+}
+
 export function usePiKernel(): boolean {
   const [isPiKernel, setIsPiKernel] = React.useState(true);
   React.useEffect(() => {

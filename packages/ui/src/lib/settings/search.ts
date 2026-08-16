@@ -1,4 +1,5 @@
 import type { I18nKey } from '@/lib/i18n/store';
+import { isSessionGoalVisibleOnPiKernel } from '@/lib/usePiKernel';
 import type { SettingsPageSlug, SettingsRuntimeContext } from './metadata';
 import { getSettingsPageMeta } from './metadata';
 
@@ -211,14 +212,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'chat',
     titleKey: 'settings.openchamber.visual.field.sessionGoal',
     keywords: ['goal', 'objective', 'auto continue', 'small model'],
-    isAvailable: (ctx) => !ctx.isVSCode && !ctx.isPiKernel,
+    isAvailable: (ctx) => !ctx.isVSCode && isSessionGoalVisibleOnPiKernel(Boolean(ctx.isPiKernel)),
   },
   {
     id: 'chat.session-goal-budget',
     page: 'chat',
     titleKey: 'settings.openchamber.visual.goal.budgetLabel',
     keywords: ['goal', 'budget', 'tokens', 'limit'],
-    isAvailable: (ctx) => !ctx.isVSCode && !ctx.isPiKernel,
+    isAvailable: (ctx) => !ctx.isVSCode && isSessionGoalVisibleOnPiKernel(Boolean(ctx.isPiKernel)),
   },
   {
     id: 'chat.reasoning-traces',

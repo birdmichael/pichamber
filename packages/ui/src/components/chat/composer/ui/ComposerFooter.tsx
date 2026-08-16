@@ -17,7 +17,7 @@ import { SessionGoalButton, SessionGoalObjectiveCounter } from '@/components/cha
 import { ComposerDictation } from '@/components/dictation/ComposerDictation';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { isSessionGoalVisibleOnPiKernel, usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { ModelControls } from '../../ModelControls';
 import { ComposerActionButtons } from './ComposerActionButtons';
@@ -139,7 +139,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
                                 onOpenMobileSheet={onOpenAttachSheet}
                             />
                             {!isPiKernel ? (
-                              <>
                             <PermissionAutoAcceptButton
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
@@ -147,6 +146,9 @@ export function ComposerFooter(props: ComposerFooterProps) {
                                 permissionAutoAcceptEnabled={permissionAutoAcceptEnabled}
                                 handlePermissionAutoAcceptToggle={onTogglePermissionAutoAccept}
                             />
+                            ) : null}
+                            {isSessionGoalVisibleOnPiKernel(isPiKernel) ? (
+                              <>
                             <SessionGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
@@ -217,7 +219,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             onToggle={onToggleExpandedInput}
                         />
                         {!isPiKernel ? (
-                          <>
                         <PermissionAutoAcceptButton
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
@@ -226,6 +227,9 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             handlePermissionAutoAcceptToggle={onTogglePermissionAutoAccept}
                             withTooltip
                         />
+                        ) : null}
+                        {isSessionGoalVisibleOnPiKernel(isPiKernel) ? (
+                          <>
                         <SessionGoalButton
                             sessionId={currentSessionId}
                             directory={directory}
