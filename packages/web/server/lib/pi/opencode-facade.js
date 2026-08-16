@@ -45,7 +45,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     '/command', '/session', '/provider', '/config', '/path', '/event',
     '/global', '/project', '/agent', '/skill', '/mcp', '/lsp', '/vcs',
     '/file', '/find', '/pty', '/permission', '/question', '/experimental',
-    '/log', '/instance', '/formatter', '/tool', '/user',
+    '/log', '/instance', '/formatter', '/tool', '/user', '/auth',
   ];
   const uiAuthPaths = ['/auth/session', '/auth/passkey', '/auth/url-token'];
   app.use((req, _res, next) => {
@@ -156,6 +156,45 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   };
   app.get('/api/provider/:providerId/source', handle(async (req, res) => {
     providerSource(req, res);
+  }));
+
+  const setProviderAuth = (req, res) => {
+    const providerId = req.params.provider;
+    if (typeof host.setProviderAuth !== 'function') {
+      json(res, 404, unsupported(`PUT /api/auth/${providerId}`));
+      return;
+    }
+    host.setProviderAuth(providerId, req.body || {});
+    json(res, 200, true);
+  };
+  app.put('/api/auth/:provider', parseJson, handle(async (req, res) => {
+    setProviderAuth(req, res);
+  }));
+
+  const deleteAuthByProvider = (req, res, { boolean = false } = {}) => {
+    const providerId = req.params.provider || req.params.providerId;
+    if (typeof host.removeProviderAuth !== 'function') {
+      json(res, 404, unsupported(`DELETE /api/auth/${providerId}`));
+      return;
+    }
+    const result = host.removeProviderAuth(providerId);
+    if (boolean) {
+      json(res, 200, true);
+      return;
+    }
+    json(res, 200, {
+      success: true,
+      removed: Boolean(result?.removed),
+      kernel: 'pi',
+      requiresReload: false,
+      message: result?.removed ? 'Provider disconnected' : 'Provider was not connected',
+    });
+  };
+  app.delete('/api/auth/:provider', handle(async (req, res) => {
+    deleteAuthByProvider(req, res, { boolean: true });
+  }));
+  app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {
+    deleteAuthByProvider(req, res);
   }));
 
   const piReload = async (_req, res) => {

@@ -20,6 +20,8 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  writePiProviderAuth,
+  removePiProviderAuth,
 } from './pi-resources.js';
 import {
   buildSessionHtml,
@@ -778,6 +780,12 @@ export const createPiHost = ({
         home,
         directory: directory || defaultDirectory,
       });
+    },
+    setProviderAuth(providerId, body) {
+      return writePiProviderAuth(providerId, body, { home });
+    },
+    removeProviderAuth(providerId) {
+      return removePiProviderAuth(providerId, { home });
     },
     getKernelInfo() {
       const defaults = readPiDefaults(home);

@@ -75,6 +75,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 - Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`
 - Project trust: `GET|PUT|POST /api/pi/trust` (`~/.pi/agent/trust.json` + `defaultProjectTrust`)
 - Scoped models: `enabledModels` on `GET|PATCH /api/pi/defaults` (`~/.pi/agent/settings.json`)
+- Provider auth write: `PUT /api/auth/:provider` and `DELETE /api/auth/:provider` (SDK `auth.set` / `auth.remove`) plus `DELETE /api/provider/:providerId/auth` (Settings disconnect). These update `~/.pi/agent/auth.json` in Pi's `{ type: "api_key", key }` / oauth shape for whatever provider id is in the URL.
 
 ## Still OpenCode-only / not ported
 

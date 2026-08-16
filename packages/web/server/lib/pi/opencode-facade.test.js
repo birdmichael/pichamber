@@ -276,6 +276,65 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('writes and disconnects provider auth for whatever id is in the URL', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const providerId = 'campus-llm';
+      const put = await fetch(`${url}/api/auth/${providerId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'api', key: 'sk-test-do-not-leak' }),
+      });
+      expect(put.status).toBe(200);
+      expect(await put.json()).toBe(true);
+
+      const authPath = path.join(home, '.pi', 'agent', 'auth.json');
+      const stored = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+      expect(stored[providerId]).toEqual({ type: 'api_key', key: 'sk-test-do-not-leak' });
+
+      const methods = await (await fetch(`${url}/api/provider/auth`)).json();
+      expect(methods[providerId][0]).toMatchObject({ type: 'api' });
+      expect(JSON.stringify(methods)).not.toContain('sk-test');
+
+      const source = await (await fetch(`${url}/api/provider/${providerId}/source`)).json();
+      expect(source.sources.auth.exists).toBe(true);
+
+      const barePut = await fetch(`${url}/auth/${providerId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'api', key: 'sk-rotated' }),
+      });
+      expect(barePut.status).toBe(200);
+      expect(JSON.parse(fs.readFileSync(authPath, 'utf8'))[providerId].key).toBe('sk-rotated');
+
+      const disconnect = await fetch(`${url}/api/provider/${providerId}/auth?scope=all`, { method: 'DELETE' });
+      expect(disconnect.status).toBe(200);
+      expect(await disconnect.json()).toMatchObject({
+        success: true,
+        removed: true,
+        kernel: 'pi',
+        requiresReload: false,
+      });
+      expect(JSON.parse(fs.readFileSync(authPath, 'utf8'))[providerId]).toBeUndefined();
+      expect((await (await fetch(`${url}/api/provider/${providerId}/source`)).json()).sources.auth.exists).toBe(false);
+
+      const sdkDelete = await fetch(`${url}/api/auth/other-provider`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'api', key: 'sk-other' }),
+      });
+      expect(sdkDelete.status).toBe(200);
+      const removed = await fetch(`${url}/api/auth/other-provider`, { method: 'DELETE' });
+      expect(removed.status).toBe(200);
+      expect(await removed.json()).toBe(true);
+      expect(JSON.parse(fs.readFileSync(authPath, 'utf8'))['other-provider']).toBeUndefined();
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('reloads the in-process Pi kernel without requiring a window reload', async () => {
     const { url, close, kernel } = await startFacade();
     try {
