@@ -3,6 +3,7 @@ import { registerPiFacade } from './opencode-facade.js';
 import { createSseBus } from './sse-bus.js';
 import { createEventTranslator } from './event-translator.js';
 import { isPiKernelEnabled, isPiMockEnabled, resolveKernelName, PI_KERNEL, OPENCODE_KERNEL } from './kernel.js';
+import { buildHealthSnapshot } from './health-snapshot.js';
 
 export const createPiKernel = (options = {}) => {
   const env = options.env || process.env;
@@ -56,4 +57,5 @@ export {
   resolveKernelName,
   PI_KERNEL,
   OPENCODE_KERNEL,
+  buildHealthSnapshot,
 };

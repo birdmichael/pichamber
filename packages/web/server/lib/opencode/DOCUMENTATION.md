@@ -266,7 +266,7 @@ Transport-triggered health checks share the periodic monitor's failure accountin
 
 ## Public exports (core-routes.js)
 - `registerServerStatusRoutes(app, dependencies)`: registers status/system endpoints:
-  - `GET /health`
+  - `GET /health` — always includes `status: "ok"` when the web server is up, plus `getHealthSnapshot()`. On the Pi kernel the snapshot reports `kernel: "pi"`, `openCodeRunning: false`, `isOpenCodeReady: false`, `openCodePort: null`, and Pi readiness as `kernelReady` / `piRunning`. OpenCode readiness stays on `openCodeRunning` / `isOpenCodeReady`. Built by `packages/web/server/lib/pi/health-snapshot.js`.
   - `POST /api/system/shutdown`
   - `GET /api/system/info`
  - `registerAuthAndAccessRoutes(app, dependencies)`: registers browser auth/session exchange and API access middleware:

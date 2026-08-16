@@ -8,6 +8,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { restartDesktopApp } from '@/lib/desktop';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { isLocalKernelReady } from '@/lib/kernelHealth';
 
 const INSTALL_COMMAND = 'curl -fsSL https://opencode.ai/install | bash';
 const DOCS_URL = 'https://opencode.ai/docs';
@@ -131,7 +132,7 @@ export function LocalSetupScreen({
       const response = await runtimeFetch('/health');
       if (!response.ok) return false;
       const data = await response.json();
-      return data.openCodeRunning === true || data.isOpenCodeReady === true;
+      return isLocalKernelReady(data);
     } catch {
       return false;
     }

@@ -30,6 +30,37 @@ describe('core-routes', () => {
     expect(shutdownOpts).toEqual({ exitProcess: true });
   });
 
+  it('returns the Pi health snapshot without claiming OpenCode is running', async () => {
+    const app = express();
+    registerServerStatusRoutes(app, {
+      gracefulShutdown: vi.fn(async () => {}),
+      getHealthSnapshot: () => ({
+        kernel: 'pi',
+        piMock: false,
+        openCodePort: null,
+        openCodeRunning: false,
+        isOpenCodeReady: false,
+        kernelReady: true,
+        piRunning: true,
+      }),
+      openchamberVersion: '1.0.0',
+      runtimeName: 'test',
+      express,
+    });
+
+    const response = await request(app).get('/health');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'ok',
+      kernel: 'pi',
+      openCodeRunning: false,
+      isOpenCodeReady: false,
+      openCodePort: null,
+      kernelReady: true,
+      piRunning: true,
+    });
+  });
+
   it('should require UI auth before /api/system/shutdown when auth is configured', async () => {
     const app = express();
     const dependencies = {

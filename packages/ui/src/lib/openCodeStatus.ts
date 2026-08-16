@@ -15,6 +15,9 @@ type ProbeResult = {
 };
 
 type OpenChamberHealthSnapshot = {
+  kernel?: unknown;
+  kernelReady?: unknown;
+  piRunning?: unknown;
   openCodePort?: unknown;
   openCodeRunning?: unknown;
   openCodeSecureConnection?: unknown;
@@ -267,9 +270,17 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
   lines.push(`Platform: ${platform}`);
 
   const runtimeOpenCodePort = normalizePort(openChamberHealth?.openCodePort);
-  lines.push(`Pi runtime port: ${runtimeOpenCodePort ?? '(unknown)'}`);
+  if (typeof openChamberHealth?.kernel === 'string' && openChamberHealth.kernel.trim()) {
+    lines.push(`Kernel: ${openChamberHealth.kernel}`);
+  }
+  if (typeof openChamberHealth?.piRunning === 'boolean') {
+    lines.push(`Pi runtime running: ${openChamberHealth.piRunning ? 'yes' : 'no'}`);
+  } else if (typeof openChamberHealth?.kernelReady === 'boolean') {
+    lines.push(`Kernel ready: ${openChamberHealth.kernelReady ? 'yes' : 'no'}`);
+  }
+  lines.push(`OpenCode port: ${runtimeOpenCodePort ?? '(none)'}`);
   if (typeof openChamberHealth?.openCodeRunning === 'boolean') {
-    lines.push(`Pi runtime running: ${openChamberHealth.openCodeRunning ? 'yes' : 'no'}`);
+    lines.push(`OpenCode running: ${openChamberHealth.openCodeRunning ? 'yes' : 'no'}`);
   }
   if (typeof openChamberHealth?.openCodeSecureConnection === 'boolean') {
     lines.push(`Secure Pi connection: ${openChamberHealth.openCodeSecureConnection ? 'true' : 'false'}`);

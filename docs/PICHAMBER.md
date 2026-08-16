@@ -65,6 +65,30 @@ OPENCHAMBER_KERNEL=pi OPENCHAMBER_PI_MOCK=1 bun run start:web
 
 Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise session create, SSE, and abort.
 
+## Health
+
+`GET /health` reports which kernel is serving the process. It does **not** pretend OpenCode is running when the kernel is Pi.
+
+On Pi (`OPENCHAMBER_KERNEL=pi`, the default):
+
+```json
+{
+  "status": "ok",
+  "kernel": "pi",
+  "piMock": false,
+  "openCodeRunning": false,
+  "isOpenCodeReady": false,
+  "openCodePort": null,
+  "kernelReady": true,
+  "piRunning": true
+}
+```
+
+- Pi-ready: `kernelReady` / `piRunning`, or `kernel === "pi"` and `status === "ok"`.
+- OpenCode-ready: `openCodeRunning` and `isOpenCodeReady` on `kernel: "opencode"`.
+
+Onboarding and bootstrap wait on those Pi signals. They must not treat the OpenCode flags as proof that a leftover OpenCode process exists.
+
 ## What the Pi facade implements
 
 - Session CRUD, `prompt_async` / `prompt`, abort, messages, status. New sessions use Pi's persisted UUID under `~/.pi/agent/sessions`; `GET /api/session/:id` and `.../message` open a listed disk session after restart (same id as `pi` CLI for that cwd).
