@@ -69,6 +69,7 @@ import { openSubagentChildSession } from '@/lib/subagents/childSession';
 import {
     readSubagentCardAgent,
     readSubagentChildSessionId,
+    shouldOfferSubagentChildOpen,
     shouldRenderDedicatedSubagentCard,
 } from '@/lib/subagents/subagentTool';
 import { useStreamingTextThrottle } from '../../hooks/useStreamingTextThrottle';
@@ -1016,6 +1017,11 @@ const TaskToolSummary: React.FC<{
     const [isOutputExpanded, setIsOutputExpanded] = React.useState(false);
 
     const agentType = readSubagentCardAgent(input);
+    const canOpenChild = shouldOfferSubagentChildOpen({
+        childSessionId: sessionId,
+        input,
+        output,
+    });
 
     const handleOpenSession = (event: React.MouseEvent) => {
         event.stopPropagation();
@@ -1032,7 +1038,7 @@ const TaskToolSummary: React.FC<{
         });
     };
 
-    if (entries.length === 0 && !hasOutput && !sessionId) {
+    if (entries.length === 0 && !hasOutput && !canOpenChild) {
         return (
             <div className="relative pr-2 pb-2 pt-2 space-y-2 pl-[1.4375rem]">
                 <div className="typography-meta text-muted-foreground/70">
@@ -1060,7 +1066,7 @@ const TaskToolSummary: React.FC<{
                 />
             ) : null}
 
-            {sessionId && (
+            {canOpenChild && (
                 <button
                     type="button"
                     className="flex items-center gap-2 typography-meta text-primary hover:text-primary/80 w-full"
@@ -1073,7 +1079,7 @@ const TaskToolSummary: React.FC<{
             )}
 
             {hasOutput ? (
-                <div className={cn('space-y-1', (entries.length > 0 || sessionId) && 'pt-1')}
+                <div className={cn('space-y-1', (entries.length > 0 || canOpenChild) && 'pt-1')}
                 >
                     <button
                         type="button"
