@@ -440,3 +440,101 @@ describe('boot outcome sessionStorage cache', () => {
   });
 });
 
+describe('boot outcome preload seed', () => {
+  const mockWindow = () => {
+    const w: Record<string, unknown> = {};
+    (globalThis as Record<string, unknown>).window = w;
+    return w;
+  };
+  const restoreWindow = () => {
+    delete (globalThis as Record<string, unknown>).window;
+  };
+
+  test('falls back to the preload seed when the injected global is missing', () => {
+    const w = mockWindow();
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__ = { target: 'local', status: 'ok' };
+    try {
+      expect(getBootInjectionStatus()).toBe('valid');
+      expect(getInjectedBootOutcome()).toEqual({ target: 'local', status: 'ok' });
+    } finally {
+      restoreWindow();
+    }
+  });
+
+  test('falls back to the preload seed when the injected global is explicitly null', () => {
+    const w = mockWindow();
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = null;
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__ = {
+      target: 'remote',
+      status: 'ok',
+      hostId: 'seed-1',
+      url: 'https://seed.test',
+    };
+    try {
+      expect(getBootInjectionStatus()).toBe('valid');
+      expect(getInjectedBootOutcome()).toEqual({
+        target: 'remote',
+        status: 'ok',
+        hostId: 'seed-1',
+        url: 'https://seed.test',
+      });
+    } finally {
+      restoreWindow();
+    }
+  });
+
+  test('prefers the writable injected outcome over the preload seed', () => {
+    const w = mockWindow();
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__ = { target: 'local', status: 'ok' };
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = {
+      target: 'remote',
+      status: 'ok',
+      hostId: 'injected-1',
+      url: 'https://injected.test',
+    };
+    try {
+      expect(getInjectedBootOutcome()).toEqual({
+        target: 'remote',
+        status: 'ok',
+        hostId: 'injected-1',
+        url: 'https://injected.test',
+      });
+    } finally {
+      restoreWindow();
+    }
+  });
+
+  test('prefers the preload seed over a cached outcome when inject is missing', () => {
+    const store = new Map<string, string>();
+    (globalThis as Record<string, unknown>).window = {
+      __OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__: { target: 'local', status: 'ok' },
+      sessionStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value);
+        },
+      },
+    };
+    store.set(
+      'pichamber.desktopBootOutcome',
+      JSON.stringify({ target: 'remote', status: 'ok', hostId: 'cached-1', url: 'https://cached.test' }),
+    );
+    try {
+      expect(getInjectedBootOutcome()).toEqual({ target: 'local', status: 'ok' });
+    } finally {
+      restoreWindow();
+    }
+  });
+
+  test('treats a malformed preload seed as malformed when inject is missing', () => {
+    const w = mockWindow();
+    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__ = { kind: 'bad' };
+    try {
+      expect(getBootInjectionStatus()).toBe('malformed');
+      expect(getInjectedBootOutcome()).toBeNull();
+    } finally {
+      restoreWindow();
+    }
+  });
+});
+

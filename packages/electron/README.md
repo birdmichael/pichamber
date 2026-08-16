@@ -12,7 +12,7 @@ Desktop starts the Pichamber web server in the same Electron main process and bo
 
 Same-origin session-chat iframes complete an authenticated parent-frame handshake before creating their SDK client. The parent supplies its active in-memory endpoint and credentials; when relay is active it also supplies the public relay descriptor without any pairing grant, because Electron preload and IPC are unavailable inside the iframe. The iframe establishes its own transport and rebinds its SDK before rendering. Additional windows retain their own per-window runtime bootstrap instead of being overwritten by the main window. Credentials are never placed in iframe URLs, and other child pages do not receive this runtime state.
 
-The preload bridge exposes desktop-only APIs to the web UI through `window.__OPENCHAMBER_DESKTOP__`. Privileged commands are checked in `main.mjs`, not only in the UI.
+The preload bridge exposes desktop-only APIs to the web UI through `window.__OPENCHAMBER_DESKTOP__`. Privileged commands are checked in `main.mjs`, not only in the UI. Preload also exposes a read-only `__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__` from the `--openchamber-boot-outcome` window switch so splash can dismiss if the later `dom-ready` inject fails after a remount. The writable `__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__` still comes from the main-process init script so host switches can refresh it.
 
 ## Main Files
 
