@@ -75,6 +75,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 - `GET /api/find/files` (and `/find/files`) for composer @ file search
 - Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`
 - Project trust: `GET|PUT|POST /api/pi/trust` (`~/.pi/agent/trust.json` + `defaultProjectTrust`)
+- Skills: `GET /api/skill` and `GET /api/pi/skills` walk `~/.pi/agent/skills`, `~/.agents/skills`, and the project `.pi/skills` / `.agents/skills` trees. The walk follows directory symlinks, skips cycles and broken links, and lists each resolved `SKILL.md` once. YAML `|` / `>` descriptions keep their block text. Project skills stay `injected: false` until the project is trusted.
 - Scoped models: `enabledModels` on `GET|PATCH /api/pi/defaults` (`~/.pi/agent/settings.json`)
 - Provider auth write: `PUT /api/auth/:provider` and `DELETE /api/auth/:provider` (SDK `auth.set` / `auth.remove`) plus `DELETE /api/provider/:providerId/auth` (Settings disconnect). These update `~/.pi/agent/auth.json` in Pi's `{ type: "api_key", key }` / oauth shape for whatever provider id is in the URL.
 

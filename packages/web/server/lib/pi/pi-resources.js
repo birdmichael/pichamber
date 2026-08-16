@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import yaml from 'yaml';
 
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -75,28 +76,65 @@ const readText = (filePath) => {
   }
 };
 
+const asFrontmatterAttributes = (parsed) => {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const attributes = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value === 'string') attributes[key] = value.trim();
+    else if (typeof value === 'number' || typeof value === 'boolean') attributes[key] = String(value);
+  }
+  return attributes;
+};
+
+/** Quote unquoted scalars that contain `:` so YAML can still parse them. */
+const sanitizeFrontmatter = (frontmatter) => (
+  frontmatter
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      if (line.trim().startsWith('#') || line.trim() === '' || /^\s+/.test(line)) return [line];
+      const entry = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*)$/);
+      if (!entry) return [line];
+      const value = entry[2].trim();
+      if (value === '' || value === '>' || value === '|' || value.startsWith('"') || value.startsWith("'")) {
+        return [line];
+      }
+      if (!value.includes(':')) return [line];
+      return [`${entry[1]}: |-`, `  ${value}`];
+    })
+    .join('\n')
+);
+
 export const parseMarkdownFrontmatter = (text) => {
   const source = typeof text === 'string' ? text : '';
-  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);
   if (!match) {
     return { attributes: {}, body: source.trim() };
   }
-  const attributes = {};
-  for (const line of match[1].split(/\r?\n/)) {
-    const index = line.indexOf(':');
-    if (index <= 0) continue;
-    const key = line.slice(0, index).trim();
-    let value = line.slice(index + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
+  let attributes = {};
+  try {
+    attributes = asFrontmatterAttributes(yaml.parse(match[1]));
+  } catch {
+    try {
+      attributes = asFrontmatterAttributes(yaml.parse(sanitizeFrontmatter(match[1])));
+    } catch {
+      attributes = {};
     }
-    if (key) attributes[key] = value;
   }
   return { attributes, body: match[2].trim() };
 };
 
-const walkFiles = (root, predicate, results = []) => {
-  if (!isDirectory(root)) return results;
+const resolveExistingPath = (value) => {
+  try {
+    return fs.realpathSync(value);
+  } catch {
+    return '';
+  }
+};
+
+const walkFiles = (root, predicate, results = [], seen = new Set()) => {
+  const realRoot = resolveExistingPath(root);
+  if (!realRoot || seen.has(realRoot) || !isDirectory(realRoot)) return results;
+  seen.add(realRoot);
   let entries = [];
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
@@ -105,11 +143,11 @@ const walkFiles = (root, predicate, results = []) => {
   }
   for (const entry of entries) {
     const fullPath = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      walkFiles(fullPath, predicate, results);
+    if (isDirectory(fullPath)) {
+      walkFiles(fullPath, predicate, results, seen);
       continue;
     }
-    if (entry.isFile() && predicate(entry.name, fullPath)) {
+    if (isFile(fullPath) && predicate(entry.name, fullPath)) {
       results.push(fullPath);
     }
   }
@@ -610,10 +648,16 @@ export const listPiPromptRoots = ({ home = os.homedir(), directory } = {}) => {
 export const listPiSkills = ({ home = os.homedir(), directory } = {}) => {
   const skills = [];
   const seen = new Set();
+  const seenRoots = new Set();
   for (const { root, scope, source } of listPiSkillRoots({ home, directory })) {
+    const realRoot = resolveExistingPath(root);
+    if (realRoot) {
+      if (seenRoots.has(realRoot)) continue;
+      seenRoots.add(realRoot);
+    }
     for (const skillPath of walkFiles(root, (name) => name === 'SKILL.md')) {
       const name = path.basename(path.dirname(skillPath));
-      const key = `${scope}:${name}`;
+      const key = resolveExistingPath(skillPath) || path.resolve(skillPath);
       if (!name || seen.has(key)) continue;
       seen.add(key);
       const parsed = parseMarkdownFrontmatter(readText(skillPath));
