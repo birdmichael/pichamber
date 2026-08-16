@@ -894,9 +894,11 @@ const RunGroupCard: React.FC<RunGroupCardProps> = ({
   const handlePromptKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showCommandAutocomplete && commandRef.current) {
       if (event.key === 'Enter' || event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'Escape' || event.key === 'Tab') {
-        event.preventDefault();
-        commandRef.current.handleKeyDown(event.key);
-        return;
+        const consumed = commandRef.current.handleKeyDown(event.key);
+        if (consumed) {
+          event.preventDefault();
+          return;
+        }
       }
     }
 

@@ -170,3 +170,42 @@ export function ensureLivePlanSlashCommand<T extends PiSlashCommandItem>(
     } as T,
   ];
 }
+
+/**
+ * Slash-popup key contract. The composer routes Enter into the open popup;
+ * an empty list must close and let that Enter send the typed text as chat.
+ * Escape still dismisses. A non-empty list still selects or navigates.
+ */
+export type CommandAutocompleteKeyAction =
+  | { type: 'close'; consume: true }
+  | { type: 'close-and-send'; consume: false }
+  | { type: 'navigate'; direction: 'next' | 'previous'; consume: true }
+  | { type: 'select'; consume: true }
+  | { type: 'noop'; consume: true };
+
+export function resolveCommandAutocompleteKey(
+  key: string,
+  itemCount: number,
+): CommandAutocompleteKeyAction {
+  if (key === 'Escape') {
+    return { type: 'close', consume: true };
+  }
+
+  if (itemCount === 0) {
+    if (key === 'Enter') {
+      return { type: 'close-and-send', consume: false };
+    }
+    return { type: 'noop', consume: true };
+  }
+
+  if (key === 'ArrowDown') {
+    return { type: 'navigate', direction: 'next', consume: true };
+  }
+  if (key === 'ArrowUp') {
+    return { type: 'navigate', direction: 'previous', consume: true };
+  }
+  if (key === 'Enter' || key === 'Tab') {
+    return { type: 'select', consume: true };
+  }
+  return { type: 'noop', consume: true };
+}

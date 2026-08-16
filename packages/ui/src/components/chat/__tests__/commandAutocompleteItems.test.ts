@@ -8,6 +8,7 @@ import {
   filterPiSettingsCommands,
   filterPiSlashCommands,
   mergeCommandAutocompleteItems,
+  resolveCommandAutocompleteKey,
   toPiSkillSlashName,
 } from '../commandAutocompleteItems';
 
@@ -322,5 +323,43 @@ describe('commandMatchesPiSlashQuery', () => {
     expect(commands.filter((item) => commandMatchesPiSlashQuery(item, 're')).map((item) => item.name)).toEqual([
       'review-pr',
     ]);
+  });
+});
+
+describe('resolveCommandAutocompleteKey', () => {
+  test('empty-list Enter closes and sends instead of no-op', () => {
+    expect(resolveCommandAutocompleteKey('Enter', 0)).toEqual({
+      type: 'close-and-send',
+      consume: false,
+    });
+  });
+
+  test('empty-list Escape still dismisses the popup', () => {
+    expect(resolveCommandAutocompleteKey('Escape', 0)).toEqual({
+      type: 'close',
+      consume: true,
+    });
+  });
+
+  test('empty-list arrows and Tab stay consumed no-ops', () => {
+    expect(resolveCommandAutocompleteKey('ArrowDown', 0)).toEqual({ type: 'noop', consume: true });
+    expect(resolveCommandAutocompleteKey('ArrowUp', 0)).toEqual({ type: 'noop', consume: true });
+    expect(resolveCommandAutocompleteKey('Tab', 0)).toEqual({ type: 'noop', consume: true });
+  });
+
+  test('a matching list still selects, navigates, and dismisses', () => {
+    expect(resolveCommandAutocompleteKey('Enter', 2)).toEqual({ type: 'select', consume: true });
+    expect(resolveCommandAutocompleteKey('Tab', 2)).toEqual({ type: 'select', consume: true });
+    expect(resolveCommandAutocompleteKey('ArrowDown', 2)).toEqual({
+      type: 'navigate',
+      direction: 'next',
+      consume: true,
+    });
+    expect(resolveCommandAutocompleteKey('ArrowUp', 2)).toEqual({
+      type: 'navigate',
+      direction: 'previous',
+      consume: true,
+    });
+    expect(resolveCommandAutocompleteKey('Escape', 2)).toEqual({ type: 'close', consume: true });
   });
 });

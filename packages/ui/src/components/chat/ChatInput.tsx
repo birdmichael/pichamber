@@ -1467,10 +1467,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
 
         if (openAutocomplete === 'command' && commandRef.current) {
             if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
-                e.preventDefault();
-                e.stopPropagation();
-                commandRef.current.handleKeyDown(e.key);
-                return;
+                const consumed = commandRef.current.handleKeyDown(e.key);
+                if (consumed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                // Empty-list Enter closed the popup; fall through so the
+                // typed `/name` sends as a normal chat message.
             }
         }
 

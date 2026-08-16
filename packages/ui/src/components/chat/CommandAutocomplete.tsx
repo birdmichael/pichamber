@@ -12,7 +12,7 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLivePlanSlashCommand, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLivePlanSlashCommand, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -32,7 +32,8 @@ export interface CommandInfo {
 }
 
 export interface CommandAutocompleteHandle {
-  handleKeyDown: (key: string) => void;
+  /** Returns whether the composer should consume the key (preventDefault). */
+  handleKeyDown: (key: string) => boolean;
 }
 
 const BASE_BADGE_CLASS = "text-[10px] leading-none uppercase font-bold tracking-tight px-1.5 py-1 rounded border flex-shrink-0";
@@ -324,34 +325,29 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   React.useImperativeHandle(ref, () => ({
     handleKeyDown: (key: string) => {
       const total = commands.length;
-      if (key === 'Escape') {
+      const action = resolveCommandAutocompleteKey(key, total);
+
+      if (action.type === 'close' || action.type === 'close-and-send') {
         onClose();
-        return;
+        return action.consume;
       }
 
-      if (total === 0) {
-        return;
-      }
-
-      if (key === 'ArrowDown') {
+      if (action.type === 'navigate') {
         keyboardNavigationRef.current = true;
-        setSelectedIndex((prev) => (prev + 1) % total);
-        return;
+        const delta = action.direction === 'next' ? 1 : -1;
+        setSelectedIndex((prev) => (prev + delta + total) % total);
+        return action.consume;
       }
 
-      if (key === 'ArrowUp') {
-        keyboardNavigationRef.current = true;
-        setSelectedIndex((prev) => (prev - 1 + total) % total);
-        return;
-      }
-
-      if (key === 'Enter' || key === 'Tab') {
+      if (action.type === 'select') {
         const safeIndex = ((selectedIndexRef.current % total) + total) % total;
         const command = commands[safeIndex];
         if (command) {
           onCommandSelect(command);
         }
       }
+
+      return action.consume;
     }
   }), [commands, onClose, onCommandSelect]);
 

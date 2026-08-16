@@ -375,9 +375,11 @@ export const AgentManagerEmptyState: React.FC<AgentManagerEmptyStateProps> = ({
 
     if (showCommandAutocomplete && commandRef.current) {
       if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
-        e.preventDefault();
-        commandRef.current.handleKeyDown(e.key);
-        return;
+        const consumed = commandRef.current.handleKeyDown(e.key);
+        if (consumed) {
+          e.preventDefault();
+          return;
+        }
       }
     }
 
