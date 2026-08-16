@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** Session Goal is available on the Pi kernel again. The composer target button and Settings Chat toggle stay visible, and a goal set on a session still shows after reload.
 - Settings: Skills, Skills Catalog, and Commands in the left rail stay clickable and keyboard-focusable without searching first. Choosing a search result (click or Enter) opens that page and focuses the matching field. Provider, agent, and skill rows are no longer announced twice by VoiceOver.
 - **Chat:** sessions from Pi or an earlier Pichamber run now open after a restart instead of showing a load error.
 - **Sessions:** Scheduled Tasks is a Pichamber scheduler on Pi. The sidebar calendar and `/schedule-task` are available again; Run now and due timers start a real Pi session with the task prompt. The OpenCode kernel still uses its existing execution path.

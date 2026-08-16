@@ -170,8 +170,15 @@ sees only that final turn, so the report is its evidence.
 - `components/chat/SessionGoalButton.tsx` — composer target button
   (arm / status color / cancel confirm); `SessionGoalRow.tsx` — goal strip
   above the composer; `SessionGoalDialog.tsx` — manage dialog
-  (edit/pause/resume/complete/clear).
+  (edit/pause/resume/complete/clear). Session Goal is a Pichamber feature:
+  `isPiKernel` does not hide the composer button, objective counter, or
+  Settings Chat sessionGoal group. VS Code still hides the entry point
+  because the loop runs in the web server.
 - Sidebar glyph next to the date in `SessionNodeItem`.
+- On the Pi kernel, `PATCH /api/session/:id` metadata (including
+  `metadata.openchamber.goal`) is persisted as a Pi `custom` entry
+  (`pichamber.metadata`) on the session jsonl under `~/.pi/agent/sessions`
+  and restored when that UUID is hydrated after reload.
 
 ## Scheduled goals
 

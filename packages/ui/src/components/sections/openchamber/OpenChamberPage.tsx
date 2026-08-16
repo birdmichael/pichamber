@@ -19,6 +19,7 @@ import { isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, isWebRunti
 import { isCapacitorApp } from '@/lib/platform';
 import { useI18n } from '@/lib/i18n';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { chatKernelSettings } from './chatSettingsVisibility';
 import { subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import type { OpenChamberSection } from './types';
 
@@ -190,8 +191,7 @@ const ChatSectionContent: React.FC = () => {
     return (
         <OpenChamberVisualSettings
             visibleSettings={[
-                ...(!isPiKernel ? ['sessionGoal' as const] : []),
-                ...(!isPiKernel ? ['sessionAssist' as const] : []),
+                ...chatKernelSettings(isPiKernel),
                 'chatRenderMode',
                 'activityRenderMode',
                 'userMessageRendering',

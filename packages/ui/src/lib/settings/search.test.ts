@@ -88,4 +88,26 @@ describe('settings search', () => {
     expect(openCodeResults.some((result) => result.id === 'agents.create')).toBe(true);
     expect(piResults.some((result) => result.id === 'agents.create')).toBe(false);
   });
+
+  test('keeps Session Goal settings searchable on Pi and hidden in VS Code', () => {
+    const query = 'goal';
+    const getPageTitle = (page: string) => page;
+    const piResults = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+    const vsCodeResults = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isVSCode: true, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(piResults.some((result) => result.id === 'chat.session-goal')).toBe(true);
+    expect(piResults.some((result) => result.id === 'chat.session-goal-budget')).toBe(true);
+    expect(vsCodeResults.some((result) => result.id === 'chat.session-goal')).toBe(false);
+    expect(vsCodeResults.some((result) => result.id === 'chat.session-goal-budget')).toBe(false);
+  });
 });
