@@ -49,4 +49,24 @@ describe('settings search', () => {
 
     expect(results.some((result) => result.id === 'integrations.messengers.discord')).toBe(true);
   });
+
+  test('hides agent create search on Pi and keeps it on OpenCode', () => {
+    const query = 'new agent';
+    const getPageTitle = (page: string) => page;
+    const openCodeResults = buildSettingsSearchResults({
+      query,
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+    const piResults = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(openCodeResults.some((result) => result.id === 'agents.create')).toBe(true);
+    expect(piResults.some((result) => result.id === 'agents.create')).toBe(false);
+  });
 });

@@ -5,7 +5,7 @@ import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui';
 import { useAgentsStore, isAgentBuiltIn, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
-import { useSelectPiAgentWhenUnset } from './piAgentSelection';
+import { PI_NATIVE_AGENT_NAME, useSelectPiAgentWhenUnset } from './piAgentSelection';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
 import { ModelSelector } from './ModelSelector';
@@ -79,7 +79,7 @@ export const AgentsPage: React.FC = () => {
   const selectedAgent = selectedAgentName ? getAgentByName(selectedAgentName) : null;
   const isNewAgent = Boolean(agentDraft && agentDraft.name === selectedAgentName && !selectedAgent);
   const isPiNativeReadOnly = isPiKernel && !isNewAgent && (
-    (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === 'pi'
+    (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === PI_NATIVE_AGENT_NAME
   );
   useSelectPiAgentWhenUnset(isPiKernel);
 
