@@ -3,6 +3,7 @@ export const thirdPartyIntegrationI18n = {
   en: {
     'settings.page.integrations.title': 'Integrations',
     'settings.page.integrations.description': 'Add third-party subscriptions to use as Pichamber providers.',
+    'settings.page.integrations.descriptionPi': 'Chat messengers are not available yet.',
     'settings.integrations.messengers.title': 'Messengers',
     'settings.integrations.messengers.info': 'Chat with Pichamber from Discord or Telegram. These bridges are not available yet.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -45,6 +46,7 @@ export const thirdPartyIntegrationI18n = {
   de: {
     'settings.page.integrations.title': 'Integrationen',
     'settings.page.integrations.description': 'Füge Drittanbieter-Abonnements hinzu, um sie als Pichamber-Provider zu nutzen.',
+    'settings.page.integrations.descriptionPi': 'Chat-Messenger sind noch nicht verfügbar.',
     'settings.integrations.messengers.title': 'Messenger',
     'settings.integrations.messengers.info': 'Chatte mit Pichamber über Discord oder Telegram. Diese Bridges sind noch nicht verfügbar.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -87,6 +89,7 @@ export const thirdPartyIntegrationI18n = {
   fr: {
     'settings.page.integrations.title': 'Intégrations',
     'settings.page.integrations.description': 'Ajoutez des abonnements tiers à utiliser comme fournisseurs Pichamber.',
+    'settings.page.integrations.descriptionPi': 'Les messageries ne sont pas encore disponibles.',
     'settings.integrations.messengers.title': 'Messagers',
     'settings.integrations.messengers.info': 'Discutez avec Pichamber depuis Discord ou Telegram. Ces ponts ne sont pas encore disponibles.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -129,6 +132,7 @@ export const thirdPartyIntegrationI18n = {
   es: {
     'settings.page.integrations.title': 'Integraciones',
     'settings.page.integrations.description': 'Añade suscripciones de terceros para usarlas como proveedores de Pichamber.',
+    'settings.page.integrations.descriptionPi': 'Los mensajeros de chat aún no están disponibles.',
     'settings.integrations.messengers.title': 'Mensajeros',
     'settings.integrations.messengers.info': 'Chatea con Pichamber desde Discord o Telegram. Estos puentes aún no están disponibles.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -171,6 +175,7 @@ export const thirdPartyIntegrationI18n = {
   ja: {
     'settings.page.integrations.title': '連携',
     'settings.page.integrations.description': 'サードパーティのサブスクリプションを追加して、Pichamber のプロバイダーとして使います。',
+    'settings.page.integrations.descriptionPi': 'チャットメッセンジャーはまだ利用できません。',
     'settings.integrations.messengers.title': 'メッセンジャー',
     'settings.integrations.messengers.info': 'Discord または Telegram から Pichamber とチャットできます。これらの連携はまだ利用できません。',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -213,6 +218,7 @@ export const thirdPartyIntegrationI18n = {
   ko: {
     'settings.page.integrations.title': '통합',
     'settings.page.integrations.description': '타사 구독을 추가해 Pichamber 프로바이더로 사용하세요.',
+    'settings.page.integrations.descriptionPi': '채팅 메신저는 아직 사용할 수 없습니다.',
     'settings.integrations.messengers.title': '메신저',
     'settings.integrations.messengers.info': 'Discord 또는 Telegram에서 Pichamber와 채팅하세요. 이 브리지는 아직 사용할 수 없습니다.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -255,6 +261,7 @@ export const thirdPartyIntegrationI18n = {
   pl: {
     'settings.page.integrations.title': 'Integracje',
     'settings.page.integrations.description': 'Dodaj subskrypcje zewnętrzne, aby używać ich jako dostawców Pichamber.',
+    'settings.page.integrations.descriptionPi': 'Komunikatory czatu nie są jeszcze dostępne.',
     'settings.integrations.messengers.title': 'Komunikatory',
     'settings.integrations.messengers.info': 'Czatuj z Pichamber przez Discord lub Telegram. Te mosty nie są jeszcze dostępne.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -297,6 +304,7 @@ export const thirdPartyIntegrationI18n = {
   'pt-BR': {
     'settings.page.integrations.title': 'Integrações',
     'settings.page.integrations.description': 'Adicione assinaturas de terceiros para usar como provedores do Pichamber.',
+    'settings.page.integrations.descriptionPi': 'Os mensageiros de chat ainda não estão disponíveis.',
     'settings.integrations.messengers.title': 'Mensageiros',
     'settings.integrations.messengers.info': 'Converse com o Pichamber pelo Discord ou Telegram. Essas pontes ainda não estão disponíveis.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -339,6 +347,7 @@ export const thirdPartyIntegrationI18n = {
   uk: {
     'settings.page.integrations.title': 'Інтеграції',
     'settings.page.integrations.description': 'Додайте сторонні підписки, щоб використовувати їх як провайдери Pichamber.',
+    'settings.page.integrations.descriptionPi': 'Чат-месенджери ще недоступні.',
     'settings.integrations.messengers.title': 'Месенджери',
     'settings.integrations.messengers.info': 'Спілкуйтеся з Pichamber у Discord або Telegram. Ці мости ще недоступні.',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -381,6 +390,7 @@ export const thirdPartyIntegrationI18n = {
   'zh-CN': {
     'settings.page.integrations.title': '集成',
     'settings.page.integrations.description': '添加第三方订阅，将其用作 Pichamber 提供商。',
+    'settings.page.integrations.descriptionPi': '即时通讯功能尚不可用。',
     'settings.integrations.messengers.title': '即时通讯',
     'settings.integrations.messengers.info': '通过 Discord 或 Telegram 与 Pichamber 聊天。这些桥接尚不可用。',
     'settings.integrations.messengers.discord.name': 'Discord',
@@ -423,6 +433,7 @@ export const thirdPartyIntegrationI18n = {
   'zh-TW': {
     'settings.page.integrations.title': '整合',
     'settings.page.integrations.description': '新增第三方訂閱，將其用作 Pichamber 供應商。',
+    'settings.page.integrations.descriptionPi': '即時通訊功能尚不可用。',
     'settings.integrations.messengers.title': '即時通訊',
     'settings.integrations.messengers.info': '透過 Discord 或 Telegram 與 Pichamber 聊天。這些橋接尚不可用。',
     'settings.integrations.messengers.discord.name': 'Discord',

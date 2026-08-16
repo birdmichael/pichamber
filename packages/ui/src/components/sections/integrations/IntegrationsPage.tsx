@@ -20,7 +20,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({
   return (
     <SettingsPageLayout
       title={t('settings.page.integrations.title')}
-      description={t('settings.page.integrations.description')}
+      description={t(isPiKernel ? 'settings.page.integrations.descriptionPi' : 'settings.page.integrations.description')}
       showSaveStatus={false}
     >
       <ComingSoonMessengersSection />
