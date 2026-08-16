@@ -132,7 +132,7 @@ export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[
     }
     if (PI_HIDDEN_SLASH_COMMANDS.has(command.name)) continue;
     const agent = typeof command.agent === 'string' ? command.agent.toLowerCase() : '';
-    if (agent === 'openchamber' && command.name !== 'compact') continue;
+    if (agent === 'openchamber' && command.name !== 'compact' && command.name !== 'plan') continue;
     kept.push(command);
   }
   return kept;
@@ -153,4 +153,20 @@ export function commandHasPiSlashPrefix(command: { name: string }, query: string
 /** Pi slash search is name-only. Fuzzy-matching descriptions re-ranks the whole list. */
 export function commandMatchesPiSlashQuery(command: { name: string }, query: string): boolean {
   return commandHasPiSlashPrefix(command, query);
+}
+
+/** Live PI `/plan` must stay visible next to `/plan-feature`, including empty drafts. */
+export function ensureLivePlanSlashCommand<T extends PiSlashCommandItem>(
+  commands: T[],
+  options: { isPiKernel: boolean; planPluginAvailable: boolean },
+): T[] {
+  if (!options.isPiKernel || !options.planPluginAvailable) return commands;
+  if (commands.some((command) => command.name === 'plan')) return commands;
+  return [
+    ...commands,
+    {
+      name: 'plan',
+      agent: 'pi',
+    } as T,
+  ];
 }

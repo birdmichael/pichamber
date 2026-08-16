@@ -4,6 +4,7 @@ import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { refreshFeaturePlugins, usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import {
+  canShowPiPlanToggle,
   isFooterPlanSelected,
   planBuildAvailable,
   sessionPlanHasMarkdown,
@@ -14,6 +15,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 export function usePiPlanChrome(sessionID?: string | null) {
   const isPiKernel = usePiKernel();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
+  const draftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const resolvedSessionId = sessionID ?? currentSessionId;
   const planPluginAvailable = usePiPlanPluginAvailable();
   const plan = useSessionPlan(resolvedSessionId);
@@ -35,9 +37,11 @@ export function usePiPlanChrome(sessionID?: string | null) {
     isPiKernel,
     available,
     sessionID: resolvedSessionId,
+    draftOpen,
     plan,
     status: plan?.status ?? 'off',
     busy,
+    showToggle: canShowPiPlanToggle(available, resolvedSessionId, draftOpen),
     footerPlanSelected: available && isFooterPlanSelected(plan?.status),
     showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
     showViewPlan: available && sessionPlanHasMarkdown(plan),

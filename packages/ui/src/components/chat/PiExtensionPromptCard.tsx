@@ -14,8 +14,10 @@ import {
   isPiExtensionUiNotFoundError,
   replyPiExtensionUi,
 } from '@/sync/pi-extension-ui';
-import { stashPiExtensionUiEditorText } from '@/sync/pi-extension-ui-store';
+import { presentPiExtensionUiNotify, stashPiExtensionUiEditorText } from '@/sync/pi-extension-ui-store';
 import type { PiExtensionUiPrompt } from '@/sync/pi-extension-ui';
+import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
+import { refreshSessionPlan } from '@/sync/pi-session-plan-store';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
 
 interface PiExtensionPromptCardProps {
@@ -142,7 +144,18 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
         await replyPiExtensionUi(prompt.sessionID, prompt.id, other);
         return;
       }
-      await replyPiExtensionUi(prompt.sessionID, prompt.id, isMultiple ? selected : selected[0]);
+      const value = isMultiple ? selected : selected[0];
+      await replyPiExtensionUi(prompt.sessionID, prompt.id, value);
+      const started = (Array.isArray(value) ? value : [value]).some((option) => (
+        /start plan mode/i.test(String(option ?? ''))
+      ));
+      if (started) {
+        presentPiExtensionUiNotify({ message: PLAN_MODE_ENABLED_NOTIFY, level: 'info' });
+      }
+      void refreshSessionPlan(prompt.sessionID);
+      window.setTimeout(() => {
+        void refreshSessionPlan(prompt.sessionID);
+      }, 400);
     } catch (error) {
       handleFailure(error, 'chat.piExtensionUi.submitFailed');
     } finally {

@@ -34,8 +34,19 @@ const isStatus = (value: unknown): value is PiExtensionUiStatus => (
 );
 
 const asOptionalString = (value: unknown): string | undefined => (
-  typeof value === 'string' && value.length > 0 ? value : undefined
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
 );
+
+const messageFromUnknown = (value: unknown): string | undefined => {
+  const direct = asOptionalString(value);
+  if (direct) return direct;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return asOptionalString(record.message)
+    ?? asOptionalString(record.title)
+    ?? asOptionalString(record.text)
+    ?? asOptionalString(record.body);
+};
 
 export const parsePiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | null => {
   if (!value || typeof value !== 'object') return null;
@@ -76,11 +87,11 @@ export const parsePiExtensionUiNotify = (value: unknown): PiExtensionUiNotify | 
     ? raw.properties as Record<string, unknown>
     : null;
   const source = nested ?? raw;
-  const message = asOptionalString(source.message)
+  const message = messageFromUnknown(source.message)
     ?? asOptionalString(source.title)
     ?? asOptionalString(source.text)
     ?? asOptionalString(source.body)
-    ?? asOptionalString(raw.message)
+    ?? messageFromUnknown(raw.message)
     ?? asOptionalString(raw.title);
   if (!message) return null;
   return {

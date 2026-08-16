@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
+  canShowPiPlanToggle,
   isFooterPlanSelected,
   parseSessionPlan,
   planBuildAvailable,
@@ -40,7 +41,7 @@ describe('parseSessionPlan', () => {
 });
 
 describe('plan toggle and build dispatch', () => {
-  test('maps Agent|Plan clicks to start/save/resume and never /plan exit', () => {
+  test('maps Agent|Plan clicks to start/save/resume and exit when Plan is on without a document', () => {
     expect(planToggleAction('off', 'plan')).toBe('start');
     expect(planToggleAction('saved', 'plan')).toBe('resume');
     expect(planToggleAction('active', 'plan')).toBeNull();
@@ -48,10 +49,17 @@ describe('plan toggle and build dispatch', () => {
     expect(planToggleAction('implementing', 'plan')).toBeNull();
 
     expect(planToggleAction('ready', 'agent')).toBe('save');
-    expect(planToggleAction('active', 'agent')).toBeNull();
+    expect(planToggleAction('active', 'agent')).toBe('exit');
     expect(planToggleAction('saved', 'agent')).toBeNull();
     expect(planToggleAction('off', 'agent')).toBeNull();
     expect(planToggleAction('implementing', 'agent')).toBeNull();
+  });
+
+  test('shows the footer toggle on an idle draft or session without waiting for a plan fetch', () => {
+    expect(canShowPiPlanToggle(true, 'ses_1', false)).toBe(true);
+    expect(canShowPiPlanToggle(true, null, true)).toBe(true);
+    expect(canShowPiPlanToggle(true, '', false)).toBe(false);
+    expect(canShowPiPlanToggle(false, 'ses_1', true)).toBe(false);
   });
 
   test('Build is only available for ready or saved markdown', () => {

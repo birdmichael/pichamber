@@ -1,8 +1,8 @@
 import React from 'react';
 
-import { toast } from '@/components/ui';
 import {
   consumePiExtensionUiNotifies,
+  presentPiExtensionUiNotify,
   usePiExtensionUiStore,
 } from '@/sync/pi-extension-ui-store';
 
@@ -12,9 +12,7 @@ export function PiExtensionUiNotifyToasts() {
   React.useEffect(() => {
     if (notifies.length === 0) return;
     for (const notify of notifies) {
-      if (notify.level === 'error') toast.error(notify.message);
-      else if (notify.level === 'warning') toast.warning(notify.message);
-      else toast.info(notify.message);
+      presentPiExtensionUiNotify(notify);
     }
     consumePiExtensionUiNotifies(notifies.map((notify) => notify.id));
   }, [notifies]);

@@ -4,6 +4,7 @@ import {
   commandHasPiSlashPrefix,
   commandMatchesPiSlashQuery,
   commandMatchesSearch,
+  ensureLivePlanSlashCommand,
   filterPiSettingsCommands,
   filterPiSlashCommands,
   mergeCommandAutocompleteItems,
@@ -173,6 +174,23 @@ describe('filterPiSlashCommands', () => {
       { name: 'catch-up', isOpenChamber: true },
     ];
     expect(filterPiSlashCommands(commands, false)).toEqual(commands);
+  });
+
+  test('keeps live PI /plan next to /plan-feature and does not hide it as OpenChamber', () => {
+    const commands = [
+      { name: 'plan', agent: 'pi' },
+      { name: 'plan-feature', isOpenChamber: true },
+      { name: 'compact', agent: 'openchamber' },
+    ];
+    expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
+      'plan',
+      'plan-feature',
+      'compact',
+    ]);
+    expect(ensureLivePlanSlashCommand(
+      filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
+      { isPiKernel: true, planPluginAvailable: true },
+    ).map((item) => item.name)).toEqual(['plan-feature', 'plan']);
   });
 
   test('keeps Pichamber starters and injected skills, and still hides leftovers', () => {

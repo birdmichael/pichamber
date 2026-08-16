@@ -33,6 +33,7 @@ import {
   createSettingsJsonPackageManager,
   isFeaturePluginSlot,
   listConfiguredPiPackageSources,
+  listFeaturePluginSlashCommands,
   readFeaturePlugins,
   toFeaturePluginsPayload,
   writeFeaturePlugins,
@@ -1333,7 +1334,10 @@ export const createPiHost = ({
         if (!sessionID && record.directory !== cwd) continue;
         live.push(...readLiveSessionCommands(record.piSession));
       }
-      return mergeLiveExtensionCommands(listed, live);
+      return mergeLiveExtensionCommands(
+        mergeLiveExtensionCommands(listed, live),
+        listFeaturePluginSlashCommands(this.getFeaturePlugins()),
+      );
     },
     writeCommand(directory, name, config = {}) {
       return writePiPrompt({
@@ -1710,6 +1714,9 @@ export const createPiHost = ({
           throw error;
         }
         await record.piSession.prompt(userText);
+        if (name === 'plan') {
+          emitPlanUpdated(record, readRecordPlan(record));
+        }
         const assistantID = createMessageId();
         return {
           info: {

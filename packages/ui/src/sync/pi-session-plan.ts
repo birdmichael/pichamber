@@ -37,8 +37,20 @@ export const sessionPlanHasMarkdown = (plan: SessionPlan | null | undefined): bo
     && plan.planMarkdown.trim().length > 0;
 };
 
+export const PLAN_MODE_ENABLED_NOTIFY =
+  'Plan mode enabled. I will explore and plan, but not modify files.';
+
 export const isFooterPlanSelected = (status: SessionPlanStatus | null | undefined): boolean => (
   status === 'active' || status === 'ready'
+);
+
+/** Footer chips: Plan slot on, plus a session id or an idle new-session draft. */
+export const canShowPiPlanToggle = (
+  available: boolean,
+  sessionID?: string | null,
+  draftOpen = false,
+): boolean => (
+  available && Boolean((typeof sessionID === 'string' && sessionID.trim()) || draftOpen)
 );
 
 export const planToggleAction = (
@@ -51,6 +63,7 @@ export const planToggleAction = (
     return null;
   }
   if (status === 'ready') return 'save';
+  if (status === 'active') return 'exit';
   return null;
 };
 

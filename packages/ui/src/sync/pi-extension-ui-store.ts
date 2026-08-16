@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { toast } from '@/components/ui';
 import {
   isBlockingPiExtensionUiKind,
   parsePiExtensionUiNotify,
@@ -31,6 +32,23 @@ type PiExtensionUiState = {
 
 let notifySeq = 0;
 const nextNotifyId = (): string => `pin_${Date.now()}_${++notifySeq}`;
+const recentNotifyAt = new Map<string, number>();
+const NOTIFY_DEDUPE_MS = 2500;
+
+export const presentPiExtensionUiNotify = (notify: {
+  message: string;
+  level: 'info' | 'warning' | 'error';
+}): void => {
+  const message = notify.message.trim();
+  if (!message) return;
+  const now = Date.now();
+  const last = recentNotifyAt.get(message) ?? 0;
+  if (now - last < NOTIFY_DEDUPE_MS) return;
+  recentNotifyAt.set(message, now);
+  if (notify.level === 'error') toast.error(message, { duration: 8000 });
+  else if (notify.level === 'warning') toast.warning(message, { duration: 8000 });
+  else toast.info(message, { duration: 8000 });
+};
 
 const empty: PiExtensionUiPrompt[] = [];
 
@@ -58,6 +76,7 @@ export const usePiExtensionUiStore = create<PiExtensionUiState>(() => ({
 }));
 
 export const resetPiExtensionUiStore = (): void => {
+  recentNotifyAt.clear();
   usePiExtensionUiStore.setState({ promptsBySession: {}, notifies: [], editorStash: null });
 };
 
@@ -93,6 +112,7 @@ export const applyPiExtensionUiNotify = (value: unknown): PiExtensionUiNotifyIte
     ...state,
     notifies: [...state.notifies, item].slice(-MAX_NOTIFIES),
   }));
+  presentPiExtensionUiNotify(item);
   return item;
 };
 

@@ -237,6 +237,17 @@ const slotPresets = (slot) => ([
   { id: 'default', source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot] },
 ]);
 
+/** Slash entries that must appear even before a live session calls getCommands(). */
+export const listFeaturePluginSlashCommands = (payload) => {
+  const plan = payload?.slots?.plan;
+  if (!plan?.installed || !plan.enabled) return [];
+  return [{
+    name: 'plan',
+    description: 'Plan mode',
+    source: 'extension',
+  }];
+};
+
 export const toFeaturePluginsPayload = ({
   plugins,
   configuredSources = [],

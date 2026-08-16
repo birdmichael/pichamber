@@ -107,6 +107,8 @@ Resolution order:
   custom prompts — not `reload`)
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
+- Feature Plugins slash names that must appear before a session exists
+  (Plan slot installed+enabled → `/plan`)
 
 Optional `?session=` pins the live session. After `host.reload()` /
 `POST /api/session/:id/reload`, the next list read sees whatever the live

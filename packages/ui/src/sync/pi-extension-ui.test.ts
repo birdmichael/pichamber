@@ -1,4 +1,15 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
+
+mock.module('@/components/ui', () => ({
+  toast: {
+    info: () => {},
+    warning: () => {},
+    error: () => {},
+  },
+}));
+mock.module('@/lib/runtime-fetch', () => ({
+  runtimeFetch: async () => ({ ok: false, json: async () => null }),
+}));
 
 import {
   displaySelectOption,
@@ -168,6 +179,9 @@ describe('pi extension UI store', () => {
       sessionID: 'ses_1',
       message: 'Plan mode enabled. I will explore and plan, but not modify files.',
     });
+    expect(parsePiExtensionUiNotify({
+      message: { text: 'Plan mode enabled. I will explore and plan, but not modify files.' },
+    })?.message).toBe('Plan mode enabled. I will explore and plan, but not modify files.');
 
     handlePiExtensionUiEvent({
       type: 'pi.ui.notify',

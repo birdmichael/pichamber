@@ -10,6 +10,7 @@ import {
   featurePluginSourcesMatch,
   isFeaturePluginSourceInstalled,
   listConfiguredPiPackageSources,
+  listFeaturePluginSlashCommands,
   mergeFeaturePluginPatch,
   normalizeFeaturePlugins,
   readFeaturePlugins,
@@ -94,6 +95,20 @@ describe('feature plugin defaults and persist', () => {
   it('rejects an empty source and an invalid goal command', () => {
     expect(() => mergeFeaturePluginPatch({}, { goal: { source: '   ' } })).toThrow(/source is required/);
     expect(() => mergeFeaturePluginPatch({}, { goal: { command: '/plan start' } })).toThrow(/command is invalid/);
+  });
+});
+
+describe('feature plugin slash commands', () => {
+  it('lists /plan for the slash menu when the Plan slot is installed and enabled', () => {
+    expect(listFeaturePluginSlashCommands({
+      slots: { plan: { installed: true, enabled: true } },
+    })).toEqual([{ name: 'plan', description: 'Plan mode', source: 'extension' }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { plan: { installed: true, enabled: false } },
+    })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { plan: { installed: false, enabled: true } },
+    })).toEqual([]);
   });
 });
 

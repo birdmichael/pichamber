@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 import { writePiPrompt } from './pi-resources.js';
 import {
+  createSettingsJsonPackageManager,
+  writeFeaturePlugins,
+} from './feature-plugins.js';
+import {
   createInMemoryPiSession,
   createPiHost,
   isPlaceholderSessionTitle,
@@ -449,6 +453,25 @@ describe('createPiHost', () => {
         command.name === 'plan' && command.source === 'extension'
       ))).toBe(true);
       expect(host.listCommands('/tmp/project').some((command) => command.name === 'reload')).toBe(false);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('lists /plan from the Plan slot before any session exists', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-plan-slot-cmd-'));
+    try {
+      writeFeaturePlugins(home, { plan: { enabled: true } });
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-plan-mode');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => (
+        command.name === 'plan' && command.source === 'extension'
+      ))).toBe(true);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
