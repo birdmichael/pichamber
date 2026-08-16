@@ -709,6 +709,8 @@ export const settingsDict = {
   'settings.skills.sidebar.title': '技能',
   'settings.skills.sidebar.total': '总计 {count}',
   'settings.skills.sidebar.section.project': '项目技能',
+  'settings.skills.sidebar.untrustedHint': '未信任，不会注入当前 Pi 会话',
+  'settings.skills.sidebar.badge.notInjected': '未注入',
   'settings.skills.sidebar.section.user': '用户技能',
   'settings.skills.sidebar.empty.title': '未配置技能',
   'settings.skills.sidebar.empty.description': '使用上方 + 按钮创建一个',

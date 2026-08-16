@@ -805,7 +805,8 @@ export const createPiHost = ({
       };
     },
     getConfigSkills(directory) {
-      return toConfigSkillsPayload(this.listSkills(directory));
+      const cwd = directory || defaultDirectory;
+      return toConfigSkillsPayload(this.listSkills(cwd), { home, directory: cwd });
     },
     async getProviders() {
       if (mock) {

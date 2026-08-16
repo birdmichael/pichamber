@@ -245,6 +245,11 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
                 <div className="px-2 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t('settings.skills.sidebar.section.project')}
                 </div>
+                {projectSkills.some((skill) => skill.injected === false) ? (
+                  <p className="px-2 pb-2 typography-meta text-muted-foreground">
+                    {t('settings.skills.sidebar.untrustedHint')}
+                  </p>
+                ) : null}
                 {groupedProjectSkills.sortedGroups.map(({ name: groupName, skills: groupSkills }) => (
                   <SidebarGroup
                     key={groupName}
@@ -468,7 +473,7 @@ const SkillListItem: React.FC<SkillListItemProps> = ({
   );
   return (
     <ContextMenu open={!isBuiltIn && isContextMenuOpen} onOpenChange={setIsContextMenuOpen}>
-      <ContextMenuTrigger render={<div className={cn('group relative flex items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover')} onContextMenu={!isMobile && !isBuiltIn ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
+      <ContextMenuTrigger render={<div className={cn('group relative flex items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover', skill.injected === false && 'opacity-70')} onContextMenu={!isMobile && !isBuiltIn ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
       <div className="flex min-w-0 flex-1 items-center">
         <button
           onClick={onSelect}
@@ -483,6 +488,9 @@ const SkillListItem: React.FC<SkillListItemProps> = ({
               {skill.scope}
             </span>
             <span className={badgeClassName}>{sourceLabel}</span>
+            {skill.injected === false ? (
+              <span className={badgeClassName}>{t('settings.skills.sidebar.badge.notInjected')}</span>
+            ) : null}
           </div>
         </button>
 

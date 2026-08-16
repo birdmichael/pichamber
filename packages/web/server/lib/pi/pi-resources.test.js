@@ -26,6 +26,7 @@ import {
   resolveProjectAgentsMd,
   readBehaviorAgentsMd,
   resolvePiAgentsMdPath,
+  toConfigSkillsPayload,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -273,6 +274,26 @@ describe('pi-resources', () => {
     const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
     expect(after.enabledModels).toBeUndefined();
   });
+
+  it('marks untrusted project skills as not injected', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent', 'skills', 'review'), { recursive: true });
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'skills', 'review', 'SKILL.md'), '---\ndescription: Review\n---\n');
+    fs.mkdirSync(path.join(project, '.pi', 'skills', 'local'), { recursive: true });
+    fs.writeFileSync(path.join(project, '.pi', 'skills', 'local', 'SKILL.md'), '---\ndescription: Local\n---\n');
+
+    const skills = listPiSkills({ home, directory: project });
+    const untrusted = toConfigSkillsPayload(skills, { home, directory: project });
+    expect(untrusted.projectTrust.trusted).toBe(false);
+    expect(untrusted.skills.find((skill) => skill.name === 'review').injected).toBe(true);
+    expect(untrusted.skills.find((skill) => skill.name === 'local').injected).toBe(false);
+
+    setPiProjectTrust(home, project, true);
+    const trusted = toConfigSkillsPayload(skills, { home, directory: project });
+    expect(trusted.projectTrust.trusted).toBe(true);
+    expect(trusted.skills.find((skill) => skill.name === 'local').injected).toBe(true);
+  });
 });
 
 describe('behavior AGENTS.md', () => {
@@ -388,3 +409,4 @@ describe('resolvePiDefaultModel', () => {
     expect(resolvePiDefaultModel('missing/gone', catalog)).toBe('bmlab/grok-4.6');
   });
 });
+

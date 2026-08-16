@@ -742,6 +742,8 @@ export const settingsDict = {
   'settings.skills.sidebar.title': 'スキル',
   'settings.skills.sidebar.total': '合計 {count}',
   'settings.skills.sidebar.section.project': 'プロジェクト Skill',
+  'settings.skills.sidebar.untrustedHint': 'Untrusted — not injected into Pi sessions',
+  'settings.skills.sidebar.badge.notInjected': 'not injected',
   'settings.skills.sidebar.section.user': 'ユーザー Skill',
   'settings.skills.sidebar.empty.title': 'Skill が設定されていません',
   'settings.skills.sidebar.empty.description': '上の + ボタンを使用して作成してください',

@@ -784,13 +784,31 @@ export const listPiPackages = ({ home = os.homedir(), directory } = {}) => {
 };
 
 
-export const toConfigSkillsPayload = (skills) => ({
-  skills,
-  externalSkills: {
-    claudeDisabled: false,
-    allDisabled: false,
-  },
-});
+export const areProjectSkillsInjected = (trust) => {
+  if (trust?.current?.trusted === true) return true;
+  if (trust?.current?.trusted == null && trust?.defaultProjectTrust === 'always') return true;
+  return false;
+};
+
+export const toConfigSkillsPayload = (skills, { home, directory } = {}) => {
+  const trust = readPiProjectTrust(home, directory);
+  const projectInjected = areProjectSkillsInjected(trust);
+  return {
+    skills: (Array.isArray(skills) ? skills : []).map((skill) => ({
+      ...skill,
+      injected: skill.scope !== 'project' || projectInjected,
+    })),
+    projectTrust: {
+      trusted: projectInjected,
+      defaultProjectTrust: trust.defaultProjectTrust,
+      current: trust.current,
+    },
+    externalSkills: {
+      claudeDisabled: false,
+      allDisabled: false,
+    },
+  };
+};
 
 const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
