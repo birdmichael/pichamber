@@ -103,8 +103,22 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@opencode-ai/sdk/v2'],
+    // Do not alias `shiki` to a directory — that breaks `shiki/core` / `shiki/wasm`.
+    // Scan the HTML entries plus the markdown worker so the first session-chat
+    // iframe does not discover shiki mid-session and force a full reload.
+    entries: [
+      path.resolve(__dirname, 'index.html'),
+      path.resolve(__dirname, 'mini-chat.html'),
+      path.resolve(__dirname, 'mobile.html'),
+      path.resolve(__dirname, '../ui/src/components/chat/markdown/markdown-shiki.worker.ts'),
+    ],
   },
   server: {
+    warmup: {
+      clientFiles: [
+        path.resolve(__dirname, '../ui/src/components/chat/markdown/markdown-shiki.worker.ts'),
+      ],
+    },
     port: 5173,
     proxy: {
       '/auth': {

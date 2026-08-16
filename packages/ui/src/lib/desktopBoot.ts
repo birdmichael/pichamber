@@ -267,9 +267,10 @@ export function shouldRestartDesktopBootFlow(input: DesktopBootFlowRestartInput)
 }
 
 /**
- * Read the boot outcome injected by the native desktop host.
- * Returns `null` when not in desktop, when the outcome has not been set yet,
- * or when the injected payload is malformed.
+ * Read the boot outcome from the native desktop host.
+ * Prefers the writable inject, then the preload seed (window switch),
+ * then the same-origin remount cache. Returns `null` when none is present
+ * or the payload is malformed.
  */
 const PICHAMBER_BOOT_OUTCOME_KEY = 'pichamber.desktopBootOutcome';
 const PICHAMBER_SPLASH_DISMISSED_KEY = 'pichamber.splashDismissed';
@@ -322,6 +323,11 @@ const readRawBootOutcome = (): unknown => {
   if (injected !== undefined && injected !== null) {
     return injected;
   }
+  const seed = (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__?: unknown })
+    .__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__;
+  if (seed !== undefined && seed !== null) {
+    return seed;
+  }
   return readCachedBootOutcome();
 };
 
@@ -343,9 +349,9 @@ export function getInjectedBootOutcome(): DesktopBootOutcome | null {
  * Check the injection status of the desktop boot outcome.
  *
  * Distinguishes three states:
- * - `'not-injected'`: the global is absent or null (keep waiting)
- * - `'malformed'`: the global is present but failed validation (deterministic failure)
- * - `'valid'`: the global is present and passes validation
+ * - `'not-injected'`: inject, preload seed, and remount cache are all absent or null (keep waiting)
+ * - `'malformed'`: a present payload failed validation (deterministic failure)
+ * - `'valid'`: a present payload passes validation
  */
 export function getBootInjectionStatus(): BootInjectionStatus {
   if (typeof window === 'undefined') {

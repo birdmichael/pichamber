@@ -31,6 +31,18 @@ const homeDirectory = readArgValue('--openchamber-home');
 const macosMajorRaw = readArgValue('--openchamber-macos-major');
 const macosMajor = Number.parseInt(macosMajorRaw, 10);
 const trayEnabled = process.platform !== 'darwin' || readArgValue('--openchamber-tray-enabled') !== '0';
+const bootOutcomeSeed = (() => {
+  const raw = readArgValue('--openchamber-boot-outcome');
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+})();
 
 // Preload re-executes on every cross-origin navigation (we run with
 // sandbox:false, per-document). Two separate concerns to balance:
@@ -122,10 +134,14 @@ contextBridge.exposeInMainWorld('__OPENCHAMBER_ELECTRON__', {
 
 contextBridge.exposeInMainWorld('__OPENCHAMBER_PLATFORM__', process.platform);
 
-// Note: bootOutcome must stay writable from the main world's initScript so
-// re-navigations (host switch via deep link) can refresh it. contextBridge-
-// exposed globals are read-only, which blocks that update — rely solely on
-// the main-process initScript injection (dispatched on did-finish-load).
+// The writable boot outcome stays on the main-world initScript so host
+// switches can refresh it. contextBridge globals are read-only and would
+// block that update. Expose a read-only seed from the window switch so
+// desktopBoot can still dismiss splash if the later executeJavaScript
+// inject on dom-ready fails after a remount.
+if (bootOutcomeSeed) {
+  contextBridge.exposeInMainWorld('__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__', bootOutcomeSeed);
+}
 
 const addListener = (event, handler) => {
   const listeners = eventListeners.get(event) || new Set();

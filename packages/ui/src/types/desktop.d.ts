@@ -8,6 +8,7 @@ declare global {
     __OPENCHAMBER_ELECTRON__?: { runtime?: string; arch?: string; trayEnabled?: boolean };
     __OPENCHAMBER_PLATFORM__?: string;
     __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: DesktopBootOutcome;
+    __OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__?: DesktopBootOutcome;
   }
 
   interface WebviewElement extends HTMLElement {
