@@ -39,6 +39,21 @@ import {
   writeFeaturePlugins,
 } from './feature-plugins.js';
 import {
+  createAdapterMcpConfig,
+  deleteAdapterMcpConfig,
+  getAdapterMcpConfig,
+  isMcpFeaturePluginActive,
+  listAdapterMcpConfigs,
+  setAdapterMcpEnabled,
+  statusMapFromAdapterConfigs,
+  statusMapFromAdapterSnapshot,
+  updateAdapterMcpConfig,
+} from './mcp-config.js';
+import {
+  attachMcpStatusListener,
+  getRememberedMcpStatusSnapshot,
+} from './mcp-status.js';
+import {
   persistSessionMetadata,
   readPersistedSessionMetadata,
 } from './session-metadata.js';
@@ -81,6 +96,7 @@ export const createInMemoryPiSession = ({
   planModeState = null,
 } = {}) => {
   const listeners = new Set();
+  const eventBusListeners = new Map();
   let streaming = false;
   let compactingFlag = compacting === true;
   let aborted = false;
@@ -100,6 +116,21 @@ export const createInMemoryPiSession = ({
     });
   };
   persistPlanState();
+  const events = {
+    on(name, listener) {
+      const set = eventBusListeners.get(name) || new Set();
+      set.add(listener);
+      eventBusListeners.set(name, set);
+    },
+    off(name, listener) {
+      eventBusListeners.get(name)?.delete(listener);
+    },
+    emit(name, payload) {
+      for (const listener of Array.from(eventBusListeners.get(name) || [])) {
+        listener(payload);
+      }
+    },
+  };
 
   const emit = (event) => {
     for (const listener of Array.from(listeners)) {
@@ -164,6 +195,7 @@ export const createInMemoryPiSession = ({
 
   const session = {
     sessionId,
+    events,
     get isStreaming() {
       return streaming;
     },
@@ -929,7 +961,11 @@ export const createPiHost = ({
         emit(record.directory, ocEvent);
       }
     });
-    record.unsubscribe = unsubscribe;
+    const detachMcpStatus = attachMcpStatusListener(record);
+    record.unsubscribe = () => {
+      unsubscribe?.();
+      detachMcpStatus?.();
+    };
   };
 
   const bindDesktopExtensionUI = async (record) => {
@@ -1883,10 +1919,111 @@ export const createPiHost = ({
       writeFeaturePlugins(home, patch);
       return this.getFeaturePlugins();
     },
-    async reloadIdleSessions() {
+    isMcpFeaturePluginActive() {
+      return isMcpFeaturePluginActive(home);
+    },
+    listPiMcpConfigs(directory) {
+      return listAdapterMcpConfigs({ home, cwd: directory || defaultDirectory });
+    },
+    getPiMcpStatus(directory) {
+      if (!isMcpFeaturePluginActive(home)) {
+        return {};
+      }
+      const cwd = directory || defaultDirectory;
+      const snapshot = getRememberedMcpStatusSnapshot(cwd);
+      if (snapshot) {
+        return statusMapFromAdapterSnapshot(snapshot);
+      }
+      return statusMapFromAdapterConfigs(listAdapterMcpConfigs({ home, cwd }));
+    },
+    async mutatePiMcpConfig(action, name, directory, payload = {}) {
+      if (!isMcpFeaturePluginActive(home)) {
+        const error = new Error('MCP adapter is not installed and enabled');
+        error.status = 404;
+        error.unavailable = true;
+        throw error;
+      }
+      const cwd = directory || defaultDirectory;
+      if (action === 'create') {
+        createAdapterMcpConfig({
+          home,
+          cwd,
+          name,
+          scope: payload.scope,
+          config: payload,
+        });
+      } else if (action === 'update') {
+        updateAdapterMcpConfig({ home, cwd, name, updates: payload });
+      } else if (action === 'delete') {
+        deleteAdapterMcpConfig({ home, cwd, name });
+      } else {
+        const error = new Error(`Unknown MCP mutation: ${action}`);
+        error.status = 400;
+        throw error;
+      }
+      const reload = await this.reloadIdleSessions(cwd);
+      return {
+        success: true,
+        kernel: 'pi',
+        reloaded: true,
+        reload,
+      };
+    },
+    async setPiMcpEnabled(name, enabled, directory) {
+      if (!isMcpFeaturePluginActive(home)) {
+        const error = new Error('MCP adapter is not installed and enabled');
+        error.status = 404;
+        error.unavailable = true;
+        throw error;
+      }
+      const cwd = directory || defaultDirectory;
+      setAdapterMcpEnabled({ home, cwd, name, enabled });
+      const reload = await this.reloadIdleSessions(cwd);
+      return {
+        success: true,
+        kernel: 'pi',
+        reloaded: true,
+        reload,
+      };
+    },
+    async startPiMcpAuth(name, directory) {
+      if (!isMcpFeaturePluginActive(home)) {
+        const error = new Error('MCP adapter is not installed and enabled');
+        error.status = 404;
+        error.unavailable = true;
+        throw error;
+      }
+      const cwd = directory || defaultDirectory;
+      const config = getAdapterMcpConfig({ home, cwd, name });
+      if (!config) {
+        const error = new Error(`MCP server "${name}" not found`);
+        error.status = 404;
+        throw error;
+      }
+      const record = Array.from(sessions.values()).find((item) => item.directory === cwd);
+      if (!record) {
+        const error = new Error('No live session is available to authorize this MCP server');
+        error.status = 409;
+        throw error;
+      }
+      if (typeof this.runCommand !== 'function') {
+        const error = new Error('MCP authorization is unavailable');
+        error.status = 503;
+        throw error;
+      }
+      await this.runCommand(record.id, { command: 'mcp-auth', arguments: name });
+      return {
+        success: true,
+        kernel: 'pi',
+        nativeFlow: true,
+        sessionID: record.id,
+      };
+    },
+    async reloadIdleSessions(directory) {
       const reloaded = [];
       const skipped = [];
       for (const record of sessions.values()) {
+        if (directory && record.directory !== directory) continue;
         const blocked = sessionBlocksPiReload(record);
         if (blocked) {
           skipped.push({ sessionID: record.id, reason: blocked });

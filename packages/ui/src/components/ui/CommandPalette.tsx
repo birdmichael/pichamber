@@ -47,7 +47,7 @@ import { McpIcon } from '@/components/icons/McpIcon';
 import { scoreByFuzzyQuery } from '@/lib/search/fuzzySearch';
 import { truncatePathMiddle } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { buildCommandPaletteFileSearchKey, scoreCommandPaletteFiles } from './commandPaletteFilesState';
@@ -79,6 +79,7 @@ const normalizePath = (value: string): string => {
 export const CommandPalette: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
 
   const isCommandPaletteOpen = useUIStore((s) => s.isCommandPaletteOpen);
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen);
@@ -281,8 +282,15 @@ export const CommandPalette: React.FC = () => {
   // ---------------------------------------------------------------------------
   const settingsRuntimeCtx = React.useMemo<SettingsRuntimeContext>(() => {
     const isDesktop = isDesktopShell();
-    return { isVSCode: isVSCodeRuntime(), isWeb: !isDesktop && isWebRuntime(), isDesktop, isMobile, isPiKernel };
-  }, [isMobile, isPiKernel]);
+    return {
+      isVSCode: isVSCodeRuntime(),
+      isWeb: !isDesktop && isWebRuntime(),
+      isDesktop,
+      isMobile,
+      isPiKernel,
+      isMcpFeaturePluginActive,
+    };
+  }, [isMobile, isMcpFeaturePluginActive, isPiKernel]);
 
   const settingsEntries = React.useMemo<CommandEntry[]>(() => {
     return SETTINGS_PAGE_METADATA

@@ -71,6 +71,7 @@ import {
   settingsSearchPreparesEntityDraft,
 } from '@/lib/settings/chrome';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useMcpFeaturePluginActive } from '@/lib/usePiKernel';
 
 // UI Kit: fixed settings navigation width
 const SETTINGS_NAV_WIDTH = 256;
@@ -131,10 +132,15 @@ const NAV_GROUP_ORDER = ['general', 'projects', 'opencode', 'content'] as const;
 
 const ADD_PROVIDER_SETTINGS_ID = '__add_provider__';
 
-function buildRuntimeContext(isDesktop: boolean, isMobile: boolean, isPiKernel = false): SettingsRuntimeContext {
+function buildRuntimeContext(
+  isDesktop: boolean,
+  isMobile: boolean,
+  isPiKernel = false,
+  isMcpFeaturePluginActive = false,
+): SettingsRuntimeContext {
   const isVSCode = isVSCodeRuntime();
   const isWeb = !isDesktop && isWebRuntime();
-  return { isVSCode, isWeb, isDesktop, isMobile, isPiKernel };
+  return { isVSCode, isWeb, isDesktop, isMobile, isPiKernel, isMcpFeaturePluginActive };
 }
 
 function isPageAvailable(page: SettingsPageMeta, ctx: SettingsRuntimeContext): boolean {
@@ -245,6 +251,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   // keep platform check available for future window chrome tweaks
 
   const [isPiKernel, setIsPiKernel] = React.useState(true);
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
 
   React.useEffect(() => {
     let cancelled = false;
@@ -268,7 +275,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     };
   }, []);
 
-  const runtimeCtx = React.useMemo(() => buildRuntimeContext(isDesktopApp, isMobile, isPiKernel), [isDesktopApp, isMobile, isPiKernel]);
+  const runtimeCtx = React.useMemo(
+    () => buildRuntimeContext(isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive),
+    [isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive],
+  );
 
   const visiblePages = React.useMemo(() => {
     const allowedPages = visiblePageSlugs ? new Set<SettingsPageSlug>(visiblePageSlugs) : null;
@@ -468,6 +478,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     }
 
     if (result.id.startsWith('mcp.')) {
+      if (isPiKernel && !isMcpFeaturePluginActive) {
+        return resolveSettingsSearchHighlightId(result);
+      }
       const store = useMcpConfigStore.getState();
       const name = nextUniqueName('new-mcp-server', store.mcpServers.map((server) => server.name));
       store.setMcpDraft({
@@ -511,7 +524,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     }
 
     return resolveSettingsSearchHighlightId(result);
-  }, [isPiKernel]);
+  }, [isMcpFeaturePluginActive, isPiKernel]);
 
   const groupedSettingsSearchResults = React.useMemo(() => {
     const groups: Array<{ page: SettingsPageSlug; pageTitle: string; results: SettingsSearchResult[] }> = [];

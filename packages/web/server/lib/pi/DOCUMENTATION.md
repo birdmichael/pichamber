@@ -133,3 +133,27 @@ leaves extensions `ui_unavailable`.
 
 Reload does not emit `server.connected`. The UI treats that event as a full
 re-bootstrap onto a new-session draft.
+
+## MCP adapter
+
+Settings → MCP and Work Status MCP are gated on the feature-plugin slot
+(`installed` and `enabled` for `mcp`, default source `npm:pi-mcp-adapter`).
+Opening Feature Plugins never auto-installs the adapter. Leftover
+`~/.config/mcp/mcp.json` or `<cwd>/.mcp.json` files do not reveal those
+surfaces while the slot is off.
+
+When the slot is on:
+
+- Config CRUD writes adapter files, never `.opencode/opencode.json` or
+  `~/.config/opencode`.
+- Create: user → `~/.config/mcp/mcp.json`; project → `<cwd>/.mcp.json`.
+- Update/delete write the file that already owns that server.
+- Enable/disable persist only `disabled` on `<cwd>/.pi/mcp.json`.
+- After a write, `reloadIdleSessions(directory)` reloads idle sessions in
+  that cwd through `piSession.reload()`. It does not emit `server.connected`.
+- `GET /api/mcp` reports the latest `pi-mcp-adapter/status/v1` snapshot when
+  a live session has emitted one; otherwise servers from adapter files are
+  `cached` or `disabled`. Lazy/`cached` is valid, not a failure.
+- Authorize dispatches the live session `/mcp-auth` command. Isolated
+  `createMcpAdapter({ config })` in-memory mode is not used. Host-config
+  discovery stays off. The `/mcp` TUI panel is not implemented.

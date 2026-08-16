@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { SettingsCheckboxRow } from '@/components/sections/shared/SettingsSection';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,7 +34,11 @@ export const WorkStatusSectionsDialog: React.FC<{
   const setSectionVisible = useUIStore((state) => state.setWorkStatusSectionVisible);
   const setHiddenSections = useUIStore((state) => state.setWorkStatusHiddenSections);
   const isPiKernel = usePiKernel();
-  const sectionContext = React.useMemo(() => ({ isPiKernel }), [isPiKernel]);
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
+  const sectionContext = React.useMemo(
+    () => ({ isPiKernel, isMcpFeaturePluginActive }),
+    [isMcpFeaturePluginActive, isPiKernel],
+  );
   const sectionIds = getAvailableWorkStatusSectionIds(sectionContext);
 
   const allVisible = sectionIds.every((sectionId) => isWorkStatusSectionVisible(hidden, sectionId, sectionContext));

@@ -131,4 +131,39 @@ describe('settings search', () => {
     expect(piResults.some((result) => result.id === 'feature-plugins.goal')).toBe(false);
     expect(openCodeResults.some((result) => result.page === 'feature-plugins')).toBe(false);
   });
+
+  test('hides Settings MCP search on Pi unless the adapter slot is active', () => {
+    const query = 'mcp';
+    const getPageTitle = (page: string) => page;
+    const hidden = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+    const leftoverFilesDoNotMatter = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isMcpFeaturePluginActive: false },
+      t,
+      getPageTitle,
+    });
+    const visible = buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isMcpFeaturePluginActive: true },
+      t,
+      getPageTitle,
+    });
+    const openCode = buildSettingsSearchResults({
+      query,
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+
+    expect(hidden.some((result) => result.id.startsWith('mcp.'))).toBe(false);
+    expect(leftoverFilesDoNotMatter.some((result) => result.id.startsWith('mcp.'))).toBe(false);
+    expect(visible.some((result) => result.id === 'mcp.create')).toBe(true);
+    expect(openCode.some((result) => result.id === 'mcp.create')).toBe(true);
+    expect(hidden.some((result) => result.id === 'feature-plugins.mcp')).toBe(true);
+  });
 });

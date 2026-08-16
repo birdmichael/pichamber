@@ -38,6 +38,9 @@ describe('Pi header instance translations', () => {
       const openCodeCopy = dictionary['header.services.openWithCurrent'];
       expect(openCodeCopy.includes('{current}')).toBe(true);
       expect(openCodeCopy.includes('MCP')).toBe(true);
+
+      expect(leftoverUsageOrMcp.test(dictionary['header.services.openPi'])).toBe(false);
+      expect(dictionary['header.services.openPiWithMcp'].includes('MCP')).toBe(true);
     }
   });
 });

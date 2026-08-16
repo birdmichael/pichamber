@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { useDeviceInfo } from '@/lib/device';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useMcpConfigStore } from '@/stores/useMcpConfigStore';
-import { computeMcpHealth, useMcpStore } from '@/stores/useMcpStore';
+import { computeMcpHealth, isMcpStatusActive, mcpStatusName, useMcpStore } from '@/stores/useMcpStore';
 import { McpIcon } from '@/components/icons/McpIcon';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
@@ -26,12 +26,16 @@ import { startMcpAuthorization } from '@/components/sections/mcp/startMcpAuthori
 
 const statusTooltip = (
   status: McpStatus | undefined,
-  t: (key: 'mcpDropdown.status.unknown' | 'mcpDropdown.status.connected' | 'mcpDropdown.status.failed' | 'mcpDropdown.status.unknownError' | 'mcpDropdown.status.needsAuth' | 'mcpDropdown.status.needsRegistration', params?: { error?: string }) => string
+  t: (key: 'mcpDropdown.status.unknown' | 'mcpDropdown.status.connected' | 'mcpDropdown.status.cached' | 'mcpDropdown.status.disabled' | 'mcpDropdown.status.failed' | 'mcpDropdown.status.unknownError' | 'mcpDropdown.status.needsAuth' | 'mcpDropdown.status.needsRegistration', params?: { error?: string }) => string
 ): string => {
   if (!status) return t('mcpDropdown.status.unknown');
-  switch (status.status) {
+  switch (mcpStatusName(status)) {
     case 'connected':
       return t('mcpDropdown.status.connected');
+    case 'cached':
+      return t('mcpDropdown.status.cached');
+    case 'disabled':
+      return t('mcpDropdown.status.disabled');
     case 'failed':
       return t('mcpDropdown.status.failed', { error: (status as { error?: string }).error || t('mcpDropdown.status.unknownError') });
     case 'needs_auth':
@@ -39,13 +43,14 @@ const statusTooltip = (
     case 'needs_client_registration':
       return t('mcpDropdown.status.needsRegistration', { error: (status as { error?: string }).error || '' });
     default:
-      return status.status;
+      return t('mcpDropdown.status.unknown');
   }
 };
 
 const statusTone = (status: McpStatus | undefined): 'default' | 'success' | 'warning' | 'error' => {
-  switch (status?.status) {
+  switch (mcpStatusName(status)) {
     case 'connected':
+    case 'cached':
       return 'success';
     case 'failed':
       return 'error';
@@ -153,7 +158,7 @@ export const McpDropdownContent: React.FC<McpDropdownContentProps> = ({ active, 
         {sortedNames.map((serverName) => {
           const serverStatus = status[serverName];
           const tone = statusTone(serverStatus);
-          const isConnected = serverStatus?.status === 'connected';
+          const isConnected = isMcpStatusActive(serverStatus);
           const isBusy = busyName === serverName;
           const tooltip = statusTooltip(serverStatus, t);
 
@@ -317,7 +322,7 @@ export const McpDropdown: React.FC<McpDropdownProps> = ({ headerIconButtonClass 
       {sortedNames.map((serverName) => {
         const serverStatus = status[serverName];
         const tone = statusTone(serverStatus);
-        const isConnected = serverStatus?.status === 'connected';
+        const isConnected = isMcpStatusActive(serverStatus);
         const isBusy = busyName === serverName;
         const tooltip = statusTooltip(serverStatus, t);
 

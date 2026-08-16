@@ -938,6 +938,46 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('does not reveal leftover MCP files while the adapter slot is off', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const cwd = kernel.host.getPath().directory;
+      fs.mkdirSync(path.join(home, '.config', 'mcp'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.config', 'mcp', 'mcp.json'), JSON.stringify({
+        mcpServers: { leftover: { command: 'npx', args: ['-y', 'demo'] } },
+      }));
+      fs.mkdirSync(cwd, { recursive: true });
+      fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({
+        mcpServers: { project: { command: 'uvx', args: ['demo'] } },
+      }));
+
+      const status = await fetch(`${url}/api/mcp`);
+      expect(status.status).toBe(200);
+      expect(await status.json()).toEqual({});
+
+      const listed = await fetch(`${url}/api/config/mcp`);
+      expect(listed.status).toBe(404);
+      const listedBody = await listed.json();
+      expect(listedBody.unavailable).toBe(true);
+
+      const named = await fetch(`${url}/api/config/mcp/leftover`);
+      expect(named.status).toBe(404);
+      expect((await named.json()).unavailable).toBe(true);
+
+      const created = await fetch(`${url}/api/config/mcp/leftover`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scope: 'user', type: 'local', command: ['npx'] }),
+      });
+      expect(created.status).toBe(404);
+      expect(fs.existsSync(path.join(cwd, '.opencode', 'opencode.json'))).toBe(false);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('exposes session plan status and dispatches plan actions', async () => {
     const { url, close, kernel } = await startFacade();
     try {
@@ -1085,6 +1125,98 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(toolsReply.status).toBe(200);
       expect((await tools).status).toBe(200);
       expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('writes adapter MCP files and reloads the session when the slot is on', async () => {
+    const idle = createInMemoryPiSession();
+    idle.registerCommand('mcp-auth', async () => {}, { description: 'Authorize MCP' });
+    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-mcp-project-'));
+    tempHomes.push(projectDir);
+    const { url, close, kernel } = await startFacade({
+      directory: projectDir,
+      createSession: async () => idle,
+    });
+    try {
+      const home = kernel.host.getPath().home;
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), JSON.stringify({
+        packages: ['npm:pi-mcp-adapter'],
+      }));
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), JSON.stringify({
+        featurePlugins: { mcp: { source: 'npm:pi-mcp-adapter', enabled: true } },
+      }));
+      const createdSession = await kernel.host.createSession({ directory: projectDir, title: 'Idle' });
+
+      const created = await fetch(`${url}/api/config/mcp/docs?directory=${encodeURIComponent(projectDir)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          scope: 'user',
+          type: 'local',
+          command: ['npx', '-y', 'docs-mcp'],
+          enabled: true,
+        }),
+      });
+      expect(created.status).toBe(200);
+      const createdBody = await created.json();
+      expect(createdBody.reloaded).toBe(true);
+      expect(createdBody.reload?.reloaded || createdBody.reloaded).toBeTruthy();
+      expect(idle.reloadCount).toBeGreaterThan(0);
+      const userFile = JSON.parse(fs.readFileSync(path.join(home, '.config', 'mcp', 'mcp.json'), 'utf8'));
+      expect(userFile.mcpServers.docs.command).toBe('npx');
+      expect(fs.existsSync(path.join(projectDir, '.opencode', 'opencode.json'))).toBe(false);
+
+      const project = await fetch(`${url}/api/config/mcp/repo?directory=${encodeURIComponent(projectDir)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          scope: 'project',
+          type: 'local',
+          command: ['uvx', 'repo-mcp'],
+          enabled: true,
+        }),
+      });
+      expect(project.status).toBe(200);
+      const projectFile = JSON.parse(fs.readFileSync(path.join(projectDir, '.mcp.json'), 'utf8'));
+      expect(projectFile.mcpServers.repo.command).toBe('uvx');
+
+      const disabled = await fetch(`${url}/api/mcp/docs/disconnect?directory=${encodeURIComponent(projectDir)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(disabled.status).toBe(200);
+      const override = JSON.parse(fs.readFileSync(path.join(projectDir, '.pi', 'mcp.json'), 'utf8'));
+      expect(override.mcpServers.docs).toEqual({ disabled: true });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.config', 'mcp', 'mcp.json'), 'utf8')).mcpServers.docs.disabled).toBeUndefined();
+
+      idle.events.emit('pi-mcp-adapter/status/v1', {
+        version: 1,
+        servers: [
+          { name: 'docs', status: 'disabled', toolCount: 0, disabled: true },
+          { name: 'repo', status: 'cached', toolCount: 2, disabled: false },
+        ],
+        totalTools: 2,
+        totalResources: 0,
+        connectedCount: 0,
+        disabledCount: 1,
+      });
+      const status = await (await fetch(`${url}/api/mcp?directory=${encodeURIComponent(projectDir)}`)).json();
+      expect(status.docs.status).toBe('disabled');
+      expect(status.repo.status).toBe('cached');
+
+      const auth = await fetch(`${url}/api/mcp/repo/auth/authenticate?directory=${encodeURIComponent(projectDir)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(auth.status).toBe(200);
+      expect((await auth.json()).nativeFlow).toBe(true);
+      expect(createdSession.id).toBeTruthy();
     } finally {
       kernel.dispose();
       await close();

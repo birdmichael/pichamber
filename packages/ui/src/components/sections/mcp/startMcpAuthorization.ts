@@ -6,6 +6,7 @@ import { focusDesktopWindow, isDesktopShell, isVSCodeRuntime } from '@/lib/deskt
 import { useMcpConfigStore } from '@/stores/useMcpConfigStore';
 import { useMcpStore } from '@/stores/useMcpStore';
 import { MCP_OAUTH_CALLBACK_PATH, parseMcpOAuthCallbackStateKey } from './mcpOAuth';
+import { useFeaturePluginsStore } from '@/stores/useFeaturePluginsStore';
 
 /**
  * Starting MCP authorization, for every surface that offers it.
@@ -197,6 +198,15 @@ export const startMcpAuthorization = async (input: {
   // OpenCode's loopback: remote instances, hosted web, mobile — and the plain
   // web runtime too, because same-origin says nothing about the browser being
   // on the server's machine.
+  const mcpSlotActive = useFeaturePluginsStore.getState().isSlotActive('mcp');
+  if (mcpSlotActive) {
+    const completion = useMcpStore.getState().authenticate(name, directory ?? null);
+    completion
+      .then(() => focusDesktopWindow())
+      .catch(() => undefined);
+    return { authorizationUrl: '', opened: true, nativeFlow: true, completion };
+  }
+
   if (isVSCodeRuntime() || (isDesktopShell() && getRuntimeKey() === 'local')) {
     await clearCustomRedirectUriForNativeFlow(name);
     const completion = useMcpStore.getState().authenticate(name, directory ?? null);

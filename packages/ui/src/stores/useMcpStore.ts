@@ -39,12 +39,25 @@ const getMcpApiClient = (directory: string | null | undefined) => {
   return opencodeClient.getScopedApiClient(normalized);
 };
 
+export const mcpStatusName = (status: McpStatus | undefined): string | undefined => (
+  status && typeof status.status === 'string' ? status.status : undefined
+);
+
+/** Adapter lazy/`cached` rows are valid, not a failure or a disconnected switch. */
+export const isMcpStatusActive = (status: McpStatus | undefined): boolean => {
+  const name = mcpStatusName(status);
+  return name === 'connected' || name === 'cached';
+};
+
 export const computeMcpHealth = (status: McpStatusMap | null | undefined): McpHealth => {
   const entries = Object.entries(status ?? {});
-  const connected = entries.filter(([, s]) => s?.status === 'connected').length;
+  const connected = entries.filter(([, s]) => isMcpStatusActive(s)).length;
   const total = entries.length;
-  const hasFailed = entries.some(([, s]) => s?.status === 'failed');
-  const hasAuthRequired = entries.some(([, s]) => s?.status === 'needs_auth' || s?.status === 'needs_client_registration');
+  const hasFailed = entries.some(([, s]) => mcpStatusName(s) === 'failed');
+  const hasAuthRequired = entries.some(([, s]) => {
+    const name = mcpStatusName(s);
+    return name === 'needs_auth' || name === 'needs_client_registration';
+  });
   return { connected, total, hasFailed, hasAuthRequired };
 };
 

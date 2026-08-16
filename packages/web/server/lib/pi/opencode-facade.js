@@ -460,8 +460,71 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     }]);
   }));
 
-  app.get('/api/mcp', handle(async (_req, res) => {
-    json(res, 200, {});
+  app.get('/api/mcp', handle(async (req, res) => {
+    json(res, 200, typeof host.getPiMcpStatus === 'function'
+      ? host.getPiMcpStatus(resolveDirectory(req))
+      : {});
+  }));
+
+  app.post('/api/mcp/:name/connect', parseJson, handle(async (req, res) => {
+    json(res, 200, await host.setPiMcpEnabled(req.params.name, true, resolveDirectory(req)));
+  }));
+
+  app.post('/api/mcp/:name/disconnect', parseJson, handle(async (req, res) => {
+    json(res, 200, await host.setPiMcpEnabled(req.params.name, false, resolveDirectory(req)));
+  }));
+
+  const handleMcpAuth = handle(async (req, res) => {
+    json(res, 200, await host.startPiMcpAuth(req.params.name, resolveDirectory(req)));
+  });
+  app.post('/api/mcp/:name/auth', parseJson, handleMcpAuth);
+  app.post('/api/mcp/:name/auth/authenticate', parseJson, handleMcpAuth);
+  app.post('/api/mcp/:name/auth/start', parseJson, handleMcpAuth);
+
+  const mcpSlotUnavailable = () => ({
+    error: 'MCP adapter is not installed and enabled',
+    unavailable: true,
+    kernel: 'pi',
+  });
+
+  const requireActiveMcpSlot = (res) => {
+    if (typeof host.isMcpFeaturePluginActive === 'function' && !host.isMcpFeaturePluginActive()) {
+      json(res, 404, mcpSlotUnavailable());
+      return false;
+    }
+    return true;
+  };
+
+  app.get('/api/config/mcp', handle(async (req, res) => {
+    if (!requireActiveMcpSlot(res)) return;
+    json(res, 200, host.listPiMcpConfigs(resolveDirectory(req)));
+  }));
+
+  app.get('/api/config/mcp/:name', handle(async (req, res) => {
+    if (!requireActiveMcpSlot(res)) return;
+    const config = host.listPiMcpConfigs(resolveDirectory(req))
+      .find((item) => item.name === req.params.name);
+    if (!config) {
+      const error = new Error(`MCP server "${req.params.name}" not found`);
+      error.status = 404;
+      throw error;
+    }
+    json(res, 200, config);
+  }));
+
+  app.post('/api/config/mcp/:name', parseJson, handle(async (req, res) => {
+    if (!requireActiveMcpSlot(res)) return;
+    json(res, 200, await host.mutatePiMcpConfig('create', req.params.name, resolveDirectory(req), req.body || {}));
+  }));
+
+  app.patch('/api/config/mcp/:name', parseJson, handle(async (req, res) => {
+    if (!requireActiveMcpSlot(res)) return;
+    json(res, 200, await host.mutatePiMcpConfig('update', req.params.name, resolveDirectory(req), req.body || {}));
+  }));
+
+  app.delete('/api/config/mcp/:name', parseJson, handle(async (req, res) => {
+    if (!requireActiveMcpSlot(res)) return;
+    json(res, 200, await host.mutatePiMcpConfig('delete', req.params.name, resolveDirectory(req)));
   }));
 
   app.get('/api/lsp', handle(async (_req, res) => {

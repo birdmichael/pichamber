@@ -23,6 +23,7 @@ import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessio
 import { useI18n } from '@/lib/i18n';
 import { reportSettingsSaveState } from '@/lib/persistence';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useFeaturePluginsStore } from '@/stores/useFeaturePluginsStore';
 import { applyFeaturePluginsPayload } from '@/sync/pi-feature-plugins-store';
 import {
   FEATURE_PLUGIN_SLOT_COPY,
@@ -63,6 +64,7 @@ export const FeaturePluginsPage: React.FC = () => {
     setDrafts(payload);
     setLoadState({ status: 'ready', data: payload });
     applyFeaturePluginsPayload(payload);
+    useFeaturePluginsStore.getState().applyPayload(payload);
   }, []);
 
   const loadPlugins = React.useCallback(async () => {

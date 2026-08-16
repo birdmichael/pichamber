@@ -42,6 +42,12 @@ export interface SettingsRuntimeContext {
   isDesktop: boolean;
   isMobile: boolean;
   isPiKernel?: boolean;
+  isMcpFeaturePluginActive?: boolean;
+}
+
+export function isMcpSettingsAvailable(ctx: Pick<SettingsRuntimeContext, 'isPiKernel' | 'isMcpFeaturePluginActive'>): boolean {
+  if (!ctx.isPiKernel) return true;
+  return Boolean(ctx.isMcpFeaturePluginActive);
 }
 
 export interface SettingsPageMeta {
@@ -127,7 +133,7 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
     group: 'opencode',
     kind: 'split',
     keywords: ['mcp', 'model context protocol', 'servers', 'tools', 'remote', 'stdio'],
-    isAvailable: (ctx) => !ctx.isPiKernel,
+    isAvailable: isMcpSettingsAvailable,
   },
   {
     slug: 'plugins',

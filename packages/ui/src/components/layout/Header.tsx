@@ -88,7 +88,7 @@ import {
 } from '@/lib/desktopCurrentHost';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
-import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
+import { canOfferOpenCodeSessionStub, useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { usePiSessionPlanStore } from '@/sync/pi-session-plan-store';
@@ -326,6 +326,7 @@ const DesktopServicesMenu = React.memo(function DesktopServicesMenu({
 }: DesktopServicesMenuProps) {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   return (
     <DropdownMenu
       open={isDesktopServicesOpen}
@@ -341,7 +342,7 @@ const DesktopServicesMenu = React.memo(function DesktopServicesMenu({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label={t(headerServicesOpenAriaKey(isDesktopApp, isPiKernel), {
+              aria-label={t(headerServicesOpenAriaKey(isDesktopApp, isPiKernel, isMcpFeaturePluginActive), {
                 current: currentInstanceLabel,
               })}
               className={cn(
@@ -519,6 +520,7 @@ export const Header: React.FC<HeaderProps> = ({
   streamPerfCount('ui.header.render');
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const canShareSession = canOfferOpenCodeSessionStub(isPiKernel);
   const setSessionSwitcherOpen = useUIStore((state) => state.setSessionSwitcherOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
@@ -1855,11 +1857,23 @@ export const Header: React.FC<HeaderProps> = ({
 
 
   const mobileServicesTabItems = React.useMemo<SortableTabsStripItem[]>(() => {
-    return [
-      { id: 'usage', label: t('layout.services.usage'), icon: <Icon name="timer" className="h-3.5 w-3.5" /> },
-      { id: 'mcp', label: 'MCP', icon: <McpIcon className="h-3.5 w-3.5" /> },
-    ];
-  }, [t]);
+    const items: SortableTabsStripItem[] = [];
+    if (!isPiKernel) {
+      items.push({ id: 'usage', label: t('layout.services.usage'), icon: <Icon name="timer" className="h-3.5 w-3.5" /> });
+    }
+    if (!isPiKernel || isMcpFeaturePluginActive) {
+      items.push({ id: 'mcp', label: 'MCP', icon: <McpIcon className="h-3.5 w-3.5" /> });
+    }
+    return items;
+  }, [isMcpFeaturePluginActive, isPiKernel, t]);
+
+  React.useEffect(() => {
+    if (mobileServicesTabItems.some((item) => item.id === mobileServicesTab)) return;
+    const first = mobileServicesTabItems[0]?.id;
+    if (first === 'usage' || first === 'mcp') {
+      setMobileServicesTab(first);
+    }
+  }, [mobileServicesTab, mobileServicesTabItems]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -2404,7 +2418,9 @@ export const Header: React.FC<HeaderProps> = ({
               />
             )}
 
-            {/* Mobile Services Menu (Usage + MCP) */}
+            {/* Mobile Services Menu (Usage + MCP). Hidden on Pi when both
+                quota usage and the MCP adapter slot are unavailable. */}
+            {mobileServicesTabItems.length > 0 ? (
             <DropdownMenu
               open={isMobileRateLimitsOpen}
               onOpenChange={(open) => {
@@ -2661,6 +2677,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+            ) : null}
 
             {onToggleRightDrawer ? (
               <Tooltip>

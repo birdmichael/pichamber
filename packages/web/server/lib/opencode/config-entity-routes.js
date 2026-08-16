@@ -26,6 +26,7 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
     updateSnippet,
     deleteSnippet,
     expandSnippets,
+    getPiHost,
   } = dependencies;
 
   // Persist to disk immediately; OpenCode restart is deferred to an explicit
@@ -157,11 +158,37 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
     }
   });
 
+  const resolvePiMcpHost = () => {
+    if (!isPiKernelEnabled()) return null;
+    return typeof getPiHost === 'function' ? getPiHost() : getPiHost;
+  };
+
+  const completePiMcpMutation = async (res, action, name, directory, payload) => {
+    const host = resolvePiMcpHost();
+    if (!host?.mutatePiMcpConfig) {
+      const error = new Error('Pi MCP host is unavailable');
+      error.status = 503;
+      throw error;
+    }
+    return res.json(await host.mutatePiMcpConfig(action, name, directory, payload));
+  };
+
   app.get('/api/config/mcp', async (req, res) => {
     try {
       const { directory, error } = await resolveOptionalProjectDirectory(req);
       if (error) {
         return res.status(400).json({ error });
+      }
+      const host = resolvePiMcpHost();
+      if (host) {
+        if (typeof host.isMcpFeaturePluginActive === 'function' && !host.isMcpFeaturePluginActive()) {
+          return res.status(404).json({
+            error: 'MCP adapter is not installed and enabled',
+            unavailable: true,
+            kernel: 'pi',
+          });
+        }
+        return res.json(host.listPiMcpConfigs(directory));
       }
       const configs = listMcpConfigs(directory);
       res.json(configs);
@@ -177,6 +204,21 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
       const { directory, error } = await resolveOptionalProjectDirectory(req);
       if (error) {
         return res.status(400).json({ error });
+      }
+      const host = resolvePiMcpHost();
+      if (host) {
+        if (typeof host.isMcpFeaturePluginActive === 'function' && !host.isMcpFeaturePluginActive()) {
+          return res.status(404).json({
+            error: 'MCP adapter is not installed and enabled',
+            unavailable: true,
+            kernel: 'pi',
+          });
+        }
+        const config = host.listPiMcpConfigs(directory).find((item) => item.name === name);
+        if (!config) {
+          return res.status(404).json({ error: `MCP server "${name}" not found` });
+        }
+        return res.json(config);
       }
       const config = getMcpConfig(name, directory);
       if (!config) {
@@ -199,6 +241,10 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
       }
       console.log(`[API:POST /api/config/mcp] Creating MCP server: ${name}`);
 
+      if (resolvePiMcpHost()) {
+        return completePiMcpMutation(res, 'create', name, directory, { ...config, scope });
+      }
+
       await completeMcpMutation(res, 'create', name, () => {
         createMcpConfig(name, config, directory, scope);
       });
@@ -217,6 +263,10 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
       console.log(`[API:PATCH /api/config/mcp] Updating MCP server: ${name}`);
+
+      if (resolvePiMcpHost()) {
+        return completePiMcpMutation(res, 'update', name, directory, updates);
+      }
 
       await completeMcpMutation(res, 'update', name, () => {
         updateMcpConfig(name, updates, directory);
@@ -238,6 +288,10 @@ export const registerConfigEntityRoutes = (app, dependencies) => {
         return res.status(400).json({ error });
       }
       console.log(`[API:DELETE /api/config/mcp] Deleting MCP server: ${name}`);
+
+      if (resolvePiMcpHost()) {
+        return completePiMcpMutation(res, 'delete', name, directory);
+      }
 
       await completeMcpMutation(res, 'delete', name, () => {
         deleteMcpConfig(name, directory);
