@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file.
 - Settings/Skills: installed skills inside symlink folders now appear, YAML block descriptions show their real text instead of `|`, and opening your home folder as the project no longer lists each user skill twice.
 - Settings: on Pi, Agents now opens the built-in `pi` agent instead of asking you to create one.
 - Settings: Extensions no longer leads with a “no extensions found” empty state when installed Pi packages are listed.
+- Chat: empty-session titles now use native wording in Chinese and other translated locales instead of leftover English.
+- UI: the command palette now says it searches sessions, actions, and files, matching the groups it actually shows.
 
 ## [1.18.4] - 2026-08-14
 
