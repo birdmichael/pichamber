@@ -33,7 +33,7 @@ export const resolveWorkStatusSubagentOpen = ({
 
 const asTrimmed = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-export const readTranscriptSubagentSessionId = (part: {
+const readTranscriptSubagentSessionId = (part: {
   metadata?: unknown;
   state?: { metadata?: unknown; input?: unknown; output?: unknown };
   input?: unknown;
