@@ -824,6 +824,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['other', 'custom', 'openai-compatible', 'base url', 'api key'],
   },
   {
+    id: 'providers.custom.fetchModels',
+    page: 'providers',
+    titleKey: 'settings.providers.page.custom.models.fetch',
+    descriptionKey: 'settings.providers.page.custom.models.fetchInfo',
+    keywords: ['fetch models', 'pull models', 'remote', '/models', 'openai-compatible'],
+  },
+  {
     id: 'providers.auth',
     page: 'providers',
     titleKey: 'settings.providers.page.auth.title',

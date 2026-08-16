@@ -1,6 +1,7 @@
 import express from 'express';
 import { resolveActiveProjectDirectory } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
+import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -45,7 +46,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     '/command', '/session', '/provider', '/config', '/path', '/event',
     '/global', '/project', '/agent', '/skill', '/mcp', '/lsp', '/vcs',
     '/file', '/find', '/pty', '/permission', '/question', '/experimental',
-    '/log', '/instance', '/formatter', '/tool', '/user',
+    '/log', '/instance', '/formatter', '/tool', '/user', '/auth',
   ];
   const uiAuthPaths = ['/auth/session', '/auth/passkey', '/auth/url-token'];
   app.use((req, _res, next) => {
@@ -156,6 +157,103 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   };
   app.get('/api/provider/:providerId/source', handle(async (req, res) => {
     providerSource(req, res);
+  }));
+
+  const authBody = (req) => {
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    return body.auth && typeof body.auth === 'object' && !Array.isArray(body.auth) ? body.auth : body;
+  };
+
+  const providerIdFromRequest = (req) => (
+    req.params.providerID
+    || req.params.providerId
+    || (typeof req.body?.providerID === 'string' ? req.body.providerID : '')
+    || (typeof req.body?.providerId === 'string' ? req.body.providerId : '')
+  );
+
+  const putAuth = (req, res) => {
+    if (typeof host.setAuth !== 'function') {
+      json(res, 501, unsupported('auth.set'));
+      return;
+    }
+    host.setAuth(providerIdFromRequest(req), authBody(req));
+    json(res, 200, true);
+  };
+  app.put('/api/auth/:providerID', parseJson, handle(async (req, res) => {
+    putAuth(req, res);
+  }));
+
+  const deleteAuth = (req, res) => {
+    if (typeof host.deleteAuth !== 'function') {
+      json(res, 501, unsupported('auth.delete'));
+      return;
+    }
+    json(res, 200, host.deleteAuth(providerIdFromRequest(req)));
+  };
+  app.delete('/api/auth/:providerID', handle(async (req, res) => {
+    deleteAuth(req, res);
+  }));
+
+  app.post('/api/provider/models', parseJson, handle(async (req, res) => {
+    await handleFetchRemoteProviderModels(req, res, { home: host.getPath().home });
+  }));
+
+  app.put('/api/provider', parseJson, handle(async (req, res) => {
+    if (typeof host.upsertProvider !== 'function') {
+      json(res, 501, unsupported('provider.upsert'));
+      return;
+    }
+    const providerID = typeof req.body?.providerID === 'string'
+      ? req.body.providerID
+      : (typeof req.body?.providerId === 'string' ? req.body.providerId : '');
+    const result = host.upsertProvider(providerID, req.body?.config, {
+      directory: resolveDirectory(req),
+      scope: typeof req.body?.scope === 'string' ? req.body.scope : 'user',
+    });
+    json(res, 200, {
+      success: true,
+      kernel: 'pi',
+      requiresReload: true,
+      requiresRestart: false,
+      message: 'Provider saved',
+      providerId: result.providerId,
+      path: result.path,
+      config: result.config,
+    });
+  }));
+
+  app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {
+    const providerId = req.params.providerId;
+    const scope = typeof req.query?.scope === 'string' ? req.query.scope : 'auth';
+    if (scope !== 'auth' && scope !== 'user' && scope !== 'project' && scope !== 'custom' && scope !== 'all') {
+      json(res, 400, { error: 'Invalid scope' });
+      return;
+    }
+    const directory = resolveDirectory(req);
+    let removed = false;
+    if (scope === 'auth' || scope === 'all') {
+      if (typeof host.deleteAuth === 'function') {
+        removed = Boolean(host.deleteAuth(providerId).removed) || removed;
+      }
+    }
+    if (scope === 'user' || scope === 'custom' || scope === 'all') {
+      if (typeof host.deleteProvider === 'function') {
+        removed = Boolean(host.deleteProvider(providerId, { directory, scope: 'user' }).removed) || removed;
+      }
+    }
+    if (scope === 'project' || scope === 'all') {
+      if (typeof host.deleteProvider === 'function') {
+        removed = Boolean(host.deleteProvider(providerId, { directory, scope: 'project' }).removed) || removed;
+      }
+    }
+    json(res, 200, {
+      success: true,
+      removed,
+      kernel: 'pi',
+      requiresReload: removed,
+      requiresRestart: false,
+      message: removed ? 'Provider disconnected' : 'Provider was not connected',
+    });
   }));
 
   const piReload = async (_req, res) => {

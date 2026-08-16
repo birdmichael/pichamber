@@ -205,6 +205,317 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
   };
 };
 
+const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
+const BASE_URL_PATTERN = /^https?:\/\//;
+export const RESERVED_PI_AUTH_IDS = new Set(['session', 'passkey', 'url-token', 'reset']);
+
+const httpError = (status, message) => {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+};
+
+const sanitizeProviderId = (providerId) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  if (!id || !PROVIDER_ID_PATTERN.test(id)) {
+    throw httpError(400, 'Provider ID must match /^[a-z0-9][a-z0-9-_]*$/');
+  }
+  if (RESERVED_PI_AUTH_IDS.has(id)) {
+    throw httpError(400, 'Provider ID is reserved');
+  }
+  return id;
+};
+
+const writeJsonFile = (filePath, data, mode = 0o644) => {
+  const directory = path.dirname(filePath);
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const payload = `${JSON.stringify(data, null, 2)}\n`;
+  const tempPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, payload, { encoding: 'utf8', mode });
+    fs.renameSync(tempPath, filePath);
+  } catch (error) {
+    try { fs.unlinkSync(tempPath); } catch { /* ignore cleanup */ }
+    throw error;
+  }
+  if (process.platform !== 'win32') {
+    try { fs.chmodSync(directory, 0o700); } catch { /* best-effort */ }
+    try { fs.chmodSync(filePath, mode); } catch { /* best-effort */ }
+  }
+};
+
+const authEntryLooksStored = (entry) => (
+  Boolean(entry && typeof entry === 'object' && (
+    (typeof entry.key === 'string' && entry.key.length > 0)
+    || (typeof entry.apiKey === 'string' && entry.apiKey.length > 0)
+    || (typeof entry.access === 'string' && entry.access.length > 0)
+    || (typeof entry.token === 'string' && entry.token.length > 0)
+    || (typeof entry.refresh === 'string' && entry.refresh.length > 0)
+  ))
+);
+
+export const hasPiStoredAuth = (home, providerId) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  if (!id) return false;
+  const auth = readJsonObject(resolvePiAuthPath(home));
+  return authEntryLooksStored(auth[id]);
+};
+
+/**
+ * Persist a provider credential to ~/.pi/agent/auth.json.
+ * OpenCode SDK sends `{ type: 'api', key }`; Pi stores `{ type: 'api_key', key }`.
+ * Never returns the key.
+ */
+export const writePiAuth = (home = os.homedir(), providerId, auth = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const incoming = auth && typeof auth === 'object' && !Array.isArray(auth) ? auth : {};
+  const rawType = typeof incoming.type === 'string' ? incoming.type.trim().toLowerCase() : 'api_key';
+  if (rawType === 'oauth') {
+    throw httpError(400, 'OAuth login is not supported from this form');
+  }
+  if (rawType !== 'api' && rawType !== 'api_key') {
+    throw httpError(400, 'Only API key credentials can be saved');
+  }
+  const key = typeof incoming.key === 'string' ? incoming.key.trim() : '';
+  if (!key) {
+    throw httpError(400, 'API key is required');
+  }
+
+  const filePath = resolvePiAuthPath(home);
+  const current = readJsonObject(filePath);
+  const existing = current[id] && typeof current[id] === 'object' && !Array.isArray(current[id])
+    ? current[id]
+    : {};
+  const next = { ...current };
+  next[id] = {
+    type: 'api_key',
+    key,
+    ...(existing.env && typeof existing.env === 'object' && !Array.isArray(existing.env)
+      ? { env: existing.env }
+      : {}),
+  };
+  writeJsonFile(filePath, next, 0o600);
+  return { providerId: id, type: 'api' };
+};
+
+export const deletePiAuth = (home = os.homedir(), providerId) => {
+  const id = sanitizeProviderId(providerId);
+  const filePath = resolvePiAuthPath(home);
+  const current = readJsonObject(filePath);
+  if (!Object.prototype.hasOwnProperty.call(current, id)) {
+    return { removed: false, providerId: id };
+  }
+  delete current[id];
+  if (Object.keys(current).length === 0) {
+    try { fs.unlinkSync(filePath); } catch { /* already gone */ }
+  } else {
+    writeJsonFile(filePath, current, 0o600);
+  }
+  return { removed: true, providerId: id };
+};
+
+const normalizePiModels = (models) => {
+  const result = [];
+  if (Array.isArray(models)) {
+    for (const model of models) {
+      if (!model || typeof model !== 'object') continue;
+      const id = typeof model.id === 'string' ? model.id.trim() : '';
+      if (!id) continue;
+      const name = typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id;
+      result.push({ id, name });
+    }
+    return result;
+  }
+  if (models && typeof models === 'object') {
+    for (const [modelId, modelValue] of Object.entries(models)) {
+      const id = typeof modelId === 'string' ? modelId.trim() : '';
+      if (!id) continue;
+      const name = modelValue && typeof modelValue === 'object' && typeof modelValue.name === 'string' && modelValue.name.trim()
+        ? modelValue.name.trim()
+        : id;
+      result.push({ id, name });
+    }
+  }
+  return result;
+};
+
+const normalizePiHeaders = (headers) => {
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) return undefined;
+  const next = {};
+  for (const [headerKey, headerValue] of Object.entries(headers)) {
+    if (typeof headerKey !== 'string' || !headerKey.trim()) continue;
+    if (typeof headerValue !== 'string' || !headerValue.trim()) {
+      throw httpError(400, `Header "${headerKey}" requires a non-empty value`);
+    }
+    next[headerKey.trim()] = headerValue.trim();
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
+const firstEnvName = (env) => {
+  if (!Array.isArray(env)) return '';
+  const name = env.find((entry) => typeof entry === 'string' && entry.trim());
+  return name ? name.trim() : '';
+};
+
+/**
+ * Map the Settings custom-provider payload (OpenCode-shaped) onto Pi models.json.
+ * Literal API keys stay in auth.json; `{env:VAR}` becomes `apiKey: "$VAR"`.
+ */
+export const mapOpenCodeProviderToPi = (config = {}) => {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw httpError(400, 'Provider config is required');
+  }
+  const name = typeof config.name === 'string' ? config.name.trim() : '';
+  if (!name) {
+    throw httpError(400, 'Provider name is required');
+  }
+  const options = config.options && typeof config.options === 'object' && !Array.isArray(config.options)
+    ? config.options
+    : {};
+  const baseUrl = typeof options.baseURL === 'string' && options.baseURL.trim()
+    ? options.baseURL.trim()
+    : (typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '');
+  if (!baseUrl) {
+    throw httpError(400, 'Base URL is required');
+  }
+  if (!BASE_URL_PATTERN.test(baseUrl)) {
+    throw httpError(400, 'Base URL must start with http:// or https://');
+  }
+  const models = normalizePiModels(config.models);
+  if (models.length === 0) {
+    throw httpError(400, 'At least one model is required');
+  }
+  const api = typeof config.api === 'string' && config.api.trim()
+    ? config.api.trim()
+    : 'openai-completions';
+  const headers = normalizePiHeaders(options.headers) || normalizePiHeaders(config.headers);
+  const envName = firstEnvName(config.env);
+  const mapped = {
+    name,
+    baseUrl,
+    api,
+    models,
+  };
+  if (headers) mapped.headers = headers;
+  if (envName) mapped.apiKey = `$${envName}`;
+  return mapped;
+};
+
+const ENV_DOLLAR_PATTERN = /^\$([A-Za-z_][A-Za-z0-9_]*)$/;
+const ENV_BRACE_PATTERN = /^\{env:([^}]+)\}$/;
+
+const envNameFromApiKey = (apiKey) => {
+  if (typeof apiKey !== 'string') return '';
+  const trimmed = apiKey.trim();
+  const dollar = trimmed.match(ENV_DOLLAR_PATTERN);
+  if (dollar) return dollar[1];
+  const brace = trimmed.match(ENV_BRACE_PATTERN);
+  return brace?.[1]?.trim() || '';
+};
+
+const publicPiProviderConfig = (provider) => {
+  if (!provider || typeof provider !== 'object') return {};
+  const envName = envNameFromApiKey(provider.apiKey) || firstEnvName(provider.env);
+  const { apiKey: _apiKey, env: _env, ...rest } = provider;
+  return envName ? { ...rest, env: [envName] } : rest;
+};
+
+/**
+ * User + project models.json providers without credentials.
+ * Settings uses baseUrl/name/headers to decide Edit and prefill the form.
+ */
+export const listPiProviderPublicConfigs = ({ home = os.homedir(), directory } = {}) => {
+  const userProviders = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  const projectProviders = directory
+    ? providerMap(readJsonObject(path.join(directory, '.pi', 'models.json')))
+    : {};
+  const ids = new Set([...Object.keys(userProviders), ...Object.keys(projectProviders)]);
+  const result = {};
+  for (const id of ids) {
+    if (!id) continue;
+    const user = userProviders[id] && typeof userProviders[id] === 'object' && !Array.isArray(userProviders[id])
+      ? userProviders[id]
+      : {};
+    const project = projectProviders[id] && typeof projectProviders[id] === 'object' && !Array.isArray(projectProviders[id])
+      ? projectProviders[id]
+      : {};
+    result[id] = publicPiProviderConfig({ ...user, ...project });
+  }
+  return result;
+};
+
+const resolvePiModelsFile = ({ home, directory, scope = 'user' } = {}) => {
+  if (scope === 'project') {
+    if (typeof directory !== 'string' || !directory.trim()) {
+      throw httpError(400, 'Working directory is required for project scope');
+    }
+    return path.join(directory.trim(), '.pi', 'models.json');
+  }
+  return resolvePiModelsPath(home);
+};
+
+export const upsertPiProviderConfig = ({
+  home = os.homedir(),
+  directory,
+  providerId,
+  config,
+  scope = 'user',
+  hasStoredAuth = false,
+} = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const mapped = mapOpenCodeProviderToPi(config);
+  const storedAuth = hasStoredAuth || hasPiStoredAuth(home, id);
+  if (!mapped.apiKey && !storedAuth) {
+    throw httpError(400, 'API key or {env:VAR} credentials are required');
+  }
+  const writeScope = scope === 'project' ? 'project' : 'user';
+  const filePath = resolvePiModelsFile({ home, directory, scope: writeScope });
+  const current = readJsonObject(filePath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[id] && typeof providers[id] === 'object' && !Array.isArray(providers[id])
+    ? providers[id]
+    : {};
+  const nextProvider = {
+    ...previous,
+    ...mapped,
+  };
+  if (!mapped.apiKey) {
+    delete nextProvider.apiKey;
+  }
+  providers[id] = nextProvider;
+  writeJsonFile(filePath, { ...current, providers }, 0o600);
+  return {
+    providerId: id,
+    path: filePath,
+    scope: writeScope,
+    config: publicPiProviderConfig(nextProvider),
+  };
+};
+
+export const deletePiProviderConfig = ({
+  home = os.homedir(),
+  directory,
+  providerId,
+  scope = 'user',
+} = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const filePath = resolvePiModelsFile({ home, directory, scope: scope === 'project' ? 'project' : 'user' });
+  const current = readJsonObject(filePath);
+  const providers = { ...providerMap(current) };
+  if (!Object.prototype.hasOwnProperty.call(providers, id)) {
+    return { removed: false, providerId: id, path: filePath };
+  }
+  delete providers[id];
+  const next = { ...current, providers };
+  if (Object.keys(providers).length === 0 && Object.keys(next).every((key) => key === 'providers')) {
+    try { fs.unlinkSync(filePath); } catch { /* already gone */ }
+  } else {
+    writeJsonFile(filePath, next, 0o600);
+  }
+  return { removed: true, providerId: id, path: filePath };
+};
+
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
     { root: path.join(home, '.pi', 'agent', 'skills'), scope: 'user', source: 'pi' },

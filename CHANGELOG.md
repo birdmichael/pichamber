@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Settings/Providers:** custom OpenAI-compatible providers can now be edited after save, keep the provider list current after save, fetch their remote `/models` list in an inline picker (re-click cancels; closing the list keeps it), collapse known vendor aliases, hide wildcard IDs, filter by Claude Code (including Opus / Sonnet / Haiku) / GPT / Grok / DeepSeek / other, and add only the models you choose.
 - Git: the pull request panel now follows the current open PR for the branch instead of keeping a merged or closed one after reload or a later open PR (thanks to @makeittech).
 - **Usage/Claude:** Claude plan limits now work when you are signed in through Claude Code, without also signing into Anthropic in OpenCode; the account is read from Claude Code's own login on macOS, Linux, and WSL. The page shows your session and weekly limits again, adds per-model weekly limits and extra usage spending, and names your plan. Limits are kept on screen instead of disappearing when Anthropic temporarily blocks refreshes.
 - **Settings/Integrations:** a new Integrations settings page lists Claude Code, Command Code, and Cursor plugins with install, update, setup, and remove actions, plus Discord and Telegram Coming soon placeholders.
