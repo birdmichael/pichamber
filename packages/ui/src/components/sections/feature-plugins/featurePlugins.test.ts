@@ -15,7 +15,7 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.subagents.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.subagents);
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
-    expect(payload.slots.plan.command).toBeUndefined();
+    expect(payload.slots.plan.command).toEqual(undefined);
   });
 
   test('rejects a failed or malformed payload instead of treating it as empty', () => {

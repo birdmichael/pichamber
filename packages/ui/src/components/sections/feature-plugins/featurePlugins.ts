@@ -11,7 +11,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   subagents: 'npm:pi-subagents',
 };
 
-export const DEFAULT_GOAL_COMMAND = 'goal';
+const DEFAULT_GOAL_COMMAND = 'goal';
 
 export interface FeaturePluginSlotState {
   source: string;
@@ -57,7 +57,7 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
   },
 };
 
-export function emptyFeaturePluginSlot(slot: FeaturePluginSlot): FeaturePluginSlotState {
+function emptyFeaturePluginSlot(slot: FeaturePluginSlot): FeaturePluginSlotState {
   return {
     source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot],
     enabled: false,

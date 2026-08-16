@@ -180,7 +180,7 @@ export const FeaturePluginsPage: React.FC = () => {
             key={slot}
             title={t(copy.titleKey)}
             info={t(copy.infoKey)}
-            divider={index === 0 && loadState.status !== 'loading' && loadState.status !== 'error' ? false : undefined}
+            divider={index === 0 && loadState.status === 'ready' ? false : undefined}
             settingsItem={copy.settingsItem}
           >
             <div className={SETTINGS_FIELDS_STACK_CLASS}>

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 import {
   resolvePiAgentDir,
@@ -7,7 +8,7 @@ import {
   resolvePiSettingsPath,
 } from './pi-resources.js';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -16,7 +17,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   subagents: 'npm:pi-subagents',
 };
 
-export const DEFAULT_GOAL_COMMAND = 'goal';
+const DEFAULT_GOAL_COMMAND = 'goal';
 
 const GOAL_COMMAND_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const NPM_SPEC_PATTERN = /^(?:npm:)?(@[^/]+\/[^@\s]+|[^@/\s:]+)(?:@.+)?$/;
@@ -49,13 +50,13 @@ const readJsonObject = (filePath) => {
 
 export const isFeaturePluginSlot = (value) => FEATURE_PLUGIN_SLOTS.includes(value);
 
-export const normalizeFeaturePluginSource = (value, fallback = '') => {
+const normalizeFeaturePluginSource = (value, fallback = '') => {
   const source = typeof value === 'string' ? value.trim() : '';
   if (!source) return typeof fallback === 'string' ? fallback : '';
   return source.length > MAX_SOURCE_LENGTH ? source.slice(0, MAX_SOURCE_LENGTH) : source;
 };
 
-export const normalizeGoalCommand = (value, fallback = DEFAULT_GOAL_COMMAND) => {
+const normalizeGoalCommand = (value, fallback = DEFAULT_GOAL_COMMAND) => {
   const raw = typeof value === 'string' ? value.trim().replace(/^\//, '') : '';
   if (GOAL_COMMAND_PATTERN.test(raw)) return raw;
   return GOAL_COMMAND_PATTERN.test(fallback) ? fallback : DEFAULT_GOAL_COMMAND;
@@ -88,7 +89,7 @@ export const featurePluginSourcesMatch = (left, right) => {
   return Boolean(a) && a === b;
 };
 
-export const configuredPackageSource = (entry) => {
+const configuredPackageSource = (entry) => {
   if (typeof entry === 'string') return entry.trim();
   if (entry && typeof entry === 'object' && typeof entry.source === 'string') {
     return entry.source.trim();
@@ -142,7 +143,7 @@ export const normalizeFeaturePlugins = (raw) => {
   return next;
 };
 
-export const serializeFeaturePlugins = (plugins) => {
+const serializeFeaturePlugins = (plugins) => {
   const normalized = normalizeFeaturePlugins(plugins);
   const out = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
@@ -167,7 +168,7 @@ const writeChamberFile = (home, chamber) => {
   fs.writeFileSync(chamberPath, `${JSON.stringify(chamber, null, 2)}\n`);
 };
 
-export const readChamberFile = (home = os.homedir()) => (
+const readChamberFile = (home = os.homedir()) => (
   isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {}
 );
 
@@ -206,13 +207,13 @@ export const mergeFeaturePluginPatch = (current, patch) => {
       merged.enabled = value.enabled;
     }
     if (slot === 'goal' && Object.prototype.hasOwnProperty.call(value, 'command')) {
-      const command = normalizeGoalCommand(value.command, '');
-      if (!command) {
+      const raw = typeof value.command === 'string' ? value.command.trim().replace(/^\//, '') : '';
+      if (!GOAL_COMMAND_PATTERN.test(raw)) {
         const error = new Error('Goal command is invalid');
         error.status = 400;
         throw error;
       }
-      merged.command = command;
+      merged.command = raw;
     }
     next[slot] = merged;
   }
