@@ -45,7 +45,7 @@ That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds nat
 
 `OPENCHAMBER_KERNEL` defaults to `pi` in both Desktop and the in-process server. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.
 
-On the Pi kernel, Settings Usage/MCP/Plugins/Scheduled Tasks/Multi-run are hidden, and Work Status does not show the OpenCode provider-quota Usage block (session context % / cost stay). Agents is the built-in `pi` agent (read-only). Share, revert, and session.shell are hidden; their facade routes return 501 unsupported rather than empty success. Skills and commands write to `~/.pi/agent` and `.pi`, not `.opencode`. `GET /api/command` lists `compact`, `reload`, `login`, and custom prompts from `~/.pi/agent/prompts` (and project `.pi/prompts`). Model and thinking stay on the composer chips and Session Defaults, not as Settings or slash entries. Walkthrough review uses the current Pi model from `~/.pi/agent` / `GET /api/pi/models` — never a hardcoded model.
+On the Pi kernel, Settings Usage/MCP/Plugins/Multi-run are hidden, and Work Status does not show the OpenCode provider-quota Usage block (session context % / cost stay). Scheduled Tasks is a Pichamber scheduler: the sidebar calendar and `/schedule-task` stay available, and Run now / due timers create a real Pi session in the project cwd and send the task prompt. Model and provider come from the task when they match Pi's runtime models, otherwise from `~/.pi/agent` / `GET /api/pi/defaults` — never a hardcoded provider. Agents is the built-in `pi` agent (read-only). Share, revert, and session.shell are hidden; their facade routes return 501 unsupported rather than empty success. Skills and commands write to `~/.pi/agent` and `.pi`, not `.opencode`. `GET /api/command` lists `compact`, `reload`, `login`, and custom prompts from `~/.pi/agent/prompts` (and project `.pi/prompts`). Model and thinking stay on the composer chips and Session Defaults, not as Settings or slash entries. Walkthrough review uses the current Pi model from `~/.pi/agent` / `GET /api/pi/models` — never a hardcoded model.
 
 ### In-process web server only
 
@@ -82,7 +82,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 
 ## Still OpenCode-only / not ported
 
-- Native OpenCode plugins, MCP OAuth, LSP diagnostics, permission/question dialogs, share, revert, Scheduled Tasks, Multi-run, and the managed OpenCode upgrade/binary resolver
+- Native OpenCode plugins, MCP OAuth, LSP diagnostics, permission/question dialogs, share, revert, Multi-run, and the managed OpenCode upgrade/binary resolver
 - VS Code, mobile, Windows, and Linux desktop packaging were not the product target for this kernel swap
 
 ## Tests

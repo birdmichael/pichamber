@@ -194,6 +194,7 @@ describe('filterPiSlashCommands', () => {
       'reload',
       'login',
       'pr-review',
+      'schedule-task',
       'skill:clack-cli-patterns',
       'skill:already-prefixed',
     ]);

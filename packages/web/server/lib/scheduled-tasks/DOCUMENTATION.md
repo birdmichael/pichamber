@@ -1,13 +1,30 @@
 # Scheduled Tasks module
 
-Server-owned scheduled task runtime and routes for OpenChamber-only automation.
+Pichamber scheduler: persist tasks, arm timers, and start a new session that
+sends the task prompt. On `OPENCHAMBER_KERNEL=pi` that session is a real Pi
+session through the in-process host (same `createSession` + `promptAsync` path
+as chat). On the leftover OpenCode kernel the runtime still uses the OpenCode
+SDK + `prompt_async`.
 
 ## Scope
 
 - Per-project scheduled task persistence is owned by `packages/web/server/lib/projects/project-config.js`.
 - Markdown loop discovery/parsing is owned by `packages/web/server/lib/scheduled-tasks/loops.js`.
 - Runtime orchestration and execution is owned by `packages/web/server/lib/scheduled-tasks/runtime.js`.
-- This module is OpenChamber feature logic; it is intentionally separate from OpenCode proxy/runtime internals.
+- This module is Pichamber feature logic; it is intentionally separate from OpenCode proxy/runtime internals.
+
+## Kernel execution
+
+`createScheduledTasksRuntime` receives `getPiHost` and `isPiKernelEnabled`.
+`resolvePiHost` picks the in-process host when the Pi kernel is on. The
+runtime must call that host directly — HTTP to the local facade deadlocks the
+same Bun process.
+
+Pi model/provider come from the task fields when they match a live Pi model
+(`host.setSessionModel`). Otherwise they come from Pi defaults
+(`host.getDefaults()` / `~/.pi/agent`). The runtime never invents a provider.
+OpenCode-only extras (session goals, permission auto-accept, slash-command
+dispatch through the OpenCode SDK) stay on the OpenCode path.
 
 ## Cross-instance occurrence claiming
 
@@ -64,7 +81,8 @@ Manual `runNow` does not claim a schedule occurrence.
   - Next-run computation (daily/weekly/cron compatibility)
   - Timer scheduling and queueing
   - Concurrency controls
-  - Session create + prompt_async execution
+  - Pi: `host.createSession` + `host.promptAsync` (stable session id from the host)
+  - OpenCode: SDK session create + `prompt_async`
   - Emits OpenChamber task-run events
 
 - `packages/web/server/lib/scheduled-tasks/loops.js`

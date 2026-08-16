@@ -2,6 +2,7 @@ import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 import { DateTime } from 'luxon';
 import parser from 'cron-parser';
 import { expandSnippets } from '../opencode/snippets.js';
+import { resolvePiHost } from '../pi/in-process-session.js';
 import { buildGoalIntroText, createSessionGoal } from '../session-goal/create.js';
 import { discoverLoops } from './loops.js';
 
@@ -254,6 +255,8 @@ export const createScheduledTasksRuntime = (deps) => {
     waitForOpenCodeReady,
     emitTaskRunEvent,
     setSessionAutoAccept,
+    getPiHost = null,
+    isPiKernelEnabled = null,
     logger = console,
     maxGlobalConcurrency = DEFAULT_GLOBAL_CONCURRENCY,
     maxProjectConcurrency = DEFAULT_PROJECT_CONCURRENCY,
@@ -519,12 +522,132 @@ export const createScheduledTasksRuntime = (deps) => {
 
   };
 
+  const readPiDefaultModelRef = (host) => {
+    if (typeof host?.getDefaults !== 'function') {
+      return '';
+    }
+    const defaults = host.getDefaults();
+    return typeof defaults?.model === 'string' ? defaults.model.trim() : '';
+  };
+
+  const readTaskModelRef = (task) => {
+    const providerID = typeof task?.execution?.providerID === 'string' ? task.execution.providerID.trim() : '';
+    const modelID = typeof task?.execution?.modelID === 'string' ? task.execution.modelID.trim() : '';
+    return providerID && modelID ? `${providerID}/${modelID}` : '';
+  };
+
+  const applyPiSessionModel = async (host, sessionID, task) => {
+    if (typeof host?.setSessionModel !== 'function') {
+      return readTaskModelRef(task) || readPiDefaultModelRef(host) || undefined;
+    }
+
+    const taskRef = readTaskModelRef(task);
+    if (taskRef) {
+      try {
+        const applied = await host.setSessionModel(sessionID, taskRef);
+        if (applied?.applied !== false) {
+          return typeof applied?.model === 'string' && applied.model.trim()
+            ? applied.model.trim()
+            : taskRef;
+        }
+      } catch {
+        // Task model is not a live Pi model — fall back to ~/.pi/agent defaults.
+      }
+    }
+
+    const defaultRef = readPiDefaultModelRef(host);
+    if (defaultRef) {
+      try {
+        const applied = await host.setSessionModel(sessionID, defaultRef);
+        if (applied?.applied !== false) {
+          return typeof applied?.model === 'string' && applied.model.trim()
+            ? applied.model.trim()
+            : defaultRef;
+        }
+      } catch {
+        // createSession already applied host defaults / first available model.
+      }
+    }
+
+    return undefined;
+  };
+
+  const applyPiSessionThinking = async (host, sessionID, task) => {
+    const variant = typeof task?.execution?.variant === 'string' ? task.execution.variant.trim() : '';
+    if (!variant || typeof host?.setSessionThinking !== 'function') {
+      return;
+    }
+    try {
+      await host.setSessionThinking(sessionID, variant);
+    } catch {
+      // Leave the session on Pi defaults when the task variant is not a Pi thinking level.
+    }
+  };
+
+  const runTaskOnPiHost = async ({ host, projectID, projectPath, task, title, startedAt, reason }) => {
+    if (typeof host.ready === 'function') {
+      await host.ready();
+    }
+
+    const record = await host.createSession({
+      directory: projectPath,
+      title,
+    });
+    const sessionID = record?.id || record?.info?.id;
+    if (!sessionID) {
+      throw new Error('failed to create session');
+    }
+
+    try {
+      emitTaskRunEvent?.({
+        projectID,
+        taskID: task.id,
+        ranAt: startedAt,
+        status: 'running',
+        sessionID,
+      });
+    } catch {
+    }
+
+    const modelRef = await applyPiSessionModel(host, sessionID, task);
+    await applyPiSessionThinking(host, sessionID, task);
+
+    const prompt = expandSnippets(task.execution.prompt, projectPath);
+    await host.promptAsync(sessionID, {
+      parts: [{ type: 'text', text: prompt }],
+      ...(task.execution.agent ? { agent: task.execution.agent } : {}),
+      ...(modelRef ? { model: modelRef } : {}),
+    });
+
+    const finishedAt = Date.now();
+    return {
+      sessionID,
+      durationMs: Math.max(0, finishedAt - startedAt),
+      reason,
+      startedAt,
+      finishedAt,
+    };
+  };
+
   const runTaskWithWatchdog = async (projectID, task, reason) => {
     const startedAt = Date.now();
     const title = formatScheduledSessionTitle(task, startedAt);
     const projectPath = projectPathByID.get(projectID);
     if (!projectPath) {
       throw new Error('project path is unavailable');
+    }
+
+    const piHost = resolvePiHost(getPiHost, isPiKernelEnabled);
+    if (piHost) {
+      return runTaskOnPiHost({
+        host: piHost,
+        projectID,
+        projectPath,
+        task,
+        title,
+        startedAt,
+        reason,
+      });
     }
 
     if (typeof waitForOpenCodeReady === 'function') {

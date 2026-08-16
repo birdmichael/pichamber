@@ -87,9 +87,14 @@ const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
 const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'init', 'undo', 'redo', 'timeline', 'summary',
   'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
-  'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
+  'catch-up', 'debug', 'weigh', 'explore',
   ...PI_CHIP_OWNED_SLASH_COMMANDS,
   'shell',
+]);
+
+/** Pichamber scheduler command — not an OpenCode leftover. */
+const PI_ALLOWED_OPENCHAMBER_SLASH_COMMANDS = new Set([
+  'schedule-task',
 ]);
 
 /** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */
@@ -111,12 +116,14 @@ export function filterPiSettingsCommands<T extends { name: string }>(commands: T
  * Pi slash menu: builtins and custom prompts stay as `/name`. Installed,
  * injected skills become `/skill:name` so AgentSession expands them.
  * Untrusted project skills and leftover OpenChamber / chip commands stay out.
+ * `/schedule-task` stays: Scheduled Tasks is a Pichamber scheduler, not an
+ * OpenCode leftover.
  */
 export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
   const kept: T[] = [];
   for (const command of commands) {
-    if (command.isOpenChamber) continue;
+    if (command.isOpenChamber && !PI_ALLOWED_OPENCHAMBER_SLASH_COMMANDS.has(command.name)) continue;
     if (command.isSkill) {
       if (command.injected === false) continue;
       const slashName = toPiSkillSlashName(command.name);

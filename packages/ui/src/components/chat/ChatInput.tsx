@@ -561,7 +561,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         const names = new Set<string>([
             'init', 'review', 'undo', 'redo', 'timeline', 'compact', 'summary', 'workspace-review', 'plan-feature', 'craft-goal', 'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
         ]);
-        if (isPiKernel) names.delete('schedule-task');
         if (!isMobile && !isVSCodeRuntime()) names.add('handoff-review');
         for (const command of availableCommands) names.add(command.name.toLowerCase());
         for (const skill of availableSkills) {
@@ -1180,7 +1179,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             // send them as one message.
             const command = findMagicPromptCommand(commandName);
             const commandIsAvailable = command !== null
-                && !(isPiKernel && command.name === 'schedule-task')
                 && canRunCommand(command, {
                     hasSession: Boolean(currentSessionId),
                     hasDraft: newSessionDraftOpen,
