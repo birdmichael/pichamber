@@ -92,7 +92,7 @@ which requests only providers enabled for this panel.
 | PR + checks | `usePrVisualSummary` | **read-only** |
 | Subagents | child sessions from `useAllLiveSessions` (`parentID`) + `useAllSessionStatuses` | |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
-| Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | grouping shared with the mobile popover; presentation is not |
+| Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | OpenCode provider quotas only. Hidden on Pi (`isWorkStatusSectionAvailable`); session context % / cost stay in the Session block |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |
 | Goal | `useSessionGoal` | respects the Settings toggle |
 | MCP | `useMcpStore` | connect/disconnect reuses the dropdown's actions |
@@ -173,7 +173,8 @@ Ordering is by durability, not category:
 1. **Session** (goal, context, cost), **Project** (attention, branch,
    changes, PR, checks) and **Usage** — true for as long as the session is
    open. Usage sits here rather than lower down because a spent quota stops the
-   work outright;
+   work outright. On Pi the provider-quota Usage section is not available
+   (there is no quota API); the Session context meter is unchanged;
 2. **Subagents**, **Tasks** — what is happening right now;
 3. **MCP**, **Pinned messages**, **Context sources** — supporting material.
 

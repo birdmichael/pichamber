@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { SettingsCheckboxRow } from '@/components/sections/shared/SettingsSection';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,9 +12,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  WORK_STATUS_SECTION_IDS,
   WORK_STATUS_SECTION_LABEL_KEYS,
   areAllWorkStatusSectionsHidden,
+  getAvailableWorkStatusSectionIds,
   isWorkStatusSectionVisible,
 } from './sections';
 
@@ -32,9 +33,12 @@ export const WorkStatusSectionsDialog: React.FC<{
   const hidden = useUIStore((state) => state.workStatusHiddenSections);
   const setSectionVisible = useUIStore((state) => state.setWorkStatusSectionVisible);
   const setHiddenSections = useUIStore((state) => state.setWorkStatusHiddenSections);
+  const isPiKernel = usePiKernel();
+  const sectionContext = React.useMemo(() => ({ isPiKernel }), [isPiKernel]);
+  const sectionIds = getAvailableWorkStatusSectionIds(sectionContext);
 
-  const allVisible = hidden.length === 0;
-  const noneVisible = areAllWorkStatusSectionsHidden(hidden);
+  const allVisible = sectionIds.every((sectionId) => isWorkStatusSectionVisible(hidden, sectionId, sectionContext));
+  const noneVisible = areAllWorkStatusSectionsHidden(hidden, sectionContext);
 
   const handleShowAll = () => setHiddenSections([]);
 
@@ -47,11 +51,11 @@ export const WorkStatusSectionsDialog: React.FC<{
         </DialogHeader>
 
         <div className="flex flex-col">
-          {WORK_STATUS_SECTION_IDS.map((sectionId) => (
+          {sectionIds.map((sectionId) => (
             <SettingsCheckboxRow
               key={sectionId}
               settingsItem={`chat.work-status.section.${sectionId}`}
-              checked={isWorkStatusSectionVisible(hidden, sectionId)}
+              checked={isWorkStatusSectionVisible(hidden, sectionId, sectionContext)}
               onChange={(checked) => setSectionVisible(sectionId, checked)}
               label={t(WORK_STATUS_SECTION_LABEL_KEYS[sectionId])}
               ariaLabel={t(WORK_STATUS_SECTION_LABEL_KEYS[sectionId])}

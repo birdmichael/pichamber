@@ -17,7 +17,7 @@ import { useReportWorkStatusPresence } from './presenceContext';
 import type { UsageWindow } from '@/types';
 
 /**
- * Provider rate limits.
+ * OpenCode provider rate limits.
  *
  * The mobile popover renders these as filled cards; that language does not
  * survive here — the fills and their padding fight the panel's flat rows and
@@ -28,6 +28,10 @@ import type { UsageWindow } from '@/types';
  * Sits above Subagents and MCP: a spent quota stops the work outright, so it
  * belongs with the readouts that hold for the whole session rather than with
  * whatever happens to be running.
+ *
+ * Pi has no quota API. The panel and section dialog must not mount this
+ * section there (`isWorkStatusSectionAvailable`); session context % / cost
+ * live in the Session block instead.
  */
 
 const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {

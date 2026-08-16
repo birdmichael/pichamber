@@ -5,7 +5,8 @@ import type { I18nKey } from '@/lib/i18n/messages/en';
  *
  * One list drives both the panel and its settings dialog, so a section cannot
  * exist in the panel without being switchable, or appear in the dialog without
- * existing.
+ * existing. Kernel availability (`isWorkStatusSectionAvailable`) filters that
+ * list before either surface sees it.
  *
  * The ids are persisted in user settings — renaming one silently resets that
  * user's choice for it.
@@ -22,6 +23,25 @@ export const WORK_STATUS_SECTION_IDS = [
 ] as const;
 
 type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
+
+type WorkStatusSectionContext = {
+  /** Pi has no provider-quota API; the OpenCode usage section is unavailable. */
+  isPiKernel?: boolean;
+};
+
+/**
+ * Provider-quota usage is an OpenCode API. Pi has no quota source, so that
+ * section is not offered — session context % / cost stay in the Session block.
+ */
+export const isWorkStatusSectionAvailable = (
+  id: WorkStatusSectionId,
+  context?: WorkStatusSectionContext,
+): boolean => !(context?.isPiKernel && id === 'usage');
+
+export const getAvailableWorkStatusSectionIds = (
+  context?: WorkStatusSectionContext,
+): readonly WorkStatusSectionId[] =>
+  WORK_STATUS_SECTION_IDS.filter((id) => isWorkStatusSectionAvailable(id, context));
 
 export const WORK_STATUS_SECTION_LABEL_KEYS: Record<WorkStatusSectionId, I18nKey> = {
   session: 'chat.workStatus.section.session',
@@ -47,18 +67,23 @@ const isWorkStatusSectionId = (value: unknown): value is WorkStatusSectionId =>
 export const isWorkStatusSectionVisible = (
   hidden: readonly string[] | null | undefined,
   id: WorkStatusSectionId,
-): boolean => !hidden?.includes(id);
+  context?: WorkStatusSectionContext,
+): boolean => isWorkStatusSectionAvailable(id, context) && !hidden?.includes(id);
 
 /**
- * True when every known section id appears in the hidden set.
+ * True when every *available* section id appears in the hidden set.
  *
  * Uses `.every()` instead of a length comparison so that stale ids left over
  * from a removed section cannot inflate the count past the current list length.
+ * Kernel-unavailable sections (provider usage on Pi) are ignored so hiding the
+ * remaining rows can still recover the empty-state controls.
  */
 export const areAllWorkStatusSectionsHidden = (
   hidden: readonly string[] | null | undefined,
+  context?: WorkStatusSectionContext,
 ): boolean =>
-  hidden != null && WORK_STATUS_SECTION_IDS.every((id) => hidden.includes(id));
+  hidden != null &&
+  getAvailableWorkStatusSectionIds(context).every((id) => hidden.includes(id));
 
 export const getWorkStatusPanelPresentation = ({
   visible,

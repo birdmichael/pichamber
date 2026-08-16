@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/useUIStore';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
 import { WorkStatusGoalRow } from './WorkStatusGoalRow';
 import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
@@ -68,14 +69,16 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const setScrollTop = useUIStore((state) => state.setWorkStatusScrollTop);
   const setOverlayOpen = useUIStore((state) => state.setWorkStatusOverlayOpen);
   const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
+  const isPiKernel = usePiKernel();
+  const sectionContext = React.useMemo(() => ({ isPiKernel }), [isPiKernel]);
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering
   // nothing on the way in would make the card flash out and back on arrival.
   const [renderedSections, setRenderedSections] = React.useState(1);
   const sectionVisible = React.useCallback(
     (sectionId: Parameters<typeof isWorkStatusSectionVisible>[1]) =>
-      isWorkStatusSectionVisible(hiddenSections, sectionId),
-    [hiddenSections],
+      isWorkStatusSectionVisible(hiddenSections, sectionId, sectionContext),
+    [hiddenSections, sectionContext],
   );
   const frameRef = React.useRef<number | null>(null);
 
@@ -93,7 +96,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   // re-enable sections. The previous `renderedSections > 0` guard is preserved
   // for the transient "no data yet" state so the panel doesn't flash a bare
   // bordered card on first mount.
-  const allSectionsHidden = areAllWorkStatusSectionsHidden(hiddenSections);
+  const allSectionsHidden = areAllWorkStatusSectionsHidden(hiddenSections, sectionContext);
   const { interactive, showEmptyState } = getWorkStatusPanelPresentation({
     visible,
     contentMounted,
