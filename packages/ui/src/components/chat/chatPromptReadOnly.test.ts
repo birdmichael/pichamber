@@ -29,6 +29,15 @@ describe('resolveChatPromptReadOnly', () => {
         expect(resolveChatPromptReadOnly(session(), true, false)).toBe(false);
     });
 
+    test('keeps a Pi adapter child writable when the tab is not read-only', () => {
+        const child = {
+            ...session('parent'),
+            metadata: { pichamber: { subagentRun: { runId: 'run_scout' } } },
+        } as Session;
+        expect(resolveChatPromptReadOnly(child, false, false)).toBe(false);
+        expect(resolveChatPromptReadOnly(child, false, true)).toBe(true);
+    });
+
     test('treats a marked code review as an independent session even with a stale parent ID', () => {
         const reviewSession = {
             ...session('original'),

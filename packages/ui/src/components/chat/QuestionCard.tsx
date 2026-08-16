@@ -14,6 +14,9 @@ import { useSessions } from '@/sync/sync-context';
 import * as sessionActions from '@/sync/session-actions';
 import { useI18n } from '@/lib/i18n';
 import { serializeQuestionAsJson, serializeQuestionAsMarkdown } from './questionSerializers';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { shouldShowPiFromSubagentLabel } from '@/lib/subagents/subagentTool';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
 
 interface QuestionCardProps {
@@ -94,11 +97,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
   const isMobile = useUIStore((state) => state.isMobile);
   const sessions = useSessions();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
+  const isPiKernel = usePiKernel();
+  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const isFromSubagent = React.useMemo(() => {
+    if (!shouldShowPiFromSubagentLabel({ isPiKernel, subagentsSlotActive })) return false;
     if (!currentSessionId || question.sessionID === currentSessionId) return false;
     const sourceSession = sessions.find((session) => session.id === question.sessionID);
     return Boolean(sourceSession?.parentID && sourceSession.parentID === currentSessionId);
-  }, [question.sessionID, currentSessionId, sessions]);
+  }, [isPiKernel, question.sessionID, currentSessionId, sessions, subagentsSlotActive]);
   const [activeTab, setActiveTab] = React.useState<TabKey>('0');
   const [isResponding, setIsResponding] = React.useState(false);
   const [hasResponded, setHasResponded] = React.useState(false);

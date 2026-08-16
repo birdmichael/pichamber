@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
-import { useAllLiveSessions, useAllSessionStatuses, useDirectorySync } from '@/sync/sync-context';
+import { useAllLiveSessions, useAllSessionStatuses, useDirectorySync, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -8,6 +8,17 @@ import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedC
 import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusValue } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
 import type { State } from '@/sync/types';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { useSubagentRuns } from '@/hooks/useSubagentRuns';
+import { openSubagentChildSession } from '@/lib/subagents/childSession';
+import {
+  buildWorkStatusSubagentRows,
+  collectTranscriptSubagentSessionIds,
+  resolveWorkStatusSubagentOpen,
+  type WorkStatusSubagentRow,
+} from '@/lib/subagents/workStatusRows';
 
 type Props = {
   sessionId: string | null;
@@ -16,24 +27,38 @@ type Props = {
 
 const SECTION_ID = 'subagents';
 
+type ChildRow = WorkStatusSubagentRow;
+
 /**
  * Running subagents and, more importantly, their blockers: a permission request
  * raised by a child session has no representation in the transcript, so this
  * panel is the only place it becomes visible.
+ *
+ * On Pi the adapter run list is the source of truth. Leftover OpenCode
+ * parentID children are not shown as a fleet.
  */
 export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directory }) => {
   const { t } = useI18n();
   const isMobile = useUIStore((state) => state.isMobile);
+  const isPiKernel = usePiKernel();
+  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const effectiveDirectory = useEffectiveDirectory() ?? null;
 
   const liveSessions = useAllLiveSessions();
   const statuses = useAllSessionStatuses();
-  const children = React.useMemo(
-    () => (sessionId ? liveSessions.filter((candidate) => candidate.parentID === sessionId) : []),
-    [liveSessions, sessionId],
+  const { runs } = useSubagentRuns(sessionId, isPiKernel && subagentsSlotActive);
+  const parentMessages = useSessionMessageRecords(
+    sessionId ?? '',
+    directory ?? effectiveDirectory ?? undefined,
+    { enabled: isPiKernel && subagentsSlotActive },
+  );
+  const openCodeChildren = React.useMemo(
+    () => (!isPiKernel && sessionId
+      ? liveSessions.filter((candidate) => candidate.parentID === sessionId)
+      : []),
+    [isPiKernel, liveSessions, sessionId],
   );
 
-  // One subscription covers every child: per-session hooks would multiply
-  // store subscriptions by the number of subagents.
   const permissions = useDirectorySync(React.useCallback((state: State) => state.permission, []));
   const questions = useDirectorySync(React.useCallback((state: State) => state.question, []));
 
@@ -41,38 +66,63 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const setSectionExpanded = useUIStore((state) => state.setWorkStatusSectionExpanded);
 
-  // Subagents appearing where there were none is the one moment this section
-  // has something urgent to say, so it opens itself. Only on the empty→present
-  // edge: re-expanding on every count change would fight a user who just
-  // collapsed it.
-  const hadChildren = React.useRef(children.length > 0);
+  const rows = React.useMemo<ChildRow[]>(() => {
+    if (isPiKernel) {
+      return buildWorkStatusSubagentRows({
+        runs,
+        transcriptIds: collectTranscriptSubagentSessionIds(parentMessages),
+        directory,
+        effectiveDirectory,
+        untitledLabel: t('chat.workStatus.subagent.untitled'),
+      });
+    }
+    return openCodeChildren.map((child) => {
+      const blocked = (permissions[child.id]?.length ?? 0) > 0;
+      const asked = (questions[child.id]?.length ?? 0) > 0;
+      const busy = statuses[child.id]?.type === 'busy';
+      const opened = resolveWorkStatusSubagentOpen({
+        sessionID: child.id,
+        directory,
+        effectiveDirectory,
+      });
+      return {
+        id: child.id,
+        label: child.title?.trim() || t('chat.workStatus.subagent.untitled'),
+        sessionID: opened.sessionID,
+        openable: opened.openable,
+        status: blocked ? 'permission' : asked ? 'question' : busy ? 'working' : 'done',
+      };
+    });
+  }, [directory, effectiveDirectory, isPiKernel, openCodeChildren, parentMessages, permissions, questions, runs, statuses, t]);
+
+  const hadChildren = React.useRef(rows.length > 0);
   React.useEffect(() => {
-    const present = children.length > 0;
+    const present = rows.length > 0;
     if (present && !hadChildren.current) setSectionExpanded(SECTION_ID, true);
     hadChildren.current = present;
-  }, [children.length, setSectionExpanded]);
+  }, [rows.length, setSectionExpanded]);
 
-  // Same branch the transcript's Task tool takes: surfaces that cannot host an
-  // embedded panel navigate to the child session instead of opening a tab.
-  const openChildSession = React.useCallback((childId: string, label: string) => {
-    if (!directory) return;
-    if (isEmbeddedSessionChat() || isMobile || isVSCodeRuntime()) {
-      setCurrentSession(childId, directory);
-      return;
-    }
-    openContextPanelTab(directory, {
-      mode: 'chat',
-      dedupeKey: `session:${childId}`,
-      label,
-      readOnly: true,
+  const openChildSession = React.useCallback((row: ChildRow) => {
+    if (!row.openable) return;
+    openSubagentChildSession({
+      sessionID: row.sessionID,
+      directory: directory?.trim() || effectiveDirectory,
+      label: row.label,
+      readOnly: !isPiKernel,
+      isMobile,
+      isVSCode: isVSCodeRuntime(),
+      isEmbedded: isEmbeddedSessionChat(),
+      setCurrentSession,
+      openContextPanelTab,
     });
-  }, [directory, isMobile, openContextPanelTab, setCurrentSession]);
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, setCurrentSession]);
 
-  useReportWorkStatusPresence('subagents', children.length > 0);
+  useReportWorkStatusPresence('subagents', rows.length > 0);
 
-  if (children.length === 0) return null;
+  if (isPiKernel && !subagentsSlotActive) return null;
+  if (rows.length === 0) return null;
 
-  const busyChildren = children.filter((child) => statuses[child.id]?.type === 'busy').length;
+  const busyChildren = rows.filter((row) => row.status === 'working' || row.status === 'blocked').length;
 
   return (
     <WorkStatusCollapsibleSection
@@ -80,32 +130,38 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       title={t('chat.workStatus.section.subagents')}
       icon="ai-agent"
       defaultExpanded
-      summary={busyChildren > 0 ? `${busyChildren}/${children.length}` : children.length}
+      summary={busyChildren > 0 ? `${busyChildren}/${rows.length}` : rows.length}
     >
       <div className="max-h-56 overflow-y-auto">
-        {children.map((child) => {
-          const blocked = (permissions[child.id]?.length ?? 0) > 0;
-          const asked = (questions[child.id]?.length ?? 0) > 0;
-          const busy = statuses[child.id]?.type === 'busy';
-          const label = child.title?.trim() || t('chat.workStatus.subagent.untitled');
-          return (
-            <WorkStatusRow
-              key={child.id}
-              onClick={directory ? () => openChildSession(child.id, label) : undefined}
-              ariaLabel={t('chat.workStatus.action.openSubagent', { name: label })}
-              label={label}
-              value={blocked ? (
-                <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
-              ) : asked ? (
-                <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
-              ) : busy ? (
-                <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
-              ) : (
-                <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
-              )}
-            />
-          );
-        })}
+        {rows.map((row) => (
+          <WorkStatusRow
+            key={row.id}
+            onClick={row.openable ? () => openChildSession(row) : undefined}
+            ariaLabel={row.openable
+              ? t('chat.workStatus.action.openSubagent', { name: row.label })
+              : row.label}
+            label={row.mode === 'background'
+              ? t('chat.workStatus.subagent.namedBackground', { name: row.label })
+              : row.mode === 'foreground'
+                ? t('chat.workStatus.subagent.namedForeground', { name: row.label })
+                : row.label}
+            value={row.status === 'permission' ? (
+              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
+            ) : row.status === 'question' ? (
+              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
+            ) : row.status === 'blocked' ? (
+              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.blocked')}</WorkStatusValue>
+            ) : row.status === 'paused' ? (
+              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
+            ) : row.status === 'failed' ? (
+              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+            ) : row.status === 'working' ? (
+              <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
+            ) : (
+              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
+            )}
+          />
+        ))}
       </div>
     </WorkStatusCollapsibleSection>
   );

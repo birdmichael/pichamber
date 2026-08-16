@@ -29,12 +29,21 @@ type WorkStatusSectionContext = {
   isPiKernel?: boolean;
   /** Pi MCP follows the feature-plugin slot, not leftover mcp.json files. */
   isMcpFeaturePluginActive?: boolean;
+  /**
+   * Pi Subagents Work Status is gated on the feature-plugin slot
+   * (installed + enabled), not on `!isPiKernel`. OpenCode is unchanged.
+   */
+  subagentsSlotActive?: boolean;
 };
 
 /**
  * Provider-quota usage is an OpenCode API. Pi has no quota source, so that
  * section is not offered — session context % / cost stay in the Session block.
  * MCP on Pi is offered only when the adapter slot is installed and enabled.
+ *
+ * Subagents on Pi exist only when the Subagents feature-plugin slot is
+ * installed and enabled. Leftover OpenCode parentID children are not a Pi
+ * fleet.
  */
 export const isWorkStatusSectionAvailable = (
   id: WorkStatusSectionId,
@@ -42,6 +51,7 @@ export const isWorkStatusSectionAvailable = (
 ): boolean => {
   if (context?.isPiKernel && id === 'usage') return false;
   if (id === 'mcp' && context?.isPiKernel && !context.isMcpFeaturePluginActive) return false;
+  if (context?.isPiKernel && id === 'subagents') return context.subagentsSlotActive === true;
   return true;
 };
 

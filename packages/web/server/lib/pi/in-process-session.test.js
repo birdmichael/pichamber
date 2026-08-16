@@ -25,9 +25,8 @@ describe('in-process Pi session client', () => {
         { info: { id: 'm3' } },
       ]),
       getStatus: vi.fn(() => ({ ses_1: { type: 'idle' } })),
-      listSessions: vi.fn(() => [
-        { info: { id: 'ses_child', parentID: 'ses_1' } },
-        { info: { id: 'ses_other', parentID: 'ses_x' } },
+      listSessionChildren: vi.fn(async () => [
+        { id: 'ses_child', parentID: 'ses_1' },
       ]),
       updateSession: vi.fn(() => ({ info: { id: 'ses_1', metadata: { ok: true } } })),
       promptAsync: vi.fn(async () => ({ info: { id: 'm4' } })),

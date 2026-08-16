@@ -90,7 +90,7 @@ which requests only providers enabled for this panel.
 | Branch, ahead/behind, attention | `useGitStore` directory state | warmed via `runBackgroundNetworkTask(ensureStatus)` and refreshed from Git mutation hints |
 | Changed files | `useGitStore` status `files` + `diffStats` | working tree, not session-authored edits |
 | PR + checks | `usePrVisualSummary` | **read-only** |
-| Subagents | child sessions from `useAllLiveSessions` (`parentID`) + `useAllSessionStatuses` | |
+| Subagents | Pi: host run list (live `subagent` tool-call session id, not leftover status-file ghosts). OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card. Terminal rows without an id are omitted. |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
 | Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | OpenCode provider quotas only. Hidden on Pi (`isWorkStatusSectionAvailable`); session context % / cost stay in the Session block |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |
@@ -263,7 +263,7 @@ Rows that name something the app can already show are buttons:
 | Changes | working-tree diff (`openContextPanelTab`, `diffScope: 'working'`, no target path) |
 | Branch | git surface (`openContextSurface(dir, 'git')`) |
 | Pull request, Checks | PR surface (`openContextSurface(dir, 'pr')`) |
-| Subagent | that child session's chat tab, read-only |
+| Subagent | that child session's chat tab via `openSubagentChildSession` (Pi writable, OpenCode read-only); status-only when no session id |
 | Goal (row) | the composer's own `SessionGoalDialog` |
 | Goal (pause/resume) | `setSessionGoalStatus(sessionId, directory, status)` |
 | MCP switch | connects/disconnects the server |

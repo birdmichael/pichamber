@@ -704,6 +704,20 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getMessages(req.params.sessionID));
   }));
 
+  app.get('/api/session/:sessionID/subagent-runs', handle(async (req, res) => {
+    const payload = typeof host.listSubagentRuns === 'function'
+      ? await host.listSubagentRuns(req.params.sessionID, resolveDirectory(req))
+      : { runs: [] };
+    json(res, 200, payload);
+  }));
+
+  app.get('/api/session/:sessionID/children', handle(async (req, res) => {
+    const children = typeof host.listSessionChildren === 'function'
+      ? await host.listSessionChildren(req.params.sessionID, resolveDirectory(req))
+      : [];
+    json(res, 200, children);
+  }));
+
   app.get('/api/session/:sessionID/todo', handle(async (_req, res) => {
     json(res, 200, []);
   }));

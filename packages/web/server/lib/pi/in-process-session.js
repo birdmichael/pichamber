@@ -63,12 +63,16 @@ export const dispatchPiSessionRequest = async (host, fetchPath, {
     return messages;
   }
   if (rest === 'children' && verb === 'GET') {
-    const records = typeof host.listSessions === 'function'
-      ? host.listSessions(directory || undefined)
-      : [];
-    return records
-      .filter((record) => (record?.info?.parentID || record?.parentID) === sessionId)
-      .map((record) => record.info || record);
+    if (typeof host.listSessionChildren === 'function') {
+      return host.listSessionChildren(sessionId, directory || undefined);
+    }
+    return [];
+  }
+  if (rest === 'subagent-runs' && verb === 'GET') {
+    if (typeof host.listSubagentRuns === 'function') {
+      return host.listSubagentRuns(sessionId, directory || undefined);
+    }
+    return { runs: [] };
   }
   if (rest === 'prompt_async' && verb === 'POST') {
     return host.promptAsync(sessionId, body || {});

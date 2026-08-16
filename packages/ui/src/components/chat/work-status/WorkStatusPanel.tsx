@@ -5,6 +5,7 @@ import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/useUIStore';
 import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
 import { WorkStatusGoalRow } from './WorkStatusGoalRow';
 import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
@@ -71,9 +72,10 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
   const isPiKernel = usePiKernel();
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
+  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive }),
-    [isMcpFeaturePluginActive, isPiKernel],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive],
   );
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering

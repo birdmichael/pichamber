@@ -27,9 +27,19 @@ describe('isWorkStatusSectionAvailable', () => {
     expect(isWorkStatusSectionAvailable('usage')).toBe(true);
   });
 
+  test('hides Subagents on Pi unless the feature-plugin slot is installed and enabled', () => {
+    expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: true, subagentsSlotActive: false })).toBe(false);
+    expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: true, subagentsSlotActive: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: false })).toBe(true);
+    expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: false, subagentsSlotActive: false })).toBe(true);
+  });
+
   test('keeps session context on the available list for Pi', () => {
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('usage');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('subagents');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, subagentsSlotActive: true })).toContain('subagents');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: false })).toEqual(WORK_STATUS_SECTION_IDS);
   });
 
@@ -60,6 +70,11 @@ describe('isWorkStatusSectionVisible', () => {
   test('never shows provider usage on Pi, even when the hidden set is empty', () => {
     expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true })).toBe(false);
     expect(isWorkStatusSectionVisible([], 'session', { isPiKernel: true })).toBe(true);
+  });
+
+  test('never shows an empty Subagents header on Pi when the slot is off', () => {
+    expect(isWorkStatusSectionVisible([], 'subagents', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionVisible([], 'subagents', { isPiKernel: true, subagentsSlotActive: true })).toBe(true);
   });
 });
 
@@ -94,7 +109,7 @@ describe('areAllWorkStatusSectionsHidden', () => {
   });
 
   test('on Pi, ignores the unavailable provider-usage section', () => {
-    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp');
+    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp' && id !== 'subagents');
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: true })).toBe(true);
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: false })).toBe(false);
     expect(areAllWorkStatusSectionsHidden([], { isPiKernel: true })).toBe(false);

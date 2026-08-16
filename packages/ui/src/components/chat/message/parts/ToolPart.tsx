@@ -63,6 +63,14 @@ import {
     type DiffPatchEntry,
 } from './toolDiffUtils';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { openSubagentChildSession } from '@/lib/subagents/childSession';
+import {
+    readSubagentCardAgent,
+    readSubagentChildSessionId,
+    shouldRenderDedicatedSubagentCard,
+} from '@/lib/subagents/subagentTool';
 import { useStreamingTextThrottle } from '../../hooks/useStreamingTextThrottle';
 import { getStreamingOutputAppend, getToolOutput } from './toolOutput';
 import { toAbsoluteFilePath } from '@/lib/path-utils';
@@ -992,7 +1000,8 @@ const TaskToolSummary: React.FC<{
     input?: Record<string, unknown>;
     animateTailText?: boolean;
     isActive?: boolean;
-}> = ({ entries, isExpanded, isMobile, output, sessionId, onShowPopup, input, animateTailText = true, isActive = false }) => {
+    childReadOnly?: boolean;
+}> = ({ entries, isExpanded, isMobile, output, sessionId, onShowPopup, input, animateTailText = true, isActive = false, childReadOnly = true }) => {
     const { t } = useI18n();
     const currentDirectory = useEffectiveDirectory();
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
@@ -1006,29 +1015,22 @@ const TaskToolSummary: React.FC<{
     const hasOutput = trimmedOutput.length > 0;
     const [isOutputExpanded, setIsOutputExpanded] = React.useState(false);
 
+    const agentType = readSubagentCardAgent(input);
+
     const handleOpenSession = (event: React.MouseEvent) => {
         event.stopPropagation();
-        if (sessionId && currentDirectory) {
-            // In contexts with no ContextPanel (embedded session-chat iframe)
-            // or single-surface layouts (mobile, VS Code), navigate in place.
-            // Otherwise open a new side-panel tab.
-            if (isEmbeddedSessionChat() || isMobile || runtime?.runtime.isVSCode) {
-                setCurrentSession(sessionId, currentDirectory);
-                return;
-            }
-
-            openContextPanelTab(currentDirectory, {
-                mode: 'chat',
-                dedupeKey: `session:${sessionId}`,
-                label: agentType.charAt(0).toUpperCase() + agentType.slice(1),
-                readOnly: true,
-            });
-        }
+        openSubagentChildSession({
+            sessionID: sessionId,
+            directory: currentDirectory,
+            label: agentType.charAt(0).toUpperCase() + agentType.slice(1),
+            readOnly: childReadOnly,
+            isMobile,
+            isVSCode: Boolean(runtime?.runtime.isVSCode),
+            isEmbedded: isEmbeddedSessionChat(),
+            setCurrentSession,
+            openContextPanelTab,
+        });
     };
-
-    const agentType = typeof input?.subagent_type === 'string'
-        ? input.subagent_type
-        : 'subagent';
 
     if (entries.length === 0 && !hasOutput && !sessionId) {
         return (
@@ -1696,7 +1698,13 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     const currentDirectory = useEffectiveDirectory() ?? '';
 
     const normalizedPartTool = normalizeToolName(part.tool);
-    const isTaskTool = normalizedPartTool === 'task';
+    const isPiKernel = usePiKernel();
+    const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+    const isTaskTool = shouldRenderDedicatedSubagentCard({
+        tool: normalizedPartTool,
+        isPiKernel,
+        subagentsSlotActive,
+    });
 
     const status = state?.status as string | undefined;
     const isFinalized = status === 'completed' || status === 'error' || status === 'aborted' || status === 'failed' || status === 'timeout' || status === 'cancelled';
@@ -1883,8 +1891,10 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
         if (parsedTaskMetadata.sessionId) {
             return parsedTaskMetadata.sessionId;
         }
-        return readTaskSessionIdFromOutput(taskOutputString);
-    }, [isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, taskOutputString]);
+        const fromOutput = readTaskSessionIdFromOutput(taskOutputString);
+        if (fromOutput) return fromOutput;
+        return readSubagentChildSessionId(input, taskOutputString) ?? undefined;
+    }, [input, isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, taskOutputString]);
 
     const childSessionLookupId = hasFinalMetadataTaskSummary ? '' : (taskSessionId ?? '');
 
@@ -2242,6 +2252,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
                     input={input}
                     animateTailText={animateTailText}
                     isActive={isActive}
+                    childReadOnly={!isPiKernel}
                 />
             ) : null}
 

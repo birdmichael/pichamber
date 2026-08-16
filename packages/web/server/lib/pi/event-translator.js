@@ -168,7 +168,7 @@ export const createEventTranslator = ({
     text,
   });
 
-  const toolPart = (partID, { callID, tool, status, input, output, error }) => ({
+  const toolPart = (partID, { callID, tool, status, input, output, error, metadata }) => ({
     id: partID,
     sessionID,
     messageID: assistantMessageID,
@@ -180,6 +180,7 @@ export const createEventTranslator = ({
       input: input ?? {},
       ...(output !== undefined ? { output } : {}),
       ...(error ? { error } : {}),
+      ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { metadata } : {}),
       time: { start: now(), ...(status === 'completed' || status === 'error' ? { end: now() } : {}) },
     },
   });
@@ -419,6 +420,9 @@ export const createEventTranslator = ({
         const partID = toolParts.get(callID);
         if (!partID || !assistantMessageID) return [];
         const output = toolText(piEvent.result?.content ?? piEvent.result);
+        const metadata = piEvent.result?.details && typeof piEvent.result.details === 'object'
+          ? piEvent.result.details
+          : undefined;
         return [partUpdated(toolPart(partID, {
             callID,
             tool: piEvent.toolName || 'tool',
@@ -426,6 +430,7 @@ export const createEventTranslator = ({
             input: piEvent.args || {},
             output,
             error: piEvent.isError ? output || 'tool error' : undefined,
+            metadata,
           }))];
       }
 
