@@ -7,6 +7,7 @@ export const createRequestSecurityRuntime = (deps) => {
   // the Android origin 403'd every WebSocket upgrade from the Android app
   // (message stream, terminal, dictation) while SSE kept working.
   const packagedClientOrigins = new Set([
+    'pichamber-ui://app',
     'openchamber-ui://app',
     'capacitor://localhost',
     'https://localhost',

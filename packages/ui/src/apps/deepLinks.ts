@@ -1,5 +1,5 @@
 /**
- * OpenChamber deep-link vocabulary — the single source of truth for the `openchamber://`
+ * Pichamber deep-link vocabulary — the single source of truth for the `pichamber://`
  * URL scheme used across every native entry point: notification taps, home-screen / lock-
  * screen widgets, and (later) Live Activities. Anything that wants to drive navigation
  * builds a URL with {@link buildDeepLink} and anything that receives one parses it with
@@ -8,9 +8,18 @@
  *
  * Keep this file pure (no React, no stores, no Capacitor) so it can be imported from any
  * context — including, eventually, a tiny encoder shared with the native widget/extension.
+ *
+ * New links emit `pichamber://`. Parsers also accept leftover `openchamber://` (any case)
+ * so already-printed QR codes and old widget URLs still redeem.
  */
 
-const DEEP_LINK_SCHEME = 'openchamber';
+const DEEP_LINK_SCHEME = 'pichamber';
+const LEGACY_DEEP_LINK_SCHEME = 'openchamber';
+
+const isDeepLinkProtocol = (protocol: string): boolean => {
+  const normalized = protocol.toLowerCase();
+  return normalized === `${DEEP_LINK_SCHEME}:` || normalized === `${LEGACY_DEEP_LINK_SCHEME}:`;
+};
 
 export type SessionsFilter = 'all' | 'attention' | 'recent';
 export type ViewTarget = 'files' | 'mcp' | 'instances' | 'update';
@@ -32,8 +41,8 @@ export type DeepLinkIntent =
 const trimSlashes = (value: string): string => value.replace(/^\/+|\/+$/g, '');
 
 const segmentsOf = (url: URL): string[] => {
-  // Custom-scheme URLs put the first route token in `host` (openchamber://session/<id>),
-  // but be tolerant of authority-less forms (openchamber:/session/<id>) where it lands in
+  // Custom-scheme URLs put the first route token in `host` (pichamber://session/<id>),
+  // but be tolerant of authority-less forms (pichamber:/session/<id>) where it lands in
   // the pathname instead.
   const pathSegments = trimSlashes(url.pathname).split('/').filter(Boolean);
   if (url.host) {
@@ -43,9 +52,9 @@ const segmentsOf = (url: URL): string[] => {
 };
 
 /**
- * Parse a raw `openchamber://…` string into a typed intent, or `null` if it isn't a
- * recognised OpenChamber deep link. Tolerant by design: unknown routes return `null`
- * rather than throwing, so callers can fall back without a try/catch.
+ * Parse a raw `pichamber://…` or leftover `openchamber://…` string into a typed intent,
+ * or `null` if it isn't a recognised Pichamber deep link. Tolerant by design: unknown
+ * routes return `null` rather than throwing, so callers can fall back without a try/catch.
  */
 export function parseDeepLink(raw: string | null | undefined): DeepLinkIntent | null {
   if (typeof raw !== 'string' || raw.length === 0) {
@@ -59,7 +68,7 @@ export function parseDeepLink(raw: string | null | undefined): DeepLinkIntent | 
     return null;
   }
 
-  if (url.protocol !== `${DEEP_LINK_SCHEME}:`) {
+  if (!isDeepLinkProtocol(url.protocol)) {
     return null;
   }
 

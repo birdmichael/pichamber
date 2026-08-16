@@ -2,16 +2,16 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-// Control Center control (iOS 18+): tap the OpenChamber logo to start a new session.
+// Control Center control (iOS 18+): tap the Pichamber logo to start a new session.
 //
 // IMPORTANT: this file is a member of BOTH the app target and the widget extension target.
 // iOS requires the control's AppIntent to exist in the app target too, otherwise tapping the
 // control can't open the app (the tap does nothing). It's kept self-contained (inline URL, no
 // dependency on the widget's shared code) so it compiles cleanly in the app target.
 @available(iOS 18.0, *)
-struct OpenChamberNewSessionControl: ControlWidget {
+struct PichamberNewSessionControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "OpenChamberNewSessionControl") {
+        StaticControlConfiguration(kind: "PichamberNewSessionControl") {
             ControlWidgetButton(action: OpenNewSessionIntent()) {
                 // Custom symbol is referenced via `image:` (the asset-catalog symbol path;
                 // `systemImage:` only finds Apple's system SF Symbols → shows a "?"). The glyph
@@ -21,18 +21,18 @@ struct OpenChamberNewSessionControl: ControlWidget {
             }
         }
         .displayName("New Session")
-        .description("Start a new OpenChamber session.")
+        .description("Start a new Pichamber session.")
     }
 }
 
 @available(iOS 18.0, *)
 struct OpenNewSessionIntent: AppIntent {
-    static let title: LocalizedStringResource = "New OpenChamber Session"
+    static let title: LocalizedStringResource = "New Pichamber Session"
     static let openAppWhenRun: Bool = true
     static let isDiscoverable: Bool = true
 
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
-        return .result(opensIntent: OpenURLIntent(URL(string: "openchamber://new")!))
+        return .result(opensIntent: OpenURLIntent(URL(string: "pichamber://new")!))
     }
 }

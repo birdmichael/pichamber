@@ -77,7 +77,7 @@ openchamber connect-url --port 3000 --lan --server http://workstation.local:3000
 
 ### Headless/API-only server for Desktop
 
-Use this on a remote machine when you want OpenChamber running as a web/API server, then connect to it from OpenChamber Desktop on another machine:
+Use this on a remote machine when you want Pichamber running as a web/API server, then connect to it from Pichamber Desktop on another machine:
 
 ```bash
 openchamber connect-url --port 3000 --api-only --lan --server http://workstation.local:3000 --qr --ui-password your-password
@@ -85,7 +85,7 @@ openchamber connect-url --port 3000 --api-only --lan --server http://workstation
 
 `--api-only` starts API routes without serving browser UI assets. `--lan` binds the server so other machines can reach it. `--server` is the address saved into the Desktop connection link. `--ui-password` protects browser access if UI routes are enabled elsewhere; the generated client token is what Desktop uses for API access.
 
-This creates a remote client token and prints an `openchamber://connect?...` link. The link contains the server URL, token, label, and payload version. In OpenChamber Desktop, paste it in **Settings -> Remote Instances -> Direct Instances -> Import Link** to add that server as an Instance.
+This creates a remote client token and prints a `pichamber://connect?...` link. The link contains the server URL, token, label, and payload version. In Pichamber Desktop, paste it in **Settings -> Remote Instances -> Direct Instances -> Import Link** to add that server as an Instance.
 
 If the server was started with `--lan` or `--host 0.0.0.0`, `connect-url` automatically advertises a detected LAN IP instead of `127.0.0.1`. Use `--server <url>` when you want to advertise a specific DNS name, Tailscale address, reverse proxy URL, or HTTPS endpoint.
 
@@ -95,7 +95,7 @@ If you are exposing the server beyond localhost, start it with a password:
 openchamber serve --lan --port 3000 --ui-password your-password
 ```
 
-Generating a client token does not automatically password-protect the hosted browser UI. `--ui-password` protects browser access; the client token lets another OpenChamber app connect to this server.
+Generating a client token does not automatically password-protect the hosted browser UI. `--ui-password` protects browser access; the client token lets another Pichamber app connect to this server.
 
 <details>
 <summary>Connect to external OpenCode server</summary>

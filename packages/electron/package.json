@@ -53,7 +53,7 @@
     "prepare:pi-kernel": "node ./scripts/prepare-pi-kernel.mjs"
   },
   "build": {
-    "appId": "dev.openchamber.desktop",
+    "appId": "dev.pichamber.desktop",
     "productName": "Pichamber",
     "files": [
       "dist-bundle/main.mjs",
@@ -119,14 +119,14 @@
       ],
       "category": "Development",
       "icon": "resources/icons/icon.png",
-      "executableName": "openchamber",
+      "executableName": "pichamber",
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
       "desktop": {
         "entry": {
-          "Name": "OpenChamber",
-          "Comment": "Desktop runtime for OpenChamber",
-          "Icon": "openchamber",
-          "StartupWMClass": "openchamber"
+          "Name": "Pichamber",
+          "Comment": "Desktop runtime for Pichamber",
+          "Icon": "pichamber",
+          "StartupWMClass": "pichamber"
         }
       }
     },

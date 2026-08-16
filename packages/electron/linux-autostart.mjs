@@ -3,7 +3,8 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const AUTOSTART_FILE_NAME = 'openchamber.desktop';
+const AUTOSTART_FILE_NAME = 'pichamber.desktop';
+const LEGACY_AUTOSTART_FILE_NAME = 'openchamber.desktop';
 
 const resolveLinuxAutostartDirectory = ({
   env = process.env,
@@ -38,7 +39,7 @@ const quoteDesktopExecArg = (value) => {
 };
 
 export const buildLinuxAutostartDesktopEntry = ({
-  appName = 'OpenChamber',
+  appName = 'Pichamber',
   executable,
   backgroundArg,
   env = process.env,
@@ -56,24 +57,27 @@ export const buildLinuxAutostartDesktopEntry = ({
     `Exec=${args.join(' ')}`,
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',
-    'StartupWMClass=openchamber',
+    'StartupWMClass=pichamber',
     '',
   ].join('\n');
 };
 
 export const readLinuxAutostartEnabled = async (options = {}) => {
   const filePath = resolveLinuxAutostartFilePath(options);
-  try {
-    await fsp.access(filePath, fs.constants.F_OK);
-    return true;
-  } catch {
-    return false;
+  const legacyFilePath = path.join(path.dirname(filePath), LEGACY_AUTOSTART_FILE_NAME);
+  for (const candidate of [filePath, legacyFilePath]) {
+    try {
+      await fsp.access(candidate, fs.constants.F_OK);
+      return true;
+    } catch {
+    }
   }
+  return false;
 };
 
 export const setLinuxAutostartEnabled = async ({
   enabled,
-  appName = 'OpenChamber',
+  appName = 'Pichamber',
   backgroundArg,
   env = process.env,
   execPath = process.execPath,
@@ -81,9 +85,11 @@ export const setLinuxAutostartEnabled = async ({
 } = {}) => {
   const directory = resolveLinuxAutostartDirectory({ env, homeDir });
   const filePath = path.join(directory, AUTOSTART_FILE_NAME);
+  const legacyFilePath = path.join(directory, LEGACY_AUTOSTART_FILE_NAME);
 
   if (!enabled) {
     await fsp.rm(filePath, { force: true });
+    await fsp.rm(legacyFilePath, { force: true });
     return { supported: true, enabled: false, filePath };
   }
 
@@ -95,5 +101,6 @@ export const setLinuxAutostartEnabled = async ({
     execPath,
   });
   await fsp.writeFile(filePath, contents, 'utf8');
+  await fsp.rm(legacyFilePath, { force: true });
   return { supported: true, enabled: true, filePath };
 };

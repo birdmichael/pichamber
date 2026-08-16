@@ -49,7 +49,7 @@ export const MobileConnectionWelcome: React.FC<{
     void conn.connect({ url: serverUrl, clientToken, label: connectionName });
   }, [clientToken, conn, connectionName, serverUrl]);
 
-  // Accept a pasted pairing link (openchamber://connect?...) in the URL field and
+  // Accept a pasted pairing link (pichamber://connect?...) in the URL field and
   // split it back into the server URL + token.
   const handleUrlChange = React.useCallback((value: string) => {
     if (/^openchamber:\/\//i.test(value.trim())) {
