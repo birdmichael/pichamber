@@ -96,7 +96,7 @@ const facadeUsageFromPiMessage = (message) => {
 };
 
 /** Copy Pi assistant provider/model/usage onto the live SSE `info` shape. */
-export const facadeAssistantInfoFromPiMessage = (message) => {
+const facadeAssistantInfoFromPiMessage = (message) => {
   if (!isRecord(message) || message.role !== 'assistant') return {};
   return {
     ...facadeModelFromPiMessage(message),
