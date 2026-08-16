@@ -89,3 +89,12 @@ bunx vitest run server/lib/pi
 
 bun test --cwd packages/electron ./kernel-env.test.mjs
 ```
+
+## Branch and version
+
+Pichamber is a new product line on this fork. Versioning starts at **1.0.0** and is independent of upstream OpenChamber 1.18.x.
+
+- Default branch: `main` (Pi kernel).
+- The pre-Pi OpenChamber line is preserved as `legacy/openchamber`.
+- Do not open PRs against upstream `openchamber/openchamber`.
+- Land one verified feature per PR into `main`. Do not pile unrelated Pi work into a single pull request.
