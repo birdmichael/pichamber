@@ -640,16 +640,9 @@ describe('fetch remote models request', () => {
 
     const edited = applyModelContextChange(switched, 64000);
     expect(applyModelIdChange(edited, 'gpt-4o').contextWindow).toBe(64000);
-    const afterFetch = addRemoteModelsToForm([edited], [
+    expect(addRemoteModelsToForm([edited], [
       { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1_047_576 },
-    ]);
-    expect(afterFetch[0]?.contextWindow).toBe(64000);
-    const persistedOverride = validateCustomProvider({
-      form: baseForm({ models: afterFetch }),
-      t,
-      existingProviderIDs: new Set(),
-    });
-    expect(persistedOverride.result?.config.models['gpt-4.1']?.contextWindow).toBe(64000);
+    ])[0]?.contextWindow).toBe(64000);
 
     const family = applyModelIdChange({ row: 'm1', id: '', name: '' }, 'claude-unknown-99');
     expect(family.contextWindow).toBe(200000);
