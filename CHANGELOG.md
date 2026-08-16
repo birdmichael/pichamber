@@ -13,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - **Settings/Git:** Connect GitHub now authorizes the Pichamber OAuth app. An existing OpenChamber GitHub login is treated as disconnected, so you will be asked to connect again.
 - **Desktop/UI:** the app mark is now the open-top chamber with Pi’s pixel “pi” on the top face — Dock, tray, favicon, About, empty chat, and splash no longer show the leftover OpenCode O. Dev builds use the same mark with a small amber badge.
 - **Chat:** a new empty session on Pi shows the welcome starter chips again, including Catch me up and Start feature planning. Clicking a chip sends that prompt in the current Pi session.
-- **Chat:** Session Goal is available on the Pi kernel again. The composer target button and Settings Chat toggle stay visible, and a goal set on a session still shows after reload.
 - Settings/Skills: on Pi, new skills, commands, and snippets write to `~/.pi/agent` and `.pi` (plus `.agents` compatibility). Leftover OpenCode folders are no longer listed or offered as Pi locations.
 - Settings: Skills, Skills Catalog, and Commands in the left rail stay clickable and keyboard-focusable without searching first. Choosing a search result (click or Enter) opens that page and focuses the matching field. Provider, agent, and skill rows are no longer announced twice by VoiceOver.
 - **Chat:** sessions from Pi or an earlier Pichamber run now open after a restart instead of showing a load error.
