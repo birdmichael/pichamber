@@ -183,9 +183,11 @@ id. One unreadable session file does not drop other complete sessions.
 Clone, fork, and import copy facade messages in memory and persist them
 through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /
 `toolCall` / `toolResult` / `image` entries so a new host hydrates the
-same transcript. Clone/fork `parentID` is `{ parentID }` on
-`pichamber.metadata`. Hydrate, disk list, and sidebar Refresh read it
-onto `info.parentID`.
+same transcript. JSONL export (`buildSessionJsonl`) writes those same
+entries from facade messages so export → import (or a new host) keeps
+tool, image, thinking, and text parts. HTML export stays text-only.
+Clone/fork `parentID` is `{ parentID }` on `pichamber.metadata`. Hydrate,
+disk list, and sidebar Refresh read it onto `info.parentID`.
 
 ## MCP adapter
 

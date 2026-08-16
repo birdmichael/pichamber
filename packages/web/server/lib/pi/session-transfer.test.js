@@ -46,6 +46,92 @@ describe('session-transfer', () => {
     expect(cloned[0].parts[0].sessionID).toBe('ses_imported');
   });
 
+  it('exports a skill-reading turn and image so import reconstructs tool and file parts', () => {
+    const record = {
+      id: 'ses_export_rich',
+      directory: '/tmp/project',
+      info: { id: 'ses_export_rich', title: 'Skill and image', time: { created: 1_700_000_000_000 } },
+      messages: [
+        {
+          info: { id: 'msg_user', role: 'user', time: { created: 1_700_000_000_100 } },
+          parts: [
+            { id: 'prt_1', type: 'text', text: 'see this' },
+            { id: 'prt_img', type: 'file', mime: 'image/png', url: 'data:image/png;base64,AAAA' },
+          ],
+        },
+        {
+          info: { id: 'msg_asst', role: 'assistant', parentID: 'msg_user', time: { created: 1_700_000_000_200 } },
+          parts: [
+            { id: 'prt_think', type: 'reasoning', text: 'load skills' },
+            { id: 'prt_text', type: 'text', text: 'reading' },
+            {
+              id: 'prt_tool',
+              type: 'tool',
+              callID: 'c1',
+              tool: 'read',
+              state: {
+                status: 'completed',
+                input: { path: 'SKILL.md' },
+                output: '---\nname: using-superpowers\n---\n',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const jsonl = buildSessionJsonl(record);
+    expect(jsonl).toContain('"type":"session"');
+    expect(jsonl).toContain('"type":"toolCall"');
+    expect(jsonl).toContain('"role":"toolResult"');
+    expect(jsonl).toContain('"type":"image"');
+    expect(jsonl).toContain('"type":"thinking"');
+    expect(jsonl).toContain('see this');
+
+    const entries = jsonl
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    expect(entries.some((entry) => entry.message?.content?.some((block) => block.type === 'toolCall'))).toBe(true);
+    expect(entries.some((entry) => entry.message?.role === 'toolResult')).toBe(true);
+    expect(entries.some((entry) => entry.message?.content?.some((block) => block.type === 'image'))).toBe(true);
+    expect(entries.some((entry) => entry.message?.content?.some((block) => block.type === 'thinking'))).toBe(true);
+
+    const parsed = parseSessionImport(jsonl);
+    expect(parsed.title).toBe('Skill and image');
+    expect(parsed.messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
+    expect(parsed.messages[0].parts.map((part) => part.type)).toEqual(['text', 'file']);
+    expect(parsed.messages[0].parts[0].text).toBe('see this');
+    expect(parsed.messages[0].parts[1]).toMatchObject({
+      type: 'file',
+      mime: 'image/png',
+      url: 'data:image/png;base64,AAAA',
+    });
+    expect(parsed.messages[1].parts.map((part) => part.type)).toEqual(['reasoning', 'text', 'tool']);
+    expect(parsed.messages[1].parts[0].text).toBe('load skills');
+    expect(parsed.messages[1].parts[1].text).toBe('reading');
+    expect(parsed.messages[1].parts[2]).toMatchObject({
+      type: 'tool',
+      callID: 'c1',
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { path: 'SKILL.md' },
+        output: '---\nname: using-superpowers\n---\n',
+      },
+    });
+
+    const remapped = facadeMessagesFromPiEntries(entries, 'ses_imported');
+    expect(remapped.map((entry) => ({
+      role: entry.info.role,
+      types: entry.parts.map((part) => part.type),
+    }))).toEqual([
+      { role: 'user', types: ['text', 'file'] },
+      { role: 'assistant', types: ['reasoning', 'text', 'tool'] },
+    ]);
+  });
+
   it('maps Pi session entries onto facade messages', () => {
     const messages = facadeMessagesFromPiEntries([
       { type: 'session_info', name: 'skip me' },

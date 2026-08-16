@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Sessions/Desktop:** on Pi, exporting a chat as JSONL now keeps tool calls, tool results, images, and thinking. Importing that file restores the same transcript.
 - **Sessions/Desktop:** on Pi, cloning, forking, or importing a chat writes the transcript to disk. Quit and reopen still shows those messages, and a clone or fork still knows its parent.
 - **Sessions/Desktop:** on Pi, archived chats stay on the Archive page after quit or sidebar Refresh. Relaunch no longer reopens an archived chat as the last session.
 - **Desktop:** listing agents with Subagents no longer adds a finished Work Status row or opens an empty child chat. Only a real child run appears there; a run that is still starting can show status only.
