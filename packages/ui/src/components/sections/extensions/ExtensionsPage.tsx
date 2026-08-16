@@ -1,6 +1,7 @@
 import React from 'react';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import { SettingsSection } from '@/components/sections/shared/SettingsSection';
+import { shouldShowExtensionsSection } from './extensionsPageVisibility';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
@@ -32,28 +33,36 @@ export const ExtensionsPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  const showExtensionsSection = shouldShowExtensionsSection({
+    loading,
+    extensionCount: extensions.length,
+    packageCount: packages.length,
+  });
+
   return (
     <SettingsPageLayout title={t('settings.page.extensions.title')} showSaveStatus={false}>
-      <SettingsSection
-        title={t('settings.extensions.page.extensions.title')}
-        info={t('settings.extensions.page.extensions.info')}
-        settingsItem="extensions.list"
-      >
-        {loading ? (
-          <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.loading')}</p>
-        ) : extensions.length === 0 ? (
-          <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.extensions.empty')}</p>
-        ) : (
-          <ul className="space-y-2">
-            {extensions.map((item) => (
-              <li key={`${item.scope}:${item.path}`} className="rounded-lg border border-border/50 px-3 py-2">
-                <div className="typography-ui-label font-medium">{item.name}</div>
-                <div className="typography-meta text-muted-foreground">{item.scope} · {item.path}</div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SettingsSection>
+      {showExtensionsSection ? (
+        <SettingsSection
+          title={t('settings.extensions.page.extensions.title')}
+          info={t('settings.extensions.page.extensions.info')}
+          settingsItem="extensions.list"
+        >
+          {loading ? (
+            <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.loading')}</p>
+          ) : extensions.length === 0 ? (
+            <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.extensions.empty')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {extensions.map((item) => (
+                <li key={`${item.scope}:${item.path}`} className="rounded-lg border border-border/50 px-3 py-2">
+                  <div className="typography-ui-label font-medium">{item.name}</div>
+                  <div className="typography-meta text-muted-foreground">{item.scope} · {item.path}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SettingsSection>
+      ) : null}
       <SettingsSection
         title={t('settings.extensions.page.packages.title')}
         info={t('settings.extensions.page.packages.info')}

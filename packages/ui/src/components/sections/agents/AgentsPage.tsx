@@ -5,6 +5,7 @@ import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui';
 import { useAgentsStore, isAgentBuiltIn, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
+import { useSelectPiAgentWhenUnset } from './piAgentSelection';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
 import { ModelSelector } from './ModelSelector';
@@ -80,6 +81,7 @@ export const AgentsPage: React.FC = () => {
   const isPiNativeReadOnly = isPiKernel && !isNewAgent && (
     (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === 'pi'
   );
+  useSelectPiAgentWhenUnset(isPiKernel);
 
 
   const [draftName, setDraftName] = React.useState('');
@@ -274,8 +276,8 @@ export const AgentsPage: React.FC = () => {
       <div className="flex h-full items-center justify-center">
         <div className="text-center text-muted-foreground">
           <Icon name="robot-2" className="mx-auto mb-3 h-12 w-12 opacity-50" />
-          <p className="typography-body">{t('settings.agents.page.empty.title')}</p>
-          <p className="typography-meta mt-1 opacity-75">{t('settings.agents.page.empty.description')}</p>
+          <p className="typography-body">{t(isPiKernel ? 'settings.agents.page.empty.title.pi' : 'settings.agents.page.empty.title')}</p>
+          <p className="typography-meta mt-1 opacity-75">{t(isPiKernel ? 'settings.agents.page.empty.description.pi' : 'settings.agents.page.empty.description')}</p>
         </div>
       </div>
     );

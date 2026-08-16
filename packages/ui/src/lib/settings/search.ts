@@ -645,12 +645,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'agents',
     titleKey: 'settings.agents.page.title.new',
     keywords: ['create', 'add', 'new agent'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.name',
     page: 'agents',
     titleKey: 'settings.agents.page.field.agentName',
     keywords: ['agent', 'name'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.mode',

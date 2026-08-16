@@ -2,7 +2,7 @@ import React from 'react';
 import { cn, getModifierLabel } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
-import { useAgentsStore } from '@/stores/useAgentsStore';
+import { filterVisibleAgents, useAgentsStore } from '@/stores/useAgentsStore';
 import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useMcpConfigStore } from '@/stores/useMcpConfigStore';
 import { useSnippetsStore } from '@/stores/useSnippetsStore';
@@ -13,6 +13,7 @@ import { Tooltip, TooltipTrigger } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { AgentsSidebar } from '@/components/sections/agents/AgentsSidebar';
 import { AgentsPage } from '@/components/sections/agents/AgentsPage';
+import { resolvePiDefaultAgentSelection } from '@/components/sections/agents/piAgentSelection';
 import { BehaviorPage } from '@/components/sections/behavior/BehaviorPage';
 import { ExtensionsPage } from '@/components/sections/extensions/ExtensionsPage';
 import { CommandsSidebar } from '@/components/sections/commands/CommandsSidebar';
@@ -433,6 +434,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   const prepareSettingsSearchTarget = React.useCallback((result: SettingsSearchResult): string => {
     if (result.id.startsWith('agents.')) {
       const store = useAgentsStore.getState();
+      if (isPiKernel) {
+        const name = resolvePiDefaultAgentSelection(filterVisibleAgents(store.agents));
+        if (name) {
+          store.setSelectedAgent(name);
+        }
+        return result.id;
+      }
       const name = nextUniqueName('new-agent', store.agents.map((agent) => agent.name));
       store.setAgentDraft({ name, scope: 'user' });
       store.setSelectedAgent(name);
@@ -495,7 +503,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     }
 
     return result.id;
-  }, []);
+  }, [isPiKernel]);
 
   const groupedSettingsSearchResults = React.useMemo(() => {
     const groups: Array<{ page: SettingsPageSlug; pageTitle: string; results: SettingsSearchResult[] }> = [];
