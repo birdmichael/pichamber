@@ -1,173 +1,65 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/badges/openchamber-logo-dark.svg"><img src="docs/references/badges/openchamber-logo-light.svg" width="32" height="32" align="absmiddle" /></picture> OpenChamber
+# Pichamber
 
-[![GitHub stars](https://img.shields.io/github/stars/openchamber/openchamber?style=flat&labelColor=100F0F&color=66800B)](https://github.com/openchamber/openchamber/stargazers)
-[![GitHub release](https://img.shields.io/github/v/release/openchamber/openchamber?style=flat&labelColor=100F0F&color=205EA6)](https://github.com/openchamber/openchamber/releases/latest)
-[![Discord](https://img.shields.io/badge/Discord-join.svg?style=flat&labelColor=100F0F&color=8B7EC8&logo=discord&logoColor=FFFCF0)](https://discord.gg/ZYRSdnwwKA)
-[![Support the project](https://img.shields.io/badge/Support-Project-black?style=flat&labelColor=100F0F&color=EC8B49&logo=ko-fi&logoColor=FFFCF0)](https://ko-fi.com/G2G41SAWNS)
+[![GitHub release](https://img.shields.io/github/v/release/birdmichael/pichamber?style=flat&labelColor=100F0F&color=205EA6)](https://github.com/birdmichael/pichamber/releases/latest)
+[![GitHub stars](https://img.shields.io/github/stars/birdmichael/pichamber?style=flat&labelColor=100F0F&color=66800B)](https://github.com/birdmichael/pichamber/stargazers)
 
-## Run agent work. Keep control. Ship from anywhere.
+**Pichamber is a macOS desktop workspace for [Pi](https://github.com/earendil-works/pi).** Direct the agent, review the diff, and keep sessions, skills, and git in one window.
 
-**OpenChamber is an open-source workspace for running, supervising, and reviewing AI coding work across desktop, browser, editor, and mobile.**
+This is a new product line on a fork of OpenChamber. Versioning starts at **1.0.0** and is independent of upstream OpenChamber `1.18.x`. The kernel is in-process Pi (`@earendil-works/pi-coding-agent`), not an OpenCode child process.
 
-OpenChamber gives you one place to direct agent work, understand the changes, and move them toward release. Your projects stay available when you switch devices or step away.
+![Pichamber](docs/references/chat_example.png)
 
-![OpenChamber Chat](docs/references/chat_example.png)
+## What you get
 
-<details>
-<summary>More screenshots</summary>
+- **Pi models and thinking** — providers and models come from `~/.pi/agent` at runtime. Thinking levels (`off` … `max`) sit next to the composer model chip.
+- **Skills, prompts, and commands** — user and project skills under `~/.pi/agent` and `.pi`. Slash commands are Pi builtins plus your prompts.
+- **Sessions** — compact, retry, scoped models, export/import JSONL or HTML, and a session tree for fork-from-here.
+- **Project trust** — decide whether a folder may load `.pi` settings and extensions.
+- **Files, git, and terminal** — review changes, open PRs, and keep a docked shell beside the chat.
 
-![VS Code Extension](packages/vscode/extension.jpg)
-
-<p>
-<img src="docs/references/pwa_chat_example.png" width="45%" alt="OpenChamber PWA chat">
-<img src="docs/references/pwa_diff_example.png" width="45%" alt="OpenChamber PWA diff review">
-</p>
-
-</details>
-
-## What you can do with OpenChamber
-
-### Goals that continue on their own
-
-Give a session a finish line with **Session Goals**. OpenChamber checks the result after every turn and keeps the agent working until the goal is complete, blocked, or reaches the limit you set — even after you close the app.
-
-### Compare and combine runs
-
-Use **Multi-run** to give the same task to up to five models, each in its own session and optionally its own worktree. See what each one actually built, choose the best result, or use **Fusion** to combine the strongest parts into a new session.
-
-### Guided changes walkthroughs
-
-**Changes Walkthrough** turns a large diff into an AI-guided tour of the change. It groups related edits into steps, puts them in the order the change makes sense, and explains how the pieces fit together.
-
-### Inspect a running app
-
-Open your app beside the conversation with **Preview**. Point at an element and send the agent its screenshot, styles, position, and browser errors — all the context behind “this thing here.” Desktop brings the same workflow to any web page through its built-in browser.
-
-### GitHub context from issue to pull request
-
-Start a session from a GitHub issue or pull request with its context attached. Send failed checks or review comments back to the agent, then update or merge the pull request from OpenChamber.
-
-### Continue on another device
-
-Open the same projects and sessions from Desktop, Web/PWA, VS Code, iOS, or Android. Check progress, answer questions, review changes, and reattach to a running terminal.
-
-### Private remote access
-
-Pair a device with a one-time QR code and connect through **Private Relay** without opening ports or exposing a public server. The connection is end-to-end encrypted and can be revoked at any time. Direct connections, LAN/VPN access, Cloudflare/Ngrok tunnels, and SSH are also supported.
-
-### Track work across projects
-
-See which sessions are working, waiting, finished, or failed, along with approvals, scheduled tasks, provider limits, token use, and costs. Organize sessions into folders and keep notes, todos, and reusable project actions nearby.
-
-### Schedule recurring work
-
-Run a prompt once, daily, weekly, or on a cron schedule. Scheduled tasks can use Session Goals, so they continue toward an outcome instead of stopping after one response.
-
-## Use it where you work
-
-| Surface | Role |
-| --- | --- |
-| **Desktop** | The complete workspace for macOS, Windows, and Linux, with multiple windows, Mini Chat, remote machines, SSH, and native notifications |
-| **Web / PWA** | Open your workspace in a browser, install it as an app, and stay up to date through background notifications |
-| **VS Code** | Keep sessions beside your code, send selections to the agent, open results in the editor, and compare parallel runs |
-| **iOS / Android** | Review and steer work away from your desk, receive completion alerts, and use the terminal with touch controls |
-| **CLI / Server** | Run OpenChamber on a workstation or server, schedule work, manage remote access, and keep it available after login |
+OpenCode-only surfaces (Usage, MCP, Plugins, Session Goals, the OpenCode CLI) are hidden on the Pi kernel.
 
 ## Quick start
 
-### Desktop — macOS (Pichamber)
-
-This fork's product is the **macOS Desktop app** running the in-process Pi kernel. See [`docs/PICHAMBER.md`](docs/PICHAMBER.md).
+Product target: **macOS Desktop (Electron)**. Web is only for backend testing. See [`docs/PICHAMBER.md`](docs/PICHAMBER.md).
 
 ```bash
 bun install
-bun run electron:dev          # Mac dev, boots Pi
+bun run electron:dev          # HMR desktop, boots Pi
 bun run electron:build        # Mac only: Pichamber-*.dmg in packages/electron/dist
 ```
 
-No OpenCode CLI install is required. Configure `~/.pi/agent`. Set `OPENCHAMBER_KERNEL=opencode` only to restore the leftover OpenCode process path.
+Configure Pi the usual way:
 
-Linux releases are available as x86_64 and ARM64 AppImages. Make the downloaded AppImage executable and keep it in a writable location for in-app updates:
+- `~/.pi/agent/auth.json`
+- `~/.pi/agent/models.json`
+- optional `~/.pi/agent/settings.json`, `AGENTS.md`, `SYSTEM.md`, skills, prompts
 
-```bash
-chmod +x OpenChamber-*.AppImage
-./OpenChamber-*.AppImage
-```
+The `pi` CLI on your PATH is optional. Desktop embeds the Pi SDK.
 
-Linux AppImages require FUSE (`libfuse.so.2`). Without FUSE, run with `APPIMAGE_EXTRACT_AND_RUN=1`.
+`OPENCHAMBER_KERNEL` defaults to `pi`. Set `OPENCHAMBER_KERNEL=opencode` only if you need the leftover OpenCode process path.
 
-### VS Code
+## Branch and version
 
-Install [OpenChamber from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=fedaykindev.openchamber), or search for “OpenChamber” in Extensions.
+| Ref | Role |
+| --- | --- |
+| [`main`](https://github.com/birdmichael/pichamber) | Pi kernel mainline, Pichamber **1.0.0** |
+| [`legacy/openchamber`](https://github.com/birdmichael/pichamber/tree/legacy/openchamber) | Pre-Pi OpenChamber history |
 
-### CLI — Web and PWA
+Land **one verified feature per pull request** into `main`. Do not open PRs against upstream [`openchamber/openchamber`](https://github.com/openchamber/openchamber).
 
-Requires Node.js 22+. CLI/Web and VS Code use your installed [OpenCode CLI](https://opencode.ai).
+## Docs
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
-openchamber --ui-password be-creative-here
-```
-
-Common operations:
-
-```bash
-openchamber status
-openchamber connect-url --qr
-openchamber tunnel start --provider cloudflare --mode quick --qr
-openchamber startup enable
-openchamber logs
-openchamber stop
-openchamber update
-```
-
-OpenChamber binds to localhost by default. Use `--lan` only on a trusted network and protect browser access with `--ui-password`.
-
-## Guides
-
-Go deeper with the OpenChamber guides:
-
-- [Quick start](packages/docs/content/docs/quickstart.mdx)
-- [Installation](packages/docs/content/docs/install.mdx)
-- [Connect devices](packages/docs/content/docs/connect-devices.mdx)
-- [Private Relay](packages/docs/content/docs/private-relay.mdx)
-- [Multi-run](packages/docs/content/docs/multi-run.mdx)
-- [Session Goals](packages/docs/content/docs/session-goals.mdx)
-- [Changes Walkthrough](packages/docs/content/docs/walkthrough.mdx)
-- [Preview and dev servers](packages/docs/content/docs/preview.mdx)
-- [GitHub workflows](packages/docs/content/docs/github.mdx)
-- [Mobile](packages/docs/content/docs/mobile.mdx)
-- [Security](packages/docs/content/docs/security.mdx)
-- [Troubleshooting](packages/docs/content/docs/troubleshooting.mdx)
-
-For self-hosting details, see the [reverse proxy guide](docs/REVERSE_PROXY.md). For custom theme authoring, see the [custom themes guide](docs/CUSTOM_THEMES.md).
-
-## Why OpenCode?
-
-OpenChamber uses [OpenCode](https://opencode.ai) to power its coding agents. We chose it because we believe it provides the best open-source agentic coding experience today: capable, extensible, and open by design.
-
-Around that foundation, OpenChamber brings together the work that happens before, during, and after an agent run — deciding what to try, keeping it on track, reviewing the result, connecting from anywhere, and getting the change shipped.
-
-OpenChamber is an independent project and is not affiliated with the OpenCode team.
-
-## Pichamber (Pi kernel)
-
-This fork runs the OpenChamber UI against [Pi](https://github.com/earendil-works/pi) instead of an OpenCode process. See [docs/PICHAMBER.md](docs/PICHAMBER.md) for macOS setup, mock mode, and what is still OpenCode-only.
-
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and contribution guidelines. Documentation authoring guidance lives in [`packages/docs`](packages/docs/README.md).
+- [Pichamber on Pi](docs/PICHAMBER.md)
+- [Reverse proxy](docs/REVERSE_PROXY.md)
+- [Custom themes](docs/CUSTOM_THEMES.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Acknowledgments
 
-Special thanks to:
+Pichamber started from [OpenChamber](https://github.com/openchamber/openchamber) and runs on [Pi](https://github.com/earendil-works/pi). Thanks to both projects, and to [Pierre](https://pierrejs-docs.vercel.app/) and [Ghostty-web](https://github.com/coder/ghostty-web) for the diff and terminal pieces that remain in the UI.
 
-- [OpenCode](https://opencode.ai) for its excellent API and extensible open-source architecture
-- [Pierre](https://pierrejs-docs.vercel.app/) for its fast diff viewer and syntax highlighting
-- [Ghostty-web](https://github.com/coder/ghostty-web) for its Ghostty web renderer
-- [Yulia Ivashko](https://github.com/yulia-ivashko), who built the firework celebration that plays on every successful push
-- Every contributor who shaped OpenChamber with code, ideas, and attention to detail
+Pichamber is an independent fork. It is not affiliated with the OpenChamber or OpenCode teams.
 
 ## License
 
