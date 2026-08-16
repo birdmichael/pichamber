@@ -46,7 +46,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const RELOAD_WAIT_FOR_RESPONSE = 'Wait for the current response to finish before reloading.';
 const RELOAD_WAIT_FOR_COMPACTION = 'Wait for compaction to finish before reloading.';
 
-export const sessionBlocksPiReload = (record) => {
+const sessionBlocksPiReload = (record) => {
   if (record?.piSession?.isStreaming) return RELOAD_WAIT_FOR_RESPONSE;
   if (record?.piSession?.isCompacting) return RELOAD_WAIT_FOR_COMPACTION;
   const statusType = record?.status?.type;
