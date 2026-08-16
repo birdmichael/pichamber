@@ -47,9 +47,10 @@ export const SkillAutocomplete = React.forwardRef<SkillAutocompleteHandle, Skill
 
   React.useEffect(() => {
     const normalizedQuery = searchQuery.trim();
+    const injectable = skills.filter((skill) => skill.injected !== false);
     const matches = normalizedQuery.length
-      ? skills.filter((skill) => fuzzyMatch(skill.name, normalizedQuery))
-      : skills;
+      ? injectable.filter((skill) => fuzzyMatch(skill.name, normalizedQuery))
+      : injectable;
 
     const sorted = [...matches].sort((a, b) => {
       // Sort by project scope first, then name

@@ -80,6 +80,8 @@ export interface DiscoveredSkill {
   group?: string;
   /** Authoritative server flag: skill lives under a managed root and can be renamed in place. */
   renamable?: boolean;
+  /** False when a project skill is discovered but Pi will not inject it (untrusted). */
+  injected?: boolean;
 }
 
 /** Parse the domain group folder from a skill file path.
@@ -104,6 +106,7 @@ interface RawSkillResponse {
   scope?: SkillScope;
   source?: SkillSource;
   renamable?: boolean;
+  injected?: boolean;
   sources?: {
     md?: {
       description?: string;
@@ -290,6 +293,7 @@ export const useSkillsStore = create<SkillsStore>()(
                   description: s.sources?.md?.description || '',
                   group: parseSkillGroup(s.path),
                   renamable: s.renamable === true,
+                  injected: s.injected !== false,
                 }));
 
                 // OpenCode loads a narrower set than this scan finds, and the
