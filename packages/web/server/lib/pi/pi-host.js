@@ -67,6 +67,15 @@ import {
   sessionPlanFromState,
 } from './session-plan.js';
 import {
+  extractRunsFromFacadeMessages,
+  findAdapterRunByChildSessionId,
+  isSubagentsSlotActive,
+  listAdapterRunsFromFiles,
+  mergeSubagentRuns,
+  readSessionIdFromSessionFile,
+  toPublicSubagentRun,
+} from './subagent-runs.js';
+import {
   buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
@@ -1236,6 +1245,178 @@ export const createPiHost = ({
     });
   };
 
+  const attachSessionFromFile = async (file, {
+    sessionID,
+    directory,
+    parentID,
+    metadata,
+    title,
+  } = {}) => {
+    const resolvedFile = typeof file === 'string' ? file.trim() : '';
+    if (!resolvedFile || !fs.existsSync(resolvedFile)) {
+      throw missingSession(sessionID || resolvedFile);
+    }
+    let manager = null;
+    if (!mock) {
+      try {
+        const pi = await loadPiSdk();
+        if (typeof pi.SessionManager?.open === 'function') {
+          manager = pi.SessionManager.open(resolvedFile);
+        }
+      } catch {
+        manager = null;
+      }
+    }
+    const fileEntries = (() => {
+      try {
+        return fs.readFileSync(resolvedFile, 'utf8')
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+      } catch {
+        return [];
+      }
+    })();
+    const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
+      || directory
+      || defaultDirectory;
+    const resolvedId = (typeof manager?.getSessionId === 'function' && manager.getSessionId())
+      || sessionID
+      || readSessionIdFromSessionFile(resolvedFile);
+    if (!resolvedId) {
+      throw missingSession(sessionID || resolvedFile);
+    }
+    const existing = sessions.get(resolvedId);
+    if (existing) {
+      if (parentID) existing.info.parentID = parentID;
+      if (metadata && typeof metadata === 'object') {
+        existing.info.metadata = { ...(existing.info.metadata || {}), ...metadata };
+      }
+      return existing;
+    }
+    const factory = await resolveCreateSession();
+    const model = await resolvePreferredModel();
+    let piSession;
+    try {
+      piSession = await factory({
+        cwd,
+        modelRuntime,
+        model,
+        ...(manager ? { sessionManager: manager } : {}),
+      });
+    } catch (error) {
+      console.warn(`[pi-host] failed to attach subagent session ${resolvedId}:`, error?.message || error);
+      piSession = createInMemoryPiSession({ sessionId: resolvedId });
+    }
+    const entries = typeof manager?.getEntries === 'function' ? manager.getEntries() : fileEntries;
+    const persistedMetadata = readPersistedSessionMetadata(entries);
+    const record = {
+      id: resolvedId,
+      directory: cwd,
+      sessionFile: resolvedFile,
+      sessionManager: manager,
+      info: createSessionInfo({
+        id: resolvedId,
+        directory: cwd,
+        title: title
+          || (typeof manager?.getSessionName === 'function' && manager.getSessionName())
+          || 'Subagent',
+        parentID,
+        metadata: {
+          ...(persistedMetadata || {}),
+          ...(metadata || {}),
+        },
+        projectID: cwd,
+      }),
+      messages: facadeMessagesFromPiEntries(entries, resolvedId),
+      status: { type: 'idle' },
+      piSession,
+      translator: createEventTranslator({ sessionID: resolvedId, directory: cwd }),
+      unsubscribe: null,
+    };
+    attachSession(record);
+    sessions.set(resolvedId, record);
+    emit(cwd, {
+      id: createEventId(),
+      type: 'session.created',
+      properties: { info: record.info },
+    });
+    return record;
+  };
+
+  const refreshChildMessagesFromFile = (record) => {
+    const file = record?.sessionFile;
+    if (!file || !fs.existsSync(file)) return;
+    try {
+      const piSessionManager = record.sessionManager;
+      const entries = typeof piSessionManager?.getEntries === 'function'
+        ? piSessionManager.getEntries()
+        : fs.readFileSync(file, 'utf8')
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .map((line) => JSON.parse(line));
+      if (!Array.isArray(entries)) return;
+      record.messages = facadeMessagesFromPiEntries(entries, record.id);
+    } catch {
+    }
+  };
+
+  const collectSubagentRuns = (parent) => {
+    const fileRuns = listAdapterRunsFromFiles({
+      parent,
+      projectDir: parent.directory,
+    });
+    const toolRuns = extractRunsFromFacadeMessages(parent.messages, parent.id);
+    return mergeSubagentRuns(fileRuns, toolRuns);
+  };
+
+  const attachSubagentRun = async (parent, run) => {
+    if (!run?.sessionFile && !run?.sessionID) return run;
+    try {
+      if (run.sessionFile) {
+        const record = await attachSessionFromFile(run.sessionFile, {
+          sessionID: run.sessionID || undefined,
+          directory: parent.directory,
+          parentID: parent.id,
+          title: run.title || run.name,
+          metadata: {
+            pichamber: {
+              subagentRun: {
+                runId: run.runId,
+                parentSessionID: parent.id,
+                mode: run.mode,
+                state: run.state,
+                name: run.name,
+                role: run.role,
+              },
+            },
+          },
+        });
+        record.subagentRun = run;
+        const nextState = run.state === 'running' || run.state === 'queued' || run.state === 'blocked'
+          ? { type: 'busy' }
+          : { type: 'idle' };
+        if (record.status?.type !== nextState.type) {
+          record.status = nextState;
+          emit(record.directory, {
+            id: createEventId(),
+            type: nextState.type === 'busy' ? 'session.status' : 'session.idle',
+            properties: nextState.type === 'busy'
+              ? { sessionID: record.id, status: nextState }
+              : { sessionID: record.id },
+          });
+        }
+        return { ...run, sessionID: record.id };
+      }
+      if (run.sessionID && sessions.has(run.sessionID)) {
+        return run;
+      }
+    } catch (error) {
+      console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
+    }
+    return run;
+  };
+
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
     if (existing) return existing;
@@ -1244,7 +1425,32 @@ export const createPiHost = ({
     }
     const pending = hydrating.get(sessionID);
     if (pending) return pending;
-    const task = hydratePersistedSession(sessionID, directory).finally(() => {
+    const task = hydratePersistedSession(sessionID, directory).catch(async (error) => {
+      const adapterRun = findAdapterRunByChildSessionId(sessionID, {
+        projectDir: directory || defaultDirectory,
+      });
+      if (adapterRun?.sessionFile) {
+        return attachSessionFromFile(adapterRun.sessionFile, {
+          sessionID,
+          directory: directory || defaultDirectory,
+          parentID: adapterRun.parentID,
+          title: adapterRun.title || adapterRun.name,
+          metadata: {
+            pichamber: {
+              subagentRun: {
+                runId: adapterRun.runId,
+                parentSessionID: adapterRun.parentID,
+                mode: adapterRun.mode,
+                state: adapterRun.state,
+                name: adapterRun.name,
+                role: adapterRun.role,
+              },
+            },
+          },
+        });
+      }
+      throw error;
+    }).finally(() => {
       hydrating.delete(sessionID);
     });
     hydrating.set(sessionID, task);
@@ -1332,7 +1538,32 @@ export const createPiHost = ({
       return record;
     },
     getMessages(sessionID) {
-      return getRecord(sessionID).messages;
+      const record = getRecord(sessionID);
+      if (record.subagentRun) {
+        refreshChildMessagesFromFile(record);
+      }
+      return record.messages;
+    },
+    async listSubagentRuns(sessionID, directory) {
+      if (!isSubagentsSlotActive(this.getFeaturePlugins())) {
+        return { runs: [] };
+      }
+      const parent = await ensureRecord(sessionID, directory);
+      const runs = [];
+      for (const run of collectSubagentRuns(parent)) {
+        runs.push(toPublicSubagentRun(await attachSubagentRun(parent, run)));
+      }
+      return { runs };
+    },
+    async listSessionChildren(sessionID, directory) {
+      if (!isSubagentsSlotActive(this.getFeaturePlugins())) {
+        return [];
+      }
+      const { runs } = await this.listSubagentRuns(sessionID, directory);
+      return runs
+        .filter((run) => run.sessionID)
+        .map((run) => sessions.get(run.sessionID)?.info)
+        .filter(Boolean);
     },
     getStatus(directory) {
       const map = {};

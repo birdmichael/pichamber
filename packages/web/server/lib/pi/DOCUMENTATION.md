@@ -192,3 +192,25 @@ install/enable because that GET hydrates the session and idle sessions were
 reloaded. The composer Goal button may mint a draft session before
 `session.command`. Start failures stay in the modal. Do not require a
 provider/model for this command-only start.
+
+## Subagent children
+
+The Subagents feature-plugin slot (`installed` and `enabled`) is the gate.
+`GET /api/pi/feature-plugins` is the existing slot status; this host does not
+add a second install path. Opening Feature Plugins or installing
+`npm:pi-subagents` does not spawn a reviewer.
+
+When the slot is on:
+
+- `GET /api/session/:id/subagent-runs` lists `pi-subagents` adapter runs
+  (async status files plus parent-transcript `subagent` tool parts). Each
+  public run is `{ runId, sessionID, name, role, mode, state, title, openable }`.
+- A run with a child session file is attached as a facade session: stable Pi
+  id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
+  Follow-ups stay on the child; the parent transcript is unchanged.
+- `GET /api/session/:id/children` returns those attached child infos. It is
+  not leftover in-memory `parentID` clones.
+- A run without an openable session id is status-only.
+
+When the slot is off, both lists are empty. Leftover OpenCode `parentID`
+children are not a Pi fleet. OpenCode kernel routes are unchanged.

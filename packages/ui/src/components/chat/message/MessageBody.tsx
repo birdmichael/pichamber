@@ -54,6 +54,10 @@ import {
     sendReviewFeedbackToOriginal,
 } from '@/lib/reviewFlow';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { openSubagentChildSession } from '@/lib/subagents/childSession';
+import { shouldRenderOpenCodeSubtaskChrome } from '@/lib/subagents/subagentTool';
 import { useProviderLogo } from '@/hooks/useProviderLogo';
 import { getAgentColor } from '@/lib/agentColors';
 import { isCapacitorMobileApp } from '@/apps/mobileNativeChrome';
@@ -197,7 +201,12 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
     const { isMobile } = useDeviceInfo();
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
     const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
+    const isPiKernel = usePiKernel();
+    const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
     const { t } = useI18n();
+    if (!shouldRenderOpenCodeSubtaskChrome({ isPiKernel, subagentsSlotActive })) {
+        return null;
+    }
 
     const description = typeof part.description === 'string' ? part.description.trim() : '';
     const command = typeof part.command === 'string' ? part.command.trim() : '';
@@ -256,21 +265,16 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
                         type="button"
                         className="typography-meta text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
                         onClick={() => {
-                            if (!effectiveDirectory) return;
-                            // In contexts with no ContextPanel (embedded
-                            // session-chat iframe) or single-surface layouts
-                            // (mobile, VS Code), navigate in place. Otherwise
-                            // open a new side-panel tab.
-                            if (isEmbeddedSessionChat() || isMobile || isVSCodeRuntime()) {
-                                setCurrentSession(taskSessionID, effectiveDirectory);
-                                return;
-                            }
-
-                            openContextPanelTab(effectiveDirectory, {
-                                mode: 'chat',
-                                dedupeKey: `session:${taskSessionID}`,
+                            openSubagentChildSession({
+                                sessionID: taskSessionID,
+                                directory: effectiveDirectory,
                                 label: description || agent || t('contextPanel.mode.chat'),
-                                readOnly: true,
+                                readOnly: !isPiKernel,
+                                isMobile,
+                                isVSCode: isVSCodeRuntime(),
+                                isEmbedded: isEmbeddedSessionChat(),
+                                setCurrentSession,
+                                openContextPanelTab,
                             });
                         }}
                     >
