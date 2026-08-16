@@ -26,7 +26,9 @@ Resolution order:
    `.pi/prompts`) — expand `$ARGUMENTS` and send as chat via `promptAsync`.
 5. Other live `getCommands()` entries (`prompt` / `skill`) — same
    `session.prompt` path as the Pi CLI.
-6. Unknown name — 404. The slash is not sent as a normal user message.
+6. Unknown name — 404 when this route is called. The composer does not
+   POST unknown names here; those fall through to `sendMessage` /
+   `promptAsync` as a normal chat turn.
 
 ## Command list
 
