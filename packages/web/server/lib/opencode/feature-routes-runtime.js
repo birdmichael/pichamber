@@ -125,6 +125,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       writeSseEvent,
       emitSessionCreatedEvent,
       permissionAutoAcceptRuntime,
+      getPiHost,
     } = routeDependencies;
 
     registerSettingsUtilityRoutes(app, {
@@ -290,6 +291,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       isClawdHubSource,
       getProfiles,
       getProfile,
+      getPiHost,
     });
 
     registerQuotaRoutes(app, { getQuotaProviders });

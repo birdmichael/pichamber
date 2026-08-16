@@ -50,6 +50,7 @@ export const registerSkillRoutes = (app, dependencies) => {
     isClawdHubSource,
     getProfiles,
     getProfile,
+    getPiHost,
   } = dependencies;
 
   const findWorktreeRootForSkills = (workingDirectory) => {
@@ -238,6 +239,15 @@ export const registerSkillRoutes = (app, dependencies) => {
 
   app.get('/api/config/skills', async (req, res) => {
     try {
+      const piHost = getPiHost?.();
+      if (typeof piHost?.getConfigSkills === 'function') {
+        const { directory, error } = await resolveSkillsDirectory(req);
+        if (error) {
+          return res.status(400).json({ error });
+        }
+        return res.json(piHost.getConfigSkills(directory));
+      }
+
       const { directory, error } = await resolveSkillsDirectory(req);
       if (error) {
         return res.status(400).json({ error });

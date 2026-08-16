@@ -28,7 +28,7 @@ const createTempProject = () => {
   return projectRoot;
 };
 
-const startSkillsApp = ({ projectRoot }) => {
+const startSkillsApp = ({ projectRoot, extraDependencies = {} }) => {
   const app = express();
   app.use(express.json());
 
@@ -79,6 +79,7 @@ const startSkillsApp = ({ projectRoot }) => {
     isClawdHubSource: () => false,
     getProfiles: () => [],
     getProfile: () => null,
+    ...extraDependencies,
   });
 
   const server = app.listen(0);
@@ -215,5 +216,63 @@ describe('skill-routes directory soft fallback', () => {
         force: true,
       });
     }
+  });
+});
+
+describe('skill-routes Pi config skills', () => {
+  /** @type {{ close: () => Promise<void> } | null} */
+  let appHandle = null;
+
+  afterEach(async () => {
+    if (appHandle) {
+      await appHandle.close();
+      appHandle = null;
+    }
+  });
+
+  it('returns getConfigSkills payload with projectTrust and injected, without OpenCode', async () => {
+    const projectRoot = '/tmp/pi-skills-project';
+    let discovered = false;
+    const payload = {
+      skills: [
+        { name: 'review', scope: 'user', injected: true },
+        { name: 'local', scope: 'project', injected: false },
+      ],
+      projectTrust: {
+        trusted: false,
+        defaultProjectTrust: false,
+        current: null,
+      },
+      externalSkills: { claudeDisabled: false, allDisabled: false },
+    };
+
+    appHandle = startSkillsApp({
+      projectRoot,
+      extraDependencies: {
+        getPiHost: () => ({
+          getConfigSkills: (directory) => {
+            expect(directory).toBe(projectRoot);
+            return payload;
+          },
+        }),
+        discoverSkills: () => {
+          discovered = true;
+          throw new Error('OpenCode discovery should not run on the Pi kernel');
+        },
+        getOpenCodePort: () => {
+          throw new Error('OpenCode port should not be required');
+        },
+      },
+    });
+
+    const listResponse = await fetch(
+      `${appHandle.baseUrl}/api/config/skills?directory=${encodeURIComponent(projectRoot)}`,
+    );
+    expect(listResponse.status).toBe(200);
+    const body = await listResponse.json();
+    expect(body).toEqual(payload);
+    expect(body.projectTrust.trusted).toBe(false);
+    expect(body.skills.find((skill) => skill.name === 'local').injected).toBe(false);
+    expect(discovered).toBe(false);
   });
 });
