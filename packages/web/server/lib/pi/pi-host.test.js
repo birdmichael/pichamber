@@ -354,7 +354,7 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
-  it('runCommand /reload invokes reload and replies in-process', async () => {
+  it('runCommand /reload is not a user command and does not reload', async () => {>>>>>>> f0dbbe4e8 (Hide /reload from Pi slash commands and Settings.)
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-cmd-'));
     try {
       const host = createPiHost({
@@ -369,10 +369,12 @@ describe('createPiHost', () => {
         reloads += 1;
         return original();
       };
-      const result = await host.runCommand(record.id, { command: 'reload', messageID: 'msg_reload' });
-      expect(reloads).toBe(1);
-      expect(result.info.role).toBe('assistant');
-      expect(result.parts[0].text).toMatch(/Reloaded Pi/);
+      await expect(host.runCommand(record.id, { command: 'reload', messageID: 'msg_reload' })).rejects.toMatchObject({
+        status: 400,
+        message: 'reload is not a user command',
+      });
+      expect(reloads).toBe(0);
+      expect(host.getMessages(record.id)).toEqual([]);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

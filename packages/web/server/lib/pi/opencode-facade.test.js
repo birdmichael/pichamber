@@ -172,6 +172,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'compact')).toBe(true);
       expect(commands.some((command) => command.name === 'login')).toBe(true);
+      expect(commands.some((command) => command.name === 'reload')).toBe(false);
       expect(commands.some((command) => command.name === 'model')).toBe(false);
       expect(commands.some((command) => command.name === 'thinking')).toBe(false);
       const sdkCommands = await (await fetch(`${url}/command`)).json();
@@ -553,7 +554,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('runs /reload as a Pi command and persists thinking defaults', async () => {
+  it('rejects /reload as a user command and persists thinking defaults', async () => {>>>>>>> f0dbbe4e8 (Hide /reload from Pi slash commands and Settings.)
     const { url, close, kernel } = await startFacade();
     try {
       const created = await (await fetch(`${url}/api/session`, {
@@ -572,11 +573,12 @@ describe('OpenCode facade HTTP/SSE', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ command: 'reload', arguments: '' }),
       });
-      expect(command.status).toBe(200);
+      expect(command.status).toBe(400);
       const body = await command.json();
-      expect(body.info.role).toBe('assistant');
-      expect(body.parts[0].text).toMatch(/Reloaded Pi/);
-      expect(reloads).toBe(1);
+      expect(body.error).toMatch(/not a user command/);
+      expect(reloads).toBe(0);
+      const messages = await (await fetch(`${url}/api/session/${created.id}/message`)).json();
+      expect(messages).toEqual([]);
 
       const thinking = await fetch(`${url}/api/session/${created.id}/command`, {
         method: 'POST',

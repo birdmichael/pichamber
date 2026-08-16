@@ -31,8 +31,8 @@ export interface Command extends CommandConfig {
   isBuiltIn?: boolean;
 }
 
-// OpenCode leftovers plus Pi-listed slash builtins. Chip-owned model/thinking are not listed on Pi.
-const BUILTIN_COMMAND_NAMES = new Set(['init', 'review', 'compact', 'reload', 'login']);
+// OpenCode leftovers plus Pi-listed slash builtins. Chip-owned model/thinking and host-only reload are not listed on Pi.
+const BUILTIN_COMMAND_NAMES = new Set(['init', 'review', 'compact', 'login']);
 
 export const isCommandBuiltIn = (command: Command): boolean => {
   return command.source === 'builtin' || BUILTIN_COMMAND_NAMES.has(command.name);

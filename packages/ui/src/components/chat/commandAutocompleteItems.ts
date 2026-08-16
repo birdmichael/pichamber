@@ -84,11 +84,12 @@ const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
   'model', 'thinking',
 ]);
 
-/** OpenCode leftovers plus composer chips that already cover the same action. */
+/** OpenCode leftovers plus composer chips that already cover the same action. Reload is host-only. */
 const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'init', 'undo', 'redo', 'timeline', 'summary',
   'handoff-review',
   ...PI_CHIP_OWNED_SLASH_COMMANDS,
+  'reload',
   'shell',
 ]);
 
@@ -101,10 +102,13 @@ export function toPiSkillSlashName(name: string): string {
   return trimmed.startsWith(PI_SKILL_SLASH_PREFIX) ? trimmed : `${PI_SKILL_SLASH_PREFIX}${trimmed}`;
 }
 
-/** Settings Commands on Pi matches the slash popup for chip-owned builtins. Skills stay listed elsewhere. */
+/** Settings Commands on Pi matches the slash popup for chip-owned and host-only builtins. Skills stay listed elsewhere. */
 export function filterPiSettingsCommands<T extends { name: string }>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
-  return commands.filter((command) => !PI_CHIP_OWNED_SLASH_COMMANDS.has(command.name));
+  return commands.filter((command) => (
+    !PI_CHIP_OWNED_SLASH_COMMANDS.has(command.name)
+    && command.name !== 'reload'
+  ));
 }
 
 /**
