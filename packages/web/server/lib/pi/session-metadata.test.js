@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import {
   PICHAMBER_METADATA_CUSTOM_TYPE,
   persistSessionMetadata,
+  readPersistedArchivedTimestamp,
   readPersistedSessionMetadata,
+  readPersistedSessionMetadataFromFile,
+  sessionTimeWithArchived,
 } from './session-metadata.js';
 
 const goalMetadata = {
@@ -54,5 +61,47 @@ describe('Pi session metadata persistence', () => {
         throw new Error('disk full');
       },
     }, goalMetadata)).toBe(false);
+  });
+
+  it('reads archived: ms | 0 from pichamber.metadata and ignores invalid values', () => {
+    expect(readPersistedArchivedTimestamp({ archived: 1_700_000_000_000 })).toBe(1_700_000_000_000);
+    expect(readPersistedArchivedTimestamp({ archived: 0 })).toBe(0);
+    expect(readPersistedArchivedTimestamp({ archived: '0' })).toBe(0);
+    expect(readPersistedArchivedTimestamp({ archived: '1700000000000' })).toBe(1_700_000_000_000);
+    expect(readPersistedArchivedTimestamp(undefined)).toBeUndefined();
+    expect(readPersistedArchivedTimestamp({ archived: -1 })).toBeUndefined();
+    expect(readPersistedArchivedTimestamp({ archived: 'nope' })).toBeUndefined();
+    expect(sessionTimeWithArchived({ created: 1, updated: 2 }, { archived: 9 })).toEqual({
+      created: 1,
+      updated: 2,
+      archived: 9,
+    });
+    expect(sessionTimeWithArchived({ created: 1, updated: 2 }, { archived: 0 })).toEqual({
+      created: 1,
+      updated: 2,
+      archived: 0,
+    });
+    expect(sessionTimeWithArchived({ created: 1, updated: 2 }, {})).toEqual({
+      created: 1,
+      updated: 2,
+    });
+  });
+
+  it('reads the latest pichamber.metadata from a jsonl file without a second store', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-metadata-file-'));
+    const file = path.join(dir, 'session.jsonl');
+    fs.writeFileSync(file, [
+      JSON.stringify({ type: 'session', id: 'ses_1' }),
+      JSON.stringify({ type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { archived: 1 } }),
+      '{not-json',
+      JSON.stringify({ type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { archived: 0, openchamber: { goal: { id: 'g' } } } }),
+      '',
+    ].join('\n'));
+    expect(readPersistedSessionMetadataFromFile(file)).toEqual({
+      archived: 0,
+      openchamber: { goal: { id: 'g' } },
+    });
+    expect(readPersistedSessionMetadataFromFile(path.join(dir, 'missing.jsonl'))).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

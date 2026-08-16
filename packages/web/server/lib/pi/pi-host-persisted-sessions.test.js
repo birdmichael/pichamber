@@ -240,4 +240,56 @@ describe('persisted Pi sessions', () => {
     expect(loaded.info.metadata?.openchamber?.goal).toMatchObject(goal);
     restarted.dispose();
   });
+
+  it('persists archive on pichamber.metadata so a new host still reports time.archived', async () => {
+    const home = tempDir('pi-persist-archive-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sibling = writePersistedSession({
+      home,
+      cwd,
+      title: 'Still active',
+      userText: 'keep me open',
+    });
+
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd, title: 'Archive me' });
+    const archivedAt = 1_700_000_123_000;
+    const archived = await first.updateSession(created.id, { time: { archived: archivedAt } }, cwd);
+    expect(archived.info.time.archived).toBe(archivedAt);
+    expect(archived.info.metadata.archived).toBe(archivedAt);
+    const createdId = created.id;
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const listed = await restarted.listSessionInfos(cwd);
+    const row = listed.find((session) => session.id === createdId);
+    expect(row?.time.archived).toBe(archivedAt);
+    const active = listed.filter((session) => !session.time?.archived);
+    expect(active.map((session) => session.id)).toContain(sibling.id);
+    expect(active.map((session) => session.id)).not.toContain(createdId);
+
+    const loaded = await restarted.ensureSession(createdId, cwd);
+    expect(loaded.info.time.archived).toBe(archivedAt);
+    expect(loaded.info.metadata?.archived).toBe(archivedAt);
+
+    const refreshed = await restarted.reloadSessionRecords({ sessionID: sibling.id, directory: cwd });
+    expect(refreshed.sessions.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
+    expect(refreshed.sessions.filter((session) => !session.time?.archived).map((session) => session.id))
+      .not.toContain(createdId);
+
+    await restarted.updateSession(createdId, { time: { archived: 0 } }, cwd);
+    restarted.dispose();
+
+    const restoredHost = createHost({ home, cwd });
+    const restoredList = await restoredHost.listSessionInfos(cwd);
+    const restored = restoredList.find((session) => session.id === createdId);
+    expect(restored?.time.archived).toBe(0);
+    expect(Boolean(restored?.time.archived)).toBe(false);
+    expect(restoredList.filter((session) => !session.time?.archived).map((session) => session.id))
+      .toContain(createdId);
+    const restoredRecord = await restoredHost.ensureSession(createdId, cwd);
+    expect(restoredRecord.info.time.archived).toBe(0);
+    restoredHost.dispose();
+  });
 });
