@@ -508,6 +508,7 @@ export const dict: Record<I18nKey, string> = {
   "header.sessionReload.disabledBusy": "Recarregar indisponível enquanto a sessão está respondendo",
   "header.sessionReload.disabledInFlight": "Recarregando skills, prompts e extensões",
   "header.sessionReload.failed": "Falha ao recarregar skills, prompts e extensões",
+  "header.sessionReload.success": "Skills, prompts e extensões recarregados",
   "sessions.sidebar.session.rename.save": "Salvar nome da sessão",
   "sessions.sidebar.session.rename.cancel": "Cancelar renomeação da sessão",
   "sessions.sidebar.session.menu.unpin": "Desfixar sessão",

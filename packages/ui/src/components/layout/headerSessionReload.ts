@@ -1,12 +1,19 @@
-import { runtimeFetch } from '@/lib/runtime-fetch';
 import type { I18nKey } from '@/lib/i18n';
+import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
+import { usePluginsStore } from '@/stores/usePluginsStore';
 
 export type SessionTitleReloadBlockReason = 'busy' | 'inFlight';
 
-type ConfigReloadFetch = (
-  path: string,
-  init?: { method?: string },
-) => Promise<Pick<Response, 'ok' | 'json'>>;
+/**
+ * Desktop session_status types are idle | busy | retry.
+ * Pi TUI `/reload` also refuses while compacting. The Pi facade maps
+ * `compaction_start` to `session.status { type: 'busy' }` (plus `session.compact`).
+ * There is no separate compacting status channel — busy already covers it.
+ */
+export const SESSION_TITLE_RELOAD_BLOCKING_STATUS_TYPES = ['busy', 'retry'] as const;
+
+type ReloadConfiguration = typeof reloadOpenCodeConfiguration;
+type RefreshExtensions = () => Promise<unknown>;
 
 export function isSessionTitleReloadVisible(input: {
   isPiKernel: boolean;
@@ -20,12 +27,16 @@ export function isSessionTitleReloadVisible(input: {
     && !input.isRenamingSession;
 }
 
+export function isSessionTitleReloadBlockedByStatus(statusType: string | null | undefined): boolean {
+  return statusType === 'busy' || statusType === 'retry';
+}
+
 export function getSessionTitleReloadBlockReason(input: {
-  isCurrentSessionActive: boolean;
+  statusType?: string | null;
   isReloadInFlight: boolean;
 }): SessionTitleReloadBlockReason | null {
   if (input.isReloadInFlight) return 'inFlight';
-  if (input.isCurrentSessionActive) return 'busy';
+  if (isSessionTitleReloadBlockedByStatus(input.statusType)) return 'busy';
   return null;
 }
 
@@ -41,24 +52,19 @@ export function sessionTitleReloadTooltipKey(reason: SessionTitleReloadBlockReas
   return 'header.sessionReload.tooltip';
 }
 
-const readReloadErrorMessage = (payload: unknown): string | null => {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  if ('error' in payload && typeof payload.error === 'string' && payload.error.trim()) {
-    return payload.error;
-  }
-  if ('message' in payload && typeof payload.message === 'string' && payload.message.trim()) {
-    return payload.message;
-  }
-  return null;
-};
-
-export async function requestPiConfigReload(options?: {
-  fetchImpl?: ConfigReloadFetch;
+export async function reloadPiSessionTitleConfig(options?: {
+  message?: string;
+  reloadConfiguration?: ReloadConfiguration;
+  refreshExtensions?: RefreshExtensions;
 }): Promise<void> {
-  const fetchImpl = options?.fetchImpl ?? runtimeFetch;
-  const response = await fetchImpl('/api/config/reload', { method: 'POST' });
-  if (response.ok) return;
+  const reloadConfiguration = options?.reloadConfiguration ?? reloadOpenCodeConfiguration;
+  const refreshExtensions = options?.refreshExtensions
+    ?? (() => usePluginsStore.getState().loadPlugins({ force: true }));
 
-  const payload: unknown = await response.json().catch(() => null);
-  throw new Error(readReloadErrorMessage(payload) ?? '');
+  await reloadConfiguration({
+    message: options?.message,
+    scopes: ['all'],
+    mode: 'projects',
+  });
+  await refreshExtensions();
 }

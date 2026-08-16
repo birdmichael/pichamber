@@ -338,6 +338,7 @@ export const dict = {
   'header.sessionReload.disabledBusy': 'Rechargement indisponible pendant que la session répond',
   'header.sessionReload.disabledInFlight': 'Rechargement des skills, prompts et extensions',
   'header.sessionReload.failed': 'Échec du rechargement des skills, prompts et extensions',
+  'header.sessionReload.success': 'Skills, prompts et extensions rechargés',
   'sessions.sidebar.session.rename.save': 'Enregistrer le nom de la session',
   'sessions.sidebar.session.rename.cancel': 'Annuler la session de changement de nom',
   'sessions.sidebar.session.menu.unpin': 'Désépingler la session',

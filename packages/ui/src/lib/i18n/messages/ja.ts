@@ -508,6 +508,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.disabledBusy': 'セッションの応答中は再読み込みできません',
   'header.sessionReload.disabledInFlight': 'スキル、プロンプト、拡張機能を再読み込みしています',
   'header.sessionReload.failed': 'スキル、プロンプト、拡張機能の再読み込みに失敗しました',
+  'header.sessionReload.success': 'スキル、プロンプト、拡張機能を再読み込みしました',
   'sessions.sidebar.session.rename.save': 'セッション名を保存',
   'sessions.sidebar.session.rename.cancel': 'セッション名の変更をキャンセル',
   'sessions.sidebar.session.menu.unpin': 'セッションのピン留めを解除',

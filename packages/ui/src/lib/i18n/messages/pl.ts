@@ -301,6 +301,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.disabledBusy': 'Odświeżanie niedostępne, gdy sesja odpowiada',
   'header.sessionReload.disabledInFlight': 'Odświeżanie skilli, promptów i rozszerzeń',
   'header.sessionReload.failed': 'Nie udało się odświeżyć skilli, promptów i rozszerzeń',
+  'header.sessionReload.success': 'Odświeżono skille, prompty i rozszerzenia',
   'sessions.sidebar.session.rename.save': 'Zapisz nazwę sesji',
   'sessions.sidebar.session.rename.cancel': 'Anuluj zmianę nazwy sesji',
   'sessions.sidebar.session.menu.unpin': 'Odepnij sesję',

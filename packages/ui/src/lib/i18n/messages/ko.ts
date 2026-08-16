@@ -508,6 +508,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.disabledBusy': '세션이 응답 중일 때는 다시 로드할 수 없습니다',
   'header.sessionReload.disabledInFlight': '스킬, 프롬프트, 확장을 다시 로드하는 중',
   'header.sessionReload.failed': '스킬, 프롬프트, 확장을 다시 로드하지 못했습니다',
+  'header.sessionReload.success': '스킬, 프롬프트, 확장을 다시 로드했습니다',
   'sessions.sidebar.session.rename.save': '세션 이름 저장',
   'sessions.sidebar.session.rename.cancel': '세션 이름 변경 취소',
   'sessions.sidebar.session.menu.unpin': '세션 고정 해제',

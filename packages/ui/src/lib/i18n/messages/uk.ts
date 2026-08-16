@@ -508,6 +508,7 @@ export const dict: Record<I18nKey, string> = {
   "header.sessionReload.disabledBusy": "Перезавантаження недоступне, поки сесія відповідає",
   "header.sessionReload.disabledInFlight": "Перезавантаження навичок, промптів і розширень",
   "header.sessionReload.failed": "Не вдалося перезавантажити навички, промпти та розширення",
+  "header.sessionReload.success": "Навички, промпти та розширення перезавантажено",
   "sessions.sidebar.session.rename.save": "Зберегти назву сесії",
   "sessions.sidebar.session.rename.cancel": "Скасувати перейменування сесії",
   "sessions.sidebar.session.menu.unpin": "Відкріпити сесія",

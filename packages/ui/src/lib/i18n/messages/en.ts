@@ -507,6 +507,7 @@ export const dict = {
   'header.sessionReload.disabledBusy': 'Reload unavailable while the session is responding',
   'header.sessionReload.disabledInFlight': 'Reloading skills, prompts, and extensions',
   'header.sessionReload.failed': 'Failed to reload skills, prompts, and extensions',
+  'header.sessionReload.success': 'Reloaded skills, prompts, and extensions',
   'sessions.sidebar.session.rename.save': 'Save session name',
   'sessions.sidebar.session.rename.cancel': 'Cancel renaming session',
   'sessions.sidebar.session.menu.unpin': 'Unpin session',

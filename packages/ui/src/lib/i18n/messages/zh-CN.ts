@@ -508,6 +508,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.disabledBusy': '会话正在回复，无法重新加载',
   'header.sessionReload.disabledInFlight': '正在重新加载技能、提示词和扩展',
   'header.sessionReload.failed': '重新加载技能、提示词和扩展失败',
+  'header.sessionReload.success': '已重新加载技能、提示词和扩展',
   'sessions.sidebar.session.rename.save': '保存会话名称',
   'sessions.sidebar.session.rename.cancel': '取消重命名会话',
   'sessions.sidebar.session.menu.unpin': '取消置顶会话',

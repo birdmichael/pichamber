@@ -521,6 +521,7 @@ export const dict: Record<I18nKey, string> = {
   'header.sessionReload.disabledBusy': '工作階段正在回覆，無法重新載入',
   'header.sessionReload.disabledInFlight': '正在重新載入技能、提示詞和擴充功能',
   'header.sessionReload.failed': '重新載入技能、提示詞和擴充功能失敗',
+  'header.sessionReload.success': '已重新載入技能、提示詞和擴充功能',
   'sessions.sidebar.session.rename.save': '儲存會話名稱',
   'sessions.sidebar.session.rename.cancel': '取消重新命名會話',
   'sessions.sidebar.session.menu.unpin': '取消釘選會話',

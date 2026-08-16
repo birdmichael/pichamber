@@ -2883,6 +2883,7 @@ export const dict = {
   'header.sessionReload.disabledBusy': 'Neu laden nicht verfügbar, während die Sitzung antwortet',
   'header.sessionReload.disabledInFlight': 'Skills, Prompts und Erweiterungen werden neu geladen',
   'header.sessionReload.failed': 'Skills, Prompts und Erweiterungen konnten nicht neu geladen werden',
+  'header.sessionReload.success': 'Skills, Prompts und Erweiterungen neu geladen',
   'sessions.sidebar.session.menu.copyId': 'Sitzungs-ID kopieren',
   'sessions.sidebar.session.copyId.success': 'Sitzungs-ID kopiert',
   'sessions.sidebar.session.copyId.error': 'Sitzungs-ID konnte nicht kopiert werden',

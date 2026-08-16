@@ -67,7 +67,7 @@ import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCop
 import {
   getSessionTitleReloadBlockReason,
   isSessionTitleReloadVisible,
-  requestPiConfigReload,
+  reloadPiSessionTitleConfig,
   sessionTitleReloadAriaKey,
   sessionTitleReloadTooltipKey,
 } from '@/components/layout/headerSessionReload';
@@ -129,8 +129,15 @@ const HeaderIconActionButton = React.memo(function HeaderIconActionButton({
   const button = (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+        onClick(event);
+      }}
       disabled={disabled}
+      aria-disabled={disabled || undefined}
       aria-label={ariaLabel}
       aria-pressed={pressed}
       className={cn(
@@ -1242,7 +1249,7 @@ export const Header: React.FC<HeaderProps> = ({
     isRenamingSession: isRenamingHeaderSession,
   });
   const sessionTitleReloadBlockReason = getSessionTitleReloadBlockReason({
-    isCurrentSessionActive,
+    statusType: currentSessionStatus?.type,
     isReloadInFlight: isPiReloadInFlight,
   });
   const isSessionTitleReloadDisabled = sessionTitleReloadBlockReason !== null;
@@ -1250,7 +1257,12 @@ export const Header: React.FC<HeaderProps> = ({
     if (isCurrentSessionActive || isPiReloadInFlightRef.current) return;
     isPiReloadInFlightRef.current = true;
     setIsPiReloadInFlight(true);
-    void requestPiConfigReload()
+    void reloadPiSessionTitleConfig({
+      message: t('header.sessionReload.disabledInFlight'),
+    })
+      .then(() => {
+        toast.success(t('header.sessionReload.success'));
+      })
       .catch((error: unknown) => {
         const message = error instanceof Error && error.message.trim()
           ? error.message
