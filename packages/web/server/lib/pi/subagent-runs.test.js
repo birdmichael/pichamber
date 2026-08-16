@@ -164,6 +164,25 @@ describe('tool-part extraction', () => {
     });
   });
 
+  it('does not treat the parent session id as an openable child', () => {
+    const run = extractSubagentRunFromToolPart({
+      tool: 'subagent',
+      callID: 'call_parent',
+      state: {
+        status: 'completed',
+        input: { agent: 'subagent', sessionId: 'parent-1' },
+        metadata: { sessionID: 'parent-1' },
+      },
+    }, 'parent-1');
+    expect(run.sessionID).toBeNull();
+    expect(toPublicSubagentRun(run).openable).toBe(false);
+    expect(toPublicSubagentRun({
+      ...run,
+      sessionID: 'parent-1',
+      parentID: 'parent-1',
+    }).sessionID).toBeNull();
+  });
+
   it('reads sessionId and childSessionId from tool input/output like the transcript card', () => {
     expect(extractSubagentRunFromToolPart({
       tool: 'subagent',

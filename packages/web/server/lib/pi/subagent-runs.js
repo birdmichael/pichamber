@@ -14,6 +14,14 @@ const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Arra
 
 const asTrimmedString = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
 
+const asChildSessionId = (sessionID, parentID) => {
+  const child = asTrimmedString(sessionID);
+  const parent = asTrimmedString(parentID);
+  if (!child || (parent && child === parent)) return null;
+  return child;
+};
+
+
 export const isSubagentsSlotActive = (payload) => {
   const slot = payload?.slots?.subagents ?? payload?.subagents;
   return Boolean(slot?.installed && slot?.enabled);
@@ -117,8 +125,11 @@ export const mapStatusToSubagentRun = (status, {
   const runId = asTrimmedString(status.runId || status.id);
   if (!runId) return null;
   const sessionFile = asTrimmedString(status.sessionFile) || firstStepSessionFile(status);
-  const childSessionID = asTrimmedString(status.childSessionId)
-    || readSessionIdFromSessionFile(sessionFile);
+  const childSessionID = resolveChildSessionId({
+    parentID,
+    sessionFile,
+    candidates: [status.childSessionId],
+  });
   const agent = firstAgentName(status) || 'subagent';
   const state = normalizeSubagentRunState(status.state);
   const mode = normalizeSubagentRunMode(status.mode, sessionFile ? 'background' : 'foreground');
@@ -250,7 +261,9 @@ const resolveChildSessionId = ({
     const id = asTrimmedString(candidate);
     if (id && id !== parent) return id;
   }
-  return readSessionIdFromSessionFile(sessionFile) || null;
+  const fromFile = readSessionIdFromSessionFile(sessionFile);
+  if (fromFile && fromFile !== parent) return fromFile;
+  return null;
 };
 
 /** Same fields the transcript card reads: tool input/output sessionId and childSessionId. */
@@ -500,11 +513,14 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
       if (file.mode) match.mode = file.mode;
       continue;
     }
-    if (file.sessionID || isLiveRunState(file.state)) extras.push(file);
+    const childId = asChildSessionId(file.sessionID, file.parentID);
+    if (childId || isLiveRunState(file.state)) extras.push({ ...file, sessionID: childId });
   }
 
   const combined = mergeSubagentRuns(live, extras);
-  const visible = combined.filter((run) => run.sessionID || isLiveRunState(run.state));
+  const visible = combined.filter((run) => (
+    asChildSessionId(run.sessionID, run.parentID) || isLiveRunState(run.state)
+  ));
   const seenSession = new Set();
   return visible.filter((run) => {
     if (!run.sessionID) return true;
@@ -514,17 +530,20 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
   });
 };
 
-export const toPublicSubagentRun = (run) => ({
-  runId: run.runId,
-  parentID: run.parentID || null,
-  sessionID: run.sessionID || null,
-  name: run.name,
-  role: run.role,
-  mode: run.mode,
-  state: run.state,
-  title: run.title,
-  openable: Boolean(run.sessionID),
-});
+export const toPublicSubagentRun = (run) => {
+  const sessionID = asChildSessionId(run.sessionID, run.parentID);
+  return {
+    runId: run.runId,
+    parentID: run.parentID || null,
+    sessionID,
+    name: run.name,
+    role: run.role,
+    mode: run.mode,
+    state: run.state,
+    title: run.title,
+    openable: Boolean(sessionID),
+  };
+};
 
 export const findAdapterRunByChildSessionId = (sessionID, options = {}) => {
   const id = asTrimmedString(sessionID);
