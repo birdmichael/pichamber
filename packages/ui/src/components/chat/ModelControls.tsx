@@ -38,6 +38,7 @@ import { useModelLists } from '@/hooks/useModelLists';
 import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
 import { shouldShowComposerAgentChip } from './composerAgentChip';
+import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { PI_THINKING_LEVELS, parsePiThinkingLevel, resolvePiThinkingChipPresentation } from './piThinking';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
@@ -3036,6 +3037,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     {renderVariantSelector()}
                     {renderModelSelector()}
                     {renderAgentSelector()}
+                    <PiPlanModeToggle />
                 </div>
             </div>
 

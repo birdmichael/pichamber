@@ -10,8 +10,9 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLivePlanSlashCommand, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -68,6 +69,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
 }, ref) => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const planPluginAvailable = usePiPlanPluginAvailable();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const sessionMessages = useSessionMessages(currentSessionId ?? '');
   const hasMessagesInCurrentSession = sessionMessages.length > 0;
@@ -204,7 +206,10 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
             : []
           ),
         ];
-        const allCommands = filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel);
+        const allCommands = ensureLivePlanSlashCommand(
+          filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel),
+          { isPiKernel, planPluginAvailable },
+        );
 
         const allowInitCommand = !hasMessagesInCurrentSession;
         const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
@@ -284,7 +289,10 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           ),
         ];
 
-        const fallbackCommands = filterPiSlashCommands(builtInCommands, isPiKernel);
+        const fallbackCommands = ensureLivePlanSlashCommand(
+          filterPiSlashCommands(builtInCommands, isPiKernel),
+          { isPiKernel, planPluginAvailable },
+        );
         const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
         const filtered = (searchQuery
           ? fallbackCommands.filter(cmd => matchesQuery(cmd, searchQuery))
@@ -297,7 +305,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     };
 
     loadCommands();
-  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel]);
+  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel, planPluginAvailable]);
 
   React.useEffect(() => {
     setSelectedIndex(0);

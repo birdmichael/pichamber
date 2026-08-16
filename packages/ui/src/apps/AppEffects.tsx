@@ -8,6 +8,7 @@ import { setOptimisticRefs } from '@/sync/session-actions';
 import { markSessionViewed } from '@/sync/notification-store';
 import { setExternallyViewedSession } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
+import { PiExtensionUiNotifyToasts } from '@/components/chat/PiExtensionUiNotifyToasts';
 
 const MINI_CHAT_PRESENCE_CHANNEL = 'openchamber:mini-chat-presence';
 
@@ -82,6 +83,7 @@ export function SyncAppEffects({ embeddedBackgroundWorkEnabled }: {
     <>
       <SyncRuntimeEffects embeddedBackgroundWorkEnabled={embeddedBackgroundWorkEnabled} />
       <MiniChatPresenceBridge />
+      <PiExtensionUiNotifyToasts />
     </>
   );
 }

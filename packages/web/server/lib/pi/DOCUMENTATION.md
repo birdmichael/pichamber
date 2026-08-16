@@ -1,8 +1,77 @@
-# Pi kernel host
+# Pi host and facade
 
-In-process Pi session host and OpenCode-shaped HTTP/SSE facade. Product
-behavior is documented in `docs/PICHAMBER.md`. This file owns the command
-dispatch and reload contracts.
+Owning module for the in-process Pi kernel: session host, OpenCode-shaped
+HTTP/SSE facade, Desktop `ctx.ui`, command dispatch, and reload. Product
+behavior is documented in `docs/PICHAMBER.md`.
+
+## Desktop `ctx.ui`
+
+Live `AgentSession` records call `bindExtensions({ uiContext, mode: "rpc" })`
+after create, hydrate, replace, and reload. Title-refresh `reload({ sessionID })`
+and process-wide `reload()` use that same bind after `piSession.reload()` (or
+factory replace). Attach-only leaves extensions `ui_unavailable`. Print-mode /
+unbound sessions stay `ui_unavailable`.
+
+`ExtensionUIContext` mapping:
+
+| `ctx.ui` | Desktop |
+|---|---|
+| `select` | In-chat option card (single, or multi when `opts.multiple`) |
+| `confirm` | Modal confirm / cancel → boolean |
+| `input` / `editor` | In-chat text field. Plan **Other** is a `select` option, then `editor` |
+| `notify` | Toast via `pi.ui.notify` |
+| TUI-only (`custom`, widgets, terminal input) | No-op |
+
+Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session.
+
+## Protocol
+
+Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
+
+- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
+- `GET /api/pi/ui?session=` — pending prompts. Opening a session hydrates this list into the transcript; fetch failure must not clear local cards. A session with no messages still shows a pending select card (do not replace it with the empty-chat welcome).
+- `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a toast, not a question card. The settled card title may still say "Status: Off".
+- `POST /api/pi/ui/:id/reply` `{ sessionID, value }`
+- `POST /api/pi/ui/:id/cancel` `{ sessionID }`
+
+`GET /api/question` stays `[]` on Pi.
+
+## Plan questions
+
+`plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. Those cards appear during a planning turn after Plan is on — not from `/plan start`.
+
+`@narumitw/pi-plan-mode` command vs UI (measured; do not invent a second menu):
+
+| Invocation | Host result |
+|---|---|
+| `/plan start` | Enter Plan + `ctx.ui.notify`. `GET /api/pi/ui` stays `[]`. Not a question-card probe. |
+| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. |
+| `/plan tools` | Tools `ctx.ui.select`. |
+
+Desktop chrome uses `/plan start` for the Agent \| Plan footer. Composer `/plan` (listed extension command, empty args) still goes through `session.command` → `session.prompt("/plan")` so the launch card still appears. Do not intercept bare `/plan` as a toast-only start.
+
+## Session plan status
+
+`GET /api/pi/session/:id/plan` returns
+`{ status: off|active|ready|saved|implementing, planMarkdown, title? }`
+from the live `plan-mode-state` custom entry (same mapping as
+`pi-plan-mode` `formatStatus`). It does not scrape TUI widgets or read
+`.opencode/plans`. Fetch failure is an HTTP error, not an empty `off`.
+
+`POST /api/pi/session/:id/plan` `{ action, model? }`:
+
+| action | Dispatch |
+|---|---|
+| `start` | `session.prompt("/plan start")` |
+| `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
+| `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
+| `exit` | `session.prompt("/plan exit")` — discard only |
+| `resume` | rewrite saved → ready `plan-mode-state`, then `reload({ sessionID })`. Do not send `/plan start` (that errors while a saved plan exists) |
+
+Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
+Desktop chrome (Agent \| Plan, View Plan rail, Build) is gated on the Pi
+kernel **and** Feature Plugins `plan` installed+enabled. Missing/disabled
+hides those surfaces. `planModeExperimentalEnabled` does not gate this on Pi.
 
 ## Slash command dispatch
 
@@ -38,6 +107,8 @@ Resolution order:
   custom prompts — not `reload`)
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
+- Feature Plugins slash names that must appear before a session exists
+  (Plan slot installed+enabled → `/plan`)
 
 Optional `?session=` pins the live session. After `host.reload()` /
 `POST /api/session/:id/reload`, the next list read sees whatever the live
@@ -55,6 +126,10 @@ the list. OpenCode kernel routes are unchanged.
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
 does not 409. Process-wide `host.reload()` / `POST /api/config/reload` still
 refuse with 409 while any targeted session is streaming or compacting.
+
+After `piSession.reload()` (or factory replace), the host calls the same
+`bindExtensions({ uiContext, mode: "rpc" })` used on create. Attach-only
+leaves extensions `ui_unavailable`.
 
 Reload does not emit `server.connected`. The UI treats that event as a full
 re-bootstrap onto a new-session draft.

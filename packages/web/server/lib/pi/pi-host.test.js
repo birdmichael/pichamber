@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 import { writePiPrompt } from './pi-resources.js';
 import {
+  createSettingsJsonPackageManager,
+  writeFeaturePlugins,
+} from './feature-plugins.js';
+import {
   createInMemoryPiSession,
   createPiHost,
   isPlaceholderSessionTitle,
@@ -15,6 +19,16 @@ import {
   resolvePromptModelRef,
   titleFromUserText,
 } from './pi-host.js';
+
+const waitForExtensionPrompts = async (host, sessionID) => {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    const prompts = host.listExtensionUIPrompts(sessionID);
+    if (prompts.length > 0) return prompts;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Timed out waiting for Desktop ctx.ui prompts');
+};
 
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
@@ -445,6 +459,25 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /plan from the Plan slot before any session exists', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-plan-slot-cmd-'));
+    try {
+      writeFeaturePlugins(home, { plan: { enabled: true } });
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-plan-mode');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => (
+        command.name === 'plan' && command.source === 'extension'
+      ))).toBe(true);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown slash names instead of sending them as chat', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-unknown-cmd-'));
     try {
@@ -662,6 +695,74 @@ describe('createPiHost', () => {
     });
     host.dispose();
   });
+
+  it('binds Desktop ctx.ui on every live session and resolves a fake select', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent: (directory, event) => events.push({ directory, event }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'UI bind' });
+    expect(record.piSession.extensionBindings?.mode).toBe('rpc');
+    expect(record.piSession.extensionBindings?.uiContext).toBeTruthy();
+    expect(host.getExtensionUI(record.id)).toBeTruthy();
+
+    const choice = host.getExtensionUI(record.id).context.select('Header: Ship now?', [
+      '1. Yes — smallest change',
+      '2. Other (free-form)',
+    ]);
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(prompt.kind).toBe('select');
+    expect(events.some((item) => item.event.type === 'pi.ui.asked')).toBe(true);
+    expect(events.some((item) => String(item.event.type).startsWith('question.'))).toBe(false);
+
+    expect(host.replyExtensionUI(record.id, prompt.id, '1. Yes — smallest change')).toBe(true);
+    await expect(choice).resolves.toBe('1. Yes — smallest change');
+    host.dispose();
+  });
+
+  it('reload({ sessionID }) re-binds Desktop ctx.ui after piSession.reload()', async () => {
+    const piSession = createInMemoryPiSession();
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => piSession,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Title refresh' });
+    expect(piSession.bindCount).toBe(1);
+    expect(piSession.extensionBindings?.mode).toBe('rpc');
+    const firstContext = host.getExtensionUI(record.id).context;
+
+    const result = await host.reload({ sessionID: record.id });
+    expect(result).toMatchObject({ reloaded: true, kernel: 'pi', sessionID: record.id });
+    expect(piSession.reloadCount).toBe(1);
+    expect(piSession.bindCount).toBe(2);
+    expect(piSession.extensionBindings?.mode).toBe('rpc');
+    expect(piSession.extensionBindings?.uiContext).toBeTruthy();
+    expect(host.getExtensionUI(record.id).context).not.toBe(firstContext);
+
+    const choice = host.getExtensionUI(record.id).context.select('Header: After reload?', [
+      '1. Yes — still bound',
+    ]);
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(prompt.kind).toBe('select');
+    expect(host.replyExtensionUI(record.id, prompt.id, '1. Yes — still bound')).toBe(true);
+    await expect(choice).resolves.toBe('1. Yes — still bound');
+    host.dispose();
+  });
+
+  it('cancels a waiting confirm without disposing the session', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Goal confirm' });
+    const confirmed = host.getExtensionUI(record.id).context.confirm('Replace goal?', 'Replace the current goal?');
+    const [prompt] = host.listExtensionUIPrompts(record.id);
+    expect(host.cancelExtensionUI(record.id, prompt.id)).toBe(true);
+    await expect(confirmed).resolves.toBe(false);
+    expect(host.getSession(record.id).id).toBe(record.id);
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+    host.dispose();
+  });
 });
 
 describe('live session command helpers', () => {
@@ -711,3 +812,174 @@ describe('resolvePromptModelRef', () => {
     expect(resolvePromptModelRef(null)).toBe('');
   });
 });
+
+describe('session plan status and actions', () => {
+  it('reads live plan-mode-state and dispatches start/save/implement/exit', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan' });
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'off', planMarkdown: '' });
+
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(prompted).toEqual(['/plan start']);
+
+    record.piSession.setPlanModeState({
+      enabled: true,
+      latestPlan: '# Ready plan\n\nDo the work.',
+      awaitingAction: true,
+    });
+    expect(await host.getSessionPlan(record.id)).toMatchObject({
+      status: 'ready',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+      title: 'Ready plan',
+    });
+
+    expect(await host.runPlanAction(record.id, { action: 'save' })).toMatchObject({
+      status: 'saved',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+    });
+    expect(prompted).toEqual(['/plan start', '/plan save']);
+
+    expect(await host.runPlanAction(record.id, { action: 'implement' })).toMatchObject({
+      status: 'implementing',
+      planMarkdown: '# Ready plan\n\nDo the work.',
+    });
+    expect(prompted).toEqual(['/plan start', '/plan save', '/plan implement']);
+    expect(events.some((event) => event.type === 'pi.plan.updated')).toBe(true);
+
+    expect(await host.runPlanAction(record.id, { action: 'exit' })).toEqual({
+      status: 'off',
+      planMarkdown: '',
+    });
+    expect(prompted.at(-1)).toBe('/plan exit');
+    host.dispose();
+  });
+
+  it('resumes a saved plan without sending /plan start', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Resume' });
+    record.piSession.setPlanModeState({
+      enabled: false,
+      savedPlan: { plan: '# Saved\n\nKeep this.', source: 'plan_mode_complete' },
+    });
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(prompted).toEqual(['/plan start']);
+
+    const plan = await host.runPlanAction(record.id, { action: 'resume' });
+    expect(plan).toMatchObject({
+      status: 'ready',
+      planMarkdown: '# Saved\n\nKeep this.',
+    });
+    expect(prompted).toEqual(['/plan start']);
+    expect(record.piSession.reloadCount).toBe(1);
+    expect(record.piSession.bindCount).toBe(2);
+    host.dispose();
+  });
+
+  it('treats /plan start as notify-only and queues a select for bare /plan', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan menus' });
+
+    const started = await host.runCommand(record.id, { command: 'plan', arguments: 'start' });
+    expect(started.info.role).toBe('assistant');
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+    expect(events.some((event) => event.type === 'pi.ui.notify')).toBe(true);
+    expect(events.some((event) => event.type === 'pi.ui.asked')).toBe(false);
+
+    record.piSession.setPlanModeState({ enabled: false, awaitingAction: false });
+
+    const launch = host.runCommand(record.id, { command: 'plan', arguments: '' });
+    const launchPrompts = await waitForExtensionPrompts(host, record.id);
+    expect(launchPrompts).toHaveLength(1);
+    expect(launchPrompts[0]).toMatchObject({
+      kind: 'select',
+      title: 'Plan mode\nStatus: Off…',
+      options: [
+        'Start Plan mode',
+        'Choose tools, then start…',
+        'Settings',
+        'How Plan mode works',
+      ],
+    });
+    expect(host.replyExtensionUI(record.id, launchPrompts[0].id, 'Start Plan mode')).toBe(true);
+    await launch;
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+
+    const tools = host.runCommand(record.id, { command: 'plan', arguments: 'tools' });
+    const toolPrompts = await waitForExtensionPrompts(host, record.id);
+    expect(toolPrompts[0]).toMatchObject({
+      kind: 'select',
+      title: 'Plan-mode tools',
+      multiple: true,
+    });
+    expect(toolPrompts[0].options).toEqual(expect.arrayContaining([
+      'bash',
+      'find',
+      'grep',
+      'ls',
+      'read',
+      'Done — start Plan mode',
+      'Back',
+    ]));
+    expect(host.replyExtensionUI(record.id, toolPrompts[0].id, ['bash', 'read'])).toBe(true);
+    await tools;
+
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(host.listExtensionUIPrompts(record.id)).toEqual([]);
+    host.dispose();
+  });
+
+  it('refuses plan actions while the session is busy', async () => {
+    const busy = createInMemoryPiSession({ compacting: true });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => busy,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
+      status: 409,
+    });
+    host.dispose();
+  });
+});
+

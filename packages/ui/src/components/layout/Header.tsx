@@ -89,6 +89,9 @@ import {
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
+import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
+import { usePiSessionPlanStore } from '@/sync/pi-session-plan-store';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { getRuntimeBearerTokenSync } from '@/lib/runtime-auth';
 import { getRuntimeApiBaseUrl, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
@@ -1578,8 +1581,21 @@ export const Header: React.FC<HeaderProps> = ({
       return;
     }
 
+    if (isPiKernel) {
+      const sessionId = useSessionUIStore.getState().currentSessionId;
+      const plan = sessionId ? usePiSessionPlanStore.getState().plansBySession[sessionId] ?? null : null;
+      if (!resolvePlanRailEnabled({
+        isPiKernel: true,
+        featurePlugins: usePiFeaturePluginsStore.getState().payload,
+        plan,
+        planModeExperimentalEnabled: false,
+      })) {
+        return;
+      }
+    }
+
     openContextPlan(directory);
-  }, [closeContextPanel, openContextPlan, openDirectory]);
+  }, [closeContextPanel, isPiKernel, openContextPlan, openDirectory]);
 
 
   const desktopHeaderIconButtonClass = DESKTOP_HEADER_ICON_BUTTON_CLASS;

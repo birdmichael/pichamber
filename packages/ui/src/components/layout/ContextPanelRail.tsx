@@ -33,7 +33,11 @@ import {
   isShortcutPrefixHeld,
 } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
+import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useGitStatus } from '@/stores/useGitStore';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 
@@ -165,6 +169,15 @@ export const ContextPanelRail: React.FC = () => {
   const openContextSurface = useUIStore((state) => state.openContextSurface);
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
   const planModeEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
+  const isPiKernel = usePiKernel();
+  const piPlanChrome = usePiPlanChrome();
+  const featurePlugins = usePiFeaturePluginsStore((state) => state.payload);
+  const showPlanSurface = resolvePlanRailEnabled({
+    isPiKernel,
+    featurePlugins,
+    plan: piPlanChrome.plan,
+    planModeExperimentalEnabled: planModeEnabled,
+  });
   const { screenWidth } = useDeviceInfo();
   const gitStatus = useGitStatus(directoryKey || null);
 
@@ -256,12 +269,12 @@ export const ContextPanelRail: React.FC = () => {
   const surfaces = React.useMemo(() => {
     return getVisibleContextRailSurfaces({
       railOrder: contextRailOrder,
-      planModeEnabled,
+      planModeEnabled: showPlanSurface,
       isVSCode: isVSCodeRuntime(),
       screenWidth,
       tabs,
     });
-  }, [contextRailOrder, planModeEnabled, screenWidth, tabs]);
+  }, [contextRailOrder, showPlanSurface, screenWidth, tabs]);
 
   const handleDragEnd = React.useCallback((event: DragEndEvent) => {
     const { active, over } = event;

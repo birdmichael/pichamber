@@ -56,6 +56,16 @@ const startFacade = async ({ directory = '/tmp/project', mock = true, createSess
   return { kernel, url: http.url, server: http.server, close };
 };
 
+const waitForPiUi = async (url, sessionID) => {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    const listed = await (await fetch(`${url}/api/pi/ui?session=${sessionID}`)).json();
+    if (Array.isArray(listed) && listed.length > 0) return listed;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Timed out waiting for /api/pi/ui');
+};
+
 describe('OpenCode facade HTTP/SSE', () => {
   it('bootstraps path/providers/session and streams a mock prompt', async () => {
     const { url, close, kernel } = await startFacade();
@@ -866,6 +876,215 @@ describe('OpenCode facade HTTP/SSE', () => {
       const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
       expect(after.packages || []).not.toContain('npm:@narumitw/pi-goal');
       expect(idle.reloadCount).toBe(2);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('replies to Desktop ctx.ui over /api/pi/ui and leaves OpenCode /api/question empty', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan question' }),
+      })).json();
+
+      const ui = kernel.host.getExtensionUI(created.id);
+      const select = ui.context.select('Scope: How wide?', [
+        '1. One file — keep the change local',
+        '2. Other (free-form)',
+      ]);
+      const listed = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      expect(listed).toHaveLength(1);
+      expect(listed[0].kind).toBe('select');
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+
+      const reply = await fetch(`${url}/api/pi/ui/${listed[0].id}/reply?session=${created.id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ value: '2. Other (free-form)' }),
+      });
+      expect(reply.status).toBe(200);
+      await expect(select).resolves.toBe('2. Other (free-form)');
+
+      const editor = ui.context.editor('How wide?', '');
+      const next = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      expect(next[0].kind).toBe('editor');
+      const editorReply = await fetch(`${url}/api/pi/ui/${next[0].id}/reply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id, value: 'Only the host module' }),
+      });
+      expect(editorReply.status).toBe(200);
+      await expect(editor).resolves.toBe('Only the host module');
+
+      ui.context.notify('Plan mode enabled.', 'info');
+
+      const cancelPrompt = ui.context.confirm('Replace goal?', 'Replace it?');
+      const pending = await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json();
+      const cancelled = await fetch(`${url}/api/pi/ui/${pending[0].id}/cancel`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id }),
+      });
+      expect(cancelled.status).toBe(200);
+      await expect(cancelPrompt).resolves.toBe(false);
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('exposes session plan status and dispatches plan actions', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan chrome' }),
+      })).json();
+
+      const missing = await fetch(`${url}/api/pi/session/ses_missing/plan`);
+      expect(missing.status).toBe(404);
+
+      const off = await (await fetch(`${url}/api/pi/session/${created.id}/plan`)).json();
+      expect(off).toEqual({ status: 'off', planMarkdown: '' });
+
+      const started = await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      expect(started.status).toBe(200);
+      expect(await started.json()).toEqual({ status: 'active', planMarkdown: '' });
+
+      kernel.host.getSession(created.id).piSession.setPlanModeState({
+        enabled: true,
+        latestPlan: '# Build the rail\n\nUse live state.',
+        awaitingAction: true,
+      });
+      const ready = await (await fetch(`${url}/api/pi/session/${created.id}/plan`)).json();
+      expect(ready).toMatchObject({
+        status: 'ready',
+        planMarkdown: '# Build the rail\n\nUse live state.',
+        title: 'Build the rail',
+      });
+
+      const saved = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'save' }),
+      })).json();
+      expect(saved.status).toBe('saved');
+
+      const resumed = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'resume' }),
+      })).json();
+      expect(resumed.status).toBe('ready');
+
+      const built = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'implement' }),
+      })).json();
+      expect(built.status).toBe('implementing');
+
+      const discarded = await (await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'exit' }),
+      })).json();
+      expect(discarded).toEqual({ status: 'off', planMarkdown: '' });
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('keeps /plan start toast-only and queues a select for bare /plan', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan menus' }),
+      })).json();
+
+      const started = await fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'plan', arguments: 'start' }),
+      });
+      expect(started.status).toBe(200);
+      expect(await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json()).toEqual([]);
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
+
+      const chromeStart = await fetch(`${url}/api/pi/session/${created.id}/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      expect(chromeStart.status).toBe(200);
+      expect(await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json()).toEqual([]);
+
+      const launch = fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'plan', arguments: '' }),
+      });
+      const listed = await waitForPiUi(url, created.id);
+      expect(listed[0]).toMatchObject({
+        kind: 'select',
+        title: 'Plan mode\nStatus: Off…',
+        options: [
+          'Start Plan mode',
+          'Choose tools, then start…',
+          'Settings',
+          'How Plan mode works',
+        ],
+      });
+      const reply = await fetch(`${url}/api/pi/ui/${listed[0].id}/reply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id, value: 'Start Plan mode' }),
+      });
+      expect(reply.status).toBe(200);
+      expect((await launch).status).toBe(200);
+      expect(await (await fetch(`${url}/api/pi/ui?session=${created.id}`)).json()).toEqual([]);
+
+      const tools = fetch(`${url}/api/session/${created.id}/command`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ command: 'plan', arguments: 'tools' }),
+      });
+      const toolListed = await waitForPiUi(url, created.id);
+      expect(toolListed[0]).toMatchObject({
+        kind: 'select',
+        title: 'Plan-mode tools',
+        multiple: true,
+      });
+      expect(toolListed[0].options).toEqual(expect.arrayContaining([
+        'bash',
+        'find',
+        'grep',
+        'ls',
+        'read',
+        'Done — start Plan mode',
+        'Back',
+      ]));
+      const toolsReply = await fetch(`${url}/api/pi/ui/${toolListed[0].id}/reply`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionID: created.id, value: ['bash', 'read'] }),
+      });
+      expect(toolsReply.status).toBe(200);
+      expect((await tools).status).toBe(200);
+      expect(await (await fetch(`${url}/api/question`)).json()).toEqual([]);
     } finally {
       kernel.dispose();
       await close();
