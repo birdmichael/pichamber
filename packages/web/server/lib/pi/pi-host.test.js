@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createInMemoryPiSession, createPiHost, isPlaceholderSessionTitle, mapPiModelsToProviders, normalizePiSessionUsage, titleFromUserText } from './pi-host.js';
+import { createInMemoryPiSession, createPiHost, isPlaceholderSessionTitle, mapPiModelsToProviders, normalizePiSessionUsage, resolvePromptModelRef, titleFromUserText } from './pi-host.js';
 
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
@@ -404,5 +404,29 @@ describe('createPiHost', () => {
     const tree = host.getSessionTree(record.id);
     expect(tree.some((node) => node.id === 'msg_a' && node.role === 'user')).toBe(true);
     host.dispose();
+  });
+
+  it('promptAsync applies the requested Pi model before sending the prompt', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Multi-run' });
+    await host.promptAsync(record.id, {
+      messageID: 'msg_model',
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+      parts: [{ type: 'text', text: 'run this model' }],
+    });
+    expect(record.piSession.currentModel).toEqual({
+      id: 'claude-sonnet-4-5',
+      provider: 'anthropic',
+    });
+    host.dispose();
+  });
+});
+
+describe('resolvePromptModelRef', () => {
+  it('reads provider/model from the OpenCode prompt body', () => {
+    expect(resolvePromptModelRef({ providerID: 'anthropic', modelID: 'claude-sonnet-4-5' }))
+      .toBe('anthropic/claude-sonnet-4-5');
+    expect(resolvePromptModelRef('openai/gpt-5')).toBe('openai/gpt-5');
+    expect(resolvePromptModelRef(null)).toBe('');
   });
 });

@@ -190,6 +190,17 @@ export const isPlaceholderSessionTitle = (title) => {
   return !trimmed || PLACEHOLDER_SESSION_TITLES.has(trimmed.toLowerCase());
 };
 
+export const resolvePromptModelRef = (model) => {
+  if (typeof model === 'string' && model.trim()) return model.trim();
+  if (!model || typeof model !== 'object') return '';
+  const providerID = typeof model.providerID === 'string' ? model.providerID.trim() : '';
+  const modelID = typeof model.modelID === 'string'
+    ? model.modelID.trim()
+    : (typeof model.id === 'string' ? model.id.trim() : '');
+  if (providerID && modelID) return `${providerID}/${modelID}`;
+  return modelID;
+};
+
 export const titleFromUserText = (text) => {
   const line = String(text || '').replace(/\s+/g, ' ').trim();
   if (!line) return '';
@@ -937,6 +948,10 @@ export const createPiHost = ({
     },
     async promptAsync(sessionID, body = {}) {
       const record = getRecord(sessionID);
+      const modelRef = resolvePromptModelRef(body.model);
+      if (modelRef) {
+        await this.setSessionModel(sessionID, modelRef);
+      }
       const text = extractPromptText(body.parts) || (typeof body.text === 'string' ? body.text : '');
       if (!text) {
         const error = new Error('Message must have at least one text part');
@@ -1254,6 +1269,15 @@ export const createPiHost = ({
       if (typeof record.piSession?.setModel !== "function") {
         return { applied: false, model: modelRef };
       }
+      const raw = typeof modelRef === "string" ? modelRef.trim() : "";
+      if (mock) {
+        const [providerID, modelID] = raw.split("/");
+        record.piSession.setModel({
+          id: modelID || raw,
+          ...(providerID ? { provider: providerID } : {}),
+        });
+        return { applied: true, model: raw };
+      }
       const runtime = await ensureModelRuntime();
       if (!runtime || typeof runtime.getAvailable !== "function") {
         const error = new Error("Pi models are not available");
@@ -1261,7 +1285,6 @@ export const createPiHost = ({
         throw error;
       }
       const available = await runtime.getAvailable();
-      const raw = typeof modelRef === "string" ? modelRef.trim() : "";
       const [providerID, modelID] = raw.split("/");
       const model = Array.isArray(available)
         ? available.find((item) => (

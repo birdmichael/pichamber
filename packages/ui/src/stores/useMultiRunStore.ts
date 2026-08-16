@@ -4,6 +4,7 @@ import { routeMessage, useSessionUIStore } from '@/sync/session-ui-store';
 import { devtools } from 'zustand/middleware';
 import type { CreateMultiRunParams, CreateMultiRunResult } from '@/types/multirun';
 import { opencodeClient } from '@/lib/opencode/client';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { getWorktreeSetupWaitEnabled, saveWorktreeSetupCommands } from '@/lib/openchamberConfig';
 import type { ProjectRef } from '@/lib/worktrees/worktreeManager';
 import { createWorktreeWithDefaults, resolveRootTrackingRemote } from '@/lib/worktrees/worktreeCreate';
@@ -41,6 +42,26 @@ const normalizePath = (value: string): string => {
     return '/';
   }
   return replaced.length > 1 ? replaced.replace(/\/+$/, '') : replaced;
+};
+
+const isPiSession = (session: Session): boolean => {
+  return (session as Session & { version?: string }).version === 'pi';
+};
+
+const applySelectedModelToSession = async (
+  session: Session,
+  providerID: string,
+  modelID: string,
+): Promise<void> => {
+  if (!isPiSession(session)) return;
+  const response = await runtimeFetch(`/api/session/${encodeURIComponent(session.id)}/model`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: `${providerID}/${modelID}` }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to apply Pi model ${providerID}/${modelID}`);
+  }
 };
 
 const registerCreatedSession = (session: Session, directory: string): Session => {
@@ -169,6 +190,7 @@ export const useMultiRunStore = create<MultiRunStore>()(
             modelID: string;
             variant?: string;
             prompt: string;
+            session: Session;
           }> = [];
 
           const commandsToRun = setupCommands?.filter((cmd) => cmd.trim().length > 0) ?? [];
@@ -214,15 +236,16 @@ export const useMultiRunStore = create<MultiRunStore>()(
                     directory,
                     () => opencodeClient.createSession({ title: sessionTitle }),
                   );
-                  registerCreatedSession(session, directory);
+                  const created = registerCreatedSession(session, directory);
 
                   createdRuns.push({
-                    sessionId: session.id,
+                    sessionId: created.id,
                     worktreePath: directory,
                     providerID: model.providerID,
                     modelID: model.modelID,
                     variant: model.variant,
                     prompt,
+                    session: created,
                   });
                   continue;
                 }
@@ -253,17 +276,18 @@ export const useMultiRunStore = create<MultiRunStore>()(
                   worktreeMetadata.path,
                   () => opencodeClient.createSession({ title: sessionTitle }),
                 );
-                registerCreatedSession(session, worktreeMetadata.path);
+                const created = registerCreatedSession(session, worktreeMetadata.path);
 
-                useSessionUIStore.getState().setWorktreeMetadata(session.id, enrichedMetadata);
+                useSessionUIStore.getState().setWorktreeMetadata(created.id, enrichedMetadata);
 
                 createdRuns.push({
-                  sessionId: session.id,
+                  sessionId: created.id,
                   worktreePath: worktreeMetadata.path,
                   providerID: model.providerID,
                   modelID: model.modelID,
                   variant: model.variant,
                   prompt,
+                  session: created,
                 });
               } catch (err) {
                 console.warn('[MultiRun] Failed to create session:', err);
@@ -293,32 +317,27 @@ export const useMultiRunStore = create<MultiRunStore>()(
             url: f.url,
           }));
 
-          void (async () => {
-            try {
-              const expandText = useSnippetsStore.getState().expandText;
-              await Promise.allSettled(
-                createdRuns.map(async (run) => {
-                  try {
-                    const text = await expandText(run.prompt).catch(() => run.prompt);
-                    await routeMessage({
-                      sessionId: run.sessionId,
-                      directory: run.worktreePath,
-                      content: text,
-                      providerID: run.providerID,
-                      modelID: run.modelID,
-                      variant: run.variant,
-                      agent,
-                      files: filesForMessage,
-                    });
-                  } catch (err) {
-                    console.warn('[MultiRun] Failed to start run:', err);
-                  }
-                }),
-              );
-            } catch (err) {
-              console.warn('[MultiRun] Failed to start runs:', err);
-            }
-          })();
+          const expandText = useSnippetsStore.getState().expandText;
+          await Promise.allSettled(
+            createdRuns.map(async (run) => {
+              try {
+                await applySelectedModelToSession(run.session, run.providerID, run.modelID);
+                const text = await expandText(run.prompt).catch(() => run.prompt);
+                await routeMessage({
+                  sessionId: run.sessionId,
+                  directory: run.worktreePath,
+                  content: text,
+                  providerID: run.providerID,
+                  modelID: run.modelID,
+                  variant: run.variant,
+                  agent,
+                  files: filesForMessage,
+                });
+              } catch (err) {
+                console.warn('[MultiRun] Failed to start run:', err);
+              }
+            }),
+          );
 
           set({ isLoading: false });
           return { groupSlug, sessionIds, firstSessionId };

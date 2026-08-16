@@ -8,6 +8,8 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useModelLists } from '@/hooks/useModelLists';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { loadPiRuntimeModels } from '@/lib/multirun/piModels';
 import { ModelPickerList, type ModelPickerEntry, type ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
 
 /** Chip height class - shared between chips and add button */
@@ -101,8 +103,27 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
   triggerIcon,
 }) => {
   const { t } = useI18n();
-  const providers = useConfigStore((state) => state.providers) as ModelPickerProvider[];
+  const isPiKernel = usePiKernel();
+  const configProviders = useConfigStore((state) => state.providers) as ModelPickerProvider[];
+  const [piProviders, setPiProviders] = React.useState<ModelPickerProvider[] | null>(null);
+  const providers = isPiKernel && piProviders ? piProviders : configProviders;
   const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+
+  React.useEffect(() => {
+    if (!isPiKernel) {
+      setPiProviders(null);
+      return;
+    }
+    let cancelled = false;
+    void loadPiRuntimeModels().then((result) => {
+      if (cancelled || !result.ok) return;
+      setPiProviders(result.providers);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPiKernel]);
+
   const toggleFavoriteModel = useUIStore((state) => state.toggleFavoriteModel);
   const isFavoriteModel = useUIStore((state) => state.isFavoriteModel);
   const { favoriteModelsList, recentModelsList } = useModelLists();

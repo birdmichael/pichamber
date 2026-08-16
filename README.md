@@ -18,7 +18,7 @@ This is a new product line on a fork of OpenChamber. Versioning starts at **1.0.
 - **Project trust** — decide whether a folder may load `.pi` settings and extensions.
 - **Files, git, and terminal** — review changes, open PRs, and keep a docked shell beside the chat.
 
-OpenCode-only surfaces (Usage, MCP, Plugins, Session Goals, Multi-run, the OpenCode CLI) are hidden on the Pi kernel.
+OpenCode-only surfaces (Usage, MCP, Plugins, Session Goals, the OpenCode CLI) are hidden on the Pi kernel. Scheduled Tasks and Multi-run stay available on Pi.
 
 ## Quick start
 

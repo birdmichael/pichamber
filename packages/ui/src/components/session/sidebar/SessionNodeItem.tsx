@@ -1029,7 +1029,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
           </TooltipContent>
         </Tooltip>
       ) : null}
-      {isMultiRunLikeSession && !isPiKernel ? (
+      {isMultiRunLikeSession ? (
         <Item onClick={() => setFusionDialogOpen(true)} className="[&>svg]:mr-1">
           <FusionIcon className="mr-1 h-4 w-4" />
           {t('sessions.sidebar.session.menu.runFusion')}
@@ -1523,7 +1523,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {isMultiRunLikeSession && !isPiKernel ? (
+      {isMultiRunLikeSession ? (
         <MultiRunFusionDialog
           session={resolvedSession}
           open={fusionDialogOpen}
