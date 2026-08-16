@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
   FEATURE_PLUGIN_SLOT_COPY,
@@ -10,6 +11,11 @@ import {
   parseFeaturePluginsPayload,
   presetSourceLabel,
 } from './featurePlugins';
+
+const pageSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'FeaturePluginsPage.tsx'),
+  'utf8',
+);
 
 describe('feature plugin payload parsing', () => {
   test('keeps default sources when building an empty payload', () => {
@@ -66,15 +72,14 @@ describe('feature plugin payload parsing', () => {
   });
 
   test('Feature Plugins page has no text inputs and anchors search on each card', () => {
-    const page = readFileSync(join(import.meta.dir, 'FeaturePluginsPage.tsx'), 'utf8');
-    expect(page).not.toMatch(/<Input\b/);
-    expect(page).not.toContain('SettingsChipGroup');
-    expect(page).not.toContain('settings.featurePlugins.field.source');
-    expect(page).not.toContain('settings.featurePlugins.field.command');
-    expect(page).toContain('@xl:grid-cols-2');
-    expect(page).not.toMatch(/(?:^|[^@\w])(?:sm|lg):/);
+    expect(pageSource.includes('<Input')).toBe(false);
+    expect(pageSource.includes('SettingsChipGroup')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.field.source')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.field.command')).toBe(false);
+    expect(pageSource.includes('@xl:grid-cols-2')).toBe(true);
+    expect(/(?:^|[^@\w])(?:sm|lg):/.test(pageSource)).toBe(false);
+    expect(pageSource.includes('data-settings-item={copy.settingsItem}')).toBe(true);
     for (const slot of FEATURE_PLUGIN_SLOTS) {
-      expect(page).toContain(`data-settings-item={copy.settingsItem}`);
       expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
     }
   });
