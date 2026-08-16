@@ -420,6 +420,40 @@ export const removePiProviderAuth = (providerId, { home = os.homedir() } = {}) =
   return { providerId: id, removed };
 };
 
+const readPositiveInt = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return Math.round(numeric);
+};
+
+const readModelContextWindow = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  return readPositiveInt(model.contextWindow)
+    ?? readPositiveInt(model.context_window)
+    ?? readPositiveInt(model.limit && typeof model.limit === 'object' ? model.limit.context : undefined);
+};
+
+const readModelMaxTokens = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  return readPositiveInt(model.maxTokens)
+    ?? readPositiveInt(model.max_tokens)
+    ?? readPositiveInt(model.limit && typeof model.limit === 'object' ? model.limit.output : undefined);
+};
+
+const toPiModelEntry = (id, model) => {
+  const name = model && typeof model === 'object' && typeof model.name === 'string' && model.name.trim()
+    ? model.name.trim()
+    : id;
+  const contextWindow = readModelContextWindow(model);
+  const maxTokens = readModelMaxTokens(model);
+  return {
+    id,
+    name,
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+  };
+};
+
 const normalizePiModels = (models) => {
   const result = [];
   if (Array.isArray(models)) {
@@ -427,8 +461,7 @@ const normalizePiModels = (models) => {
       if (!model || typeof model !== 'object') continue;
       const id = typeof model.id === 'string' ? model.id.trim() : '';
       if (!id) continue;
-      const name = typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id;
-      result.push({ id, name });
+      result.push(toPiModelEntry(id, model));
     }
     return result;
   }
@@ -436,10 +469,7 @@ const normalizePiModels = (models) => {
     for (const [modelId, modelValue] of Object.entries(models)) {
       const id = typeof modelId === 'string' ? modelId.trim() : '';
       if (!id) continue;
-      const name = modelValue && typeof modelValue === 'object' && typeof modelValue.name === 'string' && modelValue.name.trim()
-        ? modelValue.name.trim()
-        : id;
-      result.push({ id, name });
+      result.push(toPiModelEntry(id, modelValue));
     }
   }
   return result;

@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   addRemoteModelsToForm,
+  applyModelContextChange,
+  applyModelIdChange,
   buildAuthSetRequest,
   buildFetchRemoteModelsRequest,
   buildProviderUpsertRequest,
@@ -8,6 +10,7 @@ import {
   collapseRemoteModels,
   fetchRemoteModelsErrorKey,
   filterRemoteModels,
+  isInferredModelContext,
   parseRemoteProviderModelsPayload,
   prepareRemoteModelPicker,
   remoteModelAlreadyAdded,
@@ -195,6 +198,30 @@ describe('validateCustomProvider', () => {
     expect(result.result?.providerID).toBe('custom-provider');
     expect(result.err.providerID).toEqual(undefined);
   });
+
+  test('writes contextWindow when set and omits it when empty', () => {
+    const withContext = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(withContext.result?.config.models).toEqual({
+      'gpt-4o': { name: 'GPT-4o', contextWindow: 128000 },
+    });
+
+    const withoutContext = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'mystery', name: 'Mystery' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(withoutContext.result?.config.models).toEqual({
+      mystery: { name: 'Mystery' },
+    });
+  });
 });
 
 describe('request construction', () => {
@@ -313,6 +340,23 @@ describe('provider edit helpers', () => {
     expect(state.headers[0]).toEqual({ row: state.headers[0].row, key: 'X-Campus', value: '1' });
   });
 
+  test('round-trips a saved contextWindow on edit', () => {
+    const state = providerToCustomFormState({
+      id: 'campus-llm',
+      name: 'Campus LLM',
+      options: { baseURL: 'https://llm.example.edu/v1' },
+      models: [{ id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1047576, limit: { context: 1047576 } }],
+    });
+    expect(state.models[0]?.contextWindow).toBe(1047576);
+
+    const fromLimitOnly = providerToCustomFormState({
+      id: 'campus-llm',
+      options: { baseURL: 'https://llm.example.edu/v1' },
+      models: { 'gpt-4o': { name: 'GPT-4o', limit: { context: 128000 } } },
+    });
+    expect(fromLimitOnly.models[0]).toMatchObject({ id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 });
+  });
+
   test('requires a config-layer source before treating a provider as editable custom', () => {
     const catalogLike = {
       id: 'openai',
@@ -399,7 +443,23 @@ describe('fetch remote models request', () => {
         { id: '  ', name: 'blank' },
         { name: 'missing-id' },
       ],
-    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6' }]);
+    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000 }]);
+  });
+
+  test('keeps a provider-reported context and prefills exact ids when the catalog is silent', () => {
+    expect(parseRemoteProviderModelsPayload({
+      models: [
+        { id: 'gpt-4o', name: 'GPT-4o', context_length: 64000 },
+        { id: 'gpt-4.1', name: 'GPT-4.1' },
+        { id: 'claude-unknown-99', name: 'Claude mystery' },
+        { id: 'mystery-model', name: 'Mystery' },
+      ],
+    })).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000 },
+      { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1047576 },
+      { id: 'claude-unknown-99', name: 'Claude mystery', contextWindow: 200000 },
+      { id: 'mystery-model', name: 'Mystery' },
+    ]);
   });
 
   test('filters remote models by id, name, and family without mutating the source', () => {
@@ -495,6 +555,7 @@ describe('fetch remote models request', () => {
     expect(first).toHaveLength(1);
     expect(first[0]?.id).toBe('grok-4.6');
     expect(first[0]?.name).toBe('Grok 4.6');
+    expect(first[0]?.contextWindow).toBe(500000);
     expect(first[0]?.row.startsWith('row-')).toBe(true);
 
     const appended = addRemoteModelsToForm(first, [
@@ -513,5 +574,24 @@ describe('fetch remote models request', () => {
     expect(fetchRemoteModelsErrorKey(404)).toBe(
       'settings.providers.page.custom.error.fetch.unsupported',
     );
+  });
+
+  test('prefills published windows on id change and never overwrites a user edit', () => {
+    const empty = applyModelIdChange({ row: 'm0', id: '', name: '' }, 'gpt-4o');
+    expect(empty.contextWindow).toBe(128000);
+    expect(isInferredModelContext(empty)).toBe(false);
+
+    const switched = applyModelIdChange(empty, 'gpt-4.1');
+    expect(switched.contextWindow).toBe(1047576);
+
+    const edited = applyModelContextChange(switched, 64000);
+    expect(applyModelIdChange(edited, 'gpt-4o').contextWindow).toBe(64000);
+
+    const family = applyModelIdChange({ row: 'm1', id: '', name: '' }, 'claude-unknown-99');
+    expect(family.contextWindow).toBe(200000);
+    expect(isInferredModelContext(family)).toBe(true);
+
+    const unknown = applyModelIdChange({ row: 'm2', id: '', name: '' }, 'mystery-model');
+    expect(unknown.contextWindow).toBeUndefined();
   });
 });

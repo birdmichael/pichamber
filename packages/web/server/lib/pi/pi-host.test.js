@@ -82,6 +82,36 @@ describe('mapPiModelsToProviders', () => {
     ]);
     expect(providers[0].models['example-model'].limit).toEqual({ context: 200000, output: 8192 });
   });
+
+  it('fills missing live context from models.json without overwriting a live window', () => {
+    const providers = mapPiModelsToProviders(
+      [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'acme' }],
+      {
+        configs: {
+          acme: {
+            name: 'Acme',
+            baseUrl: 'https://ai.example.test/v1',
+            models: [{ id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 }],
+          },
+        },
+      },
+    );
+    expect(providers[0].models['gpt-4o'].contextWindow).toBe(128000);
+    expect(providers[0].models['gpt-4o'].limit.context).toBe(128000);
+
+    const kept = mapPiModelsToProviders(
+      [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'acme', contextWindow: 64000 }],
+      {
+        configs: {
+          acme: {
+            models: [{ id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 }],
+          },
+        },
+      },
+    );
+    expect(kept[0].models['gpt-4o'].contextWindow).toBe(64000);
+    expect(kept[0].models['gpt-4o'].limit.context).toBe(64000);
+  });
 });
 
 describe('normalizePiSessionUsage', () => {

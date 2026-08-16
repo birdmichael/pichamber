@@ -4,6 +4,15 @@ Owning module for the in-process Pi kernel: session host, OpenCode-shaped
 HTTP/SSE facade, Desktop `ctx.ui`, command dispatch, and reload. Product
 behavior is documented in `docs/PICHAMBER.md`.
 
+## Custom provider context windows
+
+Settings → Providers custom-model rows persist Pi `contextWindow` on that
+model in `~/.pi/agent/models.json` (and project `.pi/models.json`). Save
+must not strip a user-set or provider-reported window. Empty is valid: the
+UI 200k fallback stays display-only. `toProviderModelRecord` exposes
+`limit.context` from that stored value for the composer chip, context
+panel, and work-status usage.
+
 ## Desktop `ctx.ui`
 
 Live `AgentSession` records call `bindExtensions({ uiContext, mode: "rpc" })`

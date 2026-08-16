@@ -4,6 +4,8 @@
  * can be defined from Settings without code changes.
  */
 
+import { readCatalogContextWindow, readPositiveContextWindow, resolveContextWindow } from '@/lib/model-context-windows';
+
 export const CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
 const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
@@ -19,6 +21,9 @@ export type ModelRow = {
   row: string;
   id: string;
   name: string;
+  contextWindow?: number;
+  /** True after the user edits or clears context. Auto-prefill must not overwrite. */
+  contextTouched?: boolean;
 };
 
 export type HeaderRow = {
@@ -53,6 +58,11 @@ export type HeaderFieldErrors = {
   value?: string;
 };
 
+export type CustomProviderModelConfig = {
+  name: string;
+  contextWindow?: number;
+};
+
 export type CustomProviderConfig = {
   npm: typeof CUSTOM_PROVIDER_NPM;
   name: string;
@@ -61,7 +71,7 @@ export type CustomProviderConfig = {
     baseURL: string;
     headers?: Record<string, string>;
   };
-  models: Record<string, { name: string }>;
+  models: Record<string, CustomProviderModelConfig>;
 };
 
 export type CustomProviderPersistPlan = {
@@ -98,7 +108,13 @@ export type ProviderLikeForCustomForm = {
   name?: string;
   env?: string[];
   options?: Record<string, unknown> | null;
-  models?: Array<{ id?: string; name?: string; api?: { npm?: string } }> | Record<string, unknown>;
+  models?: Array<{
+    id?: string;
+    name?: string;
+    contextWindow?: number;
+    limit?: { context?: number };
+    api?: { npm?: string };
+  }> | Record<string, unknown>;
 };
 
 let rowCounter = 0;
@@ -110,6 +126,44 @@ export const createModelRow = (): ModelRow => ({
   id: '',
   name: '',
 });
+
+const readModelContextWindow = (model: unknown): number | undefined => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) {
+    return undefined;
+  }
+  const record = model as Record<string, unknown>;
+  return readPositiveContextWindow(record.contextWindow)
+    ?? readCatalogContextWindow(record);
+};
+
+export const applyModelIdChange = (row: ModelRow, id: string): ModelRow => {
+  if (row.contextTouched) {
+    return { ...row, id };
+  }
+  const resolved = resolveContextWindow({ id });
+  return {
+    ...row,
+    id,
+    contextWindow: resolved.contextWindow,
+  };
+};
+
+export const applyModelContextChange = (
+  row: ModelRow,
+  contextWindow: number | undefined,
+): ModelRow => ({
+  ...row,
+  contextWindow,
+  contextTouched: true,
+});
+
+export const isInferredModelContext = (row: Pick<ModelRow, 'id' | 'contextWindow'>): boolean => {
+  if (row.contextWindow === undefined) {
+    return false;
+  }
+  const resolved = resolveContextWindow({ id: row.id });
+  return resolved.source === 'family' && resolved.contextWindow === row.contextWindow;
+};
 
 export const createHeaderRow = (): HeaderRow => ({
   row: nextRow(),
@@ -223,6 +277,7 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
           name: value && typeof value === 'object' && 'name' in value && typeof (value as { name?: unknown }).name === 'string'
             ? (value as { name: string }).name
             : id,
+          contextWindow: readModelContextWindow(value),
         }))
       : []);
 
@@ -231,6 +286,7 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
         row: nextRow(),
         id: typeof model?.id === 'string' ? model.id : '',
         name: typeof model?.name === 'string' ? model.name : (typeof model?.id === 'string' ? model.id : ''),
+        contextWindow: readModelContextWindow(model) ?? (typeof model?.contextWindow === 'number' ? model.contextWindow : undefined),
       }))
     : [createModelRow()];
 
@@ -307,7 +363,16 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
 
   const modelsValid = modelErrors.every((entry) => !entry.id && !entry.name);
   const modelConfig = Object.fromEntries(
-    input.form.models.map((model) => [model.id.trim(), { name: model.name.trim() }]),
+    input.form.models.map((model) => {
+      const contextWindow = readPositiveContextWindow(model.contextWindow);
+      return [
+        model.id.trim(),
+        {
+          name: model.name.trim(),
+          ...(contextWindow !== undefined ? { contextWindow } : {}),
+        },
+      ];
+    }),
   );
 
   const seenHeaders = new Set<string>();
@@ -392,6 +457,7 @@ export function buildAuthSetRequest(plan: CustomProviderPersistPlan): {
 export type RemoteProviderModel = {
   id: string;
   name: string;
+  contextWindow?: number;
 };
 
 export type FetchRemoteModelsRequest = {
@@ -458,7 +524,15 @@ export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProvid
     seen.add(id);
     const rawName = (item as { name?: unknown }).name;
     const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : id;
-    models.push({ id, name });
+    const resolved = resolveContextWindow({
+      id,
+      catalogContextWindow: item,
+    });
+    models.push({
+      id,
+      name,
+      ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
+    });
   }
   return models;
 }
@@ -595,6 +669,7 @@ export type RemoteModelChoice = {
   id: string;
   name: string;
   aliases: string[];
+  contextWindow?: number;
 };
 
 /**
@@ -625,10 +700,16 @@ export function collapseRemoteModels(
       const ids = [...new Set(group.map((model) => model.id))];
       const id = preferRemoteModelId(ids);
       const named = group.find((model) => model.name.trim() && model.name.trim() !== model.id);
+      const catalog = group.find((model) => readPositiveContextWindow(model.contextWindow) !== undefined);
+      const resolved = resolveContextWindow({
+        id,
+        catalogContextWindow: catalog?.contextWindow,
+      });
       return {
         id,
         name: named?.name.trim() || group.find((model) => model.id === id)?.name || id,
         aliases: ids.filter((alias) => alias !== id).sort((left, right) => left.localeCompare(right)),
+        ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -693,7 +774,9 @@ export function remoteModelAlreadyAdded(current: readonly ModelRow[], modelId: s
   });
 }
 
-const isBlankModelRow = (row: ModelRow): boolean => !row.id.trim() && !row.name.trim();
+const isBlankModelRow = (row: ModelRow): boolean => (
+  !row.id.trim() && !row.name.trim() && row.contextWindow === undefined && !row.contextTouched
+);
 
 /**
  * Appends chosen remote models. Fetch must not replace the form list.
@@ -710,10 +793,15 @@ export function addRemoteModelsToForm(
     if (!id || remoteModelAlreadyAdded(seen, id) || remoteModelAlreadyAdded(added, id)) {
       continue;
     }
+    const resolved = resolveContextWindow({
+      id,
+      catalogContextWindow: model.contextWindow,
+    });
     const row = {
       row: nextRow(),
       id,
       name: model.name.trim() || id,
+      ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
     };
     added.push(row);
     seen.push(row);

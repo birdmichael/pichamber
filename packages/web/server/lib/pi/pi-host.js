@@ -619,9 +619,32 @@ const applyPublicProviderConfig = (provider, config) => {
   const extraModels = Array.isArray(config.models) ? config.models : [];
   for (const extra of extraModels) {
     const record = toProviderModelRecord(extra);
-    if (record && !provider.models[record.id]) {
+    if (!record) continue;
+    const existing = provider.models[record.id];
+    if (!existing) {
       provider.models[record.id] = record;
+      continue;
     }
+    const existingLimit = existing.limit && typeof existing.limit === 'object' ? existing.limit : {};
+    const existingContext = existing.contextWindow || existingLimit.context;
+    const existingOutput = existing.maxTokens || existingLimit.output;
+    const contextWindow = existingContext || record.contextWindow;
+    const maxTokens = existingOutput || record.maxTokens;
+    const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
+    const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
+    if (!hasContext && !hasOutput) continue;
+    provider.models[record.id] = {
+      ...existing,
+      ...(hasContext && !existingContext ? { contextWindow: Number(contextWindow) } : {}),
+      ...(hasOutput && !existingOutput ? { maxTokens: Number(maxTokens) } : {}),
+      ...(hasContext || hasOutput ? {
+        limit: {
+          ...existingLimit,
+          ...(hasContext && !existingLimit.context ? { context: Number(contextWindow) } : {}),
+          ...(hasOutput && !existingLimit.output ? { output: Number(maxTokens) } : {}),
+        },
+      } : {}),
+    };
   }
   return provider;
 };
