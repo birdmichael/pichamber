@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { MobileOverlayPanel } from '@/components/ui/MobileOverlayPanel';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from "@/components/icon/Icon";
 import type { IconName } from "@/components/icon/icons";
@@ -36,6 +37,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useModelLists } from '@/hooks/useModelLists';
 import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
+import { PI_THINKING_LEVELS, parsePiThinkingLevel, resolvePiThinkingChipPresentation } from './piThinking';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
 import { usePiKernel } from '@/lib/usePiKernel';
@@ -299,8 +301,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
-    const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-    const [piThinking, setPiThinking] = React.useState('high');
+    const [piThinking, setPiThinking] = React.useState<string | undefined>(undefined);
     const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
     const { isReady, isUnavailable } = useOpenCodeReadiness();
     const readinessLabel = isUnavailable ? t('common.unavailable') : t('common.loading');
@@ -350,11 +351,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 if (cancelled || !payload) {
                     return;
                 }
-                if (typeof payload.thinking === 'string') {
-                    const next = payload.thinking.trim();
-                    if (PI_THINKING_LEVELS.includes(next as typeof PI_THINKING_LEVELS[number])) {
-                        setPiThinking(next);
-                    }
+                const nextThinking = parsePiThinkingLevel(payload.thinking);
+                if (nextThinking) {
+                    setPiThinking(nextThinking);
                 }
                 if (Array.isArray(payload.enabledModels)) {
                     setEnabledModels(payload.enabledModels.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0));
@@ -2637,14 +2636,42 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const renderVariantSelector = () => {
         if (isPiKernel) {
-            const displayVariant = formatEffortLabel(piThinking);
-            const colorClass = piThinking === 'off' ? 'text-muted-foreground' : 'text-[color:var(--status-info)]';
+            const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+            const colorClass = thinkingChip.status === 'ready' && thinkingChip.level !== 'off'
+                ? 'text-[color:var(--status-info)]'
+                : 'text-muted-foreground';
+            const thinkingLabel = thinkingChip.status === 'ready'
+                ? (
+                    <span
+                        className={cn(
+                            'model-controls__variant-label',
+                            controlTextSize,
+                            'font-medium truncate min-w-0',
+                            isCompact && isMobile && 'max-w-[60px]',
+                            !isCompact && isDesktop ? 'max-w-[180px]' : undefined,
+                            colorClass,
+                        )}
+                    >
+                        {thinkingChip.label}
+                    </span>
+                )
+                : (
+                    <Skeleton
+                        className="h-3 w-8 rounded-md flex-shrink-0"
+                        aria-hidden
+                    />
+                );
+            const thinkingAriaLabel = thinkingChip.status === 'ready'
+                ? thinkingChip.label
+                : t('common.loading');
 
             if (isCompact) {
                 return (
                     <button
                         type="button"
                         onClick={() => setActiveMobilePanel('variant')}
+                        aria-busy={thinkingChip.status === 'pending'}
+                        aria-label={thinkingAriaLabel}
                         className={cn(
                             'model-controls__variant-trigger flex items-center gap-1.5 transition-opacity min-w-0 focus:outline-none',
                             buttonHeight,
@@ -2652,15 +2679,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         )}
                     >
                         <Icon name="brain-ai-3" className={cn(controlIconSize, 'flex-shrink-0', colorClass)} />
-                        <span className={cn(
-                            'model-controls__variant-label',
-                            controlTextSize,
-                            'font-medium truncate min-w-0',
-                            isMobile && 'max-w-[60px]',
-                            colorClass
-                        )}>
-                            {displayVariant}
-                        </span>
+                        {thinkingLabel}
                     </button>
                 );
             }
@@ -2671,30 +2690,22 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
                                 <div
+                                    aria-busy={thinkingChip.status === 'pending'}
+                                    aria-label={thinkingAriaLabel}
                                     className={cn(
                                         'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
                                         buttonHeight,
                                     )}
                                 >
                                     <Icon name="brain-ai-3" className={cn(controlIconSize, 'flex-shrink-0', colorClass)} />
-                                    <span
-                                        className={cn(
-                                            'model-controls__variant-label',
-                                            controlTextSize,
-                                            'font-medium min-w-0 truncate',
-                                            isDesktop ? 'max-w-[180px]' : undefined,
-                                            colorClass,
-                                        )}
-                                    >
-                                        {displayVariant}
-                                    </span>
+                                    {thinkingLabel}
                                 </div>
                             </DropdownMenuTrigger>
                         </TooltipTrigger>
                         <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(180px,calc(100vw-2rem))]">
                             <DropdownMenuLabel className="typography-ui-header font-semibold text-foreground">{t('chat.modelControls.thinking')}</DropdownMenuLabel>
                             {PI_THINKING_LEVELS.map((level) => {
-                                const selected = piThinking === level;
+                                const selected = thinkingChip.status === 'ready' && thinkingChip.level === level;
                                 return (
                                     <DropdownMenuItem
                                         key={level}
@@ -2711,7 +2722,11 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <TooltipContent side="top">
-                        <p className="typography-meta">Thinking: {displayVariant}</p>
+                        <p className="typography-meta">
+                            {thinkingChip.status === 'ready'
+                                ? `Thinking: ${thinkingChip.label}`
+                                : t('common.loading')}
+                        </p>
                     </TooltipContent>
                 </Tooltip>
             );

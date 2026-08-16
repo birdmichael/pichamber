@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **Usage/Claude:** Claude plan limits now work when you are signed in through Claude Code, without also signing into Anthropic in OpenCode; the account is read from Claude Code's own login on macOS, Linux, and WSL. The page shows your session and weekly limits again, adds per-model weekly limits and extra usage spending, and names your plan. Limits are kept on screen instead of disappearing when Anthropic temporarily blocks refreshes.
 - **Settings/Integrations:** a new Integrations settings page lists Claude Code, Command Code, and Cursor plugins with install, update, setup, and remove actions, plus Discord and Telegram Coming soon placeholders.
 - Chat: opening a busy subagent in the context panel now shows its history instead of only the working-status line (thanks to @makeittech).
+- Chat: the thinking chip no longer flashes High before the saved default loads.
 - Desktop: on Pi, the header instance control no longer mentions Usage or MCP; it still names the current Local or remote instance.
 - Settings/Skills: installed skills inside symlink folders now appear, YAML block descriptions show their real text instead of `|`, opening a nested symlink skill in Settings loads that file instead of an empty editor, and opening your home folder as the project no longer lists each user skill twice.
 - Settings: on Pi, Agents now opens the built-in `pi` agent instead of asking you to create one.
