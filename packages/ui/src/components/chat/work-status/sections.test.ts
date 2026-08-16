@@ -32,6 +32,15 @@ describe('isWorkStatusSectionAvailable', () => {
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: false })).toEqual(WORK_STATUS_SECTION_IDS);
   });
+
+  test('hides MCP on Pi until the adapter slot is installed and enabled', () => {
+    expect(isWorkStatusSectionAvailable('mcp', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('mcp', { isPiKernel: true, isMcpFeaturePluginActive: false })).toBe(false);
+    expect(isWorkStatusSectionAvailable('mcp', { isPiKernel: true, isMcpFeaturePluginActive: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('mcp', { isPiKernel: false })).toBe(true);
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('mcp');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, isMcpFeaturePluginActive: true })).toContain('mcp');
+  });
 });
 
 describe('isWorkStatusSectionVisible', () => {
@@ -85,7 +94,7 @@ describe('areAllWorkStatusSectionsHidden', () => {
   });
 
   test('on Pi, ignores the unavailable provider-usage section', () => {
-    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage');
+    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp');
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: true })).toBe(true);
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: false })).toBe(false);
     expect(areAllWorkStatusSectionsHidden([], { isPiKernel: true })).toBe(false);

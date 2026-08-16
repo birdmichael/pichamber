@@ -12,7 +12,12 @@ describe('headerServicesOpenAriaKey', () => {
   });
 
   test('keeps the non-desktop services label regardless of kernel', () => {
-    expect(headerServicesOpenAriaKey(false, true)).toBe('header.services.open');
     expect(headerServicesOpenAriaKey(false, false)).toBe('header.services.open');
+  });
+
+  test('does not advertise MCP on Pi until the adapter slot is on', () => {
+    expect(headerServicesOpenAriaKey(false, true)).toBe('header.services.openPi');
+    expect(headerServicesOpenAriaKey(false, true, false)).toBe('header.services.openPi');
+    expect(headerServicesOpenAriaKey(false, true, true)).toBe('header.services.openPiWithMcp');
   });
 });

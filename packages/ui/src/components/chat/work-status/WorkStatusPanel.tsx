@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/useUIStore';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
 import { WorkStatusGoalRow } from './WorkStatusGoalRow';
 import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
@@ -70,7 +70,11 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const setOverlayOpen = useUIStore((state) => state.setWorkStatusOverlayOpen);
   const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
   const isPiKernel = usePiKernel();
-  const sectionContext = React.useMemo(() => ({ isPiKernel }), [isPiKernel]);
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
+  const sectionContext = React.useMemo(
+    () => ({ isPiKernel, isMcpFeaturePluginActive }),
+    [isMcpFeaturePluginActive, isPiKernel],
+  );
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering
   // nothing on the way in would make the card flash out and back on arrival.

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { Switch } from '@/components/ui/switch';
-import { useMcpStore } from '@/stores/useMcpStore';
+import { isMcpStatusActive, useMcpStore } from '@/stores/useMcpStore';
 import { McpIcon } from '@/components/icons/McpIcon';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { toast } from 'sonner';
@@ -40,7 +40,7 @@ export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
     [mcpStatus],
   );
   const mcpConnected = React.useMemo(
-    () => mcpServers.filter(([, entry]) => entry?.status === 'connected').length,
+    () => mcpServers.filter(([, entry]) => isMcpStatusActive(entry)).length,
     [mcpServers],
   );
 
@@ -96,15 +96,15 @@ export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
       summary={`${mcpConnected}/${mcpServers.length}`}
     >
       {mcpServers.map(([name, entry]) => {
-        const connected = entry?.status === 'connected';
         const needsAuth = entry?.status === 'needs_auth' || entry?.status === 'needs_client_registration';
         const failed = entry?.status === 'failed';
+        const switchOn = isMcpStatusActive(entry);
         return (
           <WorkStatusRow
             key={name}
             leading={(
               <Switch
-                checked={connected}
+                checked={switchOn}
                 disabled={busyServer === name}
                 className="scale-75 data-[checked]:bg-status-info"
                 aria-label={t('chat.workStatus.mcp.toggle', { name })}
@@ -112,7 +112,7 @@ export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
               />
             )}
             label={name}
-            muted={!connected}
+            muted={!switchOn}
             // A server asking for sign-in or reporting a failure is asking to be
             // acted on; the state is the affordance, so it is the button.
             value={needsAuth ? (

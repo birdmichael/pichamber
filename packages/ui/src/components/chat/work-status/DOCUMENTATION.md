@@ -95,7 +95,7 @@ which requests only providers enabled for this panel.
 | Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | OpenCode provider quotas only. Hidden on Pi (`isWorkStatusSectionAvailable`); session context % / cost stay in the Session block |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |
 | Goal | `useSessionGoal` | respects the Settings toggle |
-| MCP | `useMcpStore` | connect/disconnect reuses the dropdown's actions |
+| MCP | `useMcpStore` | Hidden on Pi until the MCP feature-plugin slot is installed and enabled. Presence of `.mcp.json` alone does not show this block. Connect/disconnect reuses the dropdown's actions; on Pi those persist `disabled` on `<cwd>/.pi/mcp.json` and reload the session. `cached` / not-yet-connected is a valid row, not a failure. |
 | Pinned messages | `getContextObligatoryMessages` + `state.part` | see below |
 | Todos | live `state.todo[sessionId]`, persisted fallback | live channel wins |
 

@@ -227,6 +227,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       updateSnippet,
       deleteSnippet,
       expandSnippets,
+      getPiHost,
     });
 
     registerPluginRoutes(app, {

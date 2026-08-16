@@ -27,16 +27,23 @@ type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
 type WorkStatusSectionContext = {
   /** Pi has no provider-quota API; the OpenCode usage section is unavailable. */
   isPiKernel?: boolean;
+  /** Pi MCP follows the feature-plugin slot, not leftover mcp.json files. */
+  isMcpFeaturePluginActive?: boolean;
 };
 
 /**
  * Provider-quota usage is an OpenCode API. Pi has no quota source, so that
  * section is not offered — session context % / cost stay in the Session block.
+ * MCP on Pi is offered only when the adapter slot is installed and enabled.
  */
 export const isWorkStatusSectionAvailable = (
   id: WorkStatusSectionId,
   context?: WorkStatusSectionContext,
-): boolean => !(context?.isPiKernel && id === 'usage');
+): boolean => {
+  if (context?.isPiKernel && id === 'usage') return false;
+  if (id === 'mcp' && context?.isPiKernel && !context.isMcpFeaturePluginActive) return false;
+  return true;
+};
 
 export const getAvailableWorkStatusSectionIds = (
   context?: WorkStatusSectionContext,
