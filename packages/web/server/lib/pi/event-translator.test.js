@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
+import { createEventTranslator, extractPromptImages, extractPromptText, mapPiUsageToOpenCodeTokens } from './event-translator.js';
 
 const translator = (overrides = {}) => createEventTranslator({
   sessionID: 'ses_1',
@@ -173,7 +173,57 @@ describe('createEventTranslator', () => {
   });
 });
 
+describe('Pi usage mapping', () => {
+  it('maps Pi usage onto OpenCode tokens and cost', () => {
+    expect(mapPiUsageToOpenCodeTokens({
+      input: 3200,
+      output: 180,
+      cacheRead: 400,
+      cacheWrite: 50,
+      reasoning: 40,
+      totalTokens: 3830,
+      cost: { total: 0.012 },
+    })).toEqual({
+      cost: 0.012,
+      tokens: {
+        input: 3200,
+        output: 180,
+        reasoning: 40,
+        cache: { read: 400, write: 50 },
+      },
+    });
+  });
+
+  it('copies usage from message_end onto assistant info', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    const ended = t.translate({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        usage: {
+          input: 2500,
+          output: 80,
+          cacheRead: 100,
+          cacheWrite: 0,
+          reasoning: 12,
+          cost: { total: 0.004 },
+        },
+      },
+    });
+    expect(ended[0].properties.info.tokens).toEqual({
+      input: 2500,
+      output: 80,
+      reasoning: 12,
+      cache: { read: 100, write: 0 },
+    });
+    expect(ended[0].properties.info.cost).toBe(0.004);
+  });
+});
+
 describe('prompt extractors', () => {
+
   it('joins text parts and extracts data-url images', () => {
     expect(extractPromptText([
       { type: 'text', text: 'hello' },

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { createInMemoryPiSession, createPiHost, mapPiModelsToProviders } from './pi-host.js';
+import { createInMemoryPiSession, createPiHost, mapPiModelsToProviders, normalizePiSessionUsage } from './pi-host.js';
 
 describe('mapPiModelsToProviders', () => {
   it('groups Pi models by provider id', () => {
@@ -13,6 +13,47 @@ describe('mapPiModelsToProviders', () => {
     ]);
     expect(providers.map((provider) => provider.id)).toEqual(['anthropic', 'openai']);
     expect(providers[0].models['claude-sonnet-4-5'].name).toBe('Sonnet');
+  });
+
+  it('exposes limit.context from Pi contextWindow', () => {
+    const providers = mapPiModelsToProviders([
+      { id: 'example-model', name: 'Example', provider: 'example', contextWindow: 200000, maxTokens: 8192 },
+    ]);
+    expect(providers[0].models['example-model'].limit).toEqual({ context: 200000, output: 8192 });
+  });
+});
+
+describe('normalizePiSessionUsage', () => {
+  it('aliases Pi contextWindow for the composer chip and context panel', () => {
+    expect(normalizePiSessionUsage({ tokens: 4000, contextWindow: 200000, percent: 2 })).toEqual({
+      available: true,
+      tokens: 4000,
+      contextLimit: 200000,
+      contextWindow: 200000,
+      percent: 2,
+    });
+  });
+
+  it('falls back to session stats contextUsage when getContextUsage is missing', () => {
+    expect(normalizePiSessionUsage(undefined, {
+      tokens: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, total: 3 },
+      contextUsage: { tokens: 1500, contextWindow: 128000, percent: 1.171875 },
+    })).toMatchObject({
+      available: true,
+      tokens: 1500,
+      contextLimit: 128000,
+      percent: 1.171875,
+    });
+  });
+
+  it('does not invent token counts when Pi reports unknown usage', () => {
+    expect(normalizePiSessionUsage({ tokens: null, contextWindow: 200000, percent: null })).toEqual({
+      available: true,
+      tokens: null,
+      contextLimit: 200000,
+      contextWindow: 200000,
+      percent: null,
+    });
   });
 });
 
@@ -195,6 +236,84 @@ describe('createPiHost', () => {
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it('persists Pi message.usage onto stored assistant tokens', async () => {
+    const createUsageSession = () => {
+      const listeners = new Set();
+      const emit = (event) => {
+        for (const listener of Array.from(listeners)) listener(event);
+      };
+      return {
+        isStreaming: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: {
+              role: 'assistant',
+              usage: {
+                input: 2100,
+                output: 60,
+                cacheRead: 80,
+                cacheWrite: 0,
+                reasoning: 10,
+                cost: { total: 0.003 },
+              },
+            },
+          });
+          emit({ type: 'agent_settled' });
+        },
+        getContextUsage() {
+          return { tokens: 2240, contextWindow: 128000, percent: 1.75 };
+        },
+      };
+    };
+    const host = createPiHost({
+      defaultDirectory: '/tmp/project',
+      createSession: async () => createUsageSession(),
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    await host.promptAsync(record.id, { messageID: 'msg_user', parts: [{ type: 'text', text: 'hi' }] });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant.info.tokens).toEqual({
+      input: 2100,
+      output: 60,
+      reasoning: 10,
+      cache: { read: 80, write: 0 },
+    });
+    expect(assistant.info.cost).toBe(0.003);
+    expect(host.getSessionUsage(record.id).percent).toBe(1.75);
+    host.dispose();
+  });
+
+  it('getSessionUsage returns normalized Pi context usage', async () => {
+    const host = createPiHost({
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        isStreaming: false,
+        subscribe() { return () => {}; },
+        async prompt() {},
+        getContextUsage() {
+          return { tokens: 2560, contextWindow: 128000, percent: 2 };
+        },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    expect(host.getSessionUsage(record.id)).toEqual({
+      available: true,
+      tokens: 2560,
+      contextLimit: 128000,
+      contextWindow: 128000,
+      percent: 2,
+    });
+    host.dispose();
   });
 
   it('forkSession copies messages up to the chosen user message', async () => {
