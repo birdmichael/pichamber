@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from '../commandAutocompleteItems';
+import {
+  commandHasPiSlashPrefix,
+  commandMatchesPiSlashQuery,
+  commandMatchesSearch,
+  filterPiSlashCommands,
+  mergeCommandAutocompleteItems,
+  toPiSkillSlashName,
+} from '../commandAutocompleteItems';
 
 interface Item {
   name: string;
@@ -165,7 +172,7 @@ describe('filterPiSlashCommands', () => {
     expect(filterPiSlashCommands(commands, false)).toEqual(commands);
   });
 
-  test('hides chip-covered commands, leftover OpenChamber commands, and skills', () => {
+  test('keeps injected skills as skill:name and still hides chips and leftovers', () => {
     const commands = [
       { name: 'compact' },
       { name: 'reload' },
@@ -176,13 +183,34 @@ describe('filterPiSlashCommands', () => {
       { name: 'schedule-task', isOpenChamber: true },
       { name: 'catch-up', isOpenChamber: true },
       { name: 'clack-cli-patterns', isSkill: true },
+      { name: 'local-review', isSkill: true, injected: false },
+      { name: 'skill:already-prefixed', isSkill: true },
     ];
     expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
       'compact',
       'reload',
       'login',
       'pr-review',
+      'skill:clack-cli-patterns',
+      'skill:already-prefixed',
     ]);
+  });
+
+  test('does not treat a skill named model as the hidden chip command', () => {
+    const commands = [
+      { name: 'model' },
+      { name: 'model', isSkill: true },
+    ];
+    expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
+      'skill:model',
+    ]);
+  });
+});
+
+describe('toPiSkillSlashName', () => {
+  test('prefixes a bare skill name once', () => {
+    expect(toPiSkillSlashName('clack-cli-patterns')).toBe('skill:clack-cli-patterns');
+    expect(toPiSkillSlashName('skill:clack-cli-patterns')).toBe('skill:clack-cli-patterns');
   });
 });
 
@@ -192,6 +220,15 @@ describe('commandMatchesPiSlashQuery', () => {
     expect(commandMatchesPiSlashQuery(compact, 'co')).toBe(true);
     expect(commandMatchesPiSlashQuery(compact, 'th')).toBe(false);
     expect(commandMatchesPiSlashQuery(compact, 'catch')).toBe(false);
+  });
+
+  test('matches /skill, /skill:name, and the bare skill name', () => {
+    const skill = { name: 'skill:clack-cli-patterns' };
+    expect(commandMatchesPiSlashQuery(skill, 'skill')).toBe(true);
+    expect(commandMatchesPiSlashQuery(skill, 'skill:clack')).toBe(true);
+    expect(commandMatchesPiSlashQuery(skill, 'clack')).toBe(true);
+    expect(commandHasPiSlashPrefix(skill, 'cli')).toBe(false);
+    expect(commandMatchesPiSlashQuery(skill, 'compact')).toBe(false);
   });
 
   test('empty query keeps every remaining command', () => {

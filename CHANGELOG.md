@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** typing `/` now lists installed, trusted skills as `/skill:name` next to Pi builtins, matching the Pi CLI. Untrusted project skills stay out of the menu. `/model` and `/thinking` remain on the chips.
 - Work status: the provider quota block is hidden on Pi, where that API does not exist. Session context percentage and cost stay visible.
 - UI: a new session no longer shows empty Pull request and Walkthrough context tabs. Those surfaces appear when there is a pull request, a diff, or you ask for a walkthrough.
 - Sessions: Scheduled Tasks and New multi-run are hidden on the Pi kernel — the sidebar calendar and merge-arrows buttons, the leftover OpenCode pages, and `/schedule-task` no longer appear. The OpenCode kernel still has both features.

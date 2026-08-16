@@ -157,11 +157,12 @@ export function routeMessage(params: {
     const syncCommands = dirState?.command ?? []
     const storeCommands = useCommandsStore.getState().commands
 
-    // OpenCode registers every skill as a command (source: "skill"), but the
-    // commands store filters skills out and the synced command list is only
-    // hydrated at bootstrap. Consult the live skills store so a skill selected
-    // from the slash menu is invoked via session.command (injecting its
-    // content) instead of being sent as a literal "/name" message (#1605).
+    // OpenCode leftover: skills are registered as commands (source: "skill").
+    // The commands store filters them out, so consult the live skills store
+    // and invoke via session.command (#1605).
+    // Pi kernel: the slash menu inserts `/skill:name`. That token does not
+    // match a skill's bare name, so this falls through to sendMessage and
+    // AgentSession.prompt expands `/skill:name` to the skill body.
     const isCommand = syncCommands.find((c) => c.name === cmdName)
       || storeCommands.find((c) => c.name === cmdName)
       || useSkillsStore.getState().skills.some((s) => s.name === cmdName)

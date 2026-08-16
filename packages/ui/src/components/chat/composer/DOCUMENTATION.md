@@ -38,7 +38,9 @@ copy.
   picker, the same way `/skill` tokens behave — not an atomic delete.
 - `prefixTokens.ts` — `/command`, `/skill`, `#snippet`. Scanning is deliberately
   generous; **membership in the command, skill or snippet registry is the
-  authority**, not the pattern. An unknown `/token` stays plain prose.
+  authority**, not the pattern. An unknown `/token` stays plain prose. On the
+  Pi kernel, installed skills are slash targets as `/skill:name`; the scanner
+  accepts `:` in the identifier so that form is one token.
 - `triggers.ts` — which picker a caret position asks for. Exactly one can be
   active, with precedence `command > skill > snippet > mention`.
 - `tokenize.ts` — one pass producing every highlight range. Adding a construct

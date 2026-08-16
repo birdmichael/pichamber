@@ -18,10 +18,10 @@
 
 /**
  * Identifier body shared by all prefix tokens: starts alphanumeric, then
- * alphanumerics, `-` and `_`. Kept in one place so `/` and `#` cannot drift
- * apart again.
+ * alphanumerics, `-`, `_`, and `:` (Pi skill form `/skill:name`). Kept in one
+ * place so `/` and `#` cannot drift apart again.
  */
-const TOKEN_NAME = '[A-Za-z0-9][A-Za-z0-9_-]*';
+const TOKEN_NAME = '[A-Za-z0-9][A-Za-z0-9_:-]*';
 
 /** Sigils that introduce a prefix token. */
 export type TokenPrefix = '/' | '#';

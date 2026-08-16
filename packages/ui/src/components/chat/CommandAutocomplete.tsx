@@ -11,7 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, filterPiSlashCommands, mergeCommandAutocompleteItems } from './commandAutocompleteItems';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -26,6 +26,7 @@ export interface CommandInfo {
   isBuiltIn?: boolean;
   isOpenChamber?: boolean;
   isSkill?: boolean;
+  injected?: boolean;
   scope?: string;
 }
 
@@ -125,7 +126,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     const loadCommands = async () => {
       setLoading(true);
       try {
-        const skillNames = new Set(skills.map((skill) => skill.name));
+        const skillByName = new Map(skills.map((skill) => [skill.name, skill]));
         const customCommands: CommandInfo[] = commandsWithMetadata.map((cmd, index) => ({
           id: `opencode:${cmd.scope ?? 'global'}:${cmd.name}:${cmd.agent ?? ''}:${cmd.model ?? ''}:${index}`,
           name: cmd.name,
@@ -134,7 +135,8 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           agent: cmd.agent ?? undefined,
           model: cmd.model ?? undefined,
           isBuiltIn: cmd.name === 'init' || cmd.name === 'review',
-          isSkill: cmd.source === 'skill' || skillNames.has(cmd.name),
+          isSkill: cmd.source === 'skill' || skillByName.has(cmd.name),
+          injected: skillByName.get(cmd.name)?.injected,
           scope: cmd.scope,
         }));
         const skillCommands: CommandInfo[] = skills.map((skill, index) => ({
@@ -143,6 +145,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           source: 'skill',
           description: skill.description,
           isSkill: true,
+          injected: skill.injected,
           scope: skill.scope,
         }));
 
@@ -210,8 +213,12 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           : allCommands).filter(cmd => allowInitCommand || cmd.name !== 'init');
 
         filtered.sort((a, b) => {
-          const aStartsWith = a.name.toLowerCase().startsWith(searchQuery.toLowerCase());
-          const bStartsWith = b.name.toLowerCase().startsWith(searchQuery.toLowerCase());
+          const aStartsWith = isPiKernel
+            ? commandHasPiSlashPrefix(a, searchQuery)
+            : a.name.toLowerCase().startsWith(searchQuery.toLowerCase());
+          const bStartsWith = isPiKernel
+            ? commandHasPiSlashPrefix(b, searchQuery)
+            : b.name.toLowerCase().startsWith(searchQuery.toLowerCase());
           if (aStartsWith && !bStartsWith) return -1;
           if (!aStartsWith && bStartsWith) return 1;
           return a.name.localeCompare(b.name);

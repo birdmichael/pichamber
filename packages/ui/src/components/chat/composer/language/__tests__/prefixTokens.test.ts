@@ -52,6 +52,10 @@ describe('scanPrefixTokens — boundaries', () => {
         ]);
     });
 
+    test('slash names may include a colon for Pi /skill:name', () => {
+        expect(slashNames('/skill:clack-cli-patterns now')).toEqual(['skill:clack-cli-patterns']);
+    });
+
     test('a bare sigil is not a token', () => {
         expect(slashNames('a / b')).toEqual([]);
         expect(hashNames('a # b')).toEqual([]);
