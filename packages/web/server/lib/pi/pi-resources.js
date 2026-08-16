@@ -110,6 +110,10 @@ export const resolvePiAgentsMdPath = (home = os.homedir()) => path.join(resolveP
 
 export const resolvePiSettingsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'settings.json');
 
+export const resolvePiTrustPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'trust.json');
+
+export const PROJECT_TRUST_VALUES = ['ask', 'always', 'never'];
+
 export const resolvePiSystemMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'SYSTEM.md');
 
 export const resolvePiAppendSystemMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'APPEND_SYSTEM.md');
@@ -357,6 +361,51 @@ const pickRetryPatch = (patch = {}) => {
 
 export const readPiAgentSettings = (home = os.homedir()) => readJsonObject(resolvePiSettingsPath(home));
 
+export const normalizeEnabledModels = (value) => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const result = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const key = item.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(key);
+  }
+  return result;
+};
+
+export const isModelEnabled = (providerId, modelId, enabledModels) => {
+  const list = normalizeEnabledModels(enabledModels);
+  if (list.length === 0) return true;
+  const id = typeof modelId === "string" ? modelId.trim() : "";
+  const provider = typeof providerId === "string" ? providerId.trim() : "";
+  if (id && list.includes(id)) return true;
+  if (provider && id && list.includes(`${provider}/${id}`)) return true;
+  return false;
+};
+
+export const filterProvidersByEnabledModels = (providers, enabledModels) => {
+  const list = normalizeEnabledModels(enabledModels);
+  if (list.length === 0 || !Array.isArray(providers)) return providers || [];
+  return providers
+    .map((provider) => {
+      const models = provider?.models && typeof provider.models === "object" && !Array.isArray(provider.models)
+        ? provider.models
+        : {};
+      const nextModels = {};
+      for (const [id, model] of Object.entries(models)) {
+        if (isModelEnabled(provider.id, id, list)) nextModels[id] = model;
+      }
+      return { ...provider, models: nextModels };
+    })
+    .filter((provider) => Object.keys(provider.models || {}).length > 0);
+};
+
+const normalizeDefaultProjectTrust = (value, fallback = "ask") => (
+  PROJECT_TRUST_VALUES.includes(value) ? value : fallback
+);
+
 export const writePiAgentSettings = (home = os.homedir(), patch = {}) => {
   const filePath = resolvePiSettingsPath(home);
   const current = readJsonObject(filePath);
@@ -376,6 +425,14 @@ export const writePiAgentSettings = (home = os.homedir(), patch = {}) => {
         : {}),
       ...patch.retry,
     };
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "enabledModels")) {
+    const list = normalizeEnabledModels(patch.enabledModels);
+    if (list.length === 0) delete next.enabledModels;
+    else next.enabledModels = list;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "defaultProjectTrust")) {
+    next.defaultProjectTrust = normalizeDefaultProjectTrust(patch.defaultProjectTrust, current.defaultProjectTrust || "ask");
   }
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(next, null, 2)}\n`);
@@ -398,6 +455,8 @@ export const readPiDefaults = (home = os.homedir()) => {
     retry: retrySettings.enabled,
     compactionSettings,
     retrySettings,
+    enabledModels: normalizeEnabledModels(agent.enabledModels),
+    defaultProjectTrust: normalizeDefaultProjectTrust(agent.defaultProjectTrust),
   };
 };
 
@@ -411,6 +470,12 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
   const retrySettings = retryPatch
     ? normalizeRetrySettings({ ...current.retrySettings, ...retryPatch }, current.retry)
     : current.retrySettings;
+  const enabledModels = Object.prototype.hasOwnProperty.call(patch, "enabledModels")
+    ? normalizeEnabledModels(patch.enabledModels)
+    : current.enabledModels;
+  const defaultProjectTrust = Object.prototype.hasOwnProperty.call(patch, "defaultProjectTrust")
+    ? normalizeDefaultProjectTrust(patch.defaultProjectTrust, current.defaultProjectTrust)
+    : current.defaultProjectTrust;
   const next = {
     model: typeof patch.model === "string" ? patch.model : current.model,
     thinking: THINKING_LEVELS.includes(patch.thinking) ? patch.thinking : current.thinking,
@@ -418,6 +483,8 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
     retry: retrySettings.enabled,
     compactionSettings,
     retrySettings,
+    enabledModels,
+    defaultProjectTrust,
   };
   const chamberPath = resolvePiDefaultsPath(home);
   fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
@@ -427,10 +494,17 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
     compaction: next.compaction,
     retry: next.retry,
   }, null, 2)}\n`);
-  writePiAgentSettings(home, {
+  const agentPatch = {
     compaction: compactionSettings,
     retry: retrySettings,
-  });
+  };
+  if (Object.prototype.hasOwnProperty.call(patch, "enabledModels")) {
+    agentPatch.enabledModels = enabledModels;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "defaultProjectTrust")) {
+    agentPatch.defaultProjectTrust = defaultProjectTrust;
+  }
+  writePiAgentSettings(home, agentPatch);
   return next;
 };
 
@@ -670,3 +744,85 @@ export const deletePiPrompt = ({ home = os.homedir(), directory, name } = {}) =>
   fs.unlinkSync(existing);
   return { deleted: true, name: commandName, path: existing };
 };
+
+export const readPiTrustDecisions = (home = os.homedir()) => {
+  const data = readJsonObject(resolvePiTrustPath(home));
+  const decisions = [];
+  for (const [key, value] of Object.entries(data)) {
+    if (value === true || value === false) {
+      decisions.push({ path: key, trusted: value });
+    }
+  }
+  return decisions.sort((a, b) => a.path.localeCompare(b.path));
+};
+
+export const getPiTrustDecision = (home = os.homedir(), directory = '') => {
+  const target = typeof directory === 'string' && directory.trim() ? path.resolve(directory.trim()) : '';
+  if (!target) return { path: '', trusted: null };
+  const data = readJsonObject(resolvePiTrustPath(home));
+  let currentDir = target;
+  while (true) {
+    if (data[currentDir] === true || data[currentDir] === false) {
+      return { path: currentDir, trusted: data[currentDir] };
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return { path: target, trusted: null };
+    }
+    currentDir = parentDir;
+  }
+};
+
+export const writePiTrustDecisions = (home = os.homedir(), decisions = []) => {
+  const filePath = resolvePiTrustPath(home);
+  const current = readJsonObject(filePath);
+  for (const item of Array.isArray(decisions) ? decisions : []) {
+    if (!item || typeof item.path !== 'string' || !item.path.trim()) continue;
+    const key = path.resolve(item.path.trim());
+    if (item.trusted === null || item.trusted === undefined) {
+      delete current[key];
+    } else {
+      current[key] = Boolean(item.trusted);
+    }
+  }
+  const sorted = {};
+  for (const key of Object.keys(current).sort()) {
+    if (current[key] === true || current[key] === false) sorted[key] = current[key];
+  }
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(sorted, null, 2)}\n`);
+  return readPiTrustDecisions(home);
+};
+
+export const setPiProjectTrust = (home = os.homedir(), directory, trusted) => {
+  if (typeof directory !== 'string' || !directory.trim()) {
+    const error = new Error('Project directory is required');
+    error.status = 400;
+    throw error;
+  }
+  writePiTrustDecisions(home, [{ path: directory, trusted: Boolean(trusted) }]);
+  return getPiTrustDecision(home, directory);
+};
+
+export const readPiProjectTrust = (home = os.homedir(), directory = '') => {
+  const defaults = readPiDefaults(home);
+  const resolved = typeof directory === 'string' && directory.trim()
+    ? directory.trim()
+    : resolveActiveProjectDirectory(home);
+  return {
+    defaultProjectTrust: defaults.defaultProjectTrust,
+    decisions: readPiTrustDecisions(home),
+    current: resolved ? getPiTrustDecision(home, resolved) : null,
+  };
+};
+
+export const writePiProjectTrust = (home = os.homedir(), patch = {}, directory = '') => {
+  if (Object.prototype.hasOwnProperty.call(patch, 'defaultProjectTrust')) {
+    writePiAgentSettings(home, { defaultProjectTrust: patch.defaultProjectTrust });
+  }
+  if (Array.isArray(patch.decisions)) {
+    writePiTrustDecisions(home, patch.decisions);
+  }
+  return readPiProjectTrust(home, directory);
+};
+

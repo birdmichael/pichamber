@@ -72,6 +72,9 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 - Event mapping: `text_delta` → `message.part.delta` field `text`; `thinking_delta` → reasoning; `tool_execution_*` → tool parts; `agent_start` → busy; `agent_settled` → idle
 - Empty-success stubs so bootstrap does not crash: MCP, LSP, permission, question, share, revert
 - `GET /api/find/files` (and `/find/files`) for composer @ file search
+- Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`
+- Project trust: `GET|PUT|POST /api/pi/trust` (`~/.pi/agent/trust.json` + `defaultProjectTrust`)
+- Scoped models: `enabledModels` on `GET|PATCH /api/pi/defaults` (`~/.pi/agent/settings.json`)
 
 ## Still OpenCode-only / not ported
 

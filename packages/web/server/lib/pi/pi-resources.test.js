@@ -15,6 +15,10 @@ import {
   getPiProviderSources,
   listPiExtensions,
   listPiPackages,
+  filterProvidersByEnabledModels,
+  readPiProjectTrust,
+  writePiProjectTrust,
+  setPiProjectTrust,
 } from './pi-resources.js';
 
 const tempDirs = [];
@@ -153,5 +157,64 @@ describe('pi-resources', () => {
     expect(extensions.find((item) => item.name === 'local').scope).toBe('project');
     const packages = listPiPackages({ home, directory: project });
     expect(packages.some((item) => item.name === 'demo-pkg' && item.source === pkgSource && item.scope === 'user')).toBe(true);
+  });
+
+  it('reads and writes project trust in a temp home', () => {
+    const home = makeTemp();
+    const project = path.join(home, 'code', 'demo');
+    const initial = readPiProjectTrust(home, project);
+    expect(initial.defaultProjectTrust).toBe('ask');
+    expect(initial.decisions).toEqual([]);
+    expect(initial.current).toEqual({ path: path.resolve(project), trusted: null });
+
+    const saved = writePiProjectTrust(home, {
+      defaultProjectTrust: 'always',
+      decisions: [{ path: project, trusted: true }],
+    }, project);
+    expect(saved.defaultProjectTrust).toBe('always');
+    expect(saved.current.trusted).toBe(true);
+    expect(saved.decisions).toEqual([{ path: path.resolve(project), trusted: true }]);
+
+    const untrusted = setPiProjectTrust(home, project, false);
+    expect(untrusted.trusted).toBe(false);
+    const again = readPiProjectTrust(home, project);
+    expect(again.defaultProjectTrust).toBe('always');
+    expect(again.current.trusted).toBe(false);
+    const raw = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'trust.json'), 'utf8'));
+    expect(raw[path.resolve(project)]).toBe(false);
+    const settings = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+    expect(settings.defaultProjectTrust).toBe('always');
+  });
+
+  it('persists enabledModels and filters the runtime catalog', () => {
+    const home = makeTemp();
+    expect(readPiDefaults(home).enabledModels).toEqual([]);
+    const saved = writePiDefaults(home, {
+      enabledModels: ['example-provider/alpha', 'example-provider/alpha', ' other/beta '],
+    });
+    expect(saved.enabledModels).toEqual(['example-provider/alpha', 'other/beta']);
+    expect(readPiDefaults(home).enabledModels).toEqual(['example-provider/alpha', 'other/beta']);
+    const agent = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+    expect(agent.enabledModels).toEqual(['example-provider/alpha', 'other/beta']);
+
+    const catalog = [
+      {
+        id: 'example-provider',
+        models: { alpha: { id: 'alpha', name: 'Alpha' }, gamma: { id: 'gamma', name: 'Gamma' } },
+      },
+      {
+        id: 'other',
+        models: { beta: { id: 'beta', name: 'Beta' } },
+      },
+    ];
+    const filtered = filterProvidersByEnabledModels(catalog, saved.enabledModels);
+    expect(filtered.map((item) => item.id)).toEqual(['example-provider', 'other']);
+    expect(Object.keys(filtered[0].models)).toEqual(['alpha']);
+    expect(filterProvidersByEnabledModels(catalog, []).map((item) => item.id)).toEqual(['example-provider', 'other']);
+
+    const cleared = writePiDefaults(home, { enabledModels: [] });
+    expect(cleared.enabledModels).toEqual([]);
+    const after = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+    expect(after.enabledModels).toBeUndefined();
   });
 });

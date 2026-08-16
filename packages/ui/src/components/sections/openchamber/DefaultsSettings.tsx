@@ -17,7 +17,7 @@ import {
   SETTINGS_NUMBER_UNIT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
-import { updateDesktopSettings } from '@/lib/persistence';
+import { reportSettingsSaveState, updateDesktopSettings } from '@/lib/persistence';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
@@ -66,6 +66,8 @@ export const DefaultsSettings: React.FC = () => {
   const [keepRecentTokens, setKeepRecentTokens] = React.useState(20000);
   const [maxRetries, setMaxRetries] = React.useState(3);
   const [baseDelayMs, setBaseDelayMs] = React.useState(2000);
+  const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
+  const [catalogModels, setCatalogModels] = React.useState<Array<{ key: string; label: string }>>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
@@ -133,6 +135,7 @@ export const DefaultsSettings: React.FC = () => {
               retry?: boolean;
               compactionSettings?: { enabled?: boolean; reserveTokens?: number; keepRecentTokens?: number };
               retrySettings?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number };
+              enabledModels?: unknown;
             };
             if (typeof piDefaults.model === 'string' && piDefaults.model.trim()) {
               setDefaultModel(piDefaults.model.trim());
@@ -146,9 +149,35 @@ export const DefaultsSettings: React.FC = () => {
             if (typeof piDefaults.compactionSettings?.keepRecentTokens === 'number') setKeepRecentTokens(piDefaults.compactionSettings.keepRecentTokens);
             if (typeof piDefaults.retrySettings?.maxRetries === 'number') setMaxRetries(piDefaults.retrySettings.maxRetries);
             if (typeof piDefaults.retrySettings?.baseDelayMs === 'number') setBaseDelayMs(piDefaults.retrySettings.baseDelayMs);
+            if (Array.isArray(piDefaults.enabledModels)) {
+              setEnabledModels(piDefaults.enabledModels.filter((item): item is string => typeof item === 'string' && item.trim().length > 0));
+            }
           }
         } catch {
           // Pi defaults are optional when the kernel route is unavailable.
+        }
+
+        try {
+          const modelsResponse = await runtimeFetch('/api/pi/models', {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (modelsResponse.ok) {
+            const payload = await modelsResponse.json() as {
+              providers?: Array<{ id?: string; models?: Record<string, { id?: string; name?: string }> }>;
+            };
+            const items: Array<{ key: string; label: string }> = [];
+            for (const provider of payload.providers || []) {
+              if (!provider?.id || !provider.models) continue;
+              for (const [modelId, model] of Object.entries(provider.models)) {
+                const key = `${provider.id}/${modelId}`;
+                items.push({ key, label: model?.name || modelId });
+              }
+            }
+            setCatalogModels(items);
+          }
+        } catch {
+          // Catalog is optional when the kernel route is unavailable.
         }
 
         if (data) {
@@ -616,6 +645,52 @@ export const DefaultsSettings: React.FC = () => {
               ariaLabel={t('settings.openchamber.defaults.field.showDeletionDialogAria')}
             />
           </SettingsInset>
+
+          {isPiKernel && catalogModels.length > 0 ? (
+            <div className="space-y-3 pt-6">
+              <div className="flex items-center gap-1.5">
+                <SettingsGroupTitle>
+                  {t('settings.openchamber.defaults.section.enabledModels')}
+                </SettingsGroupTitle>
+                <SettingsInfoHint>
+                  {t('settings.openchamber.defaults.field.enabledModelsInfo')}
+                </SettingsInfoHint>
+              </div>
+              <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
+                {catalogModels.map((item) => {
+                  const checked = enabledModels.length === 0 || enabledModels.includes(item.key);
+                  return (
+                    <SettingsCheckboxRow
+                      key={item.key}
+                      settingsItem="sessions.enabled-models"
+                      checked={checked}
+                      onChange={(nextChecked) => {
+                        const allKeys = catalogModels.map((model) => model.key);
+                        const current = enabledModels.length === 0 ? allKeys : enabledModels;
+                        const next = nextChecked
+                          ? Array.from(new Set([...current, item.key]))
+                          : current.filter((key) => key !== item.key);
+                        const persisted = next.length === 0 || next.length === allKeys.length ? [] : next;
+                        setEnabledModels(persisted);
+                        reportSettingsSaveState('saving');
+                        void runtimeFetch('/api/pi/defaults', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ enabledModels: persisted }),
+                        }).then((response) => {
+                          reportSettingsSaveState(response.ok ? 'saved' : 'error');
+                        }).catch(() => {
+                          reportSettingsSaveState('error');
+                        });
+                      }}
+                      label={item.label}
+                      ariaLabel={`${t('settings.openchamber.defaults.field.enabledModelsAria')}: ${item.label}`}
+                    />
+                  );
+                })}
+              </SettingsInset>
+            </div>
+          ) : null}
 
           <div className="space-y-3 pt-6">
             <div className="flex items-center gap-1.5">

@@ -13,6 +13,10 @@ import { Icon } from "@/components/icon/Icon";
 import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { useI18n } from '@/lib/i18n';
+import { toast } from '@/components/ui';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useSessionUIStore } from '@/sync/session-ui-store';
 
 type Props = {
   hideDirectoryControls: boolean;
@@ -70,6 +74,31 @@ export function SidebarHeader(props: Props): React.ReactNode {
   const setSessionGroupingMode = useSessionDisplayStore((state) => state.setSessionGroupingMode);
   const stickyZoneHeaders = useSessionDisplayStore((state) => state.stickyZoneHeaders);
   const toggleStickyZoneHeaders = useSessionDisplayStore((state) => state.toggleStickyZoneHeaders);
+  const isPiKernel = usePiKernel();
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleImportSession = React.useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const jsonl = await file.text();
+      const response = await runtimeFetch('/api/session/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonl }),
+      });
+      if (!response.ok) {
+        toast.error(t('sessions.sidebar.session.import.failed'));
+        return;
+      }
+      const info = await response.json() as { id?: string; directory?: string };
+      if (typeof info.id === 'string' && info.id) {
+        useSessionUIStore.getState().setCurrentSession(info.id, typeof info.directory === 'string' ? info.directory : null);
+      }
+      toast.success(t('sessions.sidebar.session.import.success'));
+    } catch {
+      toast.error(t('sessions.sidebar.session.import.failed'));
+    }
+  }, [t]);
 
   if (hideDirectoryControls) {
     return null;
@@ -97,6 +126,35 @@ export function SidebarHeader(props: Props): React.ReactNode {
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={4}><p>{t('sessions.sidebar.header.actions.addProject')}</p></TooltipContent>
             </Tooltip>
+
+            {isPiKernel ? (
+              <>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".jsonl,application/jsonl,application/x-ndjson,text/plain"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    void handleImportSession(file);
+                  }}
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => importInputRef.current?.click()}
+                      className={cn(headerActionButtonClass, 'text-muted-foreground hover:text-foreground hover:bg-transparent')}
+                      aria-label={t('sessions.sidebar.header.actions.importSession')}
+                    >
+                      <Icon name="file-copy" className={headerActionIconClass} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={4}><p>{t('sessions.sidebar.header.actions.importSession')}</p></TooltipContent>
+                </Tooltip>
+              </>
+            ) : null}
 
             <Tooltip>
               <TooltipTrigger asChild>

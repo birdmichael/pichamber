@@ -379,6 +379,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['walkthrough', 'diff', 'review', 'changes', 'structured output', 'model', 'override'],
   },
   {
+    id: 'sessions.enabled-models',
+    page: 'sessions',
+    titleKey: 'settings.openchamber.defaults.section.enabledModels',
+    descriptionKey: 'settings.openchamber.defaults.field.enabledModelsInfo',
+    keywords: ['enabled models', 'scoped models', 'model picker', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'sessions.auto-cleanup',
     page: 'sessions',
     titleKey: 'settings.openchamber.sessionRetention.field.enableAutoCleanup',
@@ -563,6 +571,22 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'projects',
     titleKey: 'settings.openchamber.worktrees.setup.waitForCommands',
     keywords: ['worktree', 'setup commands', 'bootstrap', 'wait'],
+  },
+  {
+    id: 'projects.trust',
+    page: 'projects',
+    titleKey: 'settings.projects.page.section.trust',
+    descriptionKey: 'settings.projects.page.field.trustThisProjectInfo',
+    keywords: ['trust', 'project', 'pi', '.pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'projects.default-trust',
+    page: 'projects',
+    titleKey: 'settings.projects.page.field.defaultProjectTrust',
+    descriptionKey: 'settings.projects.page.field.defaultProjectTrustInfo',
+    keywords: ['trust', 'ask', 'always', 'never', 'pi'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
     id: 'remote-instances.client-auth',

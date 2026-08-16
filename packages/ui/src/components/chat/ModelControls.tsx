@@ -301,9 +301,27 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const isPiKernel = usePiKernel();
     const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
     const [piThinking, setPiThinking] = React.useState('high');
+    const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
     const { isReady, isUnavailable } = useOpenCodeReadiness();
     const readinessLabel = isUnavailable ? t('common.unavailable') : t('common.loading');
     const providers = useConfigStore((state) => state.providers);
+    const scopedProviders = React.useMemo(() => {
+        if (!isPiKernel || enabledModels.length === 0) {
+            return providers;
+        }
+        const allowed = new Set(enabledModels);
+        return providers
+            .map((provider) => {
+                const models = Array.isArray(provider.models)
+                    ? provider.models.filter((model) => {
+                        const id = typeof model?.id === 'string' ? model.id : '';
+                        return Boolean(id) && (allowed.has(`${provider.id}/${id}`) || allowed.has(id));
+                    })
+                    : [];
+                return { ...provider, models };
+            })
+            .filter((provider) => Array.isArray(provider.models) && provider.models.length > 0);
+    }, [enabledModels, isPiKernel, providers]);
     const currentProviderId = useConfigStore((state) => state.currentProviderId);
     const currentModelId = useConfigStore((state) => state.currentModelId);
     const currentVariant = useConfigStore((state) => state.currentVariant);
@@ -329,12 +347,17 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         void runtimeFetch('/api/pi/defaults', { method: 'GET' })
             .then((res) => (res.ok ? res.json() : null))
             .then((payload) => {
-                if (cancelled || !payload || typeof payload.thinking !== 'string') {
+                if (cancelled || !payload) {
                     return;
                 }
-                const next = payload.thinking.trim();
-                if (PI_THINKING_LEVELS.includes(next as typeof PI_THINKING_LEVELS[number])) {
-                    setPiThinking(next);
+                if (typeof payload.thinking === 'string') {
+                    const next = payload.thinking.trim();
+                    if (PI_THINKING_LEVELS.includes(next as typeof PI_THINKING_LEVELS[number])) {
+                        setPiThinking(next);
+                    }
+                }
+                if (Array.isArray(payload.enabledModels)) {
+                    setEnabledModels(payload.enabledModels.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0));
                 }
             })
             .catch(() => undefined);
@@ -2388,7 +2411,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                 </button>
                             </div>
                             <ModelPickerList
-                                providers={providers as ModelPickerProvider[]}
+                                providers={scopedProviders as ModelPickerProvider[]}
                                 favoriteModels={favoriteModelsList}
                                 recentModels={recentModelsList}
                                 modelsMetadata={useConfigStore.getState().modelsMetadata}

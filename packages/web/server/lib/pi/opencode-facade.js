@@ -263,6 +263,22 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.setDefaults(req.body || {}));
   }));
 
+  app.get('/api/pi/trust', handle(async (req, res) => {
+    json(res, 200, host.getProjectTrust(resolveDirectory(req)));
+  }));
+
+  app.put('/api/pi/trust', parseJson, handle(async (req, res) => {
+    json(res, 200, host.setProjectTrust(req.body || {}, resolveDirectory(req)));
+  }));
+
+  app.post('/api/pi/trust', parseJson, handle(async (req, res) => {
+    const directory = (typeof req.body?.directory === 'string' && req.body.directory.trim())
+      ? req.body.directory.trim()
+      : resolveDirectory(req);
+    const trusted = req.body?.trusted !== false && req.body?.trusted !== 'false';
+    json(res, 200, host.trustProject(directory, trusted));
+  }));
+
   app.get('/api/pi/extensions', handle(async (req, res) => {
     const directory = resolveDirectory(req);
     json(res, 200, {
@@ -482,6 +498,36 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.post('/api/session/:sessionID/clone', parseJson, handle(async (req, res) => {
     const record = await host.cloneSession(req.params.sessionID);
+    json(res, 200, record.info);
+  }));
+
+  const sendSessionExport = (req, res) => {
+    const format = typeof req.query?.format === 'string' ? req.query.format.toLowerCase() : (req.body?.format || 'jsonl');
+    const exported = host.exportSession(req.params.sessionID, format);
+    res.setHeader('Content-Type', exported.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${exported.filename}"`);
+    res.status(200).send(exported.content);
+  };
+  app.get('/api/session/:sessionID/export', handle(async (req, res) => {
+    sendSessionExport(req, res);
+  }));
+  app.post('/api/session/:sessionID/export', parseJson, handle(async (req, res) => {
+    sendSessionExport(req, res);
+  }));
+
+  app.post('/api/session/import', parseJson, handle(async (req, res) => {
+    const jsonl = typeof req.body?.jsonl === 'string'
+      ? req.body.jsonl
+      : (typeof req.body?.content === 'string' ? req.body.content : '');
+    if (!jsonl.trim()) {
+      json(res, 400, { error: 'Import body is empty' });
+      return;
+    }
+    const record = await host.importSession({
+      jsonl,
+      directory: resolveDirectory(req),
+      title: req.body?.title,
+    });
     json(res, 200, record.info);
   }));
 

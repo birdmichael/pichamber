@@ -20,7 +20,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { isSessionPinned, type SessionPinnedTarget } from '@/stores/useSessionPinnedStore';
 import { Icon } from "@/components/icon/Icon";
-import { buildExportFilename, downloadAsMarkdown, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
+import { buildExportFilename, downloadAsMarkdown, downloadTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionPermissions, useSessionQuestionCount } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
@@ -405,6 +407,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   // the lightweight store reference for scoped state and export actions.
   const directoryStore = useDirectoryStore(sessionDirectory ?? undefined, { bootstrap: false });
   const sync = useSync();
+  const isPiKernel = usePiKernel();
 
   const selectionModeEnabled = useSessionMultiSelectStore((state) => state.enabled);
   const isRowSelected = useSessionMultiSelectStore(
@@ -581,6 +584,28 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     }
     await doExportSession(false);
   }, [doExportSession, node.children.length]);
+
+  const handleExportPiSession = React.useCallback(async (format: 'jsonl' | 'html') => {
+    try {
+      const response = await runtimeFetch(`/api/session/${session.id}/export`, {
+        method: 'GET',
+        query: { format },
+      });
+      if (!response.ok) {
+        toast.error(t('sessions.sidebar.session.export.failed'));
+        return;
+      }
+      const content = await response.text();
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="([^"]+)"/i);
+      const filename = match?.[1] || `${buildExportFilename(resolvedSession.title ?? null).replace(/\.md$/, '')}.${format}`;
+      const mime = format === 'html' ? 'text/html;charset=utf-8' : 'application/x-ndjson;charset=utf-8';
+      downloadTextFile(content, filename, mime);
+      toast.success(t('sessions.sidebar.session.export.success'));
+    } catch {
+      toast.error(t('sessions.sidebar.session.export.failed'));
+    }
+  }, [resolvedSession.title, session.id, t]);
 
   const handleOpenMiniChatWindow = React.useCallback(() => {
     if (!sessionDirectory) return;
@@ -957,6 +982,18 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         <Icon name="download" className="mr-1 h-4 w-4" />
         {t('sessions.sidebar.session.menu.exportMarkdown')}
       </Item>
+      {isPiKernel ? (
+        <>
+          <Item onClick={() => { void handleExportPiSession('jsonl'); }} className="[&>svg]:mr-1">
+            <Icon name="file-download" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.exportJsonl')}
+          </Item>
+          <Item onClick={() => { void handleExportPiSession('html'); }} className="[&>svg]:mr-1">
+            <Icon name="file-download" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.exportHtml')}
+          </Item>
+        </>
+      ) : null}
       {!isSubtaskSession && !archivedBucket && !isVSCode ? (
         <Tooltip>
           <TooltipTrigger asChild>

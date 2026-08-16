@@ -11,13 +11,23 @@ import {
   listPiPrompts,
   listPiSkills,
   readPiDefaults,
+  readPiProjectTrust,
+  setPiProjectTrust,
   toConfigSkillsPayload,
   writePiDefaults,
+  writePiProjectTrust,
   writePiPrompt,
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
 } from './pi-resources.js';
+import {
+  buildSessionHtml,
+  buildSessionJsonl,
+  cloneImportedMessages,
+  parseSessionImport,
+  sanitizeExportBasename,
+} from './session-transfer.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -1099,6 +1109,47 @@ export const createPiHost = ({
       }
       await record.piSession.compact(typeof instructions === "string" && instructions.trim() ? instructions : undefined);
       return { compacted: true };
+    },
+    exportSession(sessionID, format = 'jsonl') {
+      const record = getRecord(sessionID);
+      const fmt = format === 'html' ? 'html' : 'jsonl';
+      const basename = sanitizeExportBasename(record.info?.title);
+      if (fmt === 'html') {
+        return {
+          format: 'html',
+          filename: `${basename}.html`,
+          mime: 'text/html; charset=utf-8',
+          content: buildSessionHtml(record),
+        };
+      }
+      return {
+        format: 'jsonl',
+        filename: `${basename}.jsonl`,
+        mime: 'application/x-ndjson; charset=utf-8',
+        content: buildSessionJsonl(record),
+      };
+    },
+    async importSession({ jsonl, directory, title } = {}) {
+      const parsed = parseSessionImport(jsonl);
+      const cwd = directory || parsed.cwd || defaultDirectory;
+      const record = await createFacadeSession({
+        directory: cwd,
+        title: (typeof title === 'string' && title.trim()) ? title.trim() : parsed.title,
+      });
+      record.messages = cloneImportedMessages(parsed.messages, record.id);
+      record.info.time.updated = Date.now();
+      return record;
+    },
+    getProjectTrust(directory) {
+      return readPiProjectTrust(home, directory || defaultDirectory);
+    },
+    setProjectTrust(patch = {}, directory) {
+      return writePiProjectTrust(home, patch, directory || defaultDirectory);
+    },
+    trustProject(directory, trusted) {
+      const cwd = directory || defaultDirectory;
+      setPiProjectTrust(home, cwd, trusted);
+      return readPiProjectTrust(home, cwd);
     },
     dispose() {
       for (const record of sessions.values()) {

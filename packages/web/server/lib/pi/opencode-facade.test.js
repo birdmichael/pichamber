@@ -366,4 +366,48 @@ describe('OpenCode facade HTTP/SSE', () => {
       await close();
     }
   });
+
+  it('exports JSONL and imports a session with prefix messages', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Export source' }),
+      })).json();
+      await fetch(`${url}/api/session/${created.id}/prompt_async`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          messageID: 'msg_export_user',
+          parts: [{ type: 'text', text: 'prefix hello' }],
+        }),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      const exported = await fetch(`${url}/api/session/${created.id}/export?format=jsonl`);
+      expect(exported.status).toBe(200);
+      const jsonl = await exported.text();
+      expect(jsonl).toContain('"type":"session"');
+      expect(jsonl).toContain('prefix hello');
+
+      const imported = await fetch(`${url}/api/session/import`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonl }),
+      });
+      expect(imported.status).toBe(200);
+      const info = await imported.json();
+      expect(info.id).not.toBe(created.id);
+      expect(info.title).toBe('Export source');
+
+      const messages = await (await fetch(`${url}/api/session/${info.id}/message`)).json();
+      expect(messages[0].info.role).toBe('user');
+      expect(messages[0].parts[0].text).toBe('prefix hello');
+      expect(messages[0].info.sessionID).toBe(info.id);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
 });
