@@ -130,6 +130,7 @@ export const DefaultsSettings: React.FC = () => {
           if (piDefaultsResponse.ok) {
             const piDefaults = await piDefaultsResponse.json() as {
               model?: string;
+              resolvedModel?: string;
               thinking?: string;
               compaction?: boolean;
               retry?: boolean;
@@ -137,8 +138,11 @@ export const DefaultsSettings: React.FC = () => {
               retrySettings?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number };
               enabledModels?: unknown;
             };
-            if (typeof piDefaults.model === 'string' && piDefaults.model.trim()) {
-              setDefaultModel(piDefaults.model.trim());
+            const stored = typeof piDefaults.model === 'string' ? piDefaults.model.trim() : '';
+            const resolved = typeof piDefaults.resolvedModel === 'string' ? piDefaults.resolvedModel.trim() : '';
+            // Empty stored model means "first catalog model" — show that, not "Not selected".
+            if (stored || resolved) {
+              setDefaultModel(stored || resolved);
             }
             if (typeof piDefaults.thinking === 'string' && piDefaults.thinking.trim()) {
               setThinkingLevel(piDefaults.thinking.trim());
@@ -175,6 +179,9 @@ export const DefaultsSettings: React.FC = () => {
               }
             }
             setCatalogModels(items);
+            if (isPiKernel && items[0]?.key) {
+              setDefaultModel((current) => current && current.trim() ? current : items[0].key);
+            }
           }
         } catch {
           // Catalog is optional when the kernel route is unavailable.
@@ -194,7 +201,7 @@ export const DefaultsSettings: React.FC = () => {
               ? data.defaultAgent.trim()
               : undefined;
 
-          if (model !== undefined) setDefaultModel(model);
+          if (model !== undefined && !isPiKernel) setDefaultModel(model);
           if (variant !== undefined) setDefaultVariant(variant);
           if (agent !== undefined) setDefaultAgent(agent);
           if (typeof data.smallModelUseDefault === 'boolean') setSmallModelUseDefault(data.smallModelUseDefault);
@@ -212,7 +219,7 @@ export const DefaultsSettings: React.FC = () => {
       }
     };
     loadSettings();
-  }, []);
+  }, [isPiKernel]);
 
   const handleModelChange = React.useCallback(
     async (providerId: string, modelId: string) => {

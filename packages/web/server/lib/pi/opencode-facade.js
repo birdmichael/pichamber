@@ -1,5 +1,5 @@
 import express from 'express';
-import { resolveActiveProjectDirectory } from './pi-resources.js';
+import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
 
 const json = (res, status, body) => {
@@ -256,7 +256,15 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/pi/defaults', handle(async (_req, res) => {
-    json(res, 200, host.getDefaults());
+    const defaults = host.getDefaults();
+    let resolvedModel = typeof defaults.model === 'string' ? defaults.model.trim() : '';
+    try {
+      const catalog = await host.getProviders();
+      resolvedModel = resolvePiDefaultModel(defaults.model, catalog?.providers || []);
+    } catch {
+      // Keep the stored model when the catalog is unavailable.
+    }
+    json(res, 200, { ...defaults, resolvedModel });
   }));
 
   app.patch('/api/pi/defaults', parseJson, handle(async (req, res) => {
