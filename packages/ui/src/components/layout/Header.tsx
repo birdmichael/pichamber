@@ -1234,6 +1234,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const isCurrentSessionActive = currentSessionStatus?.type === 'busy' || currentSessionStatus?.type === 'retry';
   const [isPiReloadInFlight, setIsPiReloadInFlight] = React.useState(false);
+  const isPiReloadInFlightRef = React.useRef(false);
   const showSessionTitleReload = isSessionTitleReloadVisible({
     isPiKernel,
     hasCurrentSession: Boolean(currentSessionId),
@@ -1246,7 +1247,8 @@ export const Header: React.FC<HeaderProps> = ({
   });
   const isSessionTitleReloadDisabled = sessionTitleReloadBlockReason !== null;
   const reloadPiKernel = React.useCallback(() => {
-    if (isCurrentSessionActive || isPiReloadInFlight) return;
+    if (isCurrentSessionActive || isPiReloadInFlightRef.current) return;
+    isPiReloadInFlightRef.current = true;
     setIsPiReloadInFlight(true);
     void requestPiConfigReload()
       .catch((error: unknown) => {
@@ -1256,9 +1258,10 @@ export const Header: React.FC<HeaderProps> = ({
         toast.error(message);
       })
       .finally(() => {
+        isPiReloadInFlightRef.current = false;
         setIsPiReloadInFlight(false);
       });
-  }, [isCurrentSessionActive, isPiReloadInFlight, t]);
+  }, [isCurrentSessionActive, t]);
   const moveCurrentSessionToWorktree = React.useCallback(() => {
     if (!currentSessionId || !sessionDirectory || isCurrentSessionActive || isCurrentSessionMovingToWorktree) return;
     const sessions = useGlobalSessionsStore.getState().activeSessions;
