@@ -1274,7 +1274,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Full-page surfaces (Scheduled, Archive, Worktrees, Multi-run) replace the
   // chat area; while one is open the header shows the surface identity
   // instead of the session switcher.
-  const isScheduledSurfaceOpen = useUIStore((state) => state.isScheduledTasksDialogOpen);
+  const isScheduledSurfaceOpen = useUIStore((state) => state.isScheduledTasksDialogOpen) && !isPiKernel;
   const isArchiveSurfaceOpen = useUIStore((state) => state.isArchivePageOpen);
   const worktreesSurfaceProjectId = useUIStore((state) => state.worktreesPageProjectId);
   const isMultiRunSurfaceOpen = useUIStore((state) => state.isMultiRunLauncherOpen);

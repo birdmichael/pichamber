@@ -559,11 +559,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         const names = new Set<string>([
             'init', 'review', 'undo', 'redo', 'timeline', 'compact', 'summary', 'workspace-review', 'plan-feature', 'craft-goal', 'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
         ]);
+        if (isPiKernel) names.delete('schedule-task');
         if (!isMobile && !isVSCodeRuntime()) names.add('handoff-review');
         for (const command of availableCommands) names.add(command.name.toLowerCase());
         for (const skill of availableSkills) names.add(skill.name.toLowerCase());
         return names;
-    }, [availableCommands, availableSkills, isMobile]);
+    }, [availableCommands, availableSkills, isMobile, isPiKernel]);
 
     const availableSnippets = useSnippetsStore((s) => s.snippets);
     const knownSnippetTriggers = React.useMemo(() => {
@@ -1171,10 +1172,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             // The rest render a visible prompt plus synthetic instructions and
             // send them as one message.
             const command = findMagicPromptCommand(commandName);
-            const commandIsAvailable = command !== null && canRunCommand(command, {
-                hasSession: Boolean(currentSessionId),
-                hasDraft: newSessionDraftOpen,
-            });
+            const commandIsAvailable = command !== null
+                && !(isPiKernel && command.name === 'schedule-task')
+                && canRunCommand(command, {
+                    hasSession: Boolean(currentSessionId),
+                    hasDraft: newSessionDraftOpen,
+                });
             if (command && commandIsAvailable) {
                 const variables = buildCommandVariables(command, argument);
                 try {

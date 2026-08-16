@@ -18,6 +18,7 @@ import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/pro
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import type { ProjectEntry } from '@/lib/api/types';
 import {
   deleteScheduledTask,
@@ -171,9 +172,11 @@ const toneStyle = (tone: StatusTone): React.CSSProperties => {
 
 export function ScheduledTasksDialog() {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const open = useUIStore((state) => state.isScheduledTasksDialogOpen);
   const setOpen = useUIStore((state) => state.setScheduledTasksDialogOpen);
   const isMobile = useUIStore((state) => state.isMobile);
+  const surfaceOpen = open && !isPiKernel;
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const projects = useProjectsStore((state) => state.projects);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
@@ -188,6 +191,12 @@ export function ScheduledTasksDialog() {
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [editorTask, setEditorTask] = React.useState<ScheduledTask | null>(null);
   const [mutatingTaskID, setMutatingTaskID] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isPiKernel && open) {
+      setOpen(false);
+    }
+  }, [isPiKernel, open, setOpen]);
 
   const selectedProject = React.useMemo(
     () => projects.find((project) => project.id === selectedProjectID) || null,
@@ -261,7 +270,7 @@ export function ScheduledTasksDialog() {
   }, [t]);
 
   React.useEffect(() => {
-    if (!open) {
+    if (!surfaceOpen) {
       return;
     }
     const preferredProjectID = activeProject?.id || projects[0]?.id || '';
@@ -272,10 +281,10 @@ export function ScheduledTasksDialog() {
       setTasks([]);
       setLoading(false);
     }
-  }, [open, activeProject, projects, reloadTasks]);
+  }, [surfaceOpen, activeProject, projects, reloadTasks]);
 
   React.useEffect(() => {
-    if (!open) {
+    if (!surfaceOpen) {
       return;
     }
     let timeoutID: ReturnType<typeof setTimeout> | null = null;
@@ -299,7 +308,7 @@ export function ScheduledTasksDialog() {
       }
       unsubscribe();
     };
-  }, [open, selectedProjectID, reloadTasks]);
+  }, [surfaceOpen, selectedProjectID, reloadTasks]);
 
   const handleSaveTask = React.useCallback(async (taskDraft: Partial<ScheduledTask>) => {
     if (!selectedProjectID) {
@@ -627,7 +636,7 @@ export function ScheduledTasksDialog() {
     <>
       {isMobile ? (
         <MobileOverlayPanel
-          open={open}
+          open={surfaceOpen}
           title={t('sessions.scheduledTasks.dialog.title')}
           onClose={() => setOpen(false)}
           contentMaxHeightClassName="max-h-[min(80vh,640px)]"
@@ -654,7 +663,7 @@ export function ScheduledTasksDialog() {
         >
           {tasksContent}
         </MobileOverlayPanel>
-      ) : open ? (
+      ) : surfaceOpen ? (
         // Full-page surface replacing the chat area (mounted inside <main>).
         // Master-detail: a scrollable project filter panel at the left, the
         // selected project's tasks at the right. The app Header shows the
