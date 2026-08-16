@@ -114,6 +114,9 @@ description: >
 
     const commands = listPiCommands({ home, directory: project });
     expect(commands.some((command) => command.name === 'compact' && command.source === 'builtin')).toBe(true);
+    expect(commands.some((command) => command.name === 'login' && command.source === 'builtin')).toBe(true);
+    expect(commands.some((command) => command.name === 'model')).toBe(false);
+    expect(commands.some((command) => command.name === 'thinking')).toBe(false);
     expect(commands.some((command) => command.name === 'ship' && command.template.includes('Prepare the change'))).toBe(true);
   });
 
@@ -211,6 +214,8 @@ description: >
     expect(created.path).toBe(path.join(home, '.pi', 'agent', 'prompts', 'ship.md'));
     expect(listPiCommands({ home }).some((command) => command.name === 'ship')).toBe(true);
     expect(() => writePiPrompt({ home, name: 'compact', template: 'nope' })).toThrow(/built-in/);
+    expect(() => writePiPrompt({ home, name: 'model', template: 'nope' })).toThrow(/built-in/);
+    expect(() => writePiPrompt({ home, name: 'thinking', template: 'nope' })).toThrow(/built-in/);
     const deleted = deletePiPrompt({ home, name: 'ship' });
     expect(deleted.deleted).toBe(true);
     expect(listPiCommands({ home }).some((command) => command.name === 'ship')).toBe(false);

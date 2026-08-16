@@ -44,13 +44,15 @@ export const resolvePiDefaultModel = (stored, providers = []) => {
   return keys[0] || pinned || '';
 };
 
+/** Invokable Pi slash entries. Model and thinking stay on composer chips / Session Defaults. */
 export const BUILTIN_COMMANDS = [
   { name: 'compact', description: 'Compact session context', source: 'builtin', template: '' },
   { name: 'reload', description: 'Reload skills, prompts, and context files', source: 'builtin', template: '' },
-  { name: 'model', description: 'Select a model', source: 'builtin', template: '' },
-  { name: 'thinking', description: 'Set thinking level', source: 'builtin', template: '' },
   { name: 'login', description: 'Authenticate a provider', source: 'builtin', template: '' },
 ];
+
+/** Reserved so custom prompts cannot collide with chip-owned actions. */
+const CHIP_OWNED_COMMAND_NAMES = new Set(['model', 'thinking']);
 
 const isDirectory = (value) => {
   try {
@@ -1105,7 +1107,10 @@ export const toConfigSkillsPayload = (skills, { home, directory } = {}) => {
 
 const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
-export const isBuiltinCommandName = (name) => BUILTIN_COMMANDS.some((command) => command.name === name);
+export const isBuiltinCommandName = (name) => (
+  BUILTIN_COMMANDS.some((command) => command.name === name)
+  || CHIP_OWNED_COMMAND_NAMES.has(name)
+);
 
 const sanitizeCommandName = (name) => {
   const value = typeof name === 'string' ? name.trim() : '';

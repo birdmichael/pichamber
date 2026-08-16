@@ -164,6 +164,9 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'compact')).toBe(true);
+      expect(commands.some((command) => command.name === 'login')).toBe(true);
+      expect(commands.some((command) => command.name === 'model')).toBe(false);
+      expect(commands.some((command) => command.name === 'thinking')).toBe(false);
       const sdkCommands = await (await fetch(`${url}/command`)).json();
       expect(sdkCommands.some((command) => command.name === 'compact')).toBe(true);
 

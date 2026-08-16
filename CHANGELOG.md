@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Settings: Extensions no longer leads with a “no extensions found” empty state when installed Pi packages are listed.
 - Chat: empty-session titles now use native wording in Chinese and other translated locales instead of leftover English.
 - UI: the command palette now says it searches sessions, actions, and files, matching the groups it actually shows.
+- Settings: Commands no longer lists `/model` or `/thinking` on Pi — those stay on the composer chips and Session Defaults. Custom prompts still appear in Commands and in the slash menu.
 
 ## [1.18.4] - 2026-08-14
 

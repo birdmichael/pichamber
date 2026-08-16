@@ -45,7 +45,7 @@ That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds nat
 
 `OPENCHAMBER_KERNEL` defaults to `pi` in both Desktop and the in-process server. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.
 
-On the Pi kernel, Settings Usage/MCP/Plugins/Scheduled Tasks/Multi-run are hidden, and Work Status does not show the OpenCode provider-quota Usage block (session context % / cost stay). Agents is the built-in `pi` agent (read-only). Share, revert, and session.shell remain empty-success stubs. Skills and commands write to `~/.pi/agent` and `.pi`, not `.opencode`. Walkthrough review uses the current Pi model from `~/.pi/agent` / `GET /api/pi/models` — never a hardcoded model.
+On the Pi kernel, Settings Usage/MCP/Plugins/Scheduled Tasks/Multi-run are hidden, and Work Status does not show the OpenCode provider-quota Usage block (session context % / cost stay). Agents is the built-in `pi` agent (read-only). Share, revert, and session.shell remain empty-success stubs. Skills and commands write to `~/.pi/agent` and `.pi`, not `.opencode`. `GET /api/command` lists `compact`, `reload`, `login`, and custom prompts from `~/.pi/agent/prompts` (and project `.pi/prompts`). Model and thinking stay on the composer chips and Session Defaults, not as Settings or slash entries. Walkthrough review uses the current Pi model from `~/.pi/agent` / `GET /api/pi/models` — never a hardcoded model.
 
 ### In-process web server only
 

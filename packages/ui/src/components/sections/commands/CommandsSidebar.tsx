@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useCommandsStore, isCommandBuiltIn, type Command } from '@/stores/useCommandsStore';
+import { filterPiSettingsCommands } from '@/components/chat/commandAutocompleteItems';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useSkillsStore } from '@/stores/useSkillsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
@@ -60,6 +62,7 @@ export const CommandsSidebar: React.FC<CommandsSidebarProps> = ({ onItemSelect }
   })));
   const skills = useSkillsStore((s) => s.skills);
   const loadSkills = useSkillsStore((s) => s.loadSkills);
+  const isPiKernel = usePiKernel();
 
   React.useEffect(() => {
     loadCommands();
@@ -68,8 +71,11 @@ export const CommandsSidebar: React.FC<CommandsSidebarProps> = ({ onItemSelect }
 
   const skillNames = React.useMemo(() => new Set(skills.map((skill) => skill.name)), [skills]);
   const commandOnlyItems = React.useMemo(
-    () => commands.filter((command) => !skillNames.has(command.name)),
-    [commands, skillNames],
+    () => filterPiSettingsCommands(
+      commands.filter((command) => !skillNames.has(command.name)),
+      isPiKernel,
+    ),
+    [commands, isPiKernel, skillNames],
   );
 
   React.useEffect(() => {
@@ -79,8 +85,13 @@ export const CommandsSidebar: React.FC<CommandsSidebarProps> = ({ onItemSelect }
 
     if (skillNames.has(selectedCommandName)) {
       setSelectedCommand(null);
+      return;
     }
-  }, [selectedCommandName, setSelectedCommand, skillNames]);
+
+    if (filterPiSettingsCommands([{ name: selectedCommandName }], isPiKernel).length === 0) {
+      setSelectedCommand(null);
+    }
+  }, [isPiKernel, selectedCommandName, setSelectedCommand, skillNames]);
 
   const bgClass = 'bg-background';
 

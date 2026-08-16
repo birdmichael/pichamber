@@ -78,12 +78,17 @@ export interface PiSlashCommandItem {
   injected?: boolean;
 }
 
+/** Composer chips / Session Defaults own these; they are not invokable slash entries on Pi. */
+export const PI_CHIP_OWNED_SLASH_COMMANDS = new Set([
+  'model', 'thinking',
+]);
+
 /** OpenChamber leftovers plus composer chips that already cover the same action. */
 const PI_HIDDEN_SLASH_COMMANDS = new Set([
   'init', 'undo', 'redo', 'timeline', 'summary',
   'workspace-review', 'handoff-review', 'plan-feature', 'craft-goal',
   'schedule-task', 'catch-up', 'debug', 'weigh', 'explore',
-  'model', 'thinking',
+  ...PI_CHIP_OWNED_SLASH_COMMANDS,
 ]);
 
 /** Pi expands `/skill:name` in prompt/steer/followUp. Do not double-prefix. */
@@ -93,6 +98,12 @@ export function toPiSkillSlashName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return trimmed;
   return trimmed.startsWith(PI_SKILL_SLASH_PREFIX) ? trimmed : `${PI_SKILL_SLASH_PREFIX}${trimmed}`;
+}
+
+/** Settings Commands on Pi matches the slash popup for chip-owned builtins. Skills stay listed elsewhere. */
+export function filterPiSettingsCommands<T extends { name: string }>(commands: T[], isPiKernel: boolean): T[] {
+  if (!isPiKernel) return commands;
+  return commands.filter((command) => !PI_CHIP_OWNED_SLASH_COMMANDS.has(command.name));
 }
 
 /**
