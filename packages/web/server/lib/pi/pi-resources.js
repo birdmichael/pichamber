@@ -996,13 +996,18 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
     defaultProjectTrust,
   };
   const chamberPath = resolvePiDefaultsPath(home);
-  fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
-  fs.writeFileSync(chamberPath, `${JSON.stringify({
+  const existingChamber = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
+  const chamberOut = {
     model: next.model,
     thinking: next.thinking,
     compaction: next.compaction,
     retry: next.retry,
-  }, null, 2)}\n`);
+  };
+  if (existingChamber.featurePlugins && typeof existingChamber.featurePlugins === 'object' && !Array.isArray(existingChamber.featurePlugins)) {
+    chamberOut.featurePlugins = existingChamber.featurePlugins;
+  }
+  fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
+  fs.writeFileSync(chamberPath, `${JSON.stringify(chamberOut, null, 2)}\n`);
   const agentPatch = {
     compaction: compactionSettings,
     retry: retrySettings,

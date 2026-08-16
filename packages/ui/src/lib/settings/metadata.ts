@@ -14,6 +14,7 @@ export type SettingsPageSlug =
   | 'mcp'
   | 'plugins'
   | 'extensions'
+  | 'feature-plugins'
   | 'skills.installed'
   | 'skills.catalog'
   | 'git'
@@ -142,6 +143,14 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
     group: 'opencode',
     kind: 'single',
     keywords: ['extension', 'extensions', 'pi', 'packages'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    slug: 'feature-plugins',
+    title: 'Feature Plugins',
+    group: 'opencode',
+    kind: 'single',
+    keywords: ['feature', 'plugins', 'goal', 'plan', 'mcp', 'subagents', 'pi', 'npm'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -293,6 +302,8 @@ export function getSettingsNavIcon(slug: SettingsPageSlug): IconName | null {
     case 'plugins':
       return 'plug-2';
     case 'extensions':
+      return 'plug-2';
+    case 'feature-plugins':
       return 'plug-2';
 
     case 'skills.installed':

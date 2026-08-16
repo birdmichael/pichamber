@@ -29,6 +29,15 @@ import {
   removePiProviderAuth,
 } from './pi-resources.js';
 import {
+  createSdkPackageManager,
+  createSettingsJsonPackageManager,
+  isFeaturePluginSlot,
+  listConfiguredPiPackageSources,
+  readFeaturePlugins,
+  toFeaturePluginsPayload,
+  writeFeaturePlugins,
+} from './feature-plugins.js';
+import {
   persistSessionMetadata,
   readPersistedSessionMetadata,
 } from './session-metadata.js';
@@ -690,6 +699,7 @@ export const createPiHost = ({
   createSession,
   createModelRuntime,
   createDirectoryRuntime,
+  createPackageManager,
   defaultDirectory = process.cwd(),
   home = defaultHome(),
   onEvent,
@@ -1630,6 +1640,107 @@ export const createPiHost = ({
     },
     listPackages(directory) {
       return listPiPackages({ home, directory: directory || defaultDirectory });
+    },
+    async resolveFeaturePackageManager() {
+      if (typeof createPackageManager === 'function') {
+        return createPackageManager({
+          cwd: defaultDirectory,
+          home,
+          agentDir: path.join(home, '.pi', 'agent'),
+        });
+      }
+      if (mock) {
+        return createSettingsJsonPackageManager({ home });
+      }
+      return createSdkPackageManager({
+        cwd: defaultDirectory,
+        home,
+        loadSdk: loadPiSdk,
+      });
+    },
+    getFeaturePlugins() {
+      return toFeaturePluginsPayload({
+        plugins: readFeaturePlugins(home),
+        configuredSources: listConfiguredPiPackageSources(home),
+      });
+    },
+    setFeaturePlugins(patch) {
+      writeFeaturePlugins(home, patch);
+      return this.getFeaturePlugins();
+    },
+    async reloadIdleSessions() {
+      const reloaded = [];
+      const skipped = [];
+      for (const record of sessions.values()) {
+        const blocked = sessionBlocksPiReload(record);
+        if (blocked) {
+          skipped.push({ sessionID: record.id, reason: blocked });
+          continue;
+        }
+        try {
+          await this.reload({ sessionID: record.id });
+          reloaded.push(record.id);
+        } catch (error) {
+          skipped.push({
+            sessionID: record.id,
+            reason: error?.message || 'reload failed',
+          });
+        }
+      }
+      return { reloaded, skipped, kernel: 'pi' };
+    },
+    async installFeaturePlugin(slot, body = {}) {
+      if (!isFeaturePluginSlot(slot)) {
+        const error = new Error('Unknown feature plugin slot');
+        error.status = 400;
+        throw error;
+      }
+      const current = readFeaturePlugins(home);
+      const source = typeof body.source === 'string' && body.source.trim()
+        ? body.source.trim()
+        : current[slot].source;
+      if (!source) {
+        const error = new Error('Package source is required');
+        error.status = 400;
+        throw error;
+      }
+      const manager = await this.resolveFeaturePackageManager();
+      await manager.installAndPersist(source);
+      const next = writeFeaturePlugins(home, { [slot]: { source } });
+      const reload = await this.reloadIdleSessions();
+      return {
+        ...toFeaturePluginsPayload({
+          plugins: next,
+          configuredSources: listConfiguredPiPackageSources(home),
+        }),
+        reload,
+      };
+    },
+    async uninstallFeaturePlugin(slot, body = {}) {
+      if (!isFeaturePluginSlot(slot)) {
+        const error = new Error('Unknown feature plugin slot');
+        error.status = 400;
+        throw error;
+      }
+      const current = readFeaturePlugins(home);
+      const source = typeof body.source === 'string' && body.source.trim()
+        ? body.source.trim()
+        : current[slot].source;
+      if (!source) {
+        const error = new Error('Package source is required');
+        error.status = 400;
+        throw error;
+      }
+      const manager = await this.resolveFeaturePackageManager();
+      await manager.removeAndPersist(source);
+      const reload = await this.reloadIdleSessions();
+      return {
+        ...toFeaturePluginsPayload({
+          plugins: readFeaturePlugins(home),
+          configuredSources: listConfiguredPiPackageSources(home),
+        }),
+        reload,
+      };
     },
     getSessionTree(sessionID) {
       const record = getRecord(sessionID);

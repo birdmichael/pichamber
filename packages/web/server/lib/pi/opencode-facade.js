@@ -416,6 +416,22 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     });
   }));
 
+  app.get('/api/pi/feature-plugins', handle(async (_req, res) => {
+    json(res, 200, host.getFeaturePlugins());
+  }));
+
+  app.patch('/api/pi/feature-plugins', parseJson, handle(async (req, res) => {
+    json(res, 200, host.setFeaturePlugins(req.body || {}));
+  }));
+
+  app.post('/api/pi/feature-plugins/:slot/install', parseJson, handle(async (req, res) => {
+    json(res, 200, await host.installFeaturePlugin(req.params.slot, req.body || {}));
+  }));
+
+  app.post('/api/pi/feature-plugins/:slot/uninstall', parseJson, handle(async (req, res) => {
+    json(res, 200, await host.uninstallFeaturePlugin(req.params.slot, req.body || {}));
+  }));
+
   app.get('/api/config/agents', handle(async (_req, res) => {
     json(res, 200, [{
       name: 'pi',

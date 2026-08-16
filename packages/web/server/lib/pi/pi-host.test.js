@@ -494,6 +494,34 @@ describe('createPiHost', () => {
     }
   });
 
+  it('reloadIdleSessions reloads idle sessions and skips a busy sibling', async () => {
+    const idleSession = createInMemoryPiSession();
+    const busySession = createInMemoryPiSession({ compacting: true });
+    const created = [];
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      createSession: async () => {
+        const next = created.length === 0 ? idleSession : busySession;
+        created.push(next);
+        return next;
+      },
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
+    await host.createSession({ directory: '/tmp/project', title: 'Busy' });
+    events.length = 0;
+    const result = await host.reloadIdleSessions();
+    expect(result.reloaded).toEqual([idle.id]);
+    expect(result.skipped).toHaveLength(1);
+    expect(idleSession.reloadCount).toBe(1);
+    expect(busySession.reloadCount).toBe(0);
+    expect(events.map((event) => event.type)).not.toContain('server.connected');
+    host.dispose();
+  });
+
   it('setDefaults persists thinking for session settings', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-defaults-'));
     try {

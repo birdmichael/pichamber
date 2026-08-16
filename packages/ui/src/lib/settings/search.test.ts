@@ -110,4 +110,25 @@ describe('settings search', () => {
     expect(vsCodeResults.some((result) => result.id === 'chat.session-goal')).toBe(false);
     expect(vsCodeResults.some((result) => result.id === 'chat.session-goal-budget')).toBe(false);
   });
+
+  test('shows Feature Plugins search on Pi and hides it on OpenCode', () => {
+    const query = 'feature plugins';
+    const getPageTitle = (page: string) => page;
+    const piResults = buildSettingsSearchResults({
+      query: 'plan',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+    const openCodeResults = buildSettingsSearchResults({
+      query,
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+
+    expect(piResults.some((result) => result.id === 'feature-plugins.plan')).toBe(true);
+    expect(piResults.some((result) => result.id === 'feature-plugins.goal')).toBe(false);
+    expect(openCodeResults.some((result) => result.page === 'feature-plugins')).toBe(false);
+  });
 });
