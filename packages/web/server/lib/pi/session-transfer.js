@@ -6,6 +6,136 @@ const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+const toNonNegativeNumber = (value) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return 0;
+  }
+  return value;
+};
+
+const usageHasRecordedNumbers = (usage) => {
+  if (!isRecord(usage)) return false;
+  const cost = usage.cost;
+  const candidates = [
+    usage.input,
+    usage.output,
+    usage.reasoning,
+    usage.cacheRead,
+    usage.cacheWrite,
+    usage.totalTokens,
+    isRecord(usage.cache) ? usage.cache.read : undefined,
+    isRecord(usage.cache) ? usage.cache.write : undefined,
+    typeof cost === 'number' ? cost : (isRecord(cost) ? cost.total : undefined),
+  ];
+  return candidates.some((value) => typeof value === 'number' && Number.isFinite(value));
+};
+
+/** Map Pi assistant `usage` onto the OpenCode message token/cost shape. */
+export const mapPiUsageToOpenCodeTokens = (usage) => {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+  }
+  const costValue = usage.cost;
+  const cost = typeof costValue === 'number'
+    ? toNonNegativeNumber(costValue)
+    : toNonNegativeNumber(costValue?.total);
+  return {
+    cost,
+    tokens: {
+      input: toNonNegativeNumber(usage.input),
+      output: toNonNegativeNumber(usage.output),
+      reasoning: toNonNegativeNumber(usage.reasoning),
+      cache: {
+        read: toNonNegativeNumber(usage.cacheRead ?? usage.cache?.read),
+        write: toNonNegativeNumber(usage.cacheWrite ?? usage.cache?.write),
+      },
+    },
+  };
+};
+
+const facadeModelFromPiMessage = (message) => {
+  const rawModel = message?.model;
+  const rawProvider = message?.provider;
+  let modelID = '';
+  let providerID = '';
+  let model = undefined;
+
+  if (isRecord(rawModel)) {
+    modelID = asTrimmedString(rawModel.modelID || rawModel.id);
+    providerID = asTrimmedString(rawModel.providerID || rawModel.provider);
+    model = rawModel;
+  } else {
+    modelID = asTrimmedString(rawModel);
+  }
+  if (!providerID) {
+    providerID = asTrimmedString(rawProvider);
+  }
+  if (!model && (modelID || providerID)) {
+    model = {
+      ...(providerID ? { providerID } : {}),
+      ...(modelID ? { modelID } : {}),
+    };
+  }
+  return {
+    ...(modelID ? { modelID } : {}),
+    ...(providerID ? { providerID } : {}),
+    ...(model ? { model } : {}),
+  };
+};
+
+const facadeUsageFromPiMessage = (message) => {
+  if (!usageHasRecordedNumbers(message?.usage)) return {};
+  const mapped = mapPiUsageToOpenCodeTokens(message.usage);
+  return {
+    cost: mapped.cost,
+    tokens: mapped.tokens,
+  };
+};
+
+/** Copy Pi assistant provider/model/usage onto the live SSE `info` shape. */
+const facadeAssistantInfoFromPiMessage = (message) => {
+  if (!isRecord(message) || message.role !== 'assistant') return {};
+  return {
+    ...facadeModelFromPiMessage(message),
+    ...facadeUsageFromPiMessage(message),
+  };
+};
+
+const piModelUsageFromFacadeInfo = (info) => {
+  if (!isRecord(info) || info.role !== 'assistant') return {};
+  const rawModel = info.model;
+  const providerID = asTrimmedString(
+    info.providerID
+    || (isRecord(rawModel) ? (rawModel.providerID || rawModel.provider) : undefined),
+  );
+  const modelID = asTrimmedString(
+    info.modelID
+    || (typeof rawModel === 'string' ? rawModel : undefined)
+    || (isRecord(rawModel) ? (rawModel.modelID || rawModel.id) : undefined),
+  );
+  const extras = {
+    ...(providerID ? { provider: providerID } : {}),
+    ...(modelID ? { model: modelID } : {}),
+  };
+  const tokens = isRecord(info.tokens) ? info.tokens : null;
+  const hasCost = typeof info.cost === 'number' && Number.isFinite(info.cost);
+  if (!tokens && !hasCost) return extras;
+  extras.usage = {
+    ...(tokens ? {
+      input: tokens.input,
+      output: tokens.output,
+      reasoning: tokens.reasoning,
+      cacheRead: tokens.cache?.read,
+      cacheWrite: tokens.cache?.write,
+    } : {}),
+    ...(hasCost ? { cost: { total: info.cost } } : {}),
+  };
+  return extras;
+};
+
 const escapeHtml = (value) => String(value ?? '')
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -313,7 +443,12 @@ export const piMessagesFromFacadeEntry = (entry) => {
   }
   if (content.length === 0 && toolResults.length === 0) return [];
   return [
-    { role, content, timestamp },
+    {
+      role,
+      content,
+      timestamp,
+      ...piModelUsageFromFacadeInfo(entry?.info),
+    },
     ...toolResults,
   ];
 };
@@ -445,7 +580,9 @@ const facadeFromPiMessage = (entry) => {
       role,
       time: { created },
       agent: 'pi',
+      ...(role === 'assistant' ? { mode: 'pi' } : {}),
       ...(asTrimmedString(entry?.parentId) ? { parentID: entry.parentId } : {}),
+      ...facadeAssistantInfoFromPiMessage(message),
     },
     parts: partsFromPiContent(message.content, '', messageID),
   };
@@ -503,12 +640,15 @@ const facadeFromUnknown = (entry) => {
   if (entry?.role && (entry.content !== undefined || Array.isArray(entry.parts))) {
     if (entry.role === 'toolResult') return null;
     const messageID = asTrimmedString(entry.id) || createMessageId();
+    const role = entry.role === 'assistant' ? 'assistant' : 'user';
     return {
       info: {
         id: messageID,
-        role: entry.role === 'assistant' ? 'assistant' : 'user',
+        role,
         time: { created: millisFromUnknown(entry.timestamp ?? entry.time?.created) },
         agent: 'pi',
+        ...(role === 'assistant' ? { mode: 'pi' } : {}),
+        ...facadeAssistantInfoFromPiMessage(entry),
       },
       parts: Array.isArray(entry.parts)
         ? entry.parts.map((part) => ({ ...part, messageID }))

@@ -469,4 +469,109 @@ describe('persisted Pi sessions', () => {
     });
     restarted.dispose();
   });
+
+  it('hydrates assistant model and usage from disk so a new host still has them', async () => {
+    const home = tempDir('pi-persist-usage-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const manager = SessionManager.create(cwd, sessionDir);
+    const file = manager.getSessionFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'session',
+      version: CURRENT_SESSION_VERSION,
+      id: manager.getSessionId(),
+      timestamp: new Date().toISOString(),
+      cwd: manager.getCwd(),
+    })}\n`);
+    const opened = SessionManager.open(file, sessionDir);
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'what model ran' }],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'this one' }],
+      timestamp: Date.now(),
+      provider: 'example-provider',
+      model: 'example-model',
+      usage: {
+        input: 1200,
+        output: 80,
+        cacheRead: 40,
+        cacheWrite: 0,
+        reasoning: 10,
+        cost: { total: 0.002 },
+      },
+    });
+    const sessionId = opened.getSessionId();
+
+    const first = createHost({ home, cwd });
+    await first.ensureSession(sessionId, cwd);
+    const messages = first.getMessages(sessionId);
+    expect(messages[1].info).toMatchObject({
+      role: 'assistant',
+      modelID: 'example-model',
+      providerID: 'example-provider',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+      cost: 0.002,
+      tokens: {
+        input: 1200,
+        output: 80,
+        reasoning: 10,
+        cache: { read: 40, write: 0 },
+      },
+    });
+    first.dispose();
+
+    const restarted = createHost({ home, cwd });
+    await restarted.ensureSession(sessionId, cwd);
+    const afterRestart = restarted.getMessages(sessionId);
+    expect(afterRestart[1].info.modelID).toBe('example-model');
+    expect(afterRestart[1].info.providerID).toBe('example-provider');
+    expect(afterRestart[1].info.cost).toBe(0.002);
+    expect(afterRestart[1].info.tokens).toEqual({
+      input: 1200,
+      output: 80,
+      reasoning: 10,
+      cache: { read: 40, write: 0 },
+    });
+    restarted.dispose();
+  });
+
+  it('omits tokens and cost after a new host when the disk assistant has no usage', async () => {
+    const home = tempDir('pi-persist-no-usage-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'No usage',
+      userText: 'hello',
+      assistantText: 'hi',
+    });
+    const opened = SessionManager.open(persisted.path, sessionDirForCwd(cwd, home));
+    opened.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'model only' }],
+      timestamp: Date.now(),
+      provider: 'example-provider',
+      model: 'example-model',
+    });
+
+    const host = createHost({ home, cwd });
+    await host.ensureSession(persisted.id, cwd);
+    const assistant = host.getMessages(persisted.id).find((entry) => (
+      entry.info.role === 'assistant' && entry.parts?.[0]?.text === 'model only'
+    ));
+    expect(assistant.info).toMatchObject({
+      modelID: 'example-model',
+      providerID: 'example-provider',
+    });
+    expect(assistant.info.tokens).toBeUndefined();
+    expect(assistant.info.cost).toBeUndefined();
+    host.dispose();
+  });
 });
