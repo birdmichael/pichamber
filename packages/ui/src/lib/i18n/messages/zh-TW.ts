@@ -1586,6 +1586,7 @@ export const dict: Record<I18nKey, string> = {
   'header.github.accountSource.oauth': 'OAuth',
   'header.github.accountSource.cli': 'CLI',
   'header.services.openWithCurrent': '開啟實例、用量和 MCP（目前：{current}）',
+  'header.services.openWithCurrentPi': '切換本機或遠端實例（目前：{current}）',
   'header.services.open': '開啟服務、用量和 MCP',
   'header.services.title': '服務',
   'header.services.viewAria': '查看服務',

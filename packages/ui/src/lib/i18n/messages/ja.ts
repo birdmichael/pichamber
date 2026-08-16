@@ -1606,6 +1606,7 @@ export const dict: Record<I18nKey, string> = {
   'header.github.accountSource.oauth': 'OAuth',
   'header.github.accountSource.cli': 'CLI',
   'header.services.openWithCurrent': 'インスタンス、使用量、MCPを開く（現在: {current}）',
+  'header.services.openWithCurrentPi': 'ローカルまたはリモートのインスタンスを切り替え（現在: {current}）',
   'header.services.open': 'サービス、使用量、MCPを開く',
   'header.services.title': 'サービス',
   'header.services.viewAria': 'サービスを表示',

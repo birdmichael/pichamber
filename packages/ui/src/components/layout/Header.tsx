@@ -63,6 +63,7 @@ import type { GitHubAuthStatus } from '@/lib/api/types';
 import type { SessionContextUsage } from '@/stores/types/sessionTypes';
 import { DesktopHostSwitcherDialog } from '@/components/desktop/DesktopHostSwitcher';
 import { OpenInAppButton } from '@/components/desktop/OpenInAppButton';
+import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCopy';
 import { ProjectActionsButton } from '@/components/layout/ProjectActionsButton';
 import { SessionSwitcherDropdown } from '@/components/session/SessionSwitcherDropdown';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, startDesktopWindowDrag, type UpdateInfo } from '@/lib/desktop';
@@ -295,6 +296,7 @@ const DesktopServicesMenu = React.memo(function DesktopServicesMenu({
   onOpenRemoteUpdate,
 }: DesktopServicesMenuProps) {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   return (
     <DropdownMenu
       open={isDesktopServicesOpen}
@@ -310,9 +312,9 @@ const DesktopServicesMenu = React.memo(function DesktopServicesMenu({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label={isDesktopApp
-                ? t('header.services.openWithCurrent', { current: currentInstanceLabel })
-                : t('header.services.open')}
+              aria-label={t(headerServicesOpenAriaKey(isDesktopApp, isPiKernel), {
+                current: currentInstanceLabel,
+              })}
               className={cn(
                 DESKTOP_HEADER_ICON_BUTTON_CLASS,
                 isDesktopApp ? 'w-auto max-w-[14rem] justify-start gap-1.5 px-2.5' : 'h-8 w-8'

@@ -1374,6 +1374,7 @@ export const dict = {
   'header.github.accountSource.oauth': 'OAuth',
   'header.github.accountSource.cli': 'CLI',
   'header.services.openWithCurrent': 'Instance ouverte, utilisation et MCP (actuel : {current})',
+  'header.services.openWithCurrentPi': 'Changer d\'instance locale ou distante (actuel : {current})',
   'header.services.open': 'Services ouverts, utilisation et MCP',
   'header.services.title': 'Services',
   'header.services.viewAria': 'Voir les prestations',

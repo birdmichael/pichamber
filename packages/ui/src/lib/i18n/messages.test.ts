@@ -42,4 +42,18 @@ describe('i18n dictionaries', () => {
       expect(dictionary['common.language.japanese']).toBeTruthy();
     }
   });
+
+  test('Pi header instance copy names the current instance and omits Usage and MCP', () => {
+    const leftoverUsageOrMcp = /MCP|usage|用量|使用量|Nutzung|utilisation|użycie|використання|사용량/i;
+
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      const piCopy = dictionary['header.services.openWithCurrentPi'];
+      expect(piCopy, locale).toContain('{current}');
+      expect(piCopy, locale).not.toMatch(leftoverUsageOrMcp);
+
+      const openCodeCopy = dictionary['header.services.openWithCurrent'];
+      expect(openCodeCopy, locale).toContain('{current}');
+      expect(openCodeCopy, locale).toMatch(/MCP/);
+    }
+  });
 });
