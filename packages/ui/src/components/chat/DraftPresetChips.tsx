@@ -34,6 +34,7 @@ import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { areDraftPresetChipsVisible } from '@/lib/draftStarters';
 import {
     useDraftStarters,
     type ResolvedStarter,
@@ -337,6 +338,6 @@ const DraftPresetChipsContent: React.FC<DraftPresetChipsProps> = ({ onSubmit, cl
 export const DraftPresetChips: React.FC<DraftPresetChipsProps> = (props) => {
     const visible = useUIStore((state) => state.draftStartersVisible);
     const isPiKernel = usePiKernel();
-    if (isPiKernel || !visible) return null;
+    if (!areDraftPresetChipsVisible({ visible, isPiKernel })) return null;
     return <DraftPresetChipsContent {...props} />;
 };

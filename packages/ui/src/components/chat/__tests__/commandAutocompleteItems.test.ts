@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { PICHAMBER_STARTER_SLASH_COMMANDS } from '@/lib/draftStarters';
 import {
   commandHasPiSlashPrefix,
   commandMatchesPiSlashQuery,
@@ -174,7 +175,7 @@ describe('filterPiSlashCommands', () => {
     expect(filterPiSlashCommands(commands, false)).toEqual(commands);
   });
 
-  test('keeps injected skills as skill:name and still hides chips and leftovers', () => {
+  test('keeps Pichamber starters and injected skills, and still hides leftovers', () => {
     const commands = [
       { name: 'compact' },
       { name: 'reload' },
@@ -185,6 +186,9 @@ describe('filterPiSlashCommands', () => {
       { name: 'shell' },
       { name: 'schedule-task', isOpenChamber: true },
       { name: 'catch-up', isOpenChamber: true },
+      { name: 'plan-feature', isOpenChamber: true },
+      { name: 'init', isOpenChamber: true },
+      { name: 'handoff-review', isOpenChamber: true },
       { name: 'clack-cli-patterns', isSkill: true },
       { name: 'local-review', isSkill: true, injected: false },
       { name: 'skill:already-prefixed', isSkill: true },
@@ -195,9 +199,23 @@ describe('filterPiSlashCommands', () => {
       'login',
       'pr-review',
       'schedule-task',
+      'catch-up',
+      'plan-feature',
       'skill:clack-cli-patterns',
       'skill:already-prefixed',
     ]);
+  });
+
+  test('Pi slash menu keeps every empty-session Pichamber starter', () => {
+    const commands = [...PICHAMBER_STARTER_SLASH_COMMANDS].map((name) => ({
+      name,
+      isOpenChamber: true,
+    }));
+    expect(filterPiSlashCommands(commands, true).map((item) => item.name).sort()).toEqual(
+      [...PICHAMBER_STARTER_SLASH_COMMANDS].sort(),
+    );
+    expect(PICHAMBER_STARTER_SLASH_COMMANDS.has('catch-up')).toBe(true);
+    expect(PICHAMBER_STARTER_SLASH_COMMANDS.has('plan-feature')).toBe(true);
   });
 
   test('does not treat a skill named model as the hidden chip command', () => {
