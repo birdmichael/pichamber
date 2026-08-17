@@ -1,11 +1,23 @@
 import type { Agent } from '@opencode-ai/sdk/v2';
 import { getProviderModelDisplayName, type DisplayProvider } from '@/lib/modelDisplay';
+import { shouldShowComposerAgentChip } from './composerAgentChip';
 
 export type MobileControlsPanel = 'model' | 'agent' | 'variant' | null;
 
 export const isPrimaryMode = (mode?: string) => mode === 'primary' || mode === 'all' || mode === undefined || mode === null;
 
 const getCyclablePrimaryAgents = (agents: Agent[]) => agents.filter((agent) => isPrimaryMode(agent.mode));
+
+/**
+ * Same Desktop hide as `shouldShowComposerAgentChip` / `ModelControls`:
+ * leftover OpenCode agent chrome whose only selectable name is the synthetic
+ * Pi default. Model and thinking chips are a different control.
+ */
+export const shouldShowMobileComposerAgentChip = (
+    agents: ReadonlyArray<{ name: string; mode?: string | null }>,
+): boolean => (
+    shouldShowComposerAgentChip(agents.filter((agent) => isPrimaryMode(agent.mode)))
+);
 
 export const getCycledPrimaryAgentName = (
     agents: Agent[],

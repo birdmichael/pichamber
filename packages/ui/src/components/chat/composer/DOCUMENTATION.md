@@ -24,6 +24,9 @@ On Pi it also no longer mounts the footer context-usage percent chip;
 inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
+The expanded mobile composer uses that same gate (`shouldShowMobileComposerAgentChip`
+→ `MobileAgentButton`); `ComposerFooter` `isMobile` and collapsed
+`MobilePillComposer` do not host that leftover chip.
 When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**
 dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session

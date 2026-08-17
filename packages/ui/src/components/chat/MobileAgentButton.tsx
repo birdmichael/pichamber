@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSelectionStore } from '@/sync/selection-store';
-import { getAgentDisplayName } from './mobileControlsUtils';
+import { getAgentDisplayName, shouldShowMobileComposerAgentChip } from './mobileControlsUtils';
 import { getAgentColor } from '@/lib/agentColors';
 
 interface MobileAgentButtonProps {
@@ -27,6 +27,7 @@ export const MobileAgentButton: React.FC<MobileAgentButtonProps> = ({ onCycleAge
     const uiAgentName = currentSessionId ? (sessionAgentName || currentAgentName) : currentAgentName;
     const agentLabel = getAgentDisplayName(agents, uiAgentName);
     const agentColor = getAgentColor(uiAgentName);
+    const showComposerAgentChip = shouldShowMobileComposerAgentChip(agents);
 
     const longPressTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const isLongPressRef = React.useRef(false);
@@ -69,6 +70,10 @@ export const MobileAgentButton: React.FC<MobileAgentButtonProps> = ({ onCycleAge
             }
         };
     }, []);
+
+    if (!showComposerAgentChip) {
+        return null;
+    }
 
     return (
         <button
