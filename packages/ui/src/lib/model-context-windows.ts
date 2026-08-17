@@ -188,6 +188,156 @@ export const lookupExactContextWindow = (modelId: string): number | undefined =>
 };
 
 /**
+ * Pi `input` tokens. Docs default omitted `input` to `["text"]`.
+ * Vision requires an explicit `["text", "image"]`.
+ */
+export const PI_MODEL_INPUT_TYPES = ['text', 'image'] as const;
+export type PiModelInputType = (typeof PI_MODEL_INPUT_TYPES)[number];
+export const PI_TEXT_IMAGE_INPUT: readonly PiModelInputType[] = ['text', 'image'];
+
+const PI_MODEL_INPUT_TYPE_SET = new Set<string>(PI_MODEL_INPUT_TYPES);
+
+/**
+ * Exact ids whose vendor docs publish image input. Same keying as
+ * `PUBLISHED_INPUT_CONTEXT_WINDOWS` (normalized, no family wildcards).
+ * DeepSeek hosted V4 ids are in the context table and stay omitted here —
+ * that API is text-only.
+ *
+ * Sources:
+ * - OpenAI: https://developers.openai.com/api/docs/models/gpt-4o
+ *   and https://developers.openai.com/api/docs/models/gpt-4.1
+ * - Anthropic: https://platform.claude.com/docs/en/about-claude/models/overview
+ *   ("All current Claude models support text and image input")
+ * - xAI: https://docs.x.ai/developers/models/grok-4.6 (and sibling model pages)
+ * - Google: https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro
+ */
+export const KNOWN_VISION_MODEL_IDS: ReadonlySet<string> = new Set([
+  'gpt-4o',
+  'gpt-4o-mini',
+  'gpt-4o-2024-05-13',
+  'gpt-4o-2024-08-06',
+  'gpt-4o-2024-11-20',
+  'gpt-4.1',
+  'gpt-4.1-mini',
+  'gpt-4.1-nano',
+  'gpt-4.1-2025-04-14',
+  'gpt-4.1-mini-2025-04-14',
+  'gpt-4.1-nano-2025-04-14',
+
+  'claude-fable-5',
+  'claude-mythos-5',
+  'claude-mythos-preview',
+  'claude-opus-5',
+  'claude-sonnet-5',
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+  'claude-sonnet-4-6',
+  'opus-4-8',
+  'opus-4-7',
+  'opus-4-6',
+  'opus-4.6',
+  'opus-5',
+  'sonnet-4-6',
+  'sonnet-4.6',
+  'sonnet-5',
+  'fable-5',
+  'claude-haiku-4-5',
+  'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5',
+  'claude-sonnet-4-5-20250929',
+  'claude-opus-4-5',
+  'claude-opus-4-5-20251101',
+  'claude-sonnet-4',
+  'claude-opus-4',
+  'claude-opus-4-1',
+  'claude-3-5-sonnet',
+  'claude-3-5-haiku',
+  'claude-3-7-sonnet',
+  'haiku-4-5',
+  'haiku-4.5',
+  'sonnet-4-5',
+  'sonnet-4.5',
+  'opus-4-5',
+  'opus-4.5',
+
+  'grok-4.6',
+  'grok-4.5',
+  'grok-4.5-latest',
+  'grok-4.3',
+  'grok-4.3-latest',
+  'grok-4.20-0309-reasoning',
+  'grok-4.20-0309-non-reasoning',
+  'grok-4.20-multi-agent-0309',
+  'grok-build-0.1',
+  'grok-build-latest',
+
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash-lite-preview-06-17',
+]);
+
+/**
+ * Pi `input` arrays. Empty, unknown tokens, and non-arrays are omitted
+ * so Pi can keep its `["text"]` default.
+ */
+export const readPersistedModelInput = (value: unknown): PiModelInputType[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const next: PiModelInputType[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const token = item.trim().toLowerCase();
+    if (!PI_MODEL_INPUT_TYPE_SET.has(token) || seen.has(token)) {
+      continue;
+    }
+    seen.add(token);
+    next.push(token as PiModelInputType);
+  }
+  return next.length > 0 ? next : undefined;
+};
+
+/**
+ * Pi's omitted-`input` default. Live models and text-only capabilities
+ * look like a stored value, but they are not a user override.
+ */
+export const isPiDefaultTextInput = (value: unknown): boolean => {
+  const input = readPersistedModelInput(value);
+  return input !== undefined && input.length === 1 && input[0] === 'text';
+};
+
+export const lookupExactVisionInput = (modelId: string): readonly PiModelInputType[] | undefined => {
+  const normalized = normalizeModelId(modelId);
+  if (!normalized || !KNOWN_VISION_MODEL_IDS.has(normalized)) {
+    return undefined;
+  }
+  return PI_TEXT_IMAGE_INPUT;
+};
+
+/**
+ * `input` to write on a custom-model persist. A stored non-default array
+ * wins (`["text", "image"]` is not stripped). Empty or Pi-default
+ * `["text"]` on a known vision id writes `["text", "image"]`. The same
+ * empty/default on an unknown id stays omitted — do not invent vision.
+ */
+export const resolvePersistedInput = (input: {
+  id: string;
+  input?: unknown;
+}): PiModelInputType[] | undefined => {
+  const user = readPersistedModelInput(input.input);
+  if (user !== undefined && !isPiDefaultTextInput(user)) {
+    return user;
+  }
+  const known = lookupExactVisionInput(input.id);
+  return known ? [...known] : undefined;
+};
+
+/**
  * Window to write on a custom-model persist. A typed number wins.
  * Empty on a known id uses the published table. Empty on an unknown id
  * stays omitted — family inference is display-only and is not persisted.

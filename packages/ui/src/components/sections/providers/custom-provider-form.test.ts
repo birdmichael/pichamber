@@ -208,7 +208,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(withContext.result?.config.models).toEqual({
-      'gpt-4o': { name: 'GPT-4o', contextWindow: 128000 },
+      'gpt-4o': { name: 'GPT-4o', contextWindow: 128000, input: ['text', 'image'] },
     });
 
     const knownEmpty = validateCustomProvider({
@@ -224,7 +224,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(knownEmpty.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000 },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
     });
 
     const unknownEmpty = validateCustomProvider({
@@ -268,7 +268,127 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(userOverride.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000 },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000, input: ['text', 'image'] },
+    });
+  });
+
+  test('writes input for a known vision id and does not invent or overwrite it', () => {
+    const knownVision = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'grok-4.6', name: 'Grok 4.6' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(knownVision.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const defaultText = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          input: ['text'],
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(defaultText.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const storedVision = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          input: ['text', 'image'],
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(storedVision.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const unknown = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'mystery-model', name: 'Mystery' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(unknown.result?.config.models).toEqual({
+      'mystery-model': { name: 'Mystery' },
+    });
+  });
+
+  test('re-saves a known vision id when the live facade only has Pi-default text input', () => {
+    const state = providerToCustomFormState({
+      id: 'bmlab',
+      name: 'bmlab',
+      options: { baseURL: 'https://ai.example.test/v1' },
+      models: [{
+        id: 'grok-4.6',
+        name: 'Grok 4.6',
+        contextWindow: 500000,
+        input: ['text'],
+        capabilities: {
+          input: { text: true, image: false, audio: false, video: false, pdf: false },
+        },
+      }],
+    });
+    expect(state.models[0]?.input).toEqual(undefined);
+
+    const saved = validateCustomProvider({
+      form: {
+        providerID: 'bmlab',
+        name: 'bmlab',
+        baseURL: 'https://ai.example.test/v1',
+        apiKey: 'sk-test',
+        models: state.models,
+        headers: [{ row: 'h0', key: '', value: '' }],
+      },
+      t,
+      existingProviderIDs: new Set(['bmlab']),
+      editingProviderID: 'bmlab',
+      allowExistingAuth: true,
+    });
+    expect(saved.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const unknownLive = providerToCustomFormState({
+      id: 'bmlab',
+      options: { baseURL: 'https://ai.example.test/v1' },
+      models: [{
+        id: 'mystery-model',
+        name: 'Mystery',
+        input: ['text'],
+        capabilities: { input: { text: true, image: false } },
+      }],
+    });
+    const unknownSaved = validateCustomProvider({
+      form: {
+        providerID: 'bmlab',
+        name: 'bmlab',
+        baseURL: 'https://ai.example.test/v1',
+        apiKey: 'sk-test',
+        models: unknownLive.models,
+        headers: [{ row: 'h0', key: '', value: '' }],
+      },
+      t,
+      existingProviderIDs: new Set(['bmlab']),
+      editingProviderID: 'bmlab',
+      allowExistingAuth: true,
+    });
+    expect(unknownSaved.result?.config.models).toEqual({
+      'mystery-model': { name: 'Mystery' },
     });
   });
 });
@@ -394,9 +514,16 @@ describe('provider edit helpers', () => {
       id: 'campus-llm',
       name: 'Campus LLM',
       options: { baseURL: 'https://llm.example.edu/v1' },
-      models: [{ id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1047576, limit: { context: 1047576 } }],
+      models: [{
+        id: 'gpt-4.1',
+        name: 'GPT-4.1',
+        contextWindow: 1047576,
+        input: ['text', 'image'],
+        limit: { context: 1047576 },
+      }],
     });
     expect(state.models[0]?.contextWindow).toBe(1047576);
+    expect(state.models[0]?.input).toEqual(['text', 'image']);
 
     const fromLimitOnly = providerToCustomFormState({
       id: 'campus-llm',
@@ -497,7 +624,7 @@ describe('fetch remote models request', () => {
         { id: '  ', name: 'blank' },
         { name: 'missing-id' },
       ],
-    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000 }]);
+    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] }]);
   });
 
   test('keeps a provider-reported context and prefills exact ids when the catalog is silent', () => {
@@ -509,8 +636,8 @@ describe('fetch remote models request', () => {
         { id: 'mystery-model', name: 'Mystery' },
       ],
     })).toEqual([
-      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000 },
-      { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1047576 },
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000, input: ['text', 'image'] },
+      { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 1047576, input: ['text', 'image'] },
       { id: 'claude-unknown-99', name: 'Claude mystery', contextWindow: 200000 },
       { id: 'mystery-model', name: 'Mystery' },
     ]);
@@ -610,6 +737,7 @@ describe('fetch remote models request', () => {
     expect(first[0]?.id).toBe('grok-4.6');
     expect(first[0]?.name).toBe('Grok 4.6');
     expect(first[0]?.contextWindow).toBe(500000);
+    expect(first[0]?.input).toEqual(['text', 'image']);
     expect(first[0]?.row.startsWith('row-')).toBe(true);
 
     const appended = addRemoteModelsToForm(first, [
@@ -650,5 +778,13 @@ describe('fetch remote models request', () => {
 
     const unknown = applyModelIdChange({ row: 'm2', id: '', name: '' }, 'mystery-model');
     expect(unknown.contextWindow).toEqual(undefined);
+
+    const dropped = applyModelIdChange({
+      row: 'm3',
+      id: 'grok-4.6',
+      name: 'Grok 4.6',
+      input: ['text'],
+    }, 'mystery-model');
+    expect(dropped.input).toEqual(undefined);
   });
 });

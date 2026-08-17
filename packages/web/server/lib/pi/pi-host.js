@@ -636,6 +636,36 @@ const applyEventToStore = (store, ocEvent) => {
   }
 };
 
+const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
+
+const readPiModelInput = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  const value = model.input;
+  if (!Array.isArray(value)) return undefined;
+  const next = [];
+  const seen = new Set();
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const token = item.trim().toLowerCase();
+    if (!PI_MODEL_INPUT_TYPES.has(token) || seen.has(token)) continue;
+    seen.add(token);
+    next.push(token);
+  }
+  return next.length > 0 ? next : undefined;
+};
+
+const capabilitiesFromPiInput = (input, reasoning) => ({
+  reasoning: Boolean(reasoning),
+  attachment: input.includes('image'),
+  input: {
+    text: input.includes('text'),
+    image: input.includes('image'),
+    audio: false,
+    video: false,
+    pdf: false,
+  },
+});
+
 const toProviderModelRecord = (model) => {
   const id = typeof model?.id === 'string' ? model.id.trim() : '';
   if (!id) return null;
@@ -643,12 +673,14 @@ const toProviderModelRecord = (model) => {
   const maxTokens = Number(model.maxTokens);
   const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
   const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
+  const input = readPiModelInput(model);
   return {
     id,
     name: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id,
     reasoning: Boolean(model.reasoning),
     ...(hasContext ? { contextWindow } : {}),
     ...(hasOutput ? { maxTokens } : {}),
+    ...(input ? { input, capabilities: capabilitiesFromPiInput(input, model.reasoning) } : {}),
     cost: model.cost,
     ...(hasContext || hasOutput ? {
       limit: {
@@ -697,15 +729,25 @@ const applyPublicProviderConfig = (provider, config) => {
     const existingLimit = existing.limit && typeof existing.limit === 'object' ? existing.limit : {};
     const existingContext = existing.contextWindow || existingLimit.context;
     const existingOutput = existing.maxTokens || existingLimit.output;
+    const existingInput = readPiModelInput(existing);
     const contextWindow = existingContext || record.contextWindow;
     const maxTokens = existingOutput || record.maxTokens;
+    const input = existingInput || record.input;
     const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
     const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
-    if (!hasContext && !hasOutput) continue;
+    const hasInput = Array.isArray(input) && input.length > 0;
+    if (!hasContext && !hasOutput && !hasInput) continue;
     provider.models[record.id] = {
       ...existing,
       ...(hasContext && !existingContext ? { contextWindow: Number(contextWindow) } : {}),
       ...(hasOutput && !existingOutput ? { maxTokens: Number(maxTokens) } : {}),
+      ...(hasInput && !existingInput ? {
+        input,
+        capabilities: {
+          ...(existing.capabilities && typeof existing.capabilities === 'object' ? existing.capabilities : {}),
+          ...capabilitiesFromPiInput(input, existing.reasoning ?? record.reasoning),
+        },
+      } : {}),
       ...(hasContext || hasOutput ? {
         limit: {
           ...existingLimit,
