@@ -84,9 +84,9 @@ const unwrapSessionList = (
  */
 const isArchivedSession = (session: GlobalSessionRecord): boolean => Boolean(session.time?.archived);
 
-export type GlobalSessionListSurface = "default" | "archive";
+type GlobalSessionListSurface = "default" | "archive";
 
-export type GlobalSessionListQuery = {
+type GlobalSessionListQuery = {
     archived: boolean;
     narrowToArchived: boolean;
 };

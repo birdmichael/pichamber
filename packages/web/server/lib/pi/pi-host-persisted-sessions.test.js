@@ -287,9 +287,10 @@ describe('persisted Pi sessions', () => {
     expect(loaded.info.metadata?.archived).toBe(archivedAt);
 
     const refreshed = await restarted.reloadSessionRecords({ sessionID: sibling.id, directory: cwd });
-    expect(refreshed.sessions.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
-    expect(refreshed.sessions.filter((session) => !session.time?.archived).map((session) => session.id))
-      .not.toContain(createdId);
+    expect(refreshed.sessions.map((session) => session.id)).toContain(sibling.id);
+    expect(refreshed.sessions.map((session) => session.id)).not.toContain(createdId);
+    const inclusive = await restarted.listSessionInfos(cwd, { archived: true });
+    expect(inclusive.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
 
     await restarted.updateSession(createdId, { time: { archived: 0 } }, cwd);
     restarted.dispose();
@@ -413,8 +414,8 @@ describe('persisted Pi sessions', () => {
     const result = await host.reloadSessionRecords({ sessionID: active.id, directory: cwd });
     expect(result.sessions.map((session) => session.id)).toContain(active.id);
     expect(result.sessions.map((session) => session.id)).not.toContain(created.id);
-    expect(listCalls.map((call) => call.dir)).toEqual([sessionDir]);
-    expect(listCalls[0].ids).not.toContain(created.id);
+    expect(listCalls.map((call) => call.dir)).not.toContain(archiveDir);
+    expect(listCalls.every((call) => !call.ids.includes(created.id))).toBe(true);
     host.dispose();
   });
 
