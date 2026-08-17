@@ -54,6 +54,12 @@ the `openContext*` actions in `useUIStore`.
 
 - Opening a surface must never require a control outside the rail, the
   command palette, or an in-content link.
+- Desktop Plan docks as a context-panel side rail. Opening Plan leaves chat
+  and the composer visible: it must not set `activeMainTab` to `plan`, and it
+  must not use the shared per-directory `expanded` overlay (`absolute` full
+  area width). Leftover `expanded: true` from Files / Diff / Git is cleared
+  when Plan becomes active. Mobile still uses the workspace sheet / `plan`
+  main tab.
 - Multi-instance and session-holding surfaces (file/editor, diff, browser,
   terminal) are keep-alive panes in `ContextPanel.tsx`. Switching these
   surfaces must not reset their state (open tabs, xterm session, scroll

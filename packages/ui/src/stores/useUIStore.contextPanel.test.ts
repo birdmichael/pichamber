@@ -152,6 +152,80 @@ describe('useUIStore closeContextPanelTab surface stability', () => {
   });
 });
 
+describe('useUIStore Plan docks beside chat', () => {
+  const directory = '/repo';
+
+  test('opening Plan clears leftover expanded overlay and does not set the plan main tab', () => {
+    useUIStore.setState({ activeMainTab: 'chat', isMobile: false });
+    useUIStore.getState().openContextSurface(directory, 'file');
+    useUIStore.getState().toggleContextPanelExpanded(directory);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.expanded).toBe(true);
+
+    useUIStore.getState().openContextSurface(directory, 'plan');
+
+    const state = useUIStore.getState().contextPanelByDirectory[directory];
+    expect(state?.isOpen).toBe(true);
+    expect(state?.expanded).toBe(false);
+    expect(state?.tabs.find((tab) => tab.id === state.activeTabId)?.mode).toBe('plan');
+    expect(useUIStore.getState().activeMainTab).toBe('chat');
+  });
+
+  test('openContextPlan docks even when the directory already stored expanded: true', () => {
+    useUIStore.setState({
+      isMobile: false,
+      activeMainTab: 'chat',
+      contextPanelByDirectory: {
+        [directory]: {
+          isOpen: false,
+          expanded: true,
+          tabs: [],
+          activeTabId: null,
+          widthByMode: {},
+          touchedAt: Date.now(),
+        },
+      },
+    });
+
+    useUIStore.getState().openContextPlan(directory);
+
+    const state = useUIStore.getState().contextPanelByDirectory[directory];
+    expect(state?.isOpen).toBe(true);
+    expect(state?.expanded).toBe(false);
+    expect(state?.activeTabId).toBe('plan');
+    expect(useUIStore.getState().activeMainTab).toBe('chat');
+  });
+
+  test('activating an existing Plan tab collapses leftover expanded state', () => {
+    useUIStore.getState().openContextPanelTab(directory, { mode: 'plan' });
+    useUIStore.getState().openContextSurface(directory, 'diff');
+    useUIStore.getState().toggleContextPanelExpanded(directory);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.expanded).toBe(true);
+
+    useUIStore.getState().openContextSurface(directory, 'plan');
+
+    const state = useUIStore.getState().contextPanelByDirectory[directory];
+    expect(state?.isOpen).toBe(true);
+    expect(state?.expanded).toBe(false);
+    expect(state?.activeTabId).toBe('plan');
+  });
+
+  test('toggle expanded is a no-op while Plan is the active surface', () => {
+    useUIStore.getState().openContextSurface(directory, 'plan');
+    useUIStore.getState().toggleContextPanelExpanded(directory);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.expanded).toBe(false);
+  });
+
+  test('desktop setActiveMainTab(plan) stays on chat; mobile still uses the plan sheet tab', () => {
+    useUIStore.setState({ isMobile: false, activeMainTab: 'chat' });
+    useUIStore.getState().setActiveMainTab('plan');
+    expect(useUIStore.getState().activeMainTab).toBe('chat');
+
+    useUIStore.setState({ isMobile: true, activeMainTab: 'chat' });
+    useUIStore.getState().setActiveMainTab('plan');
+    expect(useUIStore.getState().activeMainTab).toBe('plan');
+  });
+});
+
 describe('useUIStore per-surface panel widths', () => {
   const directory = '/repo';
 

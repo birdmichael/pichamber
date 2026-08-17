@@ -12,6 +12,7 @@ import type { TerminalShell } from '@/lib/api/types';
 import { useFilesViewTabsStore } from './useFilesViewTabsStore';
 import { isWindowsArm64 } from '@/lib/platform';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn';
@@ -421,6 +422,9 @@ const upsertContextPanelTab = (
   return {
     ...current,
     isOpen: true,
+    // Plan docks beside chat. Opening it must not inherit or flip the shared
+    // per-directory expanded overlay used by Files / Diff / Git.
+    expanded: nextTab.mode === 'plan' ? false : current.expanded,
     tabs: clampedTabs,
     activeTabId: resolveActiveContextPanelTabID(clampedTabs, activeTabId),
     touchedAt: Date.now(),
@@ -1365,7 +1369,19 @@ export const useUIStore = create<UIStore>()(
               return state;
             }
 
+            const nextTab = current.tabs.find((tab) => tab.id === normalizedTabID);
             if (current.activeTabId === normalizedTabID && current.isOpen) {
+              if (nextTab?.mode === 'plan' && current.expanded) {
+                const byDirectory = {
+                  ...state.contextPanelByDirectory,
+                  [normalizedDirectory]: {
+                    ...current,
+                    expanded: false,
+                    touchedAt: Date.now(),
+                  },
+                };
+                return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+              }
               return state;
             }
 
@@ -1374,6 +1390,7 @@ export const useUIStore = create<UIStore>()(
               [normalizedDirectory]: {
                 ...current,
                 isOpen: true,
+                expanded: nextTab?.mode === 'plan' ? false : current.expanded,
                 activeTabId: normalizedTabID,
                 touchedAt: Date.now(),
                 tabs: current.tabs.map((tab) => (tab.id === normalizedTabID
@@ -1480,6 +1497,12 @@ export const useUIStore = create<UIStore>()(
           set((state) => {
             const prev = state.contextPanelByDirectory[normalizedDirectory];
             const current = touchContextPanelState(prev);
+            const activeTab = current.tabs.find((tab) => tab.id === current.activeTabId);
+            // Plan has no expanded overlay. Do not persist a full-width flip
+            // while Plan is the active surface.
+            if (activeTab?.mode === 'plan') {
+              return state;
+            }
             const byDirectory = {
               ...state.contextPanelByDirectory,
               [normalizedDirectory]: {
@@ -1607,8 +1630,11 @@ export const useUIStore = create<UIStore>()(
           if (guard && !guard(tab)) {
             return;
           }
-          activeMainTabByRuntime.set(runtimeMemoryKey(), tab);
-          set({ activeMainTab: tab });
+          // Desktop Plan is a context-panel rail. Mobile still uses the plan
+          // main tab for its workspace sheet.
+          const nextTab = get().isMobile ? tab : resolveDesktopActiveMainTab(tab);
+          activeMainTabByRuntime.set(runtimeMemoryKey(), nextTab);
+          set({ activeMainTab: nextTab });
         },
 
         prepareForRuntimeSwitch: (runtimeKey?: string | null) => {

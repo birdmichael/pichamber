@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: opening Plan keeps the chat and composer visible. Plan stays a right-hand side panel instead of covering the window.
 - **Settings:** opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.
 - Chat: on Pi, Plan Discard stays disabled while the panel still says “No plan yet”. The confirm dialog only appears when a ready or saved plan exists.
 - **Mobile:** Git now opens the same Pull Request view as Desktop. File diffs stay inline on phones and use the Desktop Diff view on tablet-width screens (768px and up), where Walkthrough is also available. The Electron Browser session is not on mobile.

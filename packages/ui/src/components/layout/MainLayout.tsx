@@ -25,6 +25,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUpdatePolling } from '@/hooks/useUpdatePolling';
 import { useDeviceInfo } from '@/lib/device';
+import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 
@@ -286,7 +287,11 @@ export const MainLayout: React.FC = () => {
         }
     }, [activeMainTab, isMobile, mobileRightSidebarOpen]);
 
-    const isChatActive = activeMainTab === 'chat';
+    // Desktop Plan is a rail, not a main tab. Leftover persisted `plan` must
+    // not hide chat + composer. Mobile still uses the plan sheet tab.
+    const isChatActive = isMobile
+      ? activeMainTab === 'chat'
+      : resolveDesktopActiveMainTab(activeMainTab) === 'chat';
 
     return (
         <DiffWorkerProvider>
