@@ -104,6 +104,62 @@ const facadeAssistantInfoFromPiMessage = (message) => {
   };
 };
 
+const PI_ASSISTANT_TERMINAL_STOP_REASONS = new Set([
+  'stop',
+  'length',
+  'toolUse',
+  'error',
+  'aborted',
+]);
+
+const assistantContentLooksPresent = (content) => {
+  if (typeof content === 'string') return content.trim().length > 0;
+  if (!Array.isArray(content)) return false;
+  return content.some((block) => {
+    if (!isRecord(block)) return false;
+    if (block.type === 'text') return Boolean(asTrimmedString(block.text));
+    if (block.type === 'thinking') return Boolean(asTrimmedString(block.thinking));
+    if (block.type === 'toolCall' || block.type === 'image') return true;
+    return false;
+  });
+};
+
+/**
+ * Disk jsonl assistants are finished unless they still look open.
+ * `stopReason: "pending"` is the live streaming stub; Pi replaces it before persist.
+ * Persist helpers may omit `stopReason` / `usage` on an already-complete turn.
+ */
+const isFinishedPiAssistantMessage = (message) => {
+  if (!isRecord(message) || message.role !== 'assistant') return false;
+  const stopReason = asTrimmedString(message.stopReason);
+  if (stopReason === 'pending') return false;
+  if (PI_ASSISTANT_TERMINAL_STOP_REASONS.has(stopReason)) return true;
+  if (usageHasRecordedNumbers(message.usage)) return true;
+  return assistantContentLooksPresent(message.content);
+};
+
+const completedMillisFromPiAssistant = (message, created) => {
+  if (typeof message?.timestamp === 'number' && Number.isFinite(message.timestamp) && message.timestamp > 0) {
+    return message.timestamp;
+  }
+  if (typeof message?.timestamp === 'string' && message.timestamp.trim()) {
+    const parsed = Date.parse(message.timestamp);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return created;
+};
+
+/** OpenCode `info.time` / `finish` for hydrate. Users and open assistants stay created-only. */
+const facadeMessageTimeFromPi = (message, created) => {
+  if (!isFinishedPiAssistantMessage(message)) {
+    return { time: { created } };
+  }
+  return {
+    time: { created, completed: completedMillisFromPiAssistant(message, created) },
+    finish: 'stop',
+  };
+};
+
 const piModelUsageFromFacadeInfo = (info) => {
   if (!isRecord(info) || info.role !== 'assistant') return {};
   const rawModel = info.model;
@@ -578,11 +634,11 @@ const facadeFromPiMessage = (entry) => {
     info: {
       id: messageID,
       role,
-      time: { created },
       agent: 'pi',
       ...(role === 'assistant' ? { mode: 'pi' } : {}),
       ...(asTrimmedString(entry?.parentId) ? { parentID: entry.parentId } : {}),
       ...facadeAssistantInfoFromPiMessage(message),
+      ...facadeMessageTimeFromPi(message, created),
     },
     parts: partsFromPiContent(message.content, '', messageID),
   };
@@ -641,14 +697,15 @@ const facadeFromUnknown = (entry) => {
     if (entry.role === 'toolResult') return null;
     const messageID = asTrimmedString(entry.id) || createMessageId();
     const role = entry.role === 'assistant' ? 'assistant' : 'user';
+    const created = millisFromUnknown(entry.timestamp ?? entry.time?.created);
     return {
       info: {
         id: messageID,
         role,
-        time: { created: millisFromUnknown(entry.timestamp ?? entry.time?.created) },
         agent: 'pi',
         ...(role === 'assistant' ? { mode: 'pi' } : {}),
         ...facadeAssistantInfoFromPiMessage(entry),
+        ...facadeMessageTimeFromPi(entry, created),
       },
       parts: Array.isArray(entry.parts)
         ? entry.parts.map((part) => ({ ...part, messageID }))
