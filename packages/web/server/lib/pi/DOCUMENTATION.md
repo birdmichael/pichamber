@@ -191,8 +191,14 @@ unchanged.
 
 Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
 entry: `{ archived: ms | 0 }`. `updateSession` writes that value (including
-`0` for restore). `toPersistedSessionInfo`, hydrate, and sidebar Refresh
-read it onto `info.time.archived`. `0` is restored, not archived.
+`0` for restore) and moves the jsonl into a sibling `archive/` under the
+same cwd session dir. Restore moves it back. `archived: 0` stays in the
+active dir. `toPersistedSessionInfo`, hydrate, and sidebar Refresh read
+the flag onto `info.time.archived`. `0` is restored, not archived.
+Active list (`archived=false` / absent) only calls `SessionManager.list()`
+on the active dir — it does not open `archive/` files. `archived=true`
+also lists `archive/`. A leftover archived jsonl still in the active dir
+is relocated after its tail-scan so the next active list skips it.
 List metadata is a tail-scan for the last `pichamber.metadata`; it does
 not full-read jsonl again after `SessionManager.list()`. Reuse that list
 item's title / firstMessage / timestamps. After `archived: ms`, stop.
@@ -201,8 +207,9 @@ item's title / firstMessage / timestamps. After `archived: ms`, stop.
 archived rows unless `archived=true`; `roots=true` keeps sessions with no
 `parentID`; `limit` / `cursor` page by `time.updated` strictly earlier and
 set `x-next-cursor` when another page exists. Last-session restore must
-not open an archived id. One unreadable session file does not drop other
-complete sessions.
+not open an archived id. One unreadable session file (active or archive)
+does not drop other complete sessions. A failed archive-dir list keeps
+active rows.
 
 Clone, fork, and import copy facade messages in memory and persist them
 through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /

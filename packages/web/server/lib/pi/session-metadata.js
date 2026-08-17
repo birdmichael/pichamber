@@ -5,7 +5,8 @@
 // `0` means restored. Clone/fork `parentID` is the same entry:
 // `{ parentID: "<source session id>" }`. Do not invent a second session store.
 // Session list tail-scans the last pichamber.metadata; it does not full-read
-// jsonl again just to find archived / parentID.
+// jsonl again just to find archived / parentID. Archived files also move to
+// a sibling `archive/` so archived=false never opens them.
 
 import fs from 'node:fs';
 

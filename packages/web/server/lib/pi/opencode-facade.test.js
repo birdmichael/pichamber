@@ -9,8 +9,8 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
 import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
+import { sessionArchiveDir } from './session-archive.js';
 import {
-  LIST_METADATA_TAIL_CHUNK_SIZE,
   PICHAMBER_METADATA_CUSTOM_TYPE,
   readPersistedSessionMetadataFromFileTail,
 } from './session-metadata.js';
@@ -45,7 +45,16 @@ const stubPersistedSession = async ({ sessionManager }) => ({
   dispose() {},
 });
 
-const writeFacadePersistedSession = ({ home, cwd, title, userText, metadata, updated, extraLines = [] }) => {
+const writeFacadePersistedSession = ({
+  home,
+  cwd,
+  title,
+  userText,
+  metadata,
+  updated,
+  extraLines = [],
+  intoArchive = false,
+}) => {
   const sessionDir = sessionDirForCwd(cwd, home);
   const manager = SessionManager.create(cwd, sessionDir);
   const file = manager.getSessionFile();
@@ -76,12 +85,58 @@ const writeFacadePersistedSession = ({ home, cwd, title, userText, metadata, upd
       data: metadata,
     })}\n`);
   }
+  let sessionFile = opened.getSessionFile();
+  if (intoArchive) {
+    const dest = path.join(sessionArchiveDir(sessionDir), path.basename(sessionFile));
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.renameSync(sessionFile, dest);
+    sessionFile = dest;
+  }
   if (Number.isFinite(updated)) {
-    fs.utimesSync(file, new Date(updated), new Date(updated));
+    fs.utimesSync(sessionFile, new Date(updated), new Date(updated));
   }
   return {
     id: opened.getSessionId(),
-    path: opened.getSessionFile(),
+    path: sessionFile,
+  };
+};
+
+const trackSessionFileIo = (files) => {
+  const watched = new Set((files || []).map((file) => path.resolve(file)));
+  const hits = [];
+  const note = (file) => {
+    if (typeof file !== 'string' && !Buffer.isBuffer(file)) return;
+    const resolved = path.resolve(String(file));
+    if (watched.has(resolved)) hits.push(resolved);
+  };
+  const origCreateReadStream = fs.createReadStream;
+  const origReadFileSync = fs.readFileSync;
+  const origOpenSync = fs.openSync;
+  const origPromisesReadFile = fs.promises.readFile;
+  fs.createReadStream = function patchedCreateReadStream(file, options) {
+    note(file);
+    return origCreateReadStream.call(this, file, options);
+  };
+  fs.readFileSync = function patchedReadFileSync(file, options) {
+    note(file);
+    return origReadFileSync.call(this, file, options);
+  };
+  fs.openSync = function patchedOpenSync(file, flags, mode) {
+    note(file);
+    return origOpenSync.call(this, file, flags, mode);
+  };
+  fs.promises.readFile = function patchedPromisesReadFile(file, options) {
+    note(file);
+    return origPromisesReadFile.call(this, file, options);
+  };
+  return {
+    hits,
+    restore() {
+      fs.createReadStream = origCreateReadStream;
+      fs.readFileSync = origReadFileSync;
+      fs.openSync = origOpenSync;
+      fs.promises.readFile = origPromisesReadFile;
+    },
   };
 };
 
@@ -90,6 +145,7 @@ const startFacade = async ({
   mock = true,
   createSession,
   readListSessionMetadata,
+  listPersistedSessionsInDir,
 } = {}) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-home-'));
   tempHomes.push(home);
@@ -105,6 +161,7 @@ const startFacade = async ({
       createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
     } : {}),
     ...(readListSessionMetadata ? { readListSessionMetadata } : {}),
+    ...(listPersistedSessionsInDir ? { listPersistedSessionsInDir } : {}),
   });
   const app = express();
   app.use(express.json());
@@ -996,6 +1053,10 @@ describe('OpenCode facade HTTP/SSE', () => {
         body: JSON.stringify({ time: { archived: archivedAt } }),
       })).json();
       expect(patched.time.archived).toBe(archivedAt);
+      const sessionDir = sessionDirForCwd(directory, kernel.host.getPath().home);
+      const archivedFile = kernel.host.getSession(created.id).sessionFile;
+      expect(path.dirname(archivedFile)).toBe(sessionArchiveDir(sessionDir));
+      expect(fs.existsSync(archivedFile)).toBe(true);
 
       const dirQ = `directory=${encodeURIComponent(directory)}`;
       const active = await (await fetch(`${url}/api/experimental/session?archived=false&${dirQ}`)).json();
@@ -1009,14 +1070,23 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('does not full-read archived jsonl on archived=false and paginates both session list routes', async () => {
+  it('does not open archived jsonl on archived=false and paginates both session list routes', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-list-io-'));
     tempHomes.push(directory);
     const reads = [];
+    const listCalls = [];
     const { url, close, kernel } = await startFacade({
       directory,
       mock: false,
       createSession: stubPersistedSession,
+      async listPersistedSessionsInDir(cwd, dir) {
+        const items = await SessionManager.list(cwd, dir);
+        listCalls.push({
+          dir,
+          paths: (items || []).map((item) => item.path),
+        });
+        return items;
+      },
       readListSessionMetadata(file) {
         let bytes = 0;
         let size = 0;
@@ -1039,7 +1109,13 @@ describe('OpenCode facade HTTP/SSE', () => {
     });
     try {
       const home = kernel.host.getPath().home;
+      const sessionDir = sessionDirForCwd(directory, home);
+      const archiveDir = sessionArchiveDir(sessionDir);
       const pad = 'x'.repeat(256 * 1024);
+      const largeLine = JSON.stringify({
+        type: 'message',
+        message: { role: 'assistant', content: [{ type: 'text', text: pad }] },
+      });
       const active = writeFacadePersistedSession({
         home,
         cwd: directory,
@@ -1060,13 +1136,33 @@ describe('OpenCode facade HTTP/SSE', () => {
         cwd: directory,
         title: 'Archived large',
         userText: 'hide me',
-        extraLines: [JSON.stringify({
-          type: 'message',
-          message: { role: 'assistant', content: [{ type: 'text', text: pad }] },
-        })],
+        extraLines: [largeLine],
         metadata: { archived: 1_700_000_000_000 },
         updated: 1_000,
+        intoArchive: true,
       });
+      const archivedExtra = [
+        writeFacadePersistedSession({
+          home,
+          cwd: directory,
+          title: 'Archived large 2',
+          userText: 'hide me too',
+          extraLines: [largeLine],
+          metadata: { archived: 1_700_000_000_001 },
+          updated: 900,
+          intoArchive: true,
+        }),
+        writeFacadePersistedSession({
+          home,
+          cwd: directory,
+          title: 'Archived large 3',
+          userText: 'hide me three',
+          extraLines: [largeLine],
+          metadata: { archived: 1_700_000_000_002 },
+          updated: 800,
+          intoArchive: true,
+        }),
+      ];
       const child = writeFacadePersistedSession({
         home,
         cwd: directory,
@@ -1082,10 +1178,21 @@ describe('OpenCode facade HTTP/SSE', () => {
         userText: 'page one',
         updated: 5_000,
       });
-      fs.writeFileSync(path.join(path.dirname(active.path), 'broken.jsonl'), '{not-json\n');
+      fs.writeFileSync(path.join(sessionDir, 'broken.jsonl'), '{not-json\n');
+      fs.mkdirSync(archiveDir, { recursive: true });
+      fs.writeFileSync(path.join(archiveDir, 'broken-archive.jsonl'), '{not-json\n');
+
+      const archivedPaths = [archivedLarge.path, ...archivedExtra.map((item) => item.path)];
+      expect(archivedPaths.every((file) => file.startsWith(`${archiveDir}${path.sep}`))).toBe(true);
+      expect(fs.statSync(archivedLarge.path).size).toBeGreaterThan(200_000);
 
       const dirQ = `directory=${encodeURIComponent(directory)}`;
+      const io = trackSessionFileIo(archivedPaths);
+      listCalls.length = 0;
+      reads.length = 0;
       const activeList = await (await fetch(`${url}/api/experimental/session?archived=false&${dirQ}`)).json();
+      const activeListCalls = listCalls.filter((call) => call.dir === sessionDir);
+      const archiveListCalls = listCalls.filter((call) => call.dir === archiveDir);
       const activeIds = activeList.map((item) => item.id);
       expect(activeIds).toEqual(expect.arrayContaining([
         active.id,
@@ -1094,13 +1201,35 @@ describe('OpenCode facade HTTP/SSE', () => {
         newest.id,
       ]));
       expect(activeIds).not.toContain(archivedLarge.id);
+      expect(activeIds).not.toEqual(expect.arrayContaining(archivedExtra.map((item) => item.id)));
       expect(activeList.find((item) => item.id === restored.id)?.time.archived).toBe(0);
+      expect(archiveListCalls).toEqual([]);
+      expect(activeListCalls).toHaveLength(1);
+      expect(activeListCalls[0].paths).not.toEqual(expect.arrayContaining(archivedPaths));
+      expect(reads.map((item) => item.file)).not.toEqual(expect.arrayContaining(archivedPaths));
+      expect(io.hits).toEqual([]);
 
-      const archivedRead = reads.find((item) => item.file === archivedLarge.path);
-      expect(archivedRead).toBeTruthy();
-      expect(archivedRead.size).toBeGreaterThan(200_000);
-      expect(archivedRead.bytes).toBeLessThan(LIST_METADATA_TAIL_CHUNK_SIZE * 2);
-      expect(archivedRead.bytes).toBeLessThan(archivedRead.size / 8);
+      const moreArchived = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Archived large 4',
+        userText: 'still hidden',
+        extraLines: [largeLine],
+        metadata: { archived: 1_700_000_000_003 },
+        updated: 700,
+        intoArchive: true,
+      });
+      io.restore();
+      const afterArchiveIo = trackSessionFileIo([...archivedPaths, moreArchived.path]);
+      listCalls.length = 0;
+      reads.length = 0;
+      const activeAgain = await (await fetch(`${url}/api/session?archived=false&${dirQ}`)).json();
+      expect(activeAgain.map((item) => item.id).sort()).toEqual(activeIds.slice().sort());
+      expect(listCalls.filter((call) => call.dir === archiveDir)).toEqual([]);
+      expect(listCalls.filter((call) => call.dir === sessionDir)[0].paths)
+        .toHaveLength(activeListCalls[0].paths.length);
+      expect(afterArchiveIo.hits).toEqual([]);
+      afterArchiveIo.restore();
 
       const roots = await (await fetch(`${url}/api/session?archived=false&roots=true&${dirQ}`)).json();
       expect(roots.map((item) => item.id)).toEqual(expect.arrayContaining([
@@ -1129,6 +1258,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(inclusive.map((item) => item.id)).toEqual(expect.arrayContaining([
         active.id,
         restored.id,
+        moreArchived.id,
       ]));
     } finally {
       kernel.dispose();
