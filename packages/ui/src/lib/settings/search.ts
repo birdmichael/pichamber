@@ -509,10 +509,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
     descriptionKey: 'settings.openchamber.tools.field.agentControlToolInfo',
     keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'pichamber', 'sessions', 'schedule', 'scheduled', 'control'],
-    isAvailable: (ctx) => shouldShowAgentControlToolSettings({
-      isVSCode: Boolean(ctx.isVSCode),
-      isPiKernel: Boolean(ctx.isPiKernel),
-    }),
+    isAvailable: (ctx) => shouldShowAgentControlToolSettings({ isVSCode: Boolean(ctx.isVSCode) }),
   },
   {
     id: 'sessions.agent-web-tool',
@@ -520,10 +517,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentWebTool',
     descriptionKey: 'settings.openchamber.tools.field.agentWebToolInfo',
     keywords: ['agent', 'tool', 'web', 'browser', 'page', 'preview', 'openchamber', 'pichamber', 'web tool'],
-    isAvailable: (ctx) => shouldShowPichamberToolsSettings({
-      isVSCode: Boolean(ctx.isVSCode),
-      isPiKernel: Boolean(ctx.isPiKernel),
-    }),
+    isAvailable: (ctx) => shouldShowPichamberToolsSettings({ isVSCode: Boolean(ctx.isVSCode) }),
   },
   {
     id: 'git.github-account',

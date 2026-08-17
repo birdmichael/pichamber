@@ -1,16 +1,15 @@
 /**
- * Settings → Pichamber Tools is leftover OpenCode-kernel chrome.
- * VS Code has no in-app browser rail. The Pi kernel uses the Pi section
- * on General instead of these leftover tool toggles.
+ * Settings → Pichamber Tools is a Desktop/web host surface.
+ * VS Code has no in-app browser rail, so the card stays hidden there.
  */
-export function shouldShowPichamberToolsSettings(ctx: { isVSCode: boolean; isPiKernel?: boolean }): boolean {
-  return !ctx.isVSCode && !ctx.isPiKernel;
+export function shouldShowPichamberToolsSettings(ctx: { isVSCode: boolean }): boolean {
+  return !ctx.isVSCode;
 }
 
 /**
- * Agent-control / orchestration is leftover OpenCode-kernel chrome.
- * VS Code has no host tool injection. The Pi kernel hides these rows.
+ * Agent-control / orchestration is a host tool on Desktop Pi and leftover
+ * OpenCode. VS Code has no host tool injection, so the row stays hidden.
  */
-export function shouldShowAgentControlToolSettings(ctx: { isVSCode?: boolean; isPiKernel?: boolean } = {}): boolean {
-  return !ctx.isVSCode && !ctx.isPiKernel;
+export function shouldShowAgentControlToolSettings(ctx: { isVSCode?: boolean } = {}): boolean {
+  return !ctx.isVSCode;
 }

@@ -59,7 +59,7 @@ export const OpenChamberPage: React.FC<OpenChamberPageProps> = ({ section }) => 
                 {showDesktopNetworkSettings && <DesktopNetworkSettings />}
                 {!isVSCode && isPiKernel && <PiAgentSettings />}
                 {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
-                {shouldShowPichamberToolsSettings({ isVSCode, isPiKernel }) && <OpenChamberToolsSettings />}
+                {shouldShowPichamberToolsSettings({ isVSCode }) && <OpenChamberToolsSettings />}
                 <SessionRetentionSettings />
                 {isWebRuntime() && !isDesktopShell() && !isVSCode && !isCapacitorApp() && <PasskeySettings />}
                 {showAbout && <AboutSettings />}
@@ -155,7 +155,7 @@ const GeneralSectionContent: React.FC = () => {
             {showPasskeySettings && <PasskeySettings />}
             {!isVSCode && isPiKernel && <PiAgentSettings />}
             {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
-            {shouldShowPichamberToolsSettings({ isVSCode, isPiKernel }) && <OpenChamberToolsSettings />}
+            {shouldShowPichamberToolsSettings({ isVSCode }) && <OpenChamberToolsSettings />}
             <OpenChamberVisualSettings visibleSettings={[
                 'fileEditorKeymap',
                 'autoSaveEnabled',

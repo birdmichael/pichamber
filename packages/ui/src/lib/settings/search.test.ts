@@ -262,11 +262,23 @@ describe('settings search', () => {
     expect(hidden.some((result) => result.id === 'feature-plugins.mcp')).toBe(true);
   });
 
-  test('hides leftover Pichamber Tools on Pi and leftover OpenCode binary rows on Pi', () => {
+  test('shows the Pichamber Web tool on Pi Desktop and hides it in VS Code', () => {
     const getPageTitle = (page: string) => page;
     const piDesktop = buildSettingsSearchResults({
       query: 'web tool',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const piBrowser = buildSettingsSearchResults({
+      query: 'browser',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const vsCode = buildSettingsSearchResults({
+      query: 'web tool',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: true },
       t,
       getPageTitle,
     });
@@ -283,7 +295,9 @@ describe('settings search', () => {
       getPageTitle,
     });
 
-    expect(piDesktop.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
+    expect(piDesktop.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(piBrowser.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
     expect(leftoverOpenCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
     expect(piBinary.some((result) => result.id === 'sessions.opencode-binary')).toBe(false);
     expect(piBinary.some((result) => result.id === 'sessions.opencode-update-notifications')).toBe(false);
@@ -329,8 +343,20 @@ describe('settings search', () => {
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });
 
-  test('hides leftover tools and the Pi section in VS Code', () => {
+  test('shows the agent-control tool on Pi Desktop search and hides both tools in VS Code', () => {
     const getPageTitle = (page: string) => page;
+    const piAgent = buildSettingsSearchResults({
+      query: 'agent',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const piScheduled = buildSettingsSearchResults({
+      query: 'scheduled',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
     const vsCode = buildSettingsSearchResults({
       query: 'agent',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: true },
@@ -338,6 +364,8 @@ describe('settings search', () => {
       getPageTitle,
     });
 
+    expect(piAgent.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
+    expect(piScheduled.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
     expect(vsCode.some((result) => result.id === 'sessions.agent-control-tool')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
