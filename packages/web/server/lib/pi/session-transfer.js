@@ -1,4 +1,8 @@
+import { createRequire } from 'node:module';
+
 import { createMessageId, createPartId } from './ids.js';
+
+const require = createRequire(import.meta.url);
 
 const PI_SESSION_VERSION = 3;
 
@@ -851,14 +855,6 @@ const markdownToHtml = (source) => {
   return html.join('\n');
 };
 
-const formatJsonForPre = (value) => {
-  try {
-    return JSON.stringify(value ?? {}, null, 2);
-  } catch {
-    return String(value ?? '');
-  }
-};
-
 const SHARE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const formatShareDate = (value) => {
@@ -880,25 +876,231 @@ const formatModelLabel = (info) => {
   return `${resolved.providerID}/${resolved.modelID}`;
 };
 
-const formatUsageLine = (info) => {
-  const tokens = isRecord(info?.tokens) ? info.tokens : null;
-  const hasCost = typeof info?.cost === 'number' && Number.isFinite(info.cost);
-  if (!tokens && !hasCost) return '';
-  const parts = [];
-  if (tokens) {
-    if (typeof tokens.input === 'number' && Number.isFinite(tokens.input)) {
-      parts.push(`${tokens.input} in`);
-    }
-    if (typeof tokens.output === 'number' && Number.isFinite(tokens.output)) {
-      parts.push(`${tokens.output} out`);
-    }
-    if (typeof tokens.reasoning === 'number' && Number.isFinite(tokens.reasoning) && tokens.reasoning > 0) {
-      parts.push(`${tokens.reasoning} reasoning`);
-    }
-  }
-  if (hasCost) parts.push(`$${info.cost}`);
-  return parts.join(' · ');
+const EXPORT_LOCALES = {
+  en: {
+    copy: 'Copy',
+    copyMessage: 'Copy message',
+    copyAnswer: 'Copy reply',
+    copyOutput: 'Copy output',
+    questions: 'Questions',
+    answered: '{count} answered',
+    ignored: 'Questions dismissed',
+    themeToggle: 'Toggle light and dark theme',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  de: {
+    copy: 'Kopieren',
+    copyMessage: 'Nachricht kopieren',
+    copyAnswer: 'Antwort kopieren',
+    copyOutput: 'Ausgabe kopieren',
+    questions: 'Fragen',
+    answered: '{count} beantwortet',
+    ignored: 'Fragen ignoriert',
+    themeToggle: 'Hell- und Dunkelmodus umschalten',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  es: {
+    copy: 'Copiar',
+    copyMessage: 'Copiar mensaje',
+    copyAnswer: 'Copiar respuesta',
+    copyOutput: 'Copiar salida',
+    questions: 'Preguntas',
+    answered: '{count} respondidas',
+    ignored: 'Preguntas omitidas',
+    themeToggle: 'Alternar tema claro y oscuro',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  fr: {
+    copy: 'Copier',
+    copyMessage: 'Copier le message',
+    copyAnswer: 'Copier la réponse',
+    copyOutput: 'Copier la sortie',
+    questions: 'Questions',
+    answered: '{count} répondues',
+    ignored: 'Questions ignorées',
+    themeToggle: 'Basculer entre le thème clair et sombre',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  ja: {
+    copy: 'コピー',
+    copyMessage: 'メッセージをコピー',
+    copyAnswer: '返信をコピー',
+    copyOutput: '出力をコピー',
+    questions: '質問',
+    answered: '{count} 件回答済み',
+    ignored: '質問は無視されました',
+    themeToggle: 'ライトとダークのテーマを切り替え',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  ko: {
+    copy: '복사',
+    copyMessage: '메시지 복사',
+    copyAnswer: '답변 복사',
+    copyOutput: '출력 복사',
+    questions: '질문',
+    answered: '{count}개 답변됨',
+    ignored: '질문이 무시됨',
+    themeToggle: '밝은 테마와 어두운 테마 전환',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  pl: {
+    copy: 'Kopiuj',
+    copyMessage: 'Kopiuj wiadomość',
+    copyAnswer: 'Kopiuj odpowiedź',
+    copyOutput: 'Kopiuj wynik',
+    questions: 'Pytania',
+    answered: 'odpowiedziano na {count}',
+    ignored: 'Pytania pominięte',
+    themeToggle: 'Przełącz jasny i ciemny motyw',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  'pt-BR': {
+    copy: 'Copiar',
+    copyMessage: 'Copiar mensagem',
+    copyAnswer: 'Copiar resposta',
+    copyOutput: 'Copiar saída',
+    questions: 'Perguntas',
+    answered: '{count} respondidas',
+    ignored: 'Perguntas ignoradas',
+    themeToggle: 'Alternar tema claro e escuro',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  uk: {
+    copy: 'Копіювати',
+    copyMessage: 'Копіювати повідомлення',
+    copyAnswer: 'Копіювати відповідь',
+    copyOutput: 'Копіювати вивід',
+    questions: 'Питання',
+    answered: 'відповідей: {count}',
+    ignored: 'Питання проігноровано',
+    themeToggle: 'Перемкнути світлу й темну тему',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  'zh-CN': {
+    copy: '复制',
+    copyMessage: '复制消息',
+    copyAnswer: '复制回复',
+    copyOutput: '复制输出',
+    questions: '问题',
+    answered: '已回答 {count} 个',
+    ignored: '问题已忽略',
+    themeToggle: '切换浅色或深色主题',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
+  'zh-TW': {
+    copy: '複製',
+    copyMessage: '複製訊息',
+    copyAnswer: '複製回覆',
+    copyOutput: '複製輸出',
+    questions: '問題',
+    answered: '已回答 {count} 個',
+    ignored: '問題已忽略',
+    themeToggle: '切換淺色或深色主題',
+    github: 'GitHub',
+    logo: 'Pichamber',
+  },
 };
+
+const normalizeExportLocale = (value) => {
+  const normalized = asTrimmedString(value).toLowerCase().replace(/_/g, '-');
+  if (!normalized) return 'en';
+  if (normalized === 'zh-cn' || normalized === 'zh-hans' || normalized.startsWith('zh-hans-')) return 'zh-CN';
+  if (normalized === 'zh-tw' || normalized === 'zh-hant' || normalized.startsWith('zh-hant-')) return 'zh-TW';
+  if (normalized.startsWith('zh')) return 'zh-CN';
+  if (normalized === 'pt-br' || normalized.startsWith('pt-br-') || normalized === 'pt') return 'pt-BR';
+  const base = normalized.split('-')[0];
+  if (Object.hasOwn(EXPORT_LOCALES, normalized)) return normalized;
+  if (Object.hasOwn(EXPORT_LOCALES, base)) return base;
+  return 'en';
+};
+
+const exportStrings = (locale) => EXPORT_LOCALES[normalizeExportLocale(locale)] || EXPORT_LOCALES.en;
+
+const interpolate = (template, params) => String(template ?? '').replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? ''));
+
+const stripVersionPrefix = (value) => asTrimmedString(value).replace(/^[^\d]*/, '');
+
+export const readPiCodingAgentVersion = () => {
+  try {
+    const version = stripVersionPrefix(require('@earendil-works/pi-coding-agent/package.json')?.version);
+    if (version) return version;
+  } catch {
+    // Fall through to the workspace dependency pin.
+  }
+  try {
+    const version = stripVersionPrefix(require('../../../package.json')?.dependencies?.['@earendil-works/pi-coding-agent']);
+    if (version) return version;
+  } catch {
+    // One failed lookup must not empty the export.
+  }
+  return '';
+};
+
+const PICHAMBER_REPO_HREF = 'https://github.com/birdmichael/pichamber';
+const EXPORT_THEME_KEY = 'pichamber-export-theme';
+
+const PICHAMBER_MARK_SVG = `<svg class="pichamber-mark" viewBox="0 0 100 100" width="16" height="16" fill="none" aria-hidden="true"><path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)" fill="currentColor"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></g></svg>`;
+
+const PI_PIXEL_MARK_SVG = `<svg class="pi-mark" viewBox="-235 -235 470 470" width="14" height="14" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></svg>`;
+
+const GITHUB_ICON_SVG = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>`;
+
+const THEME_ICON_SVG = `<svg class="icon-sun" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.6"/><path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1"/></svg><svg class="icon-moon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12.6 10.2A5.6 5.6 0 0 1 5.8 3.4 5.6 5.6 0 1 0 12.6 10.2Z"/></svg>`;
+
+const STAR_ICON_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1.4 9.9 5.3l4.3.6-3.1 3 0.7 4.3L8 11.2 4.2 13.2l.7-4.3-3.1-3 4.3-.6Z"/></svg>`;
+
+const safeBlock = (render) => {
+  try {
+    return render() || '';
+  } catch {
+    return '';
+  }
+};
+
+const formatTurnDuration = (durationMs) => {
+  if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0) return '';
+  const totalSeconds = durationMs / 1000;
+  if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  return `${minutes}m ${seconds}s`;
+};
+
+const lastUsableModelLabel = (sources) => {
+  for (let index = sources.length - 1; index >= 0; index -= 1) {
+    const label = formatModelLabel(sources[index]);
+    if (label) return label;
+  }
+  return '';
+};
+
+const lastUsableModelId = (sources) => {
+  for (let index = sources.length - 1; index >= 0; index -= 1) {
+    const resolved = resolveUsableFacadeModel(sources[index]);
+    if (resolved?.modelID) return resolved.modelID;
+  }
+  return '';
+};
+
+const isPlanInfo = (info) => {
+  const mode = asTrimmedString(info?.mode).toLowerCase();
+  const agent = asTrimmedString(info?.agent).toLowerCase();
+  return mode === 'plan' || agent === 'plan';
+};
+
+const copyButton = (label, text) => (
+  `<button type="button" class="copy" data-copy="${escapeHtml(text)}" aria-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`
+);
 
 const htmlFromFilePart = (part) => {
   const image = toPiImageContent(part);
@@ -919,161 +1121,463 @@ const htmlFromFilePart = (part) => {
   return '';
 };
 
-const toolInputPreview = (input) => {
-  const keys = Object.keys(input);
-  if (keys.length === 1 && typeof input[keys[0]] === 'string') {
-    return input[keys[0]];
+const toolSubtitle = (input) => {
+  if (!isRecord(input)) return '';
+  for (const key of ['command', 'path', 'filePath', 'file_path', 'target']) {
+    if (typeof input[key] === 'string' && input[key].trim()) return input[key].trim();
   }
-  return formatJsonForPre(input);
+  const keys = Object.keys(input);
+  if (keys.length === 1 && typeof input[keys[0]] === 'string') return input[keys[0]];
+  return '';
 };
 
-const htmlFromToolPart = (part) => {
+const isQuestionToolName = (name) => {
+  const tool = asTrimmedString(name).toLowerCase();
+  return tool === 'question' || tool === 'plan_mode_question';
+};
+
+const answersFromUnknown = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (Array.isArray(item)) return item.map((part) => String(part)).filter(Boolean).join(', ');
+      if (typeof item === 'string') return item;
+      if (isRecord(item) && typeof item.answer === 'string') return item.answer;
+      return '';
+    });
+  }
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  if (value === true) return ['true'];
+  if (value === false) return ['false'];
+  return [];
+};
+
+const parseAnsweredQuestionOutput = (output) => {
+  const text = String(output ?? '');
+  const match = text.match(/User has answered your questions:\s*(.+?)(?:\.\s*You can now|$)/s);
+  if (!match) return [];
+  const pairs = [];
+  const pairRegex = /"([^"]+)"="([^"]*)"/g;
+  let pairMatch = pairRegex.exec(match[1]);
+  while (pairMatch) {
+    pairs.push({ question: pairMatch[1], answer: pairMatch[2] });
+    pairMatch = pairRegex.exec(match[1]);
+  }
+  return pairs;
+};
+
+const questionItemsFromToolPart = (part) => {
+  const input = isRecord(part?.state?.input) ? part.state.input : {};
+  const metadata = isRecord(part?.state?.metadata) ? part.state.metadata : {};
+  const output = typeof part?.state?.output === 'string' ? part.state.output : '';
+  const error = typeof part?.state?.error === 'string' ? part.state.error : '';
+  const status = asTrimmedString(part?.state?.status);
+  const cancelled = status === 'error' || status === 'cancelled'
+    || /dismissed|cancelled|canceled|ignored/i.test(error);
+  const questions = Array.isArray(input.questions) ? input.questions : [];
+  const parsed = parseAnsweredQuestionOutput(output);
+  const answers = Array.isArray(metadata.answers) ? metadata.answers : [];
+  if (questions.length > 0) {
+    return questions.map((item, index) => {
+      const question = asTrimmedString(item?.question || item?.title || item?.header) || asTrimmedString(item);
+      const fromMeta = answersFromUnknown(answers[index]).filter(Boolean).join(', ');
+      const fromParsed = parsed[index]?.answer || '';
+      return {
+        question,
+        answer: fromMeta || fromParsed,
+        cancelled: cancelled && !fromMeta && !fromParsed,
+      };
+    }).filter((item) => item.question);
+  }
+  if (parsed.length > 0) {
+    return parsed.map((item) => ({ ...item, cancelled: false }));
+  }
+  const title = asTrimmedString(input.title || part?.title);
+  if (title) {
+    const answer = answersFromUnknown(metadata.answers ?? metadata.value).filter(Boolean).join(', ');
+    return [{ question: title, answer, cancelled: cancelled && !answer }];
+  }
+  return [];
+};
+
+const questionItemsFromUiPrompt = (prompt) => {
+  if (!isRecord(prompt)) return [];
+  const kind = asTrimmedString(prompt.kind).toLowerCase();
+  if (kind && kind !== 'select' && kind !== 'confirm') return [];
+  const status = asTrimmedString(prompt.status).toLowerCase();
+  const cancelled = status === 'cancelled' || status === 'canceled';
+  const question = asTrimmedString(prompt.title || prompt.message || prompt.question);
+  if (!question) return [];
+  const answer = answersFromUnknown(prompt.value ?? prompt.answer).filter(Boolean).join(', ');
+  return [{ question, answer, cancelled: cancelled && !answer }];
+};
+
+const collectQuestionItems = (entry, extras = []) => {
+  const items = [];
+  for (const part of Array.isArray(entry?.parts) ? entry.parts : []) {
+    if (!part || typeof part !== 'object') continue;
+    if (part.type === 'tool' && isQuestionToolName(part.tool)) {
+      items.push(...questionItemsFromToolPart(part));
+      continue;
+    }
+    if (part.type === 'ui' || part.type === 'question' || part.type === 'select') {
+      items.push(...questionItemsFromUiPrompt(part));
+    }
+  }
+  for (const prompt of extras) items.push(...questionItemsFromUiPrompt(prompt));
+  return items;
+};
+
+const htmlFromQuestionItems = (items, strings) => {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  const answered = items.filter((item) => asTrimmedString(item.answer));
+  if (answered.length === 0) return '';
+  const countLabel = interpolate(strings.answered, { count: answered.length });
+  const rows = answered.map((item) => {
+    const question = escapeHtml(item.question);
+    const answer = asTrimmedString(item.answer);
+    return `<div class="qa-row"><div class="qa-q">${question}</div>${
+      answer ? `<div class="qa-a">${escapeHtml(answer)}</div>` : ''
+    }</div>`;
+  }).join('');
+  return `<details class="questions" open><summary><span class="q-label">${escapeHtml(strings.questions)}</span> <span class="q-count">${escapeHtml(countLabel)}</span></summary><div class="qa-list">${rows}</div></details>`;
+};
+
+const htmlFromToolPart = (part, strings) => {
+  if (isQuestionToolName(part?.tool)) return '';
   const name = escapeHtml(asTrimmedString(part?.tool) || 'tool');
   const status = asTrimmedString(part?.state?.status);
   const input = isRecord(part?.state?.input) ? part.state.input : {};
   const output = typeof part?.state?.output === 'string' ? part.state.output : '';
   const error = typeof part?.state?.error === 'string' ? part.state.error : '';
   const isError = status === 'error';
-  const preview = Object.keys(input).length > 0
-    ? ` <span class="tool-input">${escapeHtml(toolInputPreview(input))}</span>`
-    : '';
-  const result = isError
-    ? (error || output || 'tool error')
-    : output;
+  const subtitle = escapeHtml(toolSubtitle(input));
+  const result = isError ? (error || output || 'tool error') : output;
   return [
-    `<section class="tool${isError ? ' error' : ''}">`,
-    `<p class="tool-line"><strong class="tool-name">${name}</strong>${preview}</p>`,
-    result ? `<pre class="tool-output">${escapeHtml(result)}</pre>` : '',
-    '</section>',
+    `<details class="tool${isError ? ' error' : ''}">`,
+    `<summary><span class="tool-name">${name}</span>${subtitle ? `<span class="tool-sub">${subtitle}</span>` : ''}</summary>`,
+    '<div class="tool-body">',
+    result ? copyButton(strings.copyOutput, result) : '',
+    result ? `<pre class="tool-output"><span class="tool-prompt">$</span> ${escapeHtml(result)}</pre>` : '',
+    '</div>',
+    '</details>',
   ].filter(Boolean).join('');
 };
 
 const htmlFromReasoningPart = (text) => {
   const body = asTrimmedString(text);
   if (!body) return '';
-  return `<details class="thinking"><summary>Thinking</summary><div class="thinking-body">${markdownToHtml(body)}</div></details>`;
+  return `<div class="thinking">${markdownToHtml(body)}</div>`;
 };
 
-const htmlFromMessageParts = (parts) => {
-  if (!Array.isArray(parts)) return '';
-  return parts.map((part) => {
-    if (!part || typeof part !== 'object') return '';
-    if (part.type === 'reasoning') return htmlFromReasoningPart(part.text);
+const htmlFromUserEntry = (entry, strings) => {
+  const parts = Array.isArray(entry?.parts) ? entry.parts : [];
+  const texts = [];
+  const media = [];
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
     if (part.type === 'text' && typeof part.text === 'string' && part.text) {
-      return `<div class="body">${markdownToHtml(part.text)}</div>`;
+      texts.push(part.text);
+      continue;
     }
-    if (part.type === 'tool') return htmlFromToolPart(part);
-    if (part.type === 'file' || part.type === 'image') return htmlFromFilePart(part);
-    return '';
-  }).filter(Boolean).join('\n');
+    if (part.type === 'file' || part.type === 'image') {
+      media.push(safeBlock(() => htmlFromFilePart(part)));
+    }
+  }
+  const text = texts.join('\n');
+  if (!text && media.filter(Boolean).length === 0) return '';
+  return [
+    '<div class="msg-user">',
+    '<div class="bubble">',
+    text ? `<div class="bubble-text">${escapeHtml(text).replace(/\n/g, '<br>\n')}</div>` : '',
+    media.filter(Boolean).join('\n'),
+    text ? copyButton(strings.copyMessage, text) : '',
+    '</div>',
+    '</div>',
+  ].filter(Boolean).join('');
 };
 
-const htmlFromMessageEntry = (entry) => {
-  const isAssistant = entry?.info?.role === 'assistant';
-  const usage = isAssistant ? formatUsageLine(entry?.info) : '';
-  const body = htmlFromMessageParts(entry?.parts);
-  if (!isAssistant) {
-    return `<article class="msg user">${body}</article>`;
+const htmlFromAssistantEntry = (entry, strings, extras = []) => {
+  const parts = Array.isArray(entry?.parts) ? entry.parts : [];
+  const thinking = [];
+  const answers = [];
+  const tools = [];
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
+    if (part.type === 'reasoning') {
+      thinking.push(safeBlock(() => htmlFromReasoningPart(part.text)));
+      continue;
+    }
+    if (part.type === 'text' && typeof part.text === 'string' && part.text) {
+      answers.push(part.text);
+      continue;
+    }
+    if (part.type === 'tool') {
+      tools.push(safeBlock(() => htmlFromToolPart(part, strings)));
+      continue;
+    }
+    if (part.type === 'file' || part.type === 'image') {
+      tools.push(safeBlock(() => htmlFromFilePart(part)));
+    }
   }
+  const answerText = answers.join('\n\n');
+  const questions = htmlFromQuestionItems(collectQuestionItems(entry, extras), strings);
   return [
-    '<article class="msg assistant">',
-    '<span class="gutter" aria-hidden="true">≡</span>',
-    '<div class="turn">',
-    body,
-    usage ? `<footer class="usage">${escapeHtml(usage)}</footer>` : '',
-    '</div>',
-    '</article>',
+    thinking.filter(Boolean).join('\n'),
+    questions,
+    tools.filter(Boolean).join('\n'),
+    answerText ? `<div class="body answer">${markdownToHtml(answerText)}${copyButton(strings.copyAnswer, answerText)}</div>` : '',
   ].filter(Boolean).join('\n');
 };
 
-const htmlFromSessionMeta = (record) => {
-  let model = '';
-  const messages = Array.isArray(record?.messages) ? record.messages : [];
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    model = formatModelLabel(messages[index]?.info);
-    if (model) break;
+const turnsFromMessages = (messages) => {
+  const turns = [];
+  let current = null;
+  for (const entry of Array.isArray(messages) ? messages : []) {
+    const role = entry?.info?.role;
+    if (role === 'user') {
+      current = { user: entry, assistants: [] };
+      turns.push(current);
+      continue;
+    }
+    if (role === 'assistant') {
+      if (!current) {
+        current = { user: null, assistants: [] };
+        turns.push(current);
+      }
+      current.assistants.push(entry);
+    }
   }
-  const date = formatShareDate(record?.info?.time?.created);
-  if (!model && !date) return '';
-  return `<p class="session-meta">${
-    model ? `<span class="session-model">${escapeHtml(model)}</span>` : ''
-  }${
-    date ? `<span class="session-date">${escapeHtml(date)}</span>` : ''
-  }</p>`;
+  return turns;
 };
 
-const SESSION_HTML_STYLES = `html { color-scheme: light; }
+const settledUiFromRecord = (record) => {
+  const buckets = [];
+  for (const key of ['settledUi', 'uiPrompts', 'extensionUIHistory']) {
+    if (Array.isArray(record?.[key])) buckets.push(...record[key]);
+  }
+  return buckets;
+};
+
+const htmlFromTurnMeta = (assistants) => {
+  if (!Array.isArray(assistants) || assistants.length === 0) return '';
+  const model = lastUsableModelId(assistants.map((entry) => entry?.info));
+  const plan = assistants.some((entry) => isPlanInfo(entry?.info));
+  let start = null;
+  let end = null;
+  for (const entry of assistants) {
+    const created = entry?.info?.time?.created;
+    const completed = entry?.info?.time?.completed;
+    if (typeof created === 'number' && Number.isFinite(created)) {
+      start = start == null ? created : Math.min(start, created);
+    }
+    if (typeof completed === 'number' && Number.isFinite(completed)) {
+      end = end == null ? completed : Math.max(end, completed);
+    }
+  }
+  const duration = start != null && end != null && end >= start ? formatTurnDuration(end - start) : '';
+  const bits = [
+    plan ? 'Plan' : '',
+    model,
+    duration,
+  ].filter(Boolean);
+  if (bits.length === 0) return '';
+  return `<footer class="turn-meta">${escapeHtml(bits.join(' · '))}</footer>`;
+};
+
+const htmlFromTurn = (turn, index, strings, extras) => {
+  const id = `turn-${index + 1}`;
+  const user = safeBlock(() => (turn.user ? htmlFromUserEntry(turn.user, strings) : ''));
+  const assistants = (turn.assistants || []).map((entry) => safeBlock(() => htmlFromAssistantEntry(entry, strings, extras)));
+  const meta = safeBlock(() => htmlFromTurnMeta(turn.assistants));
+  return `<article class="turn" id="${id}">\n${[user, ...assistants, meta].filter(Boolean).join('\n')}\n</article>`;
+};
+
+const htmlFromSessionMeta = (record, version) => {
+  const messages = Array.isArray(record?.messages) ? record.messages : [];
+  const model = lastUsableModelLabel(messages.map((entry) => entry?.info));
+  const date = formatShareDate(record?.info?.time?.created);
+  const versionLabel = asTrimmedString(version) ? `v${asTrimmedString(version)}` : '';
+  return `<div class="session-meta">
+<span class="session-version">${PI_PIXEL_MARK_SVG}${versionLabel ? `<span> ${escapeHtml(versionLabel)}</span>` : ''}</span>
+<span class="session-model">${STAR_ICON_SVG}${model ? `<span>${escapeHtml(model)}</span>` : ''}</span>
+<span class="session-date">${escapeHtml(date)}</span>
+</div>`;
+};
+
+const SESSION_HTML_STYLES = `:root {
+  color-scheme: light;
+  --bg-deep: #F8F7F7;
+  --bg-surface: #ffffff;
+  --text: #3A3A3A;
+  --text-strong: #1A1A1A;
+  --text-muted: #6B6B6B;
+  --text-faint: #A3A3A3;
+  --text-thinking: #8A8A8A;
+  --border: #E8E6E6;
+  --bubble: #F1F0F0;
+  --critical: #B42318;
+  --watermark: #D4D2D2;
+  --icon: #6B6B6B;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-deep: #131010;
+  --bg-surface: #1b1818;
+  --text: #f1ecec;
+  --text-strong: #f1ecec;
+  --text-muted: #b7b1b1;
+  --text-faint: #7f7979;
+  --text-thinking: #7f7979;
+  --border: #2d2828;
+  --bubble: #252121;
+  --critical: #f97066;
+  --watermark: #2d2828;
+  --icon: #b7b1b1;
+}
 * { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
 body {
-  margin: 0;
-  background: #F8F7F7;
-  color: #3A3A3A;
+  background: var(--bg-deep);
+  color: var(--text);
   font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   font-size: 13px;
   line-height: 1.7;
 }
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   height: 40px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 16px;
-  background: #fff;
-  border-bottom: 1px solid #E8E6E6;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
 }
-.mark {
-  width: 16px;
-  height: 16px;
-  background: #111;
-  border-radius: 4px;
+.brand {
+  display: inline-flex;
+  color: var(--text-strong);
+  text-decoration: none;
 }
+.pichamber-mark, .pi-mark { display: block; }
+.topbar-right { display: flex; align-items: center; gap: 4px; }
+.topbar-right a, .theme-toggle, .copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--icon);
+  text-decoration: none;
+  cursor: pointer;
+}
+.topbar-right a:hover, .theme-toggle:hover, .copy:hover { background: var(--bubble); color: var(--text-strong); }
+html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display: none; }
 .page {
   width: min(880px, 100%);
   min-height: calc(100vh - 40px);
   margin: 0 auto;
   padding: 20px 36px 56px;
-  background: #fff;
-  border: 1px solid #E8E6E6;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-top: 0;
 }
 .session-header { margin-bottom: 2rem; }
 .session-meta {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 0.75rem;
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.85rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
+  color: var(--text-muted);
 }
-.session-model { color: #6B6B6B; }
-.session-date { color: #A3A3A3; }
+.session-version, .session-model, .session-date { display: inline-flex; align-items: center; gap: 6px; }
+.session-version { justify-self: start; }
+.session-model { justify-self: center; }
+.session-date { justify-self: end; color: var(--text-faint); }
 .session-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 400;
-  color: #1A1A1A;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-strong);
 }
-.transcript { display: flex; flex-direction: column; gap: 2rem; }
-.msg.user { color: #3A3A3A; }
-.msg.assistant { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
-.gutter { color: #555; font-size: 12px; line-height: 1.7; }
-.turn { min-width: 0; }
+.transcript { display: flex; flex-direction: column; gap: 2.4rem; }
+.turn { scroll-margin-top: 56px; }
+.msg-user { display: flex; justify-content: flex-end; }
+.bubble {
+  position: relative;
+  max-width: min(560px, 86%);
+  padding: 10px 14px 28px;
+  background: var(--bubble);
+  border-radius: 16px;
+  color: var(--text);
+}
+.bubble-text { white-space: pre-wrap; word-break: break-word; }
+.bubble .copy, .body .copy, .tool-body .copy {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: auto;
+  height: auto;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.thinking { margin: 0.4rem 0 1rem; color: var(--text-thinking); font-size: 13px; }
+.thinking p { margin: 0.45rem 0; }
+.thinking p:first-child { margin-top: 0; }
+.questions, .tool { margin: 0.85rem 0; }
+.questions summary, .tool summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-muted);
+}
+.questions summary::-webkit-details-marker, .tool summary::-webkit-details-marker { display: none; }
+.q-label, .tool-name { font-weight: 650; color: var(--text-strong); }
+.q-count, .tool-sub { color: var(--text-faint); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.qa-list { margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.qa-q { color: var(--text-muted); }
+.qa-a { color: var(--text-strong); }
+.tool-body { position: relative; margin-top: 0.45rem; padding-bottom: 22px; }
+.tool-output {
+  margin: 0;
+  padding: 0;
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.tool-prompt { color: var(--text-faint); margin-right: 0.35rem; }
+.tool.error .tool-name, .tool.error .tool-sub, .tool.error .tool-output { color: var(--critical); }
+.body { position: relative; padding-bottom: 22px; }
 .body h1, .body h2, .body h3, .body h4, .body h5, .body h6 {
   margin: 1.15rem 0 0.4rem;
   font-size: 13px;
   font-weight: 650;
-  color: #1A1A1A;
+  color: var(--text-strong);
   line-height: 1.45;
 }
 .body p { margin: 0.55rem 0; }
 .body p:first-child { margin-top: 0; }
 .body ul, .body ol { margin: 0.5rem 0; padding-left: 1.25rem; }
 .body li { margin: 0.15rem 0; }
-.body a { color: #3A3A3A; }
-.body hr { border: 0; border-top: 1px solid #E8E6E6; margin: 1.15rem 0; }
-.body blockquote { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 2px solid #E8E6E6; color: #6B6B6B; }
+.body a { color: var(--text); }
+.body hr { border: 0; border-top: 1px solid var(--border); margin: 1.15rem 0; }
+.body blockquote { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 2px solid var(--border); color: var(--text-muted); }
 .body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
-.body th, .body td { border: 1px solid #E8E6E6; padding: 0.35rem 0.5rem; text-align: left; }
-.body th { color: #6B6B6B; font-weight: 650; }
+.body th, .body td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
+.body th { color: var(--text-muted); font-weight: 650; }
 .body pre {
   margin: 0.65rem 0;
   padding: 0;
@@ -1083,58 +1587,106 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
-.body code, .thinking-body code {
+.body code, .thinking code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
-.thinking { margin: 0 0 0.75rem; color: #8A8A8A; font-size: 12px; }
-.thinking summary { cursor: pointer; font-weight: 400; color: #8A8A8A; list-style: none; }
-.thinking summary::-webkit-details-marker { display: none; }
-.thinking summary::before { content: "▸ "; }
-.thinking[open] summary::before { content: "▾ "; }
-.thinking-body { margin-top: 0.35rem; color: #8A8A8A; }
-.tool { margin: 0.7rem 0; }
-.tool-line { margin: 0; }
-.tool-name { font-weight: 700; color: #1A1A1A; }
-.tool-input, .tool-output {
-  color: #8A8A8A;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-.tool-output { margin: 0.2rem 0 0; padding: 0; background: none; white-space: pre-wrap; word-break: break-word; }
-.tool.error .tool-name, .tool.error .tool-input, .tool.error .tool-output { color: #B42318; }
 .image { margin: 0.6rem 0; }
 .image img { max-width: 100%; height: auto; border-radius: 4px; }
-.image-omitted, .file-omitted { color: #8A8A8A; font-style: italic; }
-.usage { margin-top: 0.85rem; color: #A3A3A3; font-size: 11px; }
-.export-note { margin: 3rem 0 0; text-align: center; color: #B0B0B0; font-size: 11px; }`;
+.image-omitted, .file-omitted { color: var(--text-thinking); font-style: italic; }
+.turn-meta { margin-top: 0.85rem; color: var(--text-faint); font-size: 11px; }
+.ticks {
+  position: fixed;
+  top: 88px;
+  left: max(8px, calc(50% - 480px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 3;
+}
+.ticks a {
+  width: 14px;
+  height: 2px;
+  background: var(--text-faint);
+  opacity: 0.55;
+  text-indent: -999px;
+  overflow: hidden;
+}
+.ticks a.current { height: 3px; opacity: 1; background: var(--text-strong); }
+.page-footer { margin-top: 4rem; }
+.watermark {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(48px, 12vw, 92px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  color: var(--watermark);
+  user-select: none;
+}
+.ignored {
+  margin: 0.4rem 0 0;
+  text-align: right;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+@media (max-width: 960px) {
+  .ticks { display: none; }
+  .session-meta { grid-template-columns: 1fr; }
+  .session-model, .session-date { justify-self: start; }
+}`;
 
-export const buildSessionHtml = (record) => {
-  const title = escapeHtml(asTrimmedString(record?.info?.title) || 'Session');
-  const sessionMeta = htmlFromSessionMeta(record);
-  const blocks = (record?.messages || []).map((entry) => htmlFromMessageEntry(entry)).join('\n');
+const SESSION_HTML_BOOT = `!function(){try{var k=${JSON.stringify(EXPORT_THEME_KEY)};var s=localStorage.getItem(k);var t=(s==="light"||s==="dark")?s:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}}();`;
+
+const SESSION_HTML_SCRIPT = `!function(){var root=document.documentElement;var key=${JSON.stringify(EXPORT_THEME_KEY)};function theme(){return root.getAttribute("data-theme")==="dark"?"dark":"light";}function setTheme(next){root.setAttribute("data-theme",next);try{localStorage.setItem(key,next);}catch(e){}}document.querySelector("[data-theme-toggle]")?.addEventListener("click",function(){setTheme(theme()==="dark"?"light":"dark");});document.addEventListener("click",function(event){var button=event.target.closest("[data-copy]");if(!button)return;var text=button.getAttribute("data-copy")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text);return;}var area=document.createElement("textarea");area.value=text;document.body.appendChild(area);area.select();try{document.execCommand("copy");}catch(e){}area.remove();});var ticks=Array.prototype.slice.call(document.querySelectorAll(".ticks a"));var turns=ticks.map(function(tick){return document.getElementById(tick.getAttribute("href").slice(1));}).filter(Boolean);function mark(id){ticks.forEach(function(tick){tick.classList.toggle("current",tick.getAttribute("href")==="#"+id);});}if("IntersectionObserver" in window&&turns.length){var io=new IntersectionObserver(function(entries){var visible=entries.filter(function(entry){return entry.isIntersecting;}).sort(function(a,b){return b.intersectionRatio-a.intersectionRatio;})[0];if(visible)mark(visible.target.id);},{rootMargin:"-20% 0px -60% 0px",threshold:[0.1,0.4,0.8]});turns.forEach(function(turn){io.observe(turn);});if(turns[0])mark(turns[0].id);}ticks.forEach(function(tick){tick.addEventListener("click",function(){mark(tick.getAttribute("href").slice(1));});});}();`;
+
+export const buildSessionHtml = (record, options = {}) => {
+  const locale = normalizeExportLocale(options?.locale || record?.locale || record?.info?.locale);
+  const strings = exportStrings(locale);
+  const rawTitle = asTrimmedString(record?.info?.title) || 'Session';
+  const title = escapeHtml(rawTitle);
+  const version = asTrimmedString(options?.piVersion) || readPiCodingAgentVersion();
+  const extras = settledUiFromRecord(record);
+  const turns = turnsFromMessages(record?.messages);
+  const cancelled = [
+    ...turns.flatMap((turn) => (turn.assistants || []).flatMap((entry) => collectQuestionItems(entry, extras))),
+    ...extras.flatMap((prompt) => questionItemsFromUiPrompt(prompt)),
+  ].some((item) => item.cancelled);
+  const articles = turns.map((turn, index) => htmlFromTurn(turn, index, strings, extras)).join('\n');
+  const ticks = turns.map((_, index) => `<a href="#turn-${index + 1}">${index + 1}</a>`).join('');
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(locale)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
+<script>${SESSION_HTML_BOOT}</script>
 <style>
 ${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>
-<header class="topbar"><span class="mark" aria-hidden="true"></span></header>
+<header class="topbar">
+<a class="brand" href="${PICHAMBER_REPO_HREF}" aria-label="${escapeHtml(strings.logo)}">${PICHAMBER_MARK_SVG}</a>
+<div class="topbar-right">
+<a href="${PICHAMBER_REPO_HREF}" aria-label="${escapeHtml(strings.github)}">${GITHUB_ICON_SVG}</a>
+<button type="button" class="theme-toggle" data-theme-toggle aria-label="${escapeHtml(strings.themeToggle)}">${THEME_ICON_SVG}</button>
+</div>
+</header>
+<nav class="ticks" aria-hidden="true">${ticks}</nav>
 <div class="page">
 <header class="session-header">
-${sessionMeta}
+${htmlFromSessionMeta(record, version)}
 <h1 class="session-title">${title}</h1>
 </header>
 <main class="transcript">
-${blocks}
+${articles}
 </main>
-<p class="export-note">Exported from Pichamber</p>
+<footer class="page-footer">
+<p class="watermark">pichamber</p>
+${cancelled ? `<p class="ignored">${escapeHtml(strings.ignored)}</p>` : ''}
+</footer>
 </div>
+<script>${SESSION_HTML_SCRIPT}</script>
 </body>
 </html>
 `;

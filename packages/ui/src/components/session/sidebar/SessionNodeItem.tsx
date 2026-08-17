@@ -255,7 +255,7 @@ const QuickSessionAction = React.memo(function QuickSessionAction({
 
 function SessionNodeItemComponent(props: Props): React.ReactNode {
   streamPerfCount('ui.sidebar_session_node.render');
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const {
     node,
     depth = 0,
@@ -590,7 +590,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     try {
       const response = await runtimeFetch(`/api/session/${session.id}/export`, {
         method: 'GET',
-        query: { format },
+        query: { format, locale },
       });
       if (!response.ok) {
         toast.error(t('sessions.sidebar.session.export.failed'));
@@ -606,7 +606,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     } catch {
       toast.error(t('sessions.sidebar.session.export.failed'));
     }
-  }, [resolvedSession.title, session.id, t]);
+  }, [locale, resolvedSession.title, session.id, t]);
 
   const handleOpenMiniChatWindow = React.useCallback(() => {
     if (!sessionDirectory) return;

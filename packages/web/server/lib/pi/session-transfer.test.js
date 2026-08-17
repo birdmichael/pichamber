@@ -8,6 +8,7 @@ import {
   parseSessionImport,
   persistFacadeMessages,
   piMessagesFromFacadeEntry,
+  readPiCodingAgentVersion,
   resolveUsableFacadeModel,
 } from './session-transfer.js';
 
@@ -143,7 +144,7 @@ describe('session-transfer', () => {
     ]);
   });
 
-  it('exports a skill-reading turn and image as standalone HTML with distinct blocks', () => {
+  it('exports a skill-reading turn and image as standalone HTML with preview chrome', () => {
     const record = {
       id: 'ses_export_rich',
       directory: '/tmp/project',
@@ -161,7 +162,8 @@ describe('session-transfer', () => {
             id: 'msg_asst',
             role: 'assistant',
             parentID: 'msg_user',
-            time: { created: 1_700_000_000_200 },
+            mode: 'plan',
+            time: { created: 1_700_000_000_200, completed: 1_700_000_178_200 },
             providerID: 'example-provider',
             modelID: 'example-model',
             model: { providerID: 'example-provider', modelID: 'example-model' },
@@ -182,42 +184,74 @@ describe('session-transfer', () => {
                 output: '---\nname: using-superpowers\n---\n',
               },
             },
+            {
+              id: 'prt_q',
+              type: 'tool',
+              callID: 'c_q',
+              tool: 'question',
+              state: {
+                status: 'completed',
+                input: {
+                  questions: [{ question: 'Which path?', options: [{ label: 'SKILL.md' }] }],
+                },
+                output: 'User has answered your questions: "Which path?"="SKILL.md". You can now continue.',
+                metadata: { answers: [['SKILL.md']] },
+              },
+            },
           ],
         },
       ],
     };
 
-    const html = buildSessionHtml(record);
+    const html = buildSessionHtml(record, { locale: 'zh-CN' });
+    const version = readPiCodingAgentVersion();
     expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('lang="zh-CN"');
     expect(html).toContain('<h1 class="session-title">Skill and image</h1>');
     expect(html).toContain('class="topbar"');
+    expect(html).toContain('class="pichamber-mark"');
+    expect(html).toContain('class="pi-mark"');
+    expect(html).toContain('data-theme-toggle');
+    expect(html).toContain('pichamber-export-theme');
+    expect(html).toContain('https://github.com/birdmichael/pichamber');
     expect(html).toContain('class="session-header"');
-    expect(html).toContain('class="msg user"');
-    expect(html).toContain('class="gutter"');
-    expect(html).toContain('background: #F8F7F7');
-    expect(html).not.toContain('class="bubble"');
+    expect(html).toContain('class="bubble"');
+    expect(html).toContain('class="ticks"');
+    expect(html).toContain('href="#turn-1"');
+    expect(html).toContain('--bg-deep: #F8F7F7');
+    expect(html).toContain('--bg-deep: #131010');
     expect(html).not.toContain('background: #0c0c0e');
     expect(html).toContain('see this');
     expect(html).toContain('<img src="data:image/png;base64,AAAA"');
-    expect(html).toContain('<details class="thinking">');
-    expect(html).toContain('<summary>Thinking</summary>');
+    expect(html).toContain('class="thinking"');
+    expect(html).not.toContain('<details class="thinking">');
+    expect(html).not.toContain('<summary>Thinking</summary>');
     expect(html).toContain('load skills');
     expect(html).toContain('reading');
-    expect(html).toContain('<section class="tool">');
-    expect(html).toContain('<strong class="tool-name">read</strong>');
+    expect(html).toContain('<details class="tool">');
+    expect(html).toContain('<span class="tool-name">read</span>');
     expect(html).toContain('SKILL.md');
+    expect(html).toContain('<span class="tool-prompt">$</span>');
     expect(html).toContain('using-superpowers');
     expect(html).toContain('example-provider/example-model');
-    expect(html).toContain('1200 in');
-    expect(html).toContain('80 out');
-    expect(html).toContain('$0.002');
+    expect(html).not.toContain('pi/pi');
+    expect(html).toContain('Plan · example-model · 2m 58s');
     expect(html).toContain('14 Nov 2023, 22:13');
-    expect(html).toContain('Exported from Pichamber');
-    expect(html).not.toMatch(/<article class="msg assistant">[\s\S]*<pre>load skills[\s\S]*reading/);
+    expect(html).toContain('class="watermark">pichamber</p>');
+    expect(html).toContain('问题');
+    expect(html).toContain('已回答 1 个');
+    expect(html).toContain('Which path?');
+    expect(html).toContain('复制回复');
+    expect(html).toContain('data-copy="reading"');
+    expect(html).toContain('data-copy="see this"');
+    if (version) expect(html).toContain(`v${version}`);
+    expect(html).not.toMatch(/<div class="body answer">[\s\S]*load skills/);
     expect(html).not.toMatch(/cdn\.|unpkg\.|jsdelivr|https:\/\/cdn/i);
     expect(html).not.toContain('session.share');
     expect(html).not.toContain('opncd.ai');
     expect(html).not.toContain('opencode');
+    expect(html).not.toContain('anomalyco');
+    expect(html).not.toContain('discord');
   });
 
   it('renders Markdown text and labels remote images instead of embedding them', () => {
@@ -226,6 +260,17 @@ describe('session-transfer', () => {
       messages: [
         {
           info: { role: 'user', time: { created: 1_700_000_000_100 } },
+          parts: [{
+            type: 'text',
+            text: 'plain user note',
+          }, {
+            type: 'file',
+            mime: 'image/png',
+            url: 'https://example.com/remote.png',
+          }],
+        },
+        {
+          info: { role: 'assistant', time: { created: 1_700_000_000_200 } },
           parts: [{
             type: 'text',
             text: [
@@ -245,14 +290,6 @@ describe('session-transfer', () => {
               '![shot](https://example.com/a.png)',
             ].join('\n'),
           }, {
-            type: 'file',
-            mime: 'image/png',
-            url: 'https://example.com/remote.png',
-          }],
-        },
-        {
-          info: { role: 'assistant', time: { created: 1_700_000_000_200 } },
-          parts: [{
             type: 'tool',
             callID: 'c_err',
             tool: 'bash',
@@ -273,12 +310,41 @@ describe('session-transfer', () => {
     expect(html).toContain('Image omitted (remote URL)');
     expect(html).not.toContain('src="https://example.com/remote.png"');
     expect(html).not.toContain('src="https://example.com/a.png"');
-    expect(html).toContain('<section class="tool error">');
-    expect(html).toContain('<strong class="tool-name">bash</strong>');
+    expect(html).toContain('<details class="tool error">');
+    expect(html).toContain('<span class="tool-name">bash</span>');
     expect(html).toContain('not found');
-    expect(html).toContain('class="msg user"');
-    expect(html).toContain('background: #F8F7F7');
-    expect(html).not.toContain('class="bubble"');
+    expect(html).toContain('class="bubble"');
+    expect(html).toContain('plain user note');
+    expect(html).toContain('--bg-deep: #F8F7F7');
+  });
+
+  it('keeps a cancelled ctx.ui question as ignored footer copy and does not empty the file', () => {
+    const html = buildSessionHtml({
+      info: { title: 'Cancelled question' },
+      messages: [{
+        info: { role: 'assistant', providerID: 'example-provider', modelID: 'example-model' },
+        parts: [{
+          type: 'text',
+          text: 'still here',
+        }, {
+          type: 'tool',
+          tool: 'question',
+          state: {
+            status: 'error',
+            input: { questions: [{ question: 'Continue?' }] },
+            error: 'The user dismissed this question',
+          },
+        }],
+      }],
+      settledUi: [{
+        kind: 'select',
+        title: 'Continue?',
+        status: 'cancelled',
+      }],
+    }, { locale: 'zh-CN' });
+    expect(html).toContain('still here');
+    expect(html).toContain('问题已忽略');
+    expect(html).toContain('example-provider/example-model');
   });
 
   it('escapes HTML in exported text and rejects javascript links', () => {
