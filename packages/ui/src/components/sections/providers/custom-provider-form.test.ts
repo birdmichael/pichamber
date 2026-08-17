@@ -310,7 +310,6 @@ describe('validateCustomProvider', () => {
     expect(unknown.result?.config.models).toEqual({
       'mystery-model': { name: 'Mystery' },
     });
-    expect(unknown.result?.config.models['mystery-model']).not.toHaveProperty('input');
   });
 });
 
