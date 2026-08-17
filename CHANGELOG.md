@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Git: Desktop Git can open the create-pull-request form when the branch has no GitHub PR yet. The numbered PR chip still opens an existing PR.
 - Desktop: opening Plan keeps the chat and composer visible. Plan stays a right-hand side panel instead of covering the window.
 - **Settings:** opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.
 - Chat: on Pi, Plan Discard stays disabled while the panel still says “No plan yet”. The confirm dialog only appears when a ready or saved plan exists.
