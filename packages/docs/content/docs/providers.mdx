@@ -1,11 +1,11 @@
 ---
 title: Providers, Models & Agents
-description: Connect AI providers, pick models, and set up agents.
+description: Connect AI providers, pick models, and use the built-in Pi agent.
 ---
 
 # Providers, Models & Agents
 
-Before OpenChamber can do anything, it needs at least one AI provider connected. This page covers connecting a provider, choosing a model, and tailoring agents.
+Before OpenChamber can do anything, it needs at least one AI provider connected. This page covers connecting a provider, choosing a model, and how the built-in Pi agent works.
 
 ## Connect a provider
 
@@ -36,20 +36,19 @@ To disconnect, open the provider and choose to remove its sign-in.
 You pick the model where you're working:
 
 - in chat, use the model picker in the message bar to set the provider and model for that session
-- per agent, set a default model (below)
+- in **Settings → Session Defaults**, set the default model and thinking
 
-## Set up agents
+## The built-in agent
 
-An agent is a named setup — a model, a personality, and what it's allowed to do.
+Pichamber uses one built-in agent (`pi`). **Settings → Agents** is hidden on Pi. You do not create extra agents or personalities there.
 
-1. Open **Settings → Agents**.
-2. Pick an agent, or create a new one.
-3. Edit any of:
-   - **description** — what the agent is for
-   - **model** — its default model
-   - **temperature** — how creative its answers are
-   - **prompt** — standing instructions it always follows
-   - **tool rules** — which tools it may use
+Use these instead:
+
+- **Model and thinking** — chat message bar, or **Settings → Session Defaults**
+- **Plan** — a session mode on the same agent. Install and enable it under **Settings → Feature Plugins**. The composer then shows **Agent / Plan**.
+- **Subagents** — extra workers via Feature Plugins **Subagents** and `/run`, not extra Settings agents
+
+On the leftover OpenCode kernel (`OPENCHAMBER_KERNEL=opencode`), **Settings → Agents** is still where you create and edit named agents.
 
 ## Where your sign-ins live
 

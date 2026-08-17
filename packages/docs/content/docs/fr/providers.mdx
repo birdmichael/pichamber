@@ -1,11 +1,11 @@
 ---
 title: Fournisseurs, modèles et agents
-description: Connectez des fournisseurs IA, choisissez des modèles et configurez des agents.
+description: Connectez des fournisseurs IA, choisissez des modèles et utilisez l’agent Pi intégré.
 ---
 
 # Fournisseurs, modèles et agents
 
-Avant qu’OpenChamber puisse faire quoi que ce soit, au moins un fournisseur IA doit être connecté. Cette page explique comment connecter un fournisseur, choisir un modèle et adapter les agents.
+Avant qu’OpenChamber puisse faire quoi que ce soit, au moins un fournisseur IA doit être connecté. Cette page explique comment connecter un fournisseur, choisir un modèle et comment fonctionne l’agent Pi intégré.
 
 ## Connecter un fournisseur
 
@@ -24,20 +24,19 @@ Pour vous déconnecter, ouvrez le fournisseur et choisissez de supprimer sa conn
 Vous choisissez le modèle là où vous travaillez :
 
 - dans le chat, utilisez le sélecteur de modèle dans la barre de message pour définir le fournisseur et le modèle de cette session
-- par agent, définissez un modèle par défaut (ci-dessous)
+- dans **Paramètres → Session Defaults**, définissez le modèle et le thinking par défaut
 
-## Configurer des agents
+## L’agent intégré
 
-Un agent est une configuration nommée — un modèle, une personnalité et ce qu’il est autorisé à faire.
+Pichamber utilise un seul agent intégré (`pi`). **Paramètres → Agents** est masqué sur Pi. Vous n’y créez pas d’agents ou de personnalités supplémentaires.
 
-1. Ouvrez **Paramètres → Agents**.
-2. Choisissez un agent ou créez-en un nouveau.
-3. Modifiez au besoin :
-   - **description** — à quoi sert l’agent
-   - **model** — son modèle par défaut
-   - **temperature** — le niveau de créativité de ses réponses
-   - **prompt** — les instructions permanentes qu’il suit toujours
-   - **tool rules** — les outils qu’il peut utiliser
+Utilisez plutôt :
+
+- **Modèle et thinking** — barre de message du chat, ou **Paramètres → Session Defaults**
+- **Plan** — un mode de session sur le même agent. Installez-le et activez-le dans **Paramètres → Feature Plugins**. Le compositeur affiche alors **Agent / Plan**.
+- **Subagents** — des workers supplémentaires via Feature Plugins **Subagents** et `/run`, pas des agents Settings supplémentaires
+
+Sur le noyau OpenCode restant (`OPENCHAMBER_KERNEL=opencode`), **Paramètres → Agents** reste l’endroit où créer et modifier des agents nommés.
 
 ## Où vivent vos connexions
 
