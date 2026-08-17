@@ -796,6 +796,17 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   app.post('/api/pi/sessions/reload', parseJson, handle(piReloadSessionRecords));
   app.post('/api/session/:sessionID/reload-records', parseJson, handle(piReloadSessionRecords));
 
+  app.post('/api/pi/sessions/reload-idle', handle(async (_req, res) => {
+    const result = typeof host.reloadIdleSessions === 'function'
+      ? await host.reloadIdleSessions()
+      : { reloaded: [], skipped: [], kernel: 'pi' };
+    json(res, 200, {
+      success: true,
+      kernel: 'pi',
+      ...result,
+    });
+  }));
+
   app.post('/api/session/:sessionID/command', parseJson, handle(async (req, res) => {
     if (typeof host.runCommand === 'function') {
       json(res, 200, await host.runCommand(req.params.sessionID, req.body || {}));

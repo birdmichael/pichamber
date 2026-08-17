@@ -49,6 +49,7 @@ import {
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
 import { buildHealthSnapshot, createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
+import { createPichamberWebTool } from './lib/pi/pichamber-web-tool.js';
 import { createOpenCodeEnvRuntime } from './lib/opencode/env-runtime.js';
 import { resolveOpenCodeEnvConfig } from './lib/opencode/env-config.js';
 import { createHmrStateRuntime } from './lib/opencode/hmr-state-runtime.js';
@@ -745,6 +746,13 @@ const piKernel = piKernelEnabled
   ? createPiKernel({
       defaultDirectory: process.cwd(),
       mock: isPiMockEnabled(),
+      getCustomTools: async () => {
+        const settings = await readSettingsFromDiskMigrated().catch(() => null);
+        if (settings?.agentWebToolEnabled === false) return undefined;
+        return [createPichamberWebTool({
+          executeAction: (...args) => openChamberControlService.execute(...args),
+        })];
+      },
     })
   : null;
 if (piKernel) {

@@ -8,21 +8,25 @@ import {
 import { toast } from '@/components/ui';
 import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
 import { updateDesktopSettings } from '@/lib/persistence';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { shouldShowAgentControlToolSettings } from '@/lib/settings/pichamberToolsVisibility';
 
 /**
- * Which OpenChamber capabilities agents are given.
+ * Which host tools agents are given.
  *
- * Each entry is one tool the managed OpenCode child is handed, so the choices
- * belong together and not under the CLI's own configuration — the binary path
- * is about which OpenCode runs, these are about what it can do.
+ * On leftover OpenCode this is the managed-child plugin set. On Pi Desktop
+ * only the Web tool row is shown; agent-control is #186.
  *
- * A toggle is written immediately, then Pi is reloaded so the change
- * reaches agents without a deferred restart banner.
+ * A toggle is written immediately, then idle Pi sessions reload (or leftover
+ * OpenCode restarts) so the change reaches agents without a deferred banner.
  */
 export const OpenChamberToolsSettings: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentControl = shouldShowAgentControlToolSettings({ isPiKernel });
   const agentControlToolEnabled = useUIStore((state) => state.agentControlToolEnabled);
   const setAgentControlToolEnabled = useUIStore((state) => state.setAgentControlToolEnabled);
   const agentWebToolEnabled = useUIStore((state) => state.agentWebToolEnabled);
@@ -51,9 +55,20 @@ export const OpenChamberToolsSettings: React.FC = () => {
     void (async () => {
       try {
         await updateDesktopSettings({ agentWebToolEnabled: enabled });
-        await reloadOpenCodeConfiguration({
-          message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
-        });
+        if (isPiKernel) {
+          const response = await runtimeFetch('/api/pi/sessions/reload-idle', {
+            method: 'POST',
+            headers: { Accept: 'application/json' },
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null) as { error?: string } | null;
+            throw new Error(payload?.error || t('settings.view.pendingRestart.applyFailed'));
+          }
+        } else {
+          await reloadOpenCodeConfiguration({
+            message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
+          });
+        }
         toast.success(t('settings.openchamber.opencodeCli.toast.savedReloaded'));
       } catch (error) {
         const message = error instanceof Error && error.message
@@ -62,19 +77,21 @@ export const OpenChamberToolsSettings: React.FC = () => {
         toast.error(message);
       }
     })();
-  }, [setAgentWebToolEnabled, t]);
+  }, [isPiKernel, setAgentWebToolEnabled, t]);
 
   return (
     <SettingsSection title={t('settings.openchamber.tools.title')}>
       <div className={SETTINGS_OPTION_STACK_CLASS}>
-        <SettingsCheckboxRow
-          settingsItem="sessions.agent-control-tool"
-          checked={agentControlToolEnabled}
-          onChange={handleAgentControlToolChange}
-          label={t('settings.openchamber.tools.field.agentControlTool')}
-          ariaLabel={t('settings.openchamber.tools.field.agentControlToolAria')}
-          info={t('settings.openchamber.tools.field.agentControlToolInfo')}
-        />
+        {showAgentControl && (
+          <SettingsCheckboxRow
+            settingsItem="sessions.agent-control-tool"
+            checked={agentControlToolEnabled}
+            onChange={handleAgentControlToolChange}
+            label={t('settings.openchamber.tools.field.agentControlTool')}
+            ariaLabel={t('settings.openchamber.tools.field.agentControlToolAria')}
+            info={t('settings.openchamber.tools.field.agentControlToolInfo')}
+          />
+        )}
 
         <SettingsCheckboxRow
           settingsItem="sessions.agent-web-tool"

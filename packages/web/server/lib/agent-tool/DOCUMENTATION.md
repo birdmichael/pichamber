@@ -11,6 +11,11 @@ the user can want independently:
 - `openchamber_web` — looking at and interacting with the page in OpenChamber's
   browser panel. Enabled while `agentWebToolEnabled` is not `false`.
 
+The Pi kernel product name for the same browser rail is `pichamber_web`
+(see `packages/web/server/lib/pi/pichamber-web-tool.js`). This leftover
+OpenCode plugin may stay `openchamber_web` when
+`OPENCHAMBER_KERNEL=opencode`. Do not inject `openchamber_web` on Pi.
+
 Both default to on, are toggled in Settings → General → OpenCode CLI, and apply
 on the next managed OpenCode restart. Each tool carries only its own actions and
 only the parameters those actions use, so turning one off removes its inputs

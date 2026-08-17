@@ -1,5 +1,9 @@
 import type { I18nKey } from '@/lib/i18n/store';
 import { isSessionGoalVisibleOnPiKernel, shouldShowOpenCodeAgentPicker } from '@/lib/usePiKernel';
+import {
+  shouldShowAgentControlToolSettings,
+  shouldShowPichamberToolsSettings,
+} from './pichamberToolsVisibility';
 import type { SettingsPageSlug, SettingsRuntimeContext } from './metadata';
 import { getSettingsPageMeta, isSettingsPageAvailable } from './metadata';
 
@@ -489,15 +493,15 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
     descriptionKey: 'settings.openchamber.tools.field.agentControlToolInfo',
     keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'sessions', 'schedule', 'control'],
-    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode,
+    isAvailable: (ctx) => shouldShowAgentControlToolSettings({ isPiKernel: Boolean(ctx.isPiKernel) }) && !ctx.isVSCode,
   },
   {
     id: 'sessions.agent-web-tool',
     page: 'general',
     titleKey: 'settings.openchamber.tools.field.agentWebTool',
     descriptionKey: 'settings.openchamber.tools.field.agentWebToolInfo',
-    keywords: ['agent', 'tool', 'web', 'browser', 'page', 'preview', 'openchamber'],
-    isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode,
+    keywords: ['agent', 'tool', 'web', 'browser', 'page', 'preview', 'openchamber', 'pichamber', 'web tool'],
+    isAvailable: (ctx) => shouldShowPichamberToolsSettings({ isVSCode: Boolean(ctx.isVSCode) }),
   },
   {
     id: 'git.github-account',

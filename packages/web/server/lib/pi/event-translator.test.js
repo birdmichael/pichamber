@@ -99,6 +99,61 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.state.output).toBe('ok');
   });
 
+  it('maps pichamber_web tool_execution_* to a chat tool part', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    const envelope = JSON.stringify({
+      schemaVersion: 1,
+      ok: true,
+      action: 'browser.snapshot',
+      data: { url: 'https://example.test', title: 'Example' },
+    });
+    const start = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_web',
+      toolName: 'pichamber_web',
+      args: { action: 'browser.snapshot' },
+    });
+    const toolStart = start.find((event) => event.type === 'message.part.updated');
+    expect(toolStart.properties.part).toMatchObject({
+      type: 'tool',
+      tool: 'pichamber_web',
+      callID: 'call_web',
+      state: expect.objectContaining({ status: 'running', input: { action: 'browser.snapshot' } }),
+    });
+
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_web',
+      toolName: 'pichamber_web',
+      result: { content: [{ type: 'text', text: envelope }] },
+      isError: false,
+    });
+    expect(end[0].properties.part.tool).toBe('pichamber_web');
+    expect(end[0].properties.part.state.status).toBe('completed');
+    expect(end[0].properties.part.state.output).toBe(envelope);
+  });
+
+  it('maps a failed pichamber_web call to an error tool part', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_web_err',
+      toolName: 'pichamber_web',
+      args: { action: 'browser.open' },
+    });
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_web_err',
+      toolName: 'pichamber_web',
+      result: { content: [{ type: 'text', text: 'url is required' }] },
+      isError: true,
+    });
+    expect(end[0].properties.part.tool).toBe('pichamber_web');
+    expect(end[0].properties.part.state.status).toBe('error');
+  });
+
   it('copies tool result details onto part metadata so subagent session ids survive', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });

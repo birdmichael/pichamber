@@ -266,6 +266,69 @@ describe('OpenChamber control service', () => {
   });
 });
 
+describe('browser validation', () => {
+  const expectUsage = async (execute, message) => {
+    await expect(execute).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringMatching(message),
+    });
+  };
+
+  it('requires an absolute http(s) url for browser.open', async () => {
+    const request = vi.fn(async () => ({}));
+    const { service } = createService({ browserControl: { request } });
+    await expectUsage(service.execute('browser.open', {}), /url is required/);
+    await expectUsage(service.execute('browser.open', { url: 'javascript:alert(1)' }), /http or https/);
+    await expectUsage(service.execute('browser.open', { url: 'ftp://x' }), /http or https/);
+    await expectUsage(service.execute('browser.open', { url: '/path' }), /absolute http\(s\)/);
+    await expectUsage(
+      service.execute('browser.open', { url: 'https://a.test', viewport: 'phone' }),
+      /mobile, tablet, desktop, or fill/,
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('rejects incomplete or invalid drive actions before waking a client', async () => {
+    const request = vi.fn(async () => ({}));
+    const { service } = createService({ browserControl: { request } });
+    await expectUsage(service.execute('browser.resize', {}), /viewport is required/);
+    await expectUsage(service.execute('browser.click', {}), /selector or text/);
+    await expectUsage(service.execute('browser.type', { value: 'hi' }), /selector is required/);
+    await expectUsage(service.execute('browser.type', { selector: '#q' }), /value is required/);
+    await expectUsage(service.execute('browser.scroll', {}), /direction or selector/);
+    await expectUsage(service.execute('browser.scroll', { direction: 'left' }), /up, down, top, or bottom/);
+    await expectUsage(service.execute('browser.inspect', {}), /selector is required/);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('uses a longer timeout for open than for other browser actions', async () => {
+    const request = vi.fn(async () => ({}));
+    const { service } = createService({ browserControl: { request } });
+    await service.execute('browser.open', { url: 'https://example.test' });
+    await service.execute('browser.snapshot', {});
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      'browser.open',
+      { url: 'https://example.test/' },
+      expect.objectContaining({ timeoutMs: 45_000 }),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      'browser.snapshot',
+      {},
+      expect.objectContaining({ timeoutMs: 20_000 }),
+    );
+  });
+
+  it('fails fast when this server has no in-app browser', async () => {
+    const { service } = createService();
+    await expect(service.execute('browser.open', { url: 'https://example.test' })).rejects.toMatchObject({
+      statusCode: 503,
+      message: expect.stringMatching(/in-app browser is not available/),
+    });
+  });
+});
+
 describe('browser capture', () => {
   const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 

@@ -153,6 +153,41 @@ Skills stay `/skill:name` on the composer; they are not merged into this
 list as fake OpenCode agents. Chip-owned `/model` and `/thinking` stay off
 the list. OpenCode kernel routes are unchanged.
 
+## Desktop `pichamber_web`
+
+Desktop Electron Pi sessions receive a host-owned `defineTool` named
+`pichamber_web` (label **Pichamber Web**) when
+`agentWebToolEnabled !== false`. It is passed as `customTools` to both
+`createAgentSession` and `createAgentSessionFromServices`. The leftover
+OpenCode plugin name `openchamber_web` is not attached on the Pi kernel.
+
+The tool reuses the existing `browser.*` allowlist and
+`openChamberControlService` / browser-control broker. Actions:
+
+| Action | Inputs |
+|---|---|
+| `browser.open` | `url` (http/https), optional `viewport` (`mobile` / `tablet` / `desktop` / `fill`) |
+| `browser.snapshot` | optional `selector` |
+| `browser.click` | `selector` or visible `text` |
+| `browser.type` | `selector`, `value`, optional `submit` |
+| `browser.scroll` | `direction` (`up` / `down` / `top` / `bottom`) or `selector` |
+| `browser.back` | none |
+| `browser.forward` | none |
+| `browser.inspect` | `selector` |
+| `browser.capture` | optional `label`; writes under `.openchamber/screenshots/` |
+| `browser.resize` | `viewport` |
+
+Budgets stay `browser.open` 45s and 20s for the other actions. No Electron
+client claiming `browser=1` returns 503 immediately. Mobile, VS Code, and
+hosted web still cannot drive a page.
+
+Settings → Pichamber Tools shows only this Web row on Pi Desktop
+(agent-control is a later host tool). Toggle persist then
+`host.reloadIdleSessions()` / `POST /api/pi/sessions/reload-idle`. A busy
+session is skipped (409 on a targeted reload) and keeps the previous tool
+set until it is idle. Mock kernel sessions get the tool only when a test
+or the production getter injects it.
+
 ## Session reload
 
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
