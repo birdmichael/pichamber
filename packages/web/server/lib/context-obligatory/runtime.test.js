@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createEventTranslator } from '../pi/event-translator.js';
 import { createContextObligatoryRuntime } from './runtime.js';
 
 const json = (body) => new Response(JSON.stringify(body), {
@@ -72,6 +73,264 @@ describe('context obligatory runtime', () => {
     });
     await runtime.processPayload({ type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'idle' } } });
     expect(fetchImpl).not.toHaveBeenCalled();
+    runtime.stop();
+  });
+
+  it('injects after a Pi compaction_end session.compacted event even without an OpenCode summary message', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_1', createdAt: 10, role: 'user' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'provider', modelID: 'model', agent: 'build' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Keep me' }] });
+      if (url.pathname === '/session/ses_1/prompt_async') return json({});
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const translated = createEventTranslator({
+      sessionID: 'ses_1',
+      directory: '/tmp/project',
+      createEventId: () => 'evt_compacted',
+      now: () => 1_700_000_000_000,
+    }).translate({
+      type: 'compaction_end',
+      reason: 'manual',
+      result: { summary: 'kept recent turns' },
+      aborted: false,
+      willRetry: false,
+    });
+    const compacted = translated.find((event) => event.type === 'session.compacted');
+    expect(compacted).toMatchObject({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1', directory: '/tmp/project' },
+    });
+
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload(compacted);
+
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(prompt).toBeTruthy();
+    expect(JSON.parse(prompt.body).parts[0].text).toContain('Keep me');
+    const patch = requests.find((request) => request.method === 'PATCH');
+    expect(JSON.parse(patch.body).metadata.openchamber.context_obligatory_last_compaction_message_id)
+      .toBe('evt_compacted');
+    runtime.stop();
+  });
+
+  it('skips a 404 pin and still injects the remaining pinned text', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_gone', createdAt: 5, role: 'user' },
+            { id: 'msg_1', createdAt: 10, role: 'assistant' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'provider', modelID: 'model' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_gone') {
+        return new Response(JSON.stringify({ error: 'Message not found' }), { status: 404 });
+      }
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Still here' }] });
+      if (url.pathname === '/session/ses_1/prompt_async') return json({});
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(JSON.parse(prompt.body).parts[0].text).toContain('Still here');
+    expect(JSON.parse(prompt.body).parts[0].text).not.toContain('msg_gone');
+    runtime.stop();
+  });
+
+  it('does not prompt_async when a compact event has no pinned messages', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET' });
+      if (url.pathname === '/session/ses_1') return json({ id: 'ses_1', metadata: {} });
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    expect(requests).toEqual([{ path: '/session/ses_1', method: 'GET' }]);
+    runtime.stop();
+  });
+
+  it('resolves a real Pi model when leftover assistant info is pi/pi and does not treat unknown-model 400 as success', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_1', createdAt: 10, role: 'user' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'pi', modelID: 'pi', agent: 'pi' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Keep me' }] });
+      if (url.pathname === '/api/pi/defaults') {
+        return json({ model: '', resolvedModel: 'example-provider/example-model' });
+      }
+      if (url.pathname === '/session/ses_1/prompt_async') {
+        const body = JSON.parse(init.body || '{}');
+        if (body?.model?.providerID === 'pi' && body?.model?.modelID === 'pi') {
+          return new Response(JSON.stringify({ error: 'Unknown Pi model' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return json({});
+      }
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(prompt).toBeTruthy();
+    expect(JSON.parse(prompt.body).model).toEqual({
+      providerID: 'example-provider',
+      modelID: 'example-model',
+    });
+    const patch = requests.find((request) => request.method === 'PATCH');
+    expect(JSON.parse(patch.body).metadata.openchamber.context_obligatory_last_compaction_message_id)
+      .toBe('evt_compacted');
+    runtime.stop();
+  });
+
+  it('uses the last model_change when leftover assistant info is pi/pi', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_1', createdAt: 10, role: 'user' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        {
+          info: { id: 'msg_agent', role: 'assistant', providerID: 'pi', modelID: 'pi' },
+          parts: [{ type: 'model_change', providerID: 'acme', modelID: 'opus' }],
+        },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Keep me' }] });
+      if (url.pathname === '/session/ses_1/prompt_async') {
+        const body = JSON.parse(init.body || '{}');
+        if (body?.model?.providerID === 'pi' && body?.model?.modelID === 'pi') {
+          return new Response(JSON.stringify({ error: 'Unknown Pi model' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return json({});
+      }
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(JSON.parse(prompt.body).model).toEqual({ providerID: 'acme', modelID: 'opus' });
+    expect(requests.some((request) => request.path === '/api/pi/defaults')).toBe(false);
+    runtime.stop();
+  });
+
+  it('does not prompt_async with pi/pi when no catalog model can be resolved', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_1', createdAt: 10, role: 'user' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'pi', modelID: 'pi' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Keep me' }] });
+      if (url.pathname === '/api/pi/defaults') return json({ model: '', resolvedModel: '' });
+      if (url.pathname === '/session/ses_1/prompt_async') {
+        return new Response(JSON.stringify({ error: 'Unknown Pi model' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    expect(requests.some((request) => request.path.endsWith('/prompt_async'))).toBe(false);
+    expect(requests.some((request) => request.method === 'PATCH')).toBe(false);
     runtime.stop();
   });
 });

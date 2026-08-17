@@ -178,21 +178,54 @@ describe('createEventTranslator', () => {
     expect(events[0].properties.status.message).toBe('overloaded');
   });
 
-  it('maps compaction_start to busy plus compact start, and compaction_end without idle', () => {
+  it('maps compaction_start to busy plus compact start, and successful compaction_end to compact end plus session.compacted', () => {
     const t = translator();
     const start = t.translate({ type: 'compaction_start', instructions: 'trim' });
     expect(start.map((event) => event.type)).toEqual(['session.status', 'session.compact']);
     expect(start[0].properties.status).toEqual({ type: 'busy' });
     expect(start[1].properties).toMatchObject({ sessionID: 'ses_1', status: 'start' });
-    const end = t.translate({ type: 'compaction_end' });
-    expect(end).toEqual([
-      expect.objectContaining({
-        type: 'session.compact',
-        properties: { sessionID: 'ses_1', status: 'end' },
-      }),
-    ]);
+    const end = t.translate({
+      type: 'compaction_end',
+      reason: 'manual',
+      result: { summary: 'kept recent turns' },
+      aborted: false,
+      willRetry: false,
+    });
+    expect(end.map((event) => event.type)).toEqual(['session.compact', 'session.compacted']);
+    expect(end[0]).toEqual(expect.objectContaining({
+      type: 'session.compact',
+      properties: { sessionID: 'ses_1', status: 'end' },
+    }));
+    expect(end[1]).toEqual(expect.objectContaining({
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1', directory: '/tmp/project' },
+    }));
     expect(end.some((event) => event.type === 'session.idle')).toBe(false);
     expect(end.some((event) => event.type === 'session.status')).toBe(false);
+  });
+
+  it('does not emit session.compacted when compaction is aborted or fails', () => {
+    const t = translator();
+    const aborted = t.translate({
+      type: 'compaction_end',
+      reason: 'manual',
+      result: undefined,
+      aborted: true,
+      willRetry: false,
+    });
+    expect(aborted.map((event) => event.type)).toEqual(['session.compact']);
+    expect(aborted[0].properties).toEqual({ sessionID: 'ses_1', status: 'end' });
+
+    const failed = t.translate({
+      type: 'compaction_end',
+      reason: 'manual',
+      result: undefined,
+      aborted: false,
+      willRetry: false,
+      errorMessage: 'Compaction failed: model overloaded',
+    });
+    expect(failed.map((event) => event.type)).toEqual(['session.compact']);
+    expect(failed.some((event) => event.type === 'session.compacted')).toBe(false);
   });
 });
 

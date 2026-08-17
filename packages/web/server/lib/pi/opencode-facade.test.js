@@ -258,6 +258,16 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(assistant.info.parentID).toBe('msg_user_1');
       expect(assistant.info.finish).toBe('stop');
 
+      const byId = await fetch(`${url}/api/session/${created.id}/message/${assistant.info.id}`);
+      expect(byId.status).toBe(200);
+      const found = await byId.json();
+      expect(found.info.id).toBe(assistant.info.id);
+      expect(found.parts.filter((part) => part.type === 'text').map((part) => part.text).join(''))
+        .toContain('Pi mock kernel');
+      const missing = await fetch(`${url}/api/session/${created.id}/message/msg_missing`);
+      expect(missing.status).toBe(404);
+      expect(await missing.json()).toEqual({ error: 'Message not found' });
+
       const status = await (await fetch(`${url}/api/session/status`)).json();
       expect(status).toEqual({});
     } finally {

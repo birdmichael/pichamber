@@ -410,10 +410,22 @@ export const createEventTranslator = ({
           event('session.compact', { sessionID, status: 'start' }),
         ];
 
-      case 'compaction_end':
-        return [
+      case 'compaction_end': {
+        const events = [
           event('session.compact', { sessionID, status: 'end' }),
         ];
+        // Pin inject listens for session.compacted. Abort/failure must not
+        // pretend pins survived — only a finished compact emits that event.
+        if (piEvent.aborted === true) return events;
+        if (typeof piEvent.errorMessage === 'string' && piEvent.errorMessage.trim()) {
+          return events;
+        }
+        events.push(event('session.compacted', {
+          sessionID,
+          ...(directory ? { directory } : {}),
+        }));
+        return events;
+      }
 
       default:
         return [];

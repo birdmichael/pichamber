@@ -35,6 +35,10 @@ describe('in-process Pi session client', () => {
     expect(await dispatchPiSessionRequest(host, '/session/ses_1')).toEqual({ id: 'ses_1', title: 'Live' });
     expect(await dispatchPiSessionRequest(host, '/session/ses_1/message', { query: { limit: '2' } }))
       .toEqual([{ info: { id: 'm2' } }, { info: { id: 'm3' } }]);
+    expect(await dispatchPiSessionRequest(host, '/session/ses_1/message/m2'))
+      .toEqual({ info: { id: 'm2' } });
+    await expect(dispatchPiSessionRequest(host, '/session/ses_1/message/missing'))
+      .rejects.toMatchObject({ message: 'Message not found', status: 404 });
     expect(await dispatchPiSessionRequest(host, '/session/status', { directory: '/tmp' }))
       .toEqual({ ses_1: { type: 'idle' } });
     expect(await dispatchPiSessionRequest(host, '/session/ses_1/children'))
