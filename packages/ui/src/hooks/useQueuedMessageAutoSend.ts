@@ -6,6 +6,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useContextStore } from '@/stores/contextStore';
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { parseAgentMentions } from '@/lib/messages/agentMentions';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { getDirectoryState } from '@/sync/sync-refs';
 import { useDirectorySync } from '@/sync/sync-context';
 import { getRuntimeKey } from '@/lib/runtime-switch';
@@ -76,14 +77,19 @@ const getAbortHoldUntil = (sessionId: string): number | null => {
   return Date.now() < holdUntil ? holdUntil : null;
 };
 
-export const buildQueuedAutoSendPayload = (queue: QueuedMessage[]) => {
+export const buildQueuedAutoSendPayload = (
+  queue: QueuedMessage[],
+  options: { isPiKernel?: boolean } = {},
+) => {
   const queued = queue[0];
   if (!queued) {
     return null;
   }
 
   const agents = useConfigStore.getState().getVisibleAgents();
-  const { sanitizedText, mention } = parseAgentMentions(queued.content, agents);
+  const { sanitizedText, mention } = parseAgentMentions(queued.content, agents, {
+    isPiKernel: options.isPiKernel,
+  });
 
   return {
     queuedMessageId: queued.id,
@@ -209,6 +215,7 @@ export const resolveQueuedSessionStatusType = (
 
 export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?: boolean }) {
   const enabled = typeof enabledOrOptions === 'boolean' ? enabledOrOptions : (enabledOrOptions?.enabled ?? true);
+  const isPiKernel = usePiKernel();
   const queuedMessages = useMessageQueueStore((state) => state.queuedMessages);
   const autoReviewRuns = useAutoReviewStore((state) => state.runsByOriginalSessionID);
   const sessionStatusRecord = useDirectorySync((state) => state.session_status);
@@ -261,7 +268,10 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
 
       // Read the queue back at dispatch time and skip anything already being
       // delivered, rather than trusting the render-time snapshot.
-      const payload = buildQueuedAutoSendPayload(useMessageQueueStore.getState().getSendableQueue(target));
+      const payload = buildQueuedAutoSendPayload(
+        useMessageQueueStore.getState().getSendableQueue(target),
+        { isPiKernel },
+      );
       if (!payload) {
         return;
       }
@@ -353,5 +363,5 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
     });
 
     previousStatusRef.current = nextStatusMap;
-  }, [enabled, queuedMessages, sessionStatusRecord, sessionMessages, autoReviewRuns, currentDirectory, retryTick, retryScheduler]);
+  }, [enabled, isPiKernel, queuedMessages, sessionStatusRecord, sessionMessages, autoReviewRuns, currentDirectory, retryTick, retryScheduler]);
 }

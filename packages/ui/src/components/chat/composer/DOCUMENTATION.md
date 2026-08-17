@@ -27,6 +27,10 @@ selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
 `isPrimaryMode`. `ComposerFooter` `isMobile` and collapsed
 `MobilePillComposer` do not host that leftover chip.
+On Pi, `@agent` mentions do not switch session personality: the send path
+does not route `@agent:build` / `@agent:plan` / leftover OpenCode names, and
+`@` autocomplete does not list those agents. Unknown `/name` stays chat.
+The OpenCode kernel keeps `@agent` mentions and the agent chip.
 When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**
 dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session

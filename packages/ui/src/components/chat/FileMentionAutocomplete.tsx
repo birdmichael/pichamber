@@ -12,6 +12,8 @@ import { Icon } from "@/components/icon/Icon";
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
 import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
 import { useI18n } from '@/lib/i18n';
+import { getComposerMentionableAgents } from '@/lib/messages/agentMentions';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useUIStore } from '@/stores/useUIStore';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 
@@ -61,6 +63,7 @@ export const FileMentionAutocomplete = React.forwardRef<FileMentionHandle, FileM
     ),
   );
   const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
+  const isPiKernel = usePiKernel();
   const searchFiles = useFileSearchStore((state) => state.searchFiles);
   const debouncedQuery = useDebouncedValue(searchQuery, 180);
   const showHidden = useDirectoryShowHidden();
@@ -259,10 +262,9 @@ export const FileMentionAutocomplete = React.forwardRef<FileMentionHandle, FileM
   }, [currentDirectory, debouncedQuery, searchFiles, showHidden, showGitignored]);
 
   React.useEffect(() => {
-    const visibleAgents = getVisibleAgents();
+    const mentionableAgents = getComposerMentionableAgents(getVisibleAgents(), { isPiKernel });
     const normalizedQuery = (searchQuery ?? '').trim().toLowerCase();
-    const filtered = visibleAgents
-      .filter((agent) => agent.mode && agent.mode !== 'primary')
+    const filtered = mentionableAgents
       .filter((agent) => {
         if (!normalizedQuery) return true;
         const haystack = `${agent.name} ${agent.description ?? ''}`.toLowerCase();
@@ -275,7 +277,7 @@ export const FileMentionAutocomplete = React.forwardRef<FileMentionHandle, FileM
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
     setAgents(filtered);
-  }, [getVisibleAgents, searchQuery]);
+  }, [getVisibleAgents, isPiKernel, searchQuery]);
 
   React.useEffect(() => {
     setSelectedIndex(0);

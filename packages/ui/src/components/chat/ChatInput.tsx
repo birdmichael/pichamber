@@ -44,7 +44,7 @@ import type { SkillAutocompleteHandle } from './SkillAutocomplete';
 import type { SnippetAutocompleteHandle } from './SnippetAutocomplete';
 import { cn } from "@/lib/utils";
 import { ModelControls } from './ModelControls';
-import { parseAgentMentions } from '@/lib/messages/agentMentions';
+import { getComposerKnownAgentNames, parseAgentMentions } from '@/lib/messages/agentMentions';
 import { StatusRow } from './StatusRow';
 import { PendingChangesBar } from './PendingChangesBar';
 import { useChatSurfaceMode } from './useChatSurfaceMode';
@@ -548,8 +548,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     }, []);
 
     const knownAgentNames = React.useMemo(
-        () => new Set(agents.map((agent) => agent.name.toLowerCase())),
-        [agents]
+        () => getComposerKnownAgentNames(agents, { isPiKernel }),
+        [agents, isPiKernel]
     );
     const knownAgentNamesRef = React.useRef(knownAgentNames);
     knownAgentNamesRef.current = knownAgentNames;
@@ -1098,7 +1098,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                 : null,
         }, {
             parseAgentMention: (text) => {
-                const { sanitizedText, mention } = parseAgentMentions(text, agents);
+                const { sanitizedText, mention } = parseAgentMentions(text, agents, { isPiKernel });
                 return { text: sanitizedText, agentName: mention?.name };
             },
             extractFileMentions: (text) => {
