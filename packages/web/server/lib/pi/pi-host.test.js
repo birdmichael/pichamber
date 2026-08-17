@@ -1020,7 +1020,42 @@ describe('createPiHost', () => {
       id: 'claude-sonnet-4-5',
       provider: 'anthropic',
     });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant.info).toMatchObject({
+      providerID: 'anthropic',
+      modelID: 'claude-sonnet-4-5',
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+    });
+    expect(assistant.info.providerID).not.toBe('pi');
+    expect(assistant.info.modelID).not.toBe('pi');
     host.dispose();
+  });
+
+  it('promptAsync stamps Pi defaults on a new-session send when the body has no model', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-default-stamp-'));
+    try {
+      const host = createPiHost({ mock: true, home, defaultDirectory: '/tmp/project' });
+      host.setDefaults({ model: 'example-provider/example-model' });
+      const record = await host.createSession({ directory: '/tmp/project', title: 'New session' });
+      await host.promptAsync(record.id, {
+        messageID: 'msg_user',
+        parts: [{ type: 'text', text: '/notacommand' }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+      expect(assistant.info).toMatchObject({
+        providerID: 'example-provider',
+        modelID: 'example-model',
+        model: { providerID: 'example-provider', modelID: 'example-model' },
+      });
+      expect(assistant.info.providerID).not.toBe('pi');
+      expect(assistant.info.modelID).not.toBe('pi');
+      expect(assistant.info.cost).toBeUndefined();
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it('binds Desktop ctx.ui on every live session and resolves a fake select', async () => {

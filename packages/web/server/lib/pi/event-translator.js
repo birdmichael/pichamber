@@ -1,7 +1,12 @@
 import { createEventId, createMessageId, createPartId } from './ids.js';
-import { mapPiUsageToOpenCodeTokens, toPiImageContent } from './session-transfer.js';
+import {
+  mapPiUsageToOpenCodeTokens,
+  resolveUsableFacadeModel,
+  toPiImageContent,
+  usageHasRecordedNumbers,
+} from './session-transfer.js';
 
-export { mapPiUsageToOpenCodeTokens } from './session-transfer.js';
+export { mapPiUsageToOpenCodeTokens, resolveUsableFacadeModel } from './session-transfer.js';
 
 const toolText = (value) => {
   if (!value) return '';
@@ -37,6 +42,7 @@ export const createEventTranslator = ({
   createPartId: nextPartId = createPartId,
   createEventId: nextEventId = createEventId,
   now = () => Date.now(),
+  fallbackModel,
 } = {}) => {
   const textParts = new Map();
   const reasoningParts = new Map();
@@ -48,6 +54,7 @@ export const createEventTranslator = ({
   let agent = 'pi';
   let model = undefined;
   let lastUsage = undefined;
+  let resolvedFallback = resolveUsableFacadeModel(fallbackModel);
 
   const event = (type, properties) => createOpenCodeEvent(type, properties, {
     id: nextEventId(),
@@ -60,12 +67,20 @@ export const createEventTranslator = ({
     if (!assistantParentID && userMessageID) assistantParentID = userMessageID;
   };
 
+  const setFallbackModel = (next) => {
+    resolvedFallback = resolveUsableFacadeModel(next) || resolvedFallback;
+  };
+
   const setUserMessage = (messageID, extras = {}) => {
     userMessageID = messageID;
     if (typeof extras.agent === 'string' && extras.agent.trim()) {
       agent = extras.agent;
     }
-    if (extras.model) {
+    const nextModel = resolveUsableFacadeModel(extras.model);
+    if (nextModel) {
+      model = nextModel;
+      resolvedFallback = nextModel;
+    } else if (extras.model) {
       model = extras.model;
     }
   };
@@ -91,12 +106,13 @@ export const createEventTranslator = ({
   const assistantInfo = ({ completed = false, model: modelOverride, usage } = {}) => {
     ensureAssistantMessage();
     const created = assistantCreatedAt ?? now();
-    const resolvedModel = modelOverride || model;
-    const modelID = resolvedModel?.modelID || resolvedModel?.id || 'pi';
-    const providerID = resolvedModel?.providerID || resolvedModel?.provider || 'pi';
+    const usable = resolveUsableFacadeModel(modelOverride, model, resolvedFallback);
     const cwd = directory || '';
-    if (usage) lastUsage = usage;
-    const mapped = mapPiUsageToOpenCodeTokens(usage || lastUsage);
+    if (usageHasRecordedNumbers(usage)) lastUsage = usage;
+    const recordedUsage = usageHasRecordedNumbers(usage) ? usage : lastUsage;
+    const mapped = usageHasRecordedNumbers(recordedUsage)
+      ? mapPiUsageToOpenCodeTokens(recordedUsage)
+      : null;
     return {
       id: assistantMessageID,
       sessionID,
@@ -104,15 +120,16 @@ export const createEventTranslator = ({
       // OpenCode chat turns group assistants by parentID === user message id.
       // Without this the UI drops the reply (streaming and on reload).
       parentID: assistantParentID || userMessageID || '',
-      modelID,
-      providerID,
+      ...(usable ? {
+        modelID: usable.modelID,
+        providerID: usable.providerID,
+        model: usable.model,
+      } : {}),
       mode: agent || 'pi',
       agent,
       path: { cwd, root: cwd },
-      cost: mapped.cost,
-      tokens: mapped.tokens,
+      ...(mapped ? { cost: mapped.cost, tokens: mapped.tokens } : {}),
       time: completed ? { created, completed: now() } : { created },
-      ...(resolvedModel ? { model: resolvedModel } : {}),
       ...(completed ? { finish: 'stop' } : {}),
     };
   };
@@ -324,27 +341,29 @@ export const createEventTranslator = ({
             }),
           ];
         }
-        if (message?.model) {
-          model = message.model;
+        const startedModel = resolveUsableFacadeModel(message);
+        if (startedModel) {
+          model = startedModel;
+        } else if (message?.model) {
+          const parsed = resolveUsableFacadeModel(message.model);
+          if (parsed) model = parsed;
         }
         beginAssistantMessage(message?.id && typeof message.id === 'string' ? message.id : undefined);
         return [messageUpdated(assistantInfo({ usage: message?.usage }))];
       }
 
       case 'message_update':
-        if (piEvent.message?.usage) {
+        if (usageHasRecordedNumbers(piEvent.message?.usage)) {
           lastUsage = piEvent.message.usage;
         }
-        if (piEvent.message?.model) {
-          model = piEvent.message.model;
-        }
+        const updatedModel = resolveUsableFacadeModel(piEvent.message);
+        if (updatedModel) model = updatedModel;
         return translateAssistantDelta(piEvent.assistantMessageEvent);
 
       case 'message_end': {
         if (!assistantMessageID) return [];
-        if (piEvent.message?.model) {
-          model = piEvent.message.model;
-        }
+        const endedModel = resolveUsableFacadeModel(piEvent.message);
+        if (endedModel) model = endedModel;
         const events = [messageUpdated(assistantInfo({
           completed: true,
           usage: piEvent.message?.usage,
@@ -436,6 +455,10 @@ export const createEventTranslator = ({
     translate,
     setAssistantMessage,
     setUserMessage,
+    setFallbackModel,
+    getFallbackModel() {
+      return resolvedFallback;
+    },
     get assistantMessageID() {
       return assistantMessageID;
     },

@@ -155,6 +155,48 @@ describe('createEventTranslator', () => {
     });
   });
 
+  it('stamps a live assistant from fallback/session model instead of leftover pi/pi', () => {
+    const t = translator({
+      fallbackModel: { providerID: 'example-provider', modelID: 'example-model' },
+    });
+    t.setUserMessage('msg_user');
+    const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.info).toMatchObject({
+      parentID: 'msg_user',
+      providerID: 'example-provider',
+      modelID: 'example-model',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+    });
+    expect(started[0].properties.info.providerID).not.toBe('pi');
+    expect(started[0].properties.info.modelID).not.toBe('pi');
+    expect(started[0].properties.info.cost).toBeUndefined();
+    expect(started[0].properties.info.tokens).toBeUndefined();
+
+    const partFirst = translator({
+      fallbackModel: 'example-provider/example-model',
+    });
+    const livePart = partFirst.translate({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'hi' },
+    });
+    const updated = livePart.find((event) => event.type === 'message.updated');
+    expect(updated.properties.info).toMatchObject({
+      providerID: 'example-provider',
+      modelID: 'example-model',
+    });
+    expect(updated.properties.info.providerID).not.toBe('pi');
+  });
+
+  it('does not invent leftover pi/pi when no defaults or session model exist', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.info.providerID).toBeUndefined();
+    expect(started[0].properties.info.modelID).toBeUndefined();
+    expect(started[0].properties.info.model).toBeUndefined();
+    expect(started[0].properties.info.cost).toBeUndefined();
+  });
+
   it('does not echo a second user text part when the facade already recorded the prompt', () => {
     const t = translator();
     t.setUserMessage('msg_user');

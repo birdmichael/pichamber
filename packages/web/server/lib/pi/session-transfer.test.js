@@ -7,6 +7,7 @@ import {
   parseSessionImport,
   persistFacadeMessages,
   piMessagesFromFacadeEntry,
+  resolveUsableFacadeModel,
 } from './session-transfer.js';
 
 const exampleAssistantUsage = {
@@ -295,6 +296,52 @@ describe('session-transfer', () => {
     expect(messages[0].info.agent).toBe('pi');
     expect(messages[0].info.time.completed).toBeGreaterThan(0);
     expect(messages[0].info.finish).toBe('stop');
+  });
+
+  it('hydrates leftover pi/pi from defaults or session model instead of keeping the placeholder', () => {
+    const leftover = {
+      type: 'message',
+      id: 'a1',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'hello' }],
+        provider: 'pi',
+        model: 'pi',
+      },
+    };
+    const stamped = facadeMessagesFromPiEntries([leftover], 'ses_stamp', {
+      fallbackModel: { providerID: 'example-provider', modelID: 'example-model' },
+    });
+    expect(stamped[0].info).toMatchObject({
+      providerID: 'example-provider',
+      modelID: 'example-model',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+    });
+    expect(stamped[0].info.providerID).not.toBe('pi');
+    expect(stamped[0].info.modelID).not.toBe('pi');
+    expect(stamped[0].info.cost).toBeUndefined();
+
+    const missing = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'a2',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'bare' }] },
+      },
+    ], 'ses_defaults', { fallbackModel: 'example-provider/example-model' });
+    expect(missing[0].info).toMatchObject({
+      providerID: 'example-provider',
+      modelID: 'example-model',
+    });
+
+    expect(resolveUsableFacadeModel({ providerID: 'pi', modelID: 'pi' })).toBeNull();
+    expect(resolveUsableFacadeModel(
+      { providerID: 'pi', modelID: 'pi' },
+      'example-provider/example-model',
+    )).toEqual({
+      providerID: 'example-provider',
+      modelID: 'example-model',
+      model: { providerID: 'example-provider', modelID: 'example-model' },
+    });
   });
 
   it('maps Pi session entries onto facade messages', () => {

@@ -189,14 +189,20 @@ to `session.prompt`. Assistant `provider` / `model` / `usage` copy onto
 facade `info` as `providerID`, `modelID`, `model`, `tokens`, and `cost`
 (the same mapping live SSE uses in `mapPiUsageToOpenCodeTokens`). Missing
 usage stays omitted; do not invent numbers or a hardcoded model.
+Leftover facade `pi`/`pi` is not a catalog model. When the turn itself has
+no usable pair, hydrate and live `message.updated` / `message.part.updated`
+stamp the session model (`currentModel` / last `model_change`) or Pi
+defaults (`pichamber.json` `model`). Omit the fields when none of those
+resolve. Do not write leftover `pi`/`pi`. Cost stays whatever Pi reported.
 A finished assistant also gets `time.completed` and `finish: "stop"` —
 the same fields live `message_end` writes — so Refresh and a new host
 still show copy / save-as-image / pin. `stopReason: "pending"`, empty
 streaming stubs, and user messages stay created-only. Do not invent
 `completed` for an unfinished assistant. `piMessagesFromFacadeEntry`
 writes model/usage back when they already exist so persist and JSONL
-export keep them. Do not invent a second session store. Live SSE is
-unchanged.
+export keep them. Do not invent a second session store. Live SSE uses
+the same usable-model stamp so a new-session send does not label the
+turn `pi`/`pi` when defaults or the session model exist.
 
 Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
 entry: `{ archived: ms | 0 }`. `updateSession` writes that value (including

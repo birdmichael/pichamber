@@ -6,6 +6,83 @@ const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+/** Facade leftover assistants default to `pi`/`pi`. That pair is not a catalog model. */
+const FACADE_PLACEHOLDER_PROVIDER = 'pi';
+const FACADE_PLACEHOLDER_MODEL = 'pi';
+
+const asUsableFacadeModel = (providerID, modelID) => {
+  const provider = asTrimmedString(providerID);
+  const model = asTrimmedString(modelID);
+  if (!provider || !model) return null;
+  if (provider === FACADE_PLACEHOLDER_PROVIDER && model === FACADE_PLACEHOLDER_MODEL) return null;
+  return {
+    providerID: provider,
+    modelID: model,
+    model: { providerID: provider, modelID: model },
+  };
+};
+
+const parseFacadeModelKey = (value) => {
+  const trimmed = asTrimmedString(value);
+  if (!trimmed) return null;
+  const slash = trimmed.indexOf('/');
+  if (slash <= 0 || slash >= trimmed.length - 1) return null;
+  return asUsableFacadeModel(trimmed.slice(0, slash), trimmed.slice(slash + 1));
+};
+
+const looksLikeModelRecord = (value) => {
+  if (!isRecord(value)) return false;
+  if (asTrimmedString(value.modelID)) return true;
+  if (value.role || value.sessionID || value.parts) return false;
+  return Boolean(asTrimmedString(value.providerID || value.provider) && asTrimmedString(value.id));
+};
+
+/**
+ * Resolve a real provider/model for assistant labels.
+ * Leftover facade `pi`/`pi` is not usable. Do not invent a hardcoded model.
+ */
+export const resolveUsableFacadeModel = (...sources) => {
+  for (const source of sources) {
+    if (source == null || source === '') continue;
+    if (typeof source === 'string') {
+      const parsed = parseFacadeModelKey(source);
+      if (parsed) return parsed;
+      continue;
+    }
+    if (!isRecord(source)) continue;
+    const fromFields = asUsableFacadeModel(
+      source.providerID || source.provider,
+      source.modelID || (looksLikeModelRecord(source) ? source.id : ''),
+    );
+    if (fromFields) return fromFields;
+    if (source.model && source.model !== source) {
+      const nested = resolveUsableFacadeModel(source.model);
+      if (nested) return nested;
+    }
+    const fromPair = asUsableFacadeModel(
+      source.provider,
+      typeof source.model === 'string' ? source.model : '',
+    );
+    if (fromPair) return fromPair;
+  }
+  return null;
+};
+
+export const lastModelChangeFromMessages = (messages) => {
+  if (!Array.isArray(messages)) return null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const parts = messages[index]?.parts;
+    if (!Array.isArray(parts)) continue;
+    for (let partIndex = parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = parts[partIndex];
+      if (part?.type !== 'model_change') continue;
+      const found = resolveUsableFacadeModel(part);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
 const toNonNegativeNumber = (value) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return 0;
@@ -13,7 +90,7 @@ const toNonNegativeNumber = (value) => {
   return value;
 };
 
-const usageHasRecordedNumbers = (usage) => {
+export const usageHasRecordedNumbers = (usage) => {
   if (!isRecord(usage)) return false;
   const cost = usage.cost;
   const candidates = [
@@ -56,33 +133,13 @@ export const mapPiUsageToOpenCodeTokens = (usage) => {
   };
 };
 
-const facadeModelFromPiMessage = (message) => {
-  const rawModel = message?.model;
-  const rawProvider = message?.provider;
-  let modelID = '';
-  let providerID = '';
-  let model = undefined;
-
-  if (isRecord(rawModel)) {
-    modelID = asTrimmedString(rawModel.modelID || rawModel.id);
-    providerID = asTrimmedString(rawModel.providerID || rawModel.provider);
-    model = rawModel;
-  } else {
-    modelID = asTrimmedString(rawModel);
-  }
-  if (!providerID) {
-    providerID = asTrimmedString(rawProvider);
-  }
-  if (!model && (modelID || providerID)) {
-    model = {
-      ...(providerID ? { providerID } : {}),
-      ...(modelID ? { modelID } : {}),
-    };
-  }
+const facadeModelFromPiMessage = (message, fallbackModel) => {
+  const resolved = resolveUsableFacadeModel(message, fallbackModel);
+  if (!resolved) return {};
   return {
-    ...(modelID ? { modelID } : {}),
-    ...(providerID ? { providerID } : {}),
-    ...(model ? { model } : {}),
+    modelID: resolved.modelID,
+    providerID: resolved.providerID,
+    model: resolved.model,
   };
 };
 
@@ -96,10 +153,10 @@ const facadeUsageFromPiMessage = (message) => {
 };
 
 /** Copy Pi assistant provider/model/usage onto the live SSE `info` shape. */
-const facadeAssistantInfoFromPiMessage = (message) => {
+const facadeAssistantInfoFromPiMessage = (message, fallbackModel) => {
   if (!isRecord(message) || message.role !== 'assistant') return {};
   return {
-    ...facadeModelFromPiMessage(message),
+    ...facadeModelFromPiMessage(message, fallbackModel),
     ...facadeUsageFromPiMessage(message),
   };
 };
@@ -624,7 +681,7 @@ ${blocks}
 `;
 };
 
-const facadeFromPiMessage = (entry) => {
+const facadeFromPiMessage = (entry, fallbackModel) => {
   const message = entry?.message && typeof entry.message === 'object' ? entry.message : {};
   if (message.role === 'toolResult') return null;
   const role = message.role === 'assistant' ? 'assistant' : 'user';
@@ -637,7 +694,7 @@ const facadeFromPiMessage = (entry) => {
       agent: 'pi',
       ...(role === 'assistant' ? { mode: 'pi' } : {}),
       ...(asTrimmedString(entry?.parentId) ? { parentID: entry.parentId } : {}),
-      ...facadeAssistantInfoFromPiMessage(message),
+      ...facadeAssistantInfoFromPiMessage(message, fallbackModel),
       ...facadeMessageTimeFromPi(message, created),
     },
     parts: partsFromPiContent(message.content, '', messageID),
@@ -653,8 +710,9 @@ const registerToolParts = (parts, toolPartsByCallID) => {
   }
 };
 
-export const facadeMessagesFromPiEntries = (entries, sessionID) => {
+export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) => {
   const id = asTrimmedString(sessionID);
+  const fallbackModel = isRecord(options) ? options.fallbackModel : undefined;
   const messages = [];
   const toolPartsByCallID = new Map();
   for (const entry of Array.isArray(entries) ? entries : []) {
@@ -667,7 +725,7 @@ export const facadeMessagesFromPiEntries = (entries, sessionID) => {
       if (part) applyToolResultToPart(part, message);
       continue;
     }
-    const facade = facadeFromPiMessage(entry);
+    const facade = facadeFromPiMessage(entry, fallbackModel);
     if (!facade) continue;
     if (id) {
       facade.info.sessionID = id;

@@ -93,8 +93,10 @@ import {
   cloneImportedMessages,
   facadeFilePartFromUnknown,
   facadeMessagesFromPiEntries,
+  lastModelChangeFromMessages,
   parseSessionImport,
   persistFacadeMessages,
+  resolveUsableFacadeModel,
   sanitizeExportBasename,
 } from './session-transfer.js';
 
@@ -503,28 +505,62 @@ const lastUserMessage = (store) => {
   return undefined;
 };
 
+const resolveStoreRuntimeModel = (store, ...extras) => resolveUsableFacadeModel(
+  ...extras,
+  store?.translator?.getFallbackModel?.(),
+  lastModelChangeFromMessages(store?.messages),
+  store?.piSession?.currentModel,
+);
+
+const stampAssistantStoreInfo = (info, store, extra) => {
+  const usable = resolveStoreRuntimeModel(store, extra, info);
+  if (usable) {
+    return {
+      ...info,
+      providerID: usable.providerID,
+      modelID: usable.modelID,
+      model: usable.model,
+    };
+  }
+  if (info?.providerID === 'pi' && info?.modelID === 'pi') {
+    const next = { ...info };
+    delete next.providerID;
+    delete next.modelID;
+    if (next.model?.providerID === 'pi' && next.model?.modelID === 'pi') delete next.model;
+    return next;
+  }
+  return info;
+};
+
 const applyEventToStore = (store, ocEvent) => {
   const type = ocEvent?.type;
   const props = ocEvent?.properties || {};
   if (type === 'message.updated' && props.info) {
     const existing = store.messages.find((entry) => entry.info.id === props.info.id);
+    const nextInfo = stampAssistantStoreInfo(props.info, store, existing?.info);
     if (existing) {
       const prevTime = existing.info.time || {};
-      const nextTime = props.info.time || {};
+      const nextTime = nextInfo.time || {};
       existing.info = {
         ...existing.info,
-        ...props.info,
+        ...nextInfo,
         time: {
           ...prevTime,
           ...nextTime,
           created: prevTime.created ?? nextTime.created,
         },
-        parentID: props.info.parentID || existing.info.parentID,
-        agent: props.info.agent || existing.info.agent,
-        model: props.info.model || existing.info.model,
+        parentID: nextInfo.parentID || existing.info.parentID,
+        agent: nextInfo.agent || existing.info.agent,
+        model: nextInfo.model || existing.info.model,
       };
+      const usable = resolveStoreRuntimeModel(store, existing.info);
+      if (usable) {
+        existing.info.providerID = usable.providerID;
+        existing.info.modelID = usable.modelID;
+        existing.info.model = usable.model;
+      }
     } else {
-      store.messages.push({ info: props.info, parts: [] });
+      store.messages.push({ info: nextInfo, parts: [] });
     }
   }
   if (type === 'message.part.updated' && props.part) {
@@ -532,16 +568,16 @@ const applyEventToStore = (store, ocEvent) => {
     let entry = store.messages.find((item) => item.info.id === messageID);
     if (!entry) {
       const parent = lastUserMessage(store);
+      const stub = {
+        id: messageID,
+        sessionID: props.part.sessionID,
+        role: 'assistant',
+        time: { created: Date.now() },
+        ...(parent?.info?.id ? { parentID: parent.info.id } : {}),
+        ...(parent?.info?.agent ? { agent: parent.info.agent } : { agent: 'pi' }),
+      };
       entry = {
-        info: {
-          id: messageID,
-          sessionID: props.part.sessionID,
-          role: 'assistant',
-          time: { created: Date.now() },
-          ...(parent?.info?.id ? { parentID: parent.info.id } : {}),
-          ...(parent?.info?.agent ? { agent: parent.info.agent } : { agent: 'pi' }),
-          ...(parent?.info?.model ? { model: parent.info.model } : {}),
-        },
+        info: stampAssistantStoreInfo(stub, store, parent?.info),
         parts: [],
       };
       store.messages.push(entry);
@@ -1139,6 +1175,23 @@ export const createPiHost = ({
     return undefined;
   };
 
+  const resolveHostFallbackModel = (record, extra) => resolveUsableFacadeModel(
+    extra,
+    record?.piSession?.currentModel,
+    lastModelChangeFromMessages(record?.messages),
+    readPiDefaults(home).model,
+  );
+
+  const createRecordTranslator = (sessionID, directory, record) => createEventTranslator({
+    sessionID,
+    directory,
+    fallbackModel: resolveHostFallbackModel(record),
+  });
+
+  const hydrateFacadeMessages = (entries, sessionID, record) => facadeMessagesFromPiEntries(entries, sessionID, {
+    fallbackModel: resolveHostFallbackModel(record),
+  });
+
   const createPersistedSessionManager = async (cwd, { title } = {}) => {
     try {
       const pi = await loadPiSdk();
@@ -1220,7 +1273,7 @@ export const createPiHost = ({
       messages: [],
       status: { type: 'idle' },
       piSession,
-      translator: createEventTranslator({ sessionID, directory: cwd }),
+      translator: createRecordTranslator(sessionID, cwd, { piSession }),
       unsubscribe: null,
     };
     attachSession(record);
@@ -1331,10 +1384,10 @@ export const createPiHost = ({
           updated: Number.isFinite(updated) ? updated : Date.now(),
         }, metadata),
       },
-      messages: facadeMessagesFromPiEntries(entries, sessionID),
+      messages: hydrateFacadeMessages(entries, sessionID, { piSession }),
       status: { type: 'idle' },
       piSession,
-      translator: createEventTranslator({ sessionID, directory: cwd }),
+      translator: createRecordTranslator(sessionID, cwd, { piSession }),
       unsubscribe: null,
     };
     attachSession(record);
@@ -1456,10 +1509,10 @@ export const createPiHost = ({
         },
         projectID: cwd,
       }),
-      messages: facadeMessagesFromPiEntries(entries, resolvedId),
+      messages: hydrateFacadeMessages(entries, resolvedId, { piSession }),
       status: { type: 'idle' },
       piSession,
-      translator: createEventTranslator({ sessionID: resolvedId, directory: cwd }),
+      translator: createRecordTranslator(resolvedId, cwd, { piSession }),
       unsubscribe: null,
     };
     attachSession(record);
@@ -1484,7 +1537,7 @@ export const createPiHost = ({
           .filter(Boolean)
           .map((line) => JSON.parse(line));
       if (!Array.isArray(entries)) return;
-      record.messages = facadeMessagesFromPiEntries(entries, record.id);
+      record.messages = hydrateFacadeMessages(entries, record.id, record);
     } catch {
     }
   };
@@ -1694,7 +1747,7 @@ export const createPiHost = ({
       }
       const manager = pi.SessionManager.open(file);
       const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
-      record.messages = facadeMessagesFromPiEntries(entries, record.id);
+      record.messages = hydrateFacadeMessages(entries, record.id, record);
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
       if (title) record.info.title = title;
       const metadata = readPersistedSessionMetadata(entries);
@@ -2029,9 +2082,13 @@ export const createPiHost = ({
 
       const userMessageID = body.messageID || createMessageId();
       const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
+      const runtimeModel = resolveHostFallbackModel(record, body.model);
+      if (runtimeModel) {
+        record.translator.setFallbackModel(runtimeModel);
+      }
       record.translator.setUserMessage(userMessageID, {
         agent: userAgent,
-        model: body.model,
+        model: runtimeModel || body.model,
       });
       const userParts = [{
         id: createPartId(),
@@ -2885,6 +2942,7 @@ export const createPiHost = ({
           id: modelID || raw,
           ...(providerID ? { provider: providerID } : {}),
         });
+        record.translator?.setFallbackModel?.(record.piSession.currentModel);
         return { applied: true, model: raw };
       }
       const runtime = await ensureModelRuntime();
@@ -2907,6 +2965,7 @@ export const createPiHost = ({
         throw error;
       }
       record.piSession.setModel(model);
+      record.translator?.setFallbackModel?.(model);
       return { applied: true, model: model.provider ? `${model.provider}/${model.id}` : model.id };
     },
     getSessionUsage(sessionID) {
