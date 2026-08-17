@@ -17,6 +17,7 @@ import type { Session, Part, Message, TextPart } from "@opencode-ai/sdk/v2/clien
 import type { AttachedFile, SessionContextUsage, SessionWorktreeAttachment } from "@/stores/types/sessionTypes"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient } from "@/lib/opencode/client"
+import { isFeaturePluginSlotActive } from "@/lib/featurePlugins/slotStatus"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 import { useConfigStore } from "@/stores/useConfigStore"
 import { useProjectsStore } from "@/stores/useProjectsStore"
@@ -86,6 +87,7 @@ import { getRuntimeKey } from "@/lib/runtime-switch"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
 import { persistWorktreeTopology, readPersistedWorktreeTopology } from "./worktree-topology-cache"
 import { rememberRuntimeLiveStatus } from "./runtime-live-memory"
+import { usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
 
 export type { AttachedFile }
 
@@ -165,10 +167,15 @@ export function routeMessage(params: {
     // AgentSession.prompt expands `/skill:name` to the skill body.
     // Unknown `/name` also falls through to sendMessage (product: may be chat).
     // Feature-plugin slashes are registered on GET /api/command before a
-    // session exists. Route them through session.command even when the
-    // directory/store lists have not caught up yet — /run must not become a
-    // dead chat bubble (#109).
-    const isFeaturePluginSlash = cmdName === 'run' || cmdName === 'plan' || cmdName === 'goal'
+    // session exists. When that slot is on, route them through session.command
+    // even if the directory/store lists have not caught up yet — /run must not
+    // become a dead chat bubble (#109). When the slot is off, typed /run,
+    // /plan, and /goal fall through as chat, same as an unknown /name.
+    const featurePlugins = usePiFeaturePluginsStore.getState().payload
+    const isFeaturePluginSlash =
+      (cmdName === 'run' && isFeaturePluginSlotActive(featurePlugins, 'subagents'))
+      || (cmdName === 'plan' && isFeaturePluginSlotActive(featurePlugins, 'plan'))
+      || (cmdName === 'goal' && isFeaturePluginSlotActive(featurePlugins, 'goal'))
     const isCommand = syncCommands.find((c) => c.name === cmdName)
       || storeCommands.find((c) => c.name === cmdName)
       || useSkillsStore.getState().skills.some((s) => s.name === cmdName)

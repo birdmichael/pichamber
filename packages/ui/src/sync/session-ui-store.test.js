@@ -9,6 +9,8 @@ import { useSkillsStore } from '@/stores/useSkillsStore';
 import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
+import { applyFeaturePluginsPayload, resetPiFeaturePluginsStore } from './pi-feature-plugins-store';
 
 /**
  * Unit tests for session worktree routing through the authoritative store.
@@ -606,7 +608,19 @@ describe('routeMessage skill invocation', () => {
     opencodeClient.sendCommand = originalSendCommand;
     opencodeClient.sendMessage = originalSendMessage;
     useSkillsStore.setState({ skills: [] });
+    useCommandsStore.setState({ commands: [] });
+    resetPiFeaturePluginsStore();
   });
+
+  function setFeaturePluginSlot(slot, { installed, enabled }) {
+    const payload = emptyFeaturePluginsPayload();
+    payload.slots[slot] = {
+      ...payload.slots[slot],
+      installed,
+      enabled,
+    };
+    applyFeaturePluginsPayload(payload);
+  }
 
   test('invokes a user-installed skill as a command', async () => {
     useSkillsStore.setState({
@@ -644,7 +658,9 @@ describe('routeMessage skill invocation', () => {
     expect(sendCommandCalls[0].arguments).toBe('focus on auth');
   });
 
-  test('routes /run through session.command even before the store lists it', async () => {
+  test('routes /run through session.command when Subagents is on even before the store lists it', async () => {
+    setFeaturePluginSlot('subagents', { installed: true, enabled: true });
+
     await routeMessage({
       sessionId: 'session-run',
       directory: '/skills/project',
@@ -656,6 +672,113 @@ describe('routeMessage skill invocation', () => {
     expect(sendCommandCalls).toHaveLength(1);
     expect(sendCommandCalls[0].command).toBe('run');
     expect(sendCommandCalls[0].arguments).toBe('scout 只回复一个词：ok');
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test('sends typed /run as chat when Feature Plugins have not loaded', async () => {
+    await routeMessage({
+      sessionId: 'session-run',
+      directory: '/skills/project',
+      content: '/run scout 只回复一个词：ok',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls).toHaveLength(1);
+    expect(sendMessageCalls[0].text).toBe('/run scout 只回复一个词：ok');
+    expect(sendCommandCalls).toHaveLength(0);
+  });
+
+  test('still routes a live-listed /run through session.command when Subagents is off', async () => {
+    setFeaturePluginSlot('subagents', { installed: true, enabled: false });
+    useCommandsStore.setState({ commands: [{ name: 'run' }] });
+
+    await routeMessage({
+      sessionId: 'session-run',
+      directory: '/skills/project',
+      content: '/run scout 只回复一个词：ok',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls).toHaveLength(1);
+    expect(sendCommandCalls[0].command).toBe('run');
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
+  test('sends typed /run as chat when Subagents is off', async () => {
+    setFeaturePluginSlot('subagents', { installed: true, enabled: false });
+
+    await routeMessage({
+      sessionId: 'session-run',
+      directory: '/skills/project',
+      content: '/run scout 只回复一个词：ok',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls).toHaveLength(1);
+    expect(sendMessageCalls[0].text).toBe('/run scout 只回复一个词：ok');
+    expect(sendCommandCalls).toHaveLength(0);
+  });
+
+  test('sends typed /plan and /goal as chat when those slots are off', async () => {
+    setFeaturePluginSlot('plan', { installed: false, enabled: false });
+
+    await routeMessage({
+      sessionId: 'session-plan',
+      directory: '/skills/project',
+      content: '/plan start',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    await routeMessage({
+      sessionId: 'session-goal',
+      directory: '/skills/project',
+      content: '/goal implement snake game',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls.map((call) => call.text)).toEqual([
+      '/plan start',
+      '/goal implement snake game',
+    ]);
+    expect(sendCommandCalls).toHaveLength(0);
+  });
+
+  test('routes /plan and /goal through session.command when those slots are on even before the store lists them', async () => {
+    const payload = emptyFeaturePluginsPayload();
+    payload.slots.plan.installed = true;
+    payload.slots.plan.enabled = true;
+    payload.slots.goal.installed = true;
+    payload.slots.goal.enabled = true;
+    applyFeaturePluginsPayload(payload);
+
+    await routeMessage({
+      sessionId: 'session-plan',
+      directory: '/skills/project',
+      content: '/plan start',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    await routeMessage({
+      sessionId: 'session-goal',
+      directory: '/skills/project',
+      content: '/goal implement snake game',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls.map((call) => ({
+      command: call.command,
+      arguments: call.arguments,
+    }))).toEqual([
+      { command: 'plan', arguments: 'start' },
+      { command: 'goal', arguments: 'implement snake game' },
+    ]);
     expect(sendMessageCalls).toHaveLength(0);
   });
 
