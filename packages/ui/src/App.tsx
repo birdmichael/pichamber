@@ -409,6 +409,8 @@ function App({ apis }: AppProps) {
     let cancelled = false;
 
     const run = async () => {
+      // Leftover OpenCode plan-mode flag only. Pi View Plan uses
+      // usePiPlanChrome + Feature Plugins, not this health field.
       const res = await runtimeFetch('/health', { method: 'GET' }).catch(() => null);
       if (!res || !res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as null | {

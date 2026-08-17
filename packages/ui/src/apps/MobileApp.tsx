@@ -79,7 +79,7 @@ const NATIVE_RESUME_SYNC_EVENT_THROTTLE_MS = 1_000;
 /** The fullscreen app-level surfaces, reachable from the sessions drawer
     footer. Exactly one can be open at a time — opening another replaces it,
     closing returns to the chat. The sessions drawer and the workspace drawer
-    (Changes / Files / Terminal / Notes / MCP) are separate layers. */
+    (Git / Files / Terminal / Notes / Plan / MCP) are separate layers. */
 type MobileSurface = 'instances' | 'settings' | 'update';
 
 const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onActiveConnectionDeleted }) => {
@@ -1050,6 +1050,8 @@ export function MobileApp({ apis }: MobileAppProps) {
     let cancelled = false;
 
     const run = async () => {
+      // Leftover OpenCode plan-mode flag only. Pi View Plan / Agent|Plan use
+      // usePiPlanChrome + Feature Plugins, not this health field.
       const res = await runtimeFetch('/health', { method: 'GET' }).catch(() => null);
       if (!res || !res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as null | { planModeExperimentalEnabled?: unknown };

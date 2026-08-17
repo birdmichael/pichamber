@@ -133,6 +133,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
             {isMobile ? (
                 <>
                     <div className="flex w-full items-center justify-between gap-x-1.5">
+                        {/* Agent/Plan and Goal self-hide via Feature Plugin hooks. */}
                         <div className="composer-mobile-actions flex items-center gap-x-2 pl-1">
                             <ComposerAttachmentControls
                                 isVSCode={isVSCode}
