@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { resolveGitHeaderPullRequestControl } from './GitHeader';
+import { resolveGitHeaderPullRequestControl } from './gitHeaderPullRequest';
 
 describe('resolveGitHeaderPullRequestControl', () => {
   test('offers create when the git header can open PR and none exists', () => {
