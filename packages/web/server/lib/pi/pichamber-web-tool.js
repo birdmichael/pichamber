@@ -4,7 +4,7 @@ import {
 } from '../openchamber-control/actions.js';
 
 export const PICHAMBER_WEB_TOOL_NAME = 'pichamber_web';
-export const PICHAMBER_WEB_TOOL_LABEL = 'Pichamber Web';
+const PICHAMBER_WEB_TOOL_LABEL = 'Pichamber Web';
 export const WEB_PARAMETER_NAMES = Object.freeze([
   'url',
   'selector',
