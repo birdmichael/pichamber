@@ -18,18 +18,25 @@ type MobileReviewPanelState = {
 export const MOBILE_GIT_PR_SURFACE_MODE = 'pr' as const satisfies MobileReviewMode;
 
 /**
- * Desktop Git opens a file with `openContextDiff`. Mobile Git uses that same
- * action and hosts `DiffView` — not a second diff stack.
+ * Desktop Git opens a file with `openContextDiff` when `!isMobile`.
+ * `GitView` on a mobile flag uses `navigateToDiff` (MainLayout). MobileApp has
+ * no main Diff tab, so phone file rows keep `MobileDiffDetail`. Tablet width
+ * opens Desktop `DiffView` so the Walkthrough toolbar can appear.
  */
 export const MOBILE_GIT_DIFF_SURFACE_MODE = 'diff' as const satisfies MobileReviewMode;
 
 /**
  * Walkthrough stays tablet-only. The Desktop rail already hides it below
- * `WALKTHROUGH_MIN_WIDTH` because a stop list beside real code is the surface.
- * A stacked phone flow would be a second Walkthrough; reuse the existing gate.
+ * `WALKTHROUGH_MIN_WIDTH`. `WalkthroughView` already stacks when the panel is
+ * under 720px; we do not unhide the Diff toolbar on phone or force side-by-side.
  */
 export const isMobileWalkthroughAvailable = (screenWidth: number): boolean => (
   Number.isFinite(screenWidth) && screenWidth >= WALKTHROUGH_MIN_WIDTH
+);
+
+/** Phone keeps the inline Git diff. Tablet hosts Desktop DiffView. */
+export const resolveMobileGitFileDiffHost = (screenWidth: number): 'inline' | 'desktop-diff' => (
+  isMobileWalkthroughAvailable(screenWidth) ? 'desktop-diff' : 'inline'
 );
 
 /**

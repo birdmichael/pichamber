@@ -10,6 +10,7 @@ import {
   isMobileWalkthroughAvailable,
   MOBILE_GIT_DIFF_SURFACE_MODE,
   MOBILE_GIT_PR_SURFACE_MODE,
+  resolveMobileGitFileDiffHost,
   resolveMobileReviewMode,
 } from './mobileWorkspaceReview';
 
@@ -25,7 +26,7 @@ beforeEach(() => {
 });
 
 describe('mobile Phase 2 review from Git', () => {
-  test('opens PR and Diff through the same Desktop context-panel actions', () => {
+  test('opens PR through the same Desktop context-panel action', () => {
     const directory = '/repo';
 
     expect(MOBILE_GIT_PR_SURFACE_MODE).toBe('pr');
@@ -36,12 +37,22 @@ describe('mobile Phase 2 review from Git', () => {
     expect(afterPr?.isOpen).toBe(true);
     expect(afterPr?.tabs.map((tab) => tab.mode)).toEqual(['pr']);
     expect(resolveMobileReviewMode(afterPr, 390)).toBe('pr');
+  });
 
-    useUIStore.getState().openContextDiff(directory, 'src/app.ts', false);
-    const afterDiff = useUIStore.getState().contextPanelByDirectory[directory];
+  test('phone file diffs stay inline; tablet file diffs use Desktop DiffView', () => {
+    expect(resolveMobileGitFileDiffHost(WALKTHROUGH_MIN_WIDTH - 1)).toBe('inline');
+    expect(resolveMobileGitFileDiffHost(WALKTHROUGH_MIN_WIDTH)).toBe('desktop-diff');
+
+    const phone = '/phone-repo';
+    expect(useUIStore.getState().contextPanelByDirectory[phone]).toBeUndefined();
+    expect(resolveMobileReviewMode(useUIStore.getState().contextPanelByDirectory[phone], 390)).toBe(null);
+
+    const tablet = '/tablet-repo';
+    useUIStore.getState().openContextDiff(tablet, 'src/app.ts', false);
+    const afterDiff = useUIStore.getState().contextPanelByDirectory[tablet];
     expect(afterDiff?.tabs.some((tab) => tab.mode === 'diff')).toBe(true);
     expect(afterDiff?.tabs.find((tab) => tab.id === afterDiff.activeTabId)?.mode).toBe('diff');
-    expect(resolveMobileReviewMode(afterDiff, 390)).toBe('diff');
+    expect(resolveMobileReviewMode(afterDiff, WALKTHROUGH_MIN_WIDTH)).toBe('diff');
   });
 
   test('opens PR on an empty repo and on a repo that already has a PR tab', () => {
@@ -54,12 +65,12 @@ describe('mobile Phase 2 review from Git', () => {
     expect(resolveMobileReviewMode(useUIStore.getState().contextPanelByDirectory[withPr], 390)).toBe('pr');
   });
 
-  test('opening Diff on a clean repo still hosts the Desktop diff surface', () => {
+  test('explicit Desktop Diff overlay still hosts on a clean repo', () => {
     const directory = '/clean-repo';
     useUIStore.getState().openContextDiff(directory, 'README.md', false);
     const panel = useUIStore.getState().contextPanelByDirectory[directory];
     expect(panel?.isOpen).toBe(true);
-    expect(resolveMobileReviewMode(panel, 390)).toBe('diff');
+    expect(resolveMobileReviewMode(panel, WALKTHROUGH_MIN_WIDTH)).toBe('diff');
   });
 
   test('Walkthrough is tablet-only at WALKTHROUGH_MIN_WIDTH', () => {

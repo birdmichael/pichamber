@@ -97,9 +97,10 @@ rail (`openContextSurface` / `openContextDiff`). They are not workspace tabs.
 
 | Opened from Git | Desktop surface id | Host |
 |---|---|---|
-| Pull Request button / PR chip | `pr` | `PullRequestView` |
-| File row (and chat pending-changes tap) | `diff` | `DiffView` |
-| Walkthrough button on PR or Diff | `walkthrough` | `WalkthroughView`, tablet-only (`WALKTHROUGH_MIN_WIDTH` / 768). Phone does not get a second stacked Walkthrough. |
+| Pull Request button / PR chip | `pr` | `PullRequestView` via `openContextSurface`. |
+| File row / pending-changes tap on phone (`< WALKTHROUGH_MIN_WIDTH`) | — | `MobileDiffDetail` + `PierreDiffViewer` inline. Does not open the Desktop Diff overlay. |
+| File row / pending-changes tap on tablet (`≥ WALKTHROUGH_MIN_WIDTH`) | `diff` | `DiffView` via `openContextDiff` so the Walkthrough toolbar can appear. |
+| Walkthrough button on PR or tablet Diff | `walkthrough` | `WalkthroughView`, tablet-only (`WALKTHROUGH_MIN_WIDTH` / 768). Phone does not unhide the Diff toolbar or force side-by-side. |
 
 Unsupported on mobile (documented, not silently missing):
 

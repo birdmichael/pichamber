@@ -21,9 +21,10 @@ extensions.
   Archive with restore, and footer Refresh. Work Status lives in the header context-ring overlay
   (`MobileWorkStatusHost` inside `MobileSessionMetadata`) and wraps Desktop sections (session,
   branch, context %, MCP, Subagents). The 300px chat-column card stays off. Workspace tabs are Git,
-  Files, Terminal, Notes, Plan (Feature Plugin gated), and MCP. Git opens Desktop Pull Request and
-  Diff (`openContextSurface` / `openContextDiff` → `PullRequestView` / `DiffView`). Walkthrough is
-  tablet-only at `WALKTHROUGH_MIN_WIDTH` (768). Browser is unsupported: mobile WebView cannot offer
+  Files, Terminal, Notes, Plan (Feature Plugin gated), and MCP. Git opens Desktop Pull Request
+  (`openContextSurface` → `PullRequestView`). Phone file diffs stay inline (`MobileDiffDetail`);
+  tablet width uses `openContextDiff` → `DiffView`. Walkthrough is tablet-only at
+  `WALKTHROUGH_MIN_WIDTH` (768). Browser is unsupported: mobile WebView cannot offer
   `persist:openchamber-browser`, and no reduced honest browser surface exists.
 
 ## Build pipeline (how a native build is produced)

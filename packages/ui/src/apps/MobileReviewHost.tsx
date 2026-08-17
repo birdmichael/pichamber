@@ -31,8 +31,9 @@ const REVIEW_TITLE_KEY: Record<MobileReviewMode, I18nKey> = {
 };
 
 /**
- * Touch host for Desktop PR / Diff / Walkthrough. Opened from Git with the
- * same `openContextSurface` / `openContextDiff` actions as the Desktop rail.
+ * Touch host for Desktop PR / tablet Diff / Walkthrough. Git opens PR with
+ * `openContextSurface`. Phone file rows stay on `MobileDiffDetail`; tablet
+ * width uses `openContextDiff` so the Diff toolbar Walkthrough can appear.
  * Walkthrough stays hidden below `WALKTHROUGH_MIN_WIDTH`.
  */
 export const MobileReviewHost: React.FC = () => {
