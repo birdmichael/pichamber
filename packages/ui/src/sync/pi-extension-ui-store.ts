@@ -2,12 +2,14 @@ import { create } from 'zustand';
 import { toast as sonnerToast } from 'sonner';
 
 import { toast } from '@/components/ui';
+import { formatMessage, useI18nStore } from '@/lib/i18n';
 import {
   isBlockingPiExtensionUiKind,
   parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
   type PiExtensionUiPrompt,
 } from './pi-extension-ui';
+import { localizePiPlanNotifyMessage, planNotifyDedupeKey } from './pi-plan-locale';
 
 const MAX_SETTLED_PER_SESSION = 20;
 const MAX_NOTIFIES = 20;
@@ -77,16 +79,20 @@ export const presentPiExtensionUiNotify = (notify: {
   const message = notify.message.trim();
   if (!message) return;
   const now = Date.now();
-  const last = recentNotifyAt.get(message) ?? 0;
+  const dedupeKey = planNotifyDedupeKey(message);
+  const last = recentNotifyAt.get(dedupeKey) ?? 0;
   if (now - last < NOTIFY_DEDUPE_MS) return;
-  recentNotifyAt.set(message, now);
+  recentNotifyAt.set(dedupeKey, now);
+  const visible = localizePiPlanNotifyMessage(message, (key) => (
+    formatMessage(useI18nStore.getState().dictionary, key)
+  ));
   const options = piExtensionUiNotifyToastOptions(notify.level);
   // Shared `toast.info` / `toast.success` inject an OK action that looks like a
   // confirm and sits on the composer. Info/warning notifies go through Sonner
   // directly so they auto-dismiss without a button. Errors keep Copy.
-  if (notify.level === 'error') toast.error(message, options);
-  else if (notify.level === 'warning') sonnerToast.warning(message, options);
-  else sonnerToast.info(message, options);
+  if (notify.level === 'error') toast.error(visible, options);
+  else if (notify.level === 'warning') sonnerToast.warning(visible, options);
+  else sonnerToast.info(visible, options);
 };
 
 const empty: PiExtensionUiPrompt[] = [];

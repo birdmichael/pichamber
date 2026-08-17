@@ -34,3 +34,15 @@ export function isContextPanelExpandedForMode(
 export function resolveDesktopActiveMainTab(tab: MainTab): MainTab {
   return tab === 'plan' ? 'chat' : tab;
 }
+
+/**
+ * On Pi, session Plan is `PiSessionPlanView`. Do not wait on Feature Plugins
+ * here — that store already gates the rail — or first paint is leftover
+ * OpenCode Plan.
+ */
+export function resolvePlanViewKind(options: {
+  isPiKernel: boolean;
+  targetPath?: string | null;
+}): 'pi-session' | 'opencode' {
+  return options.isPiKernel && !(options.targetPath || '').trim() ? 'pi-session' : 'opencode';
+}

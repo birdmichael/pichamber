@@ -45,8 +45,8 @@ import { Icon } from "@/components/icon/Icon";
 import { useMessageTTS } from '@/hooks/useMessageTTS';
 import { renderMagicPrompt } from '@/lib/magicPrompts';
 import { useI18n } from '@/lib/i18n';
+import { resolvePlanViewKind } from '@/lib/surfaces/planRail';
 import { usePiKernel } from '@/lib/usePiKernel';
-import { usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { PiSessionPlanView } from './PiSessionPlanView';
 
 type PlanViewProps = {
@@ -155,8 +155,7 @@ type SelectedLineRange = {
 
 export const PlanView: React.FC<PlanViewProps> = ({ targetPath = null, onNavigatedToChat }) => {
   const isPiKernel = usePiKernel();
-  const planPluginAvailable = usePiPlanPluginAvailable();
-  if (isPiKernel && planPluginAvailable && !targetPath) {
+  if (resolvePlanViewKind({ isPiKernel, targetPath }) === 'pi-session') {
     return <PiSessionPlanView />;
   }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { maybeOpenPlanRailOnReady, notePlanReadyCycle } from './pi-plan-ready';
 import {
   fetchSessionPlan,
   parseSessionPlan,
@@ -22,12 +23,15 @@ export const resetPiSessionPlanStore = (): void => {
 
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
+  const previous = usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   usePiSessionPlanStore.setState((state) => ({
     plansBySession: {
       ...state.plansBySession,
       [sessionID]: plan,
     },
   }));
+  notePlanReadyCycle(sessionID, plan);
+  maybeOpenPlanRailOnReady({ sessionID, previous, next: plan });
 };
 
 export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan | null> => {

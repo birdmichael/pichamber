@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Message, Part } from '@opencode-ai/sdk/v2';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 
@@ -15,11 +16,14 @@ type SessionMessageRecord = { info: Message; parts: Part[] };
  * The Header component subscribes to sessionPlanAvailable map to show/hide the Plan tab.
  */
 export const usePlanDetection = (sessionId: string, messageRecords: SessionMessageRecord[]) => {
+  const isPiKernel = usePiKernel();
   const planModeEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
   const markSessionPlanAvailable = useSessionUIStore((state) => state.markSessionPlanAvailable);
   const isSessionPlanAvailable = useSessionUIStore((state) => state.isSessionPlanAvailable);
 
   React.useEffect(() => {
+    // Leftover OpenCode English heuristics. Pi Plan is Feature Plugins + live status.
+    if (isPiKernel) return;
     // Early exit if plan mode is disabled - don't parse messages
     if (!planModeEnabled) return;
     if (!sessionId) return;
@@ -45,5 +49,5 @@ export const usePlanDetection = (sessionId: string, messageRecords: SessionMessa
         }
       }
     }
-  }, [planModeEnabled, sessionId, messageRecords, markSessionPlanAvailable, isSessionPlanAvailable]);
+  }, [isPiKernel, planModeEnabled, sessionId, messageRecords, markSessionPlanAvailable, isSessionPlanAvailable]);
 };

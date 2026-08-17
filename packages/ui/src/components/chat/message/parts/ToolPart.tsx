@@ -5,7 +5,7 @@ import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
 import { cn } from '@/lib/utils';
 import { SimpleMarkdownRenderer } from '../../MarkdownRenderer';
 import { MessageFilesDisplay } from '../../FileAttachment';
-import { getToolMetadata } from '@/lib/toolHelpers';
+import { resolveToolDisplayName } from '@/lib/toolHelpers';
 import type { ToolPart as ToolPartType, ToolState as ToolStateUnion, FilePart } from '@opencode-ai/sdk/v2';
 import { toolDisplayStyles } from '@/lib/typography';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
@@ -889,7 +889,8 @@ const TaskSummaryEntryRow = React.memo(({
     const label = getTaskSummaryLabel(entry);
     const hasLabel = label.trim().length > 0;
     const status = entry.state?.status;
-    const displayName = getToolMetadata(toolName).displayName;
+    const { t } = useI18n();
+    const displayName = resolveToolDisplayName(toolName, t);
 
     return (
         <ToolRevealOnMount animate={animateTailText} wipe>
@@ -1981,7 +1982,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     const normalizedPart = normalizedPartTool !== part.tool ? ({ ...part, tool: normalizedPartTool } as ToolPartType) : part;
     const descriptionPath = getToolDescriptionPath(normalizedPart, state, currentDirectory);
     const description = getToolDescription(normalizedPart, state, currentDirectory);
-    const displayName = getToolMetadata(normalizedPartTool || part.tool).displayName;
+    const displayName = resolveToolDisplayName(normalizedPartTool || part.tool, t);
     
     // Tool title/description — shown inline as context
     const justificationText = React.useMemo(() => {
@@ -2348,7 +2349,7 @@ class ToolPartErrorBoundary extends React.Component<{
 const ToolPart: React.FC<ToolPartProps> = (props) => {
     const { t } = useI18n();
     const toolName = normalizeToolName(props.part.tool) || 'tool';
-    const displayName = getToolMetadata(toolName).displayName;
+    const displayName = resolveToolDisplayName(toolName, t);
 
     return (
         <ToolPartErrorBoundary

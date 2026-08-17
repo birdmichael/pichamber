@@ -14,7 +14,8 @@ import { Text } from '@/components/ui/text';
 import { Icon } from "@/components/icon/Icon";
 import { FadeInOnReveal } from '../FadeInOnReveal';
 import { getToolIcon } from './toolPresentation';
-import { getToolMetadata } from '@/lib/toolHelpers';
+import { resolveToolDisplayName } from '@/lib/toolHelpers';
+import { useI18n } from '@/lib/i18n';
 import { isExpandableTool, isStandaloneTool, isStaticTool } from './toolRenderUtils';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -569,8 +570,9 @@ const StaticToolRowInner: React.FC<{
     activities: TurnActivityPart[];
     animateTailText: boolean;
 }> = ({ toolName, activities, animateTailText }) => {
+    const { t } = useI18n();
     const showToolFileIcons = useUIStore((state) => state.showToolFileIcons);
-    const displayName = getToolMetadata(toolName).displayName;
+    const displayName = resolveToolDisplayName(toolName, t);
     const icon = getToolIcon(toolName);
     const isReadGroup = toolName.toLowerCase() === 'read';
     const runtime = React.useContext(RuntimeAPIContext);

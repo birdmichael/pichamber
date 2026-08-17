@@ -57,6 +57,14 @@ describe('i18n dictionaries', () => {
     }
   });
 
+  test('plan-ready decision chrome is translated in zh-CN', () => {
+    expect(zhCnDict['chat.piPlan.enabledNotify']).not.toBe(enDict['chat.piPlan.enabledNotify']);
+    expect(zhCnDict['chat.piPlan.readySelect.title']).not.toBe(enDict['chat.piPlan.readySelect.title']);
+    expect(zhCnDict['chat.piPlan.readySelect.implementFresh']).not.toBe(enDict['chat.piPlan.readySelect.implementFresh']);
+    expect(zhCnDict['chat.tool.planModeComplete']).not.toBe(enDict['chat.tool.planModeComplete']);
+    expect(zhCnDict['chat.piPlan.readySelect.title']).toContain('/plan exit');
+  });
+
   test('empty-session draft titles stay native and keep {project}', () => {
     const englishTitle = enDict['chat.emptyState.draftTitle'];
     const englishTitleWithProject = enDict['chat.emptyState.draftTitleWithProject'];
