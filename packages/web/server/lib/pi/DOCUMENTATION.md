@@ -105,7 +105,8 @@ Resolution order:
    the pin-to-context runtime already listens for). Abort or failure of
    compact does not. Pin inject then loads each pinned id through
    `GET /api/session/:id/message/:messageID` (live `getMessages` entry, or
-   404).
+   404). The inject `prompt_async` model is a resolved catalog pair, not
+   leftover facade `pi`/`pi` — see `context-obligatory/DOCUMENTATION.md`.
 3. Live session extension commands — `record.piSession.prompt("/name args")`
    with `expandPromptTemplates` left on (Pi CLI path:
    `expandPromptTemplates` / `_tryExecuteExtensionCommand`). No facade user

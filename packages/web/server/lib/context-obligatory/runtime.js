@@ -1,7 +1,74 @@
 const FETCH_TIMEOUT_MS = 15_000;
 const MESSAGE_FETCH_LIMIT = 20;
+const FACADE_PLACEHOLDER_PROVIDER = 'pi';
+const FACADE_PLACEHOLDER_MODEL = 'pi';
 
 const isRecord = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const asTrimmed = (value) => (typeof value === 'string' ? value.trim() : '');
+
+/** Facade leftover assistants default to `pi`/`pi`. That pair is not a catalog model. */
+const asUsableModel = (providerID, modelID) => {
+  const provider = asTrimmed(providerID);
+  const model = asTrimmed(modelID);
+  if (!provider || !model) return null;
+  if (provider === FACADE_PLACEHOLDER_PROVIDER && model === FACADE_PLACEHOLDER_MODEL) return null;
+  return { providerID: provider, modelID: model };
+};
+
+const parseModelKey = (value) => {
+  const trimmed = asTrimmed(value);
+  const slash = trimmed.indexOf('/');
+  if (slash <= 0 || slash >= trimmed.length - 1) return null;
+  return asUsableModel(trimmed.slice(0, slash), trimmed.slice(slash + 1));
+};
+
+const modelFromRecord = (value) => {
+  if (!isRecord(value)) return parseModelKey(value);
+  return asUsableModel(value.providerID || value.provider, value.modelID || value.id)
+    || parseModelKey(value.model);
+};
+
+const modelFromMessageInfo = (info) => {
+  if (!isRecord(info)) return null;
+  return asUsableModel(info.providerID, info.modelID) || modelFromRecord(info.model);
+};
+
+const lastModelChange = (messages) => {
+  if (!Array.isArray(messages)) return null;
+  for (const message of messages.toReversed()) {
+    const parts = Array.isArray(message?.parts) ? message.parts : [];
+    for (const part of parts.toReversed()) {
+      if (part?.type !== 'model_change') continue;
+      const found = asUsableModel(part.providerID || part.provider, part.modelID || part.model)
+        || parseModelKey(part.model);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const lastUsableAssistantModel = (messages) => {
+  if (!Array.isArray(messages)) return null;
+  for (const message of messages.toReversed()) {
+    if (message?.info?.role !== 'assistant' || message.info.summary === true) continue;
+    const found = modelFromMessageInfo(message.info);
+    if (found) return found;
+  }
+  return null;
+};
+
+const resolveInjectModel = async ({ session, recent, executionInfo, directory, openCodeFetch }) => {
+  const resolved = modelFromMessageInfo(executionInfo)
+    || lastModelChange(recent)
+    || lastUsableAssistantModel(recent)
+    || modelFromRecord(session?.model);
+  if (resolved) return resolved;
+  const defaults = await openCodeFetch('/api/pi/defaults', { directory });
+  const fromDefaults = parseModelKey(defaults?.resolvedModel) || parseModelKey(defaults?.model);
+  if (fromDefaults) return fromDefaults;
+  throw new Error('no usable Pi provider/model for pin inject');
+};
 
 const readContextState = (session) => {
   const metadata = isRecord(session?.metadata) ? session.metadata : {};
@@ -93,10 +160,16 @@ export const createContextObligatoryRuntime = ({
 
     const executionInfo = recent.toReversed().find((message) =>
       message?.info?.role === 'assistant' && message.info.summary !== true)?.info;
-    const providerID = typeof executionInfo?.providerID === 'string' ? executionInfo.providerID : '';
-    const modelID = typeof executionInfo?.modelID === 'string' ? executionInfo.modelID : '';
-    if (!providerID || !modelID) throw new Error('no pre-compaction assistant provider/model');
-    const agent = typeof executionInfo.agent === 'string' ? executionInfo.agent : executionInfo.mode;
+    const { providerID, modelID } = await resolveInjectModel({
+      session,
+      recent,
+      executionInfo,
+      directory,
+      openCodeFetch,
+    });
+    const agent = typeof executionInfo?.agent === 'string'
+      ? executionInfo.agent
+      : executionInfo?.mode;
     await openCodeFetch(`/session/${encodeURIComponent(sessionId)}/prompt_async`, {
       directory,
       method: 'POST',
