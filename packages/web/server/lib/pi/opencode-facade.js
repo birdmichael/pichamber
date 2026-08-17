@@ -719,6 +719,17 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getMessages(req.params.sessionID));
   }));
 
+  app.get('/api/session/:sessionID/message/:messageID', handle(async (req, res) => {
+    await loadSession(req);
+    const message = host.getMessages(req.params.sessionID)
+      .find((entry) => entry?.info?.id === req.params.messageID);
+    if (!message) {
+      json(res, 404, { error: 'Message not found' });
+      return;
+    }
+    json(res, 200, message);
+  }));
+
   app.get('/api/session/:sessionID/subagent-runs', handle(async (req, res) => {
     const payload = typeof host.listSubagentRuns === 'function'
       ? await host.listSubagentRuns(req.params.sessionID, resolveDirectory(req))

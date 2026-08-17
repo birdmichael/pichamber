@@ -9,12 +9,14 @@ that event. On Pi, a finished `compaction_end` is translated to the same
 event (`sessionID` plus `directory`) so slash, UI, and API compact all hit
 this path. Abort or failure of compact does not emit `session.compacted`.
 
-It fetches every pinned message by ID, keeps non-empty text parts, sorts them
-by the stored creation time, and immediately sends one synthetic user part
-through `prompt_async`. OpenCode's session runner serializes this with its own
+It fetches every pinned message by ID (`GET /session/:id/message/:messageID`),
+keeps non-empty text parts, sorts them by the stored creation time, and
+immediately sends one synthetic user part through `prompt_async`. On Pi that
+by-id route reads the live host list (`{ info, parts }`) and 404s when the
+id is missing. OpenCode's session runner serializes this with its own
 post-compaction continuation. Missing individual messages are skipped without
-discarding the remaining context. Ordinary idle events perform no work and
-make no requests.
+discarding the remaining context. No pins means no `prompt_async`. Ordinary
+idle events perform no work and make no requests.
 
 After a successful send, the runtime merge-writes
 `context_obligatory_last_compaction_message_id`. The cursor is the OpenCode

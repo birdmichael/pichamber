@@ -67,7 +67,7 @@ All notable changes to this project will be documented in this file.
 - Chat: `/reload` is no longer a Pi slash command or Settings → Commands builtin. Applying settings still reloads skills and prompts.
 - Chat: on the Pi kernel, message Revert and composer shell / `/shell` are hidden because those actions are not implemented yet. Share stays hidden. OpenCode still offers revert and shell.
 - Chat: on Pi, a refresh button next to the session title reloads skills, prompts, and extensions for that session only. You can still switch sessions while it runs. Slash and Settings lists update afterward, and a short toast confirms the reload. It is disabled while that session is composing, streaming, or compacting.
-- Chat: on Pi, pinning a message to context now keeps it after compact, matching the tooltip.
+- Chat: on Pi, pinning a message to context now puts that text back after compact, matching the tooltip.
 
 ## [1.18.4] - 2026-08-14
 

@@ -37,12 +37,13 @@ export const dispatchPiSessionRequest = async (host, fetchPath, {
     return host.getStatus(directory || undefined);
   }
 
-  const match = pathname.match(/^\/session\/([^/]+)(?:\/([^/]+))?$/);
+  const match = pathname.match(/^\/session\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/);
   if (!match) {
     throw new Error(`Unsupported in-process Pi path: ${verb} ${pathname}`);
   }
   const sessionId = decodeSegment(match[1]);
   const rest = match[2] || '';
+  const leaf = match[3] ? decodeSegment(match[3]) : '';
 
   if (typeof host.ensureSession === 'function') {
     await host.ensureSession(sessionId, directory);
@@ -56,6 +57,17 @@ export const dispatchPiSessionRequest = async (host, fetchPath, {
   }
   if (rest === 'message' && verb === 'GET') {
     const messages = host.getMessages(sessionId);
+    if (leaf) {
+      const message = Array.isArray(messages)
+        ? messages.find((entry) => entry?.info?.id === leaf)
+        : null;
+      if (!message) {
+        const error = new Error('Message not found');
+        error.status = 404;
+        throw error;
+      }
+      return message;
+    }
     const limit = Number(query?.limit);
     if (Number.isFinite(limit) && limit > 0 && Array.isArray(messages) && messages.length > limit) {
       return messages.slice(-limit);

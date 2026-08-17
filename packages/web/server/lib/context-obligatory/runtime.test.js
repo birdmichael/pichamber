@@ -130,4 +130,65 @@ describe('context obligatory runtime', () => {
       .toBe('evt_compacted');
     runtime.stop();
   });
+
+  it('skips a 404 pin and still injects the remaining pinned text', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_gone', createdAt: 5, role: 'user' },
+            { id: 'msg_1', createdAt: 10, role: 'assistant' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'provider', modelID: 'model' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_gone') {
+        return new Response(JSON.stringify({ error: 'Message not found' }), { status: 404 });
+      }
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Still here' }] });
+      if (url.pathname === '/session/ses_1/prompt_async') return json({});
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(JSON.parse(prompt.body).parts[0].text).toContain('Still here');
+    expect(JSON.parse(prompt.body).parts[0].text).not.toContain('msg_gone');
+    runtime.stop();
+  });
+
+  it('does not prompt_async when a compact event has no pinned messages', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET' });
+      if (url.pathname === '/session/ses_1') return json({ id: 'ses_1', metadata: {} });
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1' },
+    });
+    expect(requests).toEqual([{ path: '/session/ses_1', method: 'GET' }]);
+    runtime.stop();
+  });
 });
