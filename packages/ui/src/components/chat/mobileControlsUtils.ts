@@ -16,7 +16,7 @@ const getCyclablePrimaryAgents = (agents: Agent[]) => agents.filter((agent) => i
 export const shouldShowMobileComposerAgentChip = (
     agents: ReadonlyArray<{ name: string; mode?: string | null }>,
 ): boolean => (
-    shouldShowComposerAgentChip(agents.filter((agent) => isPrimaryMode(agent.mode)))
+    shouldShowComposerAgentChip(agents.filter((agent) => isPrimaryMode(agent.mode ?? undefined)))
 );
 
 export const getCycledPrimaryAgentName = (
