@@ -488,6 +488,22 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode && !ctx.isWindowsArm64,
   },
   {
+    id: 'sessions.pi-agent-directory',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.field.directory',
+    descriptionKey: 'settings.openchamber.piAgent.field.directoryInfo',
+    keywords: ['pi', 'agent', 'directory', 'agent directory', 'PI_CODING_AGENT_DIR', 'auth.json', 'models.json'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
+    id: 'sessions.pi-update-notifications',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.field.showUpdateNotifications',
+    descriptionKey: 'settings.openchamber.piAgent.field.showUpdateNotificationsInfo',
+    keywords: ['pi', 'update', 'updates', 'notifications', 'update notifications', 'sdk'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
     id: 'sessions.agent-control-tool',
     page: 'general',
     titleKey: 'settings.openchamber.tools.field.agentControlTool',

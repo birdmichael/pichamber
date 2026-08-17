@@ -2970,6 +2970,8 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.available.description': 'Android용 버전 {version}이 준비되었습니다.',
   'mobileUpdate.toast.actions.download': '다운로드',
   'mobileUpdate.toast.actions.dismiss': '닫기',
+  'piUpdate.toast.available.title': 'Pi {version} 사용 가능',
+  'piUpdate.toast.actions.dismiss': '닫기',
   'opencodeUpdate.toast.available.title': 'Pi 업데이트',
   'opencodeUpdate.toast.available.description': '버전 {version} 사용 가능.',
   'opencodeUpdate.toast.actions.update': '업데이트',

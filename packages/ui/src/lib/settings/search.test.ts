@@ -288,11 +288,59 @@ describe('settings search', () => {
       t,
       getPageTitle,
     });
+    const piBinary = buildSettingsSearchResults({
+      query: 'OpenCode binary',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
 
     expect(piDesktop.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
     expect(piBrowser.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
     expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
     expect(leftoverOpenCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(piBinary.some((result) => result.id === 'sessions.opencode-binary')).toBe(false);
+    expect(piBinary.some((result) => result.id === 'sessions.opencode-update-notifications')).toBe(false);
+  });
+
+  test('finds the Pi agent directory and update-notification rows on Pi', () => {
+    const getPageTitle = (page: string) => page;
+    const directory = buildSettingsSearchResults({
+      query: 'agent directory',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const env = buildSettingsSearchResults({
+      query: 'PI_CODING_AGENT_DIR',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const updates = buildSettingsSearchResults({
+      query: 'update notifications',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const leftover = buildSettingsSearchResults({
+      query: 'agent directory',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: false, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const vsCode = buildSettingsSearchResults({
+      query: 'pi',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(directory.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
+    expect(env.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
+    expect(updates.some((result) => result.id === 'sessions.pi-update-notifications')).toBe(true);
+    expect(leftover.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
+    expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });
 
   test('shows the agent-control tool on Pi Desktop search and hides both tools in VS Code', () => {
@@ -320,6 +368,7 @@ describe('settings search', () => {
     expect(piScheduled.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
     expect(vsCode.some((result) => result.id === 'sessions.agent-control-tool')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
+    expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });
 
   test('lands Feature Plugins search on each slot card', () => {

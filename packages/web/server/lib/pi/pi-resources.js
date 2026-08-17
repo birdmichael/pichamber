@@ -156,7 +156,93 @@ const walkFiles = (root, predicate, results = [], seen = new Set()) => {
   return results;
 };
 
-export const resolvePiAgentDir = (home = os.homedir()) => path.join(home, '.pi', 'agent');
+export const PI_CODING_AGENT_DIR_ENV = 'PI_CODING_AGENT_DIR';
+
+const openchamberSettingsFile = (home = os.homedir()) => path.join(
+  process.env.OPENCHAMBER_DATA_DIR
+    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
+    : path.join(home, '.config', 'openchamber'),
+  'settings.json',
+);
+
+export const stripWrappingQuotes = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (trimmed.length >= 2
+    && ((trimmed.startsWith('"') && trimmed.endsWith('"'))
+      || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
+export const expandPiAgentDirPath = (value, home = os.homedir()) => {
+  const trimmed = stripWrappingQuotes(value);
+  if (!trimmed) return '';
+  if (trimmed === '~') return home;
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    return path.join(home, trimmed.slice(2));
+  }
+  return path.isAbsolute(trimmed) ? trimmed : path.resolve(home, trimmed);
+};
+
+export const readPersistedPiAgentDir = (home = os.homedir()) => {
+  try {
+    const settings = JSON.parse(readText(openchamberSettingsFile(home)));
+    if (typeof settings?.piAgentDir === 'string' && settings.piAgentDir.trim()) {
+      return settings.piAgentDir;
+    }
+  } catch {
+  }
+  return '';
+};
+
+export const resolvePiAgentDir = (home = os.homedir(), options = {}) => {
+  const setting = Object.prototype.hasOwnProperty.call(options, 'piAgentDir')
+    ? options.piAgentDir
+    : (typeof options.readSetting === 'function' ? options.readSetting() : readPersistedPiAgentDir(home));
+  if (typeof setting === 'string' && setting.trim()) {
+    return expandPiAgentDirPath(setting, home);
+  }
+  const env = options.env || process.env;
+  const envDir = env?.[PI_CODING_AGENT_DIR_ENV];
+  if (typeof envDir === 'string' && envDir.trim()) {
+    return expandPiAgentDirPath(envDir, home);
+  }
+  return path.join(home, '.pi', 'agent');
+};
+
+export const assertUsablePiAgentDir = (value, home = os.homedir()) => {
+  const resolved = expandPiAgentDirPath(value, home);
+  if (!resolved) return '';
+  try {
+    const stat = fs.statSync(resolved);
+    if (!stat.isDirectory()) {
+      const error = new Error('Pi agent directory must be a folder, not a file.');
+      error.status = 400;
+      error.code = 'pi_agent_dir_not_directory';
+      throw error;
+    }
+    fs.accessSync(resolved, fs.constants.R_OK);
+    return resolved;
+  } catch (error) {
+    if (error?.status) throw error;
+    if (error?.code === 'ENOENT') {
+      try {
+        fs.mkdirSync(resolved, { recursive: true });
+        return resolved;
+      } catch (createError) {
+        const next = new Error(createError?.message || 'Could not create the Pi agent directory.');
+        next.status = 400;
+        next.code = 'pi_agent_dir_not_creatable';
+        throw next;
+      }
+    }
+    const next = new Error(error?.message || 'Pi agent directory is not usable.');
+    next.status = 400;
+    next.code = 'pi_agent_dir_unusable';
+    throw next;
+  }
+};
 
 export const resolvePiDefaultsPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'pichamber.json');
 
@@ -655,7 +741,7 @@ export const deletePiProviderConfig = ({
 
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
-    { root: path.join(home, '.pi', 'agent', 'skills'), scope: 'user', source: 'pi' },
+    { root: path.join(resolvePiAgentDir(home), 'skills'), scope: 'user', source: 'pi' },
     { root: path.join(home, '.agents', 'skills'), scope: 'user', source: 'agents' },
   ];
   if (directory) {
@@ -669,7 +755,7 @@ export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
 
 export const listPiPromptRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
-    { root: path.join(home, '.pi', 'agent', 'prompts'), scope: 'user', source: 'pi' },
+    { root: path.join(resolvePiAgentDir(home), 'prompts'), scope: 'user', source: 'pi' },
   ];
   if (directory) {
     roots.push({ root: path.join(directory, '.pi', 'prompts'), scope: 'project', source: 'pi' });

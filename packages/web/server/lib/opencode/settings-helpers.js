@@ -1,3 +1,5 @@
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
+
 export const createSettingsHelpers = (dependencies) => {
   const {
     normalizePathForPersistence,
@@ -175,6 +177,12 @@ export const createSettingsHelpers = (dependencies) => {
     if (typeof candidate.opencodeBinary === 'string') {
       const normalized = normalizeDirectoryPath(candidate.opencodeBinary).trim();
       result.opencodeBinary = normalized;
+    }
+    // Optional override for the Pi agent directory. Empty string clears so
+    // the host falls back to PI_CODING_AGENT_DIR or ~/.pi/agent.
+    if (typeof candidate.piAgentDir === 'string') {
+      const normalized = normalizeDirectoryPath(candidate.piAgentDir).trim();
+      result.piAgentDir = normalized;
     }
     if (typeof candidate.workStatusPanelEnabled === 'boolean') {
       result.workStatusPanelEnabled = candidate.workStatusPanelEnabled;
@@ -907,6 +915,7 @@ export const createSettingsHelpers = (dependencies) => {
 
     return {
       ...sanitized,
+      piAgentDirResolved: resolvePiAgentDir(),
       hasManagedRemoteTunnelToken,
       ...(pwaAppName ? { pwaAppName } : {}),
       pwaOrientation,

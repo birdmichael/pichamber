@@ -2784,6 +2784,8 @@ export const dict = {
   'mobileUpdate.toast.available.description': 'Version {version} ist für Android bereit.',
   'mobileUpdate.toast.actions.download': 'Herunterladen',
   'mobileUpdate.toast.actions.dismiss': 'Ablehnen',
+  'piUpdate.toast.available.title': 'Pi {version} verfügbar',
+  'piUpdate.toast.actions.dismiss': 'Ablehnen',
   'opencodeUpdate.toast.available.title': 'Pi-Update',
   'opencodeUpdate.toast.available.description': 'Version {version} verfügbar.',
   'opencodeUpdate.toast.actions.update': 'Aktualisieren',

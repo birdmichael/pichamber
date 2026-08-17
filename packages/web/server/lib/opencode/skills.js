@@ -21,6 +21,7 @@ import {
   findWorktreeRoot,
 } from './shared.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
 
 const BUILT_IN_SKILL_LOCATION = '<built-in>';
 
@@ -33,7 +34,7 @@ function getProjectPiSkillPath(workingDirectory, skillName) {
 }
 
 function getUserPiSkillDir(skillName) {
-  return path.join(os.homedir(), '.pi', 'agent', 'skills', skillName);
+  return path.join(resolvePiAgentDir(os.homedir()), 'skills', skillName);
 }
 
 function getUserPiSkillPath(skillName) {
@@ -165,7 +166,7 @@ function pathHasSkillRoot(resolvedPath, rootSegments) {
 
 function isPiSkillPath(resolvedPath, home = os.homedir()) {
   if (pathHasSkillRoot(resolvedPath, ['.pi', 'skills'])) return true;
-  return isPathInside(resolvedPath, path.resolve(home, '.pi', 'agent', 'skills'));
+  return isPathInside(resolvedPath, path.join(resolvePiAgentDir(home), 'skills'));
 }
 
 function isOpenCodeSkillPath(resolvedPath, home = os.homedir()) {
@@ -296,7 +297,7 @@ function getSkillWritePath(skillName, workingDirectory, requestedScope) {
 function discoverSkills(workingDirectory) {
   const skills = new Map();
 
-  const homePiSkills = path.join(os.homedir(), '.pi', 'agent', 'skills');
+  const homePiSkills = path.join(resolvePiAgentDir(os.homedir()), 'skills');
   for (const skillMdPath of walkSkillMdFiles(homePiSkills)) {
     addSkillFromMdFile(skills, skillMdPath, SKILL_SCOPE.USER, 'pi');
   }
@@ -769,7 +770,7 @@ function getManagedSkillRoots(workingDirectory) {
   };
   const piKernel = isPiKernelEnabled();
 
-  pushRoot(path.join(os.homedir(), '.pi', 'agent', 'skills'));
+  pushRoot(path.join(resolvePiAgentDir(os.homedir()), 'skills'));
   if (!piKernel) {
     pushRoot(SKILL_DIR);
     pushRoot(path.join(OPENCODE_CONFIG_DIR, 'skill'));

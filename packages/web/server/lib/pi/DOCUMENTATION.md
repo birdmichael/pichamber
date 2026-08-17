@@ -4,10 +4,30 @@ Owning module for the in-process Pi kernel: session host, OpenCode-shaped
 HTTP/SSE facade, Desktop `ctx.ui`, command dispatch, and reload. Product
 behavior is documented in `docs/PICHAMBER.md`.
 
+## Pi agent directory
+
+`resolvePiAgentDir` is the only resolver. Order:
+
+1. Non-empty persisted `settings.piAgentDir` (`~/.config/openchamber/settings.json`)
+2. `process.env.PI_CODING_AGENT_DIR`
+3. `{home}/.pi/agent`
+
+Do not mutate `PI_CODING_AGENT_DIR` from the UI. Pass the resolved path into
+SDK calls (`agentDir`, `authPath`, `modelsPath`, `SettingsManager`,
+`SessionManager`, `ModelRuntime.create`). `host.reload()` re-resolves; a
+settings write without reload leaves the live host on the previous tree.
+Empty string clears the override. Changing the directory does not copy
+`~/.pi/agent`. Creating an empty agent dir on first use is OK.
+
+`GET /api/path` and `getKernelInfo().paths` report the resolved dir.
+`GET /api/pi/upgrade-status` compares the installed
+`@earendil-works/pi-coding-agent` with npm and returns
+`upgrade.supported: false` (`reason: "bundled"`).
+
 ## Custom provider context windows
 
 Settings → Providers custom-model rows persist Pi `contextWindow` on that
-model in `~/.pi/agent/models.json` (and project `.pi/models.json`). Save
+model in `{agentDir}/models.json` (and project `.pi/models.json`). Save
 must not strip a user-set or provider-reported window. Empty on a known
 id writes that id's published window from the UI table (`grok-4.6` =
 500k). Empty on an unknown id stays omitted — do not invent a window that
@@ -119,7 +139,7 @@ Resolution order:
    `expandPromptTemplates` / `_tryExecuteExtensionCommand`). No facade user
    bubble. Live source is `getCommands()` when present, otherwise
    `extensionRunner.getRegisteredCommands()`.
-4. Markdown prompts from `listPiCommands` (`~/.pi/agent/prompts` and project
+4. Markdown prompts from `listPiCommands` (`{agentDir}/prompts` and project
    `.pi/prompts`) — expand `$ARGUMENTS` and send as chat via `promptAsync`.
 5. Other live `getCommands()` entries (`prompt` / `skill`) — same
    `session.prompt` path as the Pi CLI.
@@ -132,7 +152,7 @@ Resolution order:
 `GET /api/command` (and `/command`) returns the OpenCode command shape:
 
 - builtins + markdown prompts from `listPiCommands` (`compact`, `login`,
-  custom prompts — not `reload`)
+  custom prompts from `{agentDir}/prompts` — not `reload`)
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
 - Feature Plugins slash names that must appear before a session exists
@@ -168,7 +188,7 @@ and scheduled tasks. `schedule.status` stays CLI-only. Session
 create/send/fork/list/status/messages go through the in-process host
 (`createSession`, `promptAsync`, `forkSession`, `getMessages`, `getStatus`,
 `listSessionInfos`) — never HTTP to the local facade, which deadlocks the
-same Bun process. `models.list` reads `host.getDefaults()` / `~/.pi/agent`,
+same Bun process. `models.list` reads `host.getDefaults()` / the resolved agent dir,
 not leftover OpenCode settings. `agent` accepts only the live Pi primary
 (`pi`) or omit; leftover OpenCode names are 400. `goal: true` dispatches
 Feature Plugins `/goal` via `host.runCommand` when that slot is
@@ -199,8 +219,10 @@ Budgets stay `browser.open` 45s and 20s for the other actions. No Electron
 client claiming `browser=1` returns 503 immediately. Mobile, VS Code, and
 hosted web still cannot drive a page.
 
-Settings → Pichamber Tools shows both rows on Pi Desktop (Agent control +
-Pichamber Web). Toggle persist then `host.reloadIdleSessions()` /
+Settings → Pichamber Tools is leftover OpenCode-kernel chrome. On Pi,
+Settings → General shows the Pi agent directory and update notifications
+instead. Host tools still attach from persisted flags when those leftover
+settings exist. Toggle persist then `host.reloadIdleSessions()` /
 `POST /api/pi/sessions/reload-idle`. Do not call leftover OpenCode restart.
 A busy session is skipped (409 on a targeted reload) and keeps the previous
 tool set until it is idle. Mock kernel sessions get a tool only when a test

@@ -24,6 +24,7 @@ import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { opencodeClient } from '@/lib/opencode/client';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
 import { shouldLoadAvailableProviders } from './providerAvailability';
 import {
   getOAuthAuthMethods,
@@ -146,6 +147,7 @@ const parseProvidersPayload = (payload: unknown): ProviderOption[] => {
 export const ProvidersPage: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const piAgentDir = useResolvedPiAgentDir();
   const providers = useConfigStore((state) => state.providers);
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
@@ -532,7 +534,7 @@ export const ProvidersPage: React.FC = () => {
         <div className="text-center text-muted-foreground">
           <Icon name="stack" className="mx-auto mb-3 h-12 w-12 opacity-50" />
           <p className="typography-body">{t('settings.providers.page.empty.noProvidersDetected')}</p>
-          <p className="typography-meta mt-1 opacity-75">{t('settings.providers.page.empty.checkOpenCodeConfiguration')}</p>
+          <p className="typography-meta mt-1 opacity-75">{t('settings.providers.page.empty.checkOpenCodeConfiguration', { path: piAgentDir })}</p>
         </div>
       </div>
     );

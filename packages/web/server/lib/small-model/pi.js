@@ -4,6 +4,7 @@ import os from 'os';
 import { isPiKernelEnabled } from '../pi/kernel.js';
 import {
   readPiDefaults,
+  resolvePiAgentDir,
   resolvePiAuthPath,
   resolvePiModelsPath,
 } from '../pi/pi-resources.js';
@@ -195,7 +196,12 @@ const getModelRuntime = async () => {
   if (!modelRuntimePromise) {
     modelRuntimePromise = (async () => {
       const { ModelRuntime } = await import('@earendil-works/pi-coding-agent');
-      return ModelRuntime.create({ allowModelNetwork: false });
+      return ModelRuntime.create({
+        allowModelNetwork: false,
+        authPath: resolvePiAuthPath(),
+        modelsPath: resolvePiModelsPath(),
+        agentDir: resolvePiAgentDir(),
+      });
     })().catch((error) => {
       modelRuntimePromise = null;
       throw error;

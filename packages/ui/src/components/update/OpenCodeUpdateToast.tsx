@@ -12,6 +12,7 @@ import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import {
   resolveOpenCodeUpdateVersion,
   resolveOpenCodeUpgradeStatusVersion,
+  resolvePiUpgradeStatusVersion,
   shouldShowOpenCodeUpdateToast,
   type OpenCodeUpgradeStatusLike,
 } from './openCodeUpdateDedup';
@@ -90,7 +91,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
     } finally {
       upgradingRef.current = false;
     }
-  }, [reloadOpenCode, t]);
+  }, [isPiKernel, reloadOpenCode, t]);
 
   React.useEffect(() => {
     const showUpdateAvailableToast = (version: string) => {
@@ -111,6 +112,24 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
       seenVersionsRef.current.add(version);
 
+      const dismiss = () => {
+        getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, version);
+        void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: version });
+        toast.dismiss(UPDATE_TOAST_ID);
+      };
+
+      if (isPiKernel) {
+        toast.info(t('piUpdate.toast.available.title', { version }), {
+          id: UPDATE_TOAST_ID,
+          duration: Infinity,
+          cancel: {
+            label: t('piUpdate.toast.actions.dismiss'),
+            onClick: dismiss,
+          },
+        });
+        return;
+      }
+
       toast.info(t('opencodeUpdate.toast.available.title'), {
         id: UPDATE_TOAST_ID,
         description: t('opencodeUpdate.toast.available.description', { version }),
@@ -121,11 +140,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
         },
         cancel: {
           label: t('opencodeUpdate.toast.actions.dismiss'),
-          onClick: () => {
-            getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, version);
-            void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: version });
-            toast.dismiss(UPDATE_TOAST_ID);
-          },
+          onClick: dismiss,
         },
       });
     };
@@ -135,10 +150,13 @@ export const OpenCodeUpdateToast: React.FC = () => {
 
     const checkForUpdate = async (attempt: number, runtimeKey = getRuntimeKey()) => {
       try {
-        const response = await runtimeFetch('/api/opencode/upgrade-status', { headers: { Accept: 'application/json' } });
-        if (!response.ok) throw new Error(response.statusText || 'Pi upgrade status check failed');
+        const path = isPiKernel ? '/api/pi/upgrade-status' : '/api/opencode/upgrade-status';
+        const response = await runtimeFetch(path, { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error(response.statusText || 'Upgrade status check failed');
         const status = await response.json().catch(() => null) as OpenCodeUpgradeStatusLike | null;
-        const version = resolveOpenCodeUpgradeStatusVersion(status);
+        const version = isPiKernel
+          ? resolvePiUpgradeStatusVersion(status)
+          : resolveOpenCodeUpgradeStatusVersion(status);
         if (!cancelled && runtimeKey === getRuntimeKey() && version) {
           showUpdateAvailableToast(version);
         }
@@ -157,7 +175,6 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
     };
 
-    if (isPiKernel) return;
     if (showOpenCodeUpdateNotifications) {
       timeoutIds.push(setTimeout(() => { void checkForUpdate(0); }, INITIAL_CHECK_DELAY_MS));
     }

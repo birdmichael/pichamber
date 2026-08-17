@@ -2936,6 +2936,8 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.available.description': '版本 {version} 已可用于 Android。',
   'mobileUpdate.toast.actions.download': '下载',
   'mobileUpdate.toast.actions.dismiss': '忽略',
+  'piUpdate.toast.available.title': 'Pi {version} 可用',
+  'piUpdate.toast.actions.dismiss': '忽略',
   'opencodeUpdate.toast.available.title': 'Pi 更新',
   'opencodeUpdate.toast.available.description': '版本 {version} 可用。',
   'opencodeUpdate.toast.actions.update': '更新',

@@ -10,6 +10,7 @@ import { Icon } from "@/components/icon/Icon";
 import { opencodeClient } from '@/lib/opencode/client';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
 import { SETTINGS_PANEL_TITLE_CLASS } from '@/components/sections/shared/SettingsSection';
 
 const ADD_PROVIDER_ID = '__add_provider__';
@@ -40,6 +41,7 @@ interface ProvidersSidebarProps {
 
 export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect }) => {
   const { t } = useI18n();
+  const piAgentDir = useResolvedPiAgentDir();
   const providers = useConfigStore((state) => state.providers);
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
@@ -136,7 +138,7 @@ export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect
           <div className="py-12 px-4 text-center text-muted-foreground">
             <Icon name="stack" className="mx-auto mb-3 h-10 w-10 opacity-50" />
             <p className="typography-ui-label font-medium">{t('settings.providers.sidebar.empty.title')}</p>
-            <p className="typography-meta mt-1 opacity-75">{t('settings.providers.sidebar.empty.description')}</p>
+            <p className="typography-meta mt-1 opacity-75">{t('settings.providers.sidebar.empty.description', { path: piAgentDir })}</p>
           </div>
         ) : (
           <>

@@ -27,6 +27,9 @@ import {
   deletePiProviderConfig,
   writePiProviderAuth,
   removePiProviderAuth,
+  resolvePiAgentDir,
+  resolvePiAuthPath,
+  resolvePiModelsPath,
 } from './pi-resources.js';
 import {
   createSdkPackageManager,
@@ -412,13 +415,13 @@ const defaultHome = () => os.homedir();
 export const sessionDirForCwd = (cwd, home = defaultHome()) => {
   const resolvedCwd = path.resolve(cwd || process.cwd());
   const safePath = `--${resolvedCwd.replace(/^[/\\]/, '').replace(/[/\\:]/g, '-')}--`;
-  return path.join(home, '.pi', 'agent', 'sessions', safePath);
+  return path.join(resolvePiAgentDir(home), 'sessions', safePath);
 };
 
 const findSessionFileById = (sessionID, home) => {
   const id = typeof sessionID === 'string' ? sessionID.trim() : '';
   if (!id) return undefined;
-  const root = path.join(home, '.pi', 'agent', 'sessions');
+  const root = path.join(resolvePiAgentDir(home), 'sessions');
   if (!fs.existsSync(root)) return undefined;
   let projects;
   try {
@@ -942,7 +945,7 @@ export const createPiHost = ({
   let modelRuntime = null;
   let modelRuntimeError = null;
   let readyPromise = null;
-  const agentDir = path.join(home, '.pi', 'agent');
+  const resolveAgentDir = () => resolvePiAgentDir(home);
 
   const emit = (directory, ocEvent) => {
     if (typeof onEvent === 'function') {
@@ -1028,7 +1031,7 @@ export const createPiHost = ({
       return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
         const { session } = await pi.createAgentSession({
           cwd,
-          agentDir,
+          agentDir: resolveAgentDir(),
           modelRuntime: runtime,
           ...(model ? { model } : {}),
           sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
@@ -1050,7 +1053,13 @@ export const createPiHost = ({
         modelRuntime = await createModelRuntime();
       } else {
         const pi = await loadPiSdk();
-        modelRuntime = await pi.ModelRuntime.create({ allowModelNetwork: false });
+        const agentDir = resolveAgentDir();
+        modelRuntime = await pi.ModelRuntime.create({
+          allowModelNetwork: false,
+          authPath: resolvePiAuthPath(home),
+          modelsPath: resolvePiModelsPath(home),
+          agentDir,
+        });
       }
     } catch (error) {
       modelRuntimeError = error;
@@ -1098,7 +1107,7 @@ export const createPiHost = ({
       };
       const runtime = await pi.createAgentSessionRuntime(factory, {
         cwd: directory,
-        agentDir,
+        agentDir: resolveAgentDir(),
         sessionManager: pi.SessionManager.inMemory(directory),
       });
       directoryRuntimes.set(directory, runtime);
@@ -1964,12 +1973,13 @@ export const createPiHost = ({
     },
     getPath(directory) {
       const cwd = directory || defaultDirectory;
+      const agentDir = resolveAgentDir();
       return {
         home,
         directory: cwd,
         worktree: cwd,
-        state: path.join(home, '.pi', 'agent'),
-        config: path.join(home, '.pi', 'agent'),
+        state: agentDir,
+        config: agentDir,
       };
     },
     listSkills(directory) {
@@ -2078,10 +2088,10 @@ export const createPiHost = ({
         thinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
         paths: {
           home,
-          agent: path.join(home, '.pi', 'agent'),
-          models: path.join(home, '.pi', 'agent', 'models.json'),
-          skills: path.join(home, '.pi', 'agent', 'skills'),
-          prompts: path.join(home, '.pi', 'agent', 'prompts'),
+          agent: resolveAgentDir(),
+          models: resolvePiModelsPath(home),
+          skills: path.join(resolveAgentDir(), 'skills'),
+          prompts: path.join(resolveAgentDir(), 'prompts'),
         },
       };
     },
@@ -2721,7 +2731,7 @@ export const createPiHost = ({
         return createPackageManager({
           cwd: defaultDirectory,
           home,
-          agentDir: path.join(home, '.pi', 'agent'),
+          agentDir: resolveAgentDir(),
         });
       }
       if (mock) {

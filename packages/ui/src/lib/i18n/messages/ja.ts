@@ -2966,6 +2966,8 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.available.description': 'バージョン{version}をAndroidで利用できます。',
   'mobileUpdate.toast.actions.download': 'ダウンロード',
   'mobileUpdate.toast.actions.dismiss': '閉じる',
+  'piUpdate.toast.available.title': 'Pi {version} が利用可能です',
+  'piUpdate.toast.actions.dismiss': '閉じる',
   'opencodeUpdate.toast.available.title': 'Pi更新',
   'opencodeUpdate.toast.available.description': 'バージョン{version}が利用可能です。',
   'opencodeUpdate.toast.actions.update': '更新',

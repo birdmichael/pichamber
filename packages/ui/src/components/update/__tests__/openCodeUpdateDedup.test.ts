@@ -3,6 +3,7 @@ import { describe, test, expect } from 'bun:test';
 import {
     resolveOpenCodeUpdateVersion,
     resolveOpenCodeUpgradeStatusVersion,
+    resolvePiUpgradeStatusVersion,
     shouldShowOpenCodeUpdateToast,
     shouldShowPwaInstallToast,
 } from '../openCodeUpdateDedup';
@@ -254,5 +255,44 @@ describe('resolveOpenCodeUpgradeStatusVersion', () => {
                 latestVersion: null,
             }),
         ).toBe('');
+    });
+});
+
+describe('resolvePiUpgradeStatusVersion', () => {
+    test('returns the latest SDK version when available even if upgrade is unsupported', () => {
+        expect(
+            resolvePiUpgradeStatusVersion({
+                available: true,
+                latestVersion: '0.90.0',
+                upgrade: { supported: false },
+            }),
+        ).toBe('0.90.0');
+    });
+
+    test('does not treat leftover OpenCode upgrade.supported as required', () => {
+        expect(
+            resolveOpenCodeUpgradeStatusVersion({
+                available: true,
+                latestVersion: '0.90.0',
+                upgrade: { supported: false },
+            }),
+        ).toBe('');
+        expect(
+            resolvePiUpgradeStatusVersion({
+                available: true,
+                latestVersion: '0.90.0',
+                upgrade: { supported: false },
+            }),
+        ).toBe('0.90.0');
+    });
+
+    test('returns empty string when the check did not find an update', () => {
+        expect(
+            resolvePiUpgradeStatusVersion({
+                available: false,
+                latestVersion: '0.90.0',
+            }),
+        ).toBe('');
+        expect(resolvePiUpgradeStatusVersion(null)).toBe('');
     });
 });

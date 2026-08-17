@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import yaml from 'yaml';
 import { isPiKernelEnabled } from '../pi/kernel.js';
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
 
 const OPENCODE_CONFIG_DIR = path.join(os.homedir(), '.config', 'opencode');
 const GLOBAL_SNIPPET_DIR = path.join(OPENCODE_CONFIG_DIR, 'snippet');
@@ -29,8 +30,8 @@ function getProjectSnippetDirs(workingDirectory) {
 function getGlobalSnippetDirs() {
   if (isPiKernelEnabled()) {
     return [
-      path.join(os.homedir(), '.pi', 'agent', 'snippets'),
-      path.join(os.homedir(), '.pi', 'agent', 'snippet'),
+      path.join(resolvePiAgentDir(os.homedir()), 'snippets'),
+      path.join(resolvePiAgentDir(os.homedir()), 'snippet'),
     ];
   }
   return [GLOBAL_SNIPPET_DIR_ALT, GLOBAL_SNIPPET_DIR];
@@ -156,7 +157,7 @@ function getWritableSnippetDir(scope, workingDirectory) {
       if (!workingDirectory) throw new Error('Project directory is required for project snippets');
       return path.join(workingDirectory, '.pi', 'snippets');
     }
-    return path.join(os.homedir(), '.pi', 'agent', 'snippets');
+    return path.join(resolvePiAgentDir(os.homedir()), 'snippets');
   }
   if (scope === 'project') {
     if (!workingDirectory) throw new Error('Project directory is required for project snippets');
