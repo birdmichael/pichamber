@@ -26,8 +26,12 @@ other.
 
 ## Invariants
 
-- Session status and messages come from official directory-scoped OpenCode
-  APIs. Message output includes only ordered `text` parts.
+- On leftover `OPENCHAMBER_KERNEL=opencode`, session status and messages
+  come from official directory-scoped OpenCode APIs. On the Pi kernel,
+  those same actions use the in-process host (`getStatus`, `getMessages`,
+  `listSessionInfos`, `createSession`, `promptAsync`, `forkSession`) and
+  must not HTTP-loopback to the local facade. Message output includes only
+  ordered `text` parts.
 - Wait never treats an initial idle response as completion after dispatch. It
   requires observed activity or a newly completed assistant message.
 - Timeout and cancellation are failures, never authoritative idle results.

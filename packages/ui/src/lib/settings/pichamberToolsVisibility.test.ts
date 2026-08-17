@@ -11,8 +11,9 @@ describe('Pichamber Tools settings visibility', () => {
     expect(shouldShowPichamberToolsSettings({ isVSCode: true })).toBe(false);
   });
 
-  test('hides the agent-control row on Pi', () => {
-    expect(shouldShowAgentControlToolSettings({ isPiKernel: true })).toBe(false);
-    expect(shouldShowAgentControlToolSettings({ isPiKernel: false })).toBe(true);
+  test('shows the agent-control row on Pi Desktop and leftover OpenCode Desktop', () => {
+    expect(shouldShowAgentControlToolSettings({ isVSCode: false })).toBe(true);
+    expect(shouldShowAgentControlToolSettings({})).toBe(true);
+    expect(shouldShowAgentControlToolSettings({ isVSCode: true })).toBe(false);
   });
 });

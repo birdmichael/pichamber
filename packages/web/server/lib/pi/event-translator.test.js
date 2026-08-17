@@ -238,6 +238,79 @@ describe('createEventTranslator', () => {
     expect(parts.some((part) => part.tool === 'tool')).toBe(false);
   });
 
+  it('maps a Pi pichamber tool_execution_* to a chat tool part', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    const envelope = JSON.stringify({
+      schemaVersion: 1,
+      ok: true,
+      action: 'session.create',
+      data: { sessionId: 'ses_from_tool' },
+    });
+    const start = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_control',
+      toolName: 'pichamber',
+      args: { action: 'session.create', title: 'from-tool' },
+    });
+    expect(start.find((event) => event.type === 'message.part.updated').properties.part).toMatchObject({
+      type: 'tool',
+      tool: 'pichamber',
+      callID: 'call_control',
+    });
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_control',
+      toolName: 'pichamber',
+      result: { content: [{ type: 'text', text: envelope }] },
+      isError: false,
+    });
+    expect(end[0].properties.part.tool).toBe('pichamber');
+    expect(end[0].properties.part.state.output).toBe(envelope);
+  });
+
+  it('maps a Pi pichamber toolcall_start + result to one part, not a leftover Tool', () => {
+    const t = translator();
+    const events = [];
+    events.push(...t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } }));
+    events.push(...t.translate({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'toolcall_start', contentIndex: 0 },
+    }));
+    events.push(...t.translate({
+      type: 'message_update',
+      assistantMessageEvent: {
+        type: 'toolcall_end',
+        contentIndex: 0,
+        toolCall: {
+          type: 'toolCall',
+          id: 'call_control',
+          name: 'pichamber',
+          arguments: { action: 'session.create' },
+        },
+      },
+    }));
+    events.push(...t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_control',
+      toolName: 'pichamber',
+      args: { action: 'session.create' },
+    }));
+    events.push(...t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_control',
+      toolName: 'pichamber',
+      args: { action: 'session.create' },
+      result: { content: [{ type: 'text', text: '{"ok":true}' }] },
+      isError: false,
+    }));
+
+    const parts = latestToolParts(events);
+    expect(parts).toHaveLength(1);
+    expect(parts[0].tool).toBe('pichamber');
+    expect(parts.some((part) => part.tool === 'tool')).toBe(false);
+  });
+
   it('maps a failed pichamber_web call to an error tool part', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });

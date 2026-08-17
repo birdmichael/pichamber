@@ -2,6 +2,21 @@ import { describe, expect, test } from 'bun:test';
 
 import { getToolMetadata, resolveToolDisplayName } from './toolHelpers';
 
+describe('Pichamber control tool chrome', () => {
+  test('pichamber is Pichamber JSON chrome', () => {
+    const metadata = getToolMetadata('pichamber');
+    expect(metadata.displayName).toBe('Pichamber');
+    expect(metadata.category).toBe('system');
+    expect(metadata.outputLanguage).toBe('json');
+    expect(resolveToolDisplayName('pichamber')).toBe('Pichamber');
+  });
+
+  test('keeps leftover openchamber for the OpenCode plugin', () => {
+    expect(getToolMetadata('openchamber').displayName).toBe('Pichamber');
+    expect(resolveToolDisplayName('openchamber')).toBe('Pichamber');
+  });
+});
+
 describe('Pichamber Web tool chrome', () => {
   test('pichamber_web is Pichamber Web JSON chrome', () => {
     const metadata = getToolMetadata('pichamber_web');

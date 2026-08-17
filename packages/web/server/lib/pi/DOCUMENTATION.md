@@ -153,15 +153,33 @@ Skills stay `/skill:name` on the composer; they are not merged into this
 list as fake OpenCode agents. Chip-owned `/model` and `/thinking` stay off
 the list. OpenCode kernel routes are unchanged.
 
-## Desktop `pichamber_web`
+## Desktop `pichamber` and `pichamber_web`
 
-Desktop Electron Pi sessions receive a host-owned `defineTool` named
-`pichamber_web` (label **Pichamber Web**) when
-`agentWebToolEnabled !== false`. It is passed as `customTools` to both
-`createAgentSession` and `createAgentSessionFromServices`. The leftover
+Desktop Electron Pi sessions receive host-owned `defineTool`s as
+`customTools` on both `createAgentSession` and `createAgentSessionFromServices`.
+The leftover OpenCode plugin names `openchamber` / `openchamber_web` are not
+attached on the Pi kernel. Each setting is independent: either, both, or
+neither.
+
+`pichamber` (label **Pichamber**) is attached when
+`agentControlToolEnabled !== false`. It reuses the shared control-service
+allowlist (`OPENCHAMBER_AGENT_TOOL_ACTIONS`): projects, models, sessions,
+and scheduled tasks. `schedule.status` stays CLI-only. Session
+create/send/fork/list/status/messages go through the in-process host
+(`createSession`, `promptAsync`, `forkSession`, `getMessages`, `getStatus`,
+`listSessionInfos`) — never HTTP to the local facade, which deadlocks the
+same Bun process. `models.list` reads `host.getDefaults()` / `~/.pi/agent`,
+not leftover OpenCode settings. `agent` accepts only the live Pi primary
+(`pi`) or omit; leftover OpenCode names are 400. `goal: true` dispatches
+Feature Plugins `/goal` via `host.runCommand` when that slot is
+installed+enabled, otherwise 400. It does not write leftover Session Goal
+metadata.
+
+`pichamber_web` (label **Pichamber Web**) is attached when
+`agentWebToolEnabled !== false`. The leftover
 OpenCode plugin name `openchamber_web` is not attached on the Pi kernel.
 
-The tool reuses the existing `browser.*` allowlist and
+The web tool reuses the existing `browser.*` allowlist and
 `openChamberControlService` / browser-control broker. Actions:
 
 | Action | Inputs |
@@ -181,11 +199,11 @@ Budgets stay `browser.open` 45s and 20s for the other actions. No Electron
 client claiming `browser=1` returns 503 immediately. Mobile, VS Code, and
 hosted web still cannot drive a page.
 
-Settings → Pichamber Tools shows only this Web row on Pi Desktop
-(agent-control is a later host tool). Toggle persist then
-`host.reloadIdleSessions()` / `POST /api/pi/sessions/reload-idle`. A busy
-session is skipped (409 on a targeted reload) and keeps the previous tool
-set until it is idle. Mock kernel sessions get the tool only when a test
+Settings → Pichamber Tools shows both rows on Pi Desktop (Agent control +
+Pichamber Web). Toggle persist then `host.reloadIdleSessions()` /
+`POST /api/pi/sessions/reload-idle`. Do not call leftover OpenCode restart.
+A busy session is skipped (409 on a targeted reload) and keeps the previous
+tool set until it is idle. Mock kernel sessions get a tool only when a test
 or the production getter injects it.
 
 ## Session reload

@@ -195,6 +195,13 @@ const TOOL_METADATA: Record<string, ToolMetadata> = {
       inputFields: []
     },
 
+    pichamber: {
+      displayName: 'Pichamber',
+      category: 'system',
+      outputLanguage: 'json',
+      inputFields: []
+    },
+
     openchamber_web: {
       displayName: 'Pichamber Web',
       category: 'system',

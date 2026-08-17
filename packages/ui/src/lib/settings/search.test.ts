@@ -271,7 +271,34 @@ describe('settings search', () => {
     expect(piBrowser.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
     expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
     expect(leftoverOpenCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
-    expect(piDesktop.some((result) => result.id === 'sessions.agent-control-tool')).toBe(false);
+    expect(piDesktop.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
+  });
+
+  test('shows the agent-control tool on Pi Desktop search and hides both tools in VS Code', () => {
+    const getPageTitle = (page: string) => page;
+    const piAgent = buildSettingsSearchResults({
+      query: 'agent',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const piScheduled = buildSettingsSearchResults({
+      query: 'scheduled',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const vsCode = buildSettingsSearchResults({
+      query: 'agent',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(piAgent.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
+    expect(piScheduled.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
+    expect(vsCode.some((result) => result.id === 'sessions.agent-control-tool')).toBe(false);
+    expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
   });
 
   test('lands Feature Plugins search on each slot card', () => {
