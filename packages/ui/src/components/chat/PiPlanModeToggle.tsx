@@ -86,7 +86,7 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
           type="button"
           variant="chip"
           size="xs"
-          className={cn('normal-case', className)}
+          className={cn('pi-plan-mode-toggle normal-case', className)}
           aria-pressed={chrome.footerPlanSelected}
           aria-label={t('chat.piPlan.toggleAria')}
           disabled={disabled}

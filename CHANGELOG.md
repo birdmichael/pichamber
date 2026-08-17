@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Mobile: on Pi, the composer Agent/Plan chip now shows the full current-side label instead of a clipped fragment. Attach, Goal, mic, and Send stay icon-sized. (close #204)
+
 ## [1.0.0] - 2026-08-18
 
 - **Pichamber 1.0.0:** first Pichamber release, independent of OpenChamber 1.18.x. The default kernel is in-process Pi.
