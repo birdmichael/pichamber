@@ -49,6 +49,11 @@ exactly as it already does when the context panel opens.
 - the row cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
   `WORK_STATUS_PANEL_WIDTH` of panel.
 
+Do not remount this card beside the mobile transcript. Hosted `mobile.html`
+and Capacitor wrap the same section components in `MobileWorkStatusHost`
+(`apps/MobileWorkStatusHost.tsx`), opened from the header context ring.
+That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
+
 `ChatContainer` additionally suppresses it in mini-chat and in expanded-input
 mode. It remains available on a new-session draft: when the draft targets a
 project or pending worktree, the panel uses that directory for project, MCP,

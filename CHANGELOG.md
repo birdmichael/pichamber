@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** the header context ring now opens Work Status — session, branch, context %, MCP, and Subagents, matching Desktop. MCP and Subagents appear when those Feature Plugins are on. Tap a live child to open that chat in place.
 - **Mobile:** the sessions sheet now reaches Scheduled Tasks, Multi-run, Archive with restore, and Pi Refresh — the same Pi actions and wording as Desktop. Swipe-archive remains; restored chats return to the active list. Refresh is disabled while a session is composing, streaming, or compacting.
 - Settings: on Pi, leftover OpenCode Agents is hidden from Settings and Settings search. Use Feature Plugins for Plan and Subagents, and Session Defaults for model and thinking. The OpenCode kernel still has the Agents editor.
 - Chat: on Pi, typing `@agent:build` or `@agent:plan` no longer switches the session agent, and `@` autocomplete no longer lists leftover OpenCode agents. Agent / Plan and Subagents stay. The OpenCode kernel is unchanged.

@@ -81,6 +81,16 @@ list. Each tab implements one Desktop surface id, or is a mobile-only pane:
 | `plan` | `plan` | Same gate as the Desktop rail: `resolvePlanRailEnabled` / `usePiPlanChrome()`. On Pi that is Feature Plugins `plan` installed+enabled **and** live status `active` / `ready` / `saved` / `implementing`, including empty “no plan yet”. `/health.planModeExperimentalEnabled` must not gate it. On OpenCode it stays the leftover experimental flag. Renders `PlanView` with no `targetPath` (`PiSessionPlanView` on Pi). |
 | `mcp` | — | Always in this slice. A later slice will match Settings MCP (`isMcpSettingsAvailable`). Not a Desktop rail surface. |
 
-Out of this slice (later mobile parity): Context / Work Status, PR, Diff,
-Walkthrough, Browser, split Chat. Desktop-native privileges (SSH, External
-Tunnel host, Electron browser session) stay unsupported on mobile.
+Work Status is not a workspace tab and not the Desktop Context rail
+(`CONTEXT_SURFACES` id `context`). The 300px chat-column card stays off
+(`useWorkStatusVisibility` / `workStatusPanelMountable`). The header context
+ring opens `MobileWorkStatusHost`, which wraps the same Desktop sections
+(session, branch, context %, MCP, Subagents). MCP follows
+`isWorkStatusSectionAvailable('mcp')` / `isMcpFeaturePluginActive`; Subagents
+follows `useFeaturePluginSlotActive('subagents')`. Usage quotas stay hidden
+on Pi. Clicking a live child uses `openSubagentChildSession` (`setCurrentSession`
+in-place).
+
+Out of this slice (later mobile parity): PR, Diff, Walkthrough, Browser,
+split Chat. Desktop-native privileges (SSH, External Tunnel host, Electron
+browser session) stay unsupported on mobile.
