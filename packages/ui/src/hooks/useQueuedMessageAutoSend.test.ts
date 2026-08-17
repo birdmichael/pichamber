@@ -221,11 +221,42 @@ describe('buildQueuedAutoSendPayload', () => {
       },
     ];
 
-    const payload = buildQueuedAutoSendPayload(queue);
+    const payload = buildQueuedAutoSendPayload(queue, { isPiKernel: false });
 
     expect(payload).not.toBeNull();
     expect(payload?.agentMentionName).toBe('Builder');
     expect(payload?.primaryText).toBe('@Builder please take this');
+  });
+
+  test('Pi queued send does not treat leftover @agent mentions as a switch', () => {
+    visibleAgents = [
+      {
+        name: 'build',
+        mode: 'subagent',
+        permission: [],
+        options: {},
+      } as Agent,
+      {
+        name: 'plan',
+        mode: 'subagent',
+        permission: [],
+        options: {},
+      } as Agent,
+    ];
+
+    const queue: QueuedMessage[] = [
+      {
+        id: 'queued-pi-mention',
+        content: '@agent:build please take this',
+        createdAt: 1,
+      },
+    ];
+
+    const payload = buildQueuedAutoSendPayload(queue, { isPiKernel: true });
+
+    expect(payload).not.toBeNull();
+    expect(payload?.agentMentionName).toBe(undefined);
+    expect(payload?.primaryText).toBe('@agent:build please take this');
   });
 
   test('preserves attachment-only queued messages as sendable payloads', () => {

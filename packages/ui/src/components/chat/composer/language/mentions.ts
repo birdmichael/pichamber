@@ -104,12 +104,18 @@ export interface MentionClassifier {
     knownAgentNames: ReadonlySet<string>;
     /** Mention paths confirmed by the picker, a drop, or a restored draft. */
     confirmedMentions: ReadonlySet<string>;
+    /**
+     * Pi has one built-in agent. Leftover OpenCode personalities (`build`,
+     * `plan`, `@agent:build`) stay prose, not an agent mention kind.
+     */
+    isPiKernel?: boolean;
 }
 
 /**
  * A name looks like a file when it carries path structure (a separator or an
  * extension) or when the user confirmed it explicitly through the picker.
  * Agents win over files: an agent name is an exact, known identifier.
+ * On Pi, leftover OpenCode agent names never win — they are not a mention kind.
  */
 export function classifyMention(
     name: string,
@@ -119,7 +125,9 @@ export function classifyMention(
     // HTML fragments are prompt text, never references. In particular, do not
     // interpret CSS syntax such as `@import</style>` as a local file path.
     if (name.includes('<') || name.includes('>')) return null;
-    if (classifier.knownAgentNames.has(name.toLowerCase())) return 'agent';
+    if (!classifier.isPiKernel && classifier.knownAgentNames.has(name.toLowerCase())) {
+        return 'agent';
+    }
     if (looksLikeFilePath(name, classifier.confirmedMentions)) return 'file';
     return null;
 }

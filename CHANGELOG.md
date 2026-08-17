@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - **Mobile:** the sessions sheet now reaches Scheduled Tasks, Multi-run, Archive with restore, and Pi Refresh — the same Pi actions and wording as Desktop. Swipe-archive remains; restored chats return to the active list. Refresh is disabled while a session is composing, streaming, or compacting.
 - Settings: on Pi, leftover OpenCode Agents is hidden from Settings and Settings search. Use Feature Plugins for Plan and Subagents, and Session Defaults for model and thinking. The OpenCode kernel still has the Agents editor.
+- Chat: on Pi, typing `@agent:build` or `@agent:plan` no longer switches the session agent, and `@` autocomplete no longer lists leftover OpenCode agents. Agent / Plan and Subagents stay. The OpenCode kernel is unchanged.
 - **Mobile:** on Pi, View Plan is now a workspace tab when Feature Plugins Plan is installed and enabled, matching Desktop — including an empty “no plan yet” state. Agent/Plan and Goal stay on the phone composer. Leftover experimental plan-mode no longer gates this.
 - Mobile: on Pi, the composer no longer shows an agent chip that only says Pi. Model and thinking chips stay. Agent/Plan and Goal stay when those Feature Plugins are on.
 - **Mobile/Settings:** on Pi, Settings and mobile chrome now say Pi / Pichamber / Git in every shipped language, matching Desktop. Leftover OpenCode skill folders stay hidden on Pi and still appear on the OpenCode kernel.

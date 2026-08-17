@@ -31,6 +31,14 @@ describe('tokenizeComposer — reference constructs', () => {
         expect(styled('ask @build please')).toEqual([['@build', 'mentionAgent']]);
     });
 
+    test('Pi does not style leftover OpenCode @agent names as agent mentions', () => {
+        const pi = context({ isPiKernel: true });
+        expect(styled('ask @build please', pi)).toEqual([]);
+        expect(styled('@agent:build do it', pi)).toEqual([]);
+        expect(styled('@agent:plan a plan', pi)).toEqual([]);
+        expect(styled('see @src/app.ts', pi)).toEqual([['@src/app.ts', 'mentionFile']]);
+    });
+
     test('a path mention is styled as a file', () => {
         expect(styled('see @src/app.ts')).toEqual([['@src/app.ts', 'mentionFile']]);
     });

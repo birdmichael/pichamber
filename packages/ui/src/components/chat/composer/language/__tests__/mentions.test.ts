@@ -156,4 +156,27 @@ describe('classifyMention', () => {
         expect(looksLikeFilePath('plain', new Set())).toBe(false);
         expect(looksLikeFilePath('plain', new Set(['plain']))).toBe(true);
     });
+
+    test('Pi does not classify leftover OpenCode agent names as agent mentions', () => {
+        const leftover = {
+            knownAgentNames: new Set(['build', 'plan', 'agent:build', 'agent:plan']),
+            confirmedMentions: new Set<string>(),
+            isPiKernel: true,
+        };
+        expect(classifyMention('build', leftover)).toBeNull();
+        expect(classifyMention('plan', leftover)).toBeNull();
+        expect(classifyMention('agent:build', leftover)).toBeNull();
+        expect(classifyMention('agent:plan', leftover)).toBeNull();
+        expect(classifyMention('src/app.ts', leftover)).toBe('file');
+    });
+
+    test('OpenCode still classifies leftover agent names as agent mentions', () => {
+        const openCode = {
+            knownAgentNames: new Set(['build', 'plan']),
+            confirmedMentions: new Set<string>(),
+            isPiKernel: false,
+        };
+        expect(classifyMention('build', openCode)).toBe('agent');
+        expect(classifyMention('plan', openCode)).toBe('agent');
+    });
 });

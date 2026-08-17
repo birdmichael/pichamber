@@ -38,6 +38,8 @@ export interface ComposerLanguageContext {
     knownAgentNames: ReadonlySet<string>;
     /** Mention paths confirmed by the picker, a drop, or a restored draft. */
     confirmedMentions: ReadonlySet<string>;
+    /** Pi does not tokenize leftover OpenCode `@agent` names as agent mentions. */
+    isPiKernel?: boolean;
     /** Lowercased command, skill and built-in names invocable with `/`. */
     knownSlashNames: ReadonlySet<string>;
     /** Lowercased snippet names and aliases invocable with `#`. */
@@ -49,7 +51,7 @@ export interface ComposerLanguageContext {
 /** Mention ranges alone — the composer also needs these to resolve references. */
 export function tokenizeMentions(
     text: string,
-    context: Pick<ComposerLanguageContext, 'knownAgentNames' | 'confirmedMentions'>,
+    context: Pick<ComposerLanguageContext, 'knownAgentNames' | 'confirmedMentions' | 'isPiKernel'>,
 ): MentionRange[] {
     const ranges: MentionRange[] = [];
     for (const token of scanMentions(text)) {
