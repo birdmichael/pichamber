@@ -84,7 +84,7 @@ describe('parseAgentMentions', () => {
       buildSkillInstruction: () => null,
     });
 
-    expect(result.agentMentionName).toBeUndefined();
+    expect(result.agentMentionName).toBe(undefined);
     expect(result.primaryText).toBe('@agent:build do it');
   });
 

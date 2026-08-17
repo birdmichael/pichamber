@@ -255,7 +255,7 @@ describe('buildQueuedAutoSendPayload', () => {
     const payload = buildQueuedAutoSendPayload(queue, { isPiKernel: true });
 
     expect(payload).not.toBeNull();
-    expect(payload?.agentMentionName).toBeUndefined();
+    expect(payload?.agentMentionName).toBe(undefined);
     expect(payload?.primaryText).toBe('@agent:build please take this');
   });
 

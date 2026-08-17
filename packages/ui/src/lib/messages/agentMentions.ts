@@ -16,7 +16,7 @@ export interface ParsedAgentResult {
   mention: ParsedAgentMention | null;
 }
 
-export interface ParseAgentMentionsOptions {
+interface ParseAgentMentionsOptions {
   /** Pi has one built-in agent. Leftover OpenCode `@agent` routing stays off. */
   isPiKernel?: boolean;
 }
