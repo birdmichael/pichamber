@@ -219,7 +219,7 @@ const EmbeddedSessionChatContent: React.FC<{
         readOnly={embeddedSessionChat.readOnly}
         initialAllowPromptingSubagentSessions={embeddedSessionChat.allowPromptingSubagentSessions}
       />
-      <Toaster />
+      <Toaster position="top-center" />
     </>
   );
 };
@@ -951,7 +951,7 @@ function App({ apis }: AppProps) {
                   <SyncAppEffects embeddedBackgroundWorkEnabled={embeddedBackgroundWorkEnabled} />
                   <OpenCodeUpdateToast />
                   <MainLayout />
-                  <Toaster />
+                  <Toaster position="top-center" />
                   {!isBootShell && (
                     <>
                       <ConfigUpdateOverlay />

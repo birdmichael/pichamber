@@ -323,7 +323,7 @@ export function ElectronMiniChatApp({ apis }: ElectronMiniChatAppProps) {
             <div className="h-full text-foreground bg-background">
               <ElectronMiniChatContent config={config} />
               <PiExtensionUiNotifyToasts />
-              <Toaster />
+              <Toaster position="top-center" />
             </div>
           </TooltipProvider>
         </RuntimeAPIProvider>

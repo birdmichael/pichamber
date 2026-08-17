@@ -1,10 +1,40 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
+const wrapperToastCalls = {
+  info: [] as Array<{ message: unknown; options: unknown }>,
+  warning: [] as Array<{ message: unknown; options: unknown }>,
+  error: [] as Array<{ message: unknown; options: unknown }>,
+};
+const sonnerToastCalls = {
+  info: [] as Array<{ message: unknown; options: unknown }>,
+  warning: [] as Array<{ message: unknown; options: unknown }>,
+  error: [] as Array<{ message: unknown; options: unknown }>,
+};
+
 mock.module('@/components/ui', () => ({
   toast: {
-    info: () => {},
-    warning: () => {},
-    error: () => {},
+    info: (message: unknown, options: unknown) => {
+      wrapperToastCalls.info.push({ message, options });
+    },
+    warning: (message: unknown, options: unknown) => {
+      wrapperToastCalls.warning.push({ message, options });
+    },
+    error: (message: unknown, options: unknown) => {
+      wrapperToastCalls.error.push({ message, options });
+    },
+  },
+}));
+mock.module('sonner', () => ({
+  toast: {
+    info: (message: unknown, options: unknown) => {
+      sonnerToastCalls.info.push({ message, options });
+    },
+    warning: (message: unknown, options: unknown) => {
+      sonnerToastCalls.warning.push({ message, options });
+    },
+    error: (message: unknown, options: unknown) => {
+      sonnerToastCalls.error.push({ message, options });
+    },
   },
 }));
 mock.module('@/lib/runtime-fetch', () => ({
@@ -23,6 +53,8 @@ import {
   applyPiExtensionUiPrompt,
   consumePiExtensionUiEditorStash,
   consumePiExtensionUiNotify,
+  piExtensionUiNotifyToastOptions,
+  presentPiExtensionUiNotify,
   reconcilePiExtensionUiPrompts,
   resetPiExtensionUiStore,
   selectPendingConfirmPrompt,
@@ -34,6 +66,12 @@ import { handlePiExtensionUiEvent } from './pi-extension-ui-events';
 
 afterEach(() => {
   resetPiExtensionUiStore();
+  wrapperToastCalls.info.length = 0;
+  wrapperToastCalls.warning.length = 0;
+  wrapperToastCalls.error.length = 0;
+  sonnerToastCalls.info.length = 0;
+  sonnerToastCalls.warning.length = 0;
+  sonnerToastCalls.error.length = 0;
 });
 
 describe('parsePiExtensionUiPrompt', () => {
@@ -197,6 +235,40 @@ describe('pi extension UI store', () => {
     consumePiExtensionUiNotify(queued[0]!.id);
     expect(usePiExtensionUiStore.getState().notifies).toEqual([]);
     expect(applyPiExtensionUiNotify({ message: '' })).toBeNull();
+  });
+
+  test('maps info notifies to a short top toast without an OK action', () => {
+    expect(piExtensionUiNotifyToastOptions('info')).toEqual({
+      duration: 3000,
+      position: 'top-center',
+    });
+    expect(piExtensionUiNotifyToastOptions('warning')).toEqual({
+      duration: 5000,
+      position: 'top-center',
+    });
+    expect(piExtensionUiNotifyToastOptions('error')).toEqual({
+      duration: 8000,
+      position: 'top-center',
+    });
+
+    presentPiExtensionUiNotify({ message: 'Plan mode enabled.', level: 'info' });
+    presentPiExtensionUiNotify({ message: 'Plan mode disabled.', level: 'info' });
+    presentPiExtensionUiNotify({ message: 'Plan plugin warning.', level: 'warning' });
+    presentPiExtensionUiNotify({ message: 'Plan plugin failed.', level: 'error' });
+
+    expect(sonnerToastCalls.info).toEqual([
+      { message: 'Plan mode enabled.', options: { duration: 3000, position: 'top-center' } },
+      { message: 'Plan mode disabled.', options: { duration: 3000, position: 'top-center' } },
+    ]);
+    expect(sonnerToastCalls.warning).toEqual([
+      { message: 'Plan plugin warning.', options: { duration: 5000, position: 'top-center' } },
+    ]);
+    expect(wrapperToastCalls.error).toEqual([
+      { message: 'Plan plugin failed.', options: { duration: 8000, position: 'top-center' } },
+    ]);
+    expect(wrapperToastCalls.info).toEqual([]);
+    expect(wrapperToastCalls.warning).toEqual([]);
+    expect(sonnerToastCalls.info[0]?.options).not.toHaveProperty('action');
   });
 
   test('hands Other text to the next editor for that session', () => {

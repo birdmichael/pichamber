@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast as sonnerToast } from 'sonner';
 
 import { toast } from '@/components/ui';
 import {
@@ -11,6 +12,40 @@ import {
 const MAX_SETTLED_PER_SESSION = 20;
 const MAX_NOTIFIES = 20;
 
+/** Info Plan/plugin notifies must not sit on the composer or require OK. */
+export const PI_EXTENSION_UI_NOTIFY_TOAST_POSITION = 'top-center' as const;
+export const PI_EXTENSION_UI_INFO_TOAST_MS = 3000;
+export const PI_EXTENSION_UI_WARNING_TOAST_MS = 5000;
+export const PI_EXTENSION_UI_ERROR_TOAST_MS = 8000;
+
+export type PiExtensionUiNotifyLevel = 'info' | 'warning' | 'error';
+
+export type PiExtensionUiNotifyToastOptions = {
+  duration: number;
+  position: typeof PI_EXTENSION_UI_NOTIFY_TOAST_POSITION;
+};
+
+export const piExtensionUiNotifyToastOptions = (
+  level: PiExtensionUiNotifyLevel,
+): PiExtensionUiNotifyToastOptions => {
+  if (level === 'error') {
+    return {
+      duration: PI_EXTENSION_UI_ERROR_TOAST_MS,
+      position: PI_EXTENSION_UI_NOTIFY_TOAST_POSITION,
+    };
+  }
+  if (level === 'warning') {
+    return {
+      duration: PI_EXTENSION_UI_WARNING_TOAST_MS,
+      position: PI_EXTENSION_UI_NOTIFY_TOAST_POSITION,
+    };
+  }
+  return {
+    duration: PI_EXTENSION_UI_INFO_TOAST_MS,
+    position: PI_EXTENSION_UI_NOTIFY_TOAST_POSITION,
+  };
+};
+
 type EditorStash = {
   sessionID: string;
   text: string;
@@ -21,7 +56,7 @@ type PiExtensionUiNotifyItem = {
   sessionID: string;
   directory?: string;
   message: string;
-  level: 'info' | 'warning' | 'error';
+  level: PiExtensionUiNotifyLevel;
 };
 
 type PiExtensionUiState = {
@@ -37,7 +72,7 @@ const NOTIFY_DEDUPE_MS = 2500;
 
 export const presentPiExtensionUiNotify = (notify: {
   message: string;
-  level: 'info' | 'warning' | 'error';
+  level: PiExtensionUiNotifyLevel;
 }): void => {
   const message = notify.message.trim();
   if (!message) return;
@@ -45,9 +80,13 @@ export const presentPiExtensionUiNotify = (notify: {
   const last = recentNotifyAt.get(message) ?? 0;
   if (now - last < NOTIFY_DEDUPE_MS) return;
   recentNotifyAt.set(message, now);
-  if (notify.level === 'error') toast.error(message, { duration: 8000 });
-  else if (notify.level === 'warning') toast.warning(message, { duration: 8000 });
-  else toast.info(message, { duration: 8000 });
+  const options = piExtensionUiNotifyToastOptions(notify.level);
+  // Shared `toast.info` / `toast.success` inject an OK action that looks like a
+  // confirm and sits on the composer. Info/warning notifies go through Sonner
+  // directly so they auto-dismiss without a button. Errors keep Copy.
+  if (notify.level === 'error') toast.error(message, options);
+  else if (notify.level === 'warning') sonnerToast.warning(message, options);
+  else sonnerToast.info(message, options);
 };
 
 const empty: PiExtensionUiPrompt[] = [];

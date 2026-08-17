@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Chat:** on Pi, `/run` is a real command when Subagents is installed. Bare `/run` explains that it needs an agent and a task; `/run scout …` starts a Work Status child or shows an error instead of a dead chat bubble. Clicking the row still opens a writable child, never the parent.
 - **Chat:** on Pi, toggling Plan now keeps View Plan and Discard available even when the model never wrote plan markdown. The panel shows “No plan yet”; Build stays disabled until a plan exists.
 - Chat/Desktop: on Pi, Agent and Plan in the composer footer are one dropdown that shows the current side, not two chips.
+- Chat: on Pi, switching Agent and Plan no longer covers Send with an OK toast. The mode message auto-dismisses at the top of the window.
 - Chat/Desktop: on Pi, the composer footer no longer shows 树 / Tree. Open the existing session timeline from a control under the prompt-navigator ticks (same dialog as /timeline).
 - Chat/Desktop: on Pi, the composer footer no longer shows a context-usage percent. Use the header context ring to inspect tokens vs the model window.
 - Chat/Desktop: saving an assistant message as an image now opens a Save dialog and only says the image was saved after the PNG is written. Cancel stays silent.
