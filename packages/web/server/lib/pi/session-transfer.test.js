@@ -218,23 +218,30 @@ describe('session-transfer', () => {
     expect(html).toContain('class="bubble"');
     expect(html).toContain('class="ticks"');
     expect(html).toContain('href="#turn-1"');
-    expect(html).toContain('--bg-deep: #F8F7F7');
-    expect(html).toContain('--bg-deep: #131010');
-    expect(html).not.toContain('background: #0c0c0e');
+    expect(html).toContain('--background-stronger: #151515');
+    expect(html).toContain('--background-stronger: #fcfcfc');
+    expect(html).toContain('--background-base: #101010');
+    expect(html).toContain('--background-base: #f8f8f8');
+    expect(html).not.toContain('--bg-deep:');
     expect(html).toContain('see this');
     expect(html).toContain('<img src="data:image/png;base64,AAAA"');
     expect(html).toContain('class="thinking"');
-    expect(html).toMatch(/\.thinking \{[\s\S]*background: var\(--bubble\)/);
-    expect(html).toMatch(/\.thinking \{[\s\S]*padding: 12px 14px/);
-    expect(html).toMatch(/\.thinking \{[\s\S]*border: 1px solid var\(--border\)/);
+    expect(html).not.toMatch(/\.thinking \{[^}]*background:/);
+    expect(html).not.toMatch(/\.thinking \{[^}]*border:/);
     expect(html).not.toContain('<details class="thinking">');
     expect(html).not.toContain('<summary>Thinking</summary>');
-    expect(html).toMatch(/\.ticks a::before \{[\s\S]*width: 4px/);
-    expect(html).toMatch(/\.ticks a::before \{[\s\S]*height: 16px/);
-    expect(html).toMatch(/\.ticks a\.current::before \{[\s\S]*width: 6px/);
-    expect(html).toMatch(/\.ticks a\.current::before \{[\s\S]*height: 22px/);
-    expect(html).toMatch(/\.pichamber-mark \{[\s\S]*width: 24px/);
-    expect(html).toContain('class="pichamber-mark" viewBox="0 0 100 100" width="24" height="24"');
+    expect(html).toMatch(/\.ticks a i \{[\s\S]*width: 10px/);
+    expect(html).toMatch(/\.ticks a i \{[\s\S]*height: 1px/);
+    expect(html).toMatch(/\.ticks a\.current i \{[\s\S]*width: 14px/);
+    expect(html).toContain('<i></i>');
+    expect(html).toContain('class="chevron"');
+    expect(html).toContain('class="toast"');
+    expect(html).toMatch(/\.pichamber-mark \{[\s\S]*width: 18px/);
+    expect(html).toContain('class="pichamber-mark" viewBox="0 0 100 100" width="18" height="18"');
+    expect(html).toContain('class="session-version"');
+    expect(html).toContain('class="session-model"');
+    expect(html).toContain('class="tool-panel"');
+    expect(html).toContain('class="user-meta"');
     expect(html).toContain('load skills');
     expect(html).toContain('reading');
     expect(html).toContain('<details class="tool">');
@@ -242,7 +249,8 @@ describe('session-transfer', () => {
     expect(html).toContain('SKILL.md');
     expect(html).toContain('<span class="tool-prompt">$</span>');
     expect(html).toContain('using-superpowers');
-    expect(html).toContain('example-provider/example-model');
+    expect(html).toContain('example-model');
+    expect(html).not.toContain('example-provider/example-model');
     expect(html).not.toContain('pi/pi');
     expect(html).toContain('Plan · example-model · 2m 58s');
     expect(html).toContain('14 Nov 2023, 22:13');
@@ -324,7 +332,7 @@ describe('session-transfer', () => {
     expect(html).toContain('not found');
     expect(html).toContain('class="bubble"');
     expect(html).toContain('plain user note');
-    expect(html).toContain('--bg-deep: #F8F7F7');
+    expect(html).toContain('--background-base: #f8f8f8');
   });
 
   it('keeps a cancelled ctx.ui question as ignored footer copy and does not empty the file', () => {
@@ -353,7 +361,7 @@ describe('session-transfer', () => {
     }, { locale: 'zh-CN' });
     expect(html).toContain('still here');
     expect(html).toContain('问题已忽略');
-    expect(html).toContain('example-provider/example-model');
+    expect(html).toContain('example-model');
   });
 
   it('escapes HTML in exported text and rejects javascript links', () => {

@@ -857,23 +857,29 @@ const markdownToHtml = (source) => {
 
 const SHARE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const formatShareDate = (value) => {
-  if (value == null || value === '') return '';
+const shareDateParts = (value) => {
+  if (value == null || value === '') return null;
   const millis = typeof value === 'number' && Number.isFinite(value)
     ? value
     : Date.parse(isoFromUnknown(value));
-  if (!Number.isFinite(millis)) return '';
+  if (!Number.isFinite(millis)) return null;
   const date = new Date(millis);
-  if (Number.isNaN(date.getTime())) return '';
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+};
+
+const formatShareClock = (value) => {
+  const date = shareDateParts(value);
+  if (!date) return '';
+  return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`;
+};
+
+const formatShareDate = (value) => {
+  const date = shareDateParts(value);
+  if (!date) return '';
   const hours = String(date.getUTCHours()).padStart(2, '0');
   const minutes = String(date.getUTCMinutes()).padStart(2, '0');
   return `${date.getUTCDate()} ${SHARE_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${hours}:${minutes}`;
-};
-
-const formatModelLabel = (info) => {
-  const resolved = resolveUsableFacadeModel(info);
-  if (!resolved) return '';
-  return `${resolved.providerID}/${resolved.modelID}`;
 };
 
 const EXPORT_LOCALES = {
@@ -882,10 +888,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Copy message',
     copyAnswer: 'Copy reply',
     copyOutput: 'Copy output',
+    copied: 'Copied',
+    copyFailed: 'Copy failed',
     questions: 'Questions',
     answered: '{count} answered',
     ignored: 'Questions dismissed',
     themeToggle: 'Toggle light and dark theme',
+    themeToLight: 'Switch to light theme',
+    themeToDark: 'Switch to dark theme',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -894,10 +904,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Nachricht kopieren',
     copyAnswer: 'Antwort kopieren',
     copyOutput: 'Ausgabe kopieren',
+    copied: 'Kopiert',
+    copyFailed: 'Kopieren fehlgeschlagen',
     questions: 'Fragen',
     answered: '{count} beantwortet',
     ignored: 'Fragen ignoriert',
     themeToggle: 'Hell- und Dunkelmodus umschalten',
+    themeToLight: 'Zum hellen Modus wechseln',
+    themeToDark: 'Zum dunklen Modus wechseln',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -906,10 +920,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Copiar mensaje',
     copyAnswer: 'Copiar respuesta',
     copyOutput: 'Copiar salida',
+    copied: 'Copiado',
+    copyFailed: 'Error al copiar',
     questions: 'Preguntas',
     answered: '{count} respondidas',
     ignored: 'Preguntas omitidas',
     themeToggle: 'Alternar tema claro y oscuro',
+    themeToLight: 'Cambiar al tema claro',
+    themeToDark: 'Cambiar al tema oscuro',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -918,10 +936,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Copier le message',
     copyAnswer: 'Copier la réponse',
     copyOutput: 'Copier la sortie',
+    copied: 'Copié',
+    copyFailed: 'Échec de la copie',
     questions: 'Questions',
     answered: '{count} répondues',
     ignored: 'Questions ignorées',
     themeToggle: 'Basculer entre le thème clair et sombre',
+    themeToLight: 'Passer au thème clair',
+    themeToDark: 'Passer au thème sombre',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -930,10 +952,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'メッセージをコピー',
     copyAnswer: '返信をコピー',
     copyOutput: '出力をコピー',
+    copied: 'コピーしました',
+    copyFailed: 'コピーに失敗しました',
     questions: '質問',
     answered: '{count} 件回答済み',
     ignored: '質問は無視されました',
     themeToggle: 'ライトとダークのテーマを切り替え',
+    themeToLight: 'ライトテーマに切り替え',
+    themeToDark: 'ダークテーマに切り替え',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -942,10 +968,14 @@ const EXPORT_LOCALES = {
     copyMessage: '메시지 복사',
     copyAnswer: '답변 복사',
     copyOutput: '출력 복사',
+    copied: '복사됨',
+    copyFailed: '복사 실패',
     questions: '질문',
     answered: '{count}개 답변됨',
     ignored: '질문이 무시됨',
     themeToggle: '밝은 테마와 어두운 테마 전환',
+    themeToLight: '밝은 테마로 전환',
+    themeToDark: '어두운 테마로 전환',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -954,10 +984,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Kopiuj wiadomość',
     copyAnswer: 'Kopiuj odpowiedź',
     copyOutput: 'Kopiuj wynik',
+    copied: 'Skopiowano',
+    copyFailed: 'Nie udało się skopiować',
     questions: 'Pytania',
     answered: 'odpowiedziano na {count}',
     ignored: 'Pytania pominięte',
     themeToggle: 'Przełącz jasny i ciemny motyw',
+    themeToLight: 'Przełącz na jasny motyw',
+    themeToDark: 'Przełącz na ciemny motyw',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -966,10 +1000,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Copiar mensagem',
     copyAnswer: 'Copiar resposta',
     copyOutput: 'Copiar saída',
+    copied: 'Copiado',
+    copyFailed: 'Falha ao copiar',
     questions: 'Perguntas',
     answered: '{count} respondidas',
     ignored: 'Perguntas ignoradas',
     themeToggle: 'Alternar tema claro e escuro',
+    themeToLight: 'Mudar para o tema claro',
+    themeToDark: 'Mudar para o tema escuro',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -978,10 +1016,14 @@ const EXPORT_LOCALES = {
     copyMessage: 'Копіювати повідомлення',
     copyAnswer: 'Копіювати відповідь',
     copyOutput: 'Копіювати вивід',
+    copied: 'Скопійовано',
+    copyFailed: 'Не вдалося скопіювати',
     questions: 'Питання',
     answered: 'відповідей: {count}',
     ignored: 'Питання проігноровано',
     themeToggle: 'Перемкнути світлу й темну тему',
+    themeToLight: 'Перемкнути на світлу тему',
+    themeToDark: 'Перемкнути на темну тему',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -990,10 +1032,14 @@ const EXPORT_LOCALES = {
     copyMessage: '复制消息',
     copyAnswer: '复制回复',
     copyOutput: '复制输出',
+    copied: '已复制',
+    copyFailed: '复制失败',
     questions: '问题',
     answered: '已回答 {count} 个',
     ignored: '问题已忽略',
     themeToggle: '切换浅色或深色主题',
+    themeToLight: '切换到浅色',
+    themeToDark: '切换到深色',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -1002,10 +1048,14 @@ const EXPORT_LOCALES = {
     copyMessage: '複製訊息',
     copyAnswer: '複製回覆',
     copyOutput: '複製輸出',
+    copied: '已複製',
+    copyFailed: '複製失敗',
     questions: '問題',
     answered: '已回答 {count} 個',
     ignored: '問題已忽略',
     themeToggle: '切換淺色或深色主題',
+    themeToLight: '切換到淺色',
+    themeToDark: '切換到深色',
     github: 'GitHub',
     logo: 'Pichamber',
   },
@@ -1049,15 +1099,19 @@ export const readPiCodingAgentVersion = () => {
 const PICHAMBER_REPO_HREF = 'https://github.com/birdmichael/pichamber';
 const EXPORT_THEME_KEY = 'pichamber-export-theme';
 
-const PICHAMBER_MARK_SVG = `<svg class="pichamber-mark" viewBox="0 0 100 100" width="24" height="24" fill="none" aria-hidden="true"><path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)" fill="currentColor"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></g></svg>`;
+const PICHAMBER_MARK_SVG = `<svg class="pichamber-mark" viewBox="0 0 100 100" width="18" height="18" fill="none" aria-hidden="true"><path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)" fill="currentColor"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></g></svg>`;
 
-const PI_PIXEL_MARK_SVG = `<svg class="pi-mark" viewBox="-235 -235 470 470" width="14" height="14" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></svg>`;
+const PI_PIXEL_MARK_SVG = `<svg class="pi-mark" viewBox="-235 -235 470 470" width="12" height="12" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></svg>`;
 
-const GITHUB_ICON_SVG = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>`;
+const GITHUB_ICON_SVG = `<svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M10 1.7A8.3 8.3 0 0 0 1.7 10c0 3.67 2.38 6.78 5.68 7.88.42.08.57-.18.57-.4 0-.2-.01-.86-.01-1.56-2.31.5-2.8-1-2.8-1-.38-.96-.92-1.22-.92-1.22-.76-.52.06-.51.06-.51.84.06 1.28.86 1.28.86.74 1.28 1.95.91 2.43.7.07-.54.29-.91.53-1.12-1.85-.21-3.79-.92-3.79-4.12 0-.91.32-1.65.86-2.23-.09-.21-.37-1.07.08-2.23 0 0 .7-.22 2.3.86a8 8 0 0 1 4.18 0c1.6-1.08 2.3-.86 2.3-.86.45 1.16.17 2.02.08 2.23.54.58.86 1.32.86 2.23 0 3.21-1.95 3.9-3.8 4.11.3.26.57.76.57 1.54 0 1.12-.01 2.02-.01 2.3 0 .22.15.48.57.4A8.3 8.3 0 0 0 18.3 10 8.3 8.3 0 0 0 10 1.7Z"/></svg>`;
 
-const THEME_ICON_SVG = `<svg class="icon-sun" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.6"/><path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1"/></svg><svg class="icon-moon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12.6 10.2A5.6 5.6 0 0 1 5.8 3.4 5.6 5.6 0 1 0 12.6 10.2Z"/></svg>`;
+const THEME_ICON_SVG = `<svg class="icon-moon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12.6 3.2A6.4 6.4 0 1 0 16.8 12 5.2 5.2 0 0 1 12.6 3.2Z"/></svg><svg class="icon-sun" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v1.6M10 15.9v1.6M2.5 10h1.6M15.9 10h1.6M4.4 4.4l1.1 1.1M14.5 14.5l1.1 1.1M4.4 15.6l1.1-1.1M14.5 5.5l1.1-1.1"/></svg>`;
 
-const STAR_ICON_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1.4 9.9 5.3l4.3.6-3.1 3 0.7 4.3L8 11.2 4.2 13.2l.7-4.3-3.1-3 4.3-.6Z"/></svg>`;
+const STAR_ICON_SVG = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 1.2 9.4 5h3.8l-3 2.3L11.5 11 8 8.8 4.5 11l1.3-3.7-3-2.3h3.8L8 1.2Z"/></svg>`;
+
+const COPY_ICON_SVG = `<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.5"/><path d="M13 7V5.5A1.5 1.5 0 0 0 11.5 4h-7A1.5 1.5 0 0 0 3 5.5v7A1.5 1.5 0 0 0 4.5 14H6"/></svg>`;
+
+const CHEVRON_SVG = `<svg class="chevron" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5"/></svg>`;
 
 const safeBlock = (render) => {
   try {
@@ -1076,14 +1130,6 @@ const formatTurnDuration = (durationMs) => {
   return `${minutes}m ${seconds}s`;
 };
 
-const lastUsableModelLabel = (sources) => {
-  for (let index = sources.length - 1; index >= 0; index -= 1) {
-    const label = formatModelLabel(sources[index]);
-    if (label) return label;
-  }
-  return '';
-};
-
 const lastUsableModelId = (sources) => {
   for (let index = sources.length - 1; index >= 0; index -= 1) {
     const resolved = resolveUsableFacadeModel(sources[index]);
@@ -1099,7 +1145,7 @@ const isPlanInfo = (info) => {
 };
 
 const copyButton = (label, text) => (
-  `<button type="button" class="copy" data-copy="${escapeHtml(text)}" aria-label="${escapeHtml(label)}">${escapeHtml(label)}</button>`
+  `<button type="button" class="copy" data-copy="${escapeHtml(text)}" aria-label="${escapeHtml(label)}">${COPY_ICON_SVG}</button>`
 );
 
 const htmlFromFilePart = (part) => {
@@ -1239,7 +1285,7 @@ const htmlFromQuestionItems = (items, strings) => {
       answer ? `<div class="qa-a">${escapeHtml(answer)}</div>` : ''
     }</div>`;
   }).join('');
-  return `<details class="questions" open><summary><span class="q-label">${escapeHtml(strings.questions)}</span> <span class="q-count">${escapeHtml(countLabel)}</span></summary><div class="qa-list">${rows}</div></details>`;
+  return `<details class="questions" open><summary>${CHEVRON_SVG}<span class="q-label">${escapeHtml(strings.questions)}</span> <span class="q-count">${escapeHtml(countLabel)}</span></summary><div class="qa-list">${rows}</div></details>`;
 };
 
 const htmlFromToolPart = (part, strings) => {
@@ -1252,12 +1298,14 @@ const htmlFromToolPart = (part, strings) => {
   const isError = status === 'error';
   const subtitle = escapeHtml(toolSubtitle(input));
   const result = isError ? (error || output || 'tool error') : output;
+  const command = subtitle || name;
   return [
     `<details class="tool${isError ? ' error' : ''}">`,
-    `<summary><span class="tool-name">${name}</span>${subtitle ? `<span class="tool-sub">${subtitle}</span>` : ''}</summary>`,
-    '<div class="tool-body">',
-    result ? copyButton(strings.copyOutput, result) : '',
-    result ? `<pre class="tool-output"><span class="tool-prompt">$</span> ${escapeHtml(result)}</pre>` : '',
+    `<summary>${CHEVRON_SVG}<span class="tool-name">${name}</span>${subtitle ? `<span class="tool-sub">${subtitle}</span>` : ''}</summary>`,
+    '<div class="tool-panel">',
+    `<div class="tool-cmd"><span class="tool-prompt">$</span> ${command}</div>`,
+    result ? `<pre class="tool-output tool-out">${escapeHtml(result)}</pre>` : '',
+    result ? `<div class="tool-copy-row">${copyButton(strings.copyOutput, result)}</div>` : '',
     '</div>',
     '</details>',
   ].filter(Boolean).join('');
@@ -1285,12 +1333,15 @@ const htmlFromUserEntry = (entry, strings) => {
   }
   const text = texts.join('\n');
   if (!text && media.filter(Boolean).length === 0) return '';
+  const clock = formatShareClock(entry?.info?.time?.created);
   return [
     '<div class="msg-user">',
+    '<div class="user-col">',
     '<div class="bubble">',
     text ? `<div class="bubble-text">${escapeHtml(text).replace(/\n/g, '<br>\n')}</div>` : '',
     media.filter(Boolean).join('\n'),
-    text ? copyButton(strings.copyMessage, text) : '',
+    '</div>',
+    (text || clock) ? `<div class="user-meta">${clock ? `<span>${escapeHtml(clock)}</span><span>·</span>` : ''}${text ? copyButton(strings.copyMessage, text) : ''}</div>` : '',
     '</div>',
     '</div>',
   ].filter(Boolean).join('');
@@ -1325,7 +1376,7 @@ const htmlFromAssistantEntry = (entry, strings, extras = []) => {
     thinking.filter(Boolean).join('\n'),
     questions,
     tools.filter(Boolean).join('\n'),
-    answerText ? `<div class="body answer">${markdownToHtml(answerText)}${copyButton(strings.copyAnswer, answerText)}</div>` : '',
+    answerText ? `<div class="body answer">${markdownToHtml(answerText)}</div>` : '',
   ].filter(Boolean).join('\n');
 };
 
@@ -1381,20 +1432,28 @@ const htmlFromTurnMeta = (assistants) => {
     duration,
   ].filter(Boolean);
   if (bits.length === 0) return '';
-  return `<footer class="turn-meta">${escapeHtml(bits.join(' · '))}</footer>`;
+  return `<footer class="turn-meta"><span>${escapeHtml(bits.join(' · '))}</span></footer>`;
 };
 
 const htmlFromTurn = (turn, index, strings, extras) => {
   const id = `turn-${index + 1}`;
   const user = safeBlock(() => (turn.user ? htmlFromUserEntry(turn.user, strings) : ''));
   const assistants = (turn.assistants || []).map((entry) => safeBlock(() => htmlFromAssistantEntry(entry, strings, extras)));
+  const answerText = (turn.assistants || []).flatMap((entry) => (
+    (Array.isArray(entry?.parts) ? entry.parts : [])
+      .filter((part) => part?.type === 'text' && typeof part.text === 'string' && part.text)
+      .map((part) => part.text)
+  )).join('\n\n');
   const meta = safeBlock(() => htmlFromTurnMeta(turn.assistants));
-  return `<article class="turn" id="${id}">\n${[user, ...assistants, meta].filter(Boolean).join('\n')}\n</article>`;
+  const metaWithCopy = meta
+    ? meta.replace('</footer>', `${answerText ? copyButton(strings.copyAnswer, answerText) : ''}</footer>`)
+    : (answerText ? `<footer class="turn-meta">${copyButton(strings.copyAnswer, answerText)}</footer>` : '');
+  return `<article class="turn" id="${id}">\n${[user, ...assistants, metaWithCopy].filter(Boolean).join('\n')}\n</article>`;
 };
 
 const htmlFromSessionMeta = (record, version) => {
   const messages = Array.isArray(record?.messages) ? record.messages : [];
-  const model = lastUsableModelLabel(messages.map((entry) => entry?.info));
+  const model = lastUsableModelId(messages.map((entry) => entry?.info));
   const date = formatShareDate(record?.info?.time?.created);
   const versionLabel = asTrimmedString(version) ? `v${asTrimmedString(version)}` : '';
   return `<div class="session-meta">
@@ -1405,279 +1464,311 @@ const htmlFromSessionMeta = (record, version) => {
 };
 
 const SESSION_HTML_STYLES = `:root {
-  color-scheme: light;
-  --bg-deep: #F8F7F7;
-  --bg-surface: #ffffff;
-  --text: #3A3A3A;
-  --text-strong: #1A1A1A;
-  --text-muted: #6B6B6B;
-  --text-faint: #A3A3A3;
-  --text-thinking: #8A8A8A;
-  --border: #E8E6E6;
-  --bubble: #F1F0F0;
-  --critical: #B42318;
-  --watermark: #D4D2D2;
-  --icon: #6B6B6B;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 html[data-theme="dark"] {
   color-scheme: dark;
-  --bg-deep: #131010;
-  --bg-surface: #1b1818;
-  --text: #f1ecec;
-  --text-strong: #f1ecec;
-  --text-muted: #b7b1b1;
-  --text-faint: #7f7979;
-  --text-thinking: #7f7979;
-  --border: #2d2828;
-  --bubble: #252121;
-  --critical: #f97066;
-  --watermark: #2d2828;
-  --icon: #b7b1b1;
+  --background-base: #101010;
+  --background-strong: #121212;
+  --background-stronger: #151515;
+  --background-weak: #1e1e1e;
+  --text-strong: #ffffffef;
+  --text-base: #ffffff9e;
+  --text-weak: #ffffff6c;
+  --text-weaker: #ffffff48;
+  --border-weak-base: #282828;
+  --border-weaker-base: #202020;
+  --surface-base: #ffffff08;
+  --surface-strong: #ffffff2b;
+  --icon-strong-base: #ededed;
+  --icon-base: #7e7e7e;
+  --icon-weak-base: #343434;
+  --markdown-text: #eee;
+  --markdown-link-text: #56b6c2;
+  --code-bg: #ffffff14;
+  --critical: #fc533a;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --background-base: #f8f8f8;
+  --background-strong: #fcfcfc;
+  --background-stronger: #fcfcfc;
+  --background-weak: #f3f3f3;
+  --text-strong: #171717;
+  --text-base: #6f6f6f;
+  --text-weak: #8f8f8f;
+  --text-weaker: #c7c7c7;
+  --border-weak-base: #e5e5e5;
+  --border-weaker-base: #ececec;
+  --surface-base: #00000008;
+  --surface-strong: #fff;
+  --icon-strong-base: #171717;
+  --icon-base: #8f8f8f;
+  --icon-weak-base: #dbdbdb;
+  --markdown-text: #1a1a1a;
+  --markdown-link-text: #318795;
+  --code-bg: #0000000d;
+  --critical: #b42318;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
-body {
-  background: var(--bg-deep);
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  font-size: 13px;
-  line-height: 1.7;
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--background-stronger);
+  color: var(--text-strong);
+  font: 13px/1.5 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
+button, a { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+a { text-decoration: none; }
+.shell { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  height: 40px;
+  height: 48px;
+  padding: 8px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--background-base);
+  border-bottom: 1px solid var(--border-weak-base);
+  flex-shrink: 0;
 }
-.brand {
-  display: inline-flex;
-  align-items: center;
-  color: var(--text-strong);
-  text-decoration: none;
-}
-.pichamber-mark {
-  display: block;
+.brand { color: var(--icon-strong-base); display: flex; }
+.pichamber-mark { display: block; width: 18px; height: 18px; color: var(--icon-strong-base); }
+.pi-mark { display: block; width: 12px; height: 12px; }
+.topbar-right { display: flex; gap: 12px; align-items: center; }
+.topbar-right a, .theme-toggle, .copy {
   width: 24px;
   height: 24px;
-  color: var(--text-strong);
-}
-.pichamber-mark path { stroke-width: 3; }
-.pichamber-mark path[fill-opacity="0.2"] { fill-opacity: 0.58; }
-.pichamber-mark path[fill-opacity="0.35"] { fill-opacity: 0.82; }
-.pi-mark { display: block; }
-.topbar-right { display: flex; align-items: center; gap: 4px; }
-.topbar-right a, .theme-toggle, .copy {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
+  color: var(--icon-base);
   border-radius: 6px;
-  background: transparent;
-  color: var(--icon);
-  text-decoration: none;
-  cursor: pointer;
 }
-.topbar-right a:hover, .theme-toggle:hover, .copy:hover { background: var(--bubble); color: var(--text-strong); }
-html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display: none; }
-.page {
-  width: min(880px, 100%);
-  min-height: calc(100vh - 40px);
-  margin: 0 auto;
-  padding: 20px 36px 56px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-top: 0;
-}
-.session-header { margin-bottom: 2rem; }
+.topbar-right a:hover, .theme-toggle:hover, .copy:hover { color: var(--icon-strong-base); background: var(--surface-base); }
+.topbar-right a svg, .theme-toggle svg { width: 16px; height: 16px; }
+.copy svg { width: 14px; height: 14px; }
+html[data-theme="dark"] .icon-moon, html[data-theme="light"] .icon-sun { display: none; }
+.scroller { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.scroller::-webkit-scrollbar { display: none; }
+.page { position: relative; max-width: 52rem; margin: 0 auto; padding: 56px 24px 96px; }
+.session-header { margin-bottom: 40px; }
 .session-meta {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin: 0 0 0.85rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  color: var(--text-muted);
+  gap: 16px;
+  min-height: 32px;
+  margin: 0 0 16px;
 }
-.session-version, .session-model, .session-date { display: inline-flex; align-items: center; gap: 6px; }
-.session-version { justify-self: start; }
-.session-model { justify-self: center; }
-.session-date { justify-self: end; color: var(--text-faint); }
+.session-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 8px 2px 6px;
+  background: var(--surface-strong);
+  box-shadow: 0 0 0 1px var(--border-weak-base);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-strong);
+}
+.session-version svg { width: 12px; height: 12px; color: var(--icon-strong-base); }
+.session-model svg { width: 12px; height: 12px; color: var(--text-weak); }
+.session-model {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-base);
+  font-size: 12px;
+}
+.session-date { margin-left: auto; color: var(--text-weaker); font-size: 12px; }
 .session-title {
   margin: 0;
   font-size: 16px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--text-strong);
 }
-.transcript { display: flex; flex-direction: column; gap: 2.4rem; }
-.turn { scroll-margin-top: 56px; }
+.layout { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 16px; }
+.ticks { position: sticky; top: 0; padding-top: 8px; display: flex; flex-direction: column; }
+.ticks a {
+  width: 24px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  color: transparent;
+}
+.ticks a i {
+  display: block;
+  width: 10px;
+  height: 1px;
+  background: var(--border-weak-base);
+}
+.ticks a.current i { width: 14px; background: var(--text-base); }
+.transcript { display: flex; flex-direction: column; gap: 40px; min-width: 0; }
+.turn { scroll-margin-top: 16px; }
 .msg-user { display: flex; justify-content: flex-end; }
+.user-col { max-width: min(36rem, 92%); }
 .bubble {
-  position: relative;
-  max-width: min(560px, 86%);
-  padding: 10px 14px 28px;
-  background: var(--bubble);
-  border-radius: 16px;
-  color: var(--text);
+  background: var(--background-weak);
+  color: var(--text-strong);
+  border-radius: 10px;
+  padding: 10px 14px;
 }
 .bubble-text { white-space: pre-wrap; word-break: break-word; }
-.bubble .copy, .body .copy, .tool-body .copy {
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  width: auto;
-  height: auto;
-  padding: 2px 6px;
-  font-size: 11px;
-  color: var(--text-faint);
+.user-meta, .turn-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--text-weak);
+  font-size: 12px;
 }
-.thinking {
-  display: block;
-  margin: 0.75rem 0 1.15rem;
-  padding: 12px 14px;
-  background: var(--bubble);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text-thinking);
-  font-size: 13px;
-}
-.thinking p { margin: 0.45rem 0; }
-.thinking p:first-child { margin-top: 0; }
+.user-meta { justify-content: flex-end; }
+.thinking { color: var(--text-weak); margin: 0 0 16px; white-space: pre-wrap; }
+.thinking p { margin: 0 0 12px; }
 .thinking p:last-child { margin-bottom: 0; }
-.questions, .tool { margin: 0.85rem 0; }
+.questions { margin: 16px 0 20px; color: var(--text-base); }
+.tool { margin: 8px 0; }
 .questions summary, .tool summary {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
   cursor: pointer;
   list-style: none;
-  color: var(--text-muted);
+  color: var(--text-base);
 }
+.questions summary { gap: 8px; }
 .questions summary::-webkit-details-marker, .tool summary::-webkit-details-marker { display: none; }
-.q-label, .tool-name { font-weight: 650; color: var(--text-strong); }
-.q-count, .tool-sub { color: var(--text-faint); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.qa-list { margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.7rem; }
-.qa-q { color: var(--text-muted); }
-.qa-a { color: var(--text-strong); }
-.tool-body { position: relative; margin-top: 0.45rem; padding-bottom: 22px; }
-.tool-output {
-  margin: 0;
-  padding: 0;
-  background: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.tool-prompt { color: var(--text-faint); margin-right: 0.35rem; }
-.tool.error .tool-name, .tool.error .tool-sub, .tool.error .tool-output { color: var(--critical); }
-.body { position: relative; padding-bottom: 22px; }
-.body h1, .body h2, .body h3, .body h4, .body h5, .body h6 {
-  margin: 1.15rem 0 0.4rem;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--text-strong);
-  line-height: 1.45;
-}
-.body p { margin: 0.55rem 0; }
-.body p:first-child { margin-top: 0; }
-.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.25rem; }
-.body li { margin: 0.15rem 0; }
-.body a { color: var(--text); }
-.body hr { border: 0; border-top: 1px solid var(--border); margin: 1.15rem 0; }
-.body blockquote { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 2px solid var(--border); color: var(--text-muted); }
-.body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
-.body th, .body td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
-.body th { color: var(--text-muted); font-weight: 650; }
-.body pre {
-  margin: 0.65rem 0;
-  padding: 0;
-  background: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-.body code, .thinking code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-.image { margin: 0.6rem 0; }
-.image img { max-width: 100%; height: auto; border-radius: 4px; }
-.image-omitted, .file-omitted { color: var(--text-thinking); font-style: italic; }
-.turn-meta { margin-top: 0.85rem; color: var(--text-faint); font-size: 11px; }
-.ticks {
-  position: fixed;
-  top: 88px;
-  left: max(8px, calc(50% - 480px));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 3;
-}
-.ticks a {
-  position: relative;
-  display: block;
+.chevron {
+  width: 12px;
+  height: 12px;
+  color: var(--text-weaker);
   flex: none;
-  width: 16px;
-  height: 22px;
-  background: transparent;
-  color: transparent;
-  font-size: 0;
-  line-height: 0;
+  transition: transform .15s;
+}
+.questions:not([open]) .chevron, .tool:not([open]) .chevron { transform: rotate(-90deg); }
+.q-label, .q-count { color: var(--text-base); }
+.tool-name { color: var(--text-strong); font-weight: 500; min-width: 3.5rem; }
+.tool-sub {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qa-list { margin: 12px 0 0 20px; display: flex; flex-direction: column; gap: 12px; }
+.qa-q { color: var(--text-weak); margin-bottom: 2px; }
+.qa-a { color: var(--text-strong); }
+.tool-panel {
+  margin: 6px 0 12px 22px;
+  border: 1px solid var(--border-weak-base);
+  border-radius: 8px;
+  background: var(--background-base);
   overflow: hidden;
 }
-.ticks a::before {
-  content: "";
-  position: absolute;
-  left: 6px;
-  top: 3px;
-  width: 4px;
-  height: 16px;
-  border-radius: 2px;
-  background: var(--text-muted);
+.tool-cmd {
+  padding: 10px 12px 0;
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
-.ticks a.current::before {
-  left: 5px;
-  top: 0;
-  width: 6px;
-  height: 22px;
-  background: var(--text-strong);
+.tool-output {
+  margin: 0;
+  padding: 10px 12px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.5 var(--font-mono);
+  color: var(--text-base);
 }
-.page-footer { margin-top: 4rem; }
+.tool-copy-row { display: flex; justify-content: flex-end; padding: 0 8px 8px; }
+.tool-prompt { color: var(--text-weaker); margin-right: 0.35rem; }
+.tool.error .tool-name, .tool.error .tool-output { color: var(--critical); }
+.body { color: var(--markdown-text); }
+.body .copy { margin-top: 8px; }
+.body h1, .body h2 { font-size: 15px; font-weight: 500; margin: 28px 0 12px; color: var(--text-strong); }
+.body h3, .body h4, .body h5, .body h6 { font-size: 13px; font-weight: 500; margin: 20px 0 8px; color: var(--text-strong); }
+.body p { margin: 0 0 12px; }
+.body ul, .body ol { margin: 0 0 12px; padding-left: 1.2em; }
+.body li { margin: 4px 0; }
+.body a { color: var(--markdown-link-text); }
+.body hr { border: 0; border-top: 1px solid var(--border-weak-base); margin: 24px 0; }
+.body blockquote { margin: 12px 0; padding-left: 0.85rem; border-left: 2px solid var(--border-weak-base); color: var(--text-weak); }
+.body table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.body th, .body td { border: 1px solid var(--border-weak-base); padding: 0.35rem 0.5rem; text-align: left; }
+.body pre {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--code-bg);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.5 var(--font-mono);
+}
+.body code, .thinking code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.body pre code { background: none; padding: 0; }
+.image { margin: 8px 0; }
+.image img { max-width: 100%; height: auto; border-radius: 4px; }
+.image-omitted, .file-omitted { color: var(--text-weak); font-style: italic; }
+.page-footer { margin-top: 72px; text-align: center; }
 .watermark {
   margin: 0;
-  text-align: center;
-  font-size: clamp(48px, 12vw, 92px);
+  font-size: 72px;
   font-weight: 600;
   letter-spacing: -0.05em;
-  color: var(--watermark);
+  color: var(--text-weaker);
+  opacity: .28;
+  line-height: 1;
   user-select: none;
 }
 .ignored {
-  margin: 0.4rem 0 0;
-  text-align: right;
-  color: var(--text-faint);
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  margin: 0;
+  color: var(--text-weaker);
   font-size: 12px;
 }
-@media (max-width: 960px) {
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  background: var(--background-weak);
+  color: var(--text-strong);
+  border: 1px solid var(--border-weak-base);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
   .ticks { display: none; }
-  .session-meta { grid-template-columns: 1fr; }
-  .session-model, .session-date { justify-self: start; }
+  .page { padding: 32px 16px 80px; }
+  .watermark { font-size: 40px; }
 }`;
 
-const SESSION_HTML_BOOT = `!function(){try{var k=${JSON.stringify(EXPORT_THEME_KEY)};var s=localStorage.getItem(k);var t=(s==="light"||s==="dark")?s:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}}();`;
+const SESSION_HTML_BOOT = `!function(){try{var k=${JSON.stringify(EXPORT_THEME_KEY)};var s=localStorage.getItem(k);var t=(s==="light"||s==="dark")?s:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}}();`;
 
-const SESSION_HTML_SCRIPT = `!function(){var root=document.documentElement;var key=${JSON.stringify(EXPORT_THEME_KEY)};function theme(){return root.getAttribute("data-theme")==="dark"?"dark":"light";}function setTheme(next){root.setAttribute("data-theme",next);try{localStorage.setItem(key,next);}catch(e){}}document.querySelector("[data-theme-toggle]")?.addEventListener("click",function(){setTheme(theme()==="dark"?"light":"dark");});document.addEventListener("click",function(event){var button=event.target.closest("[data-copy]");if(!button)return;var text=button.getAttribute("data-copy")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text);return;}var area=document.createElement("textarea");area.value=text;document.body.appendChild(area);area.select();try{document.execCommand("copy");}catch(e){}area.remove();});var ticks=Array.prototype.slice.call(document.querySelectorAll(".ticks a"));var turns=ticks.map(function(tick){return document.getElementById(tick.getAttribute("href").slice(1));}).filter(Boolean);function mark(id){ticks.forEach(function(tick){tick.classList.toggle("current",tick.getAttribute("href")==="#"+id);});}if("IntersectionObserver" in window&&turns.length){var io=new IntersectionObserver(function(entries){var visible=entries.filter(function(entry){return entry.isIntersecting;}).sort(function(a,b){return b.intersectionRatio-a.intersectionRatio;})[0];if(visible)mark(visible.target.id);},{rootMargin:"-20% 0px -60% 0px",threshold:[0.1,0.4,0.8]});turns.forEach(function(turn){io.observe(turn);});if(turns[0])mark(turns[0].id);}ticks.forEach(function(tick){tick.addEventListener("click",function(){mark(tick.getAttribute("href").slice(1));});});}();`;
+const sessionHtmlScript = (strings) => `!function(){var root=document.documentElement;var key=${JSON.stringify(EXPORT_THEME_KEY)};var toggle=document.querySelector("[data-theme-toggle]");var toast=document.querySelector(".toast");var copied=${JSON.stringify(strings.copied)};var failed=${JSON.stringify(strings.copyFailed)};var toLight=${JSON.stringify(strings.themeToLight)};var toDark=${JSON.stringify(strings.themeToDark)};function theme(){return root.getAttribute("data-theme")==="light"?"light":"dark";}function syncThemeLabel(){if(toggle)toggle.setAttribute("aria-label",theme()==="light"?toDark:toLight);}function setTheme(next){root.setAttribute("data-theme",next);try{localStorage.setItem(key,next);}catch(e){}syncThemeLabel();}syncThemeLabel();if(toggle)toggle.addEventListener("click",function(){setTheme(theme()==="dark"?"light":"dark");});var toastTimer;function showToast(text){if(!toast)return;toast.textContent=text;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(function(){toast.classList.remove("show");},1200);}document.addEventListener("click",function(event){var button=event.target.closest("[data-copy]");if(!button)return;var text=button.getAttribute("data-copy")||"";if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast(copied);}).catch(function(){showToast(failed);});return;}var area=document.createElement("textarea");area.value=text;document.body.appendChild(area);area.select();try{document.execCommand("copy");showToast(copied);}catch(e){showToast(failed);}area.remove();});var ticks=Array.prototype.slice.call(document.querySelectorAll(".ticks a"));var turns=Array.prototype.slice.call(document.querySelectorAll(".turn"));var scroller=document.querySelector(".scroller");function mark(id){ticks.forEach(function(tick){tick.classList.toggle("current",tick.getAttribute("href")==="#"+id);});}function syncTicks(){var active=turns[0];turns.forEach(function(turn){if(turn.getBoundingClientRect().top<160)active=turn;});if(active)mark(active.id);}if(turns[0])mark(turns[0].id);if(scroller)scroller.addEventListener("scroll",syncTicks,{passive:true});ticks.forEach(function(tick){tick.addEventListener("click",function(){mark(tick.getAttribute("href").slice(1));});});}();`;
 
 export const buildSessionHtml = (record, options = {}) => {
   const locale = normalizeExportLocale(options?.locale || record?.locale || record?.info?.locale);
@@ -1692,9 +1783,9 @@ export const buildSessionHtml = (record, options = {}) => {
     ...extras.flatMap((prompt) => questionItemsFromUiPrompt(prompt)),
   ].some((item) => item.cancelled);
   const articles = turns.map((turn, index) => htmlFromTurn(turn, index, strings, extras)).join('\n');
-  const ticks = turns.map((_, index) => `<a href="#turn-${index + 1}">${index + 1}</a>`).join('');
+  const ticks = turns.map((_, index) => `<a class="tick" href="#turn-${index + 1}"><i></i></a>`).join('');
   return `<!DOCTYPE html>
-<html lang="${escapeHtml(locale)}">
+<html lang="${escapeHtml(locale)}" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1705,6 +1796,7 @@ ${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>
+<div class="shell">
 <header class="topbar">
 <a class="brand" href="${PICHAMBER_REPO_HREF}" aria-label="${escapeHtml(strings.logo)}">${PICHAMBER_MARK_SVG}</a>
 <div class="topbar-right">
@@ -1712,21 +1804,27 @@ ${SESSION_HTML_STYLES}
 <button type="button" class="theme-toggle" data-theme-toggle aria-label="${escapeHtml(strings.themeToggle)}">${THEME_ICON_SVG}</button>
 </div>
 </header>
-<nav class="ticks" aria-hidden="true">${ticks}</nav>
+<div class="scroller">
 <div class="page">
 <header class="session-header">
 ${htmlFromSessionMeta(record, version)}
 <h1 class="session-title">${title}</h1>
 </header>
+<div class="layout">
+<nav class="ticks" aria-hidden="true">${ticks}</nav>
 <main class="transcript">
 ${articles}
 </main>
+</div>
 <footer class="page-footer">
 <p class="watermark">pichamber</p>
 ${cancelled ? `<p class="ignored">${escapeHtml(strings.ignored)}</p>` : ''}
 </footer>
 </div>
-<script>${SESSION_HTML_SCRIPT}</script>
+</div>
+</div>
+<div class="toast" aria-live="polite"></div>
+<script>${sessionHtmlScript(strings)}</script>
 </body>
 </html>
 `;

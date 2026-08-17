@@ -301,9 +301,9 @@ exist. HTML export (`buildSessionHtml`) writes a self-contained offline file
 that matches the accepted share-chrome preview: Pichamber cube mark, GitHub +
 light/dark toggle (`localStorage` key `pichamber-export-theme`), Pi
 coding-agent version (not the Pichamber app version), last usable
-`provider/model`, user bubbles, thinking as its own grey block, settled
+model id, user bubbles, thinking as muted unboxed paragraphs, settled
 Desktop `ctx.ui` select/confirm questions, tools collapsed by default,
-Markdown answers, left-gutter ticks, and a faded `pichamber` footer. In-file
+Markdown answers, horizontal 1px left-gutter ticks, and a faded `pichamber` footer. In-file
 copy follows the current UI locale. Images are embedded `data:` URLs. Remote
 http(s) image URLs are omitted or labeled. One failed block does not empty
 the file. It does not create a public share URL. JSONL stays the round-trip /
