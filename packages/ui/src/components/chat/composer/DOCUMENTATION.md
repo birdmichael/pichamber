@@ -20,6 +20,8 @@ inside the modal — Desktop dialogs sit on the top layer, so toasts are not
 visible while it is open. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
+On Pi it also no longer mounts the footer context-usage percent chip;
+inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**

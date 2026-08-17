@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - **Chat:** on Pi, toggling Plan now keeps View Plan and Discard available even when the model never wrote plan markdown. The panel shows “No plan yet”; Build stays disabled until a plan exists.
 - Chat/Desktop: on Pi, Agent and Plan in the composer footer are one dropdown that shows the current side, not two chips.
 - Chat/Desktop: on Pi, the composer footer no longer shows 树 / Tree. Open the existing session timeline from a control under the prompt-navigator ticks (same dialog as /timeline).
+- Chat/Desktop: on Pi, the composer footer no longer shows a context-usage percent. Use the header context ring to inspect tokens vs the model window.
 - **Sessions/Desktop:** on Pi, exporting a chat as JSONL now keeps tool calls, tool results, images, and thinking. Importing that file restores the same transcript.
 - **Sessions/Desktop:** on Pi, cloning, forking, or importing a chat writes the transcript to disk. Quit and reopen still shows those messages, and a clone or fork still knows its parent.
 - **Sessions/Desktop:** on Pi, archived chats stay on the Archive page after quit or sidebar Refresh. Relaunch no longer reopens an archived chat as the last session.

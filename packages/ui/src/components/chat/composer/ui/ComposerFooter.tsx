@@ -27,7 +27,6 @@ import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
 import { FocusModeButton } from './FocusModeButton';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
-import { ContextUsageChip } from './ContextUsageChip';
 
 const MemoModelControls = React.memo(ModelControls);
 const MemoComposerDictation = React.memo(ComposerDictation);
@@ -266,7 +265,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         />
                     </div>
                     <div className={cn('flex items-center flex-1 justify-end', footerGapClass, 'md:gap-x-3')}>
-                        {isPiKernel ? <ContextUsageChip sessionId={currentSessionId} /> : null}
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
                             radius={chatInputRadius}
