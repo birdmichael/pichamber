@@ -10,6 +10,7 @@ import {
   readPersistedArchivedTimestamp,
   readPersistedParentID,
   readPersistedSessionMetadata,
+  LIST_METADATA_TAIL_CHUNK_SIZE,
   readPersistedSessionMetadataFromFile,
   readPersistedSessionMetadataFromFileTail,
   sessionTimeWithArchived,
@@ -141,7 +142,7 @@ describe('Pi session metadata persistence', () => {
     });
     expect(metadata).toEqual({ archived: 9, parentID: 'root' });
     expect(size).toBeGreaterThan(200_000);
-    expect(bytesRead).toBeLessThan(16_384);
+    expect(bytesRead).toBeLessThan(LIST_METADATA_TAIL_CHUNK_SIZE * 2);
     expect(bytesRead).toBeLessThan(size / 8);
     expect(readPersistedSessionMetadataFromFileTail(path.join(dir, 'missing.jsonl'))).toBeUndefined();
     fs.rmSync(dir, { recursive: true, force: true });

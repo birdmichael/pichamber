@@ -10,6 +10,7 @@ import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
 import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
 import {
+  LIST_METADATA_TAIL_CHUNK_SIZE,
   PICHAMBER_METADATA_CUSTOM_TYPE,
   readPersistedSessionMetadataFromFileTail,
 } from './session-metadata.js';
@@ -1098,7 +1099,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       const archivedRead = reads.find((item) => item.file === archivedLarge.path);
       expect(archivedRead).toBeTruthy();
       expect(archivedRead.size).toBeGreaterThan(200_000);
-      expect(archivedRead.bytes).toBeLessThan(16_384);
+      expect(archivedRead.bytes).toBeLessThan(LIST_METADATA_TAIL_CHUNK_SIZE * 2);
       expect(archivedRead.bytes).toBeLessThan(archivedRead.size / 8);
 
       const roots = await (await fetch(`${url}/api/session?archived=false&roots=true&${dirQ}`)).json();
