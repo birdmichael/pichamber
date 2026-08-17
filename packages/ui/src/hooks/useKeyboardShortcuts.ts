@@ -24,6 +24,7 @@ import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { usePiSessionPlanStore } from '@/sync/pi-session-plan-store';
 import { readEmbeddedThemeSearchParams } from '@/contexts/theme-embedded-bootstrap';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
+import { useGitStore } from '@/stores/useGitStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
@@ -516,6 +517,7 @@ export const useKeyboardShortcuts = () => {
           isVSCode: isVSCodeRuntime(),
           screenWidth: window.innerWidth,
           tabs: panelState?.tabs ?? [],
+          isGitRepo: useGitStore.getState().directories.get(directory)?.isGitRepo === true,
         });
         const target = visibleSurfaces[switchSurfaceDigit - 1];
         if (!target) {

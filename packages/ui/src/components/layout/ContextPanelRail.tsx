@@ -38,7 +38,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
-import { useGitStatus } from '@/stores/useGitStore';
+import { useGitStatus, useIsGitRepo } from '@/stores/useGitStore';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 
 const RAIL_TOOLTIP_DELAY_MS = 150;
@@ -180,6 +180,7 @@ export const ContextPanelRail: React.FC = () => {
   });
   const { screenWidth } = useDeviceInfo();
   const gitStatus = useGitStatus(directoryKey || null);
+  const isGitRepo = useIsGitRepo(directoryKey || null);
 
   const surfaceSwitchPrefix = React.useMemo(
     () => getEffectiveShortcutPrefix('switch_context_surface', shortcutOverrides),
@@ -273,8 +274,9 @@ export const ContextPanelRail: React.FC = () => {
       isVSCode: isVSCodeRuntime(),
       screenWidth,
       tabs,
+      isGitRepo: isGitRepo === true,
     });
-  }, [contextRailOrder, showPlanSurface, screenWidth, tabs]);
+  }, [contextRailOrder, isGitRepo, showPlanSurface, screenWidth, tabs]);
 
   const handleDragEnd = React.useCallback((event: DragEndEvent) => {
     const { active, over } = event;

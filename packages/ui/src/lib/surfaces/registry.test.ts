@@ -12,6 +12,7 @@ const baseOptions = {
   isVSCode: false,
   screenWidth: 1200,
   tabs: [],
+  isGitRepo: false,
 } as const;
 
 describe('getVisibleContextRailSurfaces', () => {
@@ -44,9 +45,19 @@ describe('getVisibleContextRailSurfaces', () => {
     expect(surfaces.some((surface) => surface.id === 'context')).toBe(true);
   });
 
+  test('hides the pull request surface on a non-git directory', () => {
+    const pr = CONTEXT_SURFACES.find((surface) => surface.id === 'pr');
+    expect(pr?.availability).toBe('git-repo');
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, isGitRepo: false }).some((s) => s.id === 'pr')).toBe(false);
+  });
+
+  test('shows the pull request surface on a git project without a PR tab', () => {
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, isGitRepo: true }).some((s) => s.id === 'pr')).toBe(true);
+  });
+
   test('shows the pull request surface after a PR tab exists', () => {
     const pr = CONTEXT_SURFACES.find((surface) => surface.id === 'pr');
-    expect(pr?.availability).toBe('has-content');
+    expect(pr?.availability).toBe('git-repo');
     expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'pr' }] }).some((s) => s.id === 'pr')).toBe(true);
   });
 
