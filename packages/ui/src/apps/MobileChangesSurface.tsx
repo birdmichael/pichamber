@@ -11,17 +11,22 @@ import { PierreDiffViewer } from '@/components/views/PierreDiffViewer';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import type { GitStatus } from '@/lib/api/types';
+import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { generateCommitMessage, stageGitFile, stageGitFiles, unstageGitFile, unstageGitFiles } from '@/lib/gitApi';
 import type { GitRemote } from '@/lib/gitApi';
 import { getLanguageFromExtension, isImageFile } from '@/lib/toolHelpers';
+import { getFreshestPrStatusForBranch, useGitHubPrStatusStore } from '@/stores/useGitHubPrStatusStore';
 import {
   useGitStore,
   useGitStatus,
   useIsGitRepo,
   useGitLoadingStatus,
 } from '@/stores/useGitStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+
+import { MOBILE_GIT_PR_SURFACE_MODE, resolveMobileGitFileDiffHost } from './mobileWorkspaceReview';
 
 type SyncAction = 'fetch' | 'pull' | 'push' | 'sync' | null;
 type CommitAction = 'commit' | 'commitAndPush' | null;
@@ -41,6 +46,17 @@ const isUnstagedStatusFile = (file: GitStatus['files'][number]): boolean => {
 
 const diffCacheKey = (path: string, staged: boolean): string => staged ? `${path}\u0000staged` : path;
 
+const initialInlineDiffRoute = (
+  path: string | null | undefined,
+  staged: boolean,
+): { type: 'list' } | { type: 'diff'; path: string; staged: boolean } => {
+  if (!path) return { type: 'list' };
+  const width = typeof window === 'undefined' ? 0 : window.innerWidth;
+  return resolveMobileGitFileDiffHost(width) === 'inline'
+    ? { type: 'diff', path, staged }
+    : { type: 'list' };
+};
+
 type MobileChangesSurfaceProps = {
   /** When provided, the list header gets a close X that calls this. */
   onClose?: () => void;
@@ -56,6 +72,8 @@ type MobileChangesSurfaceProps = {
 export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onClose, initialDiffPath, initialDiffStaged = false }) => {
   const { t } = useI18n();
   const { git } = useRuntimeAPIs();
+  const { screenWidth } = useDeviceInfo();
+  const fileDiffHost = resolveMobileGitFileDiffHost(screenWidth);
   const currentDirectory = normalizePath(useEffectiveDirectory() ?? null);
   const status = useGitStatus(currentDirectory || null);
   const isGitRepo = useIsGitRepo(currentDirectory || null);
@@ -67,22 +85,34 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
   const prefetchDiffs = useGitStore((state) => state.prefetchDiffs);
   const getDiff = useGitStore((state) => state.getDiff);
   const setDiff = useGitStore((state) => state.setDiff);
+  const openContextDiff = useUIStore((state) => state.openContextDiff);
+  const openContextSurface = useUIStore((state) => state.openContextSurface);
+  const prStatusBranch = status?.current ?? null;
+  const prChipStatus = useGitHubPrStatusStore((state) => {
+    if (!currentDirectory || !prStatusBranch) {
+      return null;
+    }
+    return getFreshestPrStatusForBranch(state.entries, currentDirectory, prStatusBranch);
+  });
 
   const [route, setRoute] = React.useState<{ type: 'list' } | { type: 'diff'; path: string; staged: boolean }>(
-    () => (initialDiffPath ? { type: 'diff', path: initialDiffPath, staged: initialDiffStaged } : { type: 'list' }),
+    () => initialInlineDiffRoute(initialDiffPath, initialDiffStaged),
   );
 
-  // Allow the host (MobileApp) to push us into a specific diff when the surface
-  // is reopened or when an external trigger (e.g. PendingChangesBar tap) requests
-  // a different file mid-session.
+  // Phone: stay on MobileDiffDetail. Tablet: Desktop DiffView so Walkthrough can appear.
   React.useEffect(() => {
     if (!initialDiffPath) return;
+    if (fileDiffHost === 'desktop-diff') {
+      if (!currentDirectory) return;
+      openContextDiff(currentDirectory, initialDiffPath, initialDiffStaged);
+      return;
+    }
     setRoute((current) => (
       current.type === 'diff' && current.path === initialDiffPath && current.staged === initialDiffStaged
         ? current
         : { type: 'diff', path: initialDiffPath, staged: initialDiffStaged }
     ));
-  }, [initialDiffPath, initialDiffStaged]);
+  }, [currentDirectory, fileDiffHost, initialDiffPath, initialDiffStaged, openContextDiff]);
   const [syncAction, setSyncAction] = React.useState<SyncAction>(null);
   const [commitAction, setCommitAction] = React.useState<CommitAction>(null);
   const [commitMessage, setCommitMessage] = React.useState('');
@@ -285,8 +315,18 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
   }, [currentDirectory, refreshStatusAndBranches, t]);
 
   const handleViewChangeDiff = React.useCallback((path: string, staged = false) => {
+    if (fileDiffHost === 'desktop-diff') {
+      if (!currentDirectory) return;
+      openContextDiff(currentDirectory, path, staged);
+      return;
+    }
     setRoute({ type: 'diff', path, staged });
-  }, []);
+  }, [currentDirectory, fileDiffHost, openContextDiff]);
+
+  const handleOpenPullRequest = React.useCallback(() => {
+    if (!currentDirectory) return;
+    openContextSurface(currentDirectory, MOBILE_GIT_PR_SURFACE_MODE);
+  }, [currentDirectory, openContextSurface]);
 
   const handleRevertFile = React.useCallback(async (filePath: string) => {
     if (!currentDirectory) return;
@@ -445,6 +485,25 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
     return groups;
   }, [handleRevertFile, handleViewChangeDiff, moveChangePaths, stagedChangeEntries, t, unstagedChangeEntries]);
 
+  const pullRequestButton = currentDirectory ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={handleOpenPullRequest}
+      aria-label={t('gitView.header.openPullRequest')}
+      title={t('gitView.header.openPullRequest')}
+      className="h-8 shrink-0 gap-1.5 px-2"
+    >
+      <Icon name="git-pull-request" className="size-3.5" />
+      {prChipStatus?.pr ? (
+        <span className="tabular-nums text-foreground/80">
+          {t('gitView.pr.numberLabel', { number: prChipStatus.pr.number })}
+        </span>
+      ) : null}
+    </Button>
+  ) : null;
+
   const renderListState = (state: React.ReactNode) => (
     <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
       <header className="flex h-[var(--oc-header-height,56px)] shrink-0 items-center gap-2 px-3 text-foreground">
@@ -465,6 +524,7 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
             {status?.current || currentDirectory || ''}
           </p>
         </div>
+        {pullRequestButton}
       </header>
       <div className="min-h-0 flex-1">{state}</div>
     </div>
@@ -515,6 +575,7 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
             {status?.current || currentDirectory}
           </p>
         </div>
+        {pullRequestButton}
         <SyncActions
           syncAction={syncAction}
           remotes={effectiveRemotes}

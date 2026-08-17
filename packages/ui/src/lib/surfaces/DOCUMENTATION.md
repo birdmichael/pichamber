@@ -91,6 +91,23 @@ follows `useFeaturePluginSlotActive('subagents')`. Usage quotas stay hidden
 on Pi. Clicking a live child uses `openSubagentChildSession` (`setCurrentSession`
 in-place).
 
-Out of this slice (later mobile parity): PR, Diff, Walkthrough, Browser,
-split Chat. Desktop-native privileges (SSH, External Tunnel host, Electron
-browser session) stay unsupported on mobile.
+Git opens the following Desktop surfaces with the same store actions as the
+rail (`openContextSurface` / `openContextDiff`). They are not workspace tabs.
+`apps/MobileReviewHost.tsx` hosts the Desktop views:
+
+| Opened from Git | Desktop surface id | Host |
+|---|---|---|
+| Pull Request button / PR chip | `pr` | `PullRequestView` via `openContextSurface`. |
+| File row / pending-changes tap on phone (`< WALKTHROUGH_MIN_WIDTH`) | — | `MobileDiffDetail` + `PierreDiffViewer` inline. Does not open the Desktop Diff overlay. |
+| File row / pending-changes tap on tablet (`≥ WALKTHROUGH_MIN_WIDTH`) | `diff` | `DiffView` via `openContextDiff` so the Walkthrough toolbar can appear. |
+| Walkthrough button on PR or tablet Diff | `walkthrough` | `WalkthroughView`, tablet-only (`WALKTHROUGH_MIN_WIDTH` / 768). Phone does not unhide the Diff toolbar or force side-by-side. |
+
+Unsupported on mobile (documented, not silently missing):
+
+| Desktop surface id | Why |
+|---|---|
+| `browser` | Mobile WebView cannot offer the Electron Chromium session (`persist:openchamber-browser`). No reduced honest browser surface exists. |
+| `chat` | Split Chat is out of scope on phone. |
+
+Desktop-native privileges (SSH, External Tunnel host, Electron browser session)
+stay unsupported on mobile.

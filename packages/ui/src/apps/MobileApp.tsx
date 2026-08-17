@@ -16,6 +16,7 @@ import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
 import { registerRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { usePushVisibilityBeacon } from '@/hooks/usePushVisibilityBeacon';
 import { useRouter } from '@/hooks/useRouter';
 import { useUpdatePolling } from '@/hooks/useUpdatePolling';
@@ -57,6 +58,7 @@ import { MobileSessionsSheet } from './MobileSessionsSheet';
 import { MobileFullscreenSurface } from './MobileFullscreenSurface';
 import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { MobileWorkspaceDrawer, type MobileWorkspaceTab } from './MobileWorkspaceDrawer';
+import { closeMobileReviewOverlay } from './mobileWorkspaceReview';
 import { DedicatedMobileAppProvider, type MobileAppActions } from './mobileAppContext';
 import { autoConnectLastInstance, getAutoConnectTargetLabel, logMobileConnectEvent, reprobeActiveConnection, type AutoConnectOutcome } from './mobileConnections';
 import { isCapacitorMobileApp, useNativeAndroidBackButton, useNativeMobileChrome, useNativeMobileLifecycle } from './mobileNativeChrome';
@@ -88,6 +90,7 @@ type MobileSurface = 'instances' | 'settings' | 'update';
 
 const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onActiveConnectionDeleted }) => {
   const { t } = useI18n();
+  const effectiveDirectory = useEffectiveDirectory();
   const [sessionsSheetOpen, setSessionsSheetOpen] = React.useState(false);
   const [activeSurface, setActiveSurface] = React.useState<MobileSurface | null>(null);
   // Phone right drawer with the workspace tabs; the tab persists across
@@ -305,6 +308,9 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
       return true;
     }
     if (workspaceOpen) {
+      if (closeMobileReviewOverlay(effectiveDirectory, typeof window === 'undefined' ? 0 : window.innerWidth)) {
+        return true;
+      }
       closeWorkspace();
       return true;
     }
@@ -317,6 +323,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
     activeSurface,
     closeSurface,
     closeWorkspace,
+    effectiveDirectory,
     isArchivePageOpen,
     isMultiRunLauncherOpen,
     isScheduledTasksDialogOpen,

@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** Git now opens the same Pull Request view as Desktop. File diffs stay inline on phones and use the Desktop Diff view on tablet-width screens (768px and up), where Walkthrough is also available. The Electron Browser session is not on mobile.
 - **Mobile:** the header context ring now opens Work Status — session, branch, context %, MCP, and Subagents, matching Desktop. MCP and Subagents appear when those Feature Plugins are on. Tap a live child to open that chat in place.
 - **Mobile:** the sessions sheet now reaches Scheduled Tasks, Multi-run, Archive with restore, and Pi Refresh — the same Pi actions and wording as Desktop. Swipe-archive remains; restored chats return to the active list. Refresh is disabled while a session is composing, streaming, or compacting.
 - Settings: on Pi, leftover OpenCode Agents is hidden from Settings and Settings search. Use Feature Plugins for Plan and Subagents, and Session Defaults for model and thinking. The OpenCode kernel still has the Agents editor.

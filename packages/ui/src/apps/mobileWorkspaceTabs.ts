@@ -23,6 +23,9 @@ export const isMobilePlanTabVisible = (options: MobilePlanTabGate): boolean => (
 /**
  * Workspace tabs on hosted mobile / Capacitor. Plan is the Desktop `plan`
  * surface; MCP stays a mobile-only pane until a later slice gates it.
+ * PR / Diff / Walkthrough are not tabs. Git opens PR (and tablet Diff) with
+ * the Desktop context-panel actions (`mobileWorkspaceReview.ts`). Phone file
+ * diffs stay inline. Browser is unsupported.
  */
 export const listVisibleMobileWorkspaceTabs = (options: MobilePlanTabGate): MobileWorkspaceTab[] => {
   const tabs: MobileWorkspaceTab[] = ['changes', 'files', 'terminal', 'notes'];
