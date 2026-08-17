@@ -893,6 +893,31 @@ export const saveDesktopMarkdownFile = async (
   }
 };
 
+export const saveDesktopImageFile = async (
+  defaultFileName: string,
+  dataUrl: string,
+): Promise<string | null> => {
+  if (!hasDesktopInvoke() || !isDesktopLocalOriginActive()) {
+    return null;
+  }
+
+  const trimmedFileName = defaultFileName?.trim();
+  if (!trimmedFileName) {
+    return null;
+  }
+
+  const trimmedDataUrl = dataUrl?.trim();
+  if (!trimmedDataUrl) {
+    throw new Error('Image payload is required');
+  }
+
+  const result = await invokeDesktop<string>('desktop_save_image', {
+    defaultFileName: trimmedFileName,
+    dataUrl: trimmedDataUrl,
+  });
+  return typeof result === 'string' && result.trim().length > 0 ? result : null;
+};
+
 export const openDesktopProjectInApp = async (
   projectPath: string,
   appId: string,
