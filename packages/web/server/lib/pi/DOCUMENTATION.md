@@ -164,7 +164,7 @@ is the sidebar Refresh path. It reloads Pi in place (skills, prompts,
 extensions, and model runtime when no live session is busy) **and** re-reads
 persisted session records: the merged **active** session list
 (`archived: false`, so `archive/` is not scanned) plus messages for the
-targeted session. A busy target is 409 and leaves siblings untouched. Idle
+targeted session (mtime from that session file, not an inclusive list). A busy target is 409 and leaves siblings untouched. Idle
 siblings can still refresh; busy siblings are skipped. One unreadable session
 file does not remove other complete sessions. This path also does not emit
 `server.connected`. Title-refresh `POST /api/session/:id/reload` stays
