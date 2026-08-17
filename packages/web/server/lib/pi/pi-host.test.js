@@ -112,6 +112,47 @@ describe('mapPiModelsToProviders', () => {
     expect(kept[0].models['gpt-4o'].contextWindow).toBe(64000);
     expect(kept[0].models['gpt-4o'].limit.context).toBe(64000);
   });
+
+  it('exposes Pi input as composer capabilities without inventing vision', () => {
+    const providers = mapPiModelsToProviders([
+      { id: 'grok-4.6', name: 'Grok 4.6', provider: 'acme', input: ['text', 'image'] },
+      { id: 'mystery', name: 'Mystery', provider: 'acme' },
+    ]);
+    expect(providers[0].models['grok-4.6'].input).toEqual(['text', 'image']);
+    expect(providers[0].models['grok-4.6'].capabilities).toEqual({
+      reasoning: false,
+      attachment: true,
+      input: { text: true, image: true, audio: false, video: false, pdf: false },
+    });
+    expect(providers[0].models.mystery.input).toBeUndefined();
+    expect(providers[0].models.mystery.capabilities).toBeUndefined();
+
+    const filled = mapPiModelsToProviders(
+      [{ id: 'grok-4.6', name: 'Grok 4.6', provider: 'acme' }],
+      {
+        configs: {
+          acme: {
+            models: [{ id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] }],
+          },
+        },
+      },
+    );
+    expect(filled[0].models['grok-4.6'].input).toEqual(['text', 'image']);
+    expect(filled[0].models['grok-4.6'].capabilities.input.image).toBe(true);
+
+    const kept = mapPiModelsToProviders(
+      [{ id: 'grok-4.6', name: 'Grok 4.6', provider: 'acme', input: ['text'] }],
+      {
+        configs: {
+          acme: {
+            models: [{ id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] }],
+          },
+        },
+      },
+    );
+    expect(kept[0].models['grok-4.6'].input).toEqual(['text']);
+    expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(false);
+  });
 });
 
 describe('normalizePiSessionUsage', () => {

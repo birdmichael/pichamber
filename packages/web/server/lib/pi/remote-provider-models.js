@@ -270,6 +270,24 @@ const readRemoteContextWindow = (item) => {
   return undefined;
 };
 
+const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
+
+const readRemoteModelInput = (item) => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+  const value = item.input;
+  if (!Array.isArray(value)) return undefined;
+  const next = [];
+  const seen = new Set();
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const token = entry.trim().toLowerCase();
+    if (!PI_MODEL_INPUT_TYPES.has(token) || seen.has(token)) continue;
+    seen.add(token);
+    next.push(token);
+  }
+  return next.length > 0 ? next : undefined;
+};
+
 export const parseRemoteModelsPayload = (body) => {
   const list = Array.isArray(body)
     ? body
@@ -293,10 +311,12 @@ export const parseRemoteModelsPayload = (body) => {
       ? item.name.trim()
       : id;
     const contextWindow = readRemoteContextWindow(item);
+    const input = readRemoteModelInput(item);
     models.push({
       id,
       name,
       ...(contextWindow !== undefined ? { contextWindow } : {}),
+      ...(input !== undefined ? { input } : {}),
     });
   }
   return models;

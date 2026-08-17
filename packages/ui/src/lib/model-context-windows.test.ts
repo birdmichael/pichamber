@@ -1,12 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import {
   inferFamilyContextWindow,
+  KNOWN_VISION_MODEL_IDS,
   lookupExactContextWindow,
+  lookupExactVisionInput,
   normalizeModelId,
+  PI_TEXT_IMAGE_INPUT,
   PUBLISHED_INPUT_CONTEXT_WINDOWS,
   readCatalogContextWindow,
+  readPersistedModelInput,
   resolveContextWindow,
   resolvePersistedContextWindow,
+  resolvePersistedInput,
   VENDOR_MODEL_ID_PREFIXES,
   type ContextWindowSource,
   type ResolvedContextWindow,
@@ -134,6 +139,37 @@ describe('resolvePersistedContextWindow', () => {
       id: 'mystery-model',
       contextWindow: '8192',
     })).toBe(8192);
+  });
+});
+
+describe('resolvePersistedInput', () => {
+  test('writes text+image for a known vision id left empty', () => {
+    expect(KNOWN_VISION_MODEL_IDS.has('grok-4.6')).toBe(true);
+    expect(lookupExactVisionInput('grok-4.6')).toEqual(PI_TEXT_IMAGE_INPUT);
+    expect(resolvePersistedInput({ id: 'grok-4.6' })).toEqual(['text', 'image']);
+    expect(resolvePersistedInput({ id: 'x-ai/grok-4.6', input: [] })).toEqual(['text', 'image']);
+    expect(resolvePersistedInput({ id: 'gpt-4o' })).toEqual(['text', 'image']);
+    expect(resolvePersistedInput({ id: 'claude-sonnet-5' })).toEqual(['text', 'image']);
+    expect(resolvePersistedInput({ id: 'gemini-2.5-pro' })).toEqual(['text', 'image']);
+  });
+
+  test('does not invent vision for an unknown or text-only id', () => {
+    expect(resolvePersistedInput({ id: 'mystery-model' })).toEqual(undefined);
+    expect(resolvePersistedInput({ id: 'deepseek-chat' })).toEqual(undefined);
+    expect(resolvePersistedInput({ id: 'deepseek-v4-flash' })).toEqual(undefined);
+    expect(lookupExactVisionInput('grok-unknown-99')).toEqual(undefined);
+  });
+
+  test('keeps an explicit input instead of the known-vision table', () => {
+    expect(resolvePersistedInput({
+      id: 'grok-4.6',
+      input: ['text'],
+    })).toEqual(['text']);
+    expect(resolvePersistedInput({
+      id: 'mystery-model',
+      input: ['text', 'image'],
+    })).toEqual(['text', 'image']);
+    expect(readPersistedModelInput(['TEXT', 'image', 'image', 'audio'])).toEqual(['text', 'image']);
   });
 });
 

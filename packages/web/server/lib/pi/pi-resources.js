@@ -526,17 +526,37 @@ const readModelMaxTokens = (model) => {
     ?? readPositiveInt(model.limit && typeof model.limit === 'object' ? model.limit.output : undefined);
 };
 
+const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
+
+const readModelInput = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  const value = model.input;
+  if (!Array.isArray(value)) return undefined;
+  const next = [];
+  const seen = new Set();
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const token = item.trim().toLowerCase();
+    if (!PI_MODEL_INPUT_TYPES.has(token) || seen.has(token)) continue;
+    seen.add(token);
+    next.push(token);
+  }
+  return next.length > 0 ? next : undefined;
+};
+
 const toPiModelEntry = (id, model) => {
   const name = model && typeof model === 'object' && typeof model.name === 'string' && model.name.trim()
     ? model.name.trim()
     : id;
   const contextWindow = readModelContextWindow(model);
   const maxTokens = readModelMaxTokens(model);
+  const input = readModelInput(model);
   return {
     id,
     name,
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(maxTokens !== undefined ? { maxTokens } : {}),
+    ...(input !== undefined ? { input } : {}),
   };
 };
 

@@ -6,9 +6,12 @@
 
 import {
   readCatalogContextWindow,
+  readPersistedModelInput,
   readPositiveContextWindow,
   resolveContextWindow,
   resolvePersistedContextWindow,
+  resolvePersistedInput,
+  type PiModelInputType,
 } from '@/lib/model-context-windows';
 
 export const CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
@@ -29,6 +32,8 @@ export type ModelRow = {
   contextWindow?: number;
   /** True after the user edits or clears context. Auto-prefill must not overwrite. */
   contextTouched?: boolean;
+  /** Persisted Pi `input`. Not a Settings control — save must not strip it. */
+  input?: PiModelInputType[];
 };
 
 export type HeaderRow = {
@@ -66,6 +71,7 @@ export type HeaderFieldErrors = {
 export type CustomProviderModelConfig = {
   name: string;
   contextWindow?: number;
+  input?: PiModelInputType[];
 };
 
 export type CustomProviderConfig = {
@@ -117,6 +123,8 @@ export type ProviderLikeForCustomForm = {
     id?: string;
     name?: string;
     contextWindow?: number;
+    input?: unknown;
+    capabilities?: { input?: unknown };
     limit?: { context?: number };
     api?: { npm?: string };
   }> | Record<string, unknown>;
@@ -141,14 +149,42 @@ const readModelContextWindow = (model: unknown): number | undefined => {
     ?? readCatalogContextWindow(record);
 };
 
+const readCapabilityInput = (value: unknown): PiModelInputType[] | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const next: PiModelInputType[] = [];
+  if (record.text) next.push('text');
+  if (record.image) next.push('image');
+  return next.length > 0 ? next : undefined;
+};
+
+const readModelInput = (model: unknown): PiModelInputType[] | undefined => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) {
+    return undefined;
+  }
+  const record = model as Record<string, unknown>;
+  const fromPi = readPersistedModelInput(record.input);
+  if (fromPi) {
+    return fromPi;
+  }
+  const capabilities = record.capabilities;
+  if (capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)) {
+    return readCapabilityInput((capabilities as Record<string, unknown>).input);
+  }
+  return undefined;
+};
+
 export const applyModelIdChange = (row: ModelRow, id: string): ModelRow => {
+  const next: ModelRow = { ...row, id };
+  delete next.input;
   if (row.contextTouched) {
-    return { ...row, id };
+    return next;
   }
   const resolved = resolveContextWindow({ id });
   return {
-    ...row,
-    id,
+    ...next,
     contextWindow: resolved.contextWindow,
   };
 };
@@ -283,16 +319,21 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
             ? (value as { name: string }).name
             : id,
           contextWindow: readModelContextWindow(value),
+          input: readModelInput(value),
         }))
       : []);
 
   const models = modelEntries.length > 0
-    ? modelEntries.map((model) => ({
-        row: nextRow(),
-        id: typeof model?.id === 'string' ? model.id : '',
-        name: typeof model?.name === 'string' ? model.name : (typeof model?.id === 'string' ? model.id : ''),
-        contextWindow: readModelContextWindow(model) ?? (typeof model?.contextWindow === 'number' ? model.contextWindow : undefined),
-      }))
+    ? modelEntries.map((model) => {
+        const input = readModelInput(model);
+        return {
+          row: nextRow(),
+          id: typeof model?.id === 'string' ? model.id : '',
+          name: typeof model?.name === 'string' ? model.name : (typeof model?.id === 'string' ? model.id : ''),
+          contextWindow: readModelContextWindow(model) ?? (typeof model?.contextWindow === 'number' ? model.contextWindow : undefined),
+          ...(input ? { input } : {}),
+        };
+      })
     : [createModelRow()];
 
   const envName = Array.isArray(provider.env)
@@ -369,15 +410,21 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
   const modelsValid = modelErrors.every((entry) => !entry.id && !entry.name);
   const modelConfig = Object.fromEntries(
     input.form.models.map((model) => {
+      const id = model.id.trim();
       const contextWindow = resolvePersistedContextWindow({
-        id: model.id.trim(),
+        id,
         contextWindow: model.contextWindow,
       });
+      const modelInput = resolvePersistedInput({
+        id,
+        input: model.input,
+      });
       return [
-        model.id.trim(),
+        id,
         {
           name: model.name.trim(),
           ...(contextWindow !== undefined ? { contextWindow } : {}),
+          ...(modelInput !== undefined ? { input: modelInput } : {}),
         },
       ];
     }),
@@ -466,6 +513,7 @@ export type RemoteProviderModel = {
   id: string;
   name: string;
   contextWindow?: number;
+  input?: PiModelInputType[];
 };
 
 export type FetchRemoteModelsRequest = {
@@ -536,10 +584,15 @@ export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProvid
       id,
       catalogContextWindow: item,
     });
+    const modelInput = resolvePersistedInput({
+      id,
+      input: (item as { input?: unknown }).input,
+    });
     models.push({
       id,
       name,
       ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
+      ...(modelInput !== undefined ? { input: modelInput } : {}),
     });
   }
   return models;
@@ -678,6 +731,7 @@ export type RemoteModelChoice = {
   name: string;
   aliases: string[];
   contextWindow?: number;
+  input?: PiModelInputType[];
 };
 
 /**
@@ -713,11 +767,17 @@ export function collapseRemoteModels(
         id,
         catalogContextWindow: catalog?.contextWindow,
       });
+      const catalogInput = group.find((model) => readPersistedModelInput(model.input) !== undefined);
+      const modelInput = resolvePersistedInput({
+        id,
+        input: catalogInput?.input,
+      });
       return {
         id,
         name: named?.name.trim() || group.find((model) => model.id === id)?.name || id,
         aliases: ids.filter((alias) => alias !== id).sort((left, right) => left.localeCompare(right)),
         ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
+        ...(modelInput !== undefined ? { input: modelInput } : {}),
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -783,7 +843,7 @@ export function remoteModelAlreadyAdded(current: readonly ModelRow[], modelId: s
 }
 
 const isBlankModelRow = (row: ModelRow): boolean => (
-  !row.id.trim() && !row.name.trim() && row.contextWindow === undefined && !row.contextTouched
+  !row.id.trim() && !row.name.trim() && row.contextWindow === undefined && !row.contextTouched && !row.input
 );
 
 /**
@@ -805,11 +865,16 @@ export function addRemoteModelsToForm(
       id,
       catalogContextWindow: model.contextWindow,
     });
+    const modelInput = resolvePersistedInput({
+      id,
+      input: model.input,
+    });
     const row = {
       row: nextRow(),
       id,
       name: model.name.trim() || id,
       ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
+      ...(modelInput !== undefined ? { input: modelInput } : {}),
     };
     added.push(row);
     seen.push(row);

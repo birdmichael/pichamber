@@ -86,6 +86,22 @@ describe('remote-provider-models', () => {
     ]);
   });
 
+  it('keeps a provider-reported input and ignores invalid values', () => {
+    expect(parseRemoteModelsPayload({
+      data: [
+        { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] },
+        { id: 'local-llm', input: ['TEXT', 'image', 'audio'] },
+        { id: 'empty', input: [] },
+        { id: 'plain' },
+      ],
+    })).toEqual([
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] },
+      { id: 'local-llm', name: 'local-llm', input: ['text', 'image'] },
+      { id: 'empty', name: 'empty' },
+      { id: 'plain', name: 'plain' },
+    ]);
+  });
+
   it('fetches models with a bearer key and never returns the key', async () => {
     const calls = [];
     const result = await fetchRemoteProviderModels({
