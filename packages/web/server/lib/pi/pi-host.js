@@ -2296,7 +2296,7 @@ export const createPiHost = ({
       }
 
       const cwd = directory || targeted?.directory || defaultDirectory;
-      const listed = await collectSessionInfos(directory || targeted?.directory);
+      const listed = await collectSessionInfos(directory || targeted?.directory, { archived: false });
       const skills = listPiSkills({ home, directory: cwd });
       const commands = listPiCommands({ home, directory: cwd });
       // Refresh skills/prompts/extensions and re-read persisted session records.

@@ -94,6 +94,7 @@ import {
 } from '@/sync/session-ordering';
 import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
 import {
+  refreshArchivedSessions,
   refreshGlobalSessions,
   refreshGlobalSessionsForDirectories,
   getSessionStructuralSignature,
@@ -1509,6 +1510,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   // Web/desktop route archived sessions to the Archive page; only the VS Code
   // compact webview keeps inline archived buckets behind its toggle.
   const showInlineArchived = isVSCode && showArchivedSessions;
+  React.useEffect(() => {
+    if (!showInlineArchived) return;
+    void refreshArchivedSessions();
+  }, [showInlineArchived]);
   // 'by-worktree' renders the worktree-grouped sections (parallel-work
   // overview); 'flat' renders the merged per-project list. VS Code has no
   // worktree groups, so both resolve to the same shape — use flat there.

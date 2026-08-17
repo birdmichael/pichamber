@@ -279,15 +279,19 @@ key is a no-op and `null` is silently ignored. Restore therefore writes
 client-side reader classifies archive state by truthiness of `time.archived`,
 so `0` reads as active in the UI, the event reducer, and the OpenCode app/TUI.
 
-The server's `time_archived IS NULL` list filter still excludes such rows, so
-any query that wants a truthful active list must fetch inclusively
-(`archived: true`) and split client-side (`splitGlobalSessionsByArchived`).
-The global sessions store does this for its full and per-directory loads;
-directory bootstrap keeps using the server filter because live child stores
-must not hold archived sessions. A restored session re-enters its live
-directory store through the authoritative `session.updated` event the server
-publishes for the update; until then it remains fully visible through the
-global store (sidebar, switcher) and addressable by ID (message loading).
+OpenCode's `time_archived IS NULL` list filter still excludes such rows, so
+any leftover-OpenCode query that wants a truthful active list must fetch
+inclusively (`archived: true`) and split client-side
+(`splitGlobalSessionsByArchived`). The global sessions store does this on
+OpenCode for its full and per-directory loads. Pi writes `archived: 0` and
+daily startup / sidebar / tray / cleanup loads use `archived: false` (or omit,
+same meaning). Archive page and the VS Code archived bucket fetch
+`archived: true` when that surface opens. Directory bootstrap already uses
+the server filter because live child stores must not hold archived sessions.
+A restored session re-enters its live directory store through the
+authoritative `session.updated` event the server publishes for the update;
+until then it remains fully visible through the global store (sidebar,
+switcher) and addressable by ID (message loading).
 
 Archive and delete actions capture the active runtime key when they start and
 recheck it before every store reconciliation, so a response

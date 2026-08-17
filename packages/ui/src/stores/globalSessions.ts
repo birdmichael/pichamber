@@ -84,14 +84,43 @@ const unwrapSessionList = (
  */
 const isArchivedSession = (session: GlobalSessionRecord): boolean => Boolean(session.time?.archived);
 
+export type GlobalSessionListSurface = "default" | "archive";
+
+export type GlobalSessionListQuery = {
+    archived: boolean;
+    narrowToArchived: boolean;
+};
+
+/**
+ * Pi can filter active vs archived on the server (`archived: 0` is active).
+ * OpenCode cannot: its `time_archived IS NULL` filter drops restored rows, so
+ * the leftover kernel still loads inclusively and splits client-side.
+ *
+ * Daily startup / sidebar / tray / cleanup use `surface: "default"`.
+ * Archive page and the VS Code archived bucket use `surface: "archive"`.
+ */
+export const globalSessionListQuery = (input: {
+    isPiKernel: boolean;
+    surface?: GlobalSessionListSurface;
+}): GlobalSessionListQuery => {
+    if (input.surface === "archive") {
+        return { archived: true, narrowToArchived: true };
+    }
+    if (input.isPiKernel) {
+        return { archived: false, narrowToArchived: false };
+    }
+    return { archived: true, narrowToArchived: false };
+};
+
 /**
  * Split an inclusive (`archived: true`) session page stream into active and
  * archived buckets. Restored sessions carry `time.archived === 0` (see
  * `UNARCHIVED_TIMESTAMP` in `sync/session-actions.ts`); the truthiness check
- * classifies them as active even though the server's own
+ * classifies them as active even though OpenCode's
  * `time_archived IS NULL` filter would still exclude them, which is why the
- * global cache must split client-side instead of issuing an
- * `archived: false` request for its active list.
+ * leftover OpenCode global cache must split client-side instead of issuing an
+ * `archived: false` request for its active list. Pi writes `archived: 0` and
+ * can use `archived: false` for daily loads.
  */
 export const splitGlobalSessionsByArchived = <T extends GlobalSessionRecord>(
     sessions: T[],

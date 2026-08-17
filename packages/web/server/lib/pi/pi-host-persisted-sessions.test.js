@@ -373,6 +373,51 @@ describe('persisted Pi sessions', () => {
     host.dispose();
   });
 
+  it('reloadSessionRecords lists active sessions only and does not scan archive/', async () => {
+    const home = tempDir('pi-persist-reload-active-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const archiveDir = sessionArchiveDir(sessionDir);
+    const listCalls = [];
+    const active = writePersistedSession({
+      home,
+      cwd,
+      title: 'Open row',
+      userText: 'active',
+    });
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd, title: 'Archived row' });
+    await first.updateSession(created.id, { time: { archived: 1_700_000_000_000 } }, cwd);
+    expect(path.dirname(first.getSession(created.id).sessionFile)).toBe(archiveDir);
+    first.dispose();
+
+    const host = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async ({ sessionManager }) => stubSession(
+        typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      ),
+      async listPersistedSessionsInDir(directory, dir) {
+        const items = await SessionManager.list(directory, dir);
+        listCalls.push({ dir, ids: (items || []).map((item) => item.id) });
+        return items;
+      },
+    });
+    await host.ensureSession(active.id, cwd);
+    listCalls.length = 0;
+    const result = await host.reloadSessionRecords({ sessionID: active.id, directory: cwd });
+    expect(result.sessions.map((session) => session.id)).toContain(active.id);
+    expect(result.sessions.map((session) => session.id)).not.toContain(created.id);
+    expect(listCalls.map((call) => call.dir)).toEqual([sessionDir]);
+    expect(listCalls[0].ids).not.toContain(created.id);
+    host.dispose();
+  });
+
   it('cloneSession persists messages and parentID so a new host hydrates the same transcript', async () => {
     const home = tempDir('pi-persist-clone-');
     const cwd = path.join(home, 'project');

@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { OpencodeClient, Session } from "@opencode-ai/sdk/v2"
 
 import { opencodeClient } from "@/lib/opencode/client"
-import { useGlobalSessionsStore } from "./useGlobalSessionsStore"
+import {
+  setGlobalSessionsPiKernelForTests,
+  useGlobalSessionsStore,
+} from "./useGlobalSessionsStore"
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -21,18 +24,23 @@ const deferred = <T>(): Deferred<T> => {
 }
 
 let listRequest: Deferred<Session[]>
+let listCalls: Array<Record<string, unknown>>
 
-// The store issues one inclusive (`archived: true`) paginated request per
+// OpenCode issues one inclusive (`archived: true`) paginated request per
 // load/refresh scope and splits active/archived client-side, so restored
 // sessions (`time.archived` falsy-but-present) stay visible in the active
-// list. The mock serves that single request.
+// list. Pi daily loads use `archived: false` and fetch archived only when
+// Archive / the VS Code archived bucket opens. The mock serves that request.
 const sdk = {
   experimental: {
     session: {
-      list: async () => ({
-        data: await listRequest.promise,
-        response: { headers: new Headers() },
-      }),
+      list: async (options: Record<string, unknown> = {}) => {
+        listCalls.push(options)
+        return {
+          data: await listRequest.promise,
+          response: { headers: new Headers() },
+        }
+      },
     },
   },
 } as unknown as OpencodeClient
@@ -47,11 +55,14 @@ const session = (id: string, title = id, archived?: number): Session => ({
 describe("global session mutation reconciliation", () => {
   beforeEach(() => {
     listRequest = deferred<Session[]>()
+    listCalls = []
+    setGlobalSessionsPiKernelForTests(false)
     opencodeClient.getSdkClient = () => sdk
     useGlobalSessionsStore.getState().resetForRuntimeSwitch()
   })
 
   afterEach(() => {
+    setGlobalSessionsPiKernelForTests(null)
     opencodeClient.getSdkClient = originalGetSdkClient
   })
 
@@ -152,5 +163,99 @@ describe("global session mutation reconciliation", () => {
 
     expect(useGlobalSessionsStore.getState().activeSessions.map((item) => item.id)).toEqual(["restored"])
     expect(useGlobalSessionsStore.getState().archivedSessions).toEqual([])
+  })
+})
+
+describe("global session archived query by kernel", () => {
+  beforeEach(() => {
+    listRequest = deferred<Session[]>()
+    listCalls = []
+    opencodeClient.getSdkClient = () => sdk
+    useGlobalSessionsStore.getState().resetForRuntimeSwitch()
+  })
+
+  afterEach(() => {
+    setGlobalSessionsPiKernelForTests(null)
+    opencodeClient.getSdkClient = originalGetSdkClient
+  })
+
+  test("Pi default global load does not pass archived: true", async () => {
+    setGlobalSessionsPiKernelForTests(true)
+    const loading = useGlobalSessionsStore.getState().loadSessions()
+    listRequest.resolve([session("active"), session("restored", "restored", 0)])
+    await loading
+
+    expect(listCalls).toHaveLength(1)
+    expect(listCalls[0]?.archived).toBe(false)
+    expect(listCalls[0]?.archived).not.toBe(true)
+    expect(useGlobalSessionsStore.getState().activeSessions.map((item) => item.id)).toEqual([
+      "active",
+      "restored",
+    ])
+    expect(useGlobalSessionsStore.getState().archivedSessions).toEqual([])
+  })
+
+  test("Pi Archive page load passes archived: true", async () => {
+    setGlobalSessionsPiKernelForTests(true)
+    const loading = useGlobalSessionsStore.getState().loadArchivedSessions()
+    listRequest.resolve([
+      session("active"),
+      session("archived", "archived", 5),
+      session("restored", "restored", 0),
+    ])
+    await loading
+
+    expect(listCalls).toHaveLength(1)
+    expect(listCalls[0]?.archived).toBe(true)
+    expect(useGlobalSessionsStore.getState().archivedSessions.map((item) => item.id)).toEqual(["archived"])
+    expect(useGlobalSessionsStore.getState().activeSessions).toEqual([])
+  })
+
+  test("Pi default load keeps an already-fetched archived bucket", async () => {
+    setGlobalSessionsPiKernelForTests(true)
+    const archived = session("archived", "archived", 5)
+    useGlobalSessionsStore.getState().applySnapshot([session("active")], [archived])
+
+    const loading = useGlobalSessionsStore.getState().loadSessions()
+    listRequest.resolve([session("active"), session("restored", "restored", 0)])
+    await loading
+
+    expect(listCalls[0]?.archived).toBe(false)
+    expect(useGlobalSessionsStore.getState().activeSessions.map((item) => item.id)).toEqual([
+      "active",
+      "restored",
+    ])
+    expect(useGlobalSessionsStore.getState().archivedSessions.map((item) => item.id)).toEqual(["archived"])
+  })
+
+  test("Pi directory refresh does not pass archived: true", async () => {
+    setGlobalSessionsPiKernelForTests(true)
+    const archived = { ...session("archived", "archived", 5), directory: "/source" } as Session
+    const active = { ...session("active"), directory: "/source" } as Session
+    useGlobalSessionsStore.getState().applySnapshot([active], [archived])
+
+    const refreshing = useGlobalSessionsStore.getState().refreshSessionsForDirectories(["/source"])
+    listRequest.resolve([active])
+    await refreshing
+
+    expect(listCalls).toHaveLength(1)
+    expect(listCalls[0]?.archived).toBe(false)
+    expect(useGlobalSessionsStore.getState().activeSessions.map((item) => item.id)).toEqual(["active"])
+    expect(useGlobalSessionsStore.getState().archivedSessions.map((item) => item.id)).toEqual(["archived"])
+  })
+
+  test("OpenCode default global load stays inclusive", async () => {
+    setGlobalSessionsPiKernelForTests(false)
+    const loading = useGlobalSessionsStore.getState().loadSessions()
+    listRequest.resolve([session("active"), session("archived", "archived", 5), session("restored", "restored", 0)])
+    await loading
+
+    expect(listCalls).toHaveLength(1)
+    expect(listCalls[0]?.archived).toBe(true)
+    expect(useGlobalSessionsStore.getState().activeSessions.map((item) => item.id)).toEqual([
+      "active",
+      "restored",
+    ])
+    expect(useGlobalSessionsStore.getState().archivedSessions.map((item) => item.id)).toEqual(["archived"])
   })
 })
