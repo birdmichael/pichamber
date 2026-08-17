@@ -44,7 +44,7 @@ describe('mobile Phase 2 review from Git', () => {
     expect(resolveMobileGitFileDiffHost(WALKTHROUGH_MIN_WIDTH)).toBe('desktop-diff');
 
     const phone = '/phone-repo';
-    expect(useUIStore.getState().contextPanelByDirectory[phone]).toBeUndefined();
+    expect(useUIStore.getState().contextPanelByDirectory[phone]).toBe(undefined);
     expect(resolveMobileReviewMode(useUIStore.getState().contextPanelByDirectory[phone], 390)).toBe(null);
 
     const tablet = '/tablet-repo';
