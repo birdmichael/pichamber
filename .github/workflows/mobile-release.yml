@@ -394,12 +394,30 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/private_keys"
-          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 -D > "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
-          xcrun altool --upload-app \
-            --type ios \
-            --file "$RUNNER_TEMP/PichamberExport/App.ipa" \
-            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          ipa="$RUNNER_TEMP/PichamberExport/App.ipa"
+          if [[ ! -f "$ipa" ]]; then
+            echo "Exported IPA not found at $ipa"
+            exit 1
+          fi
+          if [[ -n "${APP_STORE_CONNECT_KEY_ID:-}" && -n "${APP_STORE_CONNECT_ISSUER_ID:-}" && -n "${APP_STORE_CONNECT_PRIVATE_KEY_BASE64:-}" ]]; then
+            mkdir -p "$HOME/private_keys"
+            printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 -D > "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+            xcrun altool --upload-app \
+              --type ios \
+              --file "$ipa" \
+              --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+              --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_PASSWORD:-}" ]]; then
+            xcrun altool --upload-app \
+              --type ios \
+              --file "$ipa" \
+              --username "$APPLE_ID" \
+              --password "$APPLE_PASSWORD"
+          else
+            echo "Need App Store Connect API key or APPLE_ID + APPLE_PASSWORD."
+            exit 1
+          fi

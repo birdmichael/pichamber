@@ -75,6 +75,14 @@ const findPackagedBinaries = () => {
   return candidates;
 };
 
+const shouldBundleOpenCodeCli = (env = process.env) => {
+  if (env.OPENCHAMBER_BUNDLE_OPENCODE_CLI === '1' || env.OPENCHAMBER_BUNDLE_OPENCODE_CLI === 'true') {
+    return true;
+  }
+  const kernel = typeof env.OPENCHAMBER_KERNEL === 'string' ? env.OPENCHAMBER_KERNEL.trim().toLowerCase() : '';
+  return kernel === 'opencode';
+};
+
 const usage = () => {
   console.error('Usage: node scripts/verify-opencode-cli.mjs --staged|--packaged');
   process.exit(2);
@@ -83,6 +91,11 @@ const usage = () => {
 const main = () => {
   const mode = process.argv[2];
   if (mode !== '--staged' && mode !== '--packaged') usage();
+
+  if (!shouldBundleOpenCodeCli()) {
+    console.log('[electron] skipping OpenCode CLI verify; default Pi kernel does not bundle the leftover CLI.');
+    return;
+  }
 
   const expectedVersion = readExpectedVersion();
   if (mode === '--staged') {

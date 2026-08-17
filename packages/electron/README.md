@@ -101,6 +101,15 @@ That runs, in order:
 
 **Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`). Without Apple signing env, the Mac build is unsigned and notarization is disabled.
 
+Unsigned downloads are blocked by Gatekeeper until the user removes quarantine and re-signs locally. After copying `Pichamber.app` to `/Applications`:
+
+```sh
+xattr -cr /Applications/Pichamber.app
+codesign --force --deep --sign - /Applications/Pichamber.app
+```
+
+Ad-hoc signing (`-`) is enough to launch on that Mac. To redistribute with your own Developer ID, replace `-` with that identity and notarize separately. Set `APPLE_SIGNING=false` when `APPLE_ID` is present for iOS TestFlight but the Mac build must stay unsigned.
+
 Windows/Linux desktop packaging is leftover and not the product target.
 
 ## Platform Notes
@@ -111,7 +120,7 @@ Windows packaging needs NSIS support through `electron-builder`. If no Windows s
 
 Linux AppImages must be built natively. Set `OPENCHAMBER_TARGET_ARCH=x64` or `OPENCHAMBER_TARGET_ARCH=arm64` when packaging; the build rejects a target that does not match the Linux host. The same target selects the bundled OpenCode CLI, native Electron rebuild, and Electron Builder architecture. Linux identity is stable across architectures: executable `pichamber`, desktop file `pichamber.desktop`, icon `pichamber`, and `StartupWMClass=pichamber`.
 
-After packaging, run `bun run --cwd packages/electron verify:linux-appimage`. The verifier extracts the final AppImage and checks its ELF architecture, desktop identity, Electron executable, pinned OpenCode CLI version and architecture, and all packaged native `.node` modules.
+After packaging, run `bun run --cwd packages/electron verify:linux-appimage`. The verifier extracts the final AppImage and checks its ELF architecture, desktop identity, Electron executable, and packaged native `.node` modules. The leftover OpenCode CLI check runs only when that binary is packaged.
 
 Running a packaged Linux AppImage requires FUSE (`libfuse.so.2`, typically `libfuse2` / `libfuse2t64` on Debian/Ubuntu). Without FUSE, start with `APPIMAGE_EXTRACT_AND_RUN=1`. Keep the AppImage on a writable path so in-app updates can replace it.
 

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-18
+
+- **Pichamber 1.0.0:** first Pichamber release, independent of OpenChamber 1.18.x. The default kernel is in-process Pi.
+- **Desktop:** the macOS download is unsigned. After moving Pichamber.app to Applications, remove quarantine and ad-hoc sign it (`xattr -cr` then `codesign --force --deep --sign -`) before Gatekeeper will open it.
+- **Mobile:** the GitHub Release includes a signed Android APK/AAB. iOS 1.0.0 is on TestFlight.
 - **Settings:** on Pi, General now has a Pi section for the agent directory and Pi update notifications. Empty uses `PI_CODING_AGENT_DIR` or `~/.pi/agent`; Save + Reload applies the folder without copying the old tree. The leftover OpenCode binary panel stays on the OpenCode kernel. About still updates the Pichamber app; the in-app notice is informational only (close #187).
 - **Desktop:** on Pi, agents can create sessions, send or fork prompts, and manage scheduled tasks with the Pichamber tool. Settings → Pichamber Tools now shows both Agent control and Pichamber Web; turning Agent control off and reloading idle sessions removes the tool.
 - **Desktop:** on Pi, agents can open and drive the right-hand Browser rail with the Pichamber Web tool (open, snapshot, click, type, scroll, and the rest of the existing browser actions). Settings → Pichamber Tools toggles it; turning it off and reloading idle sessions removes it.

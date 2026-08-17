@@ -90,10 +90,15 @@ export const verifyExtractedPayload = ({
 
   assertElfArchitecture(path.join(root, 'pichamber'), targetArchitecture, 'Electron executable');
   const cliPath = path.join(root, 'resources', 'opencode-cli', 'opencode');
-  assertElfArchitecture(cliPath, targetArchitecture, 'OpenCode CLI');
-  const actualVersion = runCliVersion(cliPath);
-  if (actualVersion !== expectedOpenCodeVersion) {
-    throw new Error(`OpenCode CLI version mismatch: expected ${expectedOpenCodeVersion}, got ${actualVersion || '(empty)'}`);
+  let actualVersion = null;
+  if (fs.existsSync(cliPath)) {
+    assertElfArchitecture(cliPath, targetArchitecture, 'OpenCode CLI');
+    actualVersion = runCliVersion(cliPath);
+    if (actualVersion !== expectedOpenCodeVersion) {
+      throw new Error(`OpenCode CLI version mismatch: expected ${expectedOpenCodeVersion}, got ${actualVersion || '(empty)'}`);
+    }
+  } else if (expectedOpenCodeVersion) {
+    console.log('[electron] skipping OpenCode CLI AppImage check; leftover CLI is not packaged.');
   }
 
   const unpackedModules = path.join(root, 'resources', 'app.asar.unpacked', 'node_modules');
@@ -148,7 +153,11 @@ const main = () => {
       expectedOpenCodeVersion: rootPackage.dependencies?.['@opencode-ai/sdk'],
     });
     console.log(`[electron] verified Linux ${target} AppImage: ${appImagePath}`);
-    console.log(`[electron] verified OpenCode CLI ${result.openCodeVersion} and ${result.nativeModuleCount} native modules`);
+    if (result.openCodeVersion) {
+      console.log(`[electron] verified OpenCode CLI ${result.openCodeVersion} and ${result.nativeModuleCount} native modules`);
+    } else {
+      console.log(`[electron] verified ${result.nativeModuleCount} native modules (no leftover OpenCode CLI)`);
+    }
   } finally {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   }
