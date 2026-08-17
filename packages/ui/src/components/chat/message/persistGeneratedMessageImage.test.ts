@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 
 import { persistGeneratedMessageImage } from './persistGeneratedMessageImage';
 
@@ -6,49 +6,53 @@ const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgo=';
 
 describe('persistGeneratedMessageImage', () => {
   test('Desktop save calls the IPC helper and reports saved', async () => {
-    const saveDesktopImageFile = mock(async (fileName: string, dataUrl: string) => {
-      expect(fileName).toBe('message-1.png');
-      expect(dataUrl).toBe(PNG_DATA_URL);
-      return '/tmp/message-1.png';
-    });
-    const downloadInBrowser = mock(() => {
-      throw new Error('browser download must not run on Desktop');
-    });
+    const desktopCalls: Array<{ fileName: string; dataUrl: string }> = [];
+    let browserDownloadCalls = 0;
 
-    await expect(persistGeneratedMessageImage(
+    const outcome = await persistGeneratedMessageImage(
       { fileName: 'message-1.png', dataUrl: PNG_DATA_URL },
       {
         isVSCode: false,
         isCapacitor: false,
         canUseDesktopSave: true,
-        saveDesktopImageFile,
-        downloadInBrowser,
+        saveDesktopImageFile: async (fileName, dataUrl) => {
+          desktopCalls.push({ fileName, dataUrl });
+          return '/tmp/message-1.png';
+        },
+        downloadInBrowser: () => {
+          browserDownloadCalls += 1;
+        },
       },
-    )).resolves.toBe('saved');
+    );
 
-    expect(saveDesktopImageFile).toHaveBeenCalledTimes(1);
-    expect(downloadInBrowser).not.toHaveBeenCalled();
+    expect(outcome).toBe('saved');
+    expect(desktopCalls).toEqual([{ fileName: 'message-1.png', dataUrl: PNG_DATA_URL }]);
+    expect(browserDownloadCalls).toBe(0);
   });
 
   test('Desktop cancel is silent and does not fall back to a download', async () => {
-    const saveDesktopImageFile = mock(async () => null);
-    const downloadInBrowser = mock(() => {
-      throw new Error('browser download must not run after Desktop cancel');
-    });
+    let desktopCalls = 0;
+    let browserDownloadCalls = 0;
 
-    await expect(persistGeneratedMessageImage(
+    const outcome = await persistGeneratedMessageImage(
       { fileName: 'message-1.png', dataUrl: PNG_DATA_URL },
       {
         isVSCode: false,
         isCapacitor: false,
         canUseDesktopSave: true,
-        saveDesktopImageFile,
-        downloadInBrowser,
+        saveDesktopImageFile: async () => {
+          desktopCalls += 1;
+          return null;
+        },
+        downloadInBrowser: () => {
+          browserDownloadCalls += 1;
+        },
       },
-    )).resolves.toBe('canceled');
+    );
 
-    expect(saveDesktopImageFile).toHaveBeenCalledTimes(1);
-    expect(downloadInBrowser).not.toHaveBeenCalled();
+    expect(outcome).toBe('canceled');
+    expect(desktopCalls).toBe(1);
+    expect(browserDownloadCalls).toBe(0);
   });
 
   test('Desktop write failure propagates so the caller can toast failure', async () => {
@@ -66,23 +70,27 @@ describe('persistGeneratedMessageImage', () => {
   });
 
   test('VS Code cancel stays silent', async () => {
-    const saveVSCodeImage = mock(async () => ({ saved: false, canceled: true }));
+    const vscodeCalls: Array<{ fileName: string; dataUrl: string }> = [];
 
-    await expect(persistGeneratedMessageImage(
+    const outcome = await persistGeneratedMessageImage(
       { fileName: 'message-1.png', dataUrl: PNG_DATA_URL },
       {
         isVSCode: true,
-        saveVSCodeImage,
+        saveVSCodeImage: async (payload) => {
+          vscodeCalls.push(payload);
+          return { saved: false, canceled: true };
+        },
         isCapacitor: false,
         canUseDesktopSave: false,
       },
-    )).resolves.toBe('canceled');
+    );
 
-    expect(saveVSCodeImage).toHaveBeenCalledTimes(1);
+    expect(outcome).toBe('canceled');
+    expect(vscodeCalls).toEqual([{ fileName: 'message-1.png', dataUrl: PNG_DATA_URL }]);
   });
 
   test('VS Code save reports saved', async () => {
-    await expect(persistGeneratedMessageImage(
+    const outcome = await persistGeneratedMessageImage(
       { fileName: 'message-1.png', dataUrl: PNG_DATA_URL },
       {
         isVSCode: true,
@@ -90,22 +98,27 @@ describe('persistGeneratedMessageImage', () => {
         isCapacitor: false,
         canUseDesktopSave: false,
       },
-    )).resolves.toBe('saved');
+    );
+
+    expect(outcome).toBe('saved');
   });
 
   test('web download does not claim a saved file', async () => {
-    const downloadInBrowser = mock(() => undefined);
+    let browserDownloadCalls = 0;
 
-    await expect(persistGeneratedMessageImage(
+    const outcome = await persistGeneratedMessageImage(
       { fileName: 'message-1.png', dataUrl: PNG_DATA_URL },
       {
         isVSCode: false,
         isCapacitor: false,
         canUseDesktopSave: false,
-        downloadInBrowser,
+        downloadInBrowser: () => {
+          browserDownloadCalls += 1;
+        },
       },
-    )).resolves.toBe('download-started');
+    );
 
-    expect(downloadInBrowser).toHaveBeenCalledTimes(1);
+    expect(outcome).toBe('download-started');
+    expect(browserDownloadCalls).toBe(1);
   });
 });

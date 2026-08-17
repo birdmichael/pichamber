@@ -1,4 +1,4 @@
-export type PersistGeneratedMessageImageOutcome = 'saved' | 'canceled' | 'shared' | 'download-started';
+type PersistGeneratedMessageImageOutcome = 'saved' | 'canceled' | 'shared' | 'download-started';
 
 export type VSCodeSaveImageResult = {
   saved?: boolean;
@@ -6,7 +6,7 @@ export type VSCodeSaveImageResult = {
   error?: string;
 };
 
-export type PersistGeneratedMessageImageDeps = {
+type PersistGeneratedMessageImageDeps = {
   isVSCode: boolean;
   saveVSCodeImage?: (payload: { fileName: string; dataUrl: string }) => Promise<VSCodeSaveImageResult | undefined>;
   isCapacitor: boolean;
