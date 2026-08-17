@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { RuntimeUrlQuery, RuntimeUrlResolver } from '@openchamber/ui/lib/runtime-url';
+import type { RuntimeUrlQuery, RuntimeUrlResolver } from '@pichamber/ui/lib/runtime-url';
 
 const runtimeFetchMock = vi.fn();
 
@@ -8,7 +8,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-vi.mock('@openchamber/ui/lib/runtime-fetch', () => ({
+vi.mock('@pichamber/ui/lib/runtime-fetch', () => ({
   runtimeFetch: runtimeFetchMock,
 }));
 

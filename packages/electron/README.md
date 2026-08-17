@@ -2,7 +2,7 @@
 
 Electron desktop runtime for Pichamber. **macOS is the product target.** Windows and Linux desktop packaging is leftover upstream work and is not maintained here.
 
-This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The web UI and OpenChamber server logic still live in `packages/web` and shared React UI lives in `packages/ui`.
+This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The in-process Pichamber server lives in `packages/web` and shared React UI lives in `packages/ui`.
 
 ## How It Runs
 

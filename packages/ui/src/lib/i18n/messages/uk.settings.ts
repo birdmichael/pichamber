@@ -738,6 +738,8 @@ export const settingsDict = {
   "settings.skills.sidebar.title": "Навички",
   "settings.skills.sidebar.total": "Усього {count}",
   "settings.skills.sidebar.section.project": "Проєктні навички",
+  "settings.skills.sidebar.untrustedHint": "Ненадійна — не вставляється в сесії Pi",
+  "settings.skills.sidebar.badge.notInjected": "не вставлено",
   "settings.skills.sidebar.section.user": "Навички користувача",
   "settings.skills.sidebar.empty.title": "Навички не налаштовано",
   "settings.skills.sidebar.empty.description": "Скористайтеся кнопкою + вище, щоб створити його",

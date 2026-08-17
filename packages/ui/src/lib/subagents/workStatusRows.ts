@@ -128,21 +128,22 @@ export const buildWorkStatusSubagentRows = ({
       directory,
       effectiveDirectory,
     });
+    const status: WorkStatusSubagentRow['status'] = run.state === 'running' || run.state === 'queued'
+      ? 'working'
+      : run.state === 'blocked'
+        ? 'blocked'
+        : run.state === 'paused'
+          ? 'paused'
+          : run.state === 'failed' || run.state === 'stopped'
+            ? 'failed'
+            : 'done';
     return {
       id: run.runId,
       label: run.title?.trim() || run.name || untitledLabel,
       sessionID: opened.sessionID,
       openable: opened.openable,
       mode: run.mode,
-      status: run.state === 'running' || run.state === 'queued'
-        ? 'working'
-        : run.state === 'blocked'
-          ? 'blocked'
-          : run.state === 'paused'
-            ? 'paused'
-            : run.state === 'failed' || run.state === 'stopped'
-              ? 'failed'
-              : 'done',
+      status,
     };
   });
   return rows.filter((row) => (

@@ -738,6 +738,8 @@ export const settingsDict = {
   "settings.skills.sidebar.title": "Habilidades",
   "settings.skills.sidebar.total": "Total {count}",
   "settings.skills.sidebar.section.project": "Habilidades del proyecto",
+  "settings.skills.sidebar.untrustedHint": "No es de confianza: no se inyecta en las sesiones de Pi",
+  "settings.skills.sidebar.badge.notInjected": "no inyectada",
   "settings.skills.sidebar.section.user": "Habilidades del usuario",
   "settings.skills.sidebar.empty.title": "No hay habilidades configuradas",
   "settings.skills.sidebar.empty.description": "Usa el botón + arriba para crear una",

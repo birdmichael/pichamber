@@ -13,7 +13,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "paths": {
-      "@openchamber/ui/*": ["./packages/ui/src/*"],
+      "@pichamber/ui/*": ["./packages/ui/src/*"],
       "@pichamber/web/*": ["./packages/web/src/*"]
     }
   }

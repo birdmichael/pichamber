@@ -92,7 +92,7 @@ const shouldStartInBackground = (loginItemSettings = readLoginItemSettings()) =>
 };
 
 // Set the product name early so electron-log derives its log directory as
-// ~/Library/Logs/Pichamber/ (not ~/Library/Logs/@openchamber/electron/).
+// ~/Library/Logs/Pichamber/ (not ~/Library/Logs/@pichamber/electron/).
 app.setName(APP_DISPLAY_NAME);
 if (process.platform === 'linux') {
   app.setDesktopName('pichamber.desktop');
@@ -222,13 +222,13 @@ const readAppMetadata = () => {
     try {
       const raw = fs.readFileSync(candidate, 'utf8');
       const parsed = JSON.parse(raw);
-      if (parsed?.name === '@openchamber/electron' && typeof parsed.version === 'string') {
+      if (parsed?.name === '@pichamber/electron' && typeof parsed.version === 'string') {
         return { name: parsed.name, version: parsed.version };
       }
     } catch {
     }
   }
-  return { name: '@openchamber/electron', version: app.getVersion() };
+  return { name: '@pichamber/electron', version: app.getVersion() };
 };
 
 const APP_METADATA = readAppMetadata();

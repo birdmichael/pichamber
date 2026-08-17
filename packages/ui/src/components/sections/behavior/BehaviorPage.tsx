@@ -143,14 +143,21 @@ export const BehaviorPage: React.FC = () => {
         let nextSettings: BehaviorSettingsState = DEFAULT_BEHAVIOR_SETTINGS;
         let settingsData: { globalBehaviorPrompt?: unknown; optimizeSystemPrompt?: unknown; responseStyleEnabled?: unknown; responseStylePreset?: unknown; responseStyleCustomInstructions?: unknown } | null = null;
         if (settingsRes.ok) {
-          settingsData = await settingsRes.json();
+          const loadedSettings = await settingsRes.json() as {
+            globalBehaviorPrompt?: unknown;
+            optimizeSystemPrompt?: unknown;
+            responseStyleEnabled?: unknown;
+            responseStylePreset?: unknown;
+            responseStyleCustomInstructions?: unknown;
+          };
+          settingsData = loadedSettings;
           nextSettings = {
             ...nextSettings,
-            optimizeSystemPrompt: settingsData.optimizeSystemPrompt === true,
-            responseStyleEnabled: settingsData.responseStyleEnabled === true,
-            responseStylePreset: sanitizeResponseStylePreset(settingsData.responseStylePreset),
-            responseStyleCustomInstructions: typeof settingsData.responseStyleCustomInstructions === 'string'
-              ? settingsData.responseStyleCustomInstructions
+            optimizeSystemPrompt: loadedSettings.optimizeSystemPrompt === true,
+            responseStyleEnabled: loadedSettings.responseStyleEnabled === true,
+            responseStylePreset: sanitizeResponseStylePreset(loadedSettings.responseStylePreset),
+            responseStyleCustomInstructions: typeof loadedSettings.responseStyleCustomInstructions === 'string'
+              ? loadedSettings.responseStyleCustomInstructions
               : '',
           };
         }

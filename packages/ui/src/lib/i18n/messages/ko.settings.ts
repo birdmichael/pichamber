@@ -738,6 +738,8 @@ export const settingsDict = {
   'settings.skills.sidebar.title': '스킬',
   'settings.skills.sidebar.total': '총 {count}개',
   'settings.skills.sidebar.section.project': '프로젝트 스킬',
+  'settings.skills.sidebar.untrustedHint': '신뢰되지 않음 — 현재 Pi 세션에 주입되지 않음',
+  'settings.skills.sidebar.badge.notInjected': '미주입',
   'settings.skills.sidebar.section.user': '사용자 스킬',
   'settings.skills.sidebar.empty.title': '설정된 스킬이 없습니다',
   'settings.skills.sidebar.empty.description': '위의 + 버튼으로 새로 생성하세요',

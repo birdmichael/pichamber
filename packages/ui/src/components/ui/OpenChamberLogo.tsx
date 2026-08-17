@@ -40,7 +40,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
         <path
           key={path.d}
           d={path.d}
-          fill={path.fill ?? 'currentColor'}
+          fill={'fill' in path ? path.fill : 'currentColor'}
           fillOpacity={'fillOpacity' in path ? path.fillOpacity : undefined}
           stroke="currentColor"
           strokeWidth="2"

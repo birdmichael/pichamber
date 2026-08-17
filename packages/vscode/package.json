@@ -7,7 +7,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/openchamber/openchamber.git"
+    "url": "https://github.com/birdmichael/pichamber.git"
   },
   "qna": "https://discord.gg/ZYRSdnwwKA",
   "license": "MIT",
@@ -244,7 +244,7 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
-    "@openchamber/ui": "workspace:*",
+    "@pichamber/ui": "workspace:*",
     "@opencode-ai/sdk": "1.18.18",
     "adm-zip": "^0.6.0",
     "jsonc-parser": "^3.3.1",

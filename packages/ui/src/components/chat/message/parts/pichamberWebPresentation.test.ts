@@ -20,7 +20,7 @@ const pichamberWebPart = {
       data: { url: 'https://example.test' },
     }),
   },
-} as Part;
+} as unknown as Part;
 
 const cardLabels = (parts: Part[]) => {
   const message: ChatMessageEntry = {

@@ -718,6 +718,8 @@ export const settingsDict = {
   'settings.skills.sidebar.title': 'Skills',
   'settings.skills.sidebar.total': 'Gesamt {count}',
   'settings.skills.sidebar.section.project': 'Projekt-Skills',
+  'settings.skills.sidebar.untrustedHint': 'Nicht vertrauenswürdig — wird nicht in Pi-Sitzungen injiziert',
+  'settings.skills.sidebar.badge.notInjected': 'nicht injiziert',
   'settings.skills.sidebar.section.user': 'Benutzer-Skills',
   'settings.skills.sidebar.empty.title': 'Keine Skills konfiguriert',
   'settings.skills.sidebar.empty.description': 'Verwenden Sie die Schaltfläche + oben, um einen zu erstellen',

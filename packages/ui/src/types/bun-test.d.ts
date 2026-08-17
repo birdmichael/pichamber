@@ -4,7 +4,7 @@
 declare module "bun:test" {
   export function describe(name: string, fn: () => void): void;
   export function test(name: string, fn: () => void | Promise<void>): void;
-  export function expect(value: unknown): {
+  export function expect(value: unknown, message?: string): {
     toEqual(expected: unknown): void;
     toBe(expected: unknown): void;
     toBeTruthy(): void;
@@ -13,6 +13,8 @@ declare module "bun:test" {
     toThrow(expected?: string | RegExp | (new (...args: never[]) => unknown)): void;
     toContain(expected: unknown): void;
     toBeDefined(): void;
+    toMatch(expected: string | RegExp): void;
+    toMatchObject(expected: unknown): void;
     rejects: {
       toThrow(expected?: string | RegExp | (new (...args: never[]) => unknown)): Promise<void>;
     };
@@ -26,12 +28,15 @@ declare module "bun:test" {
       toBe(expected: unknown): void;
       toContain(expected: unknown): void;
       toBeNull(): void;
+      toMatch(expected: string | RegExp): void;
     };
   };
   export function beforeEach(fn: () => void | Promise<void>): void;
   export function afterEach(fn: () => void | Promise<void>): void;
   export function afterAll(fn: () => void | Promise<void>): void;
-  export function mock<T extends (...args: never[]) => unknown>(fn?: T): T;
+  export function mock<T extends (...args: never[]) => unknown>(fn?: T): T & {
+    mockClear(): void;
+  };
   export namespace mock {
     function module(moduleName: string, factory: () => Record<string, unknown>): void;
   }

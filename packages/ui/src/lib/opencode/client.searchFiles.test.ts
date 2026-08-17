@@ -66,7 +66,7 @@ describe('opencodeClient.searchFiles', () => {
     expect(url).toContain('query=pack');
     expect(url).toContain(`directory=${encodeURIComponent('/workspace/pichamber')}`);
     expect(url).toContain('type=file');
-    expect(hits.map((hit) => hit.relativePath)).toEqual(['package.json', 'packages/ui/package.json']);
+    expect(hits.map((hit: { relativePath: string }) => hit.relativePath)).toEqual(['package.json', 'packages/ui/package.json']);
     expect(hits[0]?.name).toBe('package.json');
     expect(hits[0]?.path).toBe('/workspace/pichamber/package.json');
   });
