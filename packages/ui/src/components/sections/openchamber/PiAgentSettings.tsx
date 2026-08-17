@@ -80,14 +80,14 @@ export const PiAgentSettings: React.FC = () => {
       return;
     }
     try {
-      const selected = await requestDirectoryAccess();
+      const selected = await requestDirectoryAccess(value.trim() || resolvedPath || '');
       if (selected.success && selected.path && selected.path.trim().length > 0) {
         setValue(selected.path.trim());
       }
     } catch {
       // Cancel leaves the field unchanged.
     }
-  }, []);
+  }, [resolvedPath, value]);
 
   const handleSaveAndReload = React.useCallback(async () => {
     if (loadState !== 'ready') return;

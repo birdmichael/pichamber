@@ -166,7 +166,7 @@ function pathHasSkillRoot(resolvedPath, rootSegments) {
 
 function isPiSkillPath(resolvedPath, home = os.homedir()) {
   if (pathHasSkillRoot(resolvedPath, ['.pi', 'skills'])) return true;
-  return isPathInside(resolvedPath, path.resolve(home, '.pi', 'agent', 'skills'));
+  return isPathInside(resolvedPath, path.join(resolvePiAgentDir(home), 'skills'));
 }
 
 function isOpenCodeSkillPath(resolvedPath, home = os.homedir()) {

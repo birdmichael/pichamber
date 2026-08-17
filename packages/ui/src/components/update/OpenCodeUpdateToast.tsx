@@ -91,7 +91,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
     } finally {
       upgradingRef.current = false;
     }
-  }, [reloadOpenCode, t]);
+  }, [isPiKernel, reloadOpenCode, t]);
 
   React.useEffect(() => {
     const showUpdateAvailableToast = (version: string) => {
