@@ -49,6 +49,7 @@ import {
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
 import { buildHealthSnapshot, createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
+import { createPichamberControlTool } from './lib/pi/pichamber-control-tool.js';
 import { createPichamberWebTool } from './lib/pi/pichamber-web-tool.js';
 import { createOpenCodeEnvRuntime } from './lib/opencode/env-runtime.js';
 import { resolveOpenCodeEnvConfig } from './lib/opencode/env-config.js';
@@ -748,10 +749,18 @@ const piKernel = piKernelEnabled
       mock: isPiMockEnabled(),
       getCustomTools: async () => {
         const settings = await readSettingsFromDiskMigrated().catch(() => null);
-        if (settings?.agentWebToolEnabled === false) return undefined;
-        return [createPichamberWebTool({
-          executeAction: (...args) => openChamberControlService.execute(...args),
-        })];
+        const tools = [];
+        if (settings?.agentControlToolEnabled !== false) {
+          tools.push(createPichamberControlTool({
+            executeAction: (...args) => openChamberControlService.execute(...args),
+          }));
+        }
+        if (settings?.agentWebToolEnabled !== false) {
+          tools.push(createPichamberWebTool({
+            executeAction: (...args) => openChamberControlService.execute(...args),
+          }));
+        }
+        return tools.length > 0 ? tools : undefined;
       },
     })
   : null;
@@ -1275,6 +1284,9 @@ const openChamberControlService = createOpenChamberControlService({
   sessionService: openChamberSessionService,
   scheduledTaskService,
   browserControl: browserControlBroker,
+  getPiHost: () => piKernel?.host,
+  isPiKernelEnabled: () => piKernelEnabled,
+  emitSessionCreatedEvent,
 });
 
 const ensureGlobalWatcherStarted = async () => {

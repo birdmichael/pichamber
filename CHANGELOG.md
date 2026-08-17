@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** on Pi, agents can create sessions, send or fork prompts, and manage scheduled tasks with the Pichamber tool. Settings → Pichamber Tools now shows both Agent control and Pichamber Web; turning Agent control off and reloading idle sessions removes the tool.
 - **Desktop:** on Pi, agents can open and drive the right-hand Browser rail with the Pichamber Web tool (open, snapshot, click, type, scroll, and the rest of the existing browser actions). Settings → Pichamber Tools toggles it; turning it off and reloading idle sessions removes it.
 - Chat: on Pi, each Pichamber Web call now shows one Pichamber Web card with its arguments and result. The empty leftover Tool row above it is gone.
 - Desktop: on a git project, the right-hand rail shows Pull Request again so you can open or create a PR without opening Git first. Sessions that are not a git repo still have no empty PR tab.

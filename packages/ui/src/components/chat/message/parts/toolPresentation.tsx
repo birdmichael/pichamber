@@ -53,7 +53,7 @@ export const getToolIcon = (toolName: string) => {
     if (tool === 'task') {
         return <Icon name="ai-agent" className={iconClass} />;
     }
-    if (tool === 'openchamber') {
+    if (tool === 'openchamber' || tool === 'pichamber') {
         return <Icon name="openchamber" className={iconClass} />;
     }
     if (tool === 'openchamber_web' || tool === 'pichamber_web') {

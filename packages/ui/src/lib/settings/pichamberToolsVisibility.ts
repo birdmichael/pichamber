@@ -7,9 +7,9 @@ export function shouldShowPichamberToolsSettings(ctx: { isVSCode: boolean }): bo
 }
 
 /**
- * Agent-control / orchestration stays leftover-OpenCode-only until #186.
- * Pi Desktop shows only the Web tool row on this card.
+ * Agent-control / orchestration is a host tool on Desktop Pi and leftover
+ * OpenCode. VS Code has no host tool injection, so the row stays hidden.
  */
-export function shouldShowAgentControlToolSettings(ctx: { isPiKernel: boolean }): boolean {
-  return !ctx.isPiKernel;
+export function shouldShowAgentControlToolSettings(ctx: { isVSCode?: boolean } = {}): boolean {
+  return !ctx.isVSCode;
 }

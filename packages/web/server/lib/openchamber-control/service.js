@@ -3,6 +3,8 @@ import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 import { OpenChamberControlError, asControlError } from './error.js';
 import { OPENCHAMBER_ALL_ACTIONS } from './actions.js';
 import { writeScreenshot } from './screenshots.js';
+import { resolvePiHost } from '../pi/in-process-session.js';
+import { createPichamberControlSessions, listPiModelPreferences } from '../pi/pichamber-control-sessions.js';
 
 const DEFAULT_WAIT_TIMEOUT_SECONDS = 600;
 const MAX_WAIT_TIMEOUT_SECONDS = 86_400;
@@ -145,9 +147,25 @@ export const createOpenChamberControlService = (dependencies) => {
     scheduledTaskService,
     browserControl = null,
     createClient = createOpencodeClient,
+    getPiHost = null,
+    isPiKernelEnabled = null,
+    createWorktree,
+    getWorktreeBootstrapStatus,
+    emitSessionCreatedEvent,
     sleep = (duration) => new Promise((resolve) => setTimeout(resolve, duration)),
     now = Date.now,
   } = dependencies;
+
+  const piSessions = createPichamberControlSessions({
+    readSettingsFromDiskMigrated,
+    sanitizeProjects,
+    createWorktree,
+    getWorktreeBootstrapStatus,
+    emitSessionCreatedEvent,
+    sleep,
+  });
+
+  const piHost = () => resolvePiHost(getPiHost, isPiKernelEnabled);
 
   const wait = (duration, signal) => {
     if (!signal) return sleep(duration);
@@ -186,6 +204,8 @@ export const createOpenChamberControlService = (dependencies) => {
   };
 
   const models = async () => {
+    const host = piHost();
+    if (host) return listPiModelPreferences(host);
     const settings = await readSettingsFromDiskMigrated();
     return {
       defaultModel: asNonEmptyString(settings?.defaultModel),
@@ -196,7 +216,16 @@ export const createOpenChamberControlService = (dependencies) => {
     };
   };
 
-  const sessionStatus = async (client, sessionID, directory) => {
+  const sessionStatus = async (sessionID, directory) => {
+    const host = piHost();
+    if (host) {
+      const statuses = typeof host.getStatus === 'function' ? host.getStatus(directory || undefined) : {};
+      if (!statuses || typeof statuses !== 'object' || Array.isArray(statuses)) {
+        return { type: 'idle' };
+      }
+      return statuses[sessionID] || { type: 'idle' };
+    }
+    const client = await getClient();
     const response = await client.session.status({ directory });
     const statuses = response?.data;
     if (!statuses || typeof statuses !== 'object' || Array.isArray(statuses)) {
@@ -205,7 +234,22 @@ export const createOpenChamberControlService = (dependencies) => {
     return statuses[sessionID] || { type: 'idle' };
   };
 
-  const sessionMessages = async (client, sessionID, directory, role, limit) => {
+  const sessionMessages = async (sessionID, directory, role, limit) => {
+    const host = piHost();
+    if (host) {
+      let raw = [];
+      try {
+        raw = host.getMessages(sessionID) || [];
+      } catch {
+        if (typeof host.ensureSession === 'function') {
+          await host.ensureSession(sessionID, directory);
+          raw = host.getMessages(sessionID) || [];
+        }
+      }
+      const messages = extractTextMessages(raw, role);
+      return limit === undefined ? messages : messages.slice(-limit);
+    }
+    const client = await getClient();
     const fetchLimit = limit === undefined ? undefined : Math.max(100, limit * 4);
     let response = await client.session.messages({ sessionID, directory, ...(fetchLimit ? { limit: fetchLimit } : {}) });
     let raw = Array.isArray(response?.data) ? response.data : [];
@@ -218,18 +262,18 @@ export const createOpenChamberControlService = (dependencies) => {
     return limit === undefined ? messages : messages.slice(-limit);
   };
 
-  const waitForIdle = async ({ client, sessionID, directory, timeoutMs, requireActivity, baselineMessageID, startedAt, signal }) => {
+  const waitForIdle = async ({ sessionID, directory, timeoutMs, requireActivity, baselineMessageID, startedAt, signal }) => {
     const deadline = now() + timeoutMs;
     let observedActivity = false;
     while (true) {
       if (signal?.aborted) throw new OpenChamberControlError('OpenChamber action was cancelled', 499);
-      const status = await sessionStatus(client, sessionID, directory);
+      const status = await sessionStatus(sessionID, directory);
       if (status.type === 'busy' || status.type === 'retry') {
         observedActivity = true;
       } else if (!requireActivity || observedActivity) {
         return status;
       } else {
-        const messages = await sessionMessages(client, sessionID, directory, 'assistant', 1);
+        const messages = await sessionMessages(sessionID, directory, 'assistant', 1);
         const message = messages[0];
         if (message?.completedAt && (baselineMessageID ? message.id !== baselineMessageID : message.completedAt >= startedAt)) {
           return status;
@@ -249,6 +293,24 @@ export const createOpenChamberControlService = (dependencies) => {
   // UnknownError. Resolve the target session's directory from the global
   // session list when the caller did not scope explicitly.
   const resolveSessionDirectory = async (sessionID) => {
+    const host = piHost();
+    if (host) {
+      try {
+        const record = typeof host.getSession === 'function' ? host.getSession(sessionID) : null;
+        if (asNonEmptyString(record?.directory)) return record.directory;
+      } catch {
+      }
+      try {
+        const infos = typeof host.listSessionInfos === 'function'
+          ? await host.listSessionInfos()
+          : (typeof host.listSessions === 'function' ? host.listSessions() : [])
+            .map((item) => item?.info || item);
+        const session = (Array.isArray(infos) ? infos : []).find((item) => item?.id === sessionID);
+        return asNonEmptyString(session?.directory) || null;
+      } catch {
+        return null;
+      }
+    }
     try {
       const client = await getClient();
       const response = await client.experimental?.session?.list?.({});
@@ -289,7 +351,19 @@ export const createOpenChamberControlService = (dependencies) => {
     };
     const startedAt = now();
     let result;
-    if (action === 'session.create') {
+    const host = piHost();
+    if (host) {
+      if (action === 'session.create') {
+        result = await piSessions.create(host, payload);
+      } else {
+        if (!sessionID) throw new OpenChamberControlError('sessionId is required', 400);
+        if (action === 'session.send') {
+          result = await piSessions.send(host, sessionID, payload);
+        } else {
+          result = await piSessions.fork(host, sessionID, payload);
+        }
+      }
+    } else if (action === 'session.create') {
       result = await sessionService.create(payload);
     } else {
       if (!sessionID) throw new OpenChamberControlError('sessionId is required', 400);
@@ -304,9 +378,7 @@ export const createOpenChamberControlService = (dependencies) => {
       delete publicResult.baselineAssistantMessageId;
       return publicResult;
     }
-    const client = await getClient();
     const status = await waitForIdle({
-      client,
       sessionID: result.sessionId,
       directory: result.directory,
       timeoutMs: normalizeWaitTimeoutMs(input.timeout),
@@ -318,7 +390,7 @@ export const createOpenChamberControlService = (dependencies) => {
     const publicResult = { ...result, sessionStatus: status };
     delete publicResult.baselineAssistantMessageId;
     if (input.lastAssistant === true) {
-      publicResult.lastAssistantMessage = (await sessionMessages(client, result.sessionId, result.directory, 'assistant', 1))[0] || null;
+      publicResult.lastAssistantMessage = (await sessionMessages(result.sessionId, result.directory, 'assistant', 1))[0] || null;
     }
     return publicResult;
   };
@@ -507,9 +579,35 @@ export const createOpenChamberControlService = (dependencies) => {
       if (action.startsWith('session.')) {
         const directory = asNonEmptyString(input.directory) || asNonEmptyString(contextDirectory);
         const sessionID = asNonEmptyString(input.sessionId);
-        const client = await getClient();
         if (action === 'session.list') {
           const limit = positiveInteger(input.limit, 10, 'limit');
+          const host = piHost();
+          if (host) {
+            const infos = typeof host.listSessionInfos === 'function'
+              ? await host.listSessionInfos(directory || undefined, { archived: input.all === true })
+              : (typeof host.listSessions === 'function' ? host.listSessions(directory || undefined) : [])
+                .map((item) => item?.info || item);
+            let sessions = Array.isArray(infos) ? infos : [];
+            if (input.all !== true) sessions = sessions.filter((session) => !session?.time?.archived);
+            sessions = sessions.slice(0, limit);
+            if (input.withStatus === true) {
+              const cache = new Map();
+              sessions = await Promise.all(sessions.map(async (session) => {
+                const sessionDirectory = asNonEmptyString(session?.directory);
+                if (!sessionDirectory) return { ...session, status: { type: 'unknown' } };
+                if (!cache.has(sessionDirectory)) {
+                  const statusRequest = Promise.resolve()
+                    .then(() => (typeof host.getStatus === 'function' ? host.getStatus(sessionDirectory) : {}))
+                    .catch(() => null);
+                  cache.set(sessionDirectory, statusRequest);
+                }
+                const statusMap = await cache.get(sessionDirectory);
+                return { ...session, status: statusMap?.[session.id] || (statusMap ? { type: 'idle' } : { type: 'unknown' }) };
+              }));
+            }
+            return { sessions, limit, directory, archived: input.all === true ? 'included' : 'excluded' };
+          }
+          const client = await getClient();
           const response = await client.session.list(directory ? { directory } : {});
           let sessions = Array.isArray(response?.data) ? response.data : [];
           if (input.all !== true) sessions = sessions.filter((session) => !session?.time?.archived);
@@ -530,9 +628,13 @@ export const createOpenChamberControlService = (dependencies) => {
           return { sessions, limit, directory, archived: input.all === true ? 'included' : 'excluded' };
         }
         if (!sessionID) throw new OpenChamberControlError('sessionId is required', 400);
-        if (!directory) throw new OpenChamberControlError('directory is required', 400);
+        let scopedDirectory = directory;
+        if (!scopedDirectory) {
+          scopedDirectory = await resolveSessionDirectory(sessionID);
+        }
+        if (!scopedDirectory) throw new OpenChamberControlError('directory is required', 400);
         if (action === 'session.status') {
-          return { sessionId: sessionID, directory, sessionStatus: await sessionStatus(client, sessionID, directory) };
+          return { sessionId: sessionID, directory: scopedDirectory, sessionStatus: await sessionStatus(sessionID, scopedDirectory) };
         }
         if (action === 'session.messages') {
           if (input.timeout !== undefined && input.wait !== true) throw new OpenChamberControlError('timeout requires wait', 400);
@@ -542,10 +644,10 @@ export const createOpenChamberControlService = (dependencies) => {
           if (input.all === true && (last || input.limit !== undefined)) throw new OpenChamberControlError('all cannot be combined with last or limit', 400);
           if (last && input.limit !== undefined) throw new OpenChamberControlError('last cannot be combined with limit', 400);
           const currentStatus = input.wait === true
-            ? await waitForIdle({ client, sessionID, directory, timeoutMs: normalizeWaitTimeoutMs(input.timeout), requireActivity: false, startedAt: now(), signal: options.signal })
-            : await sessionStatus(client, sessionID, directory);
+            ? await waitForIdle({ sessionID, directory: scopedDirectory, timeoutMs: normalizeWaitTimeoutMs(input.timeout), requireActivity: false, startedAt: now(), signal: options.signal })
+            : await sessionStatus(sessionID, scopedDirectory);
           const limit = input.all === true ? undefined : (last ? 1 : positiveInteger(input.limit, 10, 'limit'));
-          return { sessionId: sessionID, directory, role, sessionStatus: currentStatus, messages: await sessionMessages(client, sessionID, directory, role, limit) };
+          return { sessionId: sessionID, directory: scopedDirectory, role, sessionStatus: currentStatus, messages: await sessionMessages(sessionID, scopedDirectory, role, limit) };
         }
       }
       throw new OpenChamberControlError(`Unsupported OpenChamber action: ${action || 'missing'}`, 400);
