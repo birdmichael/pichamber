@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-coding-agent';
 import { createPiHost, sessionDirForCwd } from './pi-host.js';
+import { sessionArchiveDir } from './session-archive.js';
 
 const tempDirs = [];
 afterEach(() => {
@@ -267,6 +268,9 @@ describe('persisted Pi sessions', () => {
     const archived = await first.updateSession(created.id, { time: { archived: archivedAt } }, cwd);
     expect(archived.info.time.archived).toBe(archivedAt);
     expect(archived.info.metadata.archived).toBe(archivedAt);
+    const sessionDir = sessionDirForCwd(cwd, home);
+    expect(archived.sessionFile.startsWith(`${sessionArchiveDir(sessionDir)}${path.sep}`)).toBe(true);
+    expect(fs.existsSync(archived.sessionFile)).toBe(true);
     const createdId = created.id;
     first.dispose();
 
@@ -299,7 +303,74 @@ describe('persisted Pi sessions', () => {
       .toContain(createdId);
     const restoredRecord = await restoredHost.ensureSession(createdId, cwd);
     expect(restoredRecord.info.time.archived).toBe(0);
+    expect(path.dirname(restoredRecord.sessionFile)).toBe(sessionDir);
+    expect(fs.existsSync(restoredRecord.sessionFile)).toBe(true);
     restoredHost.dispose();
+  });
+
+  it('skips archive/ on archived=false and keeps siblings when one archive jsonl is corrupt', async () => {
+    const home = tempDir('pi-persist-archive-io-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const archiveDir = sessionArchiveDir(sessionDir);
+    const listCalls = [];
+    const active = writePersistedSession({
+      home,
+      cwd,
+      title: 'Still listed',
+      userText: 'active',
+    });
+    const first = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async ({ sessionManager }) => stubSession(
+        typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      ),
+    });
+    const created = await first.createSession({ directory: cwd, title: 'Move me' });
+    await first.updateSession(created.id, { time: { archived: 1_700_000_000_000 } }, cwd);
+    expect(path.dirname(first.getSession(created.id).sessionFile)).toBe(archiveDir);
+    first.dispose();
+
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(path.join(archiveDir, 'broken.jsonl'), '{not-json\n');
+
+    const host = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async ({ sessionManager }) => stubSession(
+        typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      ),
+      async listPersistedSessionsInDir(directory, dir) {
+        const items = await SessionManager.list(directory, dir);
+        listCalls.push({ dir, ids: (items || []).map((item) => item.id) });
+        return items;
+      },
+    });
+    const activeList = await host.listSessionInfos(cwd, { archived: 'false' });
+    expect(activeList.map((session) => session.id)).toContain(active.id);
+    expect(activeList.map((session) => session.id)).not.toContain(created.id);
+    expect(listCalls.map((call) => call.dir)).toEqual([sessionDir]);
+    expect(listCalls[0].ids).not.toContain(created.id);
+
+    const inclusive = await host.listSessionInfos(cwd, { archived: 'true' });
+    expect(inclusive.map((session) => session.id)).toEqual(expect.arrayContaining([
+      active.id,
+      created.id,
+    ]));
+    const loaded = await host.ensureSession(created.id, cwd);
+    expect(loaded.info.time.archived).toBe(1_700_000_000_000);
+    expect(path.dirname(loaded.sessionFile)).toBe(archiveDir);
+    host.dispose();
   });
 
   it('cloneSession persists messages and parentID so a new host hydrates the same transcript', async () => {

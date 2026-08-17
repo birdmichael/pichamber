@@ -61,6 +61,12 @@ import {
   readPersistedSessionMetadataFromFileTail,
   sessionTimeWithArchived,
 } from './session-metadata.js';
+import {
+  findSessionJsonlInDir,
+  isUnderSessionArchiveDir,
+  relocateSessionFileForArchiveState,
+  sessionArchiveDir,
+} from './session-archive.js';
 import { includeArchivedSessions } from './session-list-query.js';
 import { createExtensionUIController } from './extension-ui.js';
 import {
@@ -400,14 +406,10 @@ const findSessionFileById = (sessionID, home) => {
   for (const project of projects) {
     if (!project.isDirectory() && !project.isSymbolicLink()) continue;
     const dir = path.join(root, project.name);
-    let files;
-    try {
-      files = fs.readdirSync(dir);
-    } catch {
-      continue;
-    }
-    const match = files.find((name) => name.endsWith('.jsonl') && name.includes(id));
-    if (match) return path.join(dir, match);
+    const active = findSessionJsonlInDir(dir, id);
+    if (active) return active;
+    const archived = findSessionJsonlInDir(sessionArchiveDir(dir), id);
+    if (archived) return archived;
   }
   return undefined;
 };
@@ -874,6 +876,7 @@ export const createPiHost = ({
   onEvent,
   mock = false,
   readListSessionMetadata,
+  listPersistedSessionsInDir,
 } = {}) => {
   const sessions = new Map();
   const hydrating = new Map();
@@ -889,6 +892,59 @@ export const createPiHost = ({
     }
   };
   const completeLocalReply = createLocalReply(emit);
+
+  const listSessionsInDir = typeof listPersistedSessionsInDir === 'function'
+    ? listPersistedSessionsInDir
+    : async (cwd, dir) => {
+      const pi = await loadPiSdk();
+      if (typeof pi.SessionManager?.list !== 'function') return [];
+      if (typeof dir !== 'string' || !dir || !fs.existsSync(dir)) return [];
+      return await pi.SessionManager.list(cwd, dir);
+    };
+
+  const listPersistedSessionItems = async (cwd, { includeArchived = false } = {}) => {
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const items = [];
+    try {
+      items.push(...(await listSessionsInDir(cwd, sessionDir) || []));
+    } catch {
+      // Active-dir list failed: keep going. Do not pretend the directory is empty
+      // if archive/ or live sessions still have rows.
+    }
+    if (includeArchived) {
+      try {
+        items.push(...(await listSessionsInDir(cwd, sessionArchiveDir(sessionDir)) || []));
+      } catch {
+        // Archive-dir list failed: keep active rows.
+      }
+    }
+    return items;
+  };
+
+  const retargetRecordSessionFile = (record, nextFile) => {
+    if (!record || typeof nextFile !== 'string' || !nextFile || record.sessionFile === nextFile) {
+      return record;
+    }
+    record.sessionFile = nextFile;
+    try {
+      if (typeof record.sessionManager?.setSessionFile === 'function') {
+        record.sessionManager.setSessionFile(nextFile);
+      }
+    } catch {
+    }
+    return record;
+  };
+
+  const relocateListedArchivedItem = (item, info, directory) => {
+    if (!item?.path || !info?.time?.archived) return item;
+    const sessionDir = sessionDirForCwd(item.cwd || directory || defaultDirectory, home);
+    if (isUnderSessionArchiveDir(item.path, sessionDir)) return item;
+    const moved = relocateSessionFileForArchiveState(item.path, sessionDir, true);
+    if (moved === item.path) return item;
+    const live = sessions.get(info.id);
+    if (live) retargetRecordSessionFile(live, moved);
+    return { ...item, path: moved };
+  };
 
   const resolveCreateSession = async () => {
     if (typeof createSession === 'function') return createSession;
@@ -1203,14 +1259,12 @@ export const createPiHost = ({
   };
 
   const findPersistedSession = async (sessionID, directory) => {
-    const pi = await loadPiSdk();
-    if (typeof pi.SessionManager?.list !== 'function') return null;
     const seen = new Set();
     for (const cwd of [directory, defaultDirectory]) {
       if (!cwd || seen.has(cwd)) continue;
       seen.add(cwd);
       try {
-        const listed = await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
+        const listed = await listPersistedSessionItems(cwd, { includeArchived: true });
         const found = (listed || []).find((item) => item?.id === sessionID);
         if (found) return found;
       } catch {
@@ -1609,16 +1663,13 @@ export const createPiHost = ({
     const seen = new Set(live.map((info) => info.id));
     if (mock) return live;
     try {
-      const persisted = await (async () => {
-        const pi = await loadPiSdk();
-        if (typeof pi.SessionManager?.list !== 'function') return [];
-        const cwd = directory || defaultDirectory;
-        return await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
-      })();
+      const cwd = directory || defaultDirectory;
+      const persisted = await listPersistedSessionItems(cwd, { includeArchived });
       for (const item of persisted || []) {
         try {
           const info = toPersistedSessionInfo(item, directory);
           if (!info || seen.has(info.id)) continue;
+          relocateListedArchivedItem(item, info, directory);
           if (!includeArchived && info.time?.archived) continue;
           seen.add(info.id);
           live.push(info);
@@ -1737,6 +1788,18 @@ export const createPiHost = ({
       }
       if (patch.metadata || (patch.time && Object.prototype.hasOwnProperty.call(patch.time, 'archived'))) {
         persistSessionMetadata(record.sessionManager, record.info.metadata);
+      }
+      if (patch.time && Object.prototype.hasOwnProperty.call(patch.time, 'archived') && patch.time.archived !== null) {
+        const archived = readPersistedArchivedTimestamp({ archived: patch.time.archived });
+        if (archived !== undefined && record.sessionFile) {
+          const sessionDir = sessionDirForCwd(record.directory, home);
+          const nextFile = relocateSessionFileForArchiveState(
+            record.sessionFile,
+            sessionDir,
+            Boolean(archived),
+          );
+          retargetRecordSessionFile(record, nextFile);
+        }
       }
       record.info.time.updated = Date.now();
       emit(record.directory, {
@@ -2074,10 +2137,8 @@ export const createPiHost = ({
     async listPersistedSessions(directory) {
       if (mock) return [];
       try {
-        const pi = await loadPiSdk();
-        if (typeof pi.SessionManager?.list !== 'function') return [];
         const cwd = directory || defaultDirectory;
-        return await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
+        return await listPersistedSessionItems(cwd, { includeArchived: false });
       } catch {
         return [];
       }
