@@ -32,8 +32,7 @@ export type ContextSurfaceDescriptor = {
    */
   availability: 'always' | 'has-content' | 'git-repo';
   /**
-   * Extra tab modes that also reveal this `has-content` surface. Walkthrough
-   * is the reading surface for a diff, so a diff tab is enough to offer it.
+   * Extra tab modes that also reveal this `has-content` surface.
    */
   revealedByModes?: readonly ContextPanelMode[];
   /** Short tooltip explanation shown on the rail. */
@@ -89,8 +88,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'walkthrough',
     icon: 'route',
     labelKey: 'contextPanel.mode.walkthrough',
-    availability: 'has-content',
-    revealedByModes: ['diff'],
+    availability: 'always',
   },
   {
     id: 'editor',

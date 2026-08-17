@@ -12,20 +12,25 @@ of those ids onto workspace tabs; see Mobile tabs.
 
 - A surface maps 1:1 to a `ContextPanelMode` tab mode in `useUIStore`.
 - `availability: 'always'` surfaces are always present on the rail.
-  `availability: 'has-content'` surfaces (chat, walkthrough) are hidden
-  from the rail until a tab of their mode exists, and stay visible for as
-  long as one does — they must not disappear while in use. Walkthrough also
-  appears when a diff tab exists (`revealedByModes`), so a blank draft does
-  not advertise an empty review surface. `availability: 'git-repo'`
-  (pull request) appears on a git directory so Desktop can open or create a
-  PR from the rail without opening Git first. Pass `isGitRepo` only when
-  the directory is known to be a git repo; unknown and non-git stay hidden
-  unless a `pr` tab already exists. Do not flip `pr` to `always`: a blank
-  or non-git session must not grow an empty PR tab. Desktop Git still
-  opens the create-PR form from the Git header when the session is a git
-  repo and no PR exists yet. The numbered chip still opens an existing PR.
-  Walkthrough still opens through `openContextSurface` from a real PR, a
-  diff, or an explicit generate action.
+  Walkthrough is `always` (OpenChamber): the rail shows it whenever the
+  window is ≥ `WALKTHROUGH_MIN_WIDTH` and the runtime is not VS Code, so
+  Desktop can open an empty Walkthrough and generate from there without
+  opening Diff first. Do not use `git-repo` for Walkthrough unless a later
+  decision requires hiding it on a non-git folder.
+  `availability: 'has-content'` surfaces (chat) are hidden from the rail
+  until a tab of their mode exists, and stay visible for as long as one
+  does — they must not disappear while in use. Optional `revealedByModes`
+  can also reveal a `has-content` surface when another tab mode exists.
+  `availability: 'git-repo'` (pull request) appears on a git directory so
+  Desktop can open or create a PR from the rail without opening Git first.
+  Pass `isGitRepo` only when the directory is known to be a git repo;
+  unknown and non-git stay hidden unless a `pr` tab already exists. Do not
+  flip `pr` to `always`: a blank or non-git session must not grow an empty
+  PR tab. Desktop Git still opens the create-PR form from the Git header
+  when the session is a git repo and no PR exists yet. The numbered chip
+  still opens an existing PR. Walkthrough also still opens through
+  `openContextSurface` from a real PR, a diff, or an explicit generate
+  action.
 - `defaultWidthFraction` is the panel width as a fraction of the content area,
   used until the user manually resizes that surface (manual widths are stored
   per mode in `useUIStore.contextPanelByDirectory[dir].widthByMode`).
@@ -39,9 +44,10 @@ of those ids onto workspace tabs; see Mobile tabs.
   **and** live plan markdown (`ready` / `saved` / `implementing`);
   `planModeExperimentalEnabled` must not gate it. On OpenCode it stays the
   experimental plan-mode flag. It also drops the walkthrough on VS Code and
-  below `WALKTHROUGH_MIN_WIDTH`, and hides `has-content` surfaces until a tab
-  of their mode (or a `revealedByModes` mode) exists, and hides `git-repo`
-  surfaces unless `isGitRepo` is true or a tab of that mode already exists.
+  below `WALKTHROUGH_MIN_WIDTH` even though walkthrough is `always`, and
+  hides `has-content` surfaces until a tab of their mode (or a
+  `revealedByModes` mode) exists, and hides `git-repo` surfaces unless
+  `isGitRepo` is true or a tab of that mode already exists.
   Both consumers use it so the digit shown on a rail badge always maps to the
   same surface the shortcut opens.
 
