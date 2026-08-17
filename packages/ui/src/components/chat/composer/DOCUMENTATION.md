@@ -28,7 +28,9 @@ When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Pla
 dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
-fetch. Plan enters through `/plan start` (toast only — the plugin does not ask
+fetch. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
+and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
+does not host those controls; they appear after expand). Plan enters through `/plan start` (toast only — the plugin does not ask
 a select) or resume of a saved plan. Leaving a ready plan uses `/plan save`.
 Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin

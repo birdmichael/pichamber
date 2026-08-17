@@ -7,15 +7,27 @@ import { McpDropdownContent } from '@/components/mcp/McpDropdown';
 import { ProjectContextPanel } from '@/components/layout/RightSidebarTabs';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { SortableTabsStrip, type SortableTabsStripItem } from '@/components/ui/sortable-tabs-strip';
+import { PlanView } from '@/components/views/PlanView';
 import { TerminalView } from '@/components/views/TerminalView';
+import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
+import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useMcpConfigStore } from '@/stores/useMcpConfigStore';
 import { useMcpStore } from '@/stores/useMcpStore';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
 import { MobileChangesSurface } from './MobileChangesSurface';
 import { MobileFilesSurface } from './MobileFilesSurface';
+import {
+  fallbackMobileWorkspaceTab,
+  listVisibleMobileWorkspaceTabs,
+  type MobileWorkspaceTab,
+} from './mobileWorkspaceTabs';
+
+export type { MobileWorkspaceTab } from './mobileWorkspaceTabs';
 
 const DRAWER_ROOT_ID = 'mobile-surface-root';
 const ENTER_DELAY_MS = 16;
@@ -23,8 +35,6 @@ const ENTER_DELAY_MS = 16;
 // sides feel like the same piece of chrome.
 const ENTER_DURATION_MS = 320;
 const DRAWER_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
-
-export type MobileWorkspaceTab = 'changes' | 'files' | 'terminal' | 'notes' | 'mcp';
 
 /** Quick MCP enable/disable toggles as a workspace pane, with its own slim
     action row (add server → settings, refresh) replacing the old fullscreen
@@ -85,7 +95,10 @@ const McpWorkspacePane: React.FC<{ onOpenMcpSettings: () => void }> = ({ onOpenM
   );
 };
 
-/** The workspace surfaces as tabs (Changes / Files / Terminal / Notes / MCP).
+/** The workspace surfaces as tabs (Git / Files / Terminal / Notes / Plan / MCP).
+    Plan is the Desktop `plan` surface and appears only when
+    `listVisibleMobileWorkspaceTabs` says so — Feature Plugins Plan on Pi,
+    leftover experimental plan-mode on OpenCode.
 
     Two hosts, same content and same state:
      - `drawer` (default) covers the app and slides in from the right edge —
@@ -111,6 +124,19 @@ export const MobileWorkspaceDrawer: React.FC<{
   variant?: 'drawer' | 'panel';
 }> = ({ open, onClose, tab, onTabChange, pendingChangesDiff, onOpenPlan, onOpenMcpSettings, variant = 'drawer' }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const piPlanChrome = usePiPlanChrome();
+  const featurePlugins = usePiFeaturePluginsStore((state) => state.payload);
+  const planModeExperimentalEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
+  const visibleTabs = React.useMemo(
+    () => listVisibleMobileWorkspaceTabs({
+      isPiKernel,
+      featurePlugins,
+      plan: piPlanChrome.plan,
+      planModeExperimentalEnabled,
+    }),
+    [featurePlugins, isPiKernel, piPlanChrome.plan, planModeExperimentalEnabled],
+  );
   const rootRef = React.useRef<HTMLElement | null>(null);
   const [entered, setEntered] = React.useState(false);
   // Kept visible through the exit slide; flipped to hidden once it finishes.
@@ -135,6 +161,11 @@ export const MobileWorkspaceDrawer: React.FC<{
       return next;
     });
   }, [open, tab]);
+
+  React.useEffect(() => {
+    const nextTab = fallbackMobileWorkspaceTab(tab, visibleTabs);
+    if (nextTab !== tab) onTabChange(nextTab);
+  }, [onTabChange, tab, visibleTabs]);
 
   if (typeof document !== 'undefined' && !rootRef.current) {
     let root = document.getElementById(DRAWER_ROOT_ID);
@@ -176,13 +207,15 @@ export const MobileWorkspaceDrawer: React.FC<{
 
   if (variant === 'drawer' && !rootRef.current) return null;
 
-  const tabItems: SortableTabsStripItem[] = [
-    { id: 'changes', label: t('layout.rightSidebar.git'), icon: <Icon name="git-branch" className="h-3.5 w-3.5" /> },
-    { id: 'files', label: t('mobile.menu.files'), icon: <Icon name="file-text" className="h-3.5 w-3.5" /> },
-    { id: 'terminal', label: t('mobile.menu.terminal'), icon: <Icon name="terminal" className="h-3.5 w-3.5" /> },
-    { id: 'notes', label: t('contextRail.surface.notes'), icon: <Icon name="sticky-note" className="h-3.5 w-3.5" /> },
-    { id: 'mcp', label: t('mobile.menu.mcp'), icon: <McpIcon className="h-3.5 w-3.5" /> },
-  ];
+  const tabDescriptors: Record<MobileWorkspaceTab, SortableTabsStripItem> = {
+    changes: { id: 'changes', label: t('layout.rightSidebar.git'), icon: <Icon name="git-branch" className="h-3.5 w-3.5" /> },
+    files: { id: 'files', label: t('mobile.menu.files'), icon: <Icon name="file-text" className="h-3.5 w-3.5" /> },
+    terminal: { id: 'terminal', label: t('mobile.menu.terminal'), icon: <Icon name="terminal" className="h-3.5 w-3.5" /> },
+    notes: { id: 'notes', label: t('contextRail.surface.notes'), icon: <Icon name="sticky-note" className="h-3.5 w-3.5" /> },
+    plan: { id: 'plan', label: t('contextPanel.mode.plan'), icon: <Icon name="list-check-2" className="h-3.5 w-3.5" /> },
+    mcp: { id: 'mcp', label: t('mobile.menu.mcp'), icon: <McpIcon className="h-3.5 w-3.5" /> },
+  };
+  const tabItems = visibleTabs.map((id) => tabDescriptors[id]);
 
   const body = (
     <>
@@ -199,7 +232,7 @@ export const MobileWorkspaceDrawer: React.FC<{
               layoutMode="fit"
               variant="active-pill"
               nonCompositedIndicator
-              // Five tabs don't fit with labels — the active tab keeps
+              // Six tabs don't fit with labels — the active tab keeps
               // icon + label, the rest collapse to icons.
               inactiveTabsIconOnly
               className="h-full"
@@ -253,6 +286,13 @@ export const MobileWorkspaceDrawer: React.FC<{
           <div className={cn('h-full', tab !== 'notes' && 'hidden')}>
             <ErrorBoundary>
               <ProjectContextPanel onActionComplete={onClose} onOpenPlan={onOpenPlan} />
+            </ErrorBoundary>
+          </div>
+        ) : null}
+        {visitedTabs.has('plan') && visibleTabs.includes('plan') ? (
+          <div className={cn('h-full', tab !== 'plan' && 'hidden')}>
+            <ErrorBoundary>
+              <PlanView />
             </ErrorBoundary>
           </div>
         ) : null}

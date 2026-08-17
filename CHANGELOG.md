@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** on Pi, View Plan is now a workspace tab when Feature Plugins Plan is installed and enabled, matching Desktop — including an empty “no plan yet” state. Agent/Plan and Goal stay on the phone composer. Leftover experimental plan-mode no longer gates this.
 - **Mobile/Settings:** on Pi, Settings and mobile chrome now say Pi / Pichamber / Git in every shipped language, matching Desktop. Leftover OpenCode skill folders stay hidden on Pi and still appear on the OpenCode kernel.
 - **Mobile/Settings:** on Pi, phone Settings now includes Feature Plugins, Extensions, Skills, Skills Catalog, Commands, Snippets, Agents, and Projects, matching Desktop. Usage and leftover Plugins stay hidden.
 - **Chat:** on Pi, a finished reply now leaves Composing, and Stop aborts a live run or clears a stuck session instead of staying armed after the turn is already done.

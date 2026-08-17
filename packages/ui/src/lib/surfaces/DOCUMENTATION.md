@@ -5,7 +5,8 @@
 `packages/ui/src/lib/surfaces` owns the declarative registry of context panel
 surfaces — the desktop workspaces switched by the vertical rail on the right
 edge (`components/layout/ContextPanelRail.tsx`) and rendered by
-`components/layout/ContextPanel.tsx`.
+`components/layout/ContextPanel.tsx`. The dedicated mobile shell maps a subset
+of those ids onto workspace tabs; see Mobile tabs.
 
 ## Model
 
@@ -61,5 +62,25 @@ the `openContext*` actions in `useUIStore`.
   the session stores. A closed panel mounts no chat iframe.
   Singleton surfaces (git, pr, notes, plan, context) remount on switch. These
   surfaces must restore their state from stores or snapshots.
-- Runtime scope: desktop/web `MainLayout` only. VS Code and the dedicated
-  mobile shell have their own layouts and do not consume this registry.
+- Runtime scope: the registry itself is consumed by desktop/web `MainLayout`.
+  The dedicated mobile shell does not mount the rail; it maps a subset of
+  these surfaces onto `MobileWorkspaceDrawer` tabs (see Mobile tabs).
+
+## Mobile tabs
+
+`apps/MobileWorkspaceDrawer.tsx` is the touch host. Visibility lives in
+`apps/mobileWorkspaceTabs.ts` so hosted `mobile.html` and Capacitor share one
+list. Each tab implements one Desktop surface id, or is a mobile-only pane:
+
+| Mobile tab | Desktop surface id | When it appears |
+|---|---|---|
+| `changes` | `git` | Always. Same product name as Desktop Git. |
+| `files` | `editor` | Always. |
+| `terminal` | `terminal` | Always. PTY stays on the connected server. |
+| `notes` | `notes` | Always. Opening a notes plan file is a fullscreen `PlanView` with `targetPath`, not the session Plan tab. |
+| `plan` | `plan` | Same gate as the Desktop rail: `resolvePlanRailEnabled` / `usePiPlanChrome()`. On Pi that is Feature Plugins `plan` installed+enabled **and** live status `active` / `ready` / `saved` / `implementing`, including empty “no plan yet”. `/health.planModeExperimentalEnabled` must not gate it. On OpenCode it stays the leftover experimental flag. Renders `PlanView` with no `targetPath` (`PiSessionPlanView` on Pi). |
+| `mcp` | — | Always in this slice. A later slice will match Settings MCP (`isMcpSettingsAvailable`). Not a Desktop rail surface. |
+
+Out of this slice (later mobile parity): Context / Work Status, PR, Diff,
+Walkthrough, Browser, split Chat. Desktop-native privileges (SSH, External
+Tunnel host, Electron browser session) stay unsupported on mobile.

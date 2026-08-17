@@ -81,9 +81,10 @@ from the live `plan-mode-state` custom entry (same mapping as
 | `resume` | rewrite saved → ready `plan-mode-state`, then `reload({ sessionID })`. Do not send `/plan start` (that errors while a saved plan exists) |
 
 Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
-Desktop chrome (Agent \| Plan, View Plan rail, Build) is gated on the Pi
-kernel **and** Feature Plugins `plan` installed+enabled. Missing/disabled
-hides those surfaces. `planModeExperimentalEnabled` does not gate this on Pi.
+Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
+mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
+`plan` installed+enabled. Missing/disabled hides those surfaces.
+`planModeExperimentalEnabled` does not gate this on Pi.
 View Plan / Discard stay visible while status is `active` even if
 `planMarkdown` is still empty (empty "no plan yet" state). Build still
 requires ready/saved markdown.
