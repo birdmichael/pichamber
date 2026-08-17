@@ -127,7 +127,7 @@ The package supports macOS, Windows, and Linux desktop features. Linux AppImage 
 
 On Windows and Linux, the General setting persisted as `desktopMinimizeToTrayEnabled` keeps the app running in the tray when the main window is **closed**. Minimize — the in-app control, the native title-bar button, and the taskbar — always performs a normal window minimize, so the taskbar entry stays available.
 
-The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart; while disabled, Desktop does not create the native tray controller or start the renderer subscriptions, polling, quota refresh, or IPC updates that feed it.
+The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart; while disabled, Desktop does not create the native tray controller or start the renderer subscriptions, polling, leftover OpenCode quota refresh, or IPC updates that feed it. On Pi the tray never fetches `/api/quota/*`.
 
 ## Bundled kernel (Pi)
 

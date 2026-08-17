@@ -1,5 +1,5 @@
 import { registerFsRoutes } from '../fs/routes.js';
-import { registerQuotaRoutes } from '../quota/routes.js';
+import { registerQuotaRoutes, shouldRegisterQuotaRoutes } from '../quota/routes.js';
 import { registerSmallModelRoutes } from '../small-model/routes.js';
 import { registerWalkthroughRoutes } from '../walkthrough/routes.js';
 import { registerSessionGoalRoutes } from '../session-goal/routes.js';
@@ -295,7 +295,9 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       getPiHost,
     });
 
-    registerQuotaRoutes(app, { getQuotaProviders });
+    if (shouldRegisterQuotaRoutes()) {
+      registerQuotaRoutes(app, { getQuotaProviders });
+    }
     registerSmallModelRoutes(app, { getSmallModelService });
     registerWalkthroughRoutes(app, { getWalkthroughService });
     registerSessionGoalRoutes(app);

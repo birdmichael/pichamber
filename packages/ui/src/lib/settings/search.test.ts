@@ -69,6 +69,28 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'integrations.messengers.discord')).toBe(true);
   });
 
+  test('hides leftover Usage / quota search on Pi and keeps it on OpenCode', () => {
+    const getPageTitle = (page: string) => page;
+    const queries = ['usage', 'quota', 'billing'] as const;
+    for (const query of queries) {
+      const piResults = buildSettingsSearchResults({
+        query,
+        runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+        t,
+        getPageTitle,
+      });
+      const openCodeResults = buildSettingsSearchResults({
+        query,
+        runtimeCtx,
+        t,
+        getPageTitle,
+      });
+
+      expect(piResults.some((result) => result.page === 'usage')).toBe(false);
+      expect(openCodeResults.some((result) => result.page === 'usage')).toBe(true);
+    }
+  });
+
   test('hides leftover Commands Override Agent search on Pi and keeps it on OpenCode', () => {
     const getPageTitle = (page: string) => page;
     const openCodeResults = buildSettingsSearchResults({

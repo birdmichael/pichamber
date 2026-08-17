@@ -72,6 +72,7 @@ All notable changes to this project will be documented in this file.
 - **Sessions:** Scheduled Tasks is a Pichamber scheduler on Pi. The sidebar calendar and `/schedule-task` are available again; Run now and due timers start a real Pi session with the task prompt. The OpenCode kernel still uses its existing execution path.
 - **Sessions:** New multi-run is available on the Pi kernel again. The sidebar merge-arrows button opens the launcher, you pick 1–5 models from your live Pi catalog, and Start creates a real Pi session per model (with an isolated worktree when you ask).
 - **Chat:** typing `/` now lists installed, trusted skills as `/skill:name` next to Pi builtins, matching the Pi CLI. Untrusted project skills stay out of the menu. `/model` and `/thinking` remain on the chips.
+- Desktop: on Pi, the menu bar no longer shows leftover provider quota. Session context % and cost stay in the header and Work Status.
 - Work status: the provider quota block is hidden on Pi, where that API does not exist. Session context percentage and cost stay visible.
 - UI: a new session no longer shows empty Pull request and Walkthrough context tabs. Those surfaces appear when there is a pull request, a diff, or you ask for a walkthrough.
 - **Desktop/Mobile:** app IDs, deep links, pairing URLs, and Linux desktop identity now use Pichamber (`dev.pichamber.desktop`, `com.pichamber.app`, `pichamber://`, `pichamber-ui://`). Already-printed `openchamber://` pairing and widget links still open.

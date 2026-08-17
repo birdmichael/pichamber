@@ -3,6 +3,8 @@
 ## Purpose
 This module fetches quota and usage signals for supported providers in the web server runtime.
 
+Routes are leftover OpenCode only. `registerQuotaRoutes` is skipped when `OPENCHAMBER_KERNEL=pi` (the default) so a Pi backend does not pretend `/api/quota/*` exists. The module stays for `OPENCHAMBER_KERNEL=opencode`. Pi session tokens and prompt-cache read/write are not this board.
+
 ## Entrypoints and structure
 - `packages/web/server/lib/quota/index.js`: public entrypoint imported by `packages/web/server/index.js`.
 - `packages/web/server/lib/quota/routes.js`: Express route registration for quota endpoints.
