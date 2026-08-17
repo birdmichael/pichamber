@@ -9,13 +9,13 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import {
   cancelPiExtensionUi,
-  displaySelectOption,
   isFreeformOtherOption,
   isPiExtensionUiNotFoundError,
   replyPiExtensionUi,
 } from '@/sync/pi-extension-ui';
 import { presentPiExtensionUiNotify, stashPiExtensionUiEditorText } from '@/sync/pi-extension-ui-store';
 import type { PiExtensionUiPrompt } from '@/sync/pi-extension-ui';
+import { localizePiPlanSelectOption, localizePiPlanSelectTitle } from '@/sync/pi-plan-locale';
 import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
 import { refreshSessionPlan } from '@/sync/pi-session-plan-store';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
@@ -188,7 +188,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
     if (typeof prompt.value === 'string' && prompt.value.trim()) return prompt.value;
     if (Array.isArray(prompt.value) && prompt.value.length > 0) return prompt.value.join(', ');
     if (customMode) return customTextRef.current.trim() || t('chat.piExtensionUi.answered');
-    if (selected.length > 0) return selected.map((item) => displaySelectOption(item).label).join(', ');
+    if (selected.length > 0) return selected.map((item) => localizePiPlanSelectOption(item, t).label).join(', ');
     return t('chat.piExtensionUi.answered');
   }, [customMode, prompt.status, prompt.value, selected, t]);
 
@@ -212,7 +212,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
 
           <div className="px-2 py-2">
             {prompt.title ? (
-              <div className="typography-meta font-medium text-foreground mb-1.5">{prompt.title}</div>
+              <div className="typography-meta font-medium text-foreground mb-1.5">{localizePiPlanSelectTitle(prompt.title, t)}</div>
             ) : (
               <div className="typography-meta font-medium text-foreground mb-1.5">{t('chat.piExtensionUi.questionFallback')}</div>
             )}
@@ -238,7 +238,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
                 <div className="space-y-0.5">
                   {options.map((option, index) => {
                     const other = isFreeformOtherOption(option);
-                    const parsed = displaySelectOption(option);
+                    const parsed = localizePiPlanSelectOption(option, t);
                     const isSelected = other ? customMode : selected.includes(option);
                     return (
                       <button

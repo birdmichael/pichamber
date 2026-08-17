@@ -8,7 +8,8 @@ import {
   consumePiExtensionUiEditorStash,
   usePiExtensionUiStore,
 } from './pi-extension-ui-store';
-import { refreshSessionPlan } from './pi-session-plan-store';
+import { maybeOpenPlanRailOnReady } from './pi-plan-ready';
+import { refreshSessionPlan, usePiSessionPlanStore } from './pi-session-plan-store';
 
 export const isPiExtensionUiEventType = (type: unknown): boolean => (
   type === 'pi.ui.asked' || type === 'pi.ui.settled' || type === 'pi.ui.notify'
@@ -41,6 +42,16 @@ export const handlePiExtensionUiEvent = (payload: { type?: unknown; properties?:
   const prompt = applyPiExtensionUiPrompt(properties?.prompt);
   if (prompt) {
     maybeResolveStashedEditor(prompt);
+    if (payload.type === 'pi.ui.asked') {
+      const plan = usePiSessionPlanStore.getState().plansBySession[prompt.sessionID] ?? null;
+      maybeOpenPlanRailOnReady({
+        sessionID: prompt.sessionID,
+        previous: plan,
+        next: plan,
+        prompt,
+        directoryHint: prompt.directory,
+      });
+    }
     if (payload.type === 'pi.ui.settled') void refreshSessionPlan(prompt.sessionID);
   } else if (payload.type === 'pi.ui.settled' && typeof properties?.sessionID === 'string') {
     void refreshSessionPlan(properties.sessionID);

@@ -5,6 +5,7 @@ import { DiffViewIcon } from '@/components/icons/DiffIcon';
 import { Button } from '@/components/ui/button';
 import { SortableTabsStrip } from '@/components/ui/sortable-tabs-strip';
 import { PullRequestView } from '@/components/views/PullRequestView';
+import { PlanViewFallback } from '@/components/views/PlanViewFallback';
 import { TerminalView } from '@/components/views/TerminalView';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 
@@ -941,7 +942,7 @@ export const ContextPanel: React.FC = () => {
             : activeTab?.mode === 'notes'
                 ? <ProjectContextPanel />
         : activeTab?.mode === 'plan'
-            ? <React.Suspense fallback={null}><PlanView targetPath={activeTab.targetPath} /></React.Suspense>
+            ? <React.Suspense fallback={<PlanViewFallback />}><PlanView targetPath={activeTab.targetPath} /></React.Suspense>
             : null;
 
   const browserTabs = React.useMemo(

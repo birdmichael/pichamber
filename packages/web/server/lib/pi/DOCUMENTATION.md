@@ -88,7 +88,10 @@ mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 View Plan stays visible while status is `active` even if
 `planMarkdown` is still empty (empty "no plan yet" state). Discard
 requires ready/saved/implementing markdown. Build still
-requires ready/saved markdown.
+requires ready/saved markdown. Desktop localizes known plan-ready
+`ctx.ui.select` / `plan_mode_complete` / start-Plan notify chrome.
+A ready plan with markdown auto-opens the docked Plan rail
+(`openContextPlan`); `/plan start` does not.
 
 ## Slash command dispatch
 

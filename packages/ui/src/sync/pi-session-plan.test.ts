@@ -10,6 +10,7 @@ import {
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
 } from './pi-session-plan';
+import { resetPlanReadyRailOpenForTests } from './pi-plan-ready';
 import {
   applySessionPlan,
   applySessionPlanEvent,
@@ -19,6 +20,7 @@ import {
 
 afterEach(() => {
   resetPiSessionPlanStore();
+  resetPlanReadyRailOpenForTests();
 });
 
 describe('parseSessionPlan', () => {

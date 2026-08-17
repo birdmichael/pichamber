@@ -5,6 +5,7 @@ import {
   isContextPanelExpandedForMode,
   resolveDesktopActiveMainTab,
   resolvePlanRailEnabled,
+  resolvePlanViewKind,
 } from './planRail';
 
 const plugins = (installed: boolean, enabled: boolean) => {
@@ -78,5 +79,14 @@ describe('resolveDesktopActiveMainTab', () => {
     expect(resolveDesktopActiveMainTab('chat')).toBe('chat');
     expect(resolveDesktopActiveMainTab('terminal')).toBe('terminal');
     expect(resolveDesktopActiveMainTab('diagram')).toBe('diagram');
+  });
+});
+
+describe('resolvePlanViewKind', () => {
+  test('uses the Pi session plan view without waiting on Feature Plugins', () => {
+    expect(resolvePlanViewKind({ isPiKernel: true, targetPath: null })).toBe('pi-session');
+    expect(resolvePlanViewKind({ isPiKernel: true, targetPath: '' })).toBe('pi-session');
+    expect(resolvePlanViewKind({ isPiKernel: true, targetPath: '/repo/.opencode/plans/1.md' })).toBe('opencode');
+    expect(resolvePlanViewKind({ isPiKernel: false, targetPath: null })).toBe('opencode');
   });
 });

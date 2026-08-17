@@ -1,5 +1,6 @@
 export interface ToolMetadata {
   displayName: string;
+  displayNameKey?: 'chat.tool.planModeComplete' | 'chat.tool.planEnter' | 'chat.tool.planExit';
   icon?: string;
   outputLanguage?: string;
   inputFields?: {
@@ -203,6 +204,7 @@ const TOOL_METADATA: Record<string, ToolMetadata> = {
 
     plan_enter: {
       displayName: 'Plan Mode',
+      displayNameKey: 'chat.tool.planEnter',
       category: 'ai',
       outputLanguage: 'text',
       inputFields: []
@@ -210,6 +212,15 @@ const TOOL_METADATA: Record<string, ToolMetadata> = {
 
     plan_exit: {
       displayName: 'Build Mode',
+      displayNameKey: 'chat.tool.planExit',
+      category: 'ai',
+      outputLanguage: 'text',
+      inputFields: []
+    },
+
+    plan_mode_complete: {
+      displayName: 'Plan mode complete',
+      displayNameKey: 'chat.tool.planModeComplete',
       category: 'ai',
       outputLanguage: 'text',
       inputFields: []
@@ -245,6 +256,17 @@ export function getToolMetadata(toolName: string): ToolMetadata {
     outputLanguage: 'text',
     inputFields: []
   };
+}
+
+export function resolveToolDisplayName(
+  toolName: string,
+  translate?: (key: NonNullable<ToolMetadata['displayNameKey']>) => string,
+): string {
+  const metadata = getToolMetadata(toolName);
+  if (metadata.displayNameKey && translate) {
+    return translate(metadata.displayNameKey);
+  }
+  return metadata.displayName;
 }
 
 export function detectToolOutputLanguage(

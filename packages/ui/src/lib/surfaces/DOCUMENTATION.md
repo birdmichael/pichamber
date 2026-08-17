@@ -64,6 +64,9 @@ the `openContext*` actions in `useUIStore`.
   area width). Leftover `expanded: true` from Files / Diff / Git is cleared
   when Plan becomes active. Mobile still uses the workspace sheet / `plan`
   main tab.
+- When a Pi plan becomes `ready` with markdown, or a pending plan-ready
+  `ctx.ui.select` arrives, Desktop calls `openContextPlan` (same dock path).
+  `/plan start` and status `active` do not auto-open the rail.
 - Multi-instance and session-holding surfaces (file/editor, diff, browser,
   terminal) are keep-alive panes in `ContextPanel.tsx`. Switching these
   surfaces must not reset their state (open tabs, xterm session, scroll

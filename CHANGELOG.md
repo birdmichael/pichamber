@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 - Chat: on Pi, a new session reply now shows the model that will run or just ran — the same provider/model as the composer chip — instead of leftover Pi / `pi / pi` on the assistant header and Context sheet. Cost stays whatever Pi reported.
 - Git: Desktop Git can open the create-pull-request form when the branch has no GitHub PR yet. The numbered PR chip still opens an existing PR.
 - Desktop: opening Plan keeps the chat and composer visible. Plan stays a right-hand side panel instead of covering the window.
+- Chat/Desktop: on Pi, when a plan is ready the decision card follows the app language, and Plan opens as the right-hand side panel without covering chat. Starting Plan does not open that panel.
 - **Settings:** opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.
 - Chat: on Pi, Plan Discard stays disabled while the panel still says “No plan yet”. The confirm dialog only appears when a ready or saved plan exists.
 - **Mobile:** Git now opens the same Pull Request view as Desktop. File diffs stay inline on phones and use the Desktop Diff view on tablet-width screens (768px and up), where Walkthrough is also available. The Electron Browser session is not on mobile.

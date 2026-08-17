@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 
 import { ChatView } from '@/components/views/ChatView';
+import { PlanViewFallback } from '@/components/views/PlanViewFallback';
 
 // Keep TerminalView eager: the bottom dock reserves its height immediately, so
 // suspending here leaves a large blank panel on slower machines.
@@ -269,7 +270,7 @@ export const MainLayout: React.FC = () => {
         }
         switch (activeMainTab) {
             case 'plan':
-                return <React.Suspense fallback={null}><PlanView /></React.Suspense>;
+                return <React.Suspense fallback={<PlanViewFallback />}><PlanView /></React.Suspense>;
             case 'git':
                 return <React.Suspense fallback={null}><GitView isActive={!mobileRightSidebarOpen} /></React.Suspense>;
             case 'diff':
