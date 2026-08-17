@@ -60,7 +60,9 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 | bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. |
 | `/plan tools` | Tools `ctx.ui.select`. |
 
-Desktop chrome uses `/plan start` for the Agent \| Plan footer. Composer `/plan` (listed extension command, empty args) still goes through `session.command` → `session.prompt("/plan")` so the launch card still appears. Do not intercept bare `/plan` as a toast-only start.
+Desktop chrome uses `/plan start` for the Agent \| Plan footer on an already-open
+session. On a new-session draft, the footer Plan chip is local intent only;
+`/plan start` runs after send materializes that session. Composer `/plan` (listed extension command, empty args) still goes through `session.command` → `session.prompt("/plan")` so the launch card still appears. Do not intercept bare `/plan` as a toast-only start.
 
 ## Session plan status
 

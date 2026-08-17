@@ -5,8 +5,8 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { refreshFeaturePlugins, usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import {
   canShowPiPlanToggle,
-  isFooterPlanSelected,
   planBuildAvailable,
+  resolveFooterPlanSelected,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
@@ -18,6 +18,7 @@ export function usePiPlanChrome(sessionID?: string | null) {
   const isPiKernel = usePiKernel();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const draftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
+  const draftPlanSelected = useSessionUIStore((state) => state.newSessionDraft?.planSelected === true);
   const resolvedSessionId = sessionID ?? currentSessionId;
   const planPluginAvailable = usePiPlanPluginAvailable();
   const plan = useSessionPlan(resolvedSessionId);
@@ -44,7 +45,13 @@ export function usePiPlanChrome(sessionID?: string | null) {
     status: plan?.status ?? 'off',
     busy,
     showToggle: canShowPiPlanToggle(available, resolvedSessionId, draftOpen),
-    footerPlanSelected: available && isFooterPlanSelected(plan?.status),
+    footerPlanSelected: resolveFooterPlanSelected({
+      available,
+      status: plan?.status,
+      sessionID: resolvedSessionId,
+      draftOpen,
+      draftPlanSelected,
+    }),
     showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
     showViewPlan: available && sessionPlanViewAvailable(plan),
     canDiscard: available && sessionPlanCanDiscard(plan),

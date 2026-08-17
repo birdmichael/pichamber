@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
+  applyDraftPlanStartAfterMaterialize,
+  applyPlanToggleSelect,
   canShowPiPlanToggle,
+  decidePlanToggleSelect,
   isFooterPlanSelected,
   parseSessionPlan,
   planBuildAvailable,
   planToggleAction,
+  resolveFooterPlanSelected,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
+  shouldStartPlanAfterDraftMaterialize,
 } from './pi-session-plan';
 import { resetPlanReadyRailOpenForTests } from './pi-plan-ready';
 import {
@@ -79,6 +84,128 @@ describe('plan toggle and build dispatch', () => {
     expect(isFooterPlanSelected('active')).toBe(true);
     expect(isFooterPlanSelected('saved')).toBe(false);
     expect(isFooterPlanSelected('implementing')).toBe(false);
+  });
+
+  test('draft Plan select stays local and does not imply a session action', () => {
+    expect(decidePlanToggleSelect({
+      sessionID: null,
+      draftOpen: true,
+      status: 'off',
+      side: 'plan',
+    })).toEqual({ kind: 'draft-intent', planSelected: true });
+    expect(decidePlanToggleSelect({
+      sessionID: '',
+      draftOpen: true,
+      status: 'off',
+      side: 'agent',
+    })).toEqual({ kind: 'draft-intent', planSelected: false });
+    expect(shouldStartPlanAfterDraftMaterialize(true, 'off')).toBe(true);
+    expect(shouldStartPlanAfterDraftMaterialize(true, 'active')).toBe(false);
+    expect(shouldStartPlanAfterDraftMaterialize(false, 'off')).toBe(false);
+  });
+
+  test('footer can show Plan from draft intent without a session status', () => {
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: null,
+      draftOpen: true,
+      draftPlanSelected: true,
+    })).toBe(true);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: null,
+      draftOpen: true,
+      draftPlanSelected: false,
+    })).toBe(false);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'active',
+      sessionID: 'ses_1',
+      draftOpen: false,
+      draftPlanSelected: false,
+    })).toBe(true);
+    expect(resolveFooterPlanSelected({
+      available: false,
+      draftOpen: true,
+      draftPlanSelected: true,
+    })).toBe(false);
+  });
+
+  test('existing-session Plan toggle stays on that session and never creates one', async () => {
+    const starts: string[] = [];
+    const result = await applyPlanToggleSelect({
+      sessionID: 'ses_open',
+      draftOpen: false,
+      status: 'off',
+      side: 'plan',
+      setDraftPlanSelected: () => {
+        throw new Error('draft intent must not run on an open session');
+      },
+      dispatchSessionPlanAction: async (sessionID, action) => {
+        starts.push(`${action}:${sessionID}`);
+        return { status: 'active', planMarkdown: '' };
+      },
+    });
+    expect(result).toEqual({
+      kind: 'session-action',
+      sessionID: 'ses_open',
+      action: 'start',
+    });
+    expect(starts).toEqual(['start:ses_open']);
+    expect(decidePlanToggleSelect({
+      sessionID: 'ses_open',
+      draftOpen: true,
+      status: 'off',
+      side: 'plan',
+    })).toEqual({
+      kind: 'session-action',
+      sessionID: 'ses_open',
+      action: 'start',
+    });
+  });
+
+  test('draft Plan select applies local intent and never creates a session', async () => {
+    let draftPlanSelected = false;
+    const result = await applyPlanToggleSelect({
+      sessionID: null,
+      draftOpen: true,
+      status: 'off',
+      side: 'plan',
+      setDraftPlanSelected: (selected) => {
+        draftPlanSelected = selected;
+      },
+      dispatchSessionPlanAction: async () => {
+        throw new Error('draft Plan must not /plan start');
+      },
+    });
+    expect(result).toEqual({ kind: 'draft-intent', planSelected: true });
+    expect(draftPlanSelected).toBe(true);
+    expect(Object.keys(result)).not.toContain('sessionID');
+  });
+
+  test('send from a Plan-selected draft starts plan after that session exists', async () => {
+    const starts: string[] = [];
+    const started = await applyDraftPlanStartAfterMaterialize({
+      sessionID: 'ses_new',
+      draftPlanSelected: true,
+      startPlan: async (sessionID) => {
+        starts.push(sessionID);
+        return { status: 'active', planMarkdown: '' };
+      },
+    });
+    expect(started).toBe('started');
+    expect(starts).toEqual(['ses_new']);
+
+    const skipped = await applyDraftPlanStartAfterMaterialize({
+      sessionID: 'ses_new',
+      draftPlanSelected: false,
+      startPlan: async () => {
+        throw new Error('Agent send must not start plan');
+      },
+    });
+    expect(skipped).toBe('skipped');
   });
 
   test('empty-plan Discard gate uses chrome status and markdown, not a local empty string', () => {

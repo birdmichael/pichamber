@@ -58,13 +58,17 @@ export const isFooterPlanSelected = (status: SessionPlanStatus | null | undefine
   status === 'active' || status === 'ready'
 );
 
+const trimmedSessionID = (sessionID?: string | null): string => (
+  typeof sessionID === 'string' ? sessionID.trim() : ''
+);
+
 /** Footer chips: Plan slot on, plus a session id or an idle new-session draft. */
 export const canShowPiPlanToggle = (
   available: boolean,
   sessionID?: string | null,
   draftOpen = false,
 ): boolean => (
-  available && Boolean((typeof sessionID === 'string' && sessionID.trim()) || draftOpen)
+  available && Boolean(trimmedSessionID(sessionID) || draftOpen)
 );
 
 export const planToggleAction = (
@@ -79,6 +83,94 @@ export const planToggleAction = (
   if (status === 'ready') return 'save';
   if (status === 'active') return 'exit';
   return null;
+};
+
+export type PlanToggleSelectDecision =
+  | { kind: 'draft-intent'; planSelected: boolean }
+  | { kind: 'session-action'; sessionID: string; action: SessionPlanAction }
+  | { kind: 'noop' };
+
+export type PlanToggleApplyResult =
+  | PlanToggleSelectDecision
+  | { kind: 'session-action-failed'; sessionID: string; action: SessionPlanAction };
+
+/**
+ * Draft Plan is local composer intent. It must not mint a session.
+ * An already-open session still maps to /plan start, save, resume, or exit.
+ */
+export const decidePlanToggleSelect = (input: {
+  sessionID?: string | null;
+  draftOpen: boolean;
+  status?: SessionPlanStatus | null;
+  side: SessionPlanSide;
+}): PlanToggleSelectDecision => {
+  const sessionID = trimmedSessionID(input.sessionID);
+  if (!sessionID && input.draftOpen) {
+    return { kind: 'draft-intent', planSelected: input.side === 'plan' };
+  }
+  if (!sessionID) return { kind: 'noop' };
+  const action = planToggleAction(input.status, input.side);
+  if (!action) return { kind: 'noop' };
+  return { kind: 'session-action', sessionID, action };
+};
+
+/** Plan chip on a live session, or local Plan intent on an empty new-session draft. */
+export const resolveFooterPlanSelected = (input: {
+  available: boolean;
+  status?: SessionPlanStatus | null;
+  sessionID?: string | null;
+  draftOpen?: boolean;
+  draftPlanSelected?: boolean;
+}): boolean => {
+  if (!input.available) return false;
+  if (isFooterPlanSelected(input.status)) return true;
+  return Boolean(input.draftOpen && !trimmedSessionID(input.sessionID) && input.draftPlanSelected);
+};
+
+export const shouldStartPlanAfterDraftMaterialize = (
+  draftPlanSelected?: boolean,
+  status?: SessionPlanStatus | null,
+): boolean => (
+  draftPlanSelected === true && !isFooterPlanSelected(status)
+);
+
+export const applyPlanToggleSelect = async (input: {
+  sessionID?: string | null;
+  draftOpen: boolean;
+  status?: SessionPlanStatus | null;
+  side: SessionPlanSide;
+  setDraftPlanSelected: (selected: boolean) => void;
+  dispatchSessionPlanAction: (
+    sessionID: string,
+    action: SessionPlanAction,
+  ) => Promise<SessionPlan | null>;
+}): Promise<PlanToggleApplyResult> => {
+  const decision = decidePlanToggleSelect(input);
+  if (decision.kind === 'draft-intent') {
+    input.setDraftPlanSelected(decision.planSelected);
+    return decision;
+  }
+  if (decision.kind === 'session-action') {
+    const next = await input.dispatchSessionPlanAction(decision.sessionID, decision.action);
+    if (!next) {
+      return { kind: 'session-action-failed', sessionID: decision.sessionID, action: decision.action };
+    }
+  }
+  return decision;
+};
+
+export const applyDraftPlanStartAfterMaterialize = async (input: {
+  sessionID: string;
+  draftPlanSelected?: boolean;
+  currentStatus?: SessionPlanStatus | null;
+  startPlan: (sessionID: string) => Promise<SessionPlan | null>;
+}): Promise<'skipped' | 'started'> => {
+  if (!shouldStartPlanAfterDraftMaterialize(input.draftPlanSelected, input.currentStatus)) {
+    return 'skipped';
+  }
+  const next = await input.startPlan(input.sessionID);
+  if (!next) throw new Error('Failed to start plan');
+  return 'started';
 };
 
 export const planBuildAvailable = (status: SessionPlanStatus | null | undefined): boolean => (
