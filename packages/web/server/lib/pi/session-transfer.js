@@ -1049,7 +1049,7 @@ export const readPiCodingAgentVersion = () => {
 const PICHAMBER_REPO_HREF = 'https://github.com/birdmichael/pichamber';
 const EXPORT_THEME_KEY = 'pichamber-export-theme';
 
-const PICHAMBER_MARK_SVG = `<svg class="pichamber-mark" viewBox="0 0 100 100" width="16" height="16" fill="none" aria-hidden="true"><path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)" fill="currentColor"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></g></svg>`;
+const PICHAMBER_MARK_SVG = `<svg class="pichamber-mark" viewBox="0 0 100 100" width="24" height="24" fill="none" aria-hidden="true"><path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.068)" fill="currentColor"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></g></svg>`;
 
 const PI_PIXEL_MARK_SVG = `<svg class="pi-mark" viewBox="-235 -235 470 470" width="14" height="14" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M-234.71 -234.71 H117.36 V0 H0 V117.36 H-117.35 V234.72 H-234.71 Z M-117.35 -117.35 V0 H0 V-117.35 Z"/><path d="M117.36 0 H234.72 V234.72 H117.36 Z"/></svg>`;
 
@@ -1463,13 +1463,13 @@ body {
 }
 .pichamber-mark {
   display: block;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   color: var(--text-strong);
 }
-.pichamber-mark path { stroke-width: 2.75; }
-.pichamber-mark path[fill-opacity="0.2"] { fill-opacity: 0.5; }
-.pichamber-mark path[fill-opacity="0.35"] { fill-opacity: 0.72; }
+.pichamber-mark path { stroke-width: 3; }
+.pichamber-mark path[fill-opacity="0.2"] { fill-opacity: 0.58; }
+.pichamber-mark path[fill-opacity="0.35"] { fill-opacity: 0.82; }
 .pi-mark { display: block; }
 .topbar-right { display: flex; align-items: center; gap: 4px; }
 .topbar-right a, .theme-toggle, .copy {
@@ -1540,9 +1540,11 @@ html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display
   color: var(--text-faint);
 }
 .thinking {
+  display: block;
   margin: 0.75rem 0 1.15rem;
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--bubble);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-thinking);
   font-size: 13px;
@@ -1623,20 +1625,32 @@ html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display
   z-index: 3;
 }
 .ticks a {
+  position: relative;
   display: block;
   flex: none;
-  width: 3px;
+  width: 16px;
+  height: 22px;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+.ticks a::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  width: 4px;
   height: 16px;
   border-radius: 2px;
   background: var(--text-muted);
-  opacity: 0.7;
-  text-indent: -999px;
-  overflow: hidden;
 }
-.ticks a.current {
-  width: 4px;
+.ticks a.current::before {
+  left: 5px;
+  top: 0;
+  width: 6px;
   height: 22px;
-  opacity: 1;
   background: var(--text-strong);
 }
 .page-footer { margin-top: 4rem; }
