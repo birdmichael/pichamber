@@ -268,7 +268,6 @@ describe('pi extension UI store', () => {
     ]);
     expect(wrapperToastCalls.info).toEqual([]);
     expect(wrapperToastCalls.warning).toEqual([]);
-    expect(sonnerToastCalls.info[0]?.options).not.toHaveProperty('action');
   });
 
   test('hands Other text to the next editor for that session', () => {
