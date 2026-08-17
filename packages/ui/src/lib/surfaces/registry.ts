@@ -26,8 +26,11 @@ export type ContextSurfaceDescriptor = {
    * 'has-content' surfaces are content-driven: they need an existing tab of
    * their mode (a split session, a diff to show) and stay hidden on the rail
    * until one exists.
+   * 'git-repo' surfaces appear on a git directory so they can be opened empty
+   * (create a PR). They stay hidden on non-git / unknown directories unless a
+   * tab of their mode already exists.
    */
-  availability: 'always' | 'has-content';
+  availability: 'always' | 'has-content' | 'git-repo';
   /**
    * Extra tab modes that also reveal this `has-content` surface. Walkthrough
    * is the reading surface for a diff, so a diff tab is enough to offer it.
@@ -68,7 +71,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'pr',
     icon: 'github',
     labelKey: 'contextPanel.mode.pr',
-    availability: 'has-content',
+    availability: 'git-repo',
   },
   {
     id: 'diff',
@@ -194,6 +197,8 @@ type VisibleRailSurfacesOptions = {
   isVSCode: boolean;
   screenWidth: number;
   tabs: readonly { mode: ContextPanelMode }[];
+  /** True only after the directory is known to be a git repo. Unknown is false. */
+  isGitRepo: boolean;
 };
 
 /**
@@ -203,6 +208,8 @@ type VisibleRailSurfacesOptions = {
  *
  * Content-driven surfaces are hidden (not disabled) until content exists; an
  * existing tab keeps them visible even if the content source went away.
+ * Git-repo surfaces appear once the directory is a git repo, and an existing
+ * tab keeps them visible if that check later fails or is unknown.
  */
 export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOptions): ContextSurfaceDescriptor[] => {
   return sortContextSurfaces(options.railOrder).filter((surface) => {
@@ -221,6 +228,9 @@ export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOption
     // on the desktop.
     if (surface.id === 'browser' && options.isVSCode) {
       return false;
+    }
+    if (surface.availability === 'git-repo') {
+      return options.isGitRepo || options.tabs.some((tab) => tab.mode === surface.mode);
     }
     if (surface.availability === 'has-content') {
       return options.tabs.some((tab) => (

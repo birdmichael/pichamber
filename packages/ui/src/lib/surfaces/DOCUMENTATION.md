@@ -12,17 +12,20 @@ of those ids onto workspace tabs; see Mobile tabs.
 
 - A surface maps 1:1 to a `ContextPanelMode` tab mode in `useUIStore`.
 - `availability: 'always'` surfaces are always present on the rail.
-  `availability: 'has-content'` surfaces (chat, pull request, walkthrough)
-  are hidden from the rail until a tab of their mode exists, and stay
-  visible for as long as one does — they must not disappear while in use.
-  Walkthrough also appears when a diff tab exists (`revealedByModes`), so a
-  blank draft does not advertise an empty review surface. Pull request and
-  walkthrough still open through `openContextSurface` from Git, a real PR,
-  a diff, or an explicit generate action. Desktop Git opens the create-PR
-  form from the Git header (visible control and repository-views overflow)
-  when the session is a git repo and no PR exists yet. The numbered chip
-  still opens an existing PR. Do not flip `pr` to `always`: a blank or
-  non-git session must not grow an empty PR tab.
+  `availability: 'has-content'` surfaces (chat, walkthrough) are hidden
+  from the rail until a tab of their mode exists, and stay visible for as
+  long as one does — they must not disappear while in use. Walkthrough also
+  appears when a diff tab exists (`revealedByModes`), so a blank draft does
+  not advertise an empty review surface. `availability: 'git-repo'`
+  (pull request) appears on a git directory so Desktop can open or create a
+  PR from the rail without opening Git first. Pass `isGitRepo` only when
+  the directory is known to be a git repo; unknown and non-git stay hidden
+  unless a `pr` tab already exists. Do not flip `pr` to `always`: a blank
+  or non-git session must not grow an empty PR tab. Desktop Git still
+  opens the create-PR form from the Git header when the session is a git
+  repo and no PR exists yet. The numbered chip still opens an existing PR.
+  Walkthrough still opens through `openContextSurface` from a real PR, a
+  diff, or an explicit generate action.
 - `defaultWidthFraction` is the panel width as a fraction of the content area,
   used until the user manually resizes that surface (manual widths are stored
   per mode in `useUIStore.contextPanelByDirectory[dir].widthByMode`).
@@ -37,16 +40,18 @@ of those ids onto workspace tabs; see Mobile tabs.
   `planModeExperimentalEnabled` must not gate it. On OpenCode it stays the
   experimental plan-mode flag. It also drops the walkthrough on VS Code and
   below `WALKTHROUGH_MIN_WIDTH`, and hides `has-content` surfaces until a tab
-  of their mode (or a `revealedByModes` mode) exists. Both consumers use it so
-  the digit shown on a rail badge always maps to the same surface the shortcut
-  opens.
+  of their mode (or a `revealedByModes` mode) exists, and hides `git-repo`
+  surfaces unless `isGitRepo` is true or a tab of that mode already exists.
+  Both consumers use it so the digit shown on a rail badge always maps to the
+  same surface the shortcut opens.
 
 ## Adding a surface
 
 1. Add a `ContextPanelMode` value in `useUIStore` (type union plus the
    sanitizer whitelist in `sanitizeContextPanelTabs`).
 2. Register a descriptor here (icon, label key, availability, optional
-   `revealedByModes`, width fraction).
+   `revealedByModes`, width fraction). `git-repo` callers must pass
+   `isGitRepo` into `getVisibleContextRailSurfaces`.
 3. Render the mode in `ContextPanel.tsx` (content dispatch, label, icon).
 4. Add label/hint i18n keys to every locale dictionary.
 
