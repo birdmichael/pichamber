@@ -38,10 +38,10 @@ import type { Session } from '@opencode-ai/sdk/v2';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
-import { SETTINGS_PAGE_METADATA, type SettingsRuntimeContext } from '@/lib/settings/metadata';
+import { isCapacitorApp } from '@/lib/platform';
+import { SETTINGS_PAGE_METADATA, getSettingsNavIcon, isSettingsPageAvailable, type SettingsRuntimeContext } from '@/lib/settings/metadata';
 
 const EMPTY_PINNED_SESSION_IDS = new Set<string>();
-import { getSettingsNavIcon } from '@/lib/settings/metadata';
 import { Icon } from "@/components/icon/Icon";
 import { McpIcon } from '@/components/icons/McpIcon';
 import { scoreByFuzzyQuery } from '@/lib/search/fuzzySearch';
@@ -289,13 +289,14 @@ export const CommandPalette: React.FC = () => {
       isMobile,
       isPiKernel,
       isMcpFeaturePluginActive,
+      isCapacitor: isCapacitorApp(),
     };
   }, [isMobile, isMcpFeaturePluginActive, isPiKernel]);
 
   const settingsEntries = React.useMemo<CommandEntry[]>(() => {
     return SETTINGS_PAGE_METADATA
       .filter((p) => p.slug !== 'home')
-      .filter((p) => (p.isAvailable ? p.isAvailable(settingsRuntimeCtx) : true))
+      .filter((p) => isSettingsPageAvailable(p, settingsRuntimeCtx))
       .map((page) => {
         const iconName = getSettingsNavIcon(page.slug) ?? 'settings-3';
         const keywords = (page.keywords ?? []).join(' ');

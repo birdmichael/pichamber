@@ -70,23 +70,6 @@ import {
   useIpadSidebarResize,
 } from './ipadSidebarResize';
 
-const MOBILE_SETTINGS_PAGES = [
-  'general',
-  'appearance',
-  'chat',
-  'notifications',
-  'sessions',
-  'git',
-  'magic-prompts',
-  'behavior',
-  'mcp',
-  'providers',
-  'usage',
-  'voice',
-  'integrations',
-  'about',
-] as const;
-
 type MobileAppProps = {
   apis: RuntimeAPIs;
 };
@@ -580,11 +563,6 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
                 forceMobile
                 isWindowed
                 initialMobileStage={settingsInitialMobileStage}
-                // About exists for server updates — meaningful in a browser
-                // (hosted mobile), not in the Capacitor shell (store updates).
-                visiblePageSlugs={MOBILE_SETTINGS_PAGES.filter(
-                  (page) => !(showCapacitorOnlyFeatures && page === 'about'),
-                )}
                 onClose={closeSurface}
               />
             </ErrorBoundary>

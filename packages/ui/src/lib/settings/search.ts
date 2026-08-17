@@ -1,7 +1,7 @@
 import type { I18nKey } from '@/lib/i18n/store';
 import { isSessionGoalVisibleOnPiKernel } from '@/lib/usePiKernel';
 import type { SettingsPageSlug, SettingsRuntimeContext } from './metadata';
-import { getSettingsPageMeta } from './metadata';
+import { getSettingsPageMeta, isSettingsPageAvailable } from './metadata';
 
 interface SettingsSearchItem {
   id: string;
@@ -1117,7 +1117,7 @@ export function buildSettingsSearchResults({
     }
 
     const pageMeta = getSettingsPageMeta(item.page);
-    if (!pageMeta || (pageMeta.isAvailable && !pageMeta.isAvailable(runtimeCtx)) || (item.isAvailable && !item.isAvailable(runtimeCtx))) {
+    if (!pageMeta || !isSettingsPageAvailable(pageMeta, runtimeCtx) || (item.isAvailable && !item.isAvailable(runtimeCtx))) {
       return [];
     }
 

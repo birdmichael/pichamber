@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile/Settings:** on Pi, phone Settings now includes Feature Plugins, Extensions, Skills, Skills Catalog, Commands, Snippets, Agents, and Projects, matching Desktop. Usage and leftover Plugins stay hidden.
 - **Chat:** on Pi, a finished reply now leaves Composing, and Stop aborts a live run or clears a stuck session instead of staying armed after the turn is already done.
 - **Chat:** on Pi, `/run` is a real command when Subagents is installed. Bare `/run` explains that it needs an agent and a task; `/run scout …` starts a Work Status child or shows an error instead of a dead chat bubble. Clicking the row still opens a writable child, never the parent.
 - **Chat:** on Pi, toggling Plan now keeps View Plan and Discard available even when the model never wrote plan markdown. The panel shows “No plan yet”; Build stays disabled until a plan exists.

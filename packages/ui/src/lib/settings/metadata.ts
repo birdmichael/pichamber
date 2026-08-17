@@ -43,6 +43,8 @@ export interface SettingsRuntimeContext {
   isMobile: boolean;
   isPiKernel?: boolean;
   isMcpFeaturePluginActive?: boolean;
+  /** Native Capacitor shell (iOS/Android app), not hosted `mobile.html`. */
+  isCapacitor?: boolean;
 }
 
 export function isMcpSettingsAvailable(ctx: Pick<SettingsRuntimeContext, 'isPiKernel' | 'isMcpFeaturePluginActive'>): boolean {
@@ -229,7 +231,9 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
   { slug: 'notifications', title: 'Notifications', group: 'general', kind: 'single', keywords: ['alerts', 'native', 'summary', 'summarization'], },
   { slug: 'voice', title: 'Voice', group: 'general', kind: 'single', keywords: ['tts', 'speech', 'voice'], isAvailable: (ctx) => !ctx.isVSCode },
   { slug: 'tunnel', title: 'External Tunnel', group: 'projects', kind: 'single', keywords: ['tunnel', 'external', 'cloudflare', 'qr', 'remote', 'mobile', 'share'], isAvailable: (ctx) => !ctx.isVSCode },
-  { slug: 'about', title: 'About', group: 'general', kind: 'single', keywords: ['about', 'version', 'updates', 'release', 'changelog'], isAvailable: (ctx) => ctx.isMobile && !ctx.isVSCode },
+  // Hosted mobile keeps an About nav page for server updates. Desktop uses the
+  // about dialog. Capacitor uses store updates, not this page.
+  { slug: 'about', title: 'About', group: 'general', kind: 'single', keywords: ['about', 'version', 'updates', 'release', 'changelog'], isAvailable: (ctx) => ctx.isMobile && !ctx.isVSCode && !ctx.isCapacitor },
   { slug: 'integrations', title: 'Integrations', group: 'general', kind: 'single', keywords: ['integration', 'plugin', 'provider', 'oauth', 'claude', 'cursor', 'command code', 'connect', 'discord', 'telegram', 'messenger'] },
 ] as const;
 
@@ -248,6 +252,52 @@ const LEGACY_SIDEBAR_SECTION_TO_SETTINGS_SLUG: Record<SidebarSection, SettingsPa
 export function getSettingsPageMeta(slug: string): SettingsPageMeta | null {
   const normalized = slug.trim().toLowerCase();
   return (SETTINGS_PAGE_METADATA as readonly SettingsPageMeta[]).find((page) => page.slug === normalized) ?? null;
+}
+
+/**
+ * Settings pages that stay in `SETTINGS_PAGE_METADATA` but are unsupported on
+ * phone. Desktop/web keep them via each page's `isAvailable`. Named here so
+ * they are an explicit runtime gap, not a drifting mobile allowlist.
+ *
+ * - `shortcuts` — SettingsView already drops this when `isMobile`; iPad
+ *   hardware keyboard can stay a later pass.
+ * - `remote-instances` — Desktop SSH host. Mobile connects to an existing
+ *   Pichamber server; it does not import or host remotes.
+ * - `tunnel` — Desktop tunnel host. Mobile is a consumer of a Desktop-hosted
+ *   tunnel, not the host surface.
+ */
+export const MOBILE_UNSUPPORTED_SETTINGS_PAGES = [
+  'shortcuts',
+  'remote-instances',
+  'tunnel',
+] as const satisfies readonly SettingsPageSlug[];
+
+const MOBILE_UNSUPPORTED_SETTINGS_PAGE_SET: ReadonlySet<SettingsPageSlug> = new Set(
+  MOBILE_UNSUPPORTED_SETTINGS_PAGES,
+);
+
+export function isSettingsPageAvailable(
+  page: SettingsPageMeta,
+  ctx: SettingsRuntimeContext,
+): boolean {
+  if (page.isAvailable && !page.isAvailable(ctx)) {
+    return false;
+  }
+  if (ctx.isVSCode && page.slug === 'projects') {
+    return false;
+  }
+  if (ctx.isMobile && MOBILE_UNSUPPORTED_SETTINGS_PAGE_SET.has(page.slug)) {
+    return false;
+  }
+  return true;
+}
+
+/** Nav/search slugs for a runtime. Excludes `home` (search landing, not a page). */
+export function listVisibleSettingsPageSlugs(ctx: SettingsRuntimeContext): SettingsPageSlug[] {
+  return SETTINGS_PAGE_METADATA
+    .filter((page) => page.slug !== 'home')
+    .filter((page) => isSettingsPageAvailable(page, ctx))
+    .map((page) => page.slug);
 }
 
 export function resolveSettingsSlug(value: string | null | undefined): SettingsPageSlug {
