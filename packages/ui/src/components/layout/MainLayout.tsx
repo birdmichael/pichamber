@@ -346,7 +346,7 @@ export const MainLayout: React.FC = () => {
                             isSettingsDialogOpen && 'hidden'
                         )}
                     >
-                        <main className="w-full h-full overflow-hidden bg-background relative" data-page-scroll-lock="true">
+                        <main className="relative flex h-full w-full min-h-0 flex-col overflow-hidden bg-background" data-page-scroll-lock="true">
                             <div className={cn('absolute inset-0', (!isChatActive || isSurfacePageOpen) && 'invisible')}>
                                 <ErrorBoundary><ChatView active={isChatActive && !isSettingsDialogOpen && !isSurfacePageOpen} /></ErrorBoundary>
                             </div>
@@ -442,7 +442,7 @@ export const MainLayout: React.FC = () => {
                                             work-status panel measures this rather than the chat,
                                             which the context panel animates. */}
                                         <div className="relative flex flex-1 min-h-0 min-w-0 overflow-hidden" data-page-scroll-lock="true" data-chat-area="true">
-                                            <main className="flex-1 overflow-hidden bg-background relative" data-page-scroll-lock="true">
+                                            <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background" data-page-scroll-lock="true">
                                                 <div className={cn('absolute inset-0', (!isChatActive || isSurfacePageOpen) && 'invisible')}>
                                                     <ErrorBoundary><ChatView active={isChatActive && !isSettingsDialogOpen && !isSurfacePageOpen} /></ErrorBoundary>
                                                 </div>
