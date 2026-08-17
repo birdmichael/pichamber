@@ -51,7 +51,7 @@ mock.module('@/lib/configSync', () => ({
   subscribeToConfigChanges: mock(() => () => undefined),
 }));
 
-const { useCommandsStore } = await import('./useCommandsStore');
+const { invalidateCommandsLoadCache, useCommandsStore } = await import('./useCommandsStore');
 
 describe('useCommandsStore', () => {
   beforeEach(() => {
@@ -63,6 +63,7 @@ describe('useCommandsStore', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
+    invalidateCommandsLoadCache();
     useCommandsStore.setState({
       selectedCommandName: null,
       commands: [],
@@ -89,5 +90,62 @@ describe('useCommandsStore', () => {
     expect(listCommandsWithDetailsCalls).toBe(3);
     expect(useCommandsStore.getState().commands).toEqual(previousCommands);
     expect(useCommandsStore.getState().isLoading).toBe(false);
+  });
+
+  test('loadCommands keeps template from the config detail payload when the list omits it', async () => {
+    listCommandsWithDetailsImpl = async () => [{
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      source: 'prompt',
+      agent: 'pi',
+    }];
+    runtimeFetchImpl = async () => new Response(JSON.stringify({
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      scope: 'user',
+      template: 'Help me write a Goal.\n\n$ARGUMENTS',
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const result = await useCommandsStore.getState().loadCommands();
+
+    expect(result).toBe(true);
+    expect(useCommandsStore.getState().commands).toEqual([{
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      source: 'prompt',
+      agent: 'pi',
+      scope: 'user',
+      template: 'Help me write a Goal.\n\n$ARGUMENTS',
+    }]);
+  });
+
+  test('loadCommands keeps an empty builtin template from the config detail payload', async () => {
+    listCommandsWithDetailsImpl = async () => [{
+      name: 'compact',
+      description: 'Compact session context',
+      source: 'builtin',
+      agent: 'pi',
+    }];
+    runtimeFetchImpl = async () => new Response(JSON.stringify({
+      name: 'compact',
+      description: 'Compact session context',
+      source: 'builtin',
+      template: '',
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const result = await useCommandsStore.getState().loadCommands();
+
+    expect(result).toBe(true);
+    expect(useCommandsStore.getState().commands).toEqual([{
+      name: 'compact',
+      description: 'Compact session context',
+      source: 'builtin',
+      agent: 'pi',
+      template: '',
+    }]);
   });
 });

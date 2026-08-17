@@ -41,6 +41,12 @@ Examples:
 
 These stores coordinate visible app state, navigation, selected tabs, dialogs, and lightweight feature flags.
 
+`useCommandsStore` loads Settings → Commands from the command list plus
+`GET /api/config/commands/:name`. The detail payload is authoritative for
+`scope` and `template`. A list item that omits `template` must not clear a
+body the detail response or a previous successful load already has. List
+fetch failure keeps the previous command list.
+
 `useFeaturePluginsStore` caches `GET /api/pi/feature-plugins`. Fetch failure is not treated as an authoritative empty slot list: a prior successful payload is kept, and MCP Settings / Work Status stay hidden until a successful `installed && enabled` payload arrives. Leftover adapter config files are not a visibility signal.
 
 Context-panel session chats mount only the active chat iframe. After installing
