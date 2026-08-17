@@ -37,7 +37,12 @@ export const sessionPlanHasMarkdown = (plan: SessionPlan | null | undefined): bo
     && plan.planMarkdown.trim().length > 0;
 };
 
-/** View Plan / Discard while Plan is on, even before the model writes markdown. */
+/** Confirm + /plan exit only when chrome has a ready, saved, or implementing document. */
+export const sessionPlanCanDiscard = (plan: SessionPlan | null | undefined): boolean => (
+  sessionPlanHasMarkdown(plan)
+);
+
+/** View Plan while Plan is on, even before the model writes markdown. */
 export const sessionPlanViewAvailable = (plan: SessionPlan | null | undefined): boolean => {
   if (!plan) return false;
   return plan.status === 'active'

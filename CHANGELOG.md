@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: on Pi, Plan Discard stays disabled while the panel still says “No plan yet”. The confirm dialog only appears when a ready or saved plan exists.
 - **Mobile:** Git now opens the same Pull Request view as Desktop. File diffs stay inline on phones and use the Desktop Diff view on tablet-width screens (768px and up), where Walkthrough is also available. The Electron Browser session is not on mobile.
 - **Mobile:** the header context ring now opens Work Status — session, branch, context %, MCP, and Subagents, matching Desktop. MCP and Subagents appear when those Feature Plugins are on. Tap a live child to open that chat in place.
 - **Mobile:** the sessions sheet now reaches Scheduled Tasks, Multi-run, Archive with restore, and Pi Refresh — the same Pi actions and wording as Desktop. Swipe-archive remains; restored chats return to the active list. Refresh is disabled while a session is composing, streaming, or compacting.
@@ -18,7 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Mobile/Settings:** on Pi, phone Settings now includes Feature Plugins, Extensions, Skills, Skills Catalog, Commands, Snippets, Agents, and Projects, matching Desktop. Usage and leftover Plugins stay hidden.
 - **Chat:** on Pi, a finished reply now leaves Composing, and Stop aborts a live run or clears a stuck session instead of staying armed after the turn is already done.
 - **Chat:** on Pi, `/run` is a real command when Subagents is installed. Bare `/run` explains that it needs an agent and a task; `/run scout …` starts a Work Status child or shows an error instead of a dead chat bubble. Clicking the row still opens a writable child, never the parent.
-- **Chat:** on Pi, toggling Plan now keeps View Plan and Discard available even when the model never wrote plan markdown. The panel shows “No plan yet”; Build stays disabled until a plan exists.
+- **Chat:** on Pi, toggling Plan now keeps View Plan available even when the model never wrote plan markdown. The panel shows “No plan yet”; Discard does not stay available there, and Build stays disabled until a plan exists.
 - Chat/Desktop: on Pi, Agent and Plan in the composer footer are one dropdown that shows the current side, not two chips.
 - Chat/Desktop: on Pi, the composer footer no longer shows 树 / Tree. Open the existing session timeline from a control under the prompt-navigator ticks (same dialog as /timeline).
 - Chat/Desktop: on Pi, the composer footer no longer shows a context-usage percent. Use the header context ring to inspect tokens vs the model window.

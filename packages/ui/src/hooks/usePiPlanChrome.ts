@@ -7,6 +7,7 @@ import {
   canShowPiPlanToggle,
   isFooterPlanSelected,
   planBuildAvailable,
+  sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
 } from '@/sync/pi-session-plan';
@@ -46,6 +47,7 @@ export function usePiPlanChrome(sessionID?: string | null) {
     footerPlanSelected: available && isFooterPlanSelected(plan?.status),
     showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
     showViewPlan: available && sessionPlanViewAvailable(plan),
+    canDiscard: available && sessionPlanCanDiscard(plan),
     implementing: plan?.status === 'implementing',
   };
 }

@@ -85,8 +85,9 @@ Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.
 `planModeExperimentalEnabled` does not gate this on Pi.
-View Plan / Discard stay visible while status is `active` even if
-`planMarkdown` is still empty (empty "no plan yet" state). Build still
+View Plan stays visible while status is `active` even if
+`planMarkdown` is still empty (empty "no plan yet" state). Discard
+requires ready/saved/implementing markdown. Build still
 requires ready/saved markdown.
 
 ## Slash command dispatch

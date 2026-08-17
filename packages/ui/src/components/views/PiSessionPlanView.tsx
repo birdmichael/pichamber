@@ -50,8 +50,10 @@ export function PiSessionPlanView() {
     }
   }, [effectiveDirectory]);
 
+  const canDiscard = Boolean(chrome.sessionID) && chrome.canDiscard;
+
   const discard = async () => {
-    if (!chrome.sessionID) return;
+    if (!canDiscard || !chrome.sessionID) return;
     setDiscarding(true);
     try {
       const next = await dispatchSessionPlanAction(chrome.sessionID, 'exit');
@@ -138,32 +140,37 @@ export function PiSessionPlanView() {
           type="button"
           variant="outline"
           size="sm"
-          disabled={chrome.busy || discarding || !chrome.sessionID}
-          onClick={() => setDiscardOpen(true)}
+          disabled={chrome.busy || discarding || !canDiscard}
+          onClick={() => {
+            if (!canDiscard) return;
+            setDiscardOpen(true);
+          }}
         >
           {t('chat.piPlan.discard')}
         </Button>
         <PiPlanBuildRow />
       </div>
 
-      <Dialog open={discardOpen} onOpenChange={(open) => { if (!discarding) setDiscardOpen(open); }}>
-        <DialogContent showCloseButton={false} className="max-w-sm gap-5" aria-label={t('chat.piPlan.discardConfirmAria')}>
-          <DialogHeader>
-            <DialogTitle>{t('chat.piPlan.discardConfirmTitle')}</DialogTitle>
-            <DialogDescription>{t('chat.piPlan.discardConfirmDescription')}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="w-full sm:justify-end">
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={discarding} onClick={() => setDiscardOpen(false)}>
-                {t('chat.piPlan.discardCancel')}
-              </Button>
-              <Button type="button" variant="destructive" size="sm" disabled={discarding} onClick={() => void discard()}>
-                {t('chat.piPlan.discardConfirm')}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {canDiscard ? (
+        <Dialog open={discardOpen} onOpenChange={(open) => { if (!discarding) setDiscardOpen(open); }}>
+          <DialogContent showCloseButton={false} className="max-w-sm gap-5" aria-label={t('chat.piPlan.discardConfirmAria')}>
+            <DialogHeader>
+              <DialogTitle>{t('chat.piPlan.discardConfirmTitle')}</DialogTitle>
+              <DialogDescription>{t('chat.piPlan.discardConfirmDescription')}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="w-full sm:justify-end">
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={discarding} onClick={() => setDiscardOpen(false)}>
+                  {t('chat.piPlan.discardCancel')}
+                </Button>
+                <Button type="button" variant="destructive" size="sm" disabled={discarding} onClick={() => void discard()}>
+                  {t('chat.piPlan.discardConfirm')}
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
