@@ -142,6 +142,7 @@ export function PromptNavigatorRail({
     const emptyPreviewLabel = t('chat.timeline.noTextContent');
     const currentPromptLabel = t('chat.promptNavigator.currentPrompt');
     const loadMoreLabel = t('chat.promptNavigator.loadMore');
+    const openTimelineLabel = t('chat.promptNavigator.openTimeline');
 
     const activeIndex = React.useMemo(() => {
         if (!activeTurnId) {
@@ -700,6 +701,27 @@ export function PromptNavigatorRail({
                         </div>
                     ) : null}
                 </div>
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    className={cn(
+                        // Sibling of the tick listbox, not inside it: the gutter
+                        // maps pointer Y to the nearest tick, so a control in
+                        // that hit zone would steal the last ticks. size-5
+                        // stays tappable when the gutter shrinks to 12px.
+                        '-mr-px mt-1.5 flex size-5 shrink-0 items-center justify-center rounded-full',
+                        'text-[var(--surface-mutedForeground)] transition-colors',
+                        'hover:bg-[var(--interactive-hover)]/60 hover:text-[var(--surface-foreground)]',
+                    )}
+                    aria-label={openTimelineLabel}
+                    title={openTimelineLabel}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        useUIStore.getState().setTimelineDialogOpen(true);
+                    }}
+                >
+                    <Icon name="history" className="size-3.5" />
+                </button>
             </div>
         </nav>
     );

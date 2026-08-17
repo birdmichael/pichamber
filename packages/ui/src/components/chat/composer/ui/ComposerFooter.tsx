@@ -28,7 +28,6 @@ import { ComposerAttachmentControls } from './ComposerAttachmentControls';
 import { FocusModeButton } from './FocusModeButton';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
 import { ContextUsageChip } from './ContextUsageChip';
-import { SessionTreeDialog } from '@/components/chat/SessionTreeDialog';
 
 const MemoModelControls = React.memo(ModelControls);
 const MemoComposerDictation = React.memo(ComposerDictation);
@@ -112,7 +111,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationInsertAndSend,
         onDictationContentHeightChange,
     } = props;
-    const [treeOpen, setTreeOpen] = React.useState(false);
 
     return (
         <div
@@ -269,17 +267,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
                     </div>
                     <div className={cn('flex items-center flex-1 justify-end', footerGapClass, 'md:gap-x-3')}>
                         {isPiKernel ? <ContextUsageChip sessionId={currentSessionId} /> : null}
-                        {isPiKernel && currentSessionId ? (
-                          <button
-                            type="button"
-                            className={footerIconButtonClass}
-                            onClick={() => setTreeOpen(true)}
-                            title={t('chat.sessionTree.open')}
-                            aria-label={t('chat.sessionTree.open')}
-                          >
-                            {t('chat.sessionTree.open')}
-                          </button>
-                        ) : null}
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
                             radius={chatInputRadius}
@@ -310,9 +297,6 @@ export function ComposerFooter(props: ComposerFooterProps) {
                 </>
             )}
             </div>
-            {isPiKernel ? (
-              <SessionTreeDialog open={treeOpen} onOpenChange={setTreeOpen} sessionId={currentSessionId} />
-            ) : null}
         </div>
     );
 }
