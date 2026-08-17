@@ -3064,7 +3064,7 @@ export const createPiHost = ({
       await record.piSession.compact(typeof instructions === "string" && instructions.trim() ? instructions : undefined);
       return { compacted: true };
     },
-    exportSession(sessionID, format = 'jsonl') {
+    exportSession(sessionID, format = 'jsonl', options = {}) {
       const record = getRecord(sessionID);
       const fmt = format === 'html' ? 'html' : 'jsonl';
       const basename = sanitizeExportBasename(record.info?.title);
@@ -3073,7 +3073,7 @@ export const createPiHost = ({
           format: 'html',
           filename: `${basename}.html`,
           mime: 'text/html; charset=utf-8',
-          content: buildSessionHtml(record),
+          content: buildSessionHtml(record, options),
         };
       }
       return {

@@ -875,7 +875,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   const sendSessionExport = async (req, res) => {
     await loadSession(req);
     const format = typeof req.query?.format === 'string' ? req.query.format.toLowerCase() : (req.body?.format || 'jsonl');
-    const exported = host.exportSession(req.params.sessionID, format);
+    const locale = typeof req.query?.locale === 'string'
+      ? req.query.locale
+      : (typeof req.body?.locale === 'string' ? req.body.locale : undefined);
+    const exported = host.exportSession(req.params.sessionID, format, { locale });
     res.setHeader('Content-Type', exported.mime);
     res.setHeader('Content-Disposition', `attachment; filename="${exported.filename}"`);
     res.status(200).send(exported.content);
