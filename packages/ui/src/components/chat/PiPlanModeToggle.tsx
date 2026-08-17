@@ -13,12 +13,11 @@ import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
-import { PLAN_MODE_ENABLED_NOTIFY, planToggleAction } from '@/sync/pi-session-plan';
+import { PLAN_MODE_ENABLED_NOTIFY, applyPlanToggleSelect, decidePlanToggleSelect } from '@/sync/pi-session-plan';
 import { dispatchSessionPlanAction } from '@/sync/pi-session-plan-store';
-import { materializeOpenDraftSession } from '@/sync/session-ui-store';
+import { useSessionUIStore } from '@/sync/session-ui-store';
 
 const PLAN_SIDES = [
   { side: 'agent' as const, labelKey: 'chat.piPlan.agent' },
@@ -28,10 +27,6 @@ const PLAN_SIDES = [
 export function PiPlanModeToggle({ className }: { className?: string }) {
   const { t } = useI18n();
   const chrome = usePiPlanChrome();
-  const currentProviderId = useConfigStore((state) => state.currentProviderId);
-  const currentModelId = useConfigStore((state) => state.currentModelId);
-  const currentAgentName = useConfigStore((state) => state.currentAgentName);
-  const currentVariant = useConfigStore((state) => state.currentVariant);
   const { isMobile: deviceIsMobile } = useDeviceInfo();
   const uiIsMobile = useUIStore((state) => state.isMobile);
   const isMobile = deviceIsMobile || uiIsMobile;
@@ -44,33 +39,36 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
   const triggerLabel = selectedSide === 'plan' ? t('chat.piPlan.plan') : t('chat.piPlan.agent');
 
   const select = async (side: 'agent' | 'plan') => {
-    // Plan side is `/plan start` (notify only). Bare `/plan` stays the
-    // composer/slash launch menu and still queues a ctx.ui select card.
-    const action = planToggleAction(chrome.status, side);
-    if (!action) return;
+    // Draft Plan is local composer intent. /plan start waits for send.
+    // An open session still uses /plan start (notify only). Bare /plan stays
+    // the composer/slash launch menu.
+    const decision = decidePlanToggleSelect({
+      sessionID: chrome.sessionID,
+      draftOpen: chrome.draftOpen,
+      status: chrome.status,
+      side,
+    });
+    if (decision.kind === 'noop') return;
+    if (decision.kind === 'draft-intent') {
+      useSessionUIStore.getState().setDraftPlanSelected(decision.planSelected);
+      return;
+    }
+
     setPending(true);
     try {
-      let sessionID = chrome.sessionID;
-      if (!sessionID && chrome.draftOpen) {
-        if (!currentProviderId || !currentModelId) {
-          toast.error(t('chat.piPlan.actionFailed'));
-          return;
-        }
-        const created = await materializeOpenDraftSession({
-          providerID: currentProviderId,
-          modelID: currentModelId,
-          agent: currentAgentName,
-          variant: currentVariant,
-        });
-        sessionID = created?.sessionId ?? null;
-      }
-      if (!sessionID) return;
-      const next = await dispatchSessionPlanAction(sessionID, action);
-      if (!next) {
+      const result = await applyPlanToggleSelect({
+        sessionID: chrome.sessionID,
+        draftOpen: chrome.draftOpen,
+        status: chrome.status,
+        side,
+        setDraftPlanSelected: useSessionUIStore.getState().setDraftPlanSelected,
+        dispatchSessionPlanAction,
+      });
+      if (result.kind === 'session-action-failed') {
         toast.error(t('chat.piPlan.actionFailed'));
         return;
       }
-      if (action === 'start') {
+      if (result.kind === 'session-action' && result.action === 'start') {
         presentPiExtensionUiNotify({
           message: PLAN_MODE_ENABLED_NOTIFY,
           level: 'info',

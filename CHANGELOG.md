@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: on Pi, choosing Plan on a new empty session no longer creates a chat. The session is created when you send, the same as Agent.
 - Chat: on Pi, a new session reply now shows the model that will run or just ran — the same provider/model as the composer chip — instead of leftover Pi / `pi / pi` on the assistant header and Context sheet. Cost stays whatever Pi reported.
 - Git: Desktop Git can open the create-pull-request form when the branch has no GitHub PR yet. The numbered PR chip still opens an existing PR.
 - Desktop: opening Plan keeps the chat and composer visible. Plan stays a right-hand side panel instead of covering the window.

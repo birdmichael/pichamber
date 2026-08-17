@@ -87,6 +87,7 @@ import { getRuntimeKey } from "@/lib/runtime-switch"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
 import { persistWorktreeTopology, readPersistedWorktreeTopology } from "./worktree-topology-cache"
 import { rememberRuntimeLiveStatus } from "./runtime-live-memory"
+import { applyDraftPlanStartAfterMaterialize } from "./pi-session-plan"
 import { usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
 
 export type { AttachedFile }
@@ -275,6 +276,8 @@ export type NewSessionDraftState = {
   selectedProjectId?: string | null
   directoryOverride: string | null
   permissionAutoAcceptEnabled?: boolean
+  /** Local Agent/Plan intent. Must not mint a session until send. */
+  planSelected?: boolean
   pendingWorktreeRequestId?: string | null
   bootstrapPendingDirectory?: string | null
   preserveDirectoryOverride?: boolean
@@ -332,6 +335,7 @@ export type SessionUIState = {
   setNewSessionDraftTarget: (target: { projectId?: string | null; selectedProjectId?: string | null; directoryOverride?: string | null }, options?: { force?: boolean }) => void
   setDraftPreserveDirectoryOverride: (value: boolean) => void
   setDraftPermissionAutoAcceptEnabled: (enabled: boolean) => void
+  setDraftPlanSelected: (selected: boolean) => void
   acknowledgeSessionAbort: (sessionId: string) => void
   clearAbortPrompt: () => void
   armAbortPrompt: (durationMs?: number) => number | null
@@ -999,6 +1003,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       && currentDraft.syntheticParts === undefined
       && currentDraft.targetFolderId === undefined
       && currentDraft.permissionAutoAcceptEnabled === undefined
+      && currentDraft.planSelected === undefined
     ) {
       return
     }
@@ -1050,6 +1055,12 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     set((s) => {
       if (!s.newSessionDraft?.open) return s
       return { newSessionDraft: { ...s.newSessionDraft, permissionAutoAcceptEnabled: enabled } }
+    }),
+
+  setDraftPlanSelected: (selected) =>
+    set((s) => {
+      if (!s.newSessionDraft?.open) return s
+      return { newSessionDraft: { ...s.newSessionDraft, planSelected: selected } }
     }),
 
   acknowledgeSessionAbort: (sessionId) =>
@@ -1315,6 +1326,14 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       }))
 
       await applyArmedGoal(createdDraftSession.sessionId, createdDraftSession.directory)
+      await applyDraftPlanStartAfterMaterialize({
+        sessionID: createdDraftSession.sessionId,
+        draftPlanSelected: draft.planSelected,
+        startPlan: async (sessionID) => {
+          const { dispatchSessionPlanAction } = await import("./pi-session-plan-store")
+          return dispatchSessionPlanAction(sessionID, "start")
+        },
+      })
       await routeMessage({
         sessionId: createdDraftSession.sessionId,
         directory: createdDraftSession.directory,
