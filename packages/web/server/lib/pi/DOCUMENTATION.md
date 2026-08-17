@@ -42,7 +42,7 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
 - Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
 - `GET /api/pi/ui?session=` — pending prompts. Opening a session hydrates this list into the transcript; fetch failure must not clear local cards. A session with no messages still shows a pending select card (do not replace it with the empty-chat welcome).
-- `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a toast, not a question card. The settled card title may still say "Status: Off".
+- `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a short auto-dismiss toast, not a question card or OK confirm. The settled card title may still say "Status: Off".
 - `POST /api/pi/ui/:id/reply` `{ sessionID, value }`
 - `POST /api/pi/ui/:id/cancel` `{ sessionID }`
 
