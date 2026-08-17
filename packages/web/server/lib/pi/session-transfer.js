@@ -1457,10 +1457,20 @@ body {
 }
 .brand {
   display: inline-flex;
+  align-items: center;
   color: var(--text-strong);
   text-decoration: none;
 }
-.pichamber-mark, .pi-mark { display: block; }
+.pichamber-mark {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: var(--text-strong);
+}
+.pichamber-mark path { stroke-width: 2.75; }
+.pichamber-mark path[fill-opacity="0.2"] { fill-opacity: 0.5; }
+.pichamber-mark path[fill-opacity="0.35"] { fill-opacity: 0.72; }
+.pi-mark { display: block; }
 .topbar-right { display: flex; align-items: center; gap: 4px; }
 .topbar-right a, .theme-toggle, .copy {
   display: inline-flex;
@@ -1529,9 +1539,17 @@ html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display
   font-size: 11px;
   color: var(--text-faint);
 }
-.thinking { margin: 0.4rem 0 1rem; color: var(--text-thinking); font-size: 13px; }
+.thinking {
+  margin: 0.75rem 0 1.15rem;
+  padding: 10px 12px;
+  background: var(--bubble);
+  border-radius: 8px;
+  color: var(--text-thinking);
+  font-size: 13px;
+}
 .thinking p { margin: 0.45rem 0; }
 .thinking p:first-child { margin-top: 0; }
+.thinking p:last-child { margin-bottom: 0; }
 .questions, .tool { margin: 0.85rem 0; }
 .questions summary, .tool summary {
   display: flex;
@@ -1605,14 +1623,22 @@ html[data-theme="light"] .icon-moon, html[data-theme="dark"] .icon-sun { display
   z-index: 3;
 }
 .ticks a {
-  width: 14px;
-  height: 2px;
-  background: var(--text-faint);
-  opacity: 0.55;
+  display: block;
+  flex: none;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  opacity: 0.7;
   text-indent: -999px;
   overflow: hidden;
 }
-.ticks a.current { height: 3px; opacity: 1; background: var(--text-strong); }
+.ticks a.current {
+  width: 4px;
+  height: 22px;
+  opacity: 1;
+  background: var(--text-strong);
+}
 .page-footer { margin-top: 4rem; }
 .watermark {
   margin: 0;

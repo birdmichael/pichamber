@@ -224,8 +224,13 @@ describe('session-transfer', () => {
     expect(html).toContain('see this');
     expect(html).toContain('<img src="data:image/png;base64,AAAA"');
     expect(html).toContain('class="thinking"');
+    expect(html).toMatch(/\.thinking \{[\s\S]*background: var\(--bubble\)/);
+    expect(html).toMatch(/\.thinking \{[\s\S]*padding: 10px 12px/);
     expect(html).not.toContain('<details class="thinking">');
     expect(html).not.toContain('<summary>Thinking</summary>');
+    expect(html).toMatch(/\.ticks a \{[\s\S]*height: 16px/);
+    expect(html).toMatch(/\.ticks a\.current \{[\s\S]*height: 22px/);
+    expect(html).toMatch(/\.pichamber-mark \{[\s\S]*width: 22px/);
     expect(html).toContain('load skills');
     expect(html).toContain('reading');
     expect(html).toContain('<details class="tool">');
