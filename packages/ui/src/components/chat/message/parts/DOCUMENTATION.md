@@ -11,6 +11,9 @@ Use this doc when you ask an agent to change tool/header/description behavior.
   - **Static grouped tools** -> `StaticToolRow` in `ProgressiveGroup.tsx`
   - **Expandable tools** -> `ToolPart.tsx`
 - Shared tool icon mapping is centralized in `toolPresentation.tsx` (`getToolIcon`).
+- A Pi `pichamber_web` start+result pair is one expandable **Pichamber Web**
+  card. The leftover empty **Tool** row was a translator bug (nameless
+  `toolcall_start`), not a second renderer. Do not hide the Pichamber Web card.
 
 ## Which file controls what
 

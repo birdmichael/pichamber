@@ -172,7 +172,35 @@ export const createEventTranslator = ({
     },
   });
 
-  const translateAssistantDelta = (delta) => {
+  const isToolCallBlock = (block) => (
+    Boolean(block && typeof block === 'object' && (
+      block.type === 'toolCall'
+      || (block.type == null && (typeof block.id === 'string' || typeof block.name === 'string'))
+    ))
+  );
+
+  const readToolCall = (delta, message) => {
+    if (delta?.toolCall && typeof delta.toolCall === 'object') return delta.toolCall;
+    const contentIndex = typeof delta?.contentIndex === 'number' ? delta.contentIndex : 0;
+    const fromPartial = delta?.partial?.content?.[contentIndex];
+    if (isToolCallBlock(fromPartial)) return fromPartial;
+    const fromMessage = message?.content?.[contentIndex];
+    if (isToolCallBlock(fromMessage)) return fromMessage;
+    return null;
+  };
+
+  const toolCallIdentity = (delta, message) => {
+    const call = readToolCall(delta, message);
+    const callID = (typeof call?.id === 'string' && call.id)
+      || (typeof delta?.id === 'string' && delta.id)
+      || '';
+    const tool = (typeof call?.name === 'string' && call.name)
+      || (typeof delta?.name === 'string' && delta.name)
+      || '';
+    return { call, callID, tool };
+  };
+
+  const translateAssistantDelta = (delta, message) => {
     if (!delta || typeof delta !== 'object') return [];
     const contentIndex = typeof delta.contentIndex === 'number' ? delta.contentIndex : 0;
 
@@ -253,26 +281,45 @@ export const createEventTranslator = ({
       }
       case 'toolcall_start': {
         ensureAssistantMessage();
-        const callID = delta.toolCall?.id || delta.id || nextPartId();
-        const tool = delta.toolCall?.name || delta.name || 'tool';
-        const partID = nextPartId();
-        toolParts.set(callID, partID);
-        return [
-          messageUpdated(assistantInfo()),
-          partUpdated(toolPart(partID, { callID, tool, status: 'pending', input: delta.toolCall?.arguments || {} })),
-        ];
+        // Pi's live toolcall_start is { contentIndex, partial? }. It does not
+        // carry toolCall/id/name. Inventing a part named "tool" with a generated
+        // call id leaves an empty Tool row that never joins tool_execution_*.
+        const { call, callID, tool } = toolCallIdentity(delta, message);
+        if (!callID) {
+          return [messageUpdated(assistantInfo())];
+        }
+        let partID = toolParts.get(callID);
+        const created = [];
+        if (!partID) {
+          partID = nextPartId();
+          toolParts.set(callID, partID);
+          created.push(messageUpdated(assistantInfo()));
+        }
+        created.push(partUpdated(toolPart(partID, {
+          callID,
+          tool: tool || 'tool',
+          status: 'pending',
+          input: call?.arguments || {},
+        })));
+        return created;
       }
       case 'toolcall_end': {
-        const call = delta.toolCall || {};
-        const callID = call.id || delta.id;
-        const partID = callID ? toolParts.get(callID) : null;
-        if (!partID || !assistantMessageID) return [];
-        return [partUpdated(toolPart(partID, {
-            callID,
-            tool: call.name || 'tool',
-            status: 'pending',
-            input: call.arguments || {},
-          }))];
+        const { call, callID, tool } = toolCallIdentity(delta, message);
+        if (!callID || !assistantMessageID) return [];
+        let partID = toolParts.get(callID);
+        const created = [];
+        if (!partID) {
+          partID = nextPartId();
+          toolParts.set(callID, partID);
+          created.push(messageUpdated(assistantInfo()));
+        }
+        created.push(partUpdated(toolPart(partID, {
+          callID,
+          tool: tool || 'tool',
+          status: 'pending',
+          input: call?.arguments || {},
+        })));
+        return created;
       }
       default:
         return [];
@@ -358,7 +405,7 @@ export const createEventTranslator = ({
         }
         const updatedModel = resolveUsableFacadeModel(piEvent.message);
         if (updatedModel) model = updatedModel;
-        return translateAssistantDelta(piEvent.assistantMessageEvent);
+        return translateAssistantDelta(piEvent.assistantMessageEvent, piEvent.message);
 
       case 'message_end': {
         if (!assistantMessageID) return [];

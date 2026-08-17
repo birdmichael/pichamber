@@ -221,6 +221,13 @@ Walk `type: "message"` entries in order. `thinking` → `reasoning` and
 `toolResult` with the same `toolCallId` become one assistant `type: "tool"`
 part (`callID`, `tool`, `state.input`, `state.output`, `state.status`) —
 the same shape live SSE already emits in `event-translator.js`.
+Live `message_update` `toolcall_start` is `{ contentIndex }` plus optional
+`partial`; it does not carry `toolCall`. Do not mint a facade part named
+`tool` with a generated call id — that leftover empty Tool row never joins
+`tool_execution_*` and sits above the real **Pichamber Web** card. Read
+`toolCall` from `partial.content[contentIndex]` or `message.content[contentIndex]`
+when present. `toolcall_end.toolCall.id` and `tool_execution_*.toolCallId`
+update that same part.
 `role: "toolResult"` is never a user message. A Pi `image` block
 (`mimeType` + `data`, or a `source` payload) becomes a facade `file` part
 (`mime` + `url: data:...`). `promptAsync` keeps those file/image parts on
