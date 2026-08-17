@@ -9,10 +9,11 @@ import { useSession } from '@/sync/sync-context';
 
 import { MobileSessionMetadataButton } from './MobileSessionMetadata';
 import { MobileSessionSwitcher } from './MobileSessionSwitcher';
+import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 
 export const MobileHeader: React.FC<{
   onOpenSessions: () => void;
-  /** Opens the right workspace drawer (Changes / Files / Terminal / Notes / MCP). */
+  /** Opens the right workspace drawer (Git / Files / Terminal / Notes / MCP). */
   onOpenWorkspace: () => void;
   /** Tablet: size the title trigger to its text instead of the free width, so
       a wide header doesn't turn the switcher into a full-width tap target. */
@@ -35,7 +36,7 @@ export const MobileHeader: React.FC<{
   // Single-line title, desktop-style: session title, or the "New session"
   // placeholder on the draft screen. No project/branch metadata line.
   const primaryLabel = sessionTitle
-    || (currentSessionId ? t('mobile.sessions.untitled') : t('sessions.switcher.draftTitle'));
+    || (currentSessionId ? t(MOBILE_SESSION_CHROME_KEYS.untitled) : t('sessions.switcher.draftTitle'));
 
   React.useEffect(() => {
     setMetadataOpen(false);

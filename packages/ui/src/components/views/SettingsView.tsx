@@ -112,7 +112,7 @@ const pageOrder: SettingsPageSlug[] = [
   'remote-instances',
   'tunnel',
   'git',
-  // 'opencode' group — OpenCode
+  // 'opencode' group — Pi (persisted search/nav id stays `opencode`)
   'providers',
   'agents',
   'behavior',
