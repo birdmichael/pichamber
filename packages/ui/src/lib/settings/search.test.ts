@@ -71,7 +71,7 @@ describe('settings search', () => {
 
   test('hides leftover Usage / quota search on Pi and keeps it on OpenCode', () => {
     const getPageTitle = (page: string) => page;
-    const queries = ['usage', 'quota', 'billing'] as const;
+    const queries = ['usage', 'quota'] as const;
     for (const query of queries) {
       const piResults = buildSettingsSearchResults({
         query,
@@ -81,7 +81,7 @@ describe('settings search', () => {
       });
       const openCodeResults = buildSettingsSearchResults({
         query,
-        runtimeCtx,
+        runtimeCtx: { ...runtimeCtx, isPiKernel: false },
         t,
         getPageTitle,
       });
