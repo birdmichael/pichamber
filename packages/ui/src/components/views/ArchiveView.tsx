@@ -150,8 +150,11 @@ export function ArchiveView(): React.ReactNode {
   );
 
   return (
-    <div className="absolute inset-0 z-10 flex flex-col bg-background">
-      <div className="flex min-h-0 flex-1">
+    // Fill <main> in normal flow so the directory column starts after the
+    // session sidebar. `absolute inset-0` can resolve to a higher containing
+    // block and paint from the window's left edge, under the sidebar.
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background">
+      <div className="flex min-h-0 min-w-0 flex-1">
         {/* Directory filter panel */}
         <div className="flex w-64 flex-shrink-0 flex-col border-r border-border/50">
           <div className="flex-1 space-y-0.5 overflow-y-auto p-2">

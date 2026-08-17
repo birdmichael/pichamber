@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - **Sessions:** on Pi, listing sessions no longer re-reads every jsonl just to find archive/parent metadata, and GET /api/session honors archived, roots, limit, and cursor.
 - **Sessions:** on Pi, archiving a chat now keeps it off the daily session-list scan. Startup and sidebar refresh stay proportional to open chats; restored chats return to that list, and Archive still shows archived ones.
 - **Sessions:** on Pi, startup, sidebar Refresh, and the tray no longer load archived chats. Those appear when you open Archive, or the archived list in VS Code. OpenCode still loads both.
+- Desktop: Archive's directory list no longer sits under the session sidebar, so "All directories" stays fully visible with the Git panel open or closed.
 - **Desktop:** listing agents with Subagents no longer adds a finished Work Status row or opens an empty child chat. Only a real child run appears there; a run that is still starting can show status only.
 - **Desktop/Notifications:** Agent Completion no longer fires after thinking or a single tool step. The native “completed the task” banner waits until the session is actually done.
 - **Desktop:** opening a Pi session that already has a Subagents result no longer freezes the window or ignores Quit.
