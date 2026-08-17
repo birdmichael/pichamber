@@ -2,13 +2,13 @@ import type { FeaturePluginsPayload } from '@/components/sections/feature-plugin
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import type { SessionPlan } from '@/sync/pi-session-plan';
 
-export const MOBILE_WORKSPACE_TABS = ['changes', 'files', 'terminal', 'notes', 'plan', 'mcp'] as const;
+const MOBILE_WORKSPACE_TABS = ['changes', 'files', 'terminal', 'notes', 'plan', 'mcp'] as const;
 
 export type MobileWorkspaceTab = (typeof MOBILE_WORKSPACE_TABS)[number];
 
 export const MOBILE_WORKSPACE_ALWAYS_TABS = ['changes', 'files', 'terminal', 'notes', 'mcp'] as const satisfies readonly MobileWorkspaceTab[];
 
-export type MobilePlanTabGate = {
+type MobilePlanTabGate = {
   isPiKernel: boolean;
   featurePlugins: FeaturePluginsPayload | null;
   plan: SessionPlan | null;
