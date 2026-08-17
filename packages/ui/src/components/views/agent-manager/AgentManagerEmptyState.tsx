@@ -513,6 +513,7 @@ export const AgentManagerEmptyState: React.FC<AgentManagerEmptyStateProps> = ({
           <AgentSelector
             value={selectedAgent}
             onChange={setSelectedAgent}
+            keepVisibleOnPi
           />
           <p className="typography-micro text-muted-foreground">
             {t('agentManager.empty.agent.description')}

@@ -14,13 +14,19 @@ export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
 }
 
 /**
- * Leftover OpenCode agent dropdowns (Commands override, Scheduled Tasks,
- * Todo send, Fork, Review, Multi-run, Session Defaults) imply extra agents.
- * On Pi the live list is only the synthetic `pi` row — hide those fields.
- * OpenCode keeps the pickers.
+ * Leftover OpenCode agent dropdowns (`sections/commands/AgentSelector` and
+ * `multirun/AgentSelector`) imply extra agents. On Pi hide them when the
+ * live list is only the synthetic `pi` row, or when the list is not yet
+ * loaded. OpenCode keeps the pickers even for a one-item list.
+ * Feature Plugins Subagents / Agent Manager pass `keepVisibleOnPi`.
  */
-export function shouldShowOpenCodeAgentPicker(isPiKernel: boolean): boolean {
-  return !isPiKernel;
+export function shouldShowOpenCodeAgentPicker(
+  isPiKernel: boolean,
+  selectableAgents?: ReadonlyArray<{ name: string }>,
+): boolean {
+  if (!isPiKernel) return true;
+  if (!selectableAgents || selectableAgents.length === 0) return false;
+  return selectableAgents.length !== 1 || selectableAgents[0]?.name !== SYNTHETIC_PI_AGENT_NAME;
 }
 
 /**

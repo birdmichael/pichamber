@@ -21,10 +21,18 @@ describe('canOfferOpenCodeSessionStub', () => {
 describe('shouldShowOpenCodeAgentPicker', () => {
   test('hides leftover OpenCode agent dropdowns on the Pi kernel', () => {
     expect(shouldShowOpenCodeAgentPicker(true)).toBe(false);
+    expect(shouldShowOpenCodeAgentPicker(true, [])).toBe(false);
+    expect(shouldShowOpenCodeAgentPicker(true, [{ name: SYNTHETIC_PI_AGENT_NAME }])).toBe(false);
+  });
+
+  test('shows the leftover picker on Pi only when there is another agent to choose', () => {
+    expect(shouldShowOpenCodeAgentPicker(true, [{ name: SYNTHETIC_PI_AGENT_NAME }, { name: 'reviewer' }])).toBe(true);
   });
 
   test('keeps leftover OpenCode agent dropdowns on OpenCode', () => {
     expect(shouldShowOpenCodeAgentPicker(false)).toBe(true);
+    expect(shouldShowOpenCodeAgentPicker(false, [{ name: SYNTHETIC_PI_AGENT_NAME }])).toBe(true);
+    expect(shouldShowOpenCodeAgentPicker(false, [{ name: 'build' }, { name: 'plan' }])).toBe(true);
   });
 });
 

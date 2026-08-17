@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { isPrimaryMode } from '@/components/chat/mobileControlsUtils';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useI18n } from '@/lib/i18n';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 export interface AgentSelectorProps {
   /** Currently selected agent name (empty string for no agent) */
@@ -25,6 +26,12 @@ export interface AgentSelectorProps {
   id?: string;
   /** Portal menu to body instead of nearest dialog. */
   portalToBody?: boolean;
+  /**
+   * Feature Plugins Subagents / Agent Manager keep this leftover list
+   * control. Scheduled Tasks, Multi-run, and other OpenCode pickers hide
+   * it on Pi when the only choice is `pi`.
+   */
+  keepVisibleOnPi?: boolean;
 }
 
 /**
@@ -38,8 +45,10 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   disabled,
   id,
   portalToBody,
+  keepVisibleOnPi = false,
 }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
   const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
   const loadAgents = useConfigStore((state) => state.loadAgents);
   const defaultAgentName = useConfigStore((state) => state.currentAgentName);
@@ -48,15 +57,22 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
     () => agents.filter((agent) => isPrimaryMode(agent.mode)),
     [agents]
   );
+  const showPicker = keepVisibleOnPi || shouldShowOpenCodeAgentPicker(isPiKernel, selectableAgents);
 
   // Load agents on mount
   React.useEffect(() => {
     if (agents.length === 0) void loadAgents();
   }, [agents.length, loadAgents]);
 
+  React.useEffect(() => {
+    if (showPicker) return;
+    const pinned = resolvePinnedPiAgentName(true, value);
+    if (value !== pinned) onChange(pinned);
+  }, [onChange, showPicker, value]);
+
   // Ensure we always have a valid selection (defaults to current default agent, then first selectable agent).
   React.useEffect(() => {
-    if (disabled) {
+    if (!showPicker || disabled) {
       return;
     }
 
@@ -79,9 +95,11 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
     if (firstAgent) {
       onChange(firstAgent);
     }
-  }, [defaultAgentName, disabled, onChange, selectableAgents, value]);
+  }, [defaultAgentName, disabled, onChange, selectableAgents, showPicker, value]);
 
   const selectValue = value.trim().length > 0 ? value : undefined;
+
+  if (!showPicker) return null;
 
   return (
     <Select
