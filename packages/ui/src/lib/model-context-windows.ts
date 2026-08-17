@@ -302,6 +302,15 @@ export const readPersistedModelInput = (value: unknown): PiModelInputType[] | un
   return next.length > 0 ? next : undefined;
 };
 
+/**
+ * Pi's omitted-`input` default. Live models and text-only capabilities
+ * look like a stored value, but they are not a user override.
+ */
+export const isPiDefaultTextInput = (value: unknown): boolean => {
+  const input = readPersistedModelInput(value);
+  return input !== undefined && input.length === 1 && input[0] === 'text';
+};
+
 export const lookupExactVisionInput = (modelId: string): readonly PiModelInputType[] | undefined => {
   const normalized = normalizeModelId(modelId);
   if (!normalized || !KNOWN_VISION_MODEL_IDS.has(normalized)) {
@@ -311,16 +320,17 @@ export const lookupExactVisionInput = (modelId: string): readonly PiModelInputTy
 };
 
 /**
- * `input` to write on a custom-model persist. A stored or user-set array
- * wins. Empty on a known vision id writes `["text", "image"]`. Empty on an
- * unknown id stays omitted — do not invent vision.
+ * `input` to write on a custom-model persist. A stored non-default array
+ * wins (`["text", "image"]` is not stripped). Empty or Pi-default
+ * `["text"]` on a known vision id writes `["text", "image"]`. The same
+ * empty/default on an unknown id stays omitted — do not invent vision.
  */
 export const resolvePersistedInput = (input: {
   id: string;
   input?: unknown;
 }): PiModelInputType[] | undefined => {
   const user = readPersistedModelInput(input.input);
-  if (user !== undefined) {
+  if (user !== undefined && !isPiDefaultTextInput(user)) {
     return user;
   }
   const known = lookupExactVisionInput(input.id);

@@ -28,11 +28,13 @@ Empty string clears the override. Changing the directory does not copy
 
 Settings → Providers custom-model rows persist Pi `contextWindow` and
 `input` on that model in `{agentDir}/models.json` (and project
-`.pi/models.json`). Save must not strip a user-set or provider-reported
-value. Empty on a known id writes that id's published window from the UI
+`.pi/models.json`). Save must not strip a stored `["text", "image"]`.
+Empty on a known id writes that id's published window from the UI
 table (`grok-4.6` = 500k) and, when the same id is a known vision model,
-`input: ["text", "image"]`. Empty on an unknown id stays omitted — do
-not invent a window or vision capability that pretends to be user-set.
+`input: ["text", "image"]`. Pi-default `["text"]` — including a live
+facade that already defaulted omitted `input` — is treated as empty, not
+as a user override. Empty on an unknown id stays omitted — do not invent
+a window or vision capability that pretends to be user-set.
 Family inference and the UI 200k fallback stay display-only.
 `toProviderModelRecord` exposes `limit.context` from the stored window
 for the composer chip, context panel, and work-status usage, and exposes

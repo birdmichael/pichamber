@@ -284,7 +284,7 @@ describe('validateCustomProvider', () => {
       'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
     });
 
-    const explicitText = validateCustomProvider({
+    const defaultText = validateCustomProvider({
       form: baseForm({
         models: [{
           row: 'm0',
@@ -296,8 +296,24 @@ describe('validateCustomProvider', () => {
       t,
       existingProviderIDs: new Set(),
     });
-    expect(explicitText.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text'] },
+    expect(defaultText.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const storedVision = validateCustomProvider({
+      form: baseForm({
+        models: [{
+          row: 'm0',
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          input: ['text', 'image'],
+        }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(storedVision.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
     });
 
     const unknown = validateCustomProvider({
@@ -308,6 +324,70 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(unknown.result?.config.models).toEqual({
+      'mystery-model': { name: 'Mystery' },
+    });
+  });
+
+  test('re-saves a known vision id when the live facade only has Pi-default text input', () => {
+    const state = providerToCustomFormState({
+      id: 'bmlab',
+      name: 'bmlab',
+      options: { baseURL: 'https://ai.example.test/v1' },
+      models: [{
+        id: 'grok-4.6',
+        name: 'Grok 4.6',
+        contextWindow: 500000,
+        input: ['text'],
+        capabilities: {
+          input: { text: true, image: false, audio: false, video: false, pdf: false },
+        },
+      }],
+    });
+    expect(state.models[0]?.input).toEqual(undefined);
+
+    const saved = validateCustomProvider({
+      form: {
+        providerID: 'bmlab',
+        name: 'bmlab',
+        baseURL: 'https://ai.example.test/v1',
+        apiKey: 'sk-test',
+        models: state.models,
+        headers: [{ row: 'h0', key: '', value: '' }],
+      },
+      t,
+      existingProviderIDs: new Set(['bmlab']),
+      editingProviderID: 'bmlab',
+      allowExistingAuth: true,
+    });
+    expect(saved.result?.config.models).toEqual({
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+    });
+
+    const unknownLive = providerToCustomFormState({
+      id: 'bmlab',
+      options: { baseURL: 'https://ai.example.test/v1' },
+      models: [{
+        id: 'mystery-model',
+        name: 'Mystery',
+        input: ['text'],
+        capabilities: { input: { text: true, image: false } },
+      }],
+    });
+    const unknownSaved = validateCustomProvider({
+      form: {
+        providerID: 'bmlab',
+        name: 'bmlab',
+        baseURL: 'https://ai.example.test/v1',
+        apiKey: 'sk-test',
+        models: unknownLive.models,
+        headers: [{ row: 'h0', key: '', value: '' }],
+      },
+      t,
+      existingProviderIDs: new Set(['bmlab']),
+      editingProviderID: 'bmlab',
+      allowExistingAuth: true,
+    });
+    expect(unknownSaved.result?.config.models).toEqual({
       'mystery-model': { name: 'Mystery' },
     });
   });

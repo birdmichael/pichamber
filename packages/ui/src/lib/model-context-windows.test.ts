@@ -3,6 +3,7 @@ import {
   inferFamilyContextWindow,
   KNOWN_VISION_MODEL_IDS,
   lookupExactContextWindow,
+  isPiDefaultTextInput,
   lookupExactVisionInput,
   normalizeModelId,
   PI_TEXT_IMAGE_INPUT,
@@ -160,11 +161,22 @@ describe('resolvePersistedInput', () => {
     expect(lookupExactVisionInput('grok-unknown-99')).toEqual(undefined);
   });
 
-  test('keeps an explicit input instead of the known-vision table', () => {
+  test('treats Pi-default text-only as empty and keeps a stored vision array', () => {
+    expect(isPiDefaultTextInput(['text'])).toBe(true);
+    expect(isPiDefaultTextInput(['TEXT'])).toBe(true);
+    expect(isPiDefaultTextInput(['text', 'image'])).toBe(false);
     expect(resolvePersistedInput({
       id: 'grok-4.6',
       input: ['text'],
-    })).toEqual(['text']);
+    })).toEqual(['text', 'image']);
+    expect(resolvePersistedInput({
+      id: 'mystery-model',
+      input: ['text'],
+    })).toEqual(undefined);
+    expect(resolvePersistedInput({
+      id: 'grok-4.6',
+      input: ['text', 'image'],
+    })).toEqual(['text', 'image']);
     expect(resolvePersistedInput({
       id: 'mystery-model',
       input: ['text', 'image'],

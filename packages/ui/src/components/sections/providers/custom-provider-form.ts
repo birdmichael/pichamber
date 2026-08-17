@@ -5,6 +5,7 @@
  */
 
 import {
+  isPiDefaultTextInput,
   readCatalogContextWindow,
   readPersistedModelInput,
   readPositiveContextWindow,
@@ -160,18 +161,26 @@ const readCapabilityInput = (value: unknown): PiModelInputType[] | undefined => 
   return next.length > 0 ? next : undefined;
 };
 
+const readStoredModelInput = (value: unknown): PiModelInputType[] | undefined => {
+  const input = readPersistedModelInput(value);
+  if (!input || isPiDefaultTextInput(input)) {
+    return undefined;
+  }
+  return input;
+};
+
 const readModelInput = (model: unknown): PiModelInputType[] | undefined => {
   if (!model || typeof model !== 'object' || Array.isArray(model)) {
     return undefined;
   }
   const record = model as Record<string, unknown>;
-  const fromPi = readPersistedModelInput(record.input);
+  const fromPi = readStoredModelInput(record.input);
   if (fromPi) {
     return fromPi;
   }
   const capabilities = record.capabilities;
   if (capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)) {
-    return readCapabilityInput((capabilities as Record<string, unknown>).input);
+    return readStoredModelInput(readCapabilityInput((capabilities as Record<string, unknown>).input));
   }
   return undefined;
 };
