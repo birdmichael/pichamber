@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
-import { resolvePlanRailEnabled } from './planRail';
+import {
+  isContextPanelExpandedForMode,
+  resolveDesktopActiveMainTab,
+  resolvePlanRailEnabled,
+} from './planRail';
 
 const plugins = (installed: boolean, enabled: boolean) => {
   const payload = emptyFeaturePluginsPayload();
@@ -51,5 +55,28 @@ describe('resolvePlanRailEnabled', () => {
       plan: { status: 'ready', planMarkdown: '# Plan' },
       planModeExperimentalEnabled: false,
     })).toBe(false);
+  });
+});
+
+describe('isContextPanelExpandedForMode', () => {
+  test('Plan never uses the expanded overlay, including leftover expanded state', () => {
+    expect(isContextPanelExpandedForMode('plan', true)).toBe(false);
+    expect(isContextPanelExpandedForMode('plan', false)).toBe(false);
+  });
+
+  test('other surfaces still honor the shared expanded flag', () => {
+    expect(isContextPanelExpandedForMode('file', true)).toBe(true);
+    expect(isContextPanelExpandedForMode('diff', true)).toBe(true);
+    expect(isContextPanelExpandedForMode('git', false)).toBe(false);
+    expect(isContextPanelExpandedForMode(null, true)).toBe(false);
+  });
+});
+
+describe('resolveDesktopActiveMainTab', () => {
+  test('maps leftover OpenCode plan main tab to chat and leaves other tabs alone', () => {
+    expect(resolveDesktopActiveMainTab('plan')).toBe('chat');
+    expect(resolveDesktopActiveMainTab('chat')).toBe('chat');
+    expect(resolveDesktopActiveMainTab('terminal')).toBe('terminal');
+    expect(resolveDesktopActiveMainTab('diagram')).toBe('diagram');
   });
 });

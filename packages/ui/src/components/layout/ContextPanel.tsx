@@ -46,6 +46,7 @@ import {
   type EmbeddedSessionRuntimeBootstrap,
 } from './contextPanelEmbeddedChat';
 import { getContextSurfaceWidthFraction } from '@/lib/surfaces/registry';
+import { isContextPanelExpandedForMode } from '@/lib/surfaces/planRail';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -469,7 +470,7 @@ export const ContextPanel: React.FC = () => {
   const tabs = React.useMemo(() => panelState?.tabs ?? [], [panelState?.tabs]);
   const activeTab = tabs.find((tab) => tab.id === panelState?.activeTabId) ?? tabs[tabs.length - 1] ?? null;
   const isOpen = Boolean(panelState?.isOpen && activeTab);
-  const isExpanded = Boolean(isOpen && panelState?.expanded);
+  const isExpanded = Boolean(isOpen && isContextPanelExpandedForMode(activeTab?.mode, Boolean(panelState?.expanded)));
   const [availablePanelAreaWidth, setAvailablePanelAreaWidth] = React.useState<number | null>(null);
   const activeModeForWidth = activeTab?.mode ?? null;
   const manualWidth = activeModeForWidth ? panelState?.widthByMode?.[activeModeForWidth] : undefined;
@@ -1038,17 +1039,19 @@ export const ContextPanel: React.FC = () => {
             <Icon name="layout-right" className="h-3.5 w-3.5" />
           </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={handleToggleExpanded}
-          className="h-7 w-7 p-0"
-          title={isExpanded ? t('contextPanel.actions.collapsePanel') : t('contextPanel.actions.expandPanel')}
-          aria-label={isExpanded ? t('contextPanel.actions.collapsePanel') : t('contextPanel.actions.expandPanel')}
-        >
-          {isExpanded ? <Icon name="fullscreen-exit" className="h-3.5 w-3.5" /> : <Icon name="fullscreen" className="h-3.5 w-3.5" />}
-        </Button>
+        {activeTab?.mode !== 'plan' ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleExpanded}
+            className="h-7 w-7 p-0"
+            title={isExpanded ? t('contextPanel.actions.collapsePanel') : t('contextPanel.actions.expandPanel')}
+            aria-label={isExpanded ? t('contextPanel.actions.collapsePanel') : t('contextPanel.actions.expandPanel')}
+          >
+            {isExpanded ? <Icon name="fullscreen-exit" className="h-3.5 w-3.5" /> : <Icon name="fullscreen" className="h-3.5 w-3.5" />}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
