@@ -598,7 +598,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         knownSlashNames,
         knownSnippetTriggers,
         attachmentFilenames,
-    }), [attachmentFilenames, inputMode, knownAgentNames, knownSlashNames, knownSnippetTriggers]);
+        isPiKernel,
+    }), [attachmentFilenames, inputMode, isPiKernel, knownAgentNames, knownSlashNames, knownSnippetTriggers]);
 
     const sanitizeAttachmentsForSend = React.useCallback(
         (files: readonly AttachedFile[] | undefined): AttachedFile[] => [...(files ?? [])]
@@ -626,6 +627,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             const kind = classifyMention(mentionPath, {
                 knownAgentNames: knownAgentNamesRef.current,
                 confirmedMentions: confirmedMentionsRef.current,
+                isPiKernel,
             });
             // Agents are routed separately by parseAgentMentions; only file
             // references become attachments here.
@@ -671,7 +673,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             sanitizedText: rawText,
             attachments,
         };
-    }, [chatSearchDirectory]);
+    }, [chatSearchDirectory, isPiKernel]);
     const abortTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevWasAbortedRef = React.useRef(false);
 

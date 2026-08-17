@@ -28,9 +28,11 @@ selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 `isPrimaryMode`. `ComposerFooter` `isMobile` and collapsed
 `MobilePillComposer` do not host that leftover chip.
 On Pi, `@agent` mentions do not switch session personality: the send path
-does not route `@agent:build` / `@agent:plan` / leftover OpenCode names, and
-`@` autocomplete does not list those agents. Unknown `/name` stays chat.
-The OpenCode kernel keeps `@agent` mentions and the agent chip.
+does not route `@agent:build` / `@agent:plan` / leftover OpenCode names, the
+prompt language does not classify those tokens as `agent`, and `@`
+autocomplete does not list leftover OpenCode agents. Unknown `/name` stays
+chat. The OpenCode kernel keeps `@agent` mentions. The leftover mobile Pi
+chip hide is already shipped (`shouldShowComposerAgentChip`).
 When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**
 dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
@@ -75,7 +77,10 @@ copy.
   itself and is what gets highlighted; in `see @a/b.ts,` the comma is sentence
   punctuation, not part of the file being referenced. Mentions are plain
   editable text: deleting a character edits the token and reopens the mention
-  picker, the same way `/skill` tokens behave — not an atomic delete.
+  picker, the same way `/skill` tokens behave — not an atomic delete. On Pi,
+  leftover OpenCode agent names (`build`, `plan`, `@agent:build`) are not a
+  mention kind; file `@path` references still resolve. The OpenCode kernel
+  still classifies known agent names as `agent`.
 - `prefixTokens.ts` — `/command`, `/skill`, `#snippet`. Scanning is deliberately
   generous; **membership in the command, skill or snippet registry is the
   authority**, not the pattern. An unknown `/token` stays plain prose. Enter
