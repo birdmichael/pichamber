@@ -1,11 +1,11 @@
 ---
 title: Provider, Modelle & Agents
-description: Verbinde KI-Provider, wähle Modelle aus und richte Agents ein.
+description: Verbinde KI-Provider, wähle Modelle aus und nutze den eingebauten Pi-Agent.
 ---
 
 # Provider, Modelle & Agents
 
-Bevor OpenChamber etwas tun kann, braucht es mindestens einen verbundenen KI-Provider. Diese Seite erklärt, wie du einen Provider verbindest, ein Modell auswählst und Agents anpasst.
+Bevor OpenChamber etwas tun kann, braucht es mindestens einen verbundenen KI-Provider. Diese Seite erklärt, wie du einen Provider verbindest, ein Modell auswählst und wie der eingebaute Pi-Agent arbeitet.
 
 ## Einen Provider verbinden
 
@@ -24,20 +24,19 @@ Zum Trennen öffnest du den Provider und entfernst seine Anmeldung.
 Du wählst das Modell dort aus, wo du arbeitest:
 
 - im Chat verwendest du den Modellwähler in der Nachrichtenleiste, um Provider und Modell für diese Sitzung festzulegen
-- pro Agent legst du unten ein Standardmodell fest
+- unter **Einstellungen → Session Defaults** legst du das Standardmodell und Thinking fest
 
-## Agents einrichten
+## Der eingebaute Agent
 
-Ein Agent ist eine benannte Konfiguration — ein Modell, eine Persönlichkeit und das, was er tun darf.
+Pichamber verwendet einen eingebauten Agent (`pi`). **Einstellungen → Agents** ist auf Pi ausgeblendet. Du erstellst dort keine zusätzlichen Agents oder Persönlichkeiten.
 
-1. Öffne **Einstellungen → Agents**.
-2. Wähle einen Agenten aus oder erstelle einen neuen.
-3. Bearbeite beliebige dieser Felder:
-   - **Beschreibung** — wofür der Agent gedacht ist
-   - **Modell** — sein Standardmodell
-   - **Temperatur** — wie kreativ seine Antworten sind
-   - **Prompt** — dauerhafte Anweisungen, denen er immer folgt
-   - **Tool-Regeln** — welche Werkzeuge er verwenden darf
+Nutze stattdessen:
+
+- **Modell und Thinking** — Nachrichtenleiste im Chat oder **Einstellungen → Session Defaults**
+- **Plan** — ein Sitzungsmodus auf demselben Agent. Installiere und aktiviere ihn unter **Einstellungen → Feature Plugins**. Der Composer zeigt dann **Agent / Plan**.
+- **Subagents** — zusätzliche Worker über Feature Plugins **Subagents** und `/run`, nicht über extra Settings-Agents
+
+Auf dem verbliebenen OpenCode-Kernel (`OPENCHAMBER_KERNEL=opencode`) ist **Einstellungen → Agents** weiterhin der Ort, an dem du benannte Agents erstellst und bearbeitest.
 
 ## Wo deine Anmeldungen gespeichert werden
 

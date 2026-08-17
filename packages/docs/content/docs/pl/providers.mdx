@@ -1,11 +1,11 @@
 ---
 title: Dostawcy, modele i agenci
-description: Połącz dostawców AI, wybierz modele i skonfiguruj agentów.
+description: Połącz dostawców AI, wybierz modele i korzystaj z wbudowanego agenta Pi.
 ---
 
 # Dostawcy, modele i agenci
 
-Zanim OpenChamber cokolwiek zrobi, potrzebuje co najmniej jednego połączonego dostawcy AI. Ta strona opisuje łączenie dostawcy, wybór modelu i dostosowywanie agentów.
+Zanim OpenChamber cokolwiek zrobi, potrzebuje co najmniej jednego połączonego dostawcy AI. Ta strona opisuje łączenie dostawcy, wybór modelu i działanie wbudowanego agenta Pi.
 
 ## Połącz dostawcę
 
@@ -24,20 +24,19 @@ Aby się rozłączyć, otwórz dostawcę i wybierz usunięcie jego logowania.
 Model wybierasz tam, gdzie pracujesz:
 
 - w czacie użyj selektora modelu w pasku wiadomości, aby ustawić dostawcę i model dla tej sesji
-- dla agenta ustaw model domyślny (poniżej)
+- w **Settings → Session Defaults** ustaw domyślny model i thinking
 
-## Skonfiguruj agentów
+## Wbudowany agent
 
-Agent to nazwana konfiguracja — model, osobowość i to, co wolno mu robić.
+Pichamber używa jednego wbudowanego agenta (`pi`). Na Pi **Settings → Agents** jest ukryte. Nie tworzysz tam dodatkowych agentów ani osobowości.
 
-1. Otwórz **Settings → Agents**.
-2. Wybierz agenta lub utwórz nowego.
-3. Edytuj dowolne z poniższych:
-   - **description** — do czego służy agent
-   - **model** — jego domyślny model
-   - **temperature** — jak kreatywne są jego odpowiedzi
-   - **prompt** — stałe instrukcje, których zawsze przestrzega
-   - **tool rules** — których narzędzi może używać
+Zamiast tego użyj:
+
+- **Model i thinking** — pasek wiadomości w czacie albo **Settings → Session Defaults**
+- **Plan** — tryb sesji na tym samym agencie. Zainstaluj i włącz go w **Settings → Feature Plugins**. Kompozytor pokaże wtedy **Agent / Plan**.
+- **Subagents** — dodatkowi pracownicy przez Feature Plugins **Subagents** i `/run`, nie przez dodatkowych agentów w Settings
+
+Na pozostałym jądrze OpenCode (`OPENCHAMBER_KERNEL=opencode`) **Settings → Agents** nadal służy do tworzenia i edycji nazwanych agentów.
 
 ## Gdzie są przechowywane Twoje logowania
 

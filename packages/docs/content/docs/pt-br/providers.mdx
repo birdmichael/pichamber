@@ -1,11 +1,11 @@
 ---
 title: Provedores, Modelos e Agentes
-description: Conecte provedores de IA, escolha modelos e configure agentes.
+description: Conecte provedores de IA, escolha modelos e use o agente Pi embutido.
 ---
 
 # Provedores, Modelos e Agentes
 
-Antes de o OpenChamber poder fazer qualquer coisa, ele precisa de pelo menos um provedor de IA conectado. Esta página cobre conectar um provedor, escolher um modelo e personalizar agentes.
+Antes de o OpenChamber poder fazer qualquer coisa, ele precisa de pelo menos um provedor de IA conectado. Esta página cobre conectar um provedor, escolher um modelo e como o agente Pi embutido funciona.
 
 ## Conectar um provedor
 
@@ -24,20 +24,19 @@ Para desconectar, abra o provedor e escolha remover o login dele.
 Você escolhe o modelo onde está trabalhando:
 
 - no chat, use o seletor de modelo na barra de mensagens para definir o provedor e o modelo daquela sessão
-- por agente, defina um modelo padrão (abaixo)
+- em **Settings → Session Defaults**, defina o modelo e o thinking padrão
 
-## Configurar agentes
+## O agente embutido
 
-Um agente é uma configuração nomeada — um modelo, uma personalidade e o que ele tem permissão de fazer.
+O Pichamber usa um agente embutido (`pi`). **Settings → Agents** fica oculto no Pi. Você não cria agentes extras nem personalidades ali.
 
-1. Abra **Settings → Agents**.
-2. Escolha um agente ou crie um novo.
-3. Edite qualquer um destes:
-   - **description** — para que serve o agente
-   - **model** — seu modelo padrão
-   - **temperature** — quão criativas são suas respostas
-   - **prompt** — instruções permanentes que ele sempre segue
-   - **tool rules** — quais ferramentas ele pode usar
+Use isto no lugar:
+
+- **Modelo e thinking** — barra de mensagens do chat, ou **Settings → Session Defaults**
+- **Plan** — um modo de sessão no mesmo agente. Instale e ative em **Settings → Feature Plugins**. O compositor então mostra **Agent / Plan**.
+- **Subagents** — workers extras via Feature Plugins **Subagents** e `/run`, não agentes extras de Settings
+
+No kernel OpenCode residual (`OPENCHAMBER_KERNEL=opencode`), **Settings → Agents** continua sendo o lugar para criar e editar agentes nomeados.
 
 ## Onde ficam seus logins
 
