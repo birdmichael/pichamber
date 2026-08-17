@@ -197,6 +197,10 @@ describe('filterPiSlashCommands', () => {
       filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
       { isPiKernel: true, planPluginAvailable: true, subagentsPluginAvailable: true },
     ).map((item) => item.name)).toEqual(['plan-feature', 'plan', 'run']);
+    expect(ensureLiveFeatureSlashCommands(
+      filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
+      { isPiKernel: true, planPluginAvailable: false, subagentsPluginAvailable: false },
+    ).map((item) => item.name)).toEqual(['plan-feature']);
   });
 
   test('keeps Pichamber starters and injected skills, and still hides leftovers', () => {
