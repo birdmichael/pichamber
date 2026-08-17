@@ -344,13 +344,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     id: 'sessions.default-model',
     page: 'sessions',
     titleKey: 'settings.openchamber.defaults.field.defaultModel',
-    keywords: ['model', 'provider', 'new sessions'],
+    keywords: ['model', 'provider', 'new sessions', 'agents'],
   },
   {
     id: 'sessions.default-thinking',
     page: 'sessions',
     titleKey: 'settings.openchamber.defaults.field.defaultThinking',
-    keywords: ['thinking', 'reasoning', 'variant'],
+    keywords: ['thinking', 'reasoning', 'variant', 'agents'],
   },
   {
     id: 'sessions.default-agent',
@@ -661,12 +661,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.agents.page.field.mode',
     descriptionKey: 'settings.agents.page.field.modeTooltip',
     keywords: ['primary', 'subagent', 'visibility'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.model',
     page: 'agents',
     titleKey: 'settings.agents.page.field.overrideModel',
     keywords: ['model', 'provider'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.variant',
@@ -674,6 +676,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.agents.page.field.variant',
     descriptionKey: 'settings.agents.page.field.variantTooltip',
     keywords: ['thinking', 'reasoning', 'variant', 'depth'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.temperature',
@@ -681,6 +684,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.agents.page.field.temperature',
     descriptionKey: 'settings.agents.page.field.temperatureTooltip',
     keywords: ['randomness', 'creative'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.top-p',
@@ -688,18 +692,21 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.agents.page.field.topP',
     descriptionKey: 'settings.agents.page.field.topPTooltip',
     keywords: ['sampling', 'nucleus'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.system-prompt',
     page: 'agents',
     titleKey: 'settings.agents.page.section.systemPrompt',
     keywords: ['prompt', 'instructions'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.permissions',
     page: 'agents',
     titleKey: 'settings.agents.page.section.toolPermissions',
     keywords: ['tools', 'permissions', 'allow', 'ask', 'deny'],
+    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'commands.create',
@@ -814,7 +821,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.plan.title',
     descriptionKey: 'settings.featurePlugins.slot.plan.info',
-    keywords: ['plan', 'pi-plan-mode', '@narumitw/pi-plan-mode', 'npm', 'install'],
+    keywords: ['plan', 'pi-plan-mode', '@narumitw/pi-plan-mode', 'npm', 'install', 'agents'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -830,7 +837,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.subagents.title',
     descriptionKey: 'settings.featurePlugins.slot.subagents.info',
-    keywords: ['subagents', 'pi-subagents', 'npm', 'install'],
+    keywords: ['subagents', 'pi-subagents', 'npm', 'install', 'agents'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

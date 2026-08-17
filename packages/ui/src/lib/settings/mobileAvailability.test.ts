@@ -38,6 +38,14 @@ const mobilePiCapacitor: SettingsRuntimeContext = {
   isCapacitor: true,
 };
 
+const desktopOpenCode: SettingsRuntimeContext = {
+  isVSCode: false,
+  isWeb: false,
+  isDesktop: true,
+  isMobile: false,
+  isPiKernel: false,
+};
+
 const mobileOpenCode: SettingsRuntimeContext = {
   isVSCode: false,
   isWeb: true,
@@ -61,13 +69,14 @@ const PI_MOBILE_MUST_INCLUDE: readonly SettingsPageSlug[] = [
   'skills.catalog',
   'commands',
   'snippets',
-  'agents',
+  'sessions',
   'projects',
 ];
 
 const PI_MOBILE_MUST_EXCLUDE: readonly SettingsPageSlug[] = [
   'usage',
   'plugins',
+  'agents',
   'shortcuts',
   'remote-instances',
   'tunnel',
@@ -112,6 +121,7 @@ describe('mobile settings availability', () => {
     expect(desktop).toContain('tunnel');
     expect(desktop).not.toContain('usage');
     expect(desktop).not.toContain('plugins');
+    expect(desktop).not.toContain('agents');
     expect(desktop).not.toContain('about');
 
     expect(mobile).toContain('about');
@@ -134,10 +144,20 @@ describe('mobile settings availability', () => {
     expect(listVisibleSettingsPageSlugs(mobilePiCapacitor)).not.toContain('about');
   });
 
+  test('OpenCode Settings keep leftover Agents; Pi hides it on Desktop and mobile', () => {
+    expect(listVisibleSettingsPageSlugs(desktopOpenCode)).toContain('agents');
+    expect(listVisibleSettingsPageSlugs(mobileOpenCode)).toContain('agents');
+    expect(listVisibleSettingsPageSlugs(desktopPi)).not.toContain('agents');
+    expect(listVisibleSettingsPageSlugs(mobilePi)).not.toContain('agents');
+    expect(searchPages(desktopOpenCode, 'agents')).toContain('agents');
+    expect(searchPages(desktopPi, 'agents')).not.toContain('agents');
+  });
+
   test('OpenCode mobile keeps Usage and Plugins and hides Pi-only pages', () => {
     const slugs = listVisibleSettingsPageSlugs(mobileOpenCode);
     expect(slugs).toContain('usage');
     expect(slugs).toContain('plugins');
+    expect(slugs).toContain('agents');
     expect(slugs).not.toContain('feature-plugins');
     expect(slugs).not.toContain('extensions');
     expect(slugs).not.toContain('shortcuts');
@@ -176,6 +196,7 @@ describe('mobile settings availability', () => {
 
     expect(searchPages(mobilePi, 'usage', visible)).not.toContain('usage');
     expect(searchPages(mobilePi, 'plugins', visible)).not.toContain('plugins');
+    expect(searchPages(mobilePi, 'agents', visible)).not.toContain('agents');
     expect(searchPages(mobilePi, 'shortcuts', visible)).not.toContain('shortcuts');
     expect(searchPages(mobilePi, 'remote', visible)).not.toContain('remote-instances');
     expect(searchPages(mobilePi, 'tunnel', visible)).not.toContain('tunnel');
@@ -186,7 +207,7 @@ describe('mobile settings availability', () => {
     expect(searchPages(mobilePi, 'skills catalog', visible)).toContain('skills.catalog');
     expect(searchPages(mobilePi, 'commands', visible)).toContain('commands');
     expect(searchPages(mobilePi, 'snippets', visible)).toContain('snippets');
-    expect(searchPages(mobilePi, 'agents', visible)).toContain('agents');
+    expect(searchPages(mobilePi, 'sessions', visible)).toContain('sessions');
     expect(searchPages(mobilePi, 'projects', visible)).toContain('projects');
   });
 

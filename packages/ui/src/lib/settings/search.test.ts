@@ -69,24 +69,69 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'integrations.messengers.discord')).toBe(true);
   });
 
-  test('hides agent create search on Pi and keeps it on OpenCode', () => {
-    const query = 'new agent';
+  test('hides leftover OpenCode Agents search on Pi and keeps it on OpenCode', () => {
+    const leftoverAgentIds = [
+      'agents.create',
+      'agents.name',
+      'agents.mode',
+      'agents.model',
+      'agents.variant',
+      'agents.temperature',
+      'agents.top-p',
+      'agents.system-prompt',
+      'agents.permissions',
+    ] as const;
+    const leftoverQueries = [
+      { query: 'new agent', id: 'agents.create' },
+      { query: 'primary', id: 'agents.mode' },
+      { query: 'temperature', id: 'agents.temperature' },
+      { query: 'system prompt', id: 'agents.system-prompt' },
+      { query: 'permissions', id: 'agents.permissions' },
+    ] as const;
     const getPageTitle = (page: string) => page;
-    const openCodeResults = buildSettingsSearchResults({
-      query,
-      runtimeCtx,
-      t,
-      getPageTitle,
-    });
+
+    for (const { query, id } of leftoverQueries) {
+      const openCodeResults = buildSettingsSearchResults({
+        query,
+        runtimeCtx,
+        t,
+        getPageTitle,
+      });
+      const piResults = buildSettingsSearchResults({
+        query,
+        runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+        t,
+        getPageTitle,
+      });
+
+      expect(openCodeResults.some((result) => result.id === id)).toBe(true);
+      expect(piResults.some((result) => leftoverAgentIds.includes(result.id as typeof leftoverAgentIds[number]))).toBe(false);
+      expect(piResults.some((result) => result.page === 'agents')).toBe(false);
+    }
+  });
+
+  test('Pi Settings search for agents points at Feature Plugins and Session Defaults', () => {
+    const getPageTitle = (page: string) => page;
     const piResults = buildSettingsSearchResults({
-      query,
+      query: 'agents',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true },
       t,
       getPageTitle,
     });
+    const openCodeResults = buildSettingsSearchResults({
+      query: 'agents',
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
 
+    expect(piResults.some((result) => result.page === 'agents')).toBe(false);
+    expect(piResults.some((result) => result.id === 'feature-plugins.plan')).toBe(true);
+    expect(piResults.some((result) => result.id === 'feature-plugins.subagents')).toBe(true);
+    expect(piResults.some((result) => result.id === 'sessions.default-model')).toBe(true);
+    expect(piResults.some((result) => result.id === 'sessions.default-thinking')).toBe(true);
     expect(openCodeResults.some((result) => result.id === 'agents.create')).toBe(true);
-    expect(piResults.some((result) => result.id === 'agents.create')).toBe(false);
+    expect(openCodeResults.some((result) => result.id === 'agents.mode')).toBe(true);
   });
 
   test('hides Session Goal settings on Pi and in VS Code', () => {
