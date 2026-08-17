@@ -859,10 +859,19 @@ const formatJsonForPre = (value) => {
   }
 };
 
-const formatMessageTimestamp = (info) => {
-  const created = info?.time?.created;
-  if (created == null || created === '') return '';
-  return isoFromUnknown(created);
+const SHARE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const formatShareDate = (value) => {
+  if (value == null || value === '') return '';
+  const millis = typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : Date.parse(isoFromUnknown(value));
+  if (!Number.isFinite(millis)) return '';
+  const date = new Date(millis);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${date.getUTCDate()} ${SHARE_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${hours}:${minutes}`;
 };
 
 const formatModelLabel = (info) => {
@@ -925,18 +934,18 @@ const htmlFromToolPart = (part) => {
   const output = typeof part?.state?.output === 'string' ? part.state.output : '';
   const error = typeof part?.state?.error === 'string' ? part.state.error : '';
   const isError = status === 'error';
-  const sections = [
-    `<div class="tool-head"><span class="tool-name">${name}</span></div>`,
-  ];
-  if (Object.keys(input).length > 0) {
-    sections.push(`<pre class="tool-io">${escapeHtml(toolInputPreview(input))}</pre>`);
-  }
-  if (isError) {
-    sections.push(`<div class="tool-label">Error</div><pre class="tool-io">${escapeHtml(error || output || 'tool error')}</pre>`);
-  } else if (output) {
-    sections.push(`<div class="tool-label">Output</div><pre class="tool-io">${escapeHtml(output)}</pre>`);
-  }
-  return `<section class="tool${isError ? ' error' : ''}">${sections.join('')}</section>`;
+  const preview = Object.keys(input).length > 0
+    ? ` <span class="tool-input">${escapeHtml(toolInputPreview(input))}</span>`
+    : '';
+  const result = isError
+    ? (error || output || 'tool error')
+    : output;
+  return [
+    `<section class="tool${isError ? ' error' : ''}">`,
+    `<p class="tool-line"><strong class="tool-name">${name}</strong>${preview}</p>`,
+    result ? `<pre class="tool-output">${escapeHtml(result)}</pre>` : '',
+    '</section>',
+  ].filter(Boolean).join('');
 };
 
 const htmlFromReasoningPart = (text) => {
@@ -961,130 +970,148 @@ const htmlFromMessageParts = (parts) => {
 
 const htmlFromMessageEntry = (entry) => {
   const isAssistant = entry?.info?.role === 'assistant';
-  const timestamp = formatMessageTimestamp(entry?.info);
-  const model = isAssistant ? formatModelLabel(entry?.info) : '';
   const usage = isAssistant ? formatUsageLine(entry?.info) : '';
   const body = htmlFromMessageParts(entry?.parts);
   if (!isAssistant) {
-    return `<article class="msg user"><div class="bubble">${body}</div></article>`;
+    return `<article class="msg user">${body}</article>`;
   }
-  const footer = [model, timestamp, usage].filter(Boolean).join(' · ');
   return [
     '<article class="msg assistant">',
+    '<span class="gutter" aria-hidden="true">≡</span>',
+    '<div class="turn">',
     body,
-    footer ? `<footer class="usage">${escapeHtml(footer)}</footer>` : '',
+    usage ? `<footer class="usage">${escapeHtml(usage)}</footer>` : '',
+    '</div>',
     '</article>',
   ].filter(Boolean).join('\n');
 };
 
-const formatSessionMeta = (record) => {
-  const created = record?.info?.time?.created;
-  const timestamp = created == null || created === '' ? '' : isoFromUnknown(created);
+const htmlFromSessionMeta = (record) => {
   let model = '';
   const messages = Array.isArray(record?.messages) ? record.messages : [];
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     model = formatModelLabel(messages[index]?.info);
     if (model) break;
   }
-  return [model, timestamp].filter(Boolean).join(' · ');
+  const date = formatShareDate(record?.info?.time?.created);
+  if (!model && !date) return '';
+  return `<p class="session-meta">${
+    model ? `<span class="session-model">${escapeHtml(model)}</span>` : ''
+  }${
+    date ? `<span class="session-date">${escapeHtml(date)}</span>` : ''
+  }</p>`;
 };
 
-const SESSION_HTML_STYLES = `:root {
-  --bg: #0c0c0e;
-  --fg: #ececef;
-  --muted: #9b9ba3;
-  --surface: #161618;
-  --surface-raised: #1c1c1f;
-  --border: #2a2a2e;
-  --code: #111113;
-  --link: #93c5fd;
-  --error-bg: #2a1518;
-  --error-border: #7f1d1d;
-}
-html { color-scheme: dark; }
+const SESSION_HTML_STYLES = `html { color-scheme: light; }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: #0c0c0e;
-  color: var(--fg);
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  line-height: 1.55;
+  background: #F8F7F7;
+  color: #3A3A3A;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
 }
-.page { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-.session-header { padding-bottom: 1.15rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
-.brand { margin: 0 0 0.45rem; font-size: 0.68rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.session-header h1 { margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; }
-.session-meta { margin: 0; color: var(--muted); font-size: 0.85rem; }
-.transcript { display: flex; flex-direction: column; gap: 1.15rem; }
-.msg.user { display: flex; }
-.msg.user .bubble {
-  max-width: 100%;
-  padding: 0.85rem 1rem;
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 10px 28px rgba(0,0,0,0.28);
+.topbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #E8E6E6;
 }
-.msg.assistant { display: flex; flex-direction: column; gap: 0.65rem; }
-.body h1, .body h2, .body h3, .body h4, .body h5, .body h6 { line-height: 1.3; margin: 1.1rem 0 0.45rem; }
-.body h2 { font-size: 1.15rem; }
-.body h3 { font-size: 1.05rem; }
-.body p { margin: 0.55rem 0; }
-.body p:first-child { margin-top: 0; }
-.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.35rem; }
-.body li { margin: 0.2rem 0; }
-.body a { color: var(--link); }
-.body hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
-.body blockquote { margin: 0.75rem 0; padding: 0.15rem 0 0.15rem 0.85rem; border-left: 2px solid var(--border); color: var(--muted); }
-.body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.92rem; }
-.body th, .body td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; }
-.body th { background: var(--surface); color: var(--muted); font-weight: 650; }
-.body pre, .thinking-body pre, .tool-io {
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  padding: 0.75rem 0.85rem;
-  background: var(--code);
-  border-radius: 10px;
-  overflow-x: auto;
+.mark {
+  width: 16px;
+  height: 16px;
+  background: #111;
+  border-radius: 4px;
+}
+.page {
+  width: min(880px, 100%);
+  min-height: calc(100vh - 40px);
+  margin: 0 auto;
+  padding: 20px 36px 56px;
+  background: #fff;
+  border: 1px solid #E8E6E6;
+  border-top: 0;
+}
+.session-header { margin-bottom: 2rem; }
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem;
+  font-size: 12px;
+}
+.session-model { color: #6B6B6B; }
+.session-date { color: #A3A3A3; }
+.session-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+  color: #1A1A1A;
+}
+.transcript { display: flex; flex-direction: column; gap: 2rem; }
+.msg.user { color: #3A3A3A; }
+.msg.assistant { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.gutter { color: #555; font-size: 12px; line-height: 1.7; }
+.turn { min-width: 0; }
+.body h1, .body h2, .body h3, .body h4, .body h5, .body h6 {
+  margin: 1.15rem 0 0.4rem;
+  font-size: 13px;
+  font-weight: 650;
+  color: #1A1A1A;
   line-height: 1.45;
 }
-.body pre { margin: 0.65rem 0; }
+.body p { margin: 0.55rem 0; }
+.body p:first-child { margin-top: 0; }
+.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.body li { margin: 0.15rem 0; }
+.body a { color: #3A3A3A; }
+.body hr { border: 0; border-top: 1px solid #E8E6E6; margin: 1.15rem 0; }
+.body blockquote { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 2px solid #E8E6E6; color: #6B6B6B; }
+.body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+.body th, .body td { border: 1px solid #E8E6E6; padding: 0.35rem 0.5rem; text-align: left; }
+.body th { color: #6B6B6B; font-weight: 650; }
+.body pre {
+  margin: 0.65rem 0;
+  padding: 0;
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
 .body code, .thinking-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.88em;
-  background: var(--code);
-  padding: 0.1em 0.35em;
-  border-radius: 0.3rem;
+  font-size: 12px;
 }
-.body pre code { background: none; padding: 0; }
-.thinking { margin: 0; color: var(--muted); font-size: 0.85rem; }
-.thinking summary { cursor: pointer; font-weight: 500; color: var(--muted); list-style: none; }
+.thinking { margin: 0 0 0.75rem; color: #8A8A8A; font-size: 12px; }
+.thinking summary { cursor: pointer; font-weight: 400; color: #8A8A8A; list-style: none; }
 .thinking summary::-webkit-details-marker { display: none; }
 .thinking summary::before { content: "▸ "; }
 .thinking[open] summary::before { content: "▾ "; }
-.thinking-body { margin-top: 0.45rem; color: var(--muted); }
-.tool {
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+.thinking-body { margin-top: 0.35rem; color: #8A8A8A; }
+.tool { margin: 0.7rem 0; }
+.tool-line { margin: 0; }
+.tool-name { font-weight: 700; color: #1A1A1A; }
+.tool-input, .tool-output {
+  color: #8A8A8A;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
 }
-.tool.error { background: var(--error-bg); border-color: var(--error-border); }
-.tool-head { padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); }
-.tool-name { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.tool-label { padding: 0.45rem 0.8rem 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.tool-io { border-radius: 0; background: var(--code); }
-.image { margin: 0.5rem 0; }
-.image img { max-width: 100%; height: auto; border-radius: 12px; }
-.image-omitted, .file-omitted { color: var(--muted); font-size: 0.9rem; font-style: italic; }
-.usage { color: var(--muted); font-size: 0.8rem; }`;
+.tool-output { margin: 0.2rem 0 0; padding: 0; background: none; white-space: pre-wrap; word-break: break-word; }
+.tool.error .tool-name, .tool.error .tool-input, .tool.error .tool-output { color: #B42318; }
+.image { margin: 0.6rem 0; }
+.image img { max-width: 100%; height: auto; border-radius: 4px; }
+.image-omitted, .file-omitted { color: #8A8A8A; font-style: italic; }
+.usage { margin-top: 0.85rem; color: #A3A3A3; font-size: 11px; }
+.export-note { margin: 3rem 0 0; text-align: center; color: #B0B0B0; font-size: 11px; }`;
 
 export const buildSessionHtml = (record) => {
   const title = escapeHtml(asTrimmedString(record?.info?.title) || 'Session');
-  const sessionMeta = escapeHtml(formatSessionMeta(record));
+  const sessionMeta = htmlFromSessionMeta(record);
   const blocks = (record?.messages || []).map((entry) => htmlFromMessageEntry(entry)).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1097,15 +1124,16 @@ ${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>
+<header class="topbar"><span class="mark" aria-hidden="true"></span></header>
 <div class="page">
 <header class="session-header">
-<p class="brand">Pichamber</p>
-<h1>${title}</h1>
-${sessionMeta ? `<p class="session-meta">${sessionMeta}</p>` : ''}
+${sessionMeta}
+<h1 class="session-title">${title}</h1>
 </header>
 <main class="transcript">
 ${blocks}
 </main>
+<p class="export-note">Exported from Pichamber</p>
 </div>
 </body>
 </html>

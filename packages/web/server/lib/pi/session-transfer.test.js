@@ -189,11 +189,14 @@ describe('session-transfer', () => {
 
     const html = buildSessionHtml(record);
     expect(html).toContain('<!DOCTYPE html>');
-    expect(html).toContain('<h1>Skill and image</h1>');
+    expect(html).toContain('<h1 class="session-title">Skill and image</h1>');
+    expect(html).toContain('class="topbar"');
     expect(html).toContain('class="session-header"');
     expect(html).toContain('class="msg user"');
-    expect(html).toContain('class="bubble"');
-    expect(html).toContain('background: #0c0c0e');
+    expect(html).toContain('class="gutter"');
+    expect(html).toContain('background: #F8F7F7');
+    expect(html).not.toContain('class="bubble"');
+    expect(html).not.toContain('background: #0c0c0e');
     expect(html).toContain('see this');
     expect(html).toContain('<img src="data:image/png;base64,AAAA"');
     expect(html).toContain('<details class="thinking">');
@@ -201,18 +204,20 @@ describe('session-transfer', () => {
     expect(html).toContain('load skills');
     expect(html).toContain('reading');
     expect(html).toContain('<section class="tool">');
-    expect(html).toContain('<span class="tool-name">read</span>');
+    expect(html).toContain('<strong class="tool-name">read</strong>');
     expect(html).toContain('SKILL.md');
     expect(html).toContain('using-superpowers');
     expect(html).toContain('example-provider/example-model');
     expect(html).toContain('1200 in');
     expect(html).toContain('80 out');
     expect(html).toContain('$0.002');
-    expect(html).toContain('2023-11-14T22:13:20');
+    expect(html).toContain('14 Nov 2023, 22:13');
+    expect(html).toContain('Exported from Pichamber');
     expect(html).not.toMatch(/<article class="msg assistant">[\s\S]*<pre>load skills[\s\S]*reading/);
     expect(html).not.toMatch(/cdn\.|unpkg\.|jsdelivr|https:\/\/cdn/i);
     expect(html).not.toContain('session.share');
     expect(html).not.toContain('opncd.ai');
+    expect(html).not.toContain('opencode');
   });
 
   it('renders Markdown text and labels remote images instead of embedding them', () => {
@@ -269,10 +274,11 @@ describe('session-transfer', () => {
     expect(html).not.toContain('src="https://example.com/remote.png"');
     expect(html).not.toContain('src="https://example.com/a.png"');
     expect(html).toContain('<section class="tool error">');
-    expect(html).toContain('<span class="tool-name">bash</span>');
+    expect(html).toContain('<strong class="tool-name">bash</strong>');
     expect(html).toContain('not found');
     expect(html).toContain('class="msg user"');
-    expect(html).toContain('background: #0c0c0e');
+    expect(html).toContain('background: #F8F7F7');
+    expect(html).not.toContain('class="bubble"');
   });
 
   it('escapes HTML in exported text and rejects javascript links', () => {
