@@ -58,9 +58,10 @@ import {
   readPersistedArchivedTimestamp,
   readPersistedParentID,
   readPersistedSessionMetadata,
-  readPersistedSessionMetadataFromFile,
+  readPersistedSessionMetadataFromFileTail,
   sessionTimeWithArchived,
 } from './session-metadata.js';
+import { includeArchivedSessions } from './session-list-query.js';
 import { createExtensionUIController } from './extension-ui.js';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
@@ -872,6 +873,7 @@ export const createPiHost = ({
   home = defaultHome(),
   onEvent,
   mock = false,
+  readListSessionMetadata,
 } = {}) => {
   const sessions = new Map();
   const hydrating = new Map();
@@ -1573,10 +1575,16 @@ export const createPiHost = ({
     });
   };
 
+  const readListMetadata = typeof readListSessionMetadata === 'function'
+    ? readListSessionMetadata
+    : readPersistedSessionMetadataFromFileTail;
+
   const toPersistedSessionInfo = (item, directory) => {
     const id = item?.id || item?.path;
     if (!id) return null;
-    const metadata = readPersistedSessionMetadataFromFile(item.path);
+    // Reuse title / firstMessage / timestamps from SessionManager.list().
+    // Tail-scan only for the last pichamber.metadata (archived / parentID).
+    const metadata = item.path ? readListMetadata(item.path) : undefined;
     const parentID = readPersistedParentID(metadata);
     return {
       id,
@@ -1592,10 +1600,12 @@ export const createPiHost = ({
     };
   };
 
-  const collectSessionInfos = async (directory) => {
+  const collectSessionInfos = async (directory, query) => {
+    const includeArchived = !query || includeArchivedSessions(query.archived);
     const live = Array.from(sessions.values())
       .filter((record) => !directory || record.directory === directory)
-      .map((record) => record.info);
+      .map((record) => record.info)
+      .filter((info) => includeArchived || !info?.time?.archived);
     const seen = new Set(live.map((info) => info.id));
     if (mock) return live;
     try {
@@ -1606,10 +1616,15 @@ export const createPiHost = ({
         return await pi.SessionManager.list(cwd, sessionDirForCwd(cwd, home));
       })();
       for (const item of persisted || []) {
-        const info = toPersistedSessionInfo(item, directory);
-        if (!info || seen.has(info.id)) continue;
-        seen.add(info.id);
-        live.push(info);
+        try {
+          const info = toPersistedSessionInfo(item, directory);
+          if (!info || seen.has(info.id)) continue;
+          if (!includeArchived && info.time?.archived) continue;
+          seen.add(info.id);
+          live.push(info);
+        } catch {
+          // One unreadable session file does not drop other complete sessions.
+        }
       }
     } catch {
       // Persisted listing failed: keep live sessions. Do not return empty success.
@@ -2067,8 +2082,8 @@ export const createPiHost = ({
         return [];
       }
     },
-    async listSessionInfos(directory) {
-      return collectSessionInfos(directory);
+    async listSessionInfos(directory, query) {
+      return collectSessionInfos(directory, query);
     },
     async reload(options) {
       const target = typeof options === 'string'

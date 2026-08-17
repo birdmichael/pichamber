@@ -4,6 +4,8 @@
 // Archive is a Pichamber-only flag: `{ archived: ms | 0 }` on this entry.
 // `0` means restored. Clone/fork `parentID` is the same entry:
 // `{ parentID: "<source session id>" }`. Do not invent a second session store.
+// Session list tail-scans the last pichamber.metadata; it does not full-read
+// jsonl again just to find archived / parentID.
 
 import fs from 'node:fs';
 
@@ -39,6 +41,82 @@ export const readPersistedSessionMetadataFromFile = (file) => {
     }
   }
   return readPersistedSessionMetadata(entries);
+};
+
+// List hot path: scan from the end for the last pichamber.metadata and stop.
+// Do not full-read jsonl just to count messages or rebuild allMessagesText.
+export const LIST_METADATA_TAIL_CHUNK_SIZE = 8 * 1024;
+
+const defaultListMetadataIo = {
+  openSync: (file, flags) => fs.openSync(file, flags),
+  fstatSync: (fd) => fs.fstatSync(fd),
+  readSync: (fd, buffer, offset, length, position) => (
+    fs.readSync(fd, buffer, offset, length, position)
+  ),
+  closeSync: (fd) => fs.closeSync(fd),
+};
+
+const parsePersistedSessionMetadataLine = (line) => {
+  if (!line) return undefined;
+  let parsed;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    return undefined;
+  }
+  if (parsed?.type !== 'custom' || parsed.customType !== PICHAMBER_METADATA_CUSTOM_TYPE) {
+    return undefined;
+  }
+  return isRecord(parsed.data) ? parsed.data : undefined;
+};
+
+export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => {
+  if (typeof file !== 'string' || !file) return undefined;
+  const io = options.io && typeof options.io === 'object'
+    ? { ...defaultListMetadataIo, ...options.io }
+    : defaultListMetadataIo;
+  const requestedChunk = Number(options.chunkSize);
+  const chunkSize = Number.isFinite(requestedChunk) && requestedChunk > 0
+    ? Math.floor(requestedChunk)
+    : LIST_METADATA_TAIL_CHUNK_SIZE;
+  let fd;
+  try {
+    fd = io.openSync(file, 'r');
+  } catch {
+    return undefined;
+  }
+  try {
+    const fileSize = Number(io.fstatSync(fd)?.size) || 0;
+    if (fileSize <= 0) return undefined;
+    let position = fileSize;
+    let leftover = '';
+    const buffer = Buffer.allocUnsafe(Math.min(chunkSize, fileSize));
+    while (position > 0) {
+      const start = Math.max(0, position - chunkSize);
+      const length = position - start;
+      const bytesRead = io.readSync(fd, buffer, 0, length, start);
+      const text = `${buffer.toString('utf8', 0, bytesRead)}${leftover}`;
+      const lines = text.split(/\r?\n/);
+      if (start > 0) leftover = lines.shift() ?? '';
+      else leftover = '';
+      for (let i = lines.length - 1; i >= 0; i -= 1) {
+        const metadata = parsePersistedSessionMetadataLine(lines[i]);
+        if (!metadata) continue;
+        // Last pichamber.metadata wins. After archived: ms (or any latest
+        // metadata), stop — do not keep reading earlier messages for list.
+        return metadata;
+      }
+      position = start;
+    }
+    return parsePersistedSessionMetadataLine(leftover);
+  } catch {
+    return undefined;
+  } finally {
+    try {
+      io.closeSync(fd);
+    } catch {
+    }
+  }
 };
 
 export const readPersistedParentID = (metadata) => {

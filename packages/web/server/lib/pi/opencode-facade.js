@@ -2,6 +2,7 @@ import express from 'express';
 import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
 import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
+import { applySessionListQuery } from './session-list-query.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -643,9 +644,9 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.getStatus(requestDirectory(req) || undefined));
   }));
 
-  const listSessionInfos = async (directory) => {
+  const listSessionInfos = async (directory, query) => {
     if (typeof host.listSessionInfos === 'function') {
-      return host.listSessionInfos(directory || undefined);
+      return host.listSessionInfos(directory || undefined, query);
     }
     const live = host.listSessions(directory || undefined).map((record) => record.info);
     const seen = new Set(live.map((info) => info.id));
@@ -671,24 +672,23 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     return live;
   };
 
-  const includeArchivedSessions = (archivedQuery) => archivedQuery === true || archivedQuery === 'true';
-
-  const filterSessionInfosByArchivedQuery = (infos, archivedQuery) => {
-    if (includeArchivedSessions(archivedQuery)) return infos;
-    return (infos || []).filter((info) => !info?.time?.archived);
+  const writeSessionList = async (req, res) => {
+    const { sessions, nextCursor } = applySessionListQuery(
+      await listSessionInfos(requestDirectory(req), req.query),
+      req.query,
+    );
+    if (nextCursor !== undefined) {
+      res.setHeader('x-next-cursor', String(nextCursor));
+    }
+    json(res, 200, sessions);
   };
 
-  const listSessionInfosForRequest = async (req) => filterSessionInfosByArchivedQuery(
-    await listSessionInfos(requestDirectory(req)),
-    req.query?.archived,
-  );
-
   app.get('/api/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfosForRequest(req));
+    await writeSessionList(req, res);
   }));
 
   app.get('/api/experimental/session', handle(async (req, res) => {
-    json(res, 200, await listSessionInfosForRequest(req));
+    await writeSessionList(req, res);
   }));
 
   app.post('/api/session', parseJson, handle(async (req, res) => {
