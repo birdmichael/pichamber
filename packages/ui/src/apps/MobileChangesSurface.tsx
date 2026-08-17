@@ -460,7 +460,7 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
           </button>
         ) : null}
         <div className="min-w-0 flex-1 px-1">
-          <h2 className="typography-ui-label text-foreground">{t('mobile.nav.changes')}</h2>
+          <h2 className="typography-ui-label text-foreground">{t('layout.rightSidebar.git')}</h2>
           <p className="truncate typography-micro text-muted-foreground">
             {status?.current || currentDirectory || ''}
           </p>
@@ -510,7 +510,7 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
           </button>
         ) : null}
         <div className="min-w-0 flex-1 px-1">
-          <h2 className="typography-ui-label text-foreground">{t('mobile.nav.changes')}</h2>
+          <h2 className="typography-ui-label text-foreground">{t('layout.rightSidebar.git')}</h2>
           <p className="truncate typography-micro text-muted-foreground">
             {status?.current || currentDirectory}
           </p>

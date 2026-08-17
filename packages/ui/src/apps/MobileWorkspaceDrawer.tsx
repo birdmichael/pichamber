@@ -177,7 +177,7 @@ export const MobileWorkspaceDrawer: React.FC<{
   if (variant === 'drawer' && !rootRef.current) return null;
 
   const tabItems: SortableTabsStripItem[] = [
-    { id: 'changes', label: t('mobile.menu.changes'), icon: <Icon name="git-branch" className="h-3.5 w-3.5" /> },
+    { id: 'changes', label: t('layout.rightSidebar.git'), icon: <Icon name="git-branch" className="h-3.5 w-3.5" /> },
     { id: 'files', label: t('mobile.menu.files'), icon: <Icon name="file-text" className="h-3.5 w-3.5" /> },
     { id: 'terminal', label: t('mobile.menu.terminal'), icon: <Icon name="terminal" className="h-3.5 w-3.5" /> },
     { id: 'notes', label: t('contextRail.surface.notes'), icon: <Icon name="sticky-note" className="h-3.5 w-3.5" /> },

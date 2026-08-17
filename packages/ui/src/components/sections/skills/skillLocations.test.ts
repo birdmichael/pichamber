@@ -4,6 +4,7 @@ import {
   getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
+  skillLocationLabelKey,
 } from './skillLocations';
 
 describe('skillLocations', () => {
@@ -40,5 +41,21 @@ describe('skillLocations', () => {
     expect(locationValueFrom('user', 'opencode')).toBe('user-opencode');
     expect(locationValueFrom('project', 'opencode')).toBe('project-opencode');
     expect(locationPartsFrom('user-opencode').source).toBe('opencode');
+  });
+
+  test('Pi picker labels stay on userPi / projectPi / .agents keys', () => {
+    const keys = getSkillLocationOptions(true).map((option) => skillLocationLabelKey(option.value));
+    expect(keys).toEqual([
+      'settings.skills.location.option.userPi.label',
+      'settings.skills.location.option.projectPi.label',
+      'settings.skills.location.option.userAgents.label',
+      'settings.skills.location.option.projectAgents.label',
+    ]);
+  });
+
+  test('OpenCode picker still exposes leftover OpenCode location keys', () => {
+    const keys = getSkillLocationOptions(false).map((option) => skillLocationLabelKey(option.value));
+    expect(keys).toContain('settings.skills.location.option.userOpencode.label');
+    expect(keys).toContain('settings.skills.location.option.projectOpencode.label');
   });
 });

@@ -40,6 +40,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { toast } from '@/components/ui';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
+import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { getProjectLabel, normalizePath } from './mobilePaths';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useI18n } from '@/lib/i18n';
@@ -469,7 +470,7 @@ const SessionRow: React.FC<{
 }) => {
   const { t } = useI18n();
   const time = formatRelativeShort(getSessionTimestamp(session));
-  const title = session.title?.trim() || t('mobile.sessions.untitled');
+  const title = session.title?.trim() || t(MOBILE_SESSION_CHROME_KEYS.untitled);
   const swipeEnabled = Boolean(onRevealedChange && onArchive);
   // Live indicators, same conventions as the desktop sidebar: busy/retry →
   // spinner; unseen activity on a non-active row → attention dot.
