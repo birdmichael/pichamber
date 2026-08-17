@@ -271,7 +271,6 @@ describe('settings search', () => {
     expect(piBrowser.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
     expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
     expect(leftoverOpenCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
-    expect(piDesktop.some((result) => result.id === 'sessions.agent-control-tool')).toBe(true);
   });
 
   test('shows the agent-control tool on Pi Desktop search and hides both tools in VS Code', () => {

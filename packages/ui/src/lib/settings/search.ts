@@ -492,7 +492,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'general',
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
     descriptionKey: 'settings.openchamber.tools.field.agentControlToolInfo',
-    keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'pichamber', 'sessions', 'schedule', 'control'],
+    keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'pichamber', 'sessions', 'schedule', 'scheduled', 'control'],
     isAvailable: (ctx) => shouldShowAgentControlToolSettings({ isVSCode: Boolean(ctx.isVSCode) }),
   },
   {

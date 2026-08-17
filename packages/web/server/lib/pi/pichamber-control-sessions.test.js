@@ -484,11 +484,15 @@ describe('Pi schedule actions stay on the scheduled-task service', () => {
     expect(createClient).not.toHaveBeenCalled();
   });
 
-  it('requires disabled for schedule.toggle and taskId before resolveProjectID', async () => {
+  it('requires disabled for schedule.toggle before setEnabled', async () => {
     const { service, scheduledTaskService } = createPiService();
     await expect(service.execute('schedule.toggle', { taskId: 'task-1' }, '/repo'))
       .rejects.toThrow('disabled is required for schedule.toggle');
     expect(scheduledTaskService.setEnabled).not.toHaveBeenCalled();
+  });
+
+  it('requires taskId before resolveProjectID', async () => {
+    const { service, scheduledTaskService } = createPiService();
     await expect(service.execute('schedule.run', {}, '/repo')).rejects.toThrow('taskId is required');
     expect(scheduledTaskService.resolveProjectID).not.toHaveBeenCalled();
   });
