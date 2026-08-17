@@ -222,6 +222,43 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('re-resolves the agent directory on reload after a settings change', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-agent-dir-'));
+    const first = path.join(home, 'first-agent');
+    const second = path.join(home, 'second-agent');
+    const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
+    delete process.env.OPENCHAMBER_DATA_DIR;
+    try {
+      fs.mkdirSync(first, { recursive: true });
+      fs.mkdirSync(second, { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ piAgentDir: first }),
+      );
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      expect(host.getPath('/tmp/project').config).toBe(first);
+      expect(host.getKernelInfo().paths.agent).toBe(first);
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ piAgentDir: second }),
+      );
+      await host.reload();
+      expect(host.getPath('/tmp/project').config).toBe(second);
+      expect(host.getKernelInfo().paths.agent).toBe(second);
+      expect(host.getKernelInfo().paths.models).toBe(path.join(second, 'models.json'));
+      host.dispose();
+    } finally {
+      if (previousDataDir === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+      else process.env.OPENCHAMBER_DATA_DIR = previousDataDir;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('emits session.compacted after a successful compact so pinned context can reinject', async () => {
     const events = [];
     const host = createPiHost({

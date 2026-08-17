@@ -2936,6 +2936,8 @@ export const dict: Record<I18nKey, string> = {
   "mobileUpdate.toast.available.description": "Версія {version} готова для Android.",
   "mobileUpdate.toast.actions.download": "Завантажити",
   "mobileUpdate.toast.actions.dismiss": "Сховати",
+  "piUpdate.toast.available.title": "Pi {version} доступна",
+  "piUpdate.toast.actions.dismiss": "Сховати",
   "opencodeUpdate.toast.available.title": "Оновлення Pi",
   "opencodeUpdate.toast.available.description": "Версія {version} доступна.",
   "opencodeUpdate.toast.actions.update": "Оновити",

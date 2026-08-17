@@ -811,7 +811,9 @@ export async function reloadOpenCodeConfiguration(options?: {
 
     if (!response.ok) {
       const message = payload?.error || 'Failed to reload configuration';
-      throw new Error(message);
+      const error = new Error(message) as Error & { status?: number };
+      error.status = response.status;
+      throw error;
     }
 
     if (payload?.requiresManualRestart) {

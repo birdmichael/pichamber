@@ -863,6 +863,11 @@ export const createSettingsRuntime = (deps) => {
         next = { ...next, activeProjectId: undefined };
       }
 
+      if (Object.prototype.hasOwnProperty.call(sanitized, 'piAgentDir') && sanitized.piAgentDir) {
+        const { assertUsablePiAgentDir } = await import('../pi/pi-resources.js');
+        assertUsablePiAgentDir(sanitized.piAgentDir);
+      }
+
       if (Object.prototype.hasOwnProperty.call(sanitized, 'managedRemoteTunnelPresets')) {
         await syncManagedRemoteTunnelConfigWithPresets(next.managedRemoteTunnelPresets);
       }

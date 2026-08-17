@@ -90,11 +90,13 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
 
     let cancelled = false;
     const fetchOpenCodeVersion = async () => {
-      if (isPiKernel) return;
       try {
-        const response = await runtimeFetch('/api/opencode/upgrade-status', {
-          headers: { Accept: 'application/json' },
-        });
+        const response = await runtimeFetch(
+          isPiKernel ? '/api/pi/upgrade-status' : '/api/opencode/upgrade-status',
+          {
+            headers: { Accept: 'application/json' },
+          },
+        );
         if (!response.ok) return;
         const data = await response.json().catch(() => null) as null | { currentVersion?: unknown };
         const currentVersion = typeof data?.currentVersion === 'string' ? data.currentVersion.trim() : '';
@@ -102,7 +104,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({
           setOpenCodeVersion(currentVersion);
         }
       } catch {
-        // OpenCode version is best-effort in About.
+        // Kernel version is best-effort in About.
       }
     };
 

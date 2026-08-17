@@ -3,6 +3,7 @@ import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resou
 import { findProjectFiles } from './find-files.js';
 import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
+import { getPiUpgradeStatus } from './pi-upgrade-status.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -96,6 +97,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.get('/api/health', handle(async (_req, res) => {
     json(res, 200, { healthy: true, kernel: 'pi' });
+  }));
+
+  app.get('/api/pi/upgrade-status', handle(async (_req, res) => {
+    json(res, 200, await getPiUpgradeStatus());
   }));
 
   // OpenCode SDK calls GET /user (and /api/user). A missing handler used to

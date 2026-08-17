@@ -10,6 +10,7 @@ import { GitHubSettings } from './GitHubSettings';
 import { VoiceSettings } from './VoiceSettings';
 import { TunnelSettings } from './TunnelSettings';
 import { OpenCodeCliSettings } from './OpenCodeCliSettings';
+import { PiAgentSettings } from './PiAgentSettings';
 import { OpenChamberToolsSettings } from './OpenChamberToolsSettings';
 import { shouldShowPichamberToolsSettings } from '@/lib/settings/pichamberToolsVisibility';
 import { DesktopNetworkSettings } from './DesktopNetworkSettings';
@@ -56,8 +57,9 @@ export const OpenChamberPage: React.FC<OpenChamberPageProps> = ({ section }) => 
                 <OpenChamberVisualSettings />
                 <DefaultsSettings />
                 {showDesktopNetworkSettings && <DesktopNetworkSettings />}
+                {!isVSCode && isPiKernel && <PiAgentSettings />}
                 {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
-                {shouldShowPichamberToolsSettings({ isVSCode }) && <OpenChamberToolsSettings />}
+                {shouldShowPichamberToolsSettings({ isVSCode, isPiKernel }) && <OpenChamberToolsSettings />}
                 <SessionRetentionSettings />
                 {isWebRuntime() && !isDesktopShell() && !isVSCode && !isCapacitorApp() && <PasskeySettings />}
                 {showAbout && <AboutSettings />}
@@ -136,7 +138,8 @@ const ShortcutsSectionContent: React.FC = () => {
 };
 
 // General section: app-level settings — startup/tray/network, access password,
-// passkeys, OpenCode CLI binary, message stream transport, privacy.
+// passkeys, Pi agent directory (or leftover OpenCode CLI binary), message
+// stream transport, privacy.
 const GeneralSectionContent: React.FC = () => {
     const isVSCode = isVSCodeRuntime();
     const isPiKernel = usePiKernel();
@@ -150,8 +153,9 @@ const GeneralSectionContent: React.FC = () => {
         <>
             {showDesktopNetworkSettings && <DesktopNetworkSettings />}
             {showPasskeySettings && <PasskeySettings />}
+            {!isVSCode && isPiKernel && <PiAgentSettings />}
             {!isVSCode && !isPiKernel && <OpenCodeCliSettings />}
-            {shouldShowPichamberToolsSettings({ isVSCode }) && <OpenChamberToolsSettings />}
+            {shouldShowPichamberToolsSettings({ isVSCode, isPiKernel }) && <OpenChamberToolsSettings />}
             <OpenChamberVisualSettings visibleSettings={[
                 'fileEditorKeymap',
                 'autoSaveEnabled',

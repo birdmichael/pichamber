@@ -30,6 +30,11 @@ import {
   resolveProjectAgentsMd,
   readBehaviorAgentsMd,
   resolvePiAgentsMdPath,
+  resolvePiAgentDir,
+  expandPiAgentDirPath,
+  assertUsablePiAgentDir,
+  listPiSkillRoots,
+  listPiPromptRoots,
   toConfigSkillsPayload,
 } from './pi-resources.js';
 
@@ -696,6 +701,89 @@ describe('behavior AGENTS.md', () => {
       });
       expect(resolveProjectAgentsMd(home).exists).toBe(true);
     });
+  });
+});
+
+describe('resolvePiAgentDir', () => {
+  it('uses the persisted setting over PI_CODING_AGENT_DIR and the default', () => {
+    const home = makeTemp();
+    const custom = path.join(home, 'custom-pi');
+    const envDir = path.join(home, 'env-pi');
+    expect(resolvePiAgentDir(home, {
+      piAgentDir: custom,
+      env: { PI_CODING_AGENT_DIR: envDir },
+    })).toBe(custom);
+  });
+
+  it('uses PI_CODING_AGENT_DIR when the setting is empty', () => {
+    const home = makeTemp();
+    const envDir = path.join(home, 'env-pi');
+    expect(resolvePiAgentDir(home, {
+      piAgentDir: '',
+      env: { PI_CODING_AGENT_DIR: envDir },
+    })).toBe(envDir);
+    expect(resolvePiAgentDir(home, {
+      env: { PI_CODING_AGENT_DIR: envDir },
+    })).toBe(envDir);
+  });
+
+  it('falls back to {home}/.pi/agent', () => {
+    const home = makeTemp();
+    expect(resolvePiAgentDir(home, { piAgentDir: '', env: {} })).toBe(path.join(home, '.pi', 'agent'));
+  });
+
+  it('strips wrapping quotes and expands a tilde', () => {
+    const home = makeTemp();
+    expect(expandPiAgentDirPath('"/Users/me/pi-agent"', home)).toBe('/Users/me/pi-agent');
+    expect(expandPiAgentDirPath('~/custom-pi', home)).toBe(path.join(home, 'custom-pi'));
+    expect(resolvePiAgentDir(home, { piAgentDir: '"~/quoted-pi"' })).toBe(path.join(home, 'quoted-pi'));
+  });
+
+  it('reads the persisted override from the Pichamber settings file', () => {
+    const home = makeTemp();
+    const custom = path.join(home, 'from-settings');
+    const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
+    delete process.env.OPENCHAMBER_DATA_DIR;
+    try {
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ piAgentDir: custom }),
+      );
+      expect(resolvePiAgentDir(home, { env: {} })).toBe(custom);
+    } finally {
+      if (previousDataDir === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+      else process.env.OPENCHAMBER_DATA_DIR = previousDataDir;
+    }
+  });
+
+  it('points user skill and prompt roots at the resolved agent dir', () => {
+    const home = makeTemp();
+    const custom = path.join(home, 'custom-pi');
+    const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
+    delete process.env.OPENCHAMBER_DATA_DIR;
+    try {
+      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, '.config', 'openchamber', 'settings.json'),
+        JSON.stringify({ piAgentDir: custom }),
+      );
+      expect(listPiSkillRoots({ home })[0].root).toBe(path.join(custom, 'skills'));
+      expect(listPiPromptRoots({ home })[0].root).toBe(path.join(custom, 'prompts'));
+    } finally {
+      if (previousDataDir === undefined) delete process.env.OPENCHAMBER_DATA_DIR;
+      else process.env.OPENCHAMBER_DATA_DIR = previousDataDir;
+    }
+  });
+
+  it('rejects a file path and creates a missing directory', () => {
+    const home = makeTemp();
+    const filePath = path.join(home, 'not-a-dir');
+    fs.writeFileSync(filePath, 'nope');
+    expect(() => assertUsablePiAgentDir(filePath, home)).toThrow(/folder/i);
+    const missing = path.join(home, 'new-agent');
+    expect(assertUsablePiAgentDir(missing, home)).toBe(missing);
+    expect(fs.statSync(missing).isDirectory()).toBe(true);
   });
 });
 

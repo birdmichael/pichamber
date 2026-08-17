@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { resolvePiAuthPath, resolvePiModelsPath } from './pi-resources.js';
+
 const BASE_URL_PATTERN = /^https?:\/\//;
 const ENV_KEY_PATTERN = /^\{env:([^}]+)\}$/;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -180,7 +182,7 @@ const readStoredApiKey = (home, providerId) => {
   const id = typeof providerId === 'string' ? providerId.trim() : '';
   if (!id) return '';
   try {
-    const raw = fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8');
+    const raw = fs.readFileSync(resolvePiAuthPath(home), 'utf8');
     const auth = JSON.parse(raw);
     const entry = auth && typeof auth === 'object' ? auth[id] : null;
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return '';
@@ -199,7 +201,7 @@ const readStoredProviderBaseUrl = (home, providerId) => {
   const id = typeof providerId === 'string' ? providerId.trim() : '';
   if (!id) return '';
   try {
-    const raw = fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8');
+    const raw = fs.readFileSync(resolvePiModelsPath(home), 'utf8');
     const parsed = JSON.parse(raw);
     const provider = parsed?.providers?.[id];
     if (!provider || typeof provider !== 'object' || Array.isArray(provider)) return '';

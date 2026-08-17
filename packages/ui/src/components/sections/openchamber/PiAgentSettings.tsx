@@ -1,0 +1,216 @@
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Icon } from '@/components/icon/Icon';
+import {
+  SettingsSection,
+  SettingsFieldRow,
+  SettingsCheckboxRow,
+  SettingsInset,
+  SETTINGS_ICON_BUTTON_CLASS,
+  SETTINGS_OPTION_STACK_CLASS,
+  SETTINGS_DESCRIPTION_CLASS,
+} from '@/components/sections/shared/SettingsSection';
+import { canRequestNativeDirectoryAccess, requestDirectoryAccess } from '@/lib/desktop';
+import { updateDesktopSettings } from '@/lib/persistence';
+import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
+import { useUIStore } from '@/stores/useUIStore';
+import { useI18n } from '@/lib/i18n';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import { toast } from '@/components/ui';
+
+type LoadState = 'loading' | 'error' | 'ready';
+
+const unwrapPath = (value: string): string => {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2
+    && ((trimmed.startsWith('"') && trimmed.endsWith('"'))
+      || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
+export const PiAgentSettings: React.FC = () => {
+  const { t } = useI18n();
+  const [value, setValue] = React.useState('');
+  const [resolvedPath, setResolvedPath] = React.useState('');
+  const [loadState, setLoadState] = React.useState<LoadState>('loading');
+  const [isSaving, setIsSaving] = React.useState(false);
+  const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
+  const setShowOpenCodeUpdateNotifications = useUIStore((state) => state.setShowOpenCodeUpdateNotifications);
+  const canBrowse = canRequestNativeDirectoryAccess();
+  const fieldDisabled = loadState !== 'ready' || isSaving;
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await runtimeFetch('/api/config/settings', {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) {
+          if (!cancelled) setLoadState('error');
+          return;
+        }
+        const data = (await response.json().catch(() => null)) as null | {
+          piAgentDir?: unknown;
+          piAgentDirResolved?: unknown;
+        };
+        if (cancelled) return;
+        if (!data) {
+          setLoadState('error');
+          return;
+        }
+        setValue(typeof data.piAgentDir === 'string' ? data.piAgentDir.trim() : '');
+        setResolvedPath(typeof data.piAgentDirResolved === 'string' ? data.piAgentDirResolved.trim() : '');
+        setLoadState('ready');
+      } catch {
+        if (!cancelled) setLoadState('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleBrowse = React.useCallback(async () => {
+    if (!canRequestNativeDirectoryAccess()) {
+      return;
+    }
+    try {
+      const selected = await requestDirectoryAccess();
+      if (selected.success && selected.path && selected.path.trim().length > 0) {
+        setValue(selected.path.trim());
+      }
+    } catch {
+      // Cancel leaves the field unchanged.
+    }
+  }, []);
+
+  const handleSaveAndReload = React.useCallback(async () => {
+    if (loadState !== 'ready') return;
+    setIsSaving(true);
+    try {
+      const unquoted = unwrapPath(value);
+      const response = await runtimeFetch('/api/config/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ piAgentDir: unquoted }),
+      });
+      const payload = await response.json().catch(() => null) as null | {
+        error?: unknown;
+        piAgentDir?: unknown;
+        piAgentDirResolved?: unknown;
+      };
+      if (!response.ok) {
+        const message = typeof payload?.error === 'string' && payload.error.trim()
+          ? payload.error
+          : t('settings.openchamber.piAgent.toast.saveFailed');
+        toast.error(message);
+        return;
+      }
+      setValue(typeof payload?.piAgentDir === 'string' ? payload.piAgentDir.trim() : unquoted);
+      if (typeof payload?.piAgentDirResolved === 'string') {
+        setResolvedPath(payload.piAgentDirResolved.trim());
+      }
+      try {
+        await reloadOpenCodeConfiguration({
+          message: t('settings.openchamber.piAgent.actions.reloading'),
+        });
+      } catch (error) {
+        const status = (error as Error & { status?: number })?.status;
+        if (status === 409) {
+          toast.error(t('settings.openchamber.piAgent.toast.reloadBusy'));
+          return;
+        }
+        const message = error instanceof Error && error.message
+          ? error.message
+          : t('settings.openchamber.piAgent.toast.reloadFailed');
+        toast.error(message);
+      }
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : t('settings.openchamber.piAgent.toast.saveFailed');
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [loadState, t, value]);
+
+  const handleShowUpdateNotificationsChange = React.useCallback((enabled: boolean) => {
+    setShowOpenCodeUpdateNotifications(enabled);
+    void updateDesktopSettings({ showOpenCodeUpdateNotifications: enabled });
+  }, [setShowOpenCodeUpdateNotifications]);
+
+  return (
+    <SettingsSection title={t('settings.openchamber.piAgent.title')}>
+      <div className="space-y-0.5">
+        <SettingsFieldRow
+          settingsItem="sessions.pi-agent-directory"
+          label={t('settings.openchamber.piAgent.field.directory')}
+          info={t('settings.openchamber.piAgent.field.directoryInfo')}
+          alignEnd={false}
+          controlClassName="@xl:w-[20rem]"
+        >
+          <Input
+            value={loadState === 'ready' ? value : ''}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={resolvedPath || t('settings.openchamber.piAgent.field.directoryPlaceholder')}
+            disabled={fieldDisabled}
+            className="h-8 min-w-0 flex-1 font-mono text-xs"
+            aria-invalid={loadState === 'error'}
+            aria-label={t('settings.openchamber.piAgent.field.directoryAria')}
+          />
+          {canBrowse ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={handleBrowse}
+              disabled={fieldDisabled}
+              className={SETTINGS_ICON_BUTTON_CLASS}
+              aria-label={t('settings.openchamber.piAgent.actions.browseAria')}
+              title={t('settings.openchamber.piAgent.actions.browse')}
+            >
+              <Icon name="folder" className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </SettingsFieldRow>
+        {loadState === 'error' ? (
+          <p className={SETTINGS_DESCRIPTION_CLASS} role="alert">
+            {t('settings.openchamber.piAgent.error.loadFailed')}
+          </p>
+        ) : null}
+
+        <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
+          <SettingsCheckboxRow
+            settingsItem="sessions.pi-update-notifications"
+            checked={showOpenCodeUpdateNotifications}
+            onChange={handleShowUpdateNotificationsChange}
+            label={t('settings.openchamber.piAgent.field.showUpdateNotifications')}
+            ariaLabel={t('settings.openchamber.piAgent.field.showUpdateNotificationsAria')}
+            info={t('settings.openchamber.piAgent.field.showUpdateNotificationsInfo')}
+          />
+
+          <div className="flex justify-start py-1.5">
+            <Button
+              type="button"
+              size="xs"
+              onClick={handleSaveAndReload}
+              disabled={fieldDisabled}
+              className="shrink-0 !font-normal"
+            >
+              {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}
+            </Button>
+          </div>
+        </SettingsInset>
+      </div>
+    </SettingsSection>
+  );
+};

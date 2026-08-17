@@ -58,6 +58,9 @@ export type DesktopSettings = {
   homeDirectory?: string;
   // Optional absolute path to `opencode` binary.
   opencodeBinary?: string;
+  // Optional override for the Pi agent directory. Empty clears to env-or-default.
+  piAgentDir?: string;
+  piAgentDirResolved?: string;
   desktopLanAccessEnabled?: boolean;
   desktopKeepAwakeEnabled?: boolean;
   desktopMinimizeToTrayEnabled?: boolean;

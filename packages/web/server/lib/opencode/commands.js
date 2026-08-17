@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { isPiKernelEnabled } from '../pi/kernel.js';
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
 import {
   CONFIG_FILE,
   OPENCODE_CONFIG_DIR,
@@ -56,7 +57,7 @@ function getProjectCommandPath(workingDirectory, commandName) {
 
 function getUserCommandPath(commandName) {
   if (isPiKernelEnabled()) {
-    const piPath = path.join(os.homedir(), '.pi', 'agent', 'prompts', `${commandName}.md`);
+    const piPath = path.join(resolvePiAgentDir(os.homedir()), 'prompts', `${commandName}.md`);
     const leftover = path.join(COMMAND_DIR, `${commandName}.md`);
     if (fs.existsSync(leftover) && !fs.existsSync(piPath)) return leftover;
     return piPath;

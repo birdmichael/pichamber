@@ -640,6 +640,8 @@ export interface SettingsPayload {
   lastDirectory?: string;
   homeDirectory?: string;
   opencodeBinary?: string;
+  piAgentDir?: string;
+  piAgentDirResolved?: string;
   projects?: ProjectEntry[];
   activeProjectId?: string;
   securityScopedBookmarks?: string[];

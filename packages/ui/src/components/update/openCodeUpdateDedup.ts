@@ -98,3 +98,17 @@ export const resolveOpenCodeUpgradeStatusVersion = (
   if (typeof status.latestVersion !== 'string') return '';
   return status.latestVersion.trim();
 };
+
+/**
+ * Pulls the candidate version out of an `/api/pi/upgrade-status` JSON
+ * payload. The bundled SDK cannot be upgraded in-app, so this ignores
+ * `upgrade.supported` and only requires `available === true`.
+ */
+export const resolvePiUpgradeStatusVersion = (
+  status: OpenCodeUpgradeStatusLike | null | undefined,
+): string => {
+  if (!status) return '';
+  if (status.available !== true) return '';
+  if (typeof status.latestVersion !== 'string') return '';
+  return status.latestVersion.trim();
+};

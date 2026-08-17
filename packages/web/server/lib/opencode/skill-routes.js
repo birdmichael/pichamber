@@ -2,6 +2,7 @@ import { createOpencodeClient } from '@opencode-ai/sdk/v2';
 import { buildDeferredRestartResponse } from './config-mutation-response.js';
 import { inferSkillScopeAndSourceFromPath } from './skills.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
 
 /**
  * Matches how OpenCode reads its own boolean env flags: any value other than
@@ -441,7 +442,7 @@ export const registerSkillRoutes = (app, dependencies) => {
           targetSource,
           workingDirectory,
           userSkillDir: isPiKernelEnabled()
-            ? path.join(os.homedir(), '.pi', 'agent', 'skills')
+            ? path.join(resolvePiAgentDir(os.homedir()), 'skills')
             : SKILL_DIR,
           selections,
           conflictPolicy,
@@ -482,7 +483,7 @@ export const registerSkillRoutes = (app, dependencies) => {
         targetSource,
         workingDirectory,
         userSkillDir: isPiKernelEnabled()
-          ? path.join(os.homedir(), '.pi', 'agent', 'skills')
+          ? path.join(resolvePiAgentDir(os.homedir()), 'skills')
           : SKILL_DIR,
         selections,
         conflictPolicy,

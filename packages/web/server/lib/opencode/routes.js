@@ -388,7 +388,10 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
     } catch (error) {
       console.error('[API:PUT /api/config/settings] Failed to save settings:', error);
       console.error('[API:PUT /api/config/settings] Error stack:', error.stack);
-      res.status(500).json({ error: 'Failed to save settings' });
+      const status = Number(error?.status) || 500;
+      res.status(status).json({
+        error: status === 400 && error?.message ? error.message : 'Failed to save settings',
+      });
     }
   });
 

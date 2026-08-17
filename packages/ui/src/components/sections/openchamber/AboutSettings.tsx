@@ -81,12 +81,14 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
     let cancelled = false;
 
     const loadOpenCodeVersion = async () => {
-      if (isPiKernel) return;
       try {
-        const response = await runtimeFetch('/api/opencode/upgrade-status', {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-        });
+        const response = await runtimeFetch(
+          isPiKernel ? '/api/pi/upgrade-status' : '/api/opencode/upgrade-status',
+          {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          },
+        );
         if (!response.ok) return;
         const data = await response.json().catch(() => null) as { currentVersion?: unknown } | null;
         const version = typeof data?.currentVersion === 'string' && data.currentVersion.trim().length > 0
@@ -136,7 +138,7 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
           <h2 className={`mt-4 ${SETTINGS_BRAND_TITLE_CLASS}`}>Pichamber</h2>
           <div className="mt-2 space-y-1 typography-ui text-muted-foreground">
             <p>{t('aboutDialog.openChamberVersionLabel', { version: currentVersion })}</p>
-            {!isPiKernel ? <p>{t('aboutDialog.openCodeVersionLabel', { version: openCodeVersion || t('settings.openchamber.about.state.unknown') })}</p> : null}
+            <p>{t('aboutDialog.openCodeVersionLabel', { version: openCodeVersion || t('settings.openchamber.about.state.unknown') })}</p>
           </div>
           <InstanceServiceUrls />
         </div>
@@ -229,12 +231,10 @@ export const AboutSettings: React.FC<AboutSettingsProps> = ({ initialUpdateDialo
             <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.openchamber.about.field.version')}</span>
             <span className="typography-meta text-muted-foreground font-mono">{currentVersion}</span>
           </div>
-          {!isPiKernel ? (
           <div className="flex min-w-0 flex-col">
             <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.openchamber.about.field.openCodeVersion')}</span>
             <span className="typography-meta text-muted-foreground font-mono">{openCodeVersion || t('settings.openchamber.about.state.unknown')}</span>
           </div>
-          ) : null}
           
           <div className="flex items-center gap-3">
             {updateStore.checking && (

@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Settings:** on Pi, General now has a Pi section for the agent directory and Pi update notifications. Empty uses `PI_CODING_AGENT_DIR` or `~/.pi/agent`; Save + Reload applies the folder without copying the old tree. The leftover OpenCode binary panel stays on the OpenCode kernel. About still updates the Pichamber app; the in-app notice is informational only (close #187).
 - **Desktop:** on Pi, agents can create sessions, send or fork prompts, and manage scheduled tasks with the Pichamber tool. Settings → Pichamber Tools now shows both Agent control and Pichamber Web; turning Agent control off and reloading idle sessions removes the tool.
 - **Desktop:** on Pi, agents can open and drive the right-hand Browser rail with the Pichamber Web tool (open, snapshot, click, type, scroll, and the rest of the existing browser actions). Settings → Pichamber Tools toggles it; turning it off and reloading idle sessions removes it.
 - Chat: on Pi, each Pichamber Web call now shows one Pichamber Web card with its arguments and result. The empty leftover Tool row above it is gone.

@@ -488,12 +488,31 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isPiKernel && !ctx.isVSCode && !ctx.isWindowsArm64,
   },
   {
+    id: 'sessions.pi-agent-directory',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.field.directory',
+    descriptionKey: 'settings.openchamber.piAgent.field.directoryInfo',
+    keywords: ['pi', 'agent', 'directory', 'agent directory', 'PI_CODING_AGENT_DIR', 'auth.json', 'models.json'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
+    id: 'sessions.pi-update-notifications',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.field.showUpdateNotifications',
+    descriptionKey: 'settings.openchamber.piAgent.field.showUpdateNotificationsInfo',
+    keywords: ['pi', 'update', 'updates', 'notifications', 'update notifications', 'sdk'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
     id: 'sessions.agent-control-tool',
     page: 'general',
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
     descriptionKey: 'settings.openchamber.tools.field.agentControlToolInfo',
     keywords: ['agent', 'tool', 'orchestration', 'openchamber', 'pichamber', 'sessions', 'schedule', 'scheduled', 'control'],
-    isAvailable: (ctx) => shouldShowAgentControlToolSettings({ isVSCode: Boolean(ctx.isVSCode) }),
+    isAvailable: (ctx) => shouldShowAgentControlToolSettings({
+      isVSCode: Boolean(ctx.isVSCode),
+      isPiKernel: Boolean(ctx.isPiKernel),
+    }),
   },
   {
     id: 'sessions.agent-web-tool',
@@ -501,7 +520,10 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.tools.field.agentWebTool',
     descriptionKey: 'settings.openchamber.tools.field.agentWebToolInfo',
     keywords: ['agent', 'tool', 'web', 'browser', 'page', 'preview', 'openchamber', 'pichamber', 'web tool'],
-    isAvailable: (ctx) => shouldShowPichamberToolsSettings({ isVSCode: Boolean(ctx.isVSCode) }),
+    isAvailable: (ctx) => shouldShowPichamberToolsSettings({
+      isVSCode: Boolean(ctx.isVSCode),
+      isPiKernel: Boolean(ctx.isPiKernel),
+    }),
   },
   {
     id: 'git.github-account',

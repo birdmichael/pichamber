@@ -195,6 +195,13 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(pathBody.directory).toBe('/tmp/project');
       expect(pathBody.config).toContain('.pi/agent');
 
+      const upgradeRes = await fetch(`${url}/api/pi/upgrade-status`);
+      const upgrade = await upgradeRes.json();
+      expect(upgradeRes.status).toBe(200);
+      expect(upgrade.package).toBe('@earendil-works/pi-coding-agent');
+      expect(upgrade.upgrade).toEqual({ supported: false, reason: 'bundled' });
+      expect(typeof upgrade.available).toBe('boolean');
+
       const providers = await (await fetch(`${url}/api/config/providers`)).json();
       expect(providers.providers[0].id).toBe('pi-mock');
 

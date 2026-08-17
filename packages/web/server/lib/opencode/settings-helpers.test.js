@@ -284,6 +284,21 @@ describe('settings helpers', () => {
     });
   });
 
+  it('accepts a Pi agent directory override and empty-string clear', () => {
+    const helpers = createTestHelpers();
+
+    expect(helpers.sanitizeSettingsUpdate({ piAgentDir: ' /Users/me/custom-pi ' })).toEqual({
+      piAgentDir: '/Users/me/custom-pi',
+    });
+    expect(helpers.sanitizeSettingsUpdate({ piAgentDir: '' })).toEqual({
+      piAgentDir: '',
+    });
+    expect(helpers.formatSettingsResponse({ piAgentDir: '/tmp/custom-pi' })).toMatchObject({
+      piAgentDir: '/tmp/custom-pi',
+      piAgentDirResolved: expect.any(String),
+    });
+  });
+
   it('accepts dismissed OpenCode update toast version as a persisted shared setting', () => {
     const helpers = createTestHelpers();
 

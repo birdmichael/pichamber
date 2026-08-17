@@ -1050,6 +1050,14 @@ const sanitizeWebSettings = (payload: unknown): DesktopSettings | null => {
     const trimmed = candidate.opencodeBinary.trim();
     result.opencodeBinary = trimmed.length > 0 ? trimmed : undefined;
   }
+  if (typeof candidate.piAgentDir === 'string') {
+    const trimmed = candidate.piAgentDir.trim();
+    result.piAgentDir = trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof candidate.piAgentDirResolved === 'string') {
+    const trimmed = candidate.piAgentDirResolved.trim();
+    result.piAgentDirResolved = trimmed.length > 0 ? trimmed : undefined;
+  }
   if (typeof candidate.desktopLanAccessEnabled === 'boolean') {
     result.desktopLanAccessEnabled = candidate.desktopLanAccessEnabled;
   }
