@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
-import { canShowPiPlanToggle } from '@/sync/pi-session-plan';
 import { isPiGoalComposerButtonVisible } from '@/lib/piGoal';
+import { isMcpSettingsAvailable } from '@/lib/settings/metadata';
+import { canShowPiPlanToggle } from '@/sync/pi-session-plan';
 
 import {
   fallbackMobileWorkspaceTab,
+  isMobileMcpTabVisible,
   isMobilePlanTabVisible,
   listVisibleMobileWorkspaceTabs,
   MOBILE_WORKSPACE_ALWAYS_TABS,
@@ -105,6 +107,7 @@ describe('mobile Plan tab visibility', () => {
       featurePlugins: plugins(true, true),
       plan: { status: 'active', planMarkdown: '' },
       planModeExperimentalEnabled: false,
+      isMcpFeaturePluginActive: true,
     });
     expect(tabs).toEqual(['changes', 'files', 'terminal', 'notes', 'plan', 'mcp']);
     expect((tabs as string[]).some((tab) => ['browser', 'pr', 'diff', 'walkthrough'].includes(tab))).toBe(false);
@@ -116,6 +119,7 @@ describe('mobile Plan tab visibility', () => {
       featurePlugins: plugins(true, true),
       plan: { status: 'active', planMarkdown: '' },
       planModeExperimentalEnabled: false,
+      isMcpFeaturePluginActive: true,
     })).toEqual(['changes', 'files', 'terminal', 'notes', 'plan', 'mcp']);
 
     expect(listVisibleMobileWorkspaceTabs({
@@ -123,7 +127,8 @@ describe('mobile Plan tab visibility', () => {
       featurePlugins: plugins(true, true),
       plan: { status: 'off', planMarkdown: '' },
       planModeExperimentalEnabled: true,
-    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS]);
+      isMcpFeaturePluginActive: true,
+    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS, 'mcp']);
   });
 
   test('falls back off Plan when the tab is no longer visible', () => {
@@ -134,6 +139,63 @@ describe('mobile Plan tab visibility', () => {
       planModeExperimentalEnabled: false,
     });
     expect(fallbackMobileWorkspaceTab('plan', hidden)).toBe('changes');
+    expect(fallbackMobileWorkspaceTab('files', hidden)).toBe('files');
+  });
+});
+
+describe('mobile MCP tab visibility', () => {
+  test('matches Settings MCP availability on Pi and OpenCode', () => {
+    expect(isMobileMcpTabVisible({ isPiKernel: true })).toBe(false);
+    expect(isMobileMcpTabVisible({ isPiKernel: true, isMcpFeaturePluginActive: false })).toBe(false);
+    expect(isMobileMcpTabVisible({ isPiKernel: true, isMcpFeaturePluginActive: true })).toBe(true);
+    expect(isMobileMcpTabVisible({ isPiKernel: false })).toBe(true);
+    expect(isMobileMcpTabVisible({ isPiKernel: false, isMcpFeaturePluginActive: false })).toBe(true);
+
+    expect(isMobileMcpTabVisible({ isPiKernel: true, isMcpFeaturePluginActive: true }))
+      .toBe(isMcpSettingsAvailable({ isPiKernel: true, isMcpFeaturePluginActive: true }));
+    expect(isMobileMcpTabVisible({ isPiKernel: true, isMcpFeaturePluginActive: false }))
+      .toBe(isMcpSettingsAvailable({ isPiKernel: true, isMcpFeaturePluginActive: false }));
+  });
+
+  test('lists MCP only when Settings MCP is available', () => {
+    const planOff = {
+      featurePlugins: plugins(true, true),
+      plan: { status: 'off' as const, planMarkdown: '' },
+      planModeExperimentalEnabled: true,
+    };
+
+    expect(listVisibleMobileWorkspaceTabs({
+      isPiKernel: true,
+      ...planOff,
+      isMcpFeaturePluginActive: false,
+    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS]);
+    expect(listVisibleMobileWorkspaceTabs({
+      isPiKernel: true,
+      ...planOff,
+    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS]);
+    expect(listVisibleMobileWorkspaceTabs({
+      isPiKernel: true,
+      ...planOff,
+      isMcpFeaturePluginActive: true,
+    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS, 'mcp']);
+    expect(listVisibleMobileWorkspaceTabs({
+      isPiKernel: false,
+      featurePlugins: null,
+      plan: null,
+      planModeExperimentalEnabled: false,
+      isMcpFeaturePluginActive: false,
+    })).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS, 'mcp']);
+  });
+
+  test('falls back off MCP when the tab is no longer visible', () => {
+    const hidden = listVisibleMobileWorkspaceTabs({
+      isPiKernel: true,
+      featurePlugins: plugins(false, false),
+      plan: { status: 'off', planMarkdown: '' },
+      planModeExperimentalEnabled: false,
+      isMcpFeaturePluginActive: false,
+    });
+    expect(fallbackMobileWorkspaceTab('mcp', hidden)).toBe('changes');
     expect(fallbackMobileWorkspaceTab('files', hidden)).toBe('files');
   });
 });

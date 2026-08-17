@@ -79,7 +79,7 @@ list. Each tab implements one Desktop surface id, or is a mobile-only pane:
 | `terminal` | `terminal` | Always. PTY stays on the connected server. |
 | `notes` | `notes` | Always. Opening a notes plan file is a fullscreen `PlanView` with `targetPath`, not the session Plan tab. |
 | `plan` | `plan` | Same gate as the Desktop rail: `resolvePlanRailEnabled` / `usePiPlanChrome()`. On Pi that is Feature Plugins `plan` installed+enabled **and** live status `active` / `ready` / `saved` / `implementing`, including empty “no plan yet”. `/health.planModeExperimentalEnabled` must not gate it. On OpenCode it stays the leftover experimental flag. Renders `PlanView` with no `targetPath` (`PiSessionPlanView` on Pi). |
-| `mcp` | — | Always in this slice. A later slice will match Settings MCP (`isMcpSettingsAvailable`). Not a Desktop rail surface. |
+| `mcp` | — | Same gate as Desktop Settings MCP: `isMcpSettingsAvailable` / Feature Plugin MCP installed+enabled. Hidden on Pi when the slot is off. OpenCode keeps the tab. Not a Desktop rail surface. |
 
 Work Status is not a workspace tab and not the Desktop Context rail
 (`CONTEXT_SURFACES` id `context`). The 300px chat-column card stays off

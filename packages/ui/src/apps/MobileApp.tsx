@@ -26,7 +26,9 @@ import type { RuntimeAPIs } from '@/lib/api/types';
 import { readTabletLayout, useOrientation, useTabletLayout } from '@/lib/device';
 import { useHardwareKeyboard } from '@/lib/hardwareKeyboard';
 import { useI18n } from '@/lib/i18n';
+import { isMcpSettingsAvailable } from '@/lib/settings/metadata';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { getRuntimeApiBaseUrl, getRuntimeKey, subscribeRuntimeEndpointChanged, switchRuntimeEndpoint } from '@/lib/runtime-switch';
 import { refreshGlobalSessions, resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { clearLastActiveSession, readLastActiveSession } from '@/sync/last-session-cache';
@@ -118,6 +120,9 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   const mcpServers = useMcpConfigStore((state) => state.mcpServers);
   const setMcpDraft = useMcpConfigStore((state) => state.setMcpDraft);
   const setSelectedMcp = useMcpConfigStore((state) => state.setSelectedMcp);
+  const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
+  const mcpSettingsAvailable = isMcpSettingsAvailable({ isPiKernel, isMcpFeaturePluginActive });
 
   // NOTE: pendingChangesDiff is intentionally NOT cleared on close — it keys
   // the persistent Changes pane in the workspace drawer, and clearing it would
@@ -254,6 +259,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
           return;
         }
         if (target === 'mcp') {
+          if (!mcpSettingsAvailable) return;
           setWorkspaceTab('mcp');
           setWorkspaceOpen(true);
           return;
@@ -268,7 +274,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
         openSettingsSurface(section ? 'page-content' : 'nav');
       },
     }),
-    [isTabletLayout, openChangesSurface, openFilesSurface, openSettingsSurface, openSurface, setSettingsPage],
+    [isTabletLayout, mcpSettingsAvailable, openChangesSurface, openFilesSurface, openSettingsSurface, openSurface, setSettingsPage],
   );
   useDeepLinkHandlers(deepLinkHandlers);
 
@@ -361,6 +367,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   );
 
   const openMcpCreateSettings = React.useCallback(() => {
+    if (!mcpSettingsAvailable) return;
     const baseName = 'new-mcp-server';
     let newName = baseName;
     let counter = 1;
@@ -390,7 +397,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
     setSelectedMcp(newName);
     setSettingsPage('mcp');
     openSettingsSurface('page-content');
-  }, [mcpServers, openSettingsSurface, setMcpDraft, setSelectedMcp, setSettingsPage]);
+  }, [mcpServers, mcpSettingsAvailable, openSettingsSurface, setMcpDraft, setSelectedMcp, setSettingsPage]);
 
   return (
     <DedicatedMobileAppProvider actions={mobileActions}>
