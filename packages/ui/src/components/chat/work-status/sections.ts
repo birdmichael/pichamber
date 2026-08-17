@@ -22,9 +22,9 @@ export const WORK_STATUS_SECTION_IDS = [
   'contextSources',
 ] as const;
 
-type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
+export type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
 
-type WorkStatusSectionContext = {
+export type WorkStatusSectionContext = {
   /** Pi has no provider-quota API; the OpenCode usage section is unavailable. */
   isPiKernel?: boolean;
   /** Pi MCP follows the feature-plugin slot, not leftover mcp.json files. */

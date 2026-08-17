@@ -41,6 +41,9 @@ describe('openSubagentChildSession', () => {
   });
 
   test('navigates in place on mobile, embedded, and VS Code', () => {
+    // Shared by Desktop Work Status, the transcript card, and the mobile
+    // session-metadata host. A busy parent is not an input — opening a child
+    // is always setCurrentSession on those surfaces.
     const navigated: Array<[string, string]> = [];
     const openContextPanelTab = () => {
       throw new Error('must not open a side panel');

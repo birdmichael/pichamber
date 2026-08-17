@@ -310,12 +310,15 @@ describe('useWorkStatusVisibility', () => {
     teardown();
   });
 
-  test('stays hidden on mobile and in VS Code regardless of width', () => {
+  test('refuses the inline chat-column card on mobile and in VS Code regardless of width', () => {
+    // Mobile still has Work Status: the same rows render in MobileSessionMetadata.
+    // This hook only answers whether the 300px chat-column card may occupy layout.
     const mobile = renderVisibility(
       { directory: '/repo', isMobile: true, isVSCode: false },
       REQUIRED * 2,
     );
     expect(mobile.result.visible).toBe(false);
+    expect(mobile.result.fits).toBe(false);
     mobile.teardown();
 
     observed = [];
