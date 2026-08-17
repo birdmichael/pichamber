@@ -24,7 +24,7 @@ import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useI18n } from '@/lib/i18n';
 import { parseModelIdentifier } from '@/lib/modelIdentifier';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 const getDisplayModel = (
   storedModel: string | undefined
@@ -478,7 +478,7 @@ export const DefaultsSettings: React.FC = () => {
               </Select>
             </SettingsFieldRow>
 
-            {!isPiKernel ? (
+            {shouldShowOpenCodeAgentPicker(isPiKernel) ? (
             <SettingsFieldRow
               settingsItem="sessions.default-agent"
               label={t('settings.openchamber.defaults.field.defaultAgent')}

@@ -17,6 +17,7 @@ import { isPrimaryMode } from '@/components/chat/mobileControlsUtils';
 import { EXECUTION_FORK_DEFAULT_INSTRUCTIONS, EXECUTION_FORK_GOAL_INSTRUCTIONS } from '@/lib/messages/executionMeta';
 import { useI18n } from '@/lib/i18n';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 export type ForkSessionExecution = {
   providerID: string;
@@ -38,6 +39,8 @@ type ForkSessionDialogProps = {
 
 export function ForkSessionDialog(props: ForkSessionDialogProps) {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const { open, onOpenChange, projectDirectory, submitting = false, onConfirm } = props;
 
   const loadProviders = useConfigStore((state) => state.loadProviders);
@@ -133,12 +136,12 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
       providerID,
       modelID,
       variant,
-      agent,
+      agent: resolvePinnedPiAgentName(isPiKernel, agent),
       instructions,
       createWorktree: showCreateWorktree && createWorktree,
       runAsGoal: showRunAsGoal && runAsGoal,
     });
-  }, [canConfirm, submitting, onConfirm, providerID, modelID, variant, agent, instructions, showCreateWorktree, createWorktree, showRunAsGoal, runAsGoal]);
+  }, [canConfirm, submitting, onConfirm, providerID, modelID, variant, agent, instructions, showCreateWorktree, createWorktree, showRunAsGoal, runAsGoal, isPiKernel]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -183,6 +186,7 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
               onChange={setVariant}
             />
           </div>
+          {showAgentPicker ? (
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('sessions.scheduledTasks.editor.agent.label')}</span>
             <AgentSelector
@@ -192,6 +196,7 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
               onChange={setAgent}
             />
           </div>
+          ) : null}
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('chat.messageBody.forkDialog.instructions.label')}</span>
             <Textarea

@@ -18,6 +18,7 @@ import {
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { parseModelIdentifier } from '@/lib/modelIdentifier';
+import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
   SettingsSection,
@@ -28,6 +29,8 @@ import {
 
 export const CommandsPage: React.FC = () => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showOverrideAgent = shouldShowOpenCodeAgentPicker(isPiKernel);
   const {
     selectedCommandName,
     getCommandByName,
@@ -154,7 +157,7 @@ export const CommandsPage: React.FC = () => {
       const config: CommandConfig = {
         name: commandName,
         description: description.trim() || undefined,
-        agent: trimmedAgent === '' ? null : trimmedAgent,
+        agent: showOverrideAgent ? (trimmedAgent === '' ? null : trimmedAgent) : null,
         model: trimmedModel === '' ? null : trimmedModel,
         template: trimmedTemplate,
         scope: isNewCommand ? draftScope : undefined,
@@ -269,6 +272,7 @@ export const CommandsPage: React.FC = () => {
         title={t('settings.commands.page.section.executionContext')}
         contentClassName="space-y-0"
       >
+        {showOverrideAgent ? (
         <SettingsFieldRow
           settingsItem="commands.agent"
           label={t('settings.commands.page.field.overrideAgent')}
@@ -279,6 +283,7 @@ export const CommandsPage: React.FC = () => {
             className={SETTINGS_CUSTOM_TRIGGER_CLASS}
           />
         </SettingsFieldRow>
+        ) : null}
 
         <SettingsFieldRow
           settingsItem="commands.model"

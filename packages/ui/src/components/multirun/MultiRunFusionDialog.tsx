@@ -16,6 +16,7 @@ import { getSyncMessages, getSyncParts } from '@/sync/sync-refs';
 import { flattenAssistantTextParts } from '@/lib/messages/messageText';
 import { getFusionSessionTitle, parseMultiRunSessionTitle } from '@/lib/multirun/title';
 import { renderMagicPrompt } from '@/lib/magicPrompts';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { AgentSelector } from './AgentSelector';
 import { ModelMultiSelect, generateInstanceId, type ModelSelectionWithId } from './ModelMultiSelect';
 
@@ -75,6 +76,8 @@ export function MultiRunFusionDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const liveSessions = useAllLiveSessions();
   const activeSessions = useGlobalSessionsStore((state) => state.activeSessions);
   const archivedSessions = useGlobalSessionsStore((state) => state.archivedSessions);
@@ -171,7 +174,7 @@ export function MultiRunFusionDialog({
         providerID,
         modelID,
         variant: variant || undefined,
-        agent: agent || undefined,
+        agent: resolvePinnedPiAgentName(isPiKernel, agent) || undefined,
         text: visiblePrompt,
         additionalParts: [
           { text: instructionsPrompt, synthetic: true },
@@ -231,7 +234,9 @@ export function MultiRunFusionDialog({
             </Select>
           ) : null}
 
+          {showAgentPicker ? (
           <AgentSelector value={agent} onChange={setAgent} portalToBody />
+          ) : null}
         </div>
 
         <div className="space-y-2">

@@ -17,6 +17,7 @@ import { isPrimaryMode } from '@/components/chat/mobileControlsUtils';
 import { useI18n } from '@/lib/i18n';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useAgentsStore } from '@/stores/useAgentsStore';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 export type ReviewFlowExecution = {
   providerID: string;
@@ -57,6 +58,8 @@ export function ReviewFlowDialog({
   onConfirm,
 }: ReviewFlowDialogProps) {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const loadProviders = useConfigStore((state) => state.loadProviders);
   const loadConfigAgents = useConfigStore((state) => state.loadAgents);
   const loadAgentsStoreAgents = useAgentsStore((state) => state.loadAgents);
@@ -127,8 +130,11 @@ export function ReviewFlowDialog({
 
   const handleSubmit = React.useCallback(() => {
     if (!canConfirm || submitting) return;
-    void onConfirm(execution);
-  }, [canConfirm, submitting, onConfirm, execution]);
+    void onConfirm({
+      ...execution,
+      agent: resolvePinnedPiAgentName(isPiKernel, execution.agent),
+    });
+  }, [canConfirm, submitting, onConfirm, execution, isPiKernel]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -200,6 +206,7 @@ export function ReviewFlowDialog({
             />
           </div>
 
+          {showAgentPicker ? (
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('sessions.scheduledTasks.editor.agent.label')}</span>
             <AgentSelector
@@ -209,6 +216,7 @@ export function ReviewFlowDialog({
               onChange={(agent) => setExecution((prev) => ({ ...prev, agent }))}
             />
           </div>
+          ) : null}
         </div>
 
         <DialogFooter>

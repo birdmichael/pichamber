@@ -16,6 +16,7 @@ import { MobileOverlayPanel } from '@/components/ui/MobileOverlayPanel';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 interface AgentSelectorProps {
     agentName: string;
@@ -33,6 +34,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
     dropdownPortalToBody = false,
 }) => {
     const { t } = useI18n();
+    const isPiKernel = usePiKernel();
     const { isReady, isUnavailable } = useOpenCodeReadiness();
     const configAgents = useConfigStore((state) => state.agents);
     const agentsStoreAgents = useAgentsStore((state) => state.agents);
@@ -46,6 +48,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
         const visible = filterVisibleAgents(rawAgents);
         return filter ? visible.filter(filter) : visible;
     }, [rawAgents, filter]);
+    const showPicker = shouldShowOpenCodeAgentPicker(isPiKernel, agents);
     const isMobile = useUIStore(state => state.isMobile);
     const { isMobile: deviceIsMobile } = useDeviceInfo();
     const isActuallyMobile = isMobile || deviceIsMobile;
@@ -57,6 +60,12 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
         void loadConfigAgents();
         void loadAgentsStore();
     }, [rawAgents.length, loadConfigAgents, loadAgentsStore]);
+
+    React.useEffect(() => {
+        if (showPicker) return;
+        const pinned = resolvePinnedPiAgentName(true, agentName);
+        if (agentName !== pinned) onChange(pinned);
+    }, [agentName, onChange, showPicker]);
 
     const closeMobilePanel = () => setIsMobilePanelOpen(false);
 
@@ -124,6 +133,8 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
             </MobileOverlayPanel>
         );
     };
+
+    if (!showPicker) return null;
 
     return (
         <>

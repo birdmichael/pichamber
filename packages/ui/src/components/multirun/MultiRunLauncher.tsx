@@ -30,6 +30,7 @@ import { PROJECT_ICON_MAP, PROJECT_COLOR_MAP, ProjectIconImage } from '@/lib/pro
 import type { ProjectEntry } from '@/lib/api/types';
 import { startDesktopWindowDrag } from '@/lib/desktopNative';
 import { useI18n } from '@/lib/i18n';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_MODELS_PER_GROUP = 5;
@@ -90,6 +91,8 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
   isWindowed = false,
 }) => {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const [name, setName] = React.useState('');
   const [runGroups, setRunGroups] = React.useState<RunGroupState[]>(() => [
     { id: generateInstanceId(), prompt: '', models: [] },
@@ -384,7 +387,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
       const params: CreateMultiRunParams = {
         name: name.trim(),
         groups,
-        agent: selectedAgent || undefined,
+        agent: resolvePinnedPiAgentName(isPiKernel, selectedAgent) || undefined,
         worktreeBaseBranch: effectiveIsolateRuns ? worktreeBaseBranch : undefined,
         isolateRuns: effectiveIsolateRuns,
         files: filesForStore.length > 0 ? filesForStore : undefined,
@@ -512,12 +515,14 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
                 </label>
               </div>
 
+              {showAgentPicker ? (
               <div className="flex flex-col gap-1">
                 <FieldLabel htmlFor="multirun-agent" info={<InfoTip>{t('multirun.launcher.agent.info')}</InfoTip>}>
                   {t('multirun.launcher.agent.label')}
                 </FieldLabel>
                 <AgentSelector value={selectedAgent} onChange={setSelectedAgent} id="multirun-agent" />
               </div>
+              ) : null}
             </div>
 
             <Collapsible open={isSetupCommandsOpen} onOpenChange={setIsSetupCommandsOpen}>
