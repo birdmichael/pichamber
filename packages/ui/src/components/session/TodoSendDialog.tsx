@@ -15,6 +15,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useAgentsStore } from '@/stores/useAgentsStore';
 import { isPrimaryMode } from '@/components/chat/mobileControlsUtils';
 import { useI18n } from '@/lib/i18n';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 type TodoSendTarget = 'session' | 'worktree';
 
@@ -51,6 +52,8 @@ const getInitialExecution = (params: {
 
 export function TodoSendDialog(props: TodoSendDialogProps) {
   const { t } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const { open, onOpenChange, target, projectDirectory, submitting = false, allowRunAsGoal = false, onConfirm } = props;
   const showRunAsGoal = allowRunAsGoal && !isVSCodeRuntime();
 
@@ -124,8 +127,11 @@ export function TodoSendDialog(props: TodoSendDialogProps) {
 
   const handleSubmit = React.useCallback(() => {
     if (!canConfirm || submitting) return;
-    void onConfirm(execution);
-  }, [canConfirm, submitting, onConfirm, execution]);
+    void onConfirm({
+      ...execution,
+      agent: resolvePinnedPiAgentName(isPiKernel, execution.agent),
+    });
+  }, [canConfirm, submitting, onConfirm, execution, isPiKernel]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -172,6 +178,7 @@ export function TodoSendDialog(props: TodoSendDialogProps) {
               onChange={(variant) => setExecution((prev) => ({ ...prev, variant }))}
             />
           </div>
+          {showAgentPicker ? (
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('sessions.scheduledTasks.editor.agent.label')}</span>
             <AgentSelector
@@ -181,6 +188,7 @@ export function TodoSendDialog(props: TodoSendDialogProps) {
               onChange={(agent) => setExecution((prev) => ({ ...prev, agent }))}
             />
           </div>
+          ) : null}
         </div>
 
         <div className={`flex items-center gap-3 ${showRunAsGoal ? 'justify-between' : 'justify-end'}`}>

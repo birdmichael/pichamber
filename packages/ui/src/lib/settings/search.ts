@@ -1,5 +1,5 @@
 import type { I18nKey } from '@/lib/i18n/store';
-import { isSessionGoalVisibleOnPiKernel } from '@/lib/usePiKernel';
+import { isSessionGoalVisibleOnPiKernel, shouldShowOpenCodeAgentPicker } from '@/lib/usePiKernel';
 import type { SettingsPageSlug, SettingsRuntimeContext } from './metadata';
 import { getSettingsPageMeta, isSettingsPageAvailable } from './metadata';
 
@@ -357,7 +357,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'sessions',
     titleKey: 'settings.openchamber.defaults.field.defaultAgent',
     keywords: ['agent', 'new sessions'],
-    isAvailable: (ctx) => !ctx.isPiKernel,
+    isAvailable: (ctx) => shouldShowOpenCodeAgentPicker(Boolean(ctx.isPiKernel)),
   },
   {
     id: 'sessions.deletion-dialog',
@@ -725,6 +725,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'commands',
     titleKey: 'settings.commands.page.field.overrideAgent',
     keywords: ['agent', 'execution'],
+    isAvailable: (ctx) => shouldShowOpenCodeAgentPicker(Boolean(ctx.isPiKernel)),
   },
   {
     id: 'commands.model',

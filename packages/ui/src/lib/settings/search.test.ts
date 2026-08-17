@@ -69,6 +69,34 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'integrations.messengers.discord')).toBe(true);
   });
 
+  test('hides leftover Commands Override Agent search on Pi and keeps it on OpenCode', () => {
+    const getPageTitle = (page: string) => page;
+    const openCodeResults = buildSettingsSearchResults({
+      query: 'override agent',
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+    const piOverrideResults = buildSettingsSearchResults({
+      query: 'override agent',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+    const piCommandsResults = buildSettingsSearchResults({
+      query: 'commands',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(openCodeResults.some((result) => result.id === 'commands.agent')).toBe(true);
+    expect(piOverrideResults.some((result) => result.id === 'commands.agent')).toBe(false);
+    expect(piCommandsResults.some((result) => result.page === 'commands')).toBe(true);
+    expect(piCommandsResults.some((result) => result.id === 'commands.agent')).toBe(false);
+    expect(piCommandsResults.some((result) => result.id === 'commands.model')).toBe(true);
+  });
+
   test('hides leftover OpenCode Agents search on Pi and keeps it on OpenCode', () => {
     const leftoverAgentIds = [
       'agents.create',

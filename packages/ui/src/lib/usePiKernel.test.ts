@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { canOfferOpenCodeSessionStub, isMcpFeaturePluginAvailable, isSessionGoalVisibleOnPiKernel } from './usePiKernel';
+import {
+  canOfferOpenCodeSessionStub,
+  isMcpFeaturePluginAvailable,
+  isSessionGoalVisibleOnPiKernel,
+  resolvePinnedPiAgentName,
+  shouldShowOpenCodeAgentPicker,
+  SYNTHETIC_PI_AGENT_NAME,
+} from './usePiKernel';
 
 describe('canOfferOpenCodeSessionStub', () => {
   test('hides share, revert, and shell on the Pi kernel', () => {
@@ -8,6 +15,31 @@ describe('canOfferOpenCodeSessionStub', () => {
 
   test('keeps share, revert, and shell on OpenCode', () => {
     expect(canOfferOpenCodeSessionStub(false)).toBe(true);
+  });
+});
+
+describe('shouldShowOpenCodeAgentPicker', () => {
+  test('hides leftover OpenCode agent dropdowns on the Pi kernel', () => {
+    expect(shouldShowOpenCodeAgentPicker(true)).toBe(false);
+  });
+
+  test('keeps leftover OpenCode agent dropdowns on OpenCode', () => {
+    expect(shouldShowOpenCodeAgentPicker(false)).toBe(true);
+  });
+});
+
+describe('resolvePinnedPiAgentName', () => {
+  test('pins leftover OpenCode agent values to pi on the Pi kernel', () => {
+    expect(resolvePinnedPiAgentName(true, 'plan')).toBe(SYNTHETIC_PI_AGENT_NAME);
+    expect(resolvePinnedPiAgentName(true, '')).toBe(SYNTHETIC_PI_AGENT_NAME);
+    expect(resolvePinnedPiAgentName(true, undefined)).toBe(SYNTHETIC_PI_AGENT_NAME);
+  });
+
+  test('keeps the caller agent on OpenCode', () => {
+    expect(resolvePinnedPiAgentName(false, 'build')).toBe('build');
+    expect(resolvePinnedPiAgentName(false, '  plan  ')).toBe('plan');
+    expect(resolvePinnedPiAgentName(false, '')).toBe('');
+    expect(resolvePinnedPiAgentName(false, undefined)).toBe('');
   });
 });
 

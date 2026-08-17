@@ -25,6 +25,7 @@ import type { ScheduledTask } from '@/lib/scheduledTasksApi';
 import { useI18n } from '@/lib/i18n';
 import { isValidCronExpression, getNextRuns, CRON_EXAMPLES } from '@/lib/cron';
 import { canonicalizeTimezone } from '@/lib/timezones';
+import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
 const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const;
 
@@ -731,6 +732,8 @@ export function ScheduledTaskEditorDialog(props: {
 }) {
   const { open, task, onOpenChange, onSave } = props;
   const { t, locale } = useI18n();
+  const isPiKernel = usePiKernel();
+  const showAgentPicker = shouldShowOpenCodeAgentPicker(isPiKernel);
   const loadProviders = useConfigStore((state) => state.loadProviders);
   const loadAgents = useConfigStore((state) => state.loadAgents);
   const providers = useConfigStore((state) => state.providers);
@@ -1149,6 +1152,7 @@ export function ScheduledTaskEditorDialog(props: {
       return;
     }
 
+    const pinnedAgent = resolvePinnedPiAgentName(isPiKernel, draft.execution.agent);
     const payload: Partial<ScheduledTask> = {
       ...(draft.id ? { id: draft.id } : {}),
       name: draft.name.trim(),
@@ -1173,7 +1177,7 @@ export function ScheduledTaskEditorDialog(props: {
         providerID: draft.execution.providerID,
         modelID: draft.execution.modelID,
         ...(draft.execution.variant.trim() ? { variant: draft.execution.variant.trim() } : {}),
-        ...(draft.execution.agent.trim() ? { agent: draft.execution.agent.trim() } : {}),
+        ...(pinnedAgent ? { agent: pinnedAgent } : {}),
         ...(draft.execution.permissionAutoAccept ? { permissionAutoAccept: true } : {}),
         ...(draft.execution.goalEnabled ? { goalEnabled: true } : {}),
         ...(draft.execution.goalEnabled && draft.execution.goalTokenBudget
@@ -1192,7 +1196,7 @@ export function ScheduledTaskEditorDialog(props: {
     } finally {
       setSaving(false);
     }
-  }, [draft, onOpenChange, onSave, t]);
+  }, [draft, isPiKernel, onOpenChange, onSave, t]);
 
   const descriptionId = React.useId();
   const hasOpenFloatingMenu = React.useCallback(() => {
@@ -1550,6 +1554,7 @@ export function ScheduledTaskEditorDialog(props: {
             </div>
           </div>
 
+          {showAgentPicker ? (
           <div className="flex min-w-0 flex-col gap-1">
             <FieldLabel>{t('sessions.scheduledTasks.editor.agent.label')}</FieldLabel>
             <AgentSelector
@@ -1564,6 +1569,7 @@ export function ScheduledTaskEditorDialog(props: {
               }))}
             />
           </div>
+          ) : null}
 
           <div className="flex flex-col gap-1">
             <FieldLabel htmlFor="sched-prompt" required>{t('sessions.scheduledTasks.editor.prompt.label')}</FieldLabel>

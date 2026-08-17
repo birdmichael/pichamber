@@ -2,12 +2,34 @@ import React from 'react';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useFeaturePluginsStore } from '@/stores/useFeaturePluginsStore';
 
+/** Matches the Pi facade synthetic default from GET /api/agent (`name: "pi"`). */
+export const SYNTHETIC_PI_AGENT_NAME = 'pi';
+
 /**
  * Session share, message revert, and composer / session.shell are OpenCode-only.
  * On Pi they are empty stubs and must not be offered as successful actions.
  */
 export function canOfferOpenCodeSessionStub(isPiKernel: boolean): boolean {
   return !isPiKernel;
+}
+
+/**
+ * Leftover OpenCode agent dropdowns (Commands override, Scheduled Tasks,
+ * Todo send, Fork, Review, Multi-run, Session Defaults) imply extra agents.
+ * On Pi the live list is only the synthetic `pi` row — hide those fields.
+ * OpenCode keeps the pickers.
+ */
+export function shouldShowOpenCodeAgentPicker(isPiKernel: boolean): boolean {
+  return !isPiKernel;
+}
+
+/**
+ * Pin a hidden leftover agent field to the synthetic Pi agent. OpenCode
+ * keeps the caller value (empty means inherit / unset).
+ */
+export function resolvePinnedPiAgentName(isPiKernel: boolean, agent?: string | null): string {
+  if (!isPiKernel) return (agent ?? '').trim();
+  return SYNTHETIC_PI_AGENT_NAME;
 }
 
 /**
