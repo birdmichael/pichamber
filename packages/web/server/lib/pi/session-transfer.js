@@ -653,29 +653,488 @@ export const buildSessionJsonl = (record) => {
   return `${lines.join('\n')}\n`;
 };
 
+const isSafeHref = (href) => {
+  const value = asTrimmedString(href);
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  if (lower.startsWith('https://') || lower.startsWith('http://') || lower.startsWith('mailto:')) {
+    return true;
+  }
+  if (lower.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  return true;
+};
+
+const isRemoteHttpUrl = (value) => /^https?:\/\//i.test(asTrimmedString(value));
+
+const isEmbeddableDataImage = (value) => /^data:image\/[a-z0-9.+-]+(?:;[^,]*)?,/i.test(asTrimmedString(value));
+
+const holdSlot = (slots, html) => {
+  const key = `\u0000${slots.length}\u0000`;
+  slots.push(html);
+  return key;
+};
+
+const replaceMarkdownLinks = (text, image, replace) => {
+  let result = '';
+  let index = 0;
+  while (index < text.length) {
+    const bang = image && text[index] === '!' && text[index + 1] === '[';
+    const open = bang ? index + 1 : (!image && text[index] === '[' ? index : -1);
+    if (open === -1) {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    const closeLabel = text.indexOf(']', open + 1);
+    if (closeLabel === -1 || text[closeLabel + 1] !== '(') {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    let depth = 1;
+    let cursor = closeLabel + 2;
+    while (cursor < text.length && depth > 0) {
+      if (text[cursor] === '(') depth += 1;
+      else if (text[cursor] === ')') depth -= 1;
+      cursor += 1;
+    }
+    if (depth !== 0) {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    const label = text.slice(open + 1, closeLabel);
+    const href = text.slice(closeLabel + 2, cursor - 1);
+    result += replace(label, href);
+    index = cursor;
+  }
+  return result;
+};
+
+const inlineMarkdown = (raw) => {
+  const slots = [];
+  let text = escapeHtml(raw);
+  text = text.replace(/`([^`]+)`/g, (_, code) => holdSlot(slots, `<code>${code}</code>`));
+  text = replaceMarkdownLinks(text, true, (alt, href) => {
+    const src = href.trim();
+    if (isEmbeddableDataImage(src)) {
+      return holdSlot(slots, `<img src="${src}" alt="${alt}">`);
+    }
+    if (isRemoteHttpUrl(src)) {
+      return holdSlot(slots, '<span class="image-omitted">Image omitted (remote URL)</span>');
+    }
+    return holdSlot(slots, alt ? `<span class="image-omitted">${alt}</span>` : '<span class="image-omitted">Image omitted</span>');
+  });
+  text = replaceMarkdownLinks(text, false, (label, href) => {
+    const dest = href.trim();
+    if (!isSafeHref(dest)) return `[${label}](${dest})`;
+    return holdSlot(slots, `<a href="${dest}">${label}</a>`);
+  });
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  text = text.replace(/\n/g, '<br>\n');
+  return text.replace(/\u0000(\d+)\u0000/g, (_, index) => slots[Number(index)] || '');
+};
+
+const isMarkdownFenceOpen = (line) => /^```/.test(line);
+
+const isMarkdownHeading = (line) => /^(#{1,6})\s+\S/.test(line);
+
+const isMarkdownQuote = (line) => /^>\s?/.test(line);
+
+const isMarkdownUnordered = (line) => /^\s*[-*+]\s+\S/.test(line);
+
+const isMarkdownOrdered = (line) => /^\s*\d+\.\s+\S/.test(line);
+
+const isMarkdownRule = (line) => /^(\*{3,}|-{3,}|_{3,})\s*$/.test(line);
+
+const isMarkdownTableRow = (line) => /^\s*\|.+\|\s*$/.test(line);
+
+const isMarkdownTableDivider = (line) => /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+
+const cellsFromTableRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+
+const isMarkdownBlockStart = (line) => (
+  isMarkdownFenceOpen(line)
+  || isMarkdownHeading(line)
+  || isMarkdownQuote(line)
+  || isMarkdownUnordered(line)
+  || isMarkdownOrdered(line)
+  || isMarkdownRule(line)
+  || isMarkdownTableRow(line)
+);
+
+/** Escape first, then insert only our tags. Code fences, lists, and links stay offline-safe. */
+const markdownToHtml = (source) => {
+  const lines = String(source ?? '').replace(/\r\n/g, '\n').split('\n');
+  const html = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+    if (isMarkdownFenceOpen(line)) {
+      const language = escapeHtml(line.slice(3).trim().split(/\s+/, 1)[0] || '');
+      index += 1;
+      const code = [];
+      while (index < lines.length && !isMarkdownFenceOpen(lines[index])) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      const classAttr = language ? ` class="language-${language}"` : '';
+      html.push(`<pre><code${classAttr}>${escapeHtml(code.join('\n'))}</code></pre>`);
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      index += 1;
+      continue;
+    }
+    if (isMarkdownRule(line)) {
+      html.push('<hr>');
+      index += 1;
+      continue;
+    }
+    if (isMarkdownTableRow(line) && index + 1 < lines.length && isMarkdownTableDivider(lines[index + 1])) {
+      const header = cellsFromTableRow(line);
+      index += 2;
+      const bodyRows = [];
+      while (index < lines.length && isMarkdownTableRow(lines[index]) && !isMarkdownTableDivider(lines[index])) {
+        bodyRows.push(cellsFromTableRow(lines[index]));
+        index += 1;
+      }
+      const thead = `<tr>${header.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join('')}</tr>`;
+      const tbody = bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${inlineMarkdown(cell)}</td>`).join('')}</tr>`).join('');
+      html.push(`<table><thead>${thead}</thead>${tbody ? `<tbody>${tbody}</tbody>` : ''}</table>`);
+      continue;
+    }
+    if (isMarkdownQuote(line)) {
+      const quote = [];
+      while (index < lines.length && isMarkdownQuote(lines[index])) {
+        quote.push(lines[index].replace(/^>\s?/, ''));
+        index += 1;
+      }
+      html.push(`<blockquote>${markdownToHtml(quote.join('\n'))}</blockquote>`);
+      continue;
+    }
+    if (isMarkdownUnordered(line)) {
+      const items = [];
+      while (index < lines.length && isMarkdownUnordered(lines[index])) {
+        items.push(`<li>${inlineMarkdown(lines[index].replace(/^\s*[-*+]\s+/, ''))}</li>`);
+        index += 1;
+      }
+      html.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+    if (isMarkdownOrdered(line)) {
+      const items = [];
+      while (index < lines.length && isMarkdownOrdered(lines[index])) {
+        items.push(`<li>${inlineMarkdown(lines[index].replace(/^\s*\d+\.\s+/, ''))}</li>`);
+        index += 1;
+      }
+      html.push(`<ol>${items.join('')}</ol>`);
+      continue;
+    }
+    const paragraph = [];
+    while (index < lines.length && lines[index].trim() && !isMarkdownBlockStart(lines[index])) {
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+    html.push(`<p>${inlineMarkdown(paragraph.join('\n'))}</p>`);
+  }
+  return html.join('\n');
+};
+
+const formatJsonForPre = (value) => {
+  try {
+    return JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return String(value ?? '');
+  }
+};
+
+const SHARE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const formatShareDate = (value) => {
+  if (value == null || value === '') return '';
+  const millis = typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : Date.parse(isoFromUnknown(value));
+  if (!Number.isFinite(millis)) return '';
+  const date = new Date(millis);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${date.getUTCDate()} ${SHARE_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${hours}:${minutes}`;
+};
+
+const formatModelLabel = (info) => {
+  const resolved = resolveUsableFacadeModel(info);
+  if (!resolved) return '';
+  return `${resolved.providerID}/${resolved.modelID}`;
+};
+
+const formatUsageLine = (info) => {
+  const tokens = isRecord(info?.tokens) ? info.tokens : null;
+  const hasCost = typeof info?.cost === 'number' && Number.isFinite(info.cost);
+  if (!tokens && !hasCost) return '';
+  const parts = [];
+  if (tokens) {
+    if (typeof tokens.input === 'number' && Number.isFinite(tokens.input)) {
+      parts.push(`${tokens.input} in`);
+    }
+    if (typeof tokens.output === 'number' && Number.isFinite(tokens.output)) {
+      parts.push(`${tokens.output} out`);
+    }
+    if (typeof tokens.reasoning === 'number' && Number.isFinite(tokens.reasoning) && tokens.reasoning > 0) {
+      parts.push(`${tokens.reasoning} reasoning`);
+    }
+  }
+  if (hasCost) parts.push(`$${info.cost}`);
+  return parts.join(' · ');
+};
+
+const htmlFromFilePart = (part) => {
+  const image = toPiImageContent(part);
+  if (image) {
+    const alt = escapeHtml(asTrimmedString(part.filename) || filenameFromMime(image.mimeType));
+    return `<figure class="image"><img src="data:${image.mimeType};base64,${image.data}" alt="${alt}"></figure>`;
+  }
+  const file = facadeFilePartFromUnknown(part, '', '');
+  const url = asTrimmedString(file?.url || part?.url);
+  const mime = asTrimmedString(file?.mime || part?.mime || part?.mimeType);
+  if (isRemoteHttpUrl(url) && (mime.startsWith('image/') || part?.type === 'image' || part?.type === 'file')) {
+    return '<p class="image-omitted">Image omitted (remote URL)</p>';
+  }
+  if (file || part?.type === 'file' || part?.type === 'image') {
+    const label = escapeHtml(asTrimmedString(part?.filename) || mime || 'file');
+    return `<p class="file-omitted">File omitted (${label})</p>`;
+  }
+  return '';
+};
+
+const toolInputPreview = (input) => {
+  const keys = Object.keys(input);
+  if (keys.length === 1 && typeof input[keys[0]] === 'string') {
+    return input[keys[0]];
+  }
+  return formatJsonForPre(input);
+};
+
+const htmlFromToolPart = (part) => {
+  const name = escapeHtml(asTrimmedString(part?.tool) || 'tool');
+  const status = asTrimmedString(part?.state?.status);
+  const input = isRecord(part?.state?.input) ? part.state.input : {};
+  const output = typeof part?.state?.output === 'string' ? part.state.output : '';
+  const error = typeof part?.state?.error === 'string' ? part.state.error : '';
+  const isError = status === 'error';
+  const preview = Object.keys(input).length > 0
+    ? ` <span class="tool-input">${escapeHtml(toolInputPreview(input))}</span>`
+    : '';
+  const result = isError
+    ? (error || output || 'tool error')
+    : output;
+  return [
+    `<section class="tool${isError ? ' error' : ''}">`,
+    `<p class="tool-line"><strong class="tool-name">${name}</strong>${preview}</p>`,
+    result ? `<pre class="tool-output">${escapeHtml(result)}</pre>` : '',
+    '</section>',
+  ].filter(Boolean).join('');
+};
+
+const htmlFromReasoningPart = (text) => {
+  const body = asTrimmedString(text);
+  if (!body) return '';
+  return `<details class="thinking"><summary>Thinking</summary><div class="thinking-body">${markdownToHtml(body)}</div></details>`;
+};
+
+const htmlFromMessageParts = (parts) => {
+  if (!Array.isArray(parts)) return '';
+  return parts.map((part) => {
+    if (!part || typeof part !== 'object') return '';
+    if (part.type === 'reasoning') return htmlFromReasoningPart(part.text);
+    if (part.type === 'text' && typeof part.text === 'string' && part.text) {
+      return `<div class="body">${markdownToHtml(part.text)}</div>`;
+    }
+    if (part.type === 'tool') return htmlFromToolPart(part);
+    if (part.type === 'file' || part.type === 'image') return htmlFromFilePart(part);
+    return '';
+  }).filter(Boolean).join('\n');
+};
+
+const htmlFromMessageEntry = (entry) => {
+  const isAssistant = entry?.info?.role === 'assistant';
+  const usage = isAssistant ? formatUsageLine(entry?.info) : '';
+  const body = htmlFromMessageParts(entry?.parts);
+  if (!isAssistant) {
+    return `<article class="msg user">${body}</article>`;
+  }
+  return [
+    '<article class="msg assistant">',
+    '<span class="gutter" aria-hidden="true">≡</span>',
+    '<div class="turn">',
+    body,
+    usage ? `<footer class="usage">${escapeHtml(usage)}</footer>` : '',
+    '</div>',
+    '</article>',
+  ].filter(Boolean).join('\n');
+};
+
+const htmlFromSessionMeta = (record) => {
+  let model = '';
+  const messages = Array.isArray(record?.messages) ? record.messages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    model = formatModelLabel(messages[index]?.info);
+    if (model) break;
+  }
+  const date = formatShareDate(record?.info?.time?.created);
+  if (!model && !date) return '';
+  return `<p class="session-meta">${
+    model ? `<span class="session-model">${escapeHtml(model)}</span>` : ''
+  }${
+    date ? `<span class="session-date">${escapeHtml(date)}</span>` : ''
+  }</p>`;
+};
+
+const SESSION_HTML_STYLES = `html { color-scheme: light; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #F8F7F7;
+  color: #3A3A3A;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.topbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid #E8E6E6;
+}
+.mark {
+  width: 16px;
+  height: 16px;
+  background: #111;
+  border-radius: 4px;
+}
+.page {
+  width: min(880px, 100%);
+  min-height: calc(100vh - 40px);
+  margin: 0 auto;
+  padding: 20px 36px 56px;
+  background: #fff;
+  border: 1px solid #E8E6E6;
+  border-top: 0;
+}
+.session-header { margin-bottom: 2rem; }
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.session-model { color: #6B6B6B; }
+.session-date { color: #A3A3A3; }
+.session-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 400;
+  color: #1A1A1A;
+}
+.transcript { display: flex; flex-direction: column; gap: 2rem; }
+.msg.user { color: #3A3A3A; }
+.msg.assistant { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.gutter { color: #555; font-size: 12px; line-height: 1.7; }
+.turn { min-width: 0; }
+.body h1, .body h2, .body h3, .body h4, .body h5, .body h6 {
+  margin: 1.15rem 0 0.4rem;
+  font-size: 13px;
+  font-weight: 650;
+  color: #1A1A1A;
+  line-height: 1.45;
+}
+.body p { margin: 0.55rem 0; }
+.body p:first-child { margin-top: 0; }
+.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.body li { margin: 0.15rem 0; }
+.body a { color: #3A3A3A; }
+.body hr { border: 0; border-top: 1px solid #E8E6E6; margin: 1.15rem 0; }
+.body blockquote { margin: 0.75rem 0; padding-left: 0.85rem; border-left: 2px solid #E8E6E6; color: #6B6B6B; }
+.body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+.body th, .body td { border: 1px solid #E8E6E6; padding: 0.35rem 0.5rem; text-align: left; }
+.body th { color: #6B6B6B; font-weight: 650; }
+.body pre {
+  margin: 0.65rem 0;
+  padding: 0;
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.body code, .thinking-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.thinking { margin: 0 0 0.75rem; color: #8A8A8A; font-size: 12px; }
+.thinking summary { cursor: pointer; font-weight: 400; color: #8A8A8A; list-style: none; }
+.thinking summary::-webkit-details-marker { display: none; }
+.thinking summary::before { content: "▸ "; }
+.thinking[open] summary::before { content: "▾ "; }
+.thinking-body { margin-top: 0.35rem; color: #8A8A8A; }
+.tool { margin: 0.7rem 0; }
+.tool-line { margin: 0; }
+.tool-name { font-weight: 700; color: #1A1A1A; }
+.tool-input, .tool-output {
+  color: #8A8A8A;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.tool-output { margin: 0.2rem 0 0; padding: 0; background: none; white-space: pre-wrap; word-break: break-word; }
+.tool.error .tool-name, .tool.error .tool-input, .tool.error .tool-output { color: #B42318; }
+.image { margin: 0.6rem 0; }
+.image img { max-width: 100%; height: auto; border-radius: 4px; }
+.image-omitted, .file-omitted { color: #8A8A8A; font-style: italic; }
+.usage { margin-top: 0.85rem; color: #A3A3A3; font-size: 11px; }
+.export-note { margin: 3rem 0 0; text-align: center; color: #B0B0B0; font-size: 11px; }`;
+
 export const buildSessionHtml = (record) => {
   const title = escapeHtml(asTrimmedString(record?.info?.title) || 'Session');
-  const blocks = (record?.messages || []).map((entry) => {
-    const role = entry?.info?.role === 'assistant' ? 'Assistant' : 'User';
-    const text = escapeHtml(textFromFacadeParts(entry?.parts));
-    return `<article class="msg ${role.toLowerCase()}"><div class="role">${role}</div><pre>${text}</pre></article>`;
-  }).join('\n');
+  const sessionMeta = htmlFromSessionMeta(record);
+  const blocks = (record?.messages || []).map((entry) => htmlFromMessageEntry(entry)).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <style>
-body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; color: #111; }
-h1 { font-size: 1.25rem; }
-.msg { margin: 1.25rem 0; }
-.role { font-weight: 600; margin-bottom: 0.35rem; }
-pre { white-space: pre-wrap; word-break: break-word; margin: 0; font: inherit; }
+${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>
-<h1>${title}</h1>
+<header class="topbar"><span class="mark" aria-hidden="true"></span></header>
+<div class="page">
+<header class="session-header">
+${sessionMeta}
+<h1 class="session-title">${title}</h1>
+</header>
+<main class="transcript">
 ${blocks}
+</main>
+<p class="export-note">Exported from Pichamber</p>
+</div>
 </body>
 </html>
 `;
