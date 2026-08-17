@@ -101,6 +101,9 @@ Resolution order:
    `POST /api/config/reload`, session-scoped `POST /api/session/:id/reload`,
    and `host.reload()` stay.
 2. Other host handlers (`compact`, `thinking`, `model`, `login`) — local reply.
+   Successful Pi `compaction_end` also emits `session.compacted` (same event
+   the pin-to-context runtime already listens for). Abort or failure of
+   compact does not.
 3. Live session extension commands — `record.piSession.prompt("/name args")`
    with `expandPromptTemplates` left on (Pi CLI path:
    `expandPromptTemplates` / `_tryExecuteExtensionCommand`). No facade user

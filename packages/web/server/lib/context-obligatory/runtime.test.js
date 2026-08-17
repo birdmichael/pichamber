@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { createEventTranslator } from '../pi/event-translator.js';
 import { createContextObligatoryRuntime } from './runtime.js';
 
 const json = (body) => new Response(JSON.stringify(body), {
@@ -72,6 +73,61 @@ describe('context obligatory runtime', () => {
     });
     await runtime.processPayload({ type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'idle' } } });
     expect(fetchImpl).not.toHaveBeenCalled();
+    runtime.stop();
+  });
+
+  it('injects after a Pi compaction_end session.compacted event even without an OpenCode summary message', async () => {
+    const requests = [];
+    vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      requests.push({ path: url.pathname, method: init.method ?? 'GET', body: init.body });
+      if (url.pathname === '/session/ses_1' && init.method === 'PATCH') return json({});
+      if (url.pathname === '/session/ses_1') {
+        return json({
+          id: 'ses_1',
+          metadata: { openchamber: { context_obligatory_messages: [
+            { id: 'msg_1', createdAt: 10, role: 'user' },
+          ] } },
+        });
+      }
+      if (url.pathname === '/session/ses_1/message') return json([
+        { info: { id: 'msg_agent', role: 'assistant', providerID: 'provider', modelID: 'model', agent: 'build' } },
+      ]);
+      if (url.pathname === '/session/ses_1/message/msg_1') return json({ parts: [{ type: 'text', text: 'Keep me' }] });
+      if (url.pathname === '/session/ses_1/prompt_async') return json({});
+      throw new Error(`Unexpected ${url.pathname}`);
+    }));
+    const translated = createEventTranslator({
+      sessionID: 'ses_1',
+      directory: '/tmp/project',
+      createEventId: () => 'evt_compacted',
+      now: () => 1_700_000_000_000,
+    }).translate({
+      type: 'compaction_end',
+      reason: 'manual',
+      result: { summary: 'kept recent turns' },
+      aborted: false,
+      willRetry: false,
+    });
+    const compacted = translated.find((event) => event.type === 'session.compacted');
+    expect(compacted).toMatchObject({
+      id: 'evt_compacted',
+      type: 'session.compacted',
+      properties: { sessionID: 'ses_1', directory: '/tmp/project' },
+    });
+
+    const runtime = createContextObligatoryRuntime({
+      buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
+      getOpenCodeAuthHeaders: () => ({}),
+    });
+    await runtime.processPayload(compacted);
+
+    const prompt = requests.find((request) => request.path.endsWith('/prompt_async'));
+    expect(prompt).toBeTruthy();
+    expect(JSON.parse(prompt.body).parts[0].text).toContain('Keep me');
+    const patch = requests.find((request) => request.method === 'PATCH');
+    expect(JSON.parse(patch.body).metadata.openchamber.context_obligatory_last_compaction_message_id)
+      .toBe('evt_compacted');
     runtime.stop();
   });
 });

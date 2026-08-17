@@ -55,7 +55,7 @@ export const createContextObligatoryRuntime = ({
     return response.json().catch(() => null);
   };
 
-  const tick = async (sessionId, directory) => {
+  const tick = async (sessionId, directory, compactCursor = '') => {
     const session = await openCodeFetch(`/session/${encodeURIComponent(sessionId)}`, { directory });
     if (session?.parentID) return;
     const state = readContextState(session);
@@ -68,8 +68,11 @@ export const createContextObligatoryRuntime = ({
     if (!Array.isArray(recent) || recent.length === 0) return;
     const summary = recent.toReversed().find((message) =>
       message?.info?.role === 'assistant' && message.info.summary === true)?.info;
-    if (!summary?.id || !summary?.time?.completed) return;
-    if (state.openchamber.context_obligatory_last_compaction_message_id === summary.id) return;
+    const cursorId = typeof summary?.id === 'string' && summary.id && summary?.time?.completed
+      ? summary.id
+      : compactCursor;
+    if (!cursorId) return;
+    if (state.openchamber.context_obligatory_last_compaction_message_id === cursorId) return;
 
     const fetched = await Promise.allSettled(state.messages.map(async (pinned) => {
       const message = await openCodeFetch(
@@ -114,7 +117,7 @@ export const createContextObligatoryRuntime = ({
           ...freshState.metadata,
           openchamber: {
             ...freshState.openchamber,
-            context_obligatory_last_compaction_message_id: summary.id,
+            context_obligatory_last_compaction_message_id: cursorId,
           },
         },
       },
@@ -126,8 +129,9 @@ export const createContextObligatoryRuntime = ({
     const sessionId = payload?.properties?.sessionID;
     if (typeof sessionId !== 'string' || inflight.has(sessionId)) return;
     const directory = payload?.properties?.directory || directoryHint;
+    const compactCursor = typeof payload.id === 'string' ? payload.id : '';
     inflight.add(sessionId);
-    return tick(sessionId, directory)
+    return tick(sessionId, directory, compactCursor)
       .catch((error) => console.warn('[context-obligatory] injection failed:', error?.message || error))
       .finally(() => inflight.delete(sessionId));
   };

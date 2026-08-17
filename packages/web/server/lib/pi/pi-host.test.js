@@ -222,6 +222,30 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('emits session.compacted after a successful compact so pinned context can reinject', async () => {
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent: (directory, event) => events.push({ directory, event }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Pin compact' });
+    events.length = 0;
+    await expect(host.compactSession(record.id)).resolves.toEqual({ compacted: true });
+    expect(events.map((item) => item.event.type)).toEqual([
+      'session.status',
+      'session.compact',
+      'session.compact',
+      'session.compacted',
+    ]);
+    expect(events[1].event.properties).toMatchObject({ sessionID: record.id, status: 'start' });
+    expect(events[2].event.properties).toMatchObject({ sessionID: record.id, status: 'end' });
+    expect(events[3].event).toMatchObject({
+      type: 'session.compacted',
+      properties: { sessionID: record.id, directory: '/tmp/project' },
+    });
+    host.dispose();
+  });
 
   it('does not duplicate the user text part when Pi emits message_start user echo', async () => {
     const createEchoSession = () => {
