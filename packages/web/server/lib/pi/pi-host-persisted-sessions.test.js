@@ -287,9 +287,10 @@ describe('persisted Pi sessions', () => {
     expect(loaded.info.metadata?.archived).toBe(archivedAt);
 
     const refreshed = await restarted.reloadSessionRecords({ sessionID: sibling.id, directory: cwd });
-    expect(refreshed.sessions.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
-    expect(refreshed.sessions.filter((session) => !session.time?.archived).map((session) => session.id))
-      .not.toContain(createdId);
+    expect(refreshed.sessions.map((session) => session.id)).toContain(sibling.id);
+    expect(refreshed.sessions.map((session) => session.id)).not.toContain(createdId);
+    const inclusive = await restarted.listSessionInfos(cwd, { archived: true });
+    expect(inclusive.find((session) => session.id === createdId)?.time.archived).toBe(archivedAt);
 
     await restarted.updateSession(createdId, { time: { archived: 0 } }, cwd);
     restarted.dispose();
@@ -370,6 +371,51 @@ describe('persisted Pi sessions', () => {
     const loaded = await host.ensureSession(created.id, cwd);
     expect(loaded.info.time.archived).toBe(1_700_000_000_000);
     expect(path.dirname(loaded.sessionFile)).toBe(archiveDir);
+    host.dispose();
+  });
+
+  it('reloadSessionRecords lists active sessions only and does not scan archive/', async () => {
+    const home = tempDir('pi-persist-reload-active-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const archiveDir = sessionArchiveDir(sessionDir);
+    const listCalls = [];
+    const active = writePersistedSession({
+      home,
+      cwd,
+      title: 'Open row',
+      userText: 'active',
+    });
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd, title: 'Archived row' });
+    await first.updateSession(created.id, { time: { archived: 1_700_000_000_000 } }, cwd);
+    expect(path.dirname(first.getSession(created.id).sessionFile)).toBe(archiveDir);
+    first.dispose();
+
+    const host = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async ({ sessionManager }) => stubSession(
+        typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      ),
+      async listPersistedSessionsInDir(directory, dir) {
+        const items = await SessionManager.list(directory, dir);
+        listCalls.push({ dir, ids: (items || []).map((item) => item.id) });
+        return items;
+      },
+    });
+    await host.ensureSession(active.id, cwd);
+    listCalls.length = 0;
+    const result = await host.reloadSessionRecords({ sessionID: active.id, directory: cwd });
+    expect(result.sessions.map((session) => session.id)).toContain(active.id);
+    expect(result.sessions.map((session) => session.id)).not.toContain(created.id);
+    expect(listCalls.map((call) => call.dir)).not.toContain(archiveDir);
+    expect(listCalls.every((call) => !call.ids.includes(created.id))).toBe(true);
     host.dispose();
   });
 

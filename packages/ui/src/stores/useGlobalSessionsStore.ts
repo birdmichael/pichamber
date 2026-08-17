@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import type { OpencodeClient, Session } from '@opencode-ai/sdk/v2';
 import { opencodeClient } from '@/lib/opencode/client';
-import { listGlobalSessionPages, splitGlobalSessionsByArchived } from '@/stores/globalSessions';
+import { runtimeFetch } from '@/lib/runtime-fetch';
+import {
+  globalSessionListQuery,
+  listGlobalSessionPages,
+  splitGlobalSessionsByArchived,
+} from '@/stores/globalSessions';
 import { getReviewTransferDirection, type ReviewTransferDirection } from '@/lib/reviewFlow';
 import { getOriginalSessionID, getReviewSessionID } from '@/lib/sessionReviewMetadata';
 import { normalizePath } from '@/lib/pathNormalization';
@@ -25,6 +30,7 @@ type GlobalSessionsState = {
   hasLoaded: boolean;
   status: GlobalSessionsStatus;
   loadSessions: (fallbackActive?: Session[]) => Promise<LoadResult>;
+  loadArchivedSessions: () => Promise<LoadResult>;
   refreshSessionsForDirectories: (directories: Iterable<string>, fallbackActive?: Session[]) => Promise<LoadResult>;
   applySnapshot: (activeSessions: Session[], archivedSessions: Session[], status?: GlobalSessionsStatus) => void;
   upsertSession: (session: Session) => void;
@@ -57,9 +63,52 @@ const withDirectorySessionRefreshSlot = async <T>(task: () => Promise<T>): Promi
 };
 
 let inflightLoad: Promise<LoadResult> | null = null;
+let inflightArchivedLoad: Promise<LoadResult> | null = null;
 // Bumped on runtime switch: an in-flight load from the previous instance must
 // not apply its (stale) snapshot after the reset.
 let loadGeneration = 0;
+let isPiKernelOverride: boolean | null = null;
+let resolvedIsPiKernel: boolean | null = null;
+let resolveIsPiKernelPromise: Promise<boolean> | null = null;
+
+export const setGlobalSessionsPiKernelForTests = (isPiKernel: boolean | null): void => {
+  isPiKernelOverride = isPiKernel;
+  resolvedIsPiKernel = isPiKernel;
+  resolveIsPiKernelPromise = isPiKernel === null ? null : Promise.resolve(isPiKernel);
+};
+
+const resolveIsPiKernel = async (): Promise<boolean> => {
+  if (isPiKernelOverride !== null) {
+    return isPiKernelOverride;
+  }
+  if (resolvedIsPiKernel !== null) {
+    return resolvedIsPiKernel;
+  }
+  if (!resolveIsPiKernelPromise) {
+    resolveIsPiKernelPromise = runtimeFetch('/api/health', { method: 'GET' })
+      .then(async (response) => {
+        const payload = response.ok ? await response.json() : null;
+        return payload && typeof payload.kernel === 'string'
+          ? payload.kernel === 'pi'
+          : true;
+      })
+      .catch(() => true)
+      .then((isPiKernel) => {
+        resolvedIsPiKernel = isPiKernel;
+        return isPiKernel;
+      });
+  }
+  return resolveIsPiKernelPromise;
+};
+
+const preserveArchivedAfterActiveLoad = (existingArchived: Session[], activeSessions: Session[]): Session[] => {
+  if (existingArchived.length === 0) {
+    return existingArchived;
+  }
+  const activeIds = new Set(activeSessions.map((session) => session.id));
+  const next = existingArchived.filter((session) => !activeIds.has(session.id));
+  return next.length === existingArchived.length ? existingArchived : next;
+};
 
 export const resolveGlobalSessionDirectory = (session: Session): string | null => {
   const record = session as Session & {
@@ -253,6 +302,7 @@ type DirectoryPageResult = {
 const fetchDirectoryPages = async (
   sdk: OpencodeClient,
   directories: Set<string>,
+  isPiKernel: boolean,
 ): Promise<DirectoryPageResult> => {
   const currentDirectory = normalizePath(opencodeClient.getDirectory());
   const orderedDirectories = [...directories].sort((left, right) => {
@@ -260,17 +310,18 @@ const fetchDirectoryPages = async (
     if (right === currentDirectory) return 1;
     return left.localeCompare(right);
   });
+  const listQuery = globalSessionListQuery({ isPiKernel, surface: 'default' });
   const results = await mapWithConcurrency(orderedDirectories, DIRECTORY_SESSION_REFRESH_CONCURRENCY, async (directory) => {
     try {
       return {
         status: 'fulfilled' as const,
         value: {
           directory,
-          // One inclusive request per directory: the server has no filter that
-          // returns only active sessions including restored (`time.archived`
-          // falsy-but-present) rows, so fetch everything and split client-side.
+          // OpenCode: one inclusive request per directory, then split
+          // client-side so restored (`time.archived === 0`) rows stay active.
+          // Pi: active-only; restored rows are already in that list.
           sessions: await withDirectorySessionRefreshSlot(() => (
-            listGlobalSessionPages(sdk, { directory, archived: true, narrowToArchived: false, pageSize: PAGE_SIZE })
+            listGlobalSessionPages(sdk, { directory, ...listQuery, pageSize: PAGE_SIZE })
           )),
         },
       };
@@ -504,6 +555,11 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
   resetForRuntimeSwitch: () => {
     loadGeneration += 1;
     inflightLoad = null;
+    inflightArchivedLoad = null;
+    if (isPiKernelOverride === null) {
+      resolvedIsPiKernel = null;
+      resolveIsPiKernelPromise = null;
+    }
     set({
       activeSessions: [],
       archivedSessions: [],
@@ -528,13 +584,14 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
     const loadPromise = (async () => {
       try {
         const sdk = opencodeClient.getSdkClient();
-        // One inclusive fetch, split client-side. The server's
+        const isPiKernel = await resolveIsPiKernel();
+        const listQuery = globalSessionListQuery({ isPiKernel, surface: 'default' });
+        // OpenCode: one inclusive fetch, split client-side. Its
         // `time_archived IS NULL` active filter would exclude restored
-        // sessions (`time.archived` falsy-but-present), so an
-        // `archived: false` request cannot produce a truthful active list.
+        // sessions (`time.archived` falsy-but-present).
+        // Pi: active-only. Restored rows stay in that list (`archived: 0`).
         const allSessions = await listGlobalSessionPages(sdk, {
-          archived: true,
-          narrowToArchived: false,
+          ...listQuery,
           pageSize: PAGE_SIZE,
         });
 
@@ -543,8 +600,11 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
           // instance — drop it.
           return { activeSessions: [], archivedSessions: [] };
         }
-        const { active, archived } = splitGlobalSessionsByArchived(allSessions);
+        const { active, archived: fetchedArchived } = splitGlobalSessionsByArchived(allSessions);
         set((state) => {
+          const archived = listQuery.archived
+            ? fetchedArchived
+            : preserveArchivedAfterActiveLoad(state.archivedSessions, active);
           const reconciled = overlayMutationsSince(state, active, archived, baselineRevision);
           return applySnapshot(state, reconciled.activeSessions, reconciled.archivedSessions, 'ready');
         });
@@ -579,6 +639,59 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
     return loadPromise;
   },
 
+  loadArchivedSessions: async () => {
+    if (inflightArchivedLoad) {
+      return inflightArchivedLoad;
+    }
+
+    const generation = loadGeneration;
+    const baselineRevision = get().mutationRevision;
+    const loadPromise = (async () => {
+      try {
+        const sdk = opencodeClient.getSdkClient();
+        const listQuery = globalSessionListQuery({ isPiKernel: true, surface: 'archive' });
+        const archivedSessions = await listGlobalSessionPages(sdk, {
+          ...listQuery,
+          pageSize: PAGE_SIZE,
+        });
+
+        if (generation !== loadGeneration) {
+          return { activeSessions: [], archivedSessions: [] };
+        }
+        set((state) => {
+          const reconciled = overlayMutationsSince(
+            state,
+            state.activeSessions,
+            archivedSessions,
+            baselineRevision,
+          );
+          if (sameSessionList(state.archivedSessions, reconciled.archivedSessions)) {
+            return state;
+          }
+          return { archivedSessions: reconciled.archivedSessions };
+        });
+        const committed = get();
+        return { activeSessions: committed.activeSessions, archivedSessions: committed.archivedSessions };
+      } catch (error) {
+        if (generation !== loadGeneration) {
+          return { activeSessions: [], archivedSessions: [] };
+        }
+        console.warn('[GlobalSessions] Failed to load archived sessions:', error);
+        const committed = get();
+        return { activeSessions: committed.activeSessions, archivedSessions: committed.archivedSessions };
+      }
+    })();
+
+    inflightArchivedLoad = loadPromise;
+    const clearInflightLoad = () => {
+      if (inflightArchivedLoad === loadPromise) {
+        inflightArchivedLoad = null;
+      }
+    };
+    void loadPromise.then(clearInflightLoad, clearInflightLoad);
+    return loadPromise;
+  },
+
   refreshSessionsForDirectories: async (directories, fallbackActive) => {
     const directorySet = normalizeDirectorySet(directories);
     if (directorySet.size === 0) {
@@ -589,7 +702,9 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
     const generation = loadGeneration;
     const baselineRevision = get().mutationRevision;
     const sdk = opencodeClient.getSdkClient();
-    const fetched = await fetchDirectoryPages(sdk, directorySet);
+    const isPiKernel = await resolveIsPiKernel();
+    const listQuery = globalSessionListQuery({ isPiKernel, surface: 'default' });
+    const fetched = await fetchDirectoryPages(sdk, directorySet, isPiKernel);
 
     if (generation !== loadGeneration) {
       const state = get();
@@ -600,7 +715,7 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
       console.warn('[GlobalSessions] Failed to refresh sessions for some directories:', fetched.errors[0]);
     }
 
-    const { active, archived } = splitGlobalSessionsByArchived(fetched.sessions);
+    const { active, archived: fetchedArchived } = splitGlobalSessionsByArchived(fetched.sessions);
 
     set((state) => {
       let nextActiveSessions = replaceSessionsForDirectories(state.activeSessions, active, fetched.directories);
@@ -609,7 +724,9 @@ export const useGlobalSessionsStore = create<GlobalSessionsState>((set, get) => 
         nextActiveSessions = state.activeSessions;
       }
 
-      let nextArchivedSessions = replaceSessionsForDirectories(state.archivedSessions, archived, fetched.directories);
+      let nextArchivedSessions = listQuery.archived
+        ? replaceSessionsForDirectories(state.archivedSessions, fetchedArchived, fetched.directories)
+        : preserveArchivedAfterActiveLoad(state.archivedSessions, nextActiveSessions);
       if (sameSessionList(state.archivedSessions, nextArchivedSessions)) {
         nextArchivedSessions = state.archivedSessions;
       }
@@ -735,6 +852,10 @@ export const ensureGlobalSessionsLoaded = async (fallbackActive?: Session[]): Pr
 
 export const refreshGlobalSessions = async (fallbackActive?: Session[]): Promise<LoadResult> => {
   return useGlobalSessionsStore.getState().loadSessions(fallbackActive);
+};
+
+export const refreshArchivedSessions = async (): Promise<LoadResult> => {
+  return useGlobalSessionsStore.getState().loadArchivedSessions();
 };
 
 export const refreshGlobalSessionsForDirectories = async (

@@ -1121,10 +1121,10 @@ export async function archiveSessions(
  * treat the session as active again: the UI, the event reducer, and the
  * OpenCode app/TUI all classify archive state by truthiness of
  * `time.archived`, and `0` is falsy. The one place that still excludes such a
- * session is the server's own `time_archived IS NULL` list filter, so the
- * global session cache loads with the inclusive `archived` flag and splits
- * client-side instead of relying on that filter (see
- * `useGlobalSessionsStore.loadSessions`).
+ * session is OpenCode's `time_archived IS NULL` list filter, so the leftover
+ * OpenCode global cache loads with the inclusive `archived` flag and splits
+ * client-side. Pi writes `archived: 0` and daily loads use `archived: false`
+ * (see `useGlobalSessionsStore.loadSessions`).
  */
 const UNARCHIVED_TIMESTAMP = 0
 

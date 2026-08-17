@@ -1703,8 +1703,13 @@ export const createPiHost = ({
       }
       const parentID = readPersistedParentID(metadata || record.info.metadata);
       if (parentID) record.info.parentID = parentID;
-      const persisted = await findPersistedSession(record.id, record.directory);
-      const updated = persisted?.modified ? new Date(persisted.modified).getTime() : undefined;
+      let updated;
+      try {
+        const mtime = fs.statSync(file).mtimeMs;
+        if (Number.isFinite(mtime)) updated = mtime;
+      } catch {
+        // Keep the previous updated stamp when the file disappears mid-refresh.
+      }
       record.info.time = sessionTimeWithArchived({
         ...(record.info.time || {}),
         ...(Number.isFinite(updated) ? { updated } : {}),
@@ -2296,7 +2301,7 @@ export const createPiHost = ({
       }
 
       const cwd = directory || targeted?.directory || defaultDirectory;
-      const listed = await collectSessionInfos(directory || targeted?.directory);
+      const listed = await collectSessionInfos(directory || targeted?.directory, { archived: false });
       const skills = listPiSkills({ home, directory: cwd });
       const commands = listPiCommands({ home, directory: cwd });
       // Refresh skills/prompts/extensions and re-read persisted session records.

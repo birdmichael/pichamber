@@ -1,7 +1,35 @@
 import { describe, expect, test } from 'bun:test'
 import type { OpencodeClient } from '@opencode-ai/sdk/v2'
 
-import { listGlobalSessionPages, splitGlobalSessionsByArchived } from './globalSessions'
+import { globalSessionListQuery, listGlobalSessionPages, splitGlobalSessionsByArchived } from './globalSessions'
+
+describe('globalSessionListQuery', () => {
+  test('Pi default load does not pass archived: true', () => {
+    expect(globalSessionListQuery({ isPiKernel: true })).toEqual({
+      archived: false,
+      narrowToArchived: false,
+    })
+    expect(globalSessionListQuery({ isPiKernel: true, surface: 'default' }).archived).not.toBe(true)
+  })
+
+  test('Archive page and VS Code archived bucket pass archived: true on Pi', () => {
+    expect(globalSessionListQuery({ isPiKernel: true, surface: 'archive' })).toEqual({
+      archived: true,
+      narrowToArchived: true,
+    })
+  })
+
+  test('OpenCode default load stays inclusive and splits client-side', () => {
+    expect(globalSessionListQuery({ isPiKernel: false })).toEqual({
+      archived: true,
+      narrowToArchived: false,
+    })
+    expect(globalSessionListQuery({ isPiKernel: false, surface: 'default' })).toEqual({
+      archived: true,
+      narrowToArchived: false,
+    })
+  })
+})
 
 describe('listGlobalSessionPages', () => {
   test('sanitizes session list records before returning them', async () => {
