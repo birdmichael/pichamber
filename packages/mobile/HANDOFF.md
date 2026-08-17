@@ -168,10 +168,10 @@ bun run mobile:build:ios:simulator
 Web-inherited build warnings (KaTeX font URLs, `onnxruntime-web` eval, chunk-size) are expected and
 non-fatal.
 
-## The gap: CI / release automation (next work)
+## CI / release automation
 
-The apps build and deploy locally; there is no CI/signing/publishing yet. To take them to
-TestFlight / Play internal testing:
+Signed Android APK/AAB and iOS TestFlight upload run from `.github/workflows/mobile-release.yml`
+(also called by `Release`). Remaining store-console work:
 
 ### iOS
 
@@ -179,8 +179,9 @@ TestFlight / Play internal testing:
   (`com.pichamber.app`, `.PichamberWidget`, `.PichamberNotificationService`), each enabled for
   the **App Group** and (app) **Push**.
 - Signing certificate + provisioning profiles for all three targets (extensions need their own).
-- App Store Connect API key for non-interactive TestFlight upload (`xcodebuild archive` +
-  `notarytool`/`altool`, or fastlane `gym`+`pilot`).
+- Non-interactive TestFlight upload (`xcodebuild archive` + `altool`) with either an App Store
+  Connect API key or an App Store Connect admin Apple ID plus an app-specific password
+  (`APPLE_ID` / `APPLE_PASSWORD`).
 - Runner: macOS with the same Xcode as `DEVELOPER_DIR`.
 
 ### Android

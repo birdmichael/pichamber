@@ -59,6 +59,25 @@ test('verifies identity, version, and native payload architecture', () => {
   }
 });
 
+test('skips leftover OpenCode CLI when it is not packaged', () => {
+  const root = createPayload();
+  try {
+    fs.rmSync(path.join(root, 'resources/opencode-cli/opencode'));
+    const result = verifyExtractedPayload({
+      root,
+      targetArchitecture: 'x64',
+      expectedOpenCodeVersion: '1.17.18',
+      runCliVersion: () => {
+        throw new Error('CLI should not be invoked when it is missing');
+      },
+    });
+    assert.equal(result.openCodeVersion, null);
+    assert.equal(result.nativeModuleCount, 2);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('fails on a missing native module', () => {
   const root = createPayload();
   try {

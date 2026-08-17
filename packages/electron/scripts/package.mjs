@@ -12,8 +12,17 @@ if (process.platform === 'win32' && !env.CSC_LINK && !env.WINDOWS_CSC_LINK) {
   console.log('[electron] Windows code signing disabled; building unsigned installer.');
 }
 
-if (process.platform === 'darwin' && !env.CSC_LINK && !env.CSC_NAME && !env.APPLE_ID) {
+const forceUnsignedMac = env.APPLE_SIGNING === 'false';
+if (
+  process.platform === 'darwin'
+  && (forceUnsignedMac || (!env.CSC_LINK && !env.CSC_NAME && !env.APPLE_ID))
+) {
   env.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
+  if (forceUnsignedMac) {
+    delete env.APPLE_ID;
+    delete env.APPLE_APP_SPECIFIC_PASSWORD;
+    delete env.APPLE_PASSWORD;
+  }
   builderArgs.push('--config.mac.notarize=false');
   console.log('[electron] macOS signing/notarization disabled; building an unsigned dmg/zip.');
 }
