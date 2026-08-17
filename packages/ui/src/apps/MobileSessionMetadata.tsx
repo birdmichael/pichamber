@@ -1,13 +1,6 @@
 import React from 'react';
 
-import { Icon } from '@/components/icon/Icon';
-import { Button } from '@/components/ui/button';
-import { WorkStatusPresenceProvider } from '@/components/chat/work-status/presence';
 import { computeContextUsage } from '@/components/chat/work-status/contextUsage';
-import { getWorkStatusPanelPresentation } from '@/components/chat/work-status/sections';
-import { WorkStatusSections } from '@/components/chat/work-status/WorkStatusSections';
-import { useWorkStatusSectionVisibility } from '@/components/chat/work-status/useWorkStatusSectionVisibility';
-import { WorkStatusSectionsDialog } from '@/components/chat/work-status/WorkStatusSectionsDialog';
 import { useTabletLayout } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { clampPercent, resolveUsageTone } from '@/lib/quota';
@@ -16,7 +9,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionMessages } from '@/sync/sync-context';
 
-import { MOBILE_WORK_STATUS_HOST } from './mobileWorkStatusHost';
+import { MobileWorkStatusHost } from './MobileWorkStatusHost';
 
 const TABLET_METADATA_POPOVER_WIDTH = 380;
 
@@ -77,15 +70,6 @@ const SessionMetadataOverlay: React.FC<{
   const panelRef = React.useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = React.useState(open);
   const [isExiting, setIsExiting] = React.useState(false);
-  const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
-  const [renderedSections, setRenderedSections] = React.useState(1);
-  const { allSectionsHidden } = useWorkStatusSectionVisibility();
-  const { showEmptyState } = getWorkStatusPanelPresentation({
-    visible: open,
-    contentMounted: shouldRender,
-    renderedSections,
-    allSectionsHidden,
-  });
   // Tablet: a phone-width sheet stretched across the whole chat column looks
   // broken — render a popover anchored to the metadata button instead.
   const { enabled: isTabletLayout } = useTabletLayout();
@@ -178,9 +162,8 @@ const SessionMetadataOverlay: React.FC<{
         ref={panelRef}
         role="dialog"
         aria-label={t('chat.workStatus.ariaLabel')}
-        data-work-status-host={MOBILE_WORK_STATUS_HOST}
         className={cn(
-          'relative overflow-y-auto overscroll-contain rounded-[20px] border border-border/70 bg-[var(--surface-elevated)] p-2 shadow-[0_12px_32px_rgb(0_0_0_/_0.2)] will-change-transform',
+          'overflow-y-auto overscroll-contain rounded-[20px] border border-border/70 bg-[var(--surface-elevated)] p-2 shadow-[0_12px_32px_rgb(0_0_0_/_0.2)] will-change-transform',
           isPopover ? 'absolute origin-top-left' : 'mx-3 mt-2',
           isExiting ? 'pointer-events-none' : 'pointer-events-auto',
         )}
@@ -196,31 +179,7 @@ const SessionMetadataOverlay: React.FC<{
             : null),
         }}
       >
-        <button
-          type="button"
-          aria-label={t('chat.workStatus.sections.open')}
-          onClick={() => setSectionsDialogOpen(true)}
-          className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Icon name="equalizer-2" className="size-4" />
-        </button>
-        <WorkStatusPresenceProvider onChange={setRenderedSections}>
-          <WorkStatusSections sessionId={sessionId} directory={directory} />
-        </WorkStatusPresenceProvider>
-        {showEmptyState ? (
-          <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-            <span className="text-sm text-muted-foreground">{t('chat.workStatus.sections.allHidden')}</span>
-            <Button
-              variant="link"
-              size="xs"
-              onClick={() => setSectionsDialogOpen(true)}
-              className="mt-2 normal-case text-muted-foreground hover:text-foreground"
-            >
-              {t('chat.workStatus.sections.open')}
-            </Button>
-          </div>
-        ) : null}
-        <WorkStatusSectionsDialog open={sectionsDialogOpen} onOpenChange={setSectionsDialogOpen} />
+        <MobileWorkStatusHost sessionId={sessionId} directory={directory} />
       </div>
       <style>{`
         @keyframes session-metadata-in {

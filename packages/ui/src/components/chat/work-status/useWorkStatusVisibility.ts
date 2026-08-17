@@ -28,19 +28,6 @@ type Options = {
   isVSCode: boolean;
 };
 
-/**
- * Whether the 300px chat-column card may occupy layout.
- *
- * Mobile refuses this column — phones and the dedicated MobileApp tablet
- * shell host the same rows in `MobileSessionMetadata`. VS Code also refuses
- * the inline card. This is a layout fact, not a product hide: Work Status
- * data still renders on mobile.
- */
-export const isInlineWorkStatusPanelAllowed = ({
-  isMobile,
-  isVSCode,
-}: Pick<Options, 'isMobile' | 'isVSCode'>): boolean => !isMobile && !isVSCode;
-
 type Result = {
   /** Layout can host the panel inline, regardless of the user's switch. */
   fits: boolean;
@@ -94,9 +81,7 @@ export const useWorkStatusVisibility = ({ directory, isMobile, isVSCode }: Optio
 
   // Split from the switch: a narrow chat is a layout fact, and the header needs
   // it to offer the panel as an overlay instead of pretending it is off.
-  // `isMobile` only refuses this inline column. The same rows live in the
-  // mobile session-metadata overlay (`MOBILE_WORK_STATUS_HOST`).
-  const layoutAllows = isInlineWorkStatusPanelAllowed({ isMobile, isVSCode }) && !contextPanelOpen;
+  const layoutAllows = !isMobile && !isVSCode && !contextPanelOpen;
 
   // Measures the chat AREA — the container holding the chat and the context
   // panel together — not the chat row inside it.

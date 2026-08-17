@@ -41,21 +41,18 @@ exactly as it already does when the context panel opens.
 
 ## Visibility
 
-`useWorkStatusVisibility` hides the **inline chat-column card** when any of
-these hold:
+`useWorkStatusVisibility` hides the panel when any of these hold:
 
 - the user switched it off;
-- the runtime is mobile or VS Code (`isInlineWorkStatusPanelAllowed`);
+- the runtime is mobile or VS Code;
 - the context panel is open for the active directory;
 - the row cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
   `WORK_STATUS_PANEL_WIDTH` of panel.
 
-`isMobile` is a layout refusal of that 300px column, not a product hide.
-Hosted `mobile.html` and Capacitor render the same `WorkStatusSections` in
-`MobileSessionMetadata` (`apps/mobileWorkStatusHost.ts`). MCP and Subagents
-still follow `isWorkStatusSectionAvailable` / Feature Plugin slots. Clicking
-a live child uses `openSubagentChildSession`, which navigates in-place on
-mobile.
+Do not remount this card beside the mobile transcript. Hosted `mobile.html`
+and Capacitor wrap the same section components in `MobileWorkStatusHost`
+(`apps/MobileWorkStatusHost.tsx`), opened from the header context ring.
+That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
 
 `ChatContainer` additionally suppresses it in mini-chat and in expanded-input
 mode. It remains available on a new-session draft: when the draft targets a

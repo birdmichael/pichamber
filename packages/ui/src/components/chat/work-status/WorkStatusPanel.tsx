@@ -4,11 +4,23 @@ import { cn } from '@/lib/utils';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/useUIStore';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
-import { WorkStatusSections } from './WorkStatusSections';
-import { useWorkStatusSectionVisibility } from './useWorkStatusSectionVisibility';
+import { WorkStatusGoalRow } from './WorkStatusGoalRow';
+import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
+import { WorkStatusUsageSection } from './WorkStatusUsageSection';
+import { WorkStatusSubagentsSection } from './WorkStatusSubagentsSection';
+import { WorkStatusTasksSection } from './WorkStatusTasksSection';
+import { WorkStatusMcpSection } from './WorkStatusMcpSection';
+import { WorkStatusPinnedSection } from './WorkStatusPinnedSection';
+import { WorkStatusContextSection } from './WorkStatusContextSection';
 import { WorkStatusSectionsDialog } from './WorkStatusSectionsDialog';
-import { getWorkStatusPanelPresentation } from './sections';
+import {
+  areAllWorkStatusSectionsHidden,
+  getWorkStatusPanelPresentation,
+  isWorkStatusSectionVisible,
+} from './sections';
 import { WorkStatusPresenceProvider } from './presence';
 import { Icon } from '@/components/icon/Icon';
 
@@ -57,11 +69,23 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const { t } = useI18n();
   const setScrollTop = useUIStore((state) => state.setWorkStatusScrollTop);
   const setOverlayOpen = useUIStore((state) => state.setWorkStatusOverlayOpen);
-  const { allSectionsHidden } = useWorkStatusSectionVisibility();
+  const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
+  const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
+  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const sectionContext = React.useMemo(
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive],
+  );
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering
   // nothing on the way in would make the card flash out and back on arrival.
   const [renderedSections, setRenderedSections] = React.useState(1);
+  const sectionVisible = React.useCallback(
+    (sectionId: Parameters<typeof isWorkStatusSectionVisible>[1]) =>
+      isWorkStatusSectionVisible(hiddenSections, sectionId, sectionContext),
+    [hiddenSections, sectionContext],
+  );
   const frameRef = React.useRef<number | null>(null);
 
   // Restoring the offset has to happen the moment the scroller attaches, and
@@ -78,6 +102,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   // re-enable sections. The previous `renderedSections > 0` guard is preserved
   // for the transient "no data yet" state so the panel doesn't flash a bare
   // bordered card on first mount.
+  const allSectionsHidden = areAllWorkStatusSectionsHidden(hiddenSections, sectionContext);
   const { interactive, showEmptyState } = getWorkStatusPanelPresentation({
     visible,
     contentMounted,
@@ -228,7 +253,19 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         size={24}
         className="oc-hide-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
       >
-        <WorkStatusSections sessionId={sessionId} directory={directory} />
+        <WorkStatusPrimaryGroup
+          sessionId={sessionId}
+          directory={directory}
+          showSession={sectionVisible('session')}
+          showRepository={sectionVisible('repository')}
+          goalRow={<WorkStatusGoalRow sessionId={sessionId} directory={directory} />}
+        />
+        {sectionVisible('usage') ? <WorkStatusUsageSection /> : null}
+        {sectionVisible('subagents') ? <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} /> : null}
+        {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
+        {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} /> : null}
+        {sectionVisible('pinned') ? <WorkStatusPinnedSection sessionId={sessionId} directory={directory} /> : null}
+        {sectionVisible('contextSources') ? <WorkStatusContextSection sessionId={sessionId} directory={directory} /> : null}
       </ScrollShadow>
       </WorkStatusPresenceProvider>
       ) : null}

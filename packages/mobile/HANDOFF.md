@@ -19,8 +19,9 @@ extensions.
   only in the Capacitor shell — hosted `mobile.html` in a plain browser does not expose them.
   Session chrome on both hosted mobile and Capacitor matches Desktop Pi: Scheduled Tasks, Multi-run,
   Archive with restore, and footer Refresh. Work Status lives in the header context-ring overlay
-  (`MobileSessionMetadata`) and reuses Desktop `WorkStatusSections` (session, branch, context %,
-  MCP, Subagents). Phase 2 workspace surfaces (PR / Diff / Walkthrough / Browser) are a later slice.
+  (`MobileWorkStatusHost` inside `MobileSessionMetadata`) and wraps Desktop sections (session,
+  branch, context %, MCP, Subagents). The 300px chat-column card stays off. Phase 2 workspace
+  surfaces (PR / Diff / Walkthrough / Browser) are a later slice.
 
 ## Build pipeline (how a native build is produced)
 
