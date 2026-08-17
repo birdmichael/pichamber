@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Settings: opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.
 - Chat: on Pi, typing `@agent:build` or `@agent:plan` no longer switches the session agent, and `@` autocomplete no longer lists leftover OpenCode agents.
 - Chat: typing an unknown `/name` and pressing Enter now sends it as a normal message. The empty command popup no longer swallows the first Enter.
 - Chat: on Pi, a Subagents Work Status row or transcript card opens that child session in place so you can send follow-ups there. The section stays hidden until the Subagents feature plugin is installed and enabled. Leftover adapter rows without a session id are not listed.

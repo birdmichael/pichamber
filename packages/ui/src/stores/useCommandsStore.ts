@@ -61,9 +61,66 @@ const buildCommandsSignature = (commands: Command[]): string => {
       command.description ?? '',
       command.agent ?? '',
       command.model ?? '',
+      command.template ?? '',
       String(command.isBuiltIn === true),
     ].join('|'))
     .join('||');
+};
+
+type CommandConfigDetail = {
+  scope?: unknown;
+  template?: unknown;
+  sources?: {
+    md?: { exists?: boolean; scope?: unknown };
+    json?: { exists?: boolean; scope?: unknown };
+  };
+};
+
+const resolveCommandScope = (data: CommandConfigDetail | null): CommandScope | undefined => {
+  if (!data) {
+    return undefined;
+  }
+
+  let scope = data.scope;
+  if (!scope && data.sources) {
+    const sources = data.sources;
+    scope = (sources.md?.exists ? sources.md.scope : undefined)
+      ?? (sources.json?.exists ? sources.json.scope : undefined)
+      ?? sources.md?.scope
+      ?? sources.json?.scope;
+  }
+
+  return scope === 'project' || scope === 'user' ? scope : undefined;
+};
+
+const resolveCommandTemplate = (
+  cmd: Command,
+  data: CommandConfigDetail | null,
+  previous?: Command,
+): string | undefined => {
+  if (typeof data?.template === 'string') {
+    return data.template;
+  }
+  if (typeof cmd.template === 'string') {
+    return cmd.template;
+  }
+  if (typeof previous?.template === 'string') {
+    return previous.template;
+  }
+  return undefined;
+};
+
+const mergeListedCommand = (
+  cmd: Command,
+  data: CommandConfigDetail | null,
+  previous?: Command,
+): Command => {
+  const template = resolveCommandTemplate(cmd, data, previous);
+  return {
+    ...cmd,
+    ...(template !== undefined ? { template } : {}),
+    scope: resolveCommandScope(data) ?? previous?.scope,
+  };
 };
 
 const upsertCommandLocal = (
@@ -213,8 +270,10 @@ export const useCommandsStore = create<CommandsStore>()(
                 ));
 
                 const configurableCommands = commands.filter((cmd) => cmd.source !== 'skill');
+                const previousByName = new Map(previousCommands.map((command) => [command.name, command]));
                 const commandsWithScope = await Promise.all(
                   configurableCommands.map(async (cmd) => {
+                    const previous = previousByName.get(cmd.name);
                     try {
                       // Force no-cache
                       const response = await runtimeFetch(`/api/config/commands/${encodeURIComponent(cmd.name)}${queryParams}`, {
@@ -225,31 +284,13 @@ export const useCommandsStore = create<CommandsStore>()(
                       });
 
                       if (response.ok) {
-                        const data = await response.json();
-
-                        // Prioritize explicit scope
-                        let scope = data.scope;
-
-                        // Fallback to deducing from sources
-                        if (!scope && data.sources) {
-                          const sources = data.sources;
-                          scope = (sources.md?.exists ? sources.md.scope : undefined)
-                            ?? (sources.json?.exists ? sources.json.scope : undefined)
-                            ?? sources.md?.scope
-                            ?? sources.json?.scope;
-                        }
-
-                        if (scope === 'project' || scope === 'user') {
-                          return { ...cmd, scope: scope as CommandScope };
-                        }
-
-                        // Explicitly set null scope if not found
-                        return { ...cmd, scope: undefined };
+                        const data = await response.json() as CommandConfigDetail;
+                        return mergeListedCommand(cmd, data, previous);
                       }
                     } catch (err) {
                       console.warn(`[CommandsStore] Failed to fetch config for command ${cmd.name}:`, err);
                     }
-                    return cmd;
+                    return mergeListedCommand(cmd, null, previous);
                   })
                 );
 
