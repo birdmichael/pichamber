@@ -749,6 +749,12 @@ const isMarkdownOrdered = (line) => /^\s*\d+\.\s+\S/.test(line);
 
 const isMarkdownRule = (line) => /^(\*{3,}|-{3,}|_{3,})\s*$/.test(line);
 
+const isMarkdownTableRow = (line) => /^\s*\|.+\|\s*$/.test(line);
+
+const isMarkdownTableDivider = (line) => /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(line);
+
+const cellsFromTableRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+
 const isMarkdownBlockStart = (line) => (
   isMarkdownFenceOpen(line)
   || isMarkdownHeading(line)
@@ -756,6 +762,7 @@ const isMarkdownBlockStart = (line) => (
   || isMarkdownUnordered(line)
   || isMarkdownOrdered(line)
   || isMarkdownRule(line)
+  || isMarkdownTableRow(line)
 );
 
 /** Escape first, then insert only our tags. Code fences, lists, and links stay offline-safe. */
@@ -792,6 +799,19 @@ const markdownToHtml = (source) => {
     if (isMarkdownRule(line)) {
       html.push('<hr>');
       index += 1;
+      continue;
+    }
+    if (isMarkdownTableRow(line) && index + 1 < lines.length && isMarkdownTableDivider(lines[index + 1])) {
+      const header = cellsFromTableRow(line);
+      index += 2;
+      const bodyRows = [];
+      while (index < lines.length && isMarkdownTableRow(lines[index]) && !isMarkdownTableDivider(lines[index])) {
+        bodyRows.push(cellsFromTableRow(lines[index]));
+        index += 1;
+      }
+      const thead = `<tr>${header.map((cell) => `<th>${inlineMarkdown(cell)}</th>`).join('')}</tr>`;
+      const tbody = bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${inlineMarkdown(cell)}</td>`).join('')}</tr>`).join('');
+      html.push(`<table><thead>${thead}</thead>${tbody ? `<tbody>${tbody}</tbody>` : ''}</table>`);
       continue;
     }
     if (isMarkdownQuote(line)) {
@@ -890,6 +910,14 @@ const htmlFromFilePart = (part) => {
   return '';
 };
 
+const toolInputPreview = (input) => {
+  const keys = Object.keys(input);
+  if (keys.length === 1 && typeof input[keys[0]] === 'string') {
+    return input[keys[0]];
+  }
+  return formatJsonForPre(input);
+};
+
 const htmlFromToolPart = (part) => {
   const name = escapeHtml(asTrimmedString(part?.tool) || 'tool');
   const status = asTrimmedString(part?.state?.status);
@@ -898,10 +926,10 @@ const htmlFromToolPart = (part) => {
   const error = typeof part?.state?.error === 'string' ? part.state.error : '';
   const isError = status === 'error';
   const sections = [
-    `<div class="tool-name">${name}</div>`,
+    `<div class="tool-head"><span class="tool-name">${name}</span></div>`,
   ];
   if (Object.keys(input).length > 0) {
-    sections.push(`<div class="tool-label">Input</div><pre class="tool-io">${escapeHtml(formatJsonForPre(input))}</pre>`);
+    sections.push(`<pre class="tool-io">${escapeHtml(toolInputPreview(input))}</pre>`);
   }
   if (isError) {
     sections.push(`<div class="tool-label">Error</div><pre class="tool-io">${escapeHtml(error || output || 'tool error')}</pre>`);
@@ -932,59 +960,131 @@ const htmlFromMessageParts = (parts) => {
 };
 
 const htmlFromMessageEntry = (entry) => {
-  const role = entry?.info?.role === 'assistant' ? 'Assistant' : 'User';
+  const isAssistant = entry?.info?.role === 'assistant';
   const timestamp = formatMessageTimestamp(entry?.info);
-  const model = role === 'Assistant' ? formatModelLabel(entry?.info) : '';
-  const usage = role === 'Assistant' ? formatUsageLine(entry?.info) : '';
-  const meta = [timestamp, model].filter(Boolean).join(' · ');
+  const model = isAssistant ? formatModelLabel(entry?.info) : '';
+  const usage = isAssistant ? formatUsageLine(entry?.info) : '';
   const body = htmlFromMessageParts(entry?.parts);
+  if (!isAssistant) {
+    return `<article class="msg user"><div class="bubble">${body}</div></article>`;
+  }
+  const footer = [model, timestamp, usage].filter(Boolean).join(' · ');
   return [
-    `<article class="msg ${role.toLowerCase()}">`,
-    `<header><div class="role">${role}</div>${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ''}</header>`,
+    '<article class="msg assistant">',
     body,
-    usage ? `<footer class="usage">${escapeHtml(usage)}</footer>` : '',
+    footer ? `<footer class="usage">${escapeHtml(footer)}</footer>` : '',
     '</article>',
   ].filter(Boolean).join('\n');
 };
 
-const SESSION_HTML_STYLES = `body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; color: #111; line-height: 1.5; }
-h1 { font-size: 1.35rem; margin-bottom: 1.5rem; }
-h2, h3, h4, h5, h6 { line-height: 1.3; }
-.msg { margin: 1.5rem 0; padding-bottom: 1.25rem; border-bottom: 1px solid #e5e5e5; }
-.msg:last-child { border-bottom: 0; }
-header { margin-bottom: 0.5rem; }
-.role { font-weight: 650; }
-.meta, .usage { color: #666; font-size: 0.85rem; }
-.usage { margin-top: 0.75rem; }
-.body p { margin: 0.5rem 0; }
+const formatSessionMeta = (record) => {
+  const created = record?.info?.time?.created;
+  const timestamp = created == null || created === '' ? '' : isoFromUnknown(created);
+  let model = '';
+  const messages = Array.isArray(record?.messages) ? record.messages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    model = formatModelLabel(messages[index]?.info);
+    if (model) break;
+  }
+  return [model, timestamp].filter(Boolean).join(' · ');
+};
+
+const SESSION_HTML_STYLES = `:root {
+  --bg: #0c0c0e;
+  --fg: #ececef;
+  --muted: #9b9ba3;
+  --surface: #161618;
+  --surface-raised: #1c1c1f;
+  --border: #2a2a2e;
+  --code: #111113;
+  --link: #93c5fd;
+  --error-bg: #2a1518;
+  --error-border: #7f1d1d;
+}
+html { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #0c0c0e;
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.55;
+}
+.page { max-width: 46rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+.session-header { padding-bottom: 1.15rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.brand { margin: 0 0 0.45rem; font-size: 0.68rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.session-header h1 { margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; }
+.session-meta { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.transcript { display: flex; flex-direction: column; gap: 1.15rem; }
+.msg.user { display: flex; }
+.msg.user .bubble {
+  max-width: 100%;
+  padding: 0.85rem 1rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 10px 28px rgba(0,0,0,0.28);
+}
+.msg.assistant { display: flex; flex-direction: column; gap: 0.65rem; }
+.body h1, .body h2, .body h3, .body h4, .body h5, .body h6 { line-height: 1.3; margin: 1.1rem 0 0.45rem; }
+.body h2 { font-size: 1.15rem; }
+.body h3 { font-size: 1.05rem; }
+.body p { margin: 0.55rem 0; }
 .body p:first-child { margin-top: 0; }
-.body pre, .thinking-body pre, .tool-io { white-space: pre-wrap; word-break: break-word; background: #f4f4f5; padding: 0.75rem; border-radius: 0.4rem; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
-.body code, .thinking-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #f4f4f5; padding: 0.1em 0.3em; border-radius: 0.25rem; }
+.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.35rem; }
+.body li { margin: 0.2rem 0; }
+.body a { color: var(--link); }
+.body hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
+.body blockquote { margin: 0.75rem 0; padding: 0.15rem 0 0.15rem 0.85rem; border-left: 2px solid var(--border); color: var(--muted); }
+.body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.92rem; }
+.body th, .body td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; }
+.body th { background: var(--surface); color: var(--muted); font-weight: 650; }
+.body pre, .thinking-body pre, .tool-io {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  background: var(--code);
+  border-radius: 10px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.body pre { margin: 0.65rem 0; }
+.body code, .thinking-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--code);
+  padding: 0.1em 0.35em;
+  border-radius: 0.3rem;
+}
 .body pre code { background: none; padding: 0; }
-.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.4rem; }
-.body a { color: #155eef; }
-.thinking { margin: 0.75rem 0; padding: 0.5rem 0.75rem; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 0.4rem; }
-.thinking summary { cursor: pointer; font-weight: 600; color: #444; }
-.thinking-body { margin-top: 0.5rem; color: #444; }
-.tool { margin: 0.75rem 0; padding: 0.75rem; border: 1px solid #d4d4d8; border-radius: 0.4rem; background: #fafafa; }
-.tool.error { border-color: #f0b4b4; background: #fff7f7; }
-.tool-name { font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.tool-label { margin-top: 0.6rem; font-size: 0.75rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
-.image { margin: 0.75rem 0; }
-.image img { max-width: 100%; height: auto; border-radius: 0.4rem; }
-.image-omitted, .file-omitted { color: #666; font-size: 0.9rem; font-style: italic; }
-@media (prefers-color-scheme: dark) {
-  body { color: #f4f4f5; background: #18181b; }
-  .msg { border-bottom-color: #3f3f46; }
-  .meta, .usage, .tool-label, .image-omitted, .file-omitted { color: #a1a1aa; }
-  .body pre, .thinking-body pre, .tool-io, .body code, .thinking-body code { background: #27272a; }
-  .thinking, .tool { background: #1f1f23; border-color: #3f3f46; }
-  .tool.error { background: #2a1b1b; border-color: #7f1d1d; }
-  .body a { color: #93c5fd; }
-}`;
+.thinking { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.thinking summary { cursor: pointer; font-weight: 500; color: var(--muted); list-style: none; }
+.thinking summary::-webkit-details-marker { display: none; }
+.thinking summary::before { content: "▸ "; }
+.thinking[open] summary::before { content: "▾ "; }
+.thinking-body { margin-top: 0.45rem; color: var(--muted); }
+.tool {
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.tool.error { background: var(--error-bg); border-color: var(--error-border); }
+.tool-head { padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--border); }
+.tool-name { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tool-label { padding: 0.45rem 0.8rem 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tool-io { border-radius: 0; background: var(--code); }
+.image { margin: 0.5rem 0; }
+.image img { max-width: 100%; height: auto; border-radius: 12px; }
+.image-omitted, .file-omitted { color: var(--muted); font-size: 0.9rem; font-style: italic; }
+.usage { color: var(--muted); font-size: 0.8rem; }`;
 
 export const buildSessionHtml = (record) => {
   const title = escapeHtml(asTrimmedString(record?.info?.title) || 'Session');
+  const sessionMeta = escapeHtml(formatSessionMeta(record));
   const blocks = (record?.messages || []).map((entry) => htmlFromMessageEntry(entry)).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
@@ -997,8 +1097,16 @@ ${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>
+<div class="page">
+<header class="session-header">
+<p class="brand">Pichamber</p>
 <h1>${title}</h1>
+${sessionMeta ? `<p class="session-meta">${sessionMeta}</p>` : ''}
+</header>
+<main class="transcript">
 ${blocks}
+</main>
+</div>
 </body>
 </html>
 `;
