@@ -1028,6 +1028,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.directoryAria': 'Pi 에이전트 디렉터리',
   'settings.openchamber.piAgent.field.directoryPlaceholder': '~/.pi/agent',
   'settings.openchamber.piAgent.field.directoryInfo': '비워 두면 PI_CODING_AGENT_DIR가 있을 때 그 값을 쓰고, 없으면 ~/.pi/agent를 씁니다. 이 재정의는 에이전트 디렉터리가 아니라 ~/.config/openchamber/settings.json에 저장됩니다.',
+  'settings.openchamber.piAgent.field.directoryInfoWithPath': '비워 두면 PI_CODING_AGENT_DIR가 있을 때 그 값을 쓰고, 없으면 ~/.pi/agent를 씁니다. 현재 경로는 {path}입니다. 이 재정의는 에이전트 디렉터리가 아니라 ~/.config/openchamber/settings.json에 저장됩니다.',
   'settings.openchamber.piAgent.field.showUpdateNotifications': 'Pi 업데이트 알림 표시',
   'settings.openchamber.piAgent.field.showUpdateNotificationsAria': 'Pi 업데이트 알림 표시',
   'settings.openchamber.piAgent.field.showUpdateNotificationsInfo': '프로세스 내 @earendil-works/pi-coding-agent의 새 버전이 있으면 안내를 표시합니다. About의 Pichamber 앱 업데이트와는 다릅니다.',

@@ -1062,6 +1062,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.directoryAria': 'Pi agent directory',
   'settings.openchamber.piAgent.field.directoryPlaceholder': '~/.pi/agent',
   'settings.openchamber.piAgent.field.directoryInfo': 'Leave empty to use PI_CODING_AGENT_DIR if set, otherwise ~/.pi/agent. Pichamber stores this override in ~/.config/openchamber/settings.json, not inside the agent directory.',
+  'settings.openchamber.piAgent.field.directoryInfoWithPath': 'Leave empty to use PI_CODING_AGENT_DIR if set, otherwise ~/.pi/agent. The live path is {path}. Pichamber stores this override in ~/.config/openchamber/settings.json, not inside the agent directory.',
   'settings.openchamber.piAgent.field.showUpdateNotifications': 'Show Pi update notifications',
   'settings.openchamber.piAgent.field.showUpdateNotificationsAria': 'Show Pi update notifications',
   'settings.openchamber.piAgent.field.showUpdateNotificationsInfo': 'When a newer in-process @earendil-works/pi-coding-agent is available, show an informational notice. This is not the Pichamber app updater on About.',

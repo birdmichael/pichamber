@@ -18,6 +18,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { toast } from '@/components/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 type LoadState = 'loading' | 'error' | 'ready';
 
@@ -114,7 +115,10 @@ export const PiAgentSettings: React.FC = () => {
         toast.error(message);
         return;
       }
-      setValue(typeof payload?.piAgentDir === 'string' ? payload.piAgentDir.trim() : unquoted);
+      // Empty stays empty: do not write the resolved default into the field.
+      setValue(unquoted.length === 0
+        ? ''
+        : (typeof payload?.piAgentDir === 'string' ? payload.piAgentDir.trim() : unquoted));
       if (typeof payload?.piAgentDirResolved === 'string') {
         setResolvedPath(payload.piAgentDirResolved.trim());
       }
@@ -154,32 +158,40 @@ export const PiAgentSettings: React.FC = () => {
         <SettingsFieldRow
           settingsItem="sessions.pi-agent-directory"
           label={t('settings.openchamber.piAgent.field.directory')}
-          info={t('settings.openchamber.piAgent.field.directoryInfo')}
+          info={resolvedPath
+            ? t('settings.openchamber.piAgent.field.directoryInfoWithPath', { path: resolvedPath })
+            : t('settings.openchamber.piAgent.field.directoryInfo')}
           alignEnd={false}
           controlClassName="@xl:w-[20rem]"
         >
           <Input
             value={loadState === 'ready' ? value : ''}
             onChange={(e) => setValue(e.target.value)}
-            placeholder={resolvedPath || t('settings.openchamber.piAgent.field.directoryPlaceholder')}
+            placeholder={t('settings.openchamber.piAgent.field.directoryPlaceholder')}
             disabled={fieldDisabled}
             className="h-8 min-w-0 flex-1 font-mono text-xs"
             aria-invalid={loadState === 'error'}
             aria-label={t('settings.openchamber.piAgent.field.directoryAria')}
           />
           {canBrowse ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={handleBrowse}
-              disabled={fieldDisabled}
-              className={SETTINGS_ICON_BUTTON_CLASS}
-              aria-label={t('settings.openchamber.piAgent.actions.browseAria')}
-              title={t('settings.openchamber.piAgent.actions.browse')}
-            >
-              <Icon name="folder" className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={handleBrowse}
+                  disabled={fieldDisabled}
+                  className={SETTINGS_ICON_BUTTON_CLASS}
+                  aria-label={t('settings.openchamber.piAgent.actions.browseAria')}
+                >
+                  <Icon name="folder" className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={8}>
+                {t('settings.openchamber.piAgent.actions.browse')}
+              </TooltipContent>
+            </Tooltip>
           ) : null}
         </SettingsFieldRow>
         {loadState === 'error' ? (

@@ -1030,6 +1030,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.directoryAria': 'Pi 代理目录',
   'settings.openchamber.piAgent.field.directoryPlaceholder': '~/.pi/agent',
   'settings.openchamber.piAgent.field.directoryInfo': '留空则使用 PI_CODING_AGENT_DIR（若已设置），否则使用 ~/.pi/agent。Pichamber 将此覆盖项保存在 ~/.config/openchamber/settings.json，而不是代理目录内。',
+  'settings.openchamber.piAgent.field.directoryInfoWithPath': '留空则使用 PI_CODING_AGENT_DIR（若已设置），否则使用 ~/.pi/agent。当前路径为 {path}。Pichamber 将此覆盖项保存在 ~/.config/openchamber/settings.json，而不是代理目录内。',
   'settings.openchamber.piAgent.field.showUpdateNotifications': '显示 Pi 更新通知',
   'settings.openchamber.piAgent.field.showUpdateNotificationsAria': '显示 Pi 更新通知',
   'settings.openchamber.piAgent.field.showUpdateNotificationsInfo': '当进程内的 @earendil-works/pi-coding-agent 有更新版本时，显示一条提示。这与关于页上的 Pichamber 应用更新无关。',

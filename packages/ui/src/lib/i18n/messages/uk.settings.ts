@@ -1028,6 +1028,7 @@ export const settingsDict = {
   "settings.openchamber.piAgent.field.directoryAria": "Каталог агента Pi",
   "settings.openchamber.piAgent.field.directoryPlaceholder": "~/.pi/agent",
   "settings.openchamber.piAgent.field.directoryInfo": "Залиште порожнім, щоб використати PI_CODING_AGENT_DIR, якщо задано, інакше ~/.pi/agent. Pichamber зберігає це перевизначення в ~/.config/openchamber/settings.json, а не в каталозі агента.",
+  "settings.openchamber.piAgent.field.directoryInfoWithPath": "Залиште порожнім, щоб використати PI_CODING_AGENT_DIR, якщо задано, інакше ~/.pi/agent. Поточний шлях: {path}. Pichamber зберігає це перевизначення в ~/.config/openchamber/settings.json, а не в каталозі агента.",
   "settings.openchamber.piAgent.field.showUpdateNotifications": "Показувати сповіщення про оновлення Pi",
   "settings.openchamber.piAgent.field.showUpdateNotificationsAria": "Показувати сповіщення про оновлення Pi",
   "settings.openchamber.piAgent.field.showUpdateNotificationsInfo": "Коли доступна новіша вбудована версія @earendil-works/pi-coding-agent, показати інформаційне сповіщення. Це не оновлювач програми Pichamber на сторінці «Про програму».",

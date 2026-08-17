@@ -881,6 +881,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.directoryAria': 'Katalog agenta Pi',
   'settings.openchamber.piAgent.field.directoryPlaceholder': '~/.pi/agent',
   'settings.openchamber.piAgent.field.directoryInfo': 'Zostaw puste, aby użyć PI_CODING_AGENT_DIR, jeśli jest ustawione, w przeciwnym razie ~/.pi/agent. Pichamber zapisuje to nadpisanie w ~/.config/openchamber/settings.json, nie w katalogu agenta.',
+  'settings.openchamber.piAgent.field.directoryInfoWithPath': 'Zostaw puste, aby użyć PI_CODING_AGENT_DIR, jeśli jest ustawione, w przeciwnym razie ~/.pi/agent. Bieżąca ścieżka to {path}. Pichamber zapisuje to nadpisanie w ~/.config/openchamber/settings.json, nie w katalogu agenta.',
   'settings.openchamber.piAgent.field.showUpdateNotifications': 'Pokazuj powiadomienia o aktualizacjach Pi',
   'settings.openchamber.piAgent.field.showUpdateNotificationsAria': 'Pokazuj powiadomienia o aktualizacjach Pi',
   'settings.openchamber.piAgent.field.showUpdateNotificationsInfo': 'Gdy dostępna jest nowsza wersja wbudowanego @earendil-works/pi-coding-agent, pokaż informację. To nie jest aktualizator aplikacji Pichamber w oknie Informacje.',

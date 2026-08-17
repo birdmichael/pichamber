@@ -1063,6 +1063,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.directoryAria': 'Pi エージェントディレクトリ',
   'settings.openchamber.piAgent.field.directoryPlaceholder': '~/.pi/agent',
   'settings.openchamber.piAgent.field.directoryInfo': '空欄の場合は PI_CODING_AGENT_DIR（設定時）または ~/.pi/agent を使います。この上書きはエージェントディレクトリではなく ~/.config/openchamber/settings.json に保存されます。',
+  'settings.openchamber.piAgent.field.directoryInfoWithPath': '空欄の場合は PI_CODING_AGENT_DIR（設定時）または ~/.pi/agent を使います。現在のパスは {path} です。この上書きはエージェントディレクトリではなく ~/.config/openchamber/settings.json に保存されます。',
   'settings.openchamber.piAgent.field.showUpdateNotifications': 'Pi の更新通知を表示',
   'settings.openchamber.piAgent.field.showUpdateNotificationsAria': 'Pi の更新通知を表示',
   'settings.openchamber.piAgent.field.showUpdateNotificationsInfo': 'プロセス内の @earendil-works/pi-coding-agent に新しいバージョンがあるとき、情報通知を表示します。About の Pichamber アプリ更新とは別です。',
