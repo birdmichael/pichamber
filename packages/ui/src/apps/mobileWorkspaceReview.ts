@@ -1,11 +1,11 @@
 import { WALKTHROUGH_MIN_WIDTH } from '@/lib/surfaces/registry';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 
-export const MOBILE_REVIEW_MODES = ['pr', 'diff', 'walkthrough'] as const;
+const MOBILE_REVIEW_MODES = ['pr', 'diff', 'walkthrough'] as const;
 
 export type MobileReviewMode = (typeof MOBILE_REVIEW_MODES)[number];
 
-export type MobileReviewPanelState = {
+type MobileReviewPanelState = {
   isOpen: boolean;
   activeTabId: string | null;
   tabs: readonly { id: string; mode: string }[];
@@ -38,8 +38,8 @@ export const isMobileWalkthroughAvailable = (screenWidth: number): boolean => (
  */
 export const isMobileBrowserSupported = (): false => false;
 
-export const isMobileReviewMode = (mode: string | null | undefined): mode is MobileReviewMode => (
-  mode === 'pr' || mode === 'diff' || mode === 'walkthrough'
+const isMobileReviewMode = (mode: string | null | undefined): mode is MobileReviewMode => (
+  (MOBILE_REVIEW_MODES as readonly string[]).includes(mode ?? '')
 );
 
 export const resolveMobileReviewMode = (
