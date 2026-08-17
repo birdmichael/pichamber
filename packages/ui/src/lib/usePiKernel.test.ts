@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   canOfferOpenCodeSessionStub,
   isMcpFeaturePluginAvailable,
+  isProviderQuotaAvailable,
   isSessionGoalVisibleOnPiKernel,
   resolvePinnedPiAgentName,
   shouldShowOpenCodeAgentPicker,
@@ -58,6 +59,16 @@ describe('isSessionGoalVisibleOnPiKernel', () => {
 
   test('keeps Session Goal visible on OpenCode', () => {
     expect(isSessionGoalVisibleOnPiKernel(false)).toBe(true);
+  });
+});
+
+describe('isProviderQuotaAvailable', () => {
+  test('hides leftover provider-quota Usage on the Pi kernel', () => {
+    expect(isProviderQuotaAvailable(true)).toBe(false);
+  });
+
+  test('keeps leftover provider-quota Usage on OpenCode', () => {
+    expect(isProviderQuotaAvailable(false)).toBe(true);
   });
 });
 

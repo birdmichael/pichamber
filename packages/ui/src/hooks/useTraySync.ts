@@ -18,6 +18,7 @@ import {
 } from '@/stores/useGlobalSessionsStore';
 import { useQuotaStore } from '@/stores/useQuotaStore';
 import { QUOTA_PROVIDERS, formatWindowLabel, formatQuotaValueLabel } from '@/lib/quota';
+import { isProviderQuotaAvailable, usePiKernel } from '@/lib/usePiKernel';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useGitStore } from '@/stores/useGitStore';
@@ -171,6 +172,13 @@ const resolveSessionSubtitle = (
 
   return branch ? `${projectName} · ${branch}` : projectName;
 };
+
+const EMPTY_TRAY_USAGE: TrayUsage = { mode: 'usage', groups: [] };
+
+/** Leftover OpenCode only. Pi has no quota source, so the tray omits Usage. */
+export const resolveTrayUsage = (isPiKernel: boolean): TrayUsage => (
+  isProviderQuotaAvailable(isPiKernel) ? buildUsage() : EMPTY_TRAY_USAGE
+);
 
 // Build the usage groups exactly like the header/mobile: only providers the
 // user enabled for the dropdown AND that report as configured. Window rows only
@@ -327,7 +335,7 @@ const collectStatusPollDirectories = (): Map<string, string[]> => {
   return targets;
 };
 
-const buildSnapshot = (instanceName: string): TraySnapshot => {
+const buildSnapshot = (instanceName: string, isPiKernel = false): TraySnapshot => {
   const live = collectLiveData();
   const notif = useNotificationStore.getState().index.session;
 
@@ -424,12 +432,14 @@ const buildSnapshot = (instanceName: string): TraySnapshot => {
     }
   }
 
-  return { sessions, approvals, instanceName, usage: buildUsage(), dockBadgeCount };
+  return { sessions, approvals, instanceName, usage: resolveTrayUsage(isPiKernel), dockBadgeCount };
 };
 
 export const useTraySync = (): void => {
+  const isPiKernel = usePiKernel();
   React.useEffect(() => {
     if (!isTrayPlatform() || !isTrayEnabled() || !canUseElectronDesktopIPC()) return;
+    const includeQuota = isProviderQuotaAvailable(isPiKernel);
 
     let disposed = false;
     let lastSerialized = '';
@@ -439,7 +449,7 @@ export const useTraySync = (): void => {
     let instanceName = '';
     const flushNow = () => {
       if (disposed) return;
-      const snapshot = buildSnapshot(instanceName);
+      const snapshot = buildSnapshot(instanceName, isPiKernel);
       const serialized = JSON.stringify(snapshot);
       if (serialized === lastSerialized) return;
       lastSerialized = serialized;
@@ -546,16 +556,19 @@ export const useTraySync = (): void => {
     void refreshGlobalStatus();
     const globalStatusInterval = window.setInterval(() => { void refreshGlobalStatus(); }, POLL_INTERVAL_MS);
 
-    // Usage: push to the tray whenever the quota store changes, and do one
-    // initial fetch for enabled providers so the submenu isn't empty on launch.
-    const unsubscribeQuota = useQuotaStore.subscribe(() => scheduleFlush());
-    void useQuotaStore.getState().loadSettings().then(() => {
-      if (disposed) return;
-      const { dropdownProviderIds, results } = useQuotaStore.getState();
-      const needsFetch = dropdownProviderIds.length > 0
-        && dropdownProviderIds.some((id) => !results.some((r) => r.providerId === id));
-      if (needsFetch) void useQuotaStore.getState().fetchQuotas(dropdownProviderIds);
-    });
+    // Leftover OpenCode only: Pi has no `/api/quota/*` source. Empty groups
+    // omit the tray Usage submenu.
+    let unsubscribeQuota: (() => void) | null = null;
+    if (includeQuota) {
+      unsubscribeQuota = useQuotaStore.subscribe(() => scheduleFlush());
+      void useQuotaStore.getState().loadSettings().then(() => {
+        if (disposed) return;
+        const { dropdownProviderIds, results } = useQuotaStore.getState();
+        const needsFetch = dropdownProviderIds.length > 0
+          && dropdownProviderIds.some((id) => !results.some((r) => r.providerId === id));
+        if (needsFetch) void useQuotaStore.getState().fetchQuotas(dropdownProviderIds);
+      });
+    }
 
     // Safety net: catches anything the event subscriptions miss (e.g. a store
     // that existed before the registry subscription was attached).
@@ -578,12 +591,12 @@ export const useTraySync = (): void => {
       unsubscribeGlobalStatus();
       unsubscribeSessionOrder();
       unsubscribePinnedSessions();
-      unsubscribeQuota();
+      unsubscribeQuota?.();
       unsubscribeRegistry?.();
       for (const unsub of storeUnsubs.values()) unsub();
       storeUnsubs.clear();
     };
-  }, []);
+  }, [isPiKernel]);
 
   React.useEffect(() => {
     if (!isTrayPlatform() || !isTrayEnabled() || typeof window === 'undefined') return;

@@ -46,6 +46,14 @@ export function isSessionGoalVisibleOnPiKernel(isPiKernel: boolean): boolean {
   return !isPiKernel;
 }
 
+/**
+ * Provider-quota Usage (`/api/quota/*`) is leftover OpenCode. Pi has no
+ * quota source. Session tokens and cache read/write stay elsewhere.
+ */
+export function isProviderQuotaAvailable(isPiKernel: boolean): boolean {
+  return !isPiKernel;
+}
+
 export function usePiKernel(): boolean {
   const [isPiKernel, setIsPiKernel] = React.useState(true);
   React.useEffect(() => {

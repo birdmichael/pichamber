@@ -1,7 +1,11 @@
 import express from 'express';
+import { isPiKernelEnabled } from '../pi/kernel.js';
 import { deleteManagedCredential, getManagedCredentialStatus, normalizers, readManagedCredential, writeManagedCredential } from './credentials/providers.js';
 import { fetchOllamaCloudUsage } from './providers/ollama-cloud.js';
 import { importCursorCredential, validateCursorCredential } from './providers/cursor.js';
+
+/** Leftover OpenCode only. Pi has no `/api/quota/*` source. */
+export const shouldRegisterQuotaRoutes = (env = process.env) => !isPiKernelEnabled(env);
 
 const validators = {
   'ollama-cloud': fetchOllamaCloudUsage,

@@ -86,8 +86,10 @@ and therefore displaces nothing.
 ## Data sources
 
 Everything is read from already-warm caches. The panel adds no aggregated
-endpoint; quota data refreshes through the shared fixed three-minute quota timer,
-which requests only providers enabled for this panel.
+endpoint. On leftover OpenCode, quota data refreshes through the shared fixed
+three-minute quota timer, which requests only providers enabled for this panel.
+On Pi that timer and `/api/quota/*` are off; session context % / cost stay in
+the Session block.
 
 | Block | Source | Notes |
 |---|---|---|
@@ -330,8 +332,9 @@ Two readouts had no loader of their own and appeared only after the user opened
 the matching header dropdown:
 
 - **MCP** — `McpDropdown` was the only mount-time caller of `refresh()`.
-- **Usage** — `useQuotaAutoRefresh` schedules the shared fixed three-minute
-  refresh; the *first* fetch was performed by the dropdown's open handler.
+- **Usage** — leftover OpenCode only. `useQuotaAutoRefresh` schedules the shared
+  fixed three-minute refresh when provider quota is available; the *first* fetch
+  was performed by the dropdown's open handler. On Pi the hook is a no-op.
 - **Skills** — `loadSkills()` ran only when the composer's slash autocomplete
   opened, so the context-sources count was whatever happened to be cached. The
   section loads them itself, keyed on the directory, since skills are

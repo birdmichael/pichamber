@@ -8,6 +8,7 @@ import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { getDefaultModels } from '@/lib/quota/model-families';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { isProviderQuotaAvailable, usePiKernel } from '@/lib/usePiKernel';
 
 const QUOTA_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
 let quotaAutoRefreshConsumers = 0;
@@ -264,7 +265,10 @@ export const useQuotaStore = create<QuotaStore>()(
 );
 
 export const useQuotaAutoRefresh = () => {
+  const isPiKernel = usePiKernel();
   React.useEffect(() => {
+    if (!isProviderQuotaAvailable(isPiKernel)) return;
+
     quotaAutoRefreshConsumers += 1;
     if (quotaAutoRefreshInterval === null) {
       quotaAutoRefreshInterval = window.setInterval(() => {
@@ -282,5 +286,5 @@ export const useQuotaAutoRefresh = () => {
         quotaAutoRefreshInterval = null;
       }
     };
-  }, []);
+  }, [isPiKernel]);
 };
