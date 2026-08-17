@@ -231,7 +231,7 @@ export const sessionPlanHasMarkdown = (plan) => (
   && normalizePlanMarkdown(plan.planMarkdown).length > 0
 );
 
-/** View Plan / Discard chrome while Plan is on, even before the model writes markdown. */
+/** View Plan chrome while Plan is on, even before the model writes markdown. */
 export const sessionPlanViewAvailable = (plan) => (
   Boolean(plan)
   && (plan.status === 'active' || plan.status === 'ready' || plan.status === 'saved' || plan.status === 'implementing')

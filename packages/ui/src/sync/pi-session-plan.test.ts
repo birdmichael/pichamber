@@ -6,6 +6,7 @@ import {
   parseSessionPlan,
   planBuildAvailable,
   planToggleAction,
+  sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
 } from './pi-session-plan';
@@ -76,6 +77,20 @@ describe('plan toggle and build dispatch', () => {
     expect(isFooterPlanSelected('active')).toBe(true);
     expect(isFooterPlanSelected('saved')).toBe(false);
     expect(isFooterPlanSelected('implementing')).toBe(false);
+  });
+
+  test('empty-plan Discard gate uses chrome status and markdown, not a local empty string', () => {
+    expect(sessionPlanCanDiscard({ status: 'active', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'active', planMarkdown: '   ' })).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'off', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'ready', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'ready', planMarkdown: '   ' })).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'saved', planMarkdown: '' })).toBe(false);
+    expect(sessionPlanCanDiscard(null)).toBe(false);
+    expect(sessionPlanCanDiscard({ status: 'ready', planMarkdown: '# Ready plan' })).toBe(true);
+    expect(sessionPlanCanDiscard({ status: 'saved', planMarkdown: '# Saved plan' })).toBe(true);
+    expect(sessionPlanCanDiscard({ status: 'implementing', planMarkdown: '# Building' })).toBe(true);
+    expect(sessionPlanCanDiscard({ status: 'active', planMarkdown: '# leftover' })).toBe(false);
   });
 });
 
