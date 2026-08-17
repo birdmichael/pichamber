@@ -12,6 +12,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { refreshArchivedSessions, resolveGlobalSessionDirectory, useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { formatSessionDateLabel, normalizePath } from '@/components/session/sidebar/utils';
 import { useShallow } from 'zustand/react/shallow';
+import { filterArchivedSessions, sortArchivedSessionsByTime } from './archiveSessionList';
 
 type DirectoryBucket = {
   directory: string;
@@ -44,7 +45,7 @@ export function ArchiveView(): React.ReactNode {
 
   const sortedSessions = React.useMemo(() => {
     if (!open) return [];
-    return [...archivedSessions].sort((a, b) => (b.time?.archived ?? 0) - (a.time?.archived ?? 0));
+    return sortArchivedSessionsByTime(archivedSessions);
   }, [archivedSessions, open]);
 
   const buckets = React.useMemo<DirectoryBucket[]>(() => {
@@ -69,13 +70,13 @@ export function ArchiveView(): React.ReactNode {
 
   // Search spans every archived session; the directory filter applies only
   // while not searching.
-  const filteredSessions = React.useMemo(() => {
-    if (normalizedQuery) {
-      return sortedSessions.filter((session) => (session.title ?? '').toLowerCase().includes(normalizedQuery));
-    }
-    if (selectedDirectory === null) return sortedSessions;
-    return buckets.find((bucket) => bucket.directory === selectedDirectory)?.sessions ?? [];
-  }, [buckets, normalizedQuery, selectedDirectory, sortedSessions]);
+  const filteredSessions = React.useMemo(() => (
+    filterArchivedSessions(sortedSessions, {
+      query: normalizedQuery,
+      selectedDirectory,
+      getDirectory: (session) => normalizePath(resolveGlobalSessionDirectory(session)) ?? '',
+    })
+  ), [normalizedQuery, selectedDirectory, sortedSessions]);
 
   const visibleSessions = filteredSessions.slice(0, visibleCount);
   const remainingCount = filteredSessions.length - visibleSessions.length;

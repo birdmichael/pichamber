@@ -17,6 +17,8 @@ extensions.
 - Renderer: the web build's `mobile.html` entry (`MobileApp`), copied into `dist/` and served by
   Capacitor. Mobile-only surfaces (connection onboarding, `Instances`, QR pairing, widgets) exist
   only in the Capacitor shell — hosted `mobile.html` in a plain browser does not expose them.
+  Session chrome on both hosted mobile and Capacitor matches Desktop Pi: Scheduled Tasks, Multi-run,
+  Archive with restore, and footer Refresh. Work Status / Phase 2 workspace surfaces are later slices.
 
 ## Build pipeline (how a native build is produced)
 

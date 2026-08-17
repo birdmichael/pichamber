@@ -6,6 +6,8 @@ import { MobileAppUpdateToast } from '@/components/update/MobileAppUpdateToast';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { Button } from '@/components/ui/button';
 import { OpenChamberLogo } from '@/components/ui/OpenChamberLogo';
+import { MultiRunLauncher } from '@/components/multirun';
+import { ScheduledTasksDialog } from '@/components/session/ScheduledTasksDialog';
 import { ChatView } from '@/components/views/ChatView';
 import { PlanView } from '@/components/views/PlanView';
 import { SettingsView } from '@/components/views/SettingsView';
@@ -50,8 +52,10 @@ import { BusyDots } from '@/components/chat/message/parts/BusyDots';
 import { MobileConnectionWelcome, type MobileConnectionNotice } from './MobileConnectionWelcome';
 import { MobileHeader } from './MobileHeader';
 import { MobileInstancesSurface } from './MobileInstancesSurface';
+import { MobileArchiveSurface } from './MobileArchiveSurface';
 import { MobileSessionsSheet } from './MobileSessionsSheet';
 import { MobileFullscreenSurface } from './MobileFullscreenSurface';
+import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { MobileWorkspaceDrawer, type MobileWorkspaceTab } from './MobileWorkspaceDrawer';
 import { DedicatedMobileAppProvider, type MobileAppActions } from './mobileAppContext';
 import { autoConnectLastInstance, getAutoConnectTargetLabel, logMobileConnectEvent, reprobeActiveConnection, type AutoConnectOutcome } from './mobileConnections';
@@ -97,6 +101,13 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   // When set, the Changes surface opens directly into the per-file diff for this path.
   const [pendingChangesDiff, setPendingChangesDiff] = React.useState<{ path: string; staged: boolean } | null>(null);
   const setSettingsPage = useUIStore((state) => state.setSettingsPage);
+  const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
+  const setArchivePageOpen = useUIStore((state) => state.setArchivePageOpen);
+  const isScheduledTasksDialogOpen = useUIStore((state) => state.isScheduledTasksDialogOpen);
+  const setScheduledTasksDialogOpen = useUIStore((state) => state.setScheduledTasksDialogOpen);
+  const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
+  const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
+  const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
   const wideChatLayoutEnabled = useUIStore((state) => state.wideChatLayoutEnabled);
   const updateAvailable = useUpdateStore((state) => state.available);
   const updateRuntimeType = useUpdateStore((state) => state.runtimeType);
@@ -273,6 +284,18 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   // (opened from the drawer footer / workspace tabs), so they close before the
   // drawers underneath.
   const handleNativeBack = React.useCallback(() => {
+    if (isArchivePageOpen) {
+      setArchivePageOpen(false);
+      return true;
+    }
+    if (isScheduledTasksDialogOpen) {
+      setScheduledTasksDialogOpen(false);
+      return true;
+    }
+    if (isMultiRunLauncherOpen) {
+      setMultiRunLauncherOpen(false);
+      return true;
+    }
     if (openPlan) {
       setOpenPlan(null);
       return true;
@@ -290,7 +313,20 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
       return true;
     }
     return false;
-  }, [activeSurface, closeSurface, closeWorkspace, openPlan, sessionsSheetOpen, workspaceOpen]);
+  }, [
+    activeSurface,
+    closeSurface,
+    closeWorkspace,
+    isArchivePageOpen,
+    isMultiRunLauncherOpen,
+    isScheduledTasksDialogOpen,
+    openPlan,
+    sessionsSheetOpen,
+    setArchivePageOpen,
+    setMultiRunLauncherOpen,
+    setScheduledTasksDialogOpen,
+    workspaceOpen,
+  ]);
 
   useNativeAndroidBackButton(handleNativeBack);
 
@@ -564,6 +600,52 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
                 isWindowed
                 initialMobileStage={settingsInitialMobileStage}
                 onClose={closeSurface}
+              />
+            </ErrorBoundary>
+          </MobileFullscreenSurface>
+        ) : null}
+
+        <ErrorBoundary>
+          <ScheduledTasksDialog />
+        </ErrorBoundary>
+
+        {isArchivePageOpen ? (
+          <MobileFullscreenSurface
+            open
+            variant={surfaceVariant}
+            dialogAlign="app"
+            onClose={() => setArchivePageOpen(false)}
+            ariaLabel={t(MOBILE_SESSION_CHROME_KEYS.archive)}
+            title={t(MOBILE_SESSION_CHROME_KEYS.archive)}
+          >
+            <ErrorBoundary>
+              <MobileArchiveSurface
+                onOpenSession={() => {
+                  if (!isTabletLayout) setSessionsSheetOpen(false);
+                }}
+              />
+            </ErrorBoundary>
+          </MobileFullscreenSurface>
+        ) : null}
+
+        {isMultiRunLauncherOpen ? (
+          <MobileFullscreenSurface
+            open
+            variant={surfaceVariant}
+            dialogAlign="app"
+            onClose={() => setMultiRunLauncherOpen(false)}
+            ariaLabel={t(MOBILE_SESSION_CHROME_KEYS.newMultiRun)}
+            title={t(MOBILE_SESSION_CHROME_KEYS.newMultiRun)}
+          >
+            <ErrorBoundary>
+              <MultiRunLauncher
+                isWindowed
+                initialPrompt={multiRunLauncherPrefillPrompt || undefined}
+                onCreated={() => {
+                  setMultiRunLauncherOpen(false);
+                  if (!isTabletLayout) setSessionsSheetOpen(false);
+                }}
+                onCancel={() => setMultiRunLauncherOpen(false)}
               />
             </ErrorBoundary>
           </MobileFullscreenSurface>
