@@ -46,7 +46,7 @@ import {
 } from '@/components/sections/shared/SettingsSection';
 import { useDeviceInfo } from '@/lib/device';
 import { isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
-import { isWindowsArm64 as isWindowsArm64Platform } from '@/lib/platform';
+import { isCapacitorApp, isWindowsArm64 as isWindowsArm64Platform } from '@/lib/platform';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from "@/components/icon/Icon";
 import { McpIcon } from '@/components/icons/McpIcon';
@@ -59,10 +59,10 @@ import {
   SETTINGS_PAGE_METADATA,
   getSettingsNavIcon,
   getSettingsPageMeta,
+  isSettingsPageAvailable,
   resolveSettingsSlug,
   type SettingsPageSlug,
   type SettingsRuntimeContext,
-  type SettingsPageMeta,
 } from '@/lib/settings/metadata';
 import { buildSettingsSearchResults, type SettingsSearchResult } from '@/lib/settings/search';
 import {
@@ -137,17 +137,11 @@ function buildRuntimeContext(
   isMobile: boolean,
   isPiKernel = false,
   isMcpFeaturePluginActive = false,
+  isCapacitor = false,
 ): SettingsRuntimeContext {
   const isVSCode = isVSCodeRuntime();
   const isWeb = !isDesktop && isWebRuntime();
-  return { isVSCode, isWeb, isDesktop, isMobile, isPiKernel, isMcpFeaturePluginActive };
-}
-
-function isPageAvailable(page: SettingsPageMeta, ctx: SettingsRuntimeContext): boolean {
-  if (!page.isAvailable) {
-    return true;
-  }
-  return page.isAvailable(ctx);
+  return { isVSCode, isWeb, isDesktop, isMobile, isPiKernel, isMcpFeaturePluginActive, isCapacitor };
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -275,9 +269,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     };
   }, []);
 
+  const isCapacitor = React.useMemo(() => isCapacitorApp(), []);
+
   const runtimeCtx = React.useMemo(
-    () => buildRuntimeContext(isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive),
-    [isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive],
+    () => buildRuntimeContext(isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive, isCapacitor),
+    [isDesktopApp, isMobile, isPiKernel, isMcpFeaturePluginActive, isCapacitor],
   );
 
   const visiblePages = React.useMemo(() => {
@@ -285,10 +281,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     return SETTINGS_PAGE_METADATA
       .filter((page) => page.slug !== 'home')
       .filter((page) => !allowedPages || allowedPages.has(page.slug))
-      .filter((page) => isPageAvailable(page, runtimeCtx))
-      .filter((page) => !(runtimeCtx.isVSCode && page.slug === 'projects'))
-      .filter((page) => !(isMobile && page.slug === 'shortcuts'));
-  }, [runtimeCtx, isMobile, visiblePageSlugs]);
+      .filter((page) => isSettingsPageAvailable(page, runtimeCtx));
+  }, [runtimeCtx, visiblePageSlugs]);
+
+  const visibleSearchPageSlugs = React.useMemo(
+    () => visiblePages.map((page) => page.slug),
+    [visiblePages],
+  );
 
   const sortedFilteredPages = React.useMemo(() => {
     const rank = new Map<SettingsPageSlug, number>(pageOrder.map((s, i) => [s, i]));
@@ -443,11 +442,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     return buildSettingsSearchResults({
       query: settingsSearchQuery,
       runtimeCtx: { ...runtimeCtx, isDesktopLocalOrigin, isMac, isWindows, isLinux, isWindowsArm64 },
-      visiblePageSlugs,
+      visiblePageSlugs: visibleSearchPageSlugs,
       t,
       getPageTitle,
     });
-  }, [getPageTitle, isWindowsArm64, isDesktopLocalOrigin, isMac, isWindows, isLinux, runtimeCtx, settingsSearchQuery, t, visiblePageSlugs]);
+  }, [getPageTitle, isWindowsArm64, isDesktopLocalOrigin, isMac, isWindows, isLinux, runtimeCtx, settingsSearchQuery, t, visibleSearchPageSlugs]);
 
   const prepareSettingsSearchTarget = React.useCallback((result: SettingsSearchResult): string => {
     if (!settingsSearchPreparesEntityDraft(result)) {
@@ -675,7 +674,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
 
   const renderPageContent = React.useCallback((slug: SettingsPageSlug) => {
     const meta = getSettingsPageMeta(slug);
-    if (meta && !isPageAvailable(meta, runtimeCtx)) {
+    if (meta && !isSettingsPageAvailable(meta, runtimeCtx)) {
       return renderUnavailable();
     }
 
