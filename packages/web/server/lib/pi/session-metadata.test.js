@@ -11,6 +11,7 @@ import {
   readPersistedParentID,
   readPersistedSessionMetadata,
   readPersistedSessionMetadataFromFile,
+  readPersistedSessionMetadataFromFileTail,
   sessionTimeWithArchived,
 } from './session-metadata.js';
 
@@ -113,6 +114,36 @@ describe('Pi session metadata persistence', () => {
       openchamber: { goal: { id: 'g' } },
     });
     expect(readPersistedSessionMetadataFromFile(path.join(dir, 'missing.jsonl'))).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('tail-scans the last pichamber.metadata without full-reading a large jsonl', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-metadata-tail-'));
+    const file = path.join(dir, 'archived.jsonl');
+    const pad = `${'x'.repeat(256 * 1024)}\n`;
+    fs.writeFileSync(file, [
+      JSON.stringify({ type: 'session', id: 'ses_archived' }),
+      JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: pad }] } }),
+      JSON.stringify({ type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { archived: 1, stale: true } }),
+      JSON.stringify({ type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { archived: 9, parentID: 'root' } }),
+      '',
+    ].join('\n'));
+    const size = fs.statSync(file).size;
+    let bytesRead = 0;
+    const metadata = readPersistedSessionMetadataFromFileTail(file, {
+      io: {
+        readSync(fd, buffer, offset, length, position) {
+          const n = fs.readSync(fd, buffer, offset, length, position);
+          bytesRead += n;
+          return n;
+        },
+      },
+    });
+    expect(metadata).toEqual({ archived: 9, parentID: 'root' });
+    expect(size).toBeGreaterThan(200_000);
+    expect(bytesRead).toBeLessThan(16_384);
+    expect(bytesRead).toBeLessThan(size / 8);
+    expect(readPersistedSessionMetadataFromFileTail(path.join(dir, 'missing.jsonl'))).toBeUndefined();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

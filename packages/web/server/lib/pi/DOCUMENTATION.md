@@ -188,9 +188,16 @@ Archive is a Pichamber-only flag on the same `pichamber.metadata` custom
 entry: `{ archived: ms | 0 }`. `updateSession` writes that value (including
 `0` for restore). `toPersistedSessionInfo`, hydrate, and sidebar Refresh
 read it onto `info.time.archived`. `0` is restored, not archived.
-`GET /api/session` and `GET /api/experimental/session` omit truthy archived
-rows unless `archived=true`. Last-session restore must not open an archived
-id. One unreadable session file does not drop other complete sessions.
+List metadata is a tail-scan for the last `pichamber.metadata`; it does
+not full-read jsonl again after `SessionManager.list()`. Reuse that list
+item's title / firstMessage / timestamps. After `archived: ms`, stop.
+`GET /api/session` and `GET /api/experimental/session` honor `archived`,
+`roots`, `limit`, and `cursor` before building the response: omit truthy
+archived rows unless `archived=true`; `roots=true` keeps sessions with no
+`parentID`; `limit` / `cursor` page by `time.updated` strictly earlier and
+set `x-next-cursor` when another page exists. Last-session restore must
+not open an archived id. One unreadable session file does not drop other
+complete sessions.
 
 Clone, fork, and import copy facade messages in memory and persist them
 through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /

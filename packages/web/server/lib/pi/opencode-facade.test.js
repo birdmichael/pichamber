@@ -9,6 +9,10 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
 import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
+import {
+  PICHAMBER_METADATA_CUSTOM_TYPE,
+  readPersistedSessionMetadataFromFileTail,
+} from './session-metadata.js';
 
 const tempHomes = [];
 afterEach(() => {
@@ -29,7 +33,63 @@ const listen = (app) => new Promise((resolve) => {
   });
 });
 
-const startFacade = async ({ directory = '/tmp/project', mock = true, createSession } = {}) => {
+const stubPersistedSession = async ({ sessionManager }) => ({
+  sessionId: typeof sessionManager?.getSessionId === 'function'
+    ? sessionManager.getSessionId()
+    : undefined,
+  isStreaming: false,
+  subscribe() { return () => {}; },
+  async prompt() {},
+  async abort() {},
+  dispose() {},
+});
+
+const writeFacadePersistedSession = ({ home, cwd, title, userText, metadata, updated, extraLines = [] }) => {
+  const sessionDir = sessionDirForCwd(cwd, home);
+  const manager = SessionManager.create(cwd, sessionDir);
+  const file = manager.getSessionFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify({
+    type: 'session',
+    version: CURRENT_SESSION_VERSION,
+    id: manager.getSessionId(),
+    timestamp: new Date().toISOString(),
+    cwd: manager.getCwd(),
+  })}\n`);
+  const opened = SessionManager.open(file, sessionDir);
+  if (title) opened.appendSessionInfo(title);
+  if (userText) {
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: userText }],
+      timestamp: Number.isFinite(updated) ? updated : Date.now(),
+    });
+  }
+  if (extraLines.length > 0) {
+    fs.appendFileSync(file, `${extraLines.join('\n')}\n`);
+  }
+  if (metadata) {
+    fs.appendFileSync(file, `${JSON.stringify({
+      type: 'custom',
+      customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+      data: metadata,
+    })}\n`);
+  }
+  if (Number.isFinite(updated)) {
+    fs.utimesSync(file, new Date(updated), new Date(updated));
+  }
+  return {
+    id: opened.getSessionId(),
+    path: opened.getSessionFile(),
+  };
+};
+
+const startFacade = async ({
+  directory = '/tmp/project',
+  mock = true,
+  createSession,
+  readListSessionMetadata,
+} = {}) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-home-'));
   tempHomes.push(home);
   const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
@@ -43,6 +103,7 @@ const startFacade = async ({ directory = '/tmp/project', mock = true, createSess
       createModelRuntime: async () => ({ getAvailable: async () => [] }),
       createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
     } : {}),
+    ...(readListSessionMetadata ? { readListSessionMetadata } : {}),
   });
   const app = express();
   app.use(express.json());
@@ -941,6 +1002,133 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const inclusive = await (await fetch(`${url}/api/experimental/session?archived=true&${dirQ}`)).json();
       expect(inclusive.find((item) => item.id === created.id)?.time.archived).toBe(archivedAt);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('does not full-read archived jsonl on archived=false and paginates both session list routes', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-facade-list-io-'));
+    tempHomes.push(directory);
+    const reads = [];
+    const { url, close, kernel } = await startFacade({
+      directory,
+      mock: false,
+      createSession: stubPersistedSession,
+      readListSessionMetadata(file) {
+        let bytes = 0;
+        let size = 0;
+        try {
+          size = fs.statSync(file).size;
+        } catch {
+        }
+        const metadata = readPersistedSessionMetadataFromFileTail(file, {
+          io: {
+            readSync(fd, buffer, offset, length, position) {
+              const n = fs.readSync(fd, buffer, offset, length, position);
+              bytes += n;
+              return n;
+            },
+          },
+        });
+        reads.push({ file, bytes, size });
+        return metadata;
+      },
+    });
+    try {
+      const home = kernel.host.getPath().home;
+      const pad = 'x'.repeat(256 * 1024);
+      const active = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Active row',
+        userText: 'keep me',
+        updated: 3_000,
+      });
+      const restored = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Restored row',
+        userText: 'back on the list',
+        metadata: { archived: 0 },
+        updated: 2_000,
+      });
+      const archivedLarge = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Archived large',
+        userText: 'hide me',
+        extraLines: [JSON.stringify({
+          type: 'message',
+          message: { role: 'assistant', content: [{ type: 'text', text: pad }] },
+        })],
+        metadata: { archived: 1_700_000_000_000 },
+        updated: 1_000,
+      });
+      const child = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Child row',
+        userText: 'not a root',
+        metadata: { parentID: active.id },
+        updated: 4_000,
+      });
+      const newest = writeFacadePersistedSession({
+        home,
+        cwd: directory,
+        title: 'Newest root',
+        userText: 'page one',
+        updated: 5_000,
+      });
+      fs.writeFileSync(path.join(path.dirname(active.path), 'broken.jsonl'), '{not-json\n');
+
+      const dirQ = `directory=${encodeURIComponent(directory)}`;
+      const activeList = await (await fetch(`${url}/api/experimental/session?archived=false&${dirQ}`)).json();
+      const activeIds = activeList.map((item) => item.id);
+      expect(activeIds).toEqual(expect.arrayContaining([
+        active.id,
+        restored.id,
+        child.id,
+        newest.id,
+      ]));
+      expect(activeIds).not.toContain(archivedLarge.id);
+      expect(activeList.find((item) => item.id === restored.id)?.time.archived).toBe(0);
+
+      const archivedRead = reads.find((item) => item.file === archivedLarge.path);
+      expect(archivedRead).toBeTruthy();
+      expect(archivedRead.size).toBeGreaterThan(200_000);
+      expect(archivedRead.bytes).toBeLessThan(16_384);
+      expect(archivedRead.bytes).toBeLessThan(archivedRead.size / 8);
+
+      const roots = await (await fetch(`${url}/api/session?archived=false&roots=true&${dirQ}`)).json();
+      expect(roots.map((item) => item.id)).toEqual(expect.arrayContaining([
+        active.id,
+        restored.id,
+        newest.id,
+      ]));
+      expect(roots.map((item) => item.id)).not.toContain(child.id);
+
+      const first = await fetch(`${url}/api/session?archived=false&roots=true&limit=1&${dirQ}`);
+      const firstPage = await first.json();
+      expect(firstPage.map((item) => item.id)).toEqual([newest.id]);
+      expect(first.headers.get('x-next-cursor')).toBe(String(firstPage[0].time.updated));
+
+      const second = await fetch(
+        `${url}/api/experimental/session?archived=false&roots=true&limit=1&cursor=${first.headers.get('x-next-cursor')}&${dirQ}`,
+      );
+      const secondPage = await second.json();
+      expect(secondPage).toHaveLength(1);
+      expect(secondPage[0].id).not.toBe(newest.id);
+      expect(secondPage.map((item) => item.id)).not.toContain(child.id);
+      expect(second.headers.get('x-next-cursor')).toBeTruthy();
+
+      const inclusive = await (await fetch(`${url}/api/session?archived=true&${dirQ}`)).json();
+      expect(inclusive.map((item) => item.id)).toContain(archivedLarge.id);
+      expect(inclusive.map((item) => item.id)).toEqual(expect.arrayContaining([
+        active.id,
+        restored.id,
+      ]));
     } finally {
       kernel.dispose();
       await close();
