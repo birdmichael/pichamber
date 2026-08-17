@@ -43,7 +43,10 @@ path, then `/plan start` on that new session if Plan is not already on, then
 the prompt. An already-open session still runs `/plan start` / save / exit on
 that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
 and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
-does not host those controls; they appear after expand). Plan enters through `/plan start` (toast only — the plugin does not ask
+does not host those controls; they appear after expand). The left cluster
+class `composer-mobile-actions` still clamps attach / Goal to a 24px icon
+slot; `PiPlanModeToggle` opts out of that width so the current-side label
+stays fully visible. Plan enters through `/plan start` (toast only — the plugin does not ask
 a select) or resume of a saved plan. Leaving a ready plan uses `/plan save`.
 Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin

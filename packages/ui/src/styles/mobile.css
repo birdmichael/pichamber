@@ -52,14 +52,23 @@
     min-width: 36px;
   }
 
-  /* Composer footer action buttons (sessions / attach / auto-accept): hug the
-     icon so the group stays tight. The container only renders in the mobile
-     JSX, so no pointer/runtime gating is needed; !important overrides both the
-     w-8 utility and the global mobile touch-target min-width regardless of
-     cascade layer or specificity. */
-  .composer-mobile-actions button {
+  /* Composer footer icon buttons (attach / Goal / leftover auto-accept): hug
+     the icon so the group stays tight. The container only renders in the
+     mobile JSX, so no pointer/runtime gating is needed; !important overrides
+     both the w-8 utility and the global mobile touch-target min-width
+     regardless of cascade layer or specificity.
+
+     Agent/Plan is a text chip in this same cluster. Do not clamp it to the
+     24px icon slot — the current-side label (Agent / 智能体 / Plan / 计划,
+     and other locales) must stay fully visible. */
+  .composer-mobile-actions button:not(.pi-plan-mode-toggle) {
     width: 1.5rem !important;
     min-width: 0 !important;
+  }
+
+  .composer-mobile-actions .pi-plan-mode-toggle {
+    width: auto !important;
+    min-width: min-content !important;
   }
 
   /* Improve input field touch targets */
