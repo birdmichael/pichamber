@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Desktop:** on Pi, agents can open and drive the right-hand Browser rail with the Pichamber Web tool (open, snapshot, click, type, scroll, and the rest of the existing browser actions). Settings → Pichamber Tools toggles it; turning it off and reloading idle sessions removes it.
+- Chat: on Pi, each Pichamber Web call now shows one Pichamber Web card with its arguments and result. The empty leftover Tool row above it is gone.
 - Desktop: on a git project, the right-hand rail shows Pull Request again so you can open or create a PR without opening Git first. Sessions that are not a git repo still have no empty PR tab.
 - Chat: on Pi, choosing Plan on a new empty session no longer creates a chat. The session is created when you send, the same as Agent.
 - Chat: on Pi, a new session reply now shows the model that will run or just ran — the same provider/model as the composer chip — instead of leftover Pi / `pi / pi` on the assistant header and Context sheet. Cost stays whatever Pi reported.

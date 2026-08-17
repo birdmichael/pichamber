@@ -99,6 +99,16 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.state.output).toBe('ok');
   });
 
+  const latestToolParts = (events) => {
+    const byId = new Map();
+    for (const event of events) {
+      if (event.type !== 'message.part.updated') continue;
+      const part = event.properties.part;
+      if (part?.type === 'tool') byId.set(part.id, part);
+    }
+    return [...byId.values()];
+  };
+
   it('maps pichamber_web tool_execution_* to a chat tool part', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
@@ -132,6 +142,100 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.tool).toBe('pichamber_web');
     expect(end[0].properties.part.state.status).toBe('completed');
     expect(end[0].properties.part.state.output).toBe(envelope);
+  });
+
+  it('maps a Pi pichamber_web toolcall_start + result to one part, not a leftover Tool', () => {
+    const t = translator();
+    const events = [];
+    events.push(...t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } }));
+    // Live Pi toolcall_start is contentIndex-only. A generated call id named
+    // "tool" is the empty leftover Tool row above Pichamber Web.
+    events.push(...t.translate({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'toolcall_start', contentIndex: 0 },
+    }));
+    events.push(...t.translate({
+      type: 'message_update',
+      assistantMessageEvent: {
+        type: 'toolcall_end',
+        contentIndex: 0,
+        toolCall: {
+          type: 'toolCall',
+          id: 'call_web',
+          name: 'pichamber_web',
+          arguments: { action: 'browser.open', url: 'https://example.test' },
+        },
+      },
+    }));
+    const envelope = JSON.stringify({
+      schemaVersion: 1,
+      ok: true,
+      action: 'browser.open',
+      data: { url: 'https://example.test' },
+    });
+    events.push(...t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_web',
+      toolName: 'pichamber_web',
+      args: { action: 'browser.open', url: 'https://example.test' },
+    }));
+    events.push(...t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_web',
+      toolName: 'pichamber_web',
+      args: { action: 'browser.open', url: 'https://example.test' },
+      result: { content: [{ type: 'text', text: envelope }] },
+      isError: false,
+    }));
+
+    const parts = latestToolParts(events);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({
+      type: 'tool',
+      tool: 'pichamber_web',
+      callID: 'call_web',
+      state: expect.objectContaining({
+        status: 'completed',
+        input: { action: 'browser.open', url: 'https://example.test' },
+        output: envelope,
+      }),
+    });
+    expect(parts.some((part) => part.tool === 'tool')).toBe(false);
+  });
+
+  it('reuses the same pichamber_web part when toolcall_start already has the call', () => {
+    const t = translator();
+    const events = [];
+    events.push(...t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } }));
+    events.push(...t.translate({
+      type: 'message_update',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'toolCall',
+          id: 'call_web',
+          name: 'pichamber_web',
+          arguments: { action: 'browser.snapshot' },
+        }],
+      },
+      assistantMessageEvent: { type: 'toolcall_start', contentIndex: 0 },
+    }));
+    events.push(...t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_web',
+      toolName: 'pichamber_web',
+      args: { action: 'browser.snapshot' },
+      result: { content: [{ type: 'text', text: '{"ok":true}' }] },
+      isError: false,
+    }));
+
+    const parts = latestToolParts(events);
+    expect(parts).toHaveLength(1);
+    expect(parts[0].tool).toBe('pichamber_web');
+    expect(parts[0].id).toBe(events.find((event) => (
+      event.type === 'message.part.updated' && event.properties.part.tool === 'pichamber_web'
+    )).properties.part.id);
+    expect(parts.some((part) => part.tool === 'tool')).toBe(false);
   });
 
   it('maps a failed pichamber_web call to an error tool part', () => {

@@ -15,4 +15,9 @@ describe('Pichamber Web tool chrome', () => {
     expect(getToolMetadata('openchamber_web').displayName).toBe('Pichamber Web');
     expect(resolveToolDisplayName('openchamber_web')).toBe('Pichamber Web');
   });
+
+  test('a leftover nameless tool part is the empty Tool row, not Pichamber Web', () => {
+    expect(resolveToolDisplayName('tool')).toBe('Tool');
+    expect(resolveToolDisplayName('tool')).not.toBe('Pichamber Web');
+  });
 });
