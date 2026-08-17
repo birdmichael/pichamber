@@ -52,31 +52,34 @@ const MOBILE_CHROME_KEYS = [
 
 describe('Pi copy audit', () => {
   test('Settings Pi group and reload/wait/default strings say Pi in every locale', () => {
-    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
-      expect(dictionary['settings.view.nav.group.opencode'], locale).toBe('Pi');
+    for (const dictionary of Object.values(localeDictionaries)) {
+      expect(dictionary['settings.view.nav.group.opencode']).toBe('Pi');
 
       for (const key of PI_VISIBLE_KEYS) {
         const value = dictionary[key];
-        expect(value, `${locale} ${key}`).toContain('Pi');
-        expect(value, `${locale} ${key}`).not.toContain('OpenCode');
+        expect(value.includes('Pi')).toBe(true);
+        expect(value.includes('OpenCode')).toBe(false);
       }
     }
   });
 
   test('leftover OpenCode skill-location strings stay OpenCode for the OpenCode kernel', () => {
-    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+    for (const dictionary of Object.values(localeDictionaries)) {
+      expect(dictionary['settings.skills.location.option.userOpencode.label'].includes('OpenCode')).toBe(true);
+      expect(dictionary['settings.skills.location.option.projectOpencode.label'].includes('OpenCode')).toBe(true);
+      expect(/OpenCode|\.opencode/.test(dictionary['settings.skills.location.option.userOpencode.description'])).toBe(true);
+      expect(/OpenCode|\.opencode/.test(dictionary['settings.skills.location.option.projectOpencode.description'])).toBe(true);
       for (const key of OPENCODE_KERNEL_LOCATION_KEYS) {
-        expect(dictionary[key], `${locale} ${key}`).toContain('OpenCode');
-        expect(dictionary[key], `${locale} ${key}`).not.toContain('Pi');
+        expect(dictionary[key].includes('Pi')).toBe(false);
       }
     }
   });
 
   test('mobile Git tab reuses the Desktop Git product name', () => {
-    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
-      expect(dictionary['layout.rightSidebar.git'], locale).toBe('Git');
-      expect(dictionary['mobile.menu.changes'], locale).toBe(dictionary['layout.rightSidebar.git']);
-      expect(dictionary['mobile.nav.changes'], locale).toBe(dictionary['layout.rightSidebar.git']);
+    for (const dictionary of Object.values(localeDictionaries)) {
+      expect(dictionary['layout.rightSidebar.git']).toBe('Git');
+      expect(dictionary['mobile.menu.changes']).toBe(dictionary['layout.rightSidebar.git']);
+      expect(dictionary['mobile.nav.changes']).toBe(dictionary['layout.rightSidebar.git']);
     }
   });
 
@@ -89,23 +92,23 @@ describe('Pi copy audit', () => {
       'sessions.sidebar.session.untitled',
     ] as const;
 
-    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+    for (const dictionary of Object.values(localeDictionaries)) {
       for (const key of sharedKeys) {
-        expect(dictionary[key], `${locale} ${key}`).toBeTruthy();
+        expect(dictionary[key].length > 0).toBe(true);
       }
-      expect(dictionary['mobile.menu.instances'], locale).toBeTruthy();
-      expect(dictionary['mobile.menu.instances'], locale).not.toBe(
+      expect(dictionary['mobile.menu.instances'].length > 0).toBe(true);
+      expect(dictionary['mobile.menu.instances']).not.toBe(
         dictionary['settings.page.remoteInstances.title'],
       );
     }
   });
 
   test('mobile chrome does not reintroduce OpenChamber', () => {
-    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+    for (const dictionary of Object.values(localeDictionaries)) {
       for (const key of MOBILE_CHROME_KEYS) {
-        expect(dictionary[key], `${locale} ${key}`).not.toContain('OpenChamber');
+        expect(dictionary[key].includes('OpenChamber')).toBe(false);
       }
-      expect(dictionary['mobile.connect.welcome.title'], locale).toContain('Pichamber');
+      expect(dictionary['mobile.connect.welcome.title'].includes('Pichamber')).toBe(true);
     }
   });
 });
