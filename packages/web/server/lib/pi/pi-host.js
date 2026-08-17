@@ -113,12 +113,26 @@ const sessionBlocksPiReload = (record) => {
   return null;
 };
 
+const asCustomToolList = (value) => {
+  if (!value) return undefined;
+  if (Array.isArray(value)) {
+    const list = value.filter((tool) => tool && typeof tool.name === 'string');
+    return list.length > 0 ? list : undefined;
+  }
+  if (typeof value === 'object') {
+    const list = Object.values(value).filter((tool) => tool && typeof tool.name === 'string');
+    return list.length > 0 ? list : undefined;
+  }
+  return undefined;
+};
+
 export const createInMemoryPiSession = ({
   sessionId = createSessionId(),
   chunks = ['Hello from ', 'the Pi mock kernel.'],
   chunkDelayMs = 5,
   compacting = false,
   planModeState = null,
+  customTools,
 } = {}) => {
   const listeners = new Set();
   const eventBusListeners = new Map();
@@ -129,6 +143,7 @@ export const createInMemoryPiSession = ({
   const messages = [];
   const extensionCommands = new Map();
   const sessionEntries = [];
+  let customToolList = asCustomToolList(customTools) || [];
   let planState = planModeState && typeof planModeState === 'object'
     ? { ...planModeState }
     : { enabled: false, awaitingAction: false };
@@ -236,6 +251,12 @@ export const createInMemoryPiSession = ({
     },
     getCommands() {
       return Array.from(extensionCommands.values()).map(({ handler: _handler, ...info }) => info);
+    },
+    getToolDefinition(name) {
+      return customToolList.find((tool) => tool.name === name);
+    },
+    setCustomTools(next) {
+      customToolList = asCustomToolList(next) || [];
     },
     registerCommand(name, handler, { description } = {}) {
       const commandName = typeof name === 'string' ? name.replace(/^\//, '').trim() : '';
@@ -913,6 +934,7 @@ export const createPiHost = ({
   mock = false,
   readListSessionMetadata,
   listPersistedSessionsInDir,
+  getCustomTools,
 } = {}) => {
   const sessions = new Map();
   const hydrating = new Map();
@@ -928,6 +950,20 @@ export const createPiHost = ({
     }
   };
   const completeLocalReply = createLocalReply(emit);
+
+  const resolveCustomTools = async () => {
+    if (typeof getCustomTools !== 'function') return undefined;
+    return asCustomToolList(await getCustomTools());
+  };
+
+  const invokeSessionFactory = async (factory, args) => {
+    const customTools = await resolveCustomTools();
+    const session = await factory({ ...args, customTools });
+    if (typeof session?.setCustomTools === 'function') {
+      session.setCustomTools(customTools);
+    }
+    return session;
+  };
 
   const listSessionsInDir = typeof listPersistedSessionsInDir === 'function'
     ? listPersistedSessionsInDir
@@ -989,13 +1025,14 @@ export const createPiHost = ({
     }
     try {
       const pi = await loadPiSdk();
-      return async ({ cwd, modelRuntime: runtime, model, sessionManager }) => {
+      return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
         const { session } = await pi.createAgentSession({
           cwd,
           agentDir,
           modelRuntime: runtime,
           ...(model ? { model } : {}),
           sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
+          ...(customTools ? { customTools } : {}),
         });
         return session;
       };
@@ -1031,7 +1068,11 @@ export const createPiHost = ({
     }
     try {
       if (typeof createDirectoryRuntime === 'function') {
-        const runtime = await createDirectoryRuntime({ cwd: directory, modelRuntime });
+        const runtime = await createDirectoryRuntime({
+          cwd: directory,
+          modelRuntime,
+          customTools: await resolveCustomTools(),
+        });
         directoryRuntimes.set(directory, runtime);
         return runtime;
       }
@@ -1042,12 +1083,14 @@ export const createPiHost = ({
         return placeholder;
       }
       const factory = async ({ cwd, sessionManager, sessionStartEvent }) => {
+        const customTools = await resolveCustomTools();
         const services = await pi.createAgentSessionServices({ cwd });
         return {
           ...(await pi.createAgentSessionFromServices({
             services,
             sessionManager,
             sessionStartEvent,
+            ...(customTools ? { customTools } : {}),
           })),
           services,
           diagnostics: services.diagnostics,
@@ -1221,7 +1264,7 @@ export const createPiHost = ({
     const model = await resolvePreferredModel();
     const sessionManager = mock ? null : await createPersistedSessionManager(cwd, { title });
 
-    const piSession = await factory({
+    const piSession = await invokeSessionFactory(factory, {
       cwd,
       modelRuntime,
       model,
@@ -1347,7 +1390,7 @@ export const createPiHost = ({
     const model = await resolvePreferredModel();
     let piSession;
     try {
-      piSession = await factory({
+      piSession = await invokeSessionFactory(factory, {
         cwd,
         modelRuntime,
         model,
@@ -1479,7 +1522,7 @@ export const createPiHost = ({
     const model = await resolvePreferredModel();
     let piSession;
     try {
-      piSession = await factory({
+      piSession = await invokeSessionFactory(factory, {
         cwd,
         modelRuntime,
         model,
@@ -1661,6 +1704,21 @@ export const createPiHost = ({
     record.unsubscribe?.();
     if (typeof record.piSession?.reload === 'function') {
       await record.piSession.reload();
+      if (typeof record.piSession.setCustomTools === 'function') {
+        record.piSession.setCustomTools(await resolveCustomTools());
+      } else if (typeof getCustomTools === 'function') {
+        try {
+          record.extensionUI?.dispose?.();
+          record.piSession?.dispose?.();
+        } catch {
+        }
+        const factory = await resolveCreateSession();
+        record.piSession = await invokeSessionFactory(factory, {
+          cwd: record.directory,
+          modelRuntime,
+          sessionManager: record.sessionManager,
+        });
+      }
     } else {
       try {
         record.extensionUI?.dispose?.();
@@ -1668,7 +1726,7 @@ export const createPiHost = ({
       } catch {
       }
       const factory = await resolveCreateSession();
-      record.piSession = await factory({
+      record.piSession = await invokeSessionFactory(factory, {
         cwd: record.directory,
         modelRuntime,
       });

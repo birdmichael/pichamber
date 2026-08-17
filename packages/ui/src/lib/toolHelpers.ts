@@ -202,6 +202,13 @@ const TOOL_METADATA: Record<string, ToolMetadata> = {
       inputFields: []
     },
 
+    pichamber_web: {
+      displayName: 'Pichamber Web',
+      category: 'system',
+      outputLanguage: 'json',
+      inputFields: []
+    },
+
     plan_enter: {
       displayName: 'Plan Mode',
       displayNameKey: 'chat.tool.planEnter',

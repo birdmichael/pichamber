@@ -240,6 +240,40 @@ describe('settings search', () => {
     expect(hidden.some((result) => result.id === 'feature-plugins.mcp')).toBe(true);
   });
 
+  test('shows the Pichamber Web tool on Pi Desktop and hides it in VS Code', () => {
+    const getPageTitle = (page: string) => page;
+    const piDesktop = buildSettingsSearchResults({
+      query: 'web tool',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const piBrowser = buildSettingsSearchResults({
+      query: 'browser',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    const vsCode = buildSettingsSearchResults({
+      query: 'web tool',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: true },
+      t,
+      getPageTitle,
+    });
+    const leftoverOpenCode = buildSettingsSearchResults({
+      query: 'web tool',
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+
+    expect(piDesktop.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(piBrowser.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(vsCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(false);
+    expect(leftoverOpenCode.some((result) => result.id === 'sessions.agent-web-tool')).toBe(true);
+    expect(piDesktop.some((result) => result.id === 'sessions.agent-control-tool')).toBe(false);
+  });
+
   test('lands Feature Plugins search on each slot card', () => {
     const getPageTitle = (page: string) => page;
     const queries = [
