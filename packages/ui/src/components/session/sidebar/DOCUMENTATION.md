@@ -22,6 +22,19 @@
 - VS Code groups strictly **by open workspace**: `useSessionGrouping` funnels every non-archived session into the project's root group and emits **no per-worktree subgroups** (worktrees aren't registered in VS Code). `getSessionsForProject` buckets sessions to a workspace by exact directory match, so only sessions whose directory is an open workspace folder appear.
 - VS Code passes `hideDirectoryControls` (clean workspace headers, no worktree/close chrome) and no longer passes `showOnlyMainWorkspace`/`sharedSessionsOnly`. Folders and pinning therefore work natively, scoped to the workspace root.
 
+## Mobile session chrome
+
+Hosted `mobile.html` and Capacitor use `apps/MobileSessionsSheet.tsx`, not this sidebar tree. The same Pi actions are reachable there:
+
+| Desktop control | Mobile host |
+|---|---|
+| Sidebar calendar / Scheduled Tasks | Sessions-sheet calendar chip → `ScheduledTasksDialog` (`MobileOverlayPanel` on phone). `/schedule-task` stays an in-chat starter. |
+| Sidebar merge-arrows / Multi-run | Sessions-sheet merge-arrows chip → `MultiRunLauncher` in `MobileFullscreenSurface`. Models come from the live Pi catalog (`GET /api/pi/models`). |
+| Archive page + restore | Sessions-sheet archive chip → `MobileArchiveSurface`. Restore writes `time.archived = 0` (same client-side split as Desktop; see `sync/DOCUMENTATION.md`). |
+| Footer Refresh | Sessions-sheet footer Refresh. Same `sidebarSessionRecordsReload.ts` contract (`POST /api/pi/sessions/reload`). Hidden on leftover OpenCode. Disabled while composing/streaming/compacting. |
+
+Wording reuses `sessions.sidebar.*` via `apps/mobileSessionChromeKeys.ts`. Import session, Shortcuts, and About stay Desktop-only in this slice. Capacitor still shows Instances in the footer.
+
 ## File summaries
 
 ### Components

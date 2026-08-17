@@ -34,7 +34,18 @@ import { CSS } from '@dnd-kit/utilities';
 
 import { DirectoryExplorerDialog } from '@/components/session/DirectoryExplorerDialog';
 import { Icon } from '@/components/icon/Icon';
+import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import { NewWorktreeDialog } from '@/components/session/NewWorktreeDialog';
+import {
+  getSessionRecordsReloadBlockReason,
+  isSessionTitleReloadBlocked,
+  isSessionTitleReloadOutputting,
+  isSidebarSessionRecordsReloadVisible,
+  reloadPiSessionRecords,
+  sessionRecordsReloadAriaKey,
+  sessionRecordsReloadTooltipKey,
+} from '@/components/session/sidebar/sidebarSessionRecordsReload';
+import { isActiveSessionRecord } from '@/components/views/archiveSessionList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
@@ -42,8 +53,10 @@ import { toast } from '@/components/ui';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { getProjectLabel, normalizePath } from './mobilePaths';
+import { useAssistantStatus } from '@/hooks/useAssistantStatus';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { cn } from '@/lib/utils';
 import {
@@ -62,8 +75,10 @@ import {
   orderSessionsByLifecycleScopes,
   useSessionOrderingStore,
 } from '@/sync/session-ordering';
+import { useUIStore } from '@/stores/useUIStore';
+import { getImperativeSessionMessageLoader } from '@/sync/session-message-loader';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useAllLiveSessions, useGlobalSessionStatus } from '@/sync/sync-context';
+import { useAllLiveSessions, useChildStoreManager, useGlobalSessionStatus } from '@/sync/sync-context';
 import { useSessionUnseenCount } from '@/sync/notification-store';
 import { useHasSessionActivityDuration } from '@/sync/session-activity-timing';
 import { SessionActivityDuration } from '@/components/session/SessionActivityDuration';
@@ -854,7 +869,12 @@ const SortableProjectRow: React.FC<{
 export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, onOpenChange, variant = 'drawer', footer }) => {
   const { t } = useI18n();
   const { git } = useRuntimeAPIs();
+  const isPiKernel = usePiKernel();
+  const childStores = useChildStoreManager();
   const liveSessions = useAllLiveSessions();
+  const setScheduledTasksDialogOpen = useUIStore((state) => state.setScheduledTasksDialogOpen);
+  const openMultiRunLauncher = useUIStore((state) => state.openMultiRunLauncher);
+  const setArchivePageOpen = useUIStore((state) => state.setArchivePageOpen);
   const globalActiveSessions = useGlobalSessionsStore((state) => state.activeSessions);
   const pinnedSessionIds = useSessionPinnedStore(React.useCallback(
     (state) => open || variant === 'sidebar' ? state.ids : EMPTY_PINNED_SESSION_IDS,
@@ -868,6 +888,34 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
   const activeProjectId = useProjectsStore((state) => state.activeProjectId);
   const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
+  const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
+  const targetedSessionId = currentSessionId && !isNewSessionDraftOpen ? currentSessionId : null;
+  const currentSessionStatus = useGlobalSessionStatus(targetedSessionId ?? '');
+  const assistantStatus = useAssistantStatus();
+  const sessionRecordsReloadIsOutputting = isSessionTitleReloadOutputting({
+    assistantIsWorking: assistantStatus.working.isWorking,
+    assistantIsStreaming: assistantStatus.working.isStreaming,
+    assistantIsForming: assistantStatus.forming.isActive,
+    assistantCanAbort: assistantStatus.working.canAbort,
+    assistantStatusText: assistantStatus.working.statusText,
+  });
+  const sessionRecordsReloadIsCompacting = assistantStatus.working.compactionDeadline != null;
+  const sessionRecordsReloadLiveBlocked = Boolean(targetedSessionId) && isSessionTitleReloadBlocked({
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionRecordsReloadIsOutputting,
+    isCompacting: sessionRecordsReloadIsCompacting,
+  });
+  const [sessionRecordsReloadInFlight, setSessionRecordsReloadInFlight] = React.useState(false);
+  const sessionRecordsReloadInFlightRef = React.useRef(false);
+  const showSessionRecordsReload = isSidebarSessionRecordsReloadVisible({ isPiKernel });
+  const sessionRecordsReloadBlockReason = getSessionRecordsReloadBlockReason({
+    hasTargetedSession: Boolean(targetedSessionId),
+    statusType: currentSessionStatus?.type,
+    isOutputting: sessionRecordsReloadIsOutputting,
+    isCompacting: sessionRecordsReloadIsCompacting,
+    isReloadInFlight: sessionRecordsReloadInFlight,
+  });
+  const isSessionRecordsReloadDisabled = sessionRecordsReloadBlockReason !== null;
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const archiveSession = useSessionUIStore((state) => state.archiveSession);
   const deleteSession = useSessionUIStore((state) => state.deleteSession);
@@ -1019,10 +1067,9 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
     for (const session of liveSessions) {
       if (!seenIds.has(session.id)) merged.push(session);
     }
-    // Archived sessions never show on mobile (no archived view here): the live
-    // overlay can carry them for the active directory, and they'd otherwise
-    // surface in search and then "disappear" once the overlay refreshes.
-    return merged.filter((session) => !session.time?.archived);
+    // Active tree only. Archived chats live on the Archive surface and
+    // return here after restore writes `time.archived = 0`.
+    return merged.filter((session) => isActiveSessionRecord(session));
   }, [globalActiveSessions, liveSessions]);
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -1306,6 +1353,55 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
     onOpenChange(false);
   };
 
+  const handleOpenScheduled = () => {
+    setScheduledTasksDialogOpen(true);
+  };
+
+  const handleOpenMultiRun = () => {
+    if (projectsMeta.length === 0) return;
+    openMultiRunLauncher();
+  };
+
+  const handleOpenArchive = () => {
+    setArchivePageOpen(true);
+  };
+
+  const reloadSessionRecords = React.useCallback(() => {
+    if (sessionRecordsReloadLiveBlocked || sessionRecordsReloadInFlightRef.current) return;
+    const sessionID = useSessionUIStore.getState().currentSessionId;
+    const isDraft = Boolean(useSessionUIStore.getState().newSessionDraft?.open);
+    const targetSessionID = sessionID && !isDraft ? sessionID : null;
+    const directory = targetSessionID
+      ? useSessionUIStore.getState().getDirectoryForSession(targetSessionID)
+      : useSessionUIStore.getState().currentSessionDirectory;
+    sessionRecordsReloadInFlightRef.current = true;
+    setSessionRecordsReloadInFlight(true);
+    void reloadPiSessionRecords({
+      sessionID: targetSessionID,
+      directory,
+      requestBootstrap: (demand) => {
+        childStores.requestBootstrap(demand);
+      },
+      refreshGlobalSessions: () => refreshGlobalSessions(),
+      refreshMessages: async (target) => {
+        await getImperativeSessionMessageLoader()?.ensure(target, { force: true });
+      },
+    })
+      .then(() => {
+        toast.success(t('sessions.sidebar.footer.refresh.success'));
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error && error.message.trim()
+          ? error.message
+          : t('sessions.sidebar.footer.refresh.failed');
+        toast.error(message);
+      })
+      .finally(() => {
+        sessionRecordsReloadInFlightRef.current = false;
+        setSessionRecordsReloadInFlight(false);
+      });
+  }, [childStores, sessionRecordsReloadLiveBlocked, t]);
+
   const handleNewWorktree = (projectId: string) => {
     setWorktreeDialogProjectId(projectId);
     setActiveProjectIdOnly(projectId);
@@ -1454,11 +1550,54 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
       </>
     ) : null;
 
+  const sessionChromeActions = !editingOrder ? (
+    <div className="flex shrink-0 items-center gap-1 px-3 pb-1">
+      <Button
+        type="button"
+        variant="chip"
+        size="sm"
+        className="w-10 px-0"
+        aria-label={t(MOBILE_SESSION_CHROME_KEYS.scheduledTasks)}
+        title={t(MOBILE_SESSION_CHROME_KEYS.scheduledTasks)}
+        onClick={handleOpenScheduled}
+        style={{ touchAction: 'manipulation' }}
+      >
+        <Icon name="calendar-schedule" className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="chip"
+        size="sm"
+        className="w-10 px-0"
+        aria-label={t(MOBILE_SESSION_CHROME_KEYS.newMultiRun)}
+        title={t(MOBILE_SESSION_CHROME_KEYS.newMultiRun)}
+        disabled={projectsMeta.length === 0}
+        onClick={handleOpenMultiRun}
+        style={{ touchAction: 'manipulation' }}
+      >
+        <ArrowsMerge className="size-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="chip"
+        size="sm"
+        className="w-10 px-0"
+        aria-label={t(MOBILE_SESSION_CHROME_KEYS.archive)}
+        title={t(MOBILE_SESSION_CHROME_KEYS.archive)}
+        onClick={handleOpenArchive}
+        style={{ touchAction: 'manipulation' }}
+      >
+        <Icon name="archive" className="size-4" />
+      </Button>
+    </div>
+  ) : null;
+
   // flex-1 + min-h-0 rather than h-full: both hosts put a fixed-height header
   // above this, so a 100% height overflows by exactly that header — and the
   // clipped overflow swallowed the footer.
   const surfaceContent = (
       <div ref={contentRootRef} className="flex min-h-0 flex-1 flex-col">
+        {sessionChromeActions}
         <ScrollShadow className="min-h-0 flex-1 overflow-y-auto pb-4">
           {/* The search bar scrolls WITH the list (iOS-style): the open-time
               auto-scroll to the current session naturally tucks it away, and
@@ -1833,6 +1972,24 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
               <div className="min-w-0 flex-1" />
             )}
             <div className="flex shrink-0 items-center gap-1">
+              {showSessionRecordsReload ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="lg"
+                  className="w-10 px-0"
+                  disabled={isSessionRecordsReloadDisabled}
+                  onClick={reloadSessionRecords}
+                  aria-label={t(sessionRecordsReloadAriaKey(sessionRecordsReloadBlockReason))}
+                  title={t(sessionRecordsReloadTooltipKey(sessionRecordsReloadBlockReason))}
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  <Icon
+                    name={sessionRecordsReloadInFlight ? 'loader-4' : 'refresh'}
+                    className={cn('size-5', sessionRecordsReloadInFlight && 'animate-spin')}
+                  />
+                </Button>
+              ) : null}
               {footer.onOpenUpdate ? (
                 <Button
                   type="button"
