@@ -36,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Chat/Desktop: on Pi, the composer footer no longer shows 树 / Tree. Open the existing session timeline from a control under the prompt-navigator ticks (same dialog as /timeline).
 - Chat/Desktop: on Pi, the composer footer no longer shows a context-usage percent. Use the header context ring to inspect tokens vs the model window.
 - Chat/Desktop: saving an assistant message as an image now opens a Save dialog and only says the image was saved after the PNG is written. Cancel stays silent.
+- **Sessions/Desktop:** on Pi, Export HTML now saves a standalone file you can open offline, with Markdown text, thinking, tool calls, and embedded images. It does not create a public share link.
 - **Sessions/Desktop:** on Pi, exporting a chat as JSONL now keeps tool calls, tool results, images, and thinking. Importing that file restores the same transcript.
 - **Sessions/Desktop:** on Pi, cloning, forking, or importing a chat writes the transcript to disk. Quit and reopen still shows those messages, and a clone or fork still knows its parent.
 - **Sessions/Desktop:** on Pi, archived chats stay on the Archive page after quit or sidebar Refresh. Relaunch no longer reopens an archived chat as the last session.

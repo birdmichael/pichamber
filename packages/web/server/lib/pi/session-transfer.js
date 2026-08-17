@@ -653,24 +653,347 @@ export const buildSessionJsonl = (record) => {
   return `${lines.join('\n')}\n`;
 };
 
+const isSafeHref = (href) => {
+  const value = asTrimmedString(href);
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  if (lower.startsWith('https://') || lower.startsWith('http://') || lower.startsWith('mailto:')) {
+    return true;
+  }
+  if (lower.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
+  return true;
+};
+
+const isRemoteHttpUrl = (value) => /^https?:\/\//i.test(asTrimmedString(value));
+
+const isEmbeddableDataImage = (value) => /^data:image\/[a-z0-9.+-]+(?:;[^,]*)?,/i.test(asTrimmedString(value));
+
+const holdSlot = (slots, html) => {
+  const key = `\u0000${slots.length}\u0000`;
+  slots.push(html);
+  return key;
+};
+
+const replaceMarkdownLinks = (text, image, replace) => {
+  let result = '';
+  let index = 0;
+  while (index < text.length) {
+    const bang = image && text[index] === '!' && text[index + 1] === '[';
+    const open = bang ? index + 1 : (!image && text[index] === '[' ? index : -1);
+    if (open === -1) {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    const closeLabel = text.indexOf(']', open + 1);
+    if (closeLabel === -1 || text[closeLabel + 1] !== '(') {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    let depth = 1;
+    let cursor = closeLabel + 2;
+    while (cursor < text.length && depth > 0) {
+      if (text[cursor] === '(') depth += 1;
+      else if (text[cursor] === ')') depth -= 1;
+      cursor += 1;
+    }
+    if (depth !== 0) {
+      result += text[index];
+      index += 1;
+      continue;
+    }
+    const label = text.slice(open + 1, closeLabel);
+    const href = text.slice(closeLabel + 2, cursor - 1);
+    result += replace(label, href);
+    index = cursor;
+  }
+  return result;
+};
+
+const inlineMarkdown = (raw) => {
+  const slots = [];
+  let text = escapeHtml(raw);
+  text = text.replace(/`([^`]+)`/g, (_, code) => holdSlot(slots, `<code>${code}</code>`));
+  text = replaceMarkdownLinks(text, true, (alt, href) => {
+    const src = href.trim();
+    if (isEmbeddableDataImage(src)) {
+      return holdSlot(slots, `<img src="${src}" alt="${alt}">`);
+    }
+    if (isRemoteHttpUrl(src)) {
+      return holdSlot(slots, '<span class="image-omitted">Image omitted (remote URL)</span>');
+    }
+    return holdSlot(slots, alt ? `<span class="image-omitted">${alt}</span>` : '<span class="image-omitted">Image omitted</span>');
+  });
+  text = replaceMarkdownLinks(text, false, (label, href) => {
+    const dest = href.trim();
+    if (!isSafeHref(dest)) return `[${label}](${dest})`;
+    return holdSlot(slots, `<a href="${dest}">${label}</a>`);
+  });
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  text = text.replace(/\n/g, '<br>\n');
+  return text.replace(/\u0000(\d+)\u0000/g, (_, index) => slots[Number(index)] || '');
+};
+
+const isMarkdownFenceOpen = (line) => /^```/.test(line);
+
+const isMarkdownHeading = (line) => /^(#{1,6})\s+\S/.test(line);
+
+const isMarkdownQuote = (line) => /^>\s?/.test(line);
+
+const isMarkdownUnordered = (line) => /^\s*[-*+]\s+\S/.test(line);
+
+const isMarkdownOrdered = (line) => /^\s*\d+\.\s+\S/.test(line);
+
+const isMarkdownRule = (line) => /^(\*{3,}|-{3,}|_{3,})\s*$/.test(line);
+
+const isMarkdownBlockStart = (line) => (
+  isMarkdownFenceOpen(line)
+  || isMarkdownHeading(line)
+  || isMarkdownQuote(line)
+  || isMarkdownUnordered(line)
+  || isMarkdownOrdered(line)
+  || isMarkdownRule(line)
+);
+
+/** Escape first, then insert only our tags. Code fences, lists, and links stay offline-safe. */
+const markdownToHtml = (source) => {
+  const lines = String(source ?? '').replace(/\r\n/g, '\n').split('\n');
+  const html = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+    if (isMarkdownFenceOpen(line)) {
+      const language = escapeHtml(line.slice(3).trim().split(/\s+/, 1)[0] || '');
+      index += 1;
+      const code = [];
+      while (index < lines.length && !isMarkdownFenceOpen(lines[index])) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) index += 1;
+      const classAttr = language ? ` class="language-${language}"` : '';
+      html.push(`<pre><code${classAttr}>${escapeHtml(code.join('\n'))}</code></pre>`);
+      continue;
+    }
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    if (heading) {
+      const level = heading[1].length;
+      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      index += 1;
+      continue;
+    }
+    if (isMarkdownRule(line)) {
+      html.push('<hr>');
+      index += 1;
+      continue;
+    }
+    if (isMarkdownQuote(line)) {
+      const quote = [];
+      while (index < lines.length && isMarkdownQuote(lines[index])) {
+        quote.push(lines[index].replace(/^>\s?/, ''));
+        index += 1;
+      }
+      html.push(`<blockquote>${markdownToHtml(quote.join('\n'))}</blockquote>`);
+      continue;
+    }
+    if (isMarkdownUnordered(line)) {
+      const items = [];
+      while (index < lines.length && isMarkdownUnordered(lines[index])) {
+        items.push(`<li>${inlineMarkdown(lines[index].replace(/^\s*[-*+]\s+/, ''))}</li>`);
+        index += 1;
+      }
+      html.push(`<ul>${items.join('')}</ul>`);
+      continue;
+    }
+    if (isMarkdownOrdered(line)) {
+      const items = [];
+      while (index < lines.length && isMarkdownOrdered(lines[index])) {
+        items.push(`<li>${inlineMarkdown(lines[index].replace(/^\s*\d+\.\s+/, ''))}</li>`);
+        index += 1;
+      }
+      html.push(`<ol>${items.join('')}</ol>`);
+      continue;
+    }
+    const paragraph = [];
+    while (index < lines.length && lines[index].trim() && !isMarkdownBlockStart(lines[index])) {
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+    html.push(`<p>${inlineMarkdown(paragraph.join('\n'))}</p>`);
+  }
+  return html.join('\n');
+};
+
+const formatJsonForPre = (value) => {
+  try {
+    return JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return String(value ?? '');
+  }
+};
+
+const formatMessageTimestamp = (info) => {
+  const created = info?.time?.created;
+  if (created == null || created === '') return '';
+  return isoFromUnknown(created);
+};
+
+const formatModelLabel = (info) => {
+  const resolved = resolveUsableFacadeModel(info);
+  if (!resolved) return '';
+  return `${resolved.providerID}/${resolved.modelID}`;
+};
+
+const formatUsageLine = (info) => {
+  const tokens = isRecord(info?.tokens) ? info.tokens : null;
+  const hasCost = typeof info?.cost === 'number' && Number.isFinite(info.cost);
+  if (!tokens && !hasCost) return '';
+  const parts = [];
+  if (tokens) {
+    if (typeof tokens.input === 'number' && Number.isFinite(tokens.input)) {
+      parts.push(`${tokens.input} in`);
+    }
+    if (typeof tokens.output === 'number' && Number.isFinite(tokens.output)) {
+      parts.push(`${tokens.output} out`);
+    }
+    if (typeof tokens.reasoning === 'number' && Number.isFinite(tokens.reasoning) && tokens.reasoning > 0) {
+      parts.push(`${tokens.reasoning} reasoning`);
+    }
+  }
+  if (hasCost) parts.push(`$${info.cost}`);
+  return parts.join(' · ');
+};
+
+const htmlFromFilePart = (part) => {
+  const image = toPiImageContent(part);
+  if (image) {
+    const alt = escapeHtml(asTrimmedString(part.filename) || filenameFromMime(image.mimeType));
+    return `<figure class="image"><img src="data:${image.mimeType};base64,${image.data}" alt="${alt}"></figure>`;
+  }
+  const file = facadeFilePartFromUnknown(part, '', '');
+  const url = asTrimmedString(file?.url || part?.url);
+  const mime = asTrimmedString(file?.mime || part?.mime || part?.mimeType);
+  if (isRemoteHttpUrl(url) && (mime.startsWith('image/') || part?.type === 'image' || part?.type === 'file')) {
+    return '<p class="image-omitted">Image omitted (remote URL)</p>';
+  }
+  if (file || part?.type === 'file' || part?.type === 'image') {
+    const label = escapeHtml(asTrimmedString(part?.filename) || mime || 'file');
+    return `<p class="file-omitted">File omitted (${label})</p>`;
+  }
+  return '';
+};
+
+const htmlFromToolPart = (part) => {
+  const name = escapeHtml(asTrimmedString(part?.tool) || 'tool');
+  const status = asTrimmedString(part?.state?.status);
+  const input = isRecord(part?.state?.input) ? part.state.input : {};
+  const output = typeof part?.state?.output === 'string' ? part.state.output : '';
+  const error = typeof part?.state?.error === 'string' ? part.state.error : '';
+  const isError = status === 'error';
+  const sections = [
+    `<div class="tool-name">${name}</div>`,
+  ];
+  if (Object.keys(input).length > 0) {
+    sections.push(`<div class="tool-label">Input</div><pre class="tool-io">${escapeHtml(formatJsonForPre(input))}</pre>`);
+  }
+  if (isError) {
+    sections.push(`<div class="tool-label">Error</div><pre class="tool-io">${escapeHtml(error || output || 'tool error')}</pre>`);
+  } else if (output) {
+    sections.push(`<div class="tool-label">Output</div><pre class="tool-io">${escapeHtml(output)}</pre>`);
+  }
+  return `<section class="tool${isError ? ' error' : ''}">${sections.join('')}</section>`;
+};
+
+const htmlFromReasoningPart = (text) => {
+  const body = asTrimmedString(text);
+  if (!body) return '';
+  return `<details class="thinking"><summary>Thinking</summary><div class="thinking-body">${markdownToHtml(body)}</div></details>`;
+};
+
+const htmlFromMessageParts = (parts) => {
+  if (!Array.isArray(parts)) return '';
+  return parts.map((part) => {
+    if (!part || typeof part !== 'object') return '';
+    if (part.type === 'reasoning') return htmlFromReasoningPart(part.text);
+    if (part.type === 'text' && typeof part.text === 'string' && part.text) {
+      return `<div class="body">${markdownToHtml(part.text)}</div>`;
+    }
+    if (part.type === 'tool') return htmlFromToolPart(part);
+    if (part.type === 'file' || part.type === 'image') return htmlFromFilePart(part);
+    return '';
+  }).filter(Boolean).join('\n');
+};
+
+const htmlFromMessageEntry = (entry) => {
+  const role = entry?.info?.role === 'assistant' ? 'Assistant' : 'User';
+  const timestamp = formatMessageTimestamp(entry?.info);
+  const model = role === 'Assistant' ? formatModelLabel(entry?.info) : '';
+  const usage = role === 'Assistant' ? formatUsageLine(entry?.info) : '';
+  const meta = [timestamp, model].filter(Boolean).join(' · ');
+  const body = htmlFromMessageParts(entry?.parts);
+  return [
+    `<article class="msg ${role.toLowerCase()}">`,
+    `<header><div class="role">${role}</div>${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ''}</header>`,
+    body,
+    usage ? `<footer class="usage">${escapeHtml(usage)}</footer>` : '',
+    '</article>',
+  ].filter(Boolean).join('\n');
+};
+
+const SESSION_HTML_STYLES = `body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; color: #111; line-height: 1.5; }
+h1 { font-size: 1.35rem; margin-bottom: 1.5rem; }
+h2, h3, h4, h5, h6 { line-height: 1.3; }
+.msg { margin: 1.5rem 0; padding-bottom: 1.25rem; border-bottom: 1px solid #e5e5e5; }
+.msg:last-child { border-bottom: 0; }
+header { margin-bottom: 0.5rem; }
+.role { font-weight: 650; }
+.meta, .usage { color: #666; font-size: 0.85rem; }
+.usage { margin-top: 0.75rem; }
+.body p { margin: 0.5rem 0; }
+.body p:first-child { margin-top: 0; }
+.body pre, .thinking-body pre, .tool-io { white-space: pre-wrap; word-break: break-word; background: #f4f4f5; padding: 0.75rem; border-radius: 0.4rem; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem; }
+.body code, .thinking-body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #f4f4f5; padding: 0.1em 0.3em; border-radius: 0.25rem; }
+.body pre code { background: none; padding: 0; }
+.body ul, .body ol { margin: 0.5rem 0; padding-left: 1.4rem; }
+.body a { color: #155eef; }
+.thinking { margin: 0.75rem 0; padding: 0.5rem 0.75rem; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 0.4rem; }
+.thinking summary { cursor: pointer; font-weight: 600; color: #444; }
+.thinking-body { margin-top: 0.5rem; color: #444; }
+.tool { margin: 0.75rem 0; padding: 0.75rem; border: 1px solid #d4d4d8; border-radius: 0.4rem; background: #fafafa; }
+.tool.error { border-color: #f0b4b4; background: #fff7f7; }
+.tool-name { font-weight: 650; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tool-label { margin-top: 0.6rem; font-size: 0.75rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+.image { margin: 0.75rem 0; }
+.image img { max-width: 100%; height: auto; border-radius: 0.4rem; }
+.image-omitted, .file-omitted { color: #666; font-size: 0.9rem; font-style: italic; }
+@media (prefers-color-scheme: dark) {
+  body { color: #f4f4f5; background: #18181b; }
+  .msg { border-bottom-color: #3f3f46; }
+  .meta, .usage, .tool-label, .image-omitted, .file-omitted { color: #a1a1aa; }
+  .body pre, .thinking-body pre, .tool-io, .body code, .thinking-body code { background: #27272a; }
+  .thinking, .tool { background: #1f1f23; border-color: #3f3f46; }
+  .tool.error { background: #2a1b1b; border-color: #7f1d1d; }
+  .body a { color: #93c5fd; }
+}`;
+
 export const buildSessionHtml = (record) => {
   const title = escapeHtml(asTrimmedString(record?.info?.title) || 'Session');
-  const blocks = (record?.messages || []).map((entry) => {
-    const role = entry?.info?.role === 'assistant' ? 'Assistant' : 'User';
-    const text = escapeHtml(textFromFacadeParts(entry?.parts));
-    return `<article class="msg ${role.toLowerCase()}"><div class="role">${role}</div><pre>${text}</pre></article>`;
-  }).join('\n');
+  const blocks = (record?.messages || []).map((entry) => htmlFromMessageEntry(entry)).join('\n');
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <style>
-body { font-family: ui-sans-serif, system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; color: #111; }
-h1 { font-size: 1.25rem; }
-.msg { margin: 1.25rem 0; }
-.role { font-weight: 600; margin-bottom: 0.35rem; }
-pre { white-space: pre-wrap; word-break: break-word; margin: 0; font: inherit; }
+${SESSION_HTML_STYLES}
 </style>
 </head>
 <body>

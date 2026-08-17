@@ -297,7 +297,12 @@ through `SessionManager.appendMessage` as Pi-native `text` / `thinking` /
 same transcript. JSONL export (`buildSessionJsonl`) writes those same
 entries from facade messages so export → import (or a new host) keeps
 tool, image, thinking, text, and assistant model/usage when they already
-exist. HTML export stays text-only.
+exist. HTML export (`buildSessionHtml`) writes a self-contained offline file:
+Markdown text, thinking as its own block, tool calls with input/output/error,
+and embedded `data:` images. Remote http(s) image URLs are omitted or labeled.
+It does not create a public share URL. JSONL stays the round-trip / re-import
+format.
+
 Clone/fork `parentID` is `{ parentID }` on `pichamber.metadata`. Hydrate,
 disk list, and sidebar Refresh read it onto `info.parentID`.
 

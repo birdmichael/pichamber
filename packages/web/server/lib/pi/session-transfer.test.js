@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildSessionHtml,
   buildSessionJsonl,
   cloneImportedMessages,
   facadeMessagesFromPiEntries,
@@ -140,6 +141,141 @@ describe('session-transfer', () => {
       { role: 'user', types: ['text', 'file'] },
       { role: 'assistant', types: ['reasoning', 'text', 'tool'] },
     ]);
+  });
+
+  it('exports a skill-reading turn and image as standalone HTML with distinct blocks', () => {
+    const record = {
+      id: 'ses_export_rich',
+      directory: '/tmp/project',
+      info: { id: 'ses_export_rich', title: 'Skill and image', time: { created: 1_700_000_000_000 } },
+      messages: [
+        {
+          info: { id: 'msg_user', role: 'user', time: { created: 1_700_000_000_100 } },
+          parts: [
+            { id: 'prt_1', type: 'text', text: 'see this' },
+            { id: 'prt_img', type: 'file', mime: 'image/png', url: 'data:image/png;base64,AAAA' },
+          ],
+        },
+        {
+          info: {
+            id: 'msg_asst',
+            role: 'assistant',
+            parentID: 'msg_user',
+            time: { created: 1_700_000_000_200 },
+            providerID: 'example-provider',
+            modelID: 'example-model',
+            model: { providerID: 'example-provider', modelID: 'example-model' },
+            cost: 0.002,
+            tokens: { input: 1200, output: 80, reasoning: 10, cache: { read: 40, write: 0 } },
+          },
+          parts: [
+            { id: 'prt_think', type: 'reasoning', text: 'load skills' },
+            { id: 'prt_text', type: 'text', text: 'reading' },
+            {
+              id: 'prt_tool',
+              type: 'tool',
+              callID: 'c1',
+              tool: 'read',
+              state: {
+                status: 'completed',
+                input: { path: 'SKILL.md' },
+                output: '---\nname: using-superpowers\n---\n',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = buildSessionHtml(record);
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('<h1>Skill and image</h1>');
+    expect(html).toContain('see this');
+    expect(html).toContain('<img src="data:image/png;base64,AAAA"');
+    expect(html).toContain('<details class="thinking">');
+    expect(html).toContain('<summary>Thinking</summary>');
+    expect(html).toContain('load skills');
+    expect(html).toContain('reading');
+    expect(html).toContain('<section class="tool">');
+    expect(html).toContain('<div class="tool-name">read</div>');
+    expect(html).toContain('SKILL.md');
+    expect(html).toContain('using-superpowers');
+    expect(html).toContain('example-provider/example-model');
+    expect(html).toContain('1200 in');
+    expect(html).toContain('80 out');
+    expect(html).toContain('$0.002');
+    expect(html).toContain('2023-11-14T22:13:20.100Z');
+    expect(html).not.toMatch(/<article class="msg assistant">[\s\S]*<pre>load skills[\s\S]*reading/);
+    expect(html).not.toMatch(/cdn\.|unpkg\.|jsdelivr|https:\/\/cdn/i);
+    expect(html).not.toContain('session.share');
+  });
+
+  it('renders Markdown text and labels remote images instead of embedding them', () => {
+    const html = buildSessionHtml({
+      info: { title: 'Markdown demo' },
+      messages: [
+        {
+          info: { role: 'user', time: { created: 1_700_000_000_100 } },
+          parts: [{
+            type: 'text',
+            text: [
+              'See [docs](https://example.com) and `code`.',
+              '',
+              '- one',
+              '- two',
+              '',
+              '```js',
+              'const x = 1;',
+              '```',
+              '',
+              '![shot](https://example.com/a.png)',
+            ].join('\n'),
+          }, {
+            type: 'file',
+            mime: 'image/png',
+            url: 'https://example.com/remote.png',
+          }],
+        },
+        {
+          info: { role: 'assistant', time: { created: 1_700_000_000_200 } },
+          parts: [{
+            type: 'tool',
+            callID: 'c_err',
+            tool: 'bash',
+            state: { status: 'error', input: { command: 'ls' }, output: '', error: 'not found' },
+          }],
+        },
+      ],
+    });
+
+    expect(html).toContain('<a href="https://example.com">docs</a>');
+    expect(html).toContain('<code>code</code>');
+    expect(html).toContain('<ul>');
+    expect(html).toContain('<li>one</li>');
+    expect(html).toContain('<pre><code class="language-js">const x = 1;</code></pre>');
+    expect(html).toContain('Image omitted (remote URL)');
+    expect(html).not.toContain('src="https://example.com/remote.png"');
+    expect(html).not.toContain('src="https://example.com/a.png"');
+    expect(html).toContain('<section class="tool error">');
+    expect(html).toContain('<div class="tool-name">bash</div>');
+    expect(html).toContain('not found');
+  });
+
+  it('escapes HTML in exported text and rejects javascript links', () => {
+    const html = buildSessionHtml({
+      info: { title: '<script>alert(1)</script>' },
+      messages: [{
+        info: { role: 'user' },
+        parts: [{
+          type: 'text',
+          text: 'Hello <script>alert(1)</script> and [x](javascript:alert(1))',
+        }],
+      }],
+    });
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).not.toContain('href="javascript:alert(1)"');
+    expect(html).toContain('javascript:alert(1)');
   });
 
   it('copies Pi assistant model and usage onto facade info', () => {
