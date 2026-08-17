@@ -13,7 +13,7 @@ import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
-import { usePiKernel } from '@/lib/usePiKernel';
+import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
@@ -102,7 +102,8 @@ const McpWorkspacePane: React.FC<{ onOpenMcpSettings: () => void }> = ({ onOpenM
 /** The workspace surfaces as tabs (Git / Files / Terminal / Notes / Plan / MCP).
     Plan is the Desktop `plan` surface and appears only when
     `listVisibleMobileWorkspaceTabs` says so — Feature Plugins Plan on Pi,
-    leftover experimental plan-mode on OpenCode.
+    leftover experimental plan-mode on OpenCode. MCP follows Settings MCP
+    (`isMcpSettingsAvailable` / Feature Plugin MCP).
 
     Two hosts, same content and same state:
      - `drawer` (default) covers the app and slides in from the right edge —
@@ -131,6 +132,7 @@ export const MobileWorkspaceDrawer: React.FC<{
   const { screenWidth } = useDeviceInfo();
   const effectiveDirectory = useEffectiveDirectory() ?? null;
   const isPiKernel = usePiKernel();
+  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const piPlanChrome = usePiPlanChrome();
   const featurePlugins = usePiFeaturePluginsStore((state) => state.payload);
   const planModeExperimentalEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
@@ -140,8 +142,9 @@ export const MobileWorkspaceDrawer: React.FC<{
       featurePlugins,
       plan: piPlanChrome.plan,
       planModeExperimentalEnabled,
+      isMcpFeaturePluginActive,
     }),
-    [featurePlugins, isPiKernel, piPlanChrome.plan, planModeExperimentalEnabled],
+    [featurePlugins, isMcpFeaturePluginActive, isPiKernel, piPlanChrome.plan, planModeExperimentalEnabled],
   );
   const rootRef = React.useRef<HTMLElement | null>(null);
   const [entered, setEntered] = React.useState(false);
@@ -304,7 +307,7 @@ export const MobileWorkspaceDrawer: React.FC<{
             </ErrorBoundary>
           </div>
         ) : null}
-        {visitedTabs.has('mcp') ? (
+        {visitedTabs.has('mcp') && visibleTabs.includes('mcp') ? (
           <div className={cn('h-full', tab !== 'mcp' && 'hidden')}>
             <ErrorBoundary>
               <McpWorkspacePane onOpenMcpSettings={onOpenMcpSettings} />
