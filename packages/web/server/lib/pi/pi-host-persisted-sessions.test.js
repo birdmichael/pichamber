@@ -103,6 +103,10 @@ describe('persisted Pi sessions', () => {
     expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant']);
     expect(messages[0].parts[0].text).toBe('帮我深度体验 Pichamber');
     expect(messages[1].parts[0].text).toBe('已从磁盘恢复');
+    expect(messages[0].info.time.completed).toBeUndefined();
+    expect(messages[0].info.finish).toBeUndefined();
+    expect(messages[1].info.time.completed).toBeGreaterThan(0);
+    expect(messages[1].info.finish).toBe('stop');
     first.dispose();
 
     const restarted = createHost({ home, cwd });
@@ -113,6 +117,8 @@ describe('persisted Pi sessions', () => {
     expect(restartedMessages).toHaveLength(2);
     expect(restartedMessages[0].parts[0].text).toBe('帮我深度体验 Pichamber');
     expect(restartedMessages[1].parts[0].text).toBe('已从磁盘恢复');
+    expect(restartedMessages[1].info.time.completed).toBeGreaterThan(0);
+    expect(restartedMessages[1].info.finish).toBe('stop');
     restarted.dispose();
   });
 
@@ -175,6 +181,9 @@ describe('persisted Pi sessions', () => {
     expect(result.sessions.map((item) => item.id)).toEqual(expect.arrayContaining([open.id, sibling.id]));
     expect(result.messages.map((entry) => entry.parts?.[0]?.text)).toContain('appended on disk');
     expect(host.getMessages(open.id).map((entry) => entry.parts?.[0]?.text)).toContain('appended on disk');
+    const refreshedAssistant = host.getMessages(open.id).find((entry) => entry.info.role === 'assistant');
+    expect(refreshedAssistant.info.time.completed).toBeGreaterThan(0);
+    expect(refreshedAssistant.info.finish).toBe('stop');
     expect(host.listSessions(cwd).map((item) => item.id)).toContain(open.id);
     host.dispose();
   });
@@ -513,6 +522,7 @@ describe('persisted Pi sessions', () => {
     const messages = first.getMessages(sessionId);
     expect(messages[1].info).toMatchObject({
       role: 'assistant',
+      finish: 'stop',
       modelID: 'example-model',
       providerID: 'example-provider',
       model: { providerID: 'example-provider', modelID: 'example-model' },
@@ -524,6 +534,7 @@ describe('persisted Pi sessions', () => {
         cache: { read: 40, write: 0 },
       },
     });
+    expect(messages[1].info.time.completed).toBeGreaterThan(0);
     first.dispose();
 
     const restarted = createHost({ home, cwd });
@@ -532,6 +543,8 @@ describe('persisted Pi sessions', () => {
     expect(afterRestart[1].info.modelID).toBe('example-model');
     expect(afterRestart[1].info.providerID).toBe('example-provider');
     expect(afterRestart[1].info.cost).toBe(0.002);
+    expect(afterRestart[1].info.time.completed).toBeGreaterThan(0);
+    expect(afterRestart[1].info.finish).toBe('stop');
     expect(afterRestart[1].info.tokens).toEqual({
       input: 1200,
       output: 80,
@@ -572,6 +585,45 @@ describe('persisted Pi sessions', () => {
     });
     expect(assistant.info.tokens).toBeUndefined();
     expect(assistant.info.cost).toBeUndefined();
+    expect(assistant.info.time.completed).toBeGreaterThan(0);
+    expect(assistant.info.finish).toBe('stop');
+    host.dispose();
+  });
+
+  it('does not mark a still-open disk assistant as completed after hydrate', async () => {
+    const home = tempDir('pi-persist-pending-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const manager = SessionManager.create(cwd, sessionDir);
+    const file = manager.getSessionFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'session',
+      version: CURRENT_SESSION_VERSION,
+      id: manager.getSessionId(),
+      timestamp: new Date().toISOString(),
+      cwd: manager.getCwd(),
+    })}\n`);
+    const opened = SessionManager.open(file, sessionDir);
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'still going' }],
+      timestamp: Date.now(),
+    });
+    opened.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'partial' }],
+      timestamp: Date.now(),
+      stopReason: 'pending',
+    });
+    const sessionId = opened.getSessionId();
+
+    const host = createHost({ home, cwd });
+    await host.ensureSession(sessionId, cwd);
+    const assistant = host.getMessages(sessionId).find((entry) => entry.info.role === 'assistant');
+    expect(assistant.info.time.completed).toBeUndefined();
+    expect(assistant.info.finish).toBeUndefined();
     host.dispose();
   });
 });

@@ -184,6 +184,70 @@ describe('session-transfer', () => {
     expect(messages[0].info.modelID).toBeUndefined();
     expect(messages[0].info.tokens).toBeUndefined();
     expect(messages[0].info.cost).toBeUndefined();
+    expect(messages[0].info.time.completed).toBeUndefined();
+    expect(messages[0].info.finish).toBeUndefined();
+    expect(messages[1].info.time.completed).toBeGreaterThan(0);
+    expect(messages[1].info.finish).toBe('stop');
+  });
+
+  it('hydrates a finished disk assistant with time.completed and finish stop', () => {
+    const created = 1_700_000_000_200;
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        timestamp: 1_700_000_000_100,
+        message: { role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 1_700_000_000_100 },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        timestamp: created,
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'done' }],
+          timestamp: created,
+          stopReason: 'stop',
+        },
+      },
+    ], 'ses_done');
+
+    expect(messages[0].info.time).toEqual({ created: 1_700_000_000_100 });
+    expect(messages[0].info.finish).toBeUndefined();
+    expect(messages[1].info.time).toEqual({ created, completed: created });
+    expect(messages[1].info.finish).toBe('stop');
+  });
+
+  it('does not invent completed or finish for a still-open assistant', () => {
+    const pending = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'a_pending',
+        timestamp: 1_700_000_000_200,
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'partial' }],
+          stopReason: 'pending',
+          timestamp: 1_700_000_000_200,
+        },
+      },
+    ], 'ses_open');
+    expect(pending[0].info.time).toEqual({ created: 1_700_000_000_200 });
+    expect(pending[0].info.time.completed).toBeUndefined();
+    expect(pending[0].info.finish).toBeUndefined();
+
+    const streamingStub = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'a_stub',
+        timestamp: 1_700_000_000_300,
+        message: { role: 'assistant', content: [] },
+      },
+    ], 'ses_stub');
+    expect(streamingStub[0].info.time).toEqual({ created: 1_700_000_000_300 });
+    expect(streamingStub[0].info.time.completed).toBeUndefined();
+    expect(streamingStub[0].info.finish).toBeUndefined();
   });
 
   it('omits tokens and cost when the Pi assistant has no usage', () => {
@@ -207,6 +271,8 @@ describe('session-transfer', () => {
     });
     expect(messages[0].info.tokens).toBeUndefined();
     expect(messages[0].info.cost).toBeUndefined();
+    expect(messages[0].info.time.completed).toBeGreaterThan(0);
+    expect(messages[0].info.finish).toBe('stop');
   });
 
   it('omits invented model and usage when the Pi assistant has neither', () => {
@@ -227,6 +293,8 @@ describe('session-transfer', () => {
     expect(messages[0].info.tokens).toBeUndefined();
     expect(messages[0].info.cost).toBeUndefined();
     expect(messages[0].info.agent).toBe('pi');
+    expect(messages[0].info.time.completed).toBeGreaterThan(0);
+    expect(messages[0].info.finish).toBe('stop');
   });
 
   it('maps Pi session entries onto facade messages', () => {
@@ -613,6 +681,8 @@ describe('session-transfer', () => {
     expect(remapped[0].info).toMatchObject({
       modelID: 'example-model',
       providerID: 'example-provider',
+      finish: 'stop',
+      time: { created: 1_700_000_000_200, completed: 1_700_000_000_200 },
       cost: 0.002,
       tokens: {
         input: 1200,
