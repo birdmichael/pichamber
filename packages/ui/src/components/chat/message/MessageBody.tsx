@@ -32,7 +32,12 @@ import { useProjectsStore } from '@/stores/useProjectsStore';
 import { TextSelectionMenu } from './TextSelectionMenu';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { useChatSurfaceMode } from '@/components/chat/useChatSurfaceMode';
-import { isVSCodeRuntime } from '@/lib/desktop';
+import { hasDesktopInvoke, isDesktopLocalOriginActive, isVSCodeRuntime, saveDesktopImageFile } from '@/lib/desktop';
+import {
+    persistGeneratedMessageImage,
+    triggerBrowserImageDownload,
+    type VSCodeSaveImageResult,
+} from './persistGeneratedMessageImage';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { toast } from '@/components/ui';
 import { Icon } from "@/components/icon/Icon";
@@ -1610,32 +1615,23 @@ const AssistantMessageBody = React.memo(({
                 });
 
                 const fileName = `message-${messageId}.png`;
-
-                if (isVSCodeRuntime()) {
-                    const payload = await vscodeApi?.saveImage?.({ fileName, dataUrl }) as { saved?: boolean; canceled?: boolean; error?: string } | undefined;
-                    if (!payload) {
-                        throw new Error('Failed to save image in VS Code');
-                    }
-                    if (payload.saved !== true) {
-                        if (payload.canceled) {
-                            return;
-                        }
-                        throw new Error(payload.error || 'Failed to save image in VS Code');
-                    }
-                } else if (isCapacitorMobileApp()) {
-                    const blob = await fetch(dataUrl).then((response) => response.blob());
-                    const file = new File([blob], fileName, { type: blob.type || 'image/png' });
-                    if (!navigator.canShare?.({ files: [file] })) {
-                        throw new Error('Image sharing is unavailable in this mobile runtime');
-                    }
-                    await navigator.share({ files: [file] });
-                } else {
-                    const link = document.createElement('a');
-                    link.download = fileName;
-                    link.href = dataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                const outcome = await persistGeneratedMessageImage(
+                    { fileName, dataUrl },
+                    {
+                        isVSCode: isVSCodeRuntime(),
+                        saveVSCodeImage: vscodeApi?.saveImage
+                            ? async (payload) => await vscodeApi.saveImage?.(payload) as VSCodeSaveImageResult | undefined
+                            : undefined,
+                        isCapacitor: isCapacitorMobileApp(),
+                        canShareFiles: (files) => navigator.canShare?.({ files }) === true,
+                        shareFiles: (files) => navigator.share({ files }),
+                        canUseDesktopSave: hasDesktopInvoke() && isDesktopLocalOriginActive(),
+                        saveDesktopImageFile,
+                        downloadInBrowser: triggerBrowserImageDownload,
+                    },
+                );
+                if (outcome === 'canceled' || outcome === 'download-started') {
+                    return;
                 }
 
                 toast.success(t('chat.messageBody.toast.imageSaved'));

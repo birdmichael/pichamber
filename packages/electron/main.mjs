@@ -32,6 +32,7 @@ import {
   setLinuxAutostartEnabled,
 } from './linux-autostart.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
+import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
 
 const execFileAsync = promisify(execFile);
@@ -4097,6 +4098,25 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       }
 
       await fsp.writeFile(result.filePath, content, 'utf8');
+      return result.filePath;
+    }
+
+    case 'desktop_save_image': {
+      const defaultPath = typeof args.defaultFileName === 'string' ? args.defaultFileName.trim() : '';
+      if (!defaultPath) {
+        throw new Error('Default file name is required');
+      }
+
+      const bytes = decodeDesktopImagePayload(args);
+      const result = await dialog.showSaveDialog(browserWindow || undefined, {
+        defaultPath,
+        filters: [{ name: 'PNG', extensions: ['png'] }],
+      });
+      if (result.canceled || !result.filePath) {
+        return null;
+      }
+
+      await fsp.writeFile(result.filePath, bytes);
       return result.filePath;
     }
 
