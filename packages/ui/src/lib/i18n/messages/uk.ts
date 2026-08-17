@@ -792,6 +792,7 @@ export const dict: Record<I18nKey, string> = {
   "gitView.header.repositoryViews": "Перегляди репозиторію",
   "gitView.header.updateBranch": "Оновити гілку",
   "gitView.header.openPullRequest": "Відкрити pull request",
+  "gitView.header.createPullRequest": "Створити pull request",
   "gitView.header.removeRemoteAria": "Видалити remote",
   "gitView.header.removeRemoteTitle": "Видалити remote",
   "gitView.header.upstreamSynced": "синхронізовано",

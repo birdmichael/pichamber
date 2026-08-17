@@ -791,6 +791,7 @@ export const dict = {
   'gitView.header.repositoryViews': 'Repository views',
   'gitView.header.updateBranch': 'Update branch',
   'gitView.header.openPullRequest': 'Open pull request',
+  'gitView.header.createPullRequest': 'Create pull request',
   'gitView.header.removeRemoteAria': 'Remove remote {name}',
   'gitView.header.removeRemoteTitle': 'Remove remote {name}',
   'gitView.header.upstreamSynced': 'synced',

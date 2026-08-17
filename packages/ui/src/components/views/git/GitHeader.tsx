@@ -24,6 +24,21 @@ import { useI18n } from '@/lib/i18n';
 
 type SyncAction = 'fetch' | 'pull' | 'push' | 'sync' | null;
 
+export type GitHeaderPullRequestControl = 'create' | 'open' | null;
+
+/**
+ * Desktop Git header PR entry: numbered chip when a PR exists, create control
+ * when the repo is git and there is no PR yet. Null when the surface cannot
+ * be opened (no directory / no handler).
+ */
+export function resolveGitHeaderPullRequestControl(input: {
+  canOpenPullRequest: boolean;
+  hasPullRequest: boolean;
+}): GitHeaderPullRequestControl {
+  if (!input.canOpenPullRequest) return null;
+  return input.hasPullRequest ? 'open' : 'create';
+}
+
 interface GitHeaderProps {
   status: GitStatus | null;
   localBranches: string[];
@@ -264,9 +279,15 @@ export const GitHeader: React.FC<GitHeaderProps> = ({
     return null;
   }
 
+  const pullRequestControl = resolveGitHeaderPullRequestControl({
+    canOpenPullRequest: Boolean(onOpenPullRequest),
+    hasPullRequest: Boolean(pullRequest),
+  });
+  const showCreatePullRequest = pullRequestControl === 'create' && Boolean(onOpenPullRequest);
+
   const managementButtons = (
     <div className="flex items-center gap-1 shrink-0">
-      {onOpenHistory || onOpenGraph || onOpenStashes || onOpenUpdateBranch ? (
+      {onOpenHistory || onOpenGraph || onOpenStashes || onOpenUpdateBranch || showCreatePullRequest ? (
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -314,6 +335,12 @@ export const GitHeader: React.FC<GitHeaderProps> = ({
                 {t('gitView.integrate.title')}
               </DropdownMenuItem>
             ) : null}
+            {showCreatePullRequest && onOpenPullRequest ? (
+              <DropdownMenuItem onSelect={onOpenPullRequest}>
+                <Icon name="git-pull-request" className="size-4" />
+                {t('gitView.header.createPullRequest')}
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
@@ -343,7 +370,7 @@ export const GitHeader: React.FC<GitHeaderProps> = ({
             : 'open'
     : null;
 
-  const prChip = pullRequest && onOpenPullRequest ? (
+  const prChip = pullRequestControl === 'open' && pullRequest && onOpenPullRequest ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
@@ -368,6 +395,22 @@ export const GitHeader: React.FC<GitHeaderProps> = ({
         </Button>
       </TooltipTrigger>
       <TooltipContent sideOffset={8}>{t('gitView.header.openPullRequest')}</TooltipContent>
+    </Tooltip>
+  ) : showCreatePullRequest && onOpenPullRequest ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onOpenPullRequest}
+          className="h-8 gap-1.5 px-2 typography-micro"
+          aria-label={t('gitView.header.createPullRequest')}
+        >
+          <Icon name="git-pull-request" className="size-3.5" />
+          <span className="text-foreground/80">{t('gitView.pr.actions.createPr')}</span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={8}>{t('gitView.header.createPullRequest')}</TooltipContent>
     </Tooltip>
   ) : null;
 

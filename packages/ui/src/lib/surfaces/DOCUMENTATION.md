@@ -18,7 +18,11 @@ of those ids onto workspace tabs; see Mobile tabs.
   Walkthrough also appears when a diff tab exists (`revealedByModes`), so a
   blank draft does not advertise an empty review surface. Pull request and
   walkthrough still open through `openContextSurface` from Git, a real PR,
-  a diff, or an explicit generate action.
+  a diff, or an explicit generate action. Desktop Git opens the create-PR
+  form from the Git header (visible control and repository-views overflow)
+  when the session is a git repo and no PR exists yet. The numbered chip
+  still opens an existing PR. Do not flip `pr` to `always`: a blank or
+  non-git session must not grow an empty PR tab.
 - `defaultWidthFraction` is the panel width as a fraction of the content area,
   used until the user manually resizes that surface (manual widths are stored
   per mode in `useUIStore.contextPanelByDirectory[dir].widthByMode`).
