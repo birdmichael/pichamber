@@ -99,6 +99,17 @@ describe('mobile Plan tab visibility', () => {
     })).toBe(false);
   });
 
+  test('never lists Browser, PR, Diff, or Walkthrough as workspace tabs', () => {
+    const tabs = listVisibleMobileWorkspaceTabs({
+      isPiKernel: true,
+      featurePlugins: plugins(true, true),
+      plan: { status: 'active', planMarkdown: '' },
+      planModeExperimentalEnabled: false,
+    });
+    expect(tabs).toEqual(['changes', 'files', 'terminal', 'notes', 'plan', 'mcp']);
+    expect((tabs as string[]).some((tab) => ['browser', 'pr', 'diff', 'walkthrough'].includes(tab))).toBe(false);
+  });
+
   test('lists Plan between Notes and MCP only when the gate is on', () => {
     expect(listVisibleMobileWorkspaceTabs({
       isPiKernel: true,

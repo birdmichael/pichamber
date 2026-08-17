@@ -3,25 +3,25 @@ import { Icon } from '@/components/icon/Icon';
 
 import { toast } from '@/components/ui';
 import { Button } from '@/components/ui/button';
-import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { ChangesPanel, type ChangesGroupConfig } from '@/components/views/git/ChangesPanel';
 import { CommitSection } from '@/components/views/git/CommitSection';
 import { SyncActions } from '@/components/views/git/SyncActions';
-import { PierreDiffViewer } from '@/components/views/PierreDiffViewer';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import type { GitStatus } from '@/lib/api/types';
 import { useI18n } from '@/lib/i18n';
 import { generateCommitMessage, stageGitFile, stageGitFiles, unstageGitFile, unstageGitFiles } from '@/lib/gitApi';
 import type { GitRemote } from '@/lib/gitApi';
-import { getLanguageFromExtension, isImageFile } from '@/lib/toolHelpers';
+import { getFreshestPrStatusForBranch, useGitHubPrStatusStore } from '@/stores/useGitHubPrStatusStore';
 import {
   useGitStore,
   useGitStatus,
   useIsGitRepo,
   useGitLoadingStatus,
 } from '@/stores/useGitStore';
-import { getRuntimeKey } from '@/lib/runtime-switch';
+import { useUIStore } from '@/stores/useUIStore';
+
+import { MOBILE_GIT_PR_SURFACE_MODE } from './mobileWorkspaceReview';
 
 type SyncAction = 'fetch' | 'pull' | 'push' | 'sync' | null;
 type CommitAction = 'commit' | 'commitAndPush' | null;
@@ -38,8 +38,6 @@ const isUnstagedStatusFile = (file: GitStatus['files'][number]): boolean => {
   const indexStatus = file.index?.trim();
   return Boolean(workingStatus || indexStatus === '?');
 };
-
-const diffCacheKey = (path: string, staged: boolean): string => staged ? `${path}\u0000staged` : path;
 
 type MobileChangesSurfaceProps = {
   /** When provided, the list header gets a close X that calls this. */
@@ -65,24 +63,21 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
   const fetchStatus = useGitStore((state) => state.fetchStatus);
   const fetchBranches = useGitStore((state) => state.fetchBranches);
   const prefetchDiffs = useGitStore((state) => state.prefetchDiffs);
-  const getDiff = useGitStore((state) => state.getDiff);
-  const setDiff = useGitStore((state) => state.setDiff);
+  const openContextDiff = useUIStore((state) => state.openContextDiff);
+  const openContextSurface = useUIStore((state) => state.openContextSurface);
+  const prStatusBranch = status?.current ?? null;
+  const prChipStatus = useGitHubPrStatusStore((state) => {
+    if (!currentDirectory || !prStatusBranch) {
+      return null;
+    }
+    return getFreshestPrStatusForBranch(state.entries, currentDirectory, prStatusBranch);
+  });
 
-  const [route, setRoute] = React.useState<{ type: 'list' } | { type: 'diff'; path: string; staged: boolean }>(
-    () => (initialDiffPath ? { type: 'diff', path: initialDiffPath, staged: initialDiffStaged } : { type: 'list' }),
-  );
-
-  // Allow the host (MobileApp) to push us into a specific diff when the surface
-  // is reopened or when an external trigger (e.g. PendingChangesBar tap) requests
-  // a different file mid-session.
+  // Chat / pending-changes taps use the same Desktop Diff action as Git file rows.
   React.useEffect(() => {
-    if (!initialDiffPath) return;
-    setRoute((current) => (
-      current.type === 'diff' && current.path === initialDiffPath && current.staged === initialDiffStaged
-        ? current
-        : { type: 'diff', path: initialDiffPath, staged: initialDiffStaged }
-    ));
-  }, [initialDiffPath, initialDiffStaged]);
+    if (!initialDiffPath || !currentDirectory) return;
+    openContextDiff(currentDirectory, initialDiffPath, initialDiffStaged);
+  }, [currentDirectory, initialDiffPath, initialDiffStaged, openContextDiff]);
   const [syncAction, setSyncAction] = React.useState<SyncAction>(null);
   const [commitAction, setCommitAction] = React.useState<CommitAction>(null);
   const [commitMessage, setCommitMessage] = React.useState('');
@@ -93,8 +88,6 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
   const [visibleChangePaths, setVisibleChangePaths] = React.useState<string[]>([]);
   const [remotes, setRemotes] = React.useState<GitRemote[]>([]);
   const [remoteUrl, setRemoteUrl] = React.useState<string | null>(null);
-  const [diffLoadError, setDiffLoadError] = React.useState<string | null>(null);
-  const [diffRetryNonce, setDiffRetryNonce] = React.useState(0);
 
   const changeEntries = React.useMemo(() => {
     const files = status?.files ?? [];
@@ -123,16 +116,6 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
     }
     return [];
   }, [remoteUrl, remotes, status?.tracking]);
-
-  const selectedDiff = useGitStore(React.useCallback((state) => {
-    if (!currentDirectory || route.type !== 'diff') return null;
-    return state.directories.get(currentDirectory)?.diffCache.get(diffCacheKey(route.path, route.staged)) ?? null;
-  }, [currentDirectory, route]));
-
-  const selectedFileEntry = React.useMemo(() => {
-    if (route.type !== 'diff') return null;
-    return changeEntries.find((entry) => entry.path === route.path) ?? null;
-  }, [changeEntries, route]);
 
   const refreshStatusAndBranches = React.useCallback(async (showErrors = true) => {
     if (!currentDirectory) return;
@@ -190,39 +173,6 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
     }, 120);
     return () => window.clearTimeout(timeoutId);
   }, [changeEntries, currentDirectory, git, prefetchDiffs, stagedChangeEntries, visibleChangePaths]);
-
-  React.useEffect(() => {
-    if (route.type !== 'diff') {
-      setDiffLoadError(null);
-      return;
-    }
-    const cacheKey = diffCacheKey(route.path, route.staged);
-    if (!currentDirectory || getDiff(currentDirectory, cacheKey)) {
-      setDiffLoadError(null);
-      return;
-    }
-
-    let cancelled = false;
-    const runtimeKey = getRuntimeKey();
-    setDiffLoadError(null);
-    void git.getGitFileDiff(currentDirectory, { path: route.path, staged: route.staged || undefined })
-      .then((response) => {
-        if (cancelled) return;
-        setDiff(currentDirectory, cacheKey, {
-          original: response.original ?? '',
-          modified: response.modified ?? '',
-          isBinary: response.isBinary,
-        }, runtimeKey);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setDiffLoadError(error instanceof Error ? error.message : String(error));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentDirectory, diffRetryNonce, getDiff, git, route, setDiff]);
 
   const handleSyncAction = async (action: Exclude<SyncAction, null>, remote?: GitRemote) => {
     if (!currentDirectory) return;
@@ -285,8 +235,14 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
   }, [currentDirectory, refreshStatusAndBranches, t]);
 
   const handleViewChangeDiff = React.useCallback((path: string, staged = false) => {
-    setRoute({ type: 'diff', path, staged });
-  }, []);
+    if (!currentDirectory) return;
+    openContextDiff(currentDirectory, path, staged);
+  }, [currentDirectory, openContextDiff]);
+
+  const handleOpenPullRequest = React.useCallback(() => {
+    if (!currentDirectory) return;
+    openContextSurface(currentDirectory, MOBILE_GIT_PR_SURFACE_MODE);
+  }, [currentDirectory, openContextSurface]);
 
   const handleRevertFile = React.useCallback(async (filePath: string) => {
     if (!currentDirectory) return;
@@ -465,6 +421,24 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
             {status?.current || currentDirectory || ''}
           </p>
         </div>
+        {currentDirectory ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleOpenPullRequest}
+            aria-label={t('gitView.header.openPullRequest')}
+            title={t('gitView.header.openPullRequest')}
+            className="h-8 shrink-0 gap-1.5 px-2"
+          >
+            <Icon name="git-pull-request" className="size-3.5" />
+            {prChipStatus?.pr ? (
+              <span className="tabular-nums text-foreground/80">
+                {t('gitView.pr.numberLabel', { number: prChipStatus.pr.number })}
+              </span>
+            ) : null}
+          </Button>
+        ) : null}
       </header>
       <div className="min-h-0 flex-1">{state}</div>
     </div>
@@ -482,18 +456,24 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
     return renderListState(<MobileChangesState icon message={t('gitView.empty.notGitRepository')} description={t('gitView.empty.notGitRepositoryDescription')} />);
   }
 
-  if (route.type === 'diff') {
-    return (
-      <MobileDiffDetail
-        path={route.path}
-        diff={selectedDiff}
-        fileExists={Boolean(selectedFileEntry)}
-        error={diffLoadError}
-        onBack={() => setRoute({ type: 'list' })}
-        onRetry={() => setDiffRetryNonce((value) => value + 1)}
-      />
-    );
-  }
+  const pullRequestButton = currentDirectory ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={handleOpenPullRequest}
+      aria-label={t('gitView.header.openPullRequest')}
+      title={t('gitView.header.openPullRequest')}
+      className="h-8 shrink-0 gap-1.5 px-2"
+    >
+      <Icon name="git-pull-request" className="size-3.5" />
+      {prChipStatus?.pr ? (
+        <span className="tabular-nums text-foreground/80">
+          {t('gitView.pr.numberLabel', { number: prChipStatus.pr.number })}
+        </span>
+      ) : null}
+    </Button>
+  ) : null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
@@ -515,6 +495,7 @@ export const MobileChangesSurface: React.FC<MobileChangesSurfaceProps> = ({ onCl
             {status?.current || currentDirectory}
           </p>
         </div>
+        {pullRequestButton}
         <SyncActions
           syncAction={syncAction}
           remotes={effectiveRemotes}
@@ -582,68 +563,3 @@ const MobileChangesState: React.FC<{
     </div>
   </div>
 );
-
-const MobileDiffDetail: React.FC<{
-  path: string;
-  diff: { original: string; modified: string; isBinary?: boolean } | null;
-  fileExists: boolean;
-  error: string | null;
-  onBack: () => void;
-  onRetry: () => void;
-}> = ({ path, diff, fileExists, error, onBack, onRetry }) => {
-  const { t } = useI18n();
-  const language = React.useMemo(() => getLanguageFromExtension(path) || 'text', [path]);
-
-  return (
-    <div className="flex h-full flex-col overflow-hidden bg-background text-foreground">
-      <header className="flex h-[var(--oc-header-height,56px)] shrink-0 items-center gap-3 border-b border-border/70 px-3 text-foreground">
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-interactive-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label={t('header.actions.backAria')}
-          onClick={onBack}
-        >
-          <Icon name="arrow-left" className="size-5" />
-        </button>
-        <div className="min-w-0 flex-1 px-2">
-          <h2 className="truncate typography-ui-header text-foreground">{path}</h2>
-        </div>
-      </header>
-      <div className="min-h-0 flex-1 overflow-hidden">
-        {!fileExists ? (
-          <MobileChangesState icon message={t('mobile.changes.diffDetail.missingTitle')} description={t('mobile.changes.diffDetail.missingDescription')} />
-        ) : error ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <div className="flex max-w-sm flex-col items-center gap-3">
-              <p className="typography-ui-label font-semibold text-foreground">{t('mobile.changes.diffDetail.loadFailed')}</p>
-              <p className="typography-meta text-muted-foreground">{error}</p>
-              <Button type="button" size="sm" variant="outline" onClick={onRetry}>{t('diffView.actions.retry')}</Button>
-            </div>
-          </div>
-        ) : !diff ? (
-          <MobileChangesState loading message={t('diffView.state.loadingDiff')} />
-        ) : diff.isBinary ? (
-          <MobileChangesState icon message={t('diffView.binary.unavailable')} />
-        ) : isImageFile(path) ? (
-          <MobileChangesState icon message={t('mobile.changes.diffDetail.imageUnavailable')} />
-        ) : (
-          <ScrollShadow
-            className="h-full overflow-y-auto overflow-x-hidden p-3"
-            data-diff-virtual-root
-            data-diff-virtual-content
-          >
-            <PierreDiffViewer
-              original={diff.original}
-              modified={diff.modified}
-              language={language}
-              fileName={path}
-              renderSideBySide={false}
-              wrapLines={true}
-              layout="inline"
-            />
-          </ScrollShadow>
-        )}
-      </div>
-    </div>
-  );
-};

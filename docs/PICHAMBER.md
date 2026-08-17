@@ -119,7 +119,7 @@ Onboarding and bootstrap wait on those Pi signals. They must not treat the OpenC
 ## Still OpenCode-only / not ported
 
 - Native OpenCode plugins, LSP diagnostics, OpenCode permission/question dialogs, share, revert, and the managed OpenCode upgrade/binary resolver. Pi extension prompts use Desktop `ctx.ui`, not OpenCode `/api/question`. MCP OAuth on Pi goes through `pi-mcp-adapter` `/mcp-auth`, not the leftover OpenCode connect route.
-- VS Code, Windows, and Linux desktop packaging were not the product target for this kernel swap. Hosted mobile / Capacitor is a touch client of the same Pi host: Settings, View Plan, session chrome (Scheduled Tasks, Multi-run, Archive+restore, Pi Refresh), and Work Status (header context ring: session, branch, context %, MCP, Subagents) now follow the same Pi APIs as Desktop; a later slice still covers Phase 2 workspace surfaces. Desktop-native privileges (SSH, External Tunnel host, Electron browser session) stay unsupported.
+- VS Code, Windows, and Linux desktop packaging were not the product target for this kernel swap. Hosted mobile / Capacitor is a touch client of the same Pi host: Settings, View Plan, session chrome (Scheduled Tasks, Multi-run, Archive+restore, Pi Refresh), Work Status (header context ring: session, branch, context %, MCP, Subagents), and Git-opened Pull Request / Diff now follow the same Pi APIs and Desktop views. Walkthrough is tablet-only (`WALKTHROUGH_MIN_WIDTH`). Browser stays unsupported (no Electron Chromium session). Desktop-native privileges (SSH, External Tunnel host, Electron browser session) stay unsupported.
 
 ## Tests
 

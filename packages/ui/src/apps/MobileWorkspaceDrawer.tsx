@@ -9,7 +9,9 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { SortableTabsStrip, type SortableTabsStripItem } from '@/components/ui/sortable-tabs-strip';
 import { PlanView } from '@/components/views/PlanView';
 import { TerminalView } from '@/components/views/TerminalView';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
+import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
@@ -21,6 +23,8 @@ import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
 import { MobileChangesSurface } from './MobileChangesSurface';
 import { MobileFilesSurface } from './MobileFilesSurface';
+import { MobileReviewHost } from './MobileReviewHost';
+import { closeMobileReviewOverlay } from './mobileWorkspaceReview';
 import {
   fallbackMobileWorkspaceTab,
   listVisibleMobileWorkspaceTabs,
@@ -124,6 +128,8 @@ export const MobileWorkspaceDrawer: React.FC<{
   variant?: 'drawer' | 'panel';
 }> = ({ open, onClose, tab, onTabChange, pendingChangesDiff, onOpenPlan, onOpenMcpSettings, variant = 'drawer' }) => {
   const { t } = useI18n();
+  const { screenWidth } = useDeviceInfo();
+  const effectiveDirectory = useEffectiveDirectory() ?? null;
   const isPiKernel = usePiKernel();
   const piPlanChrome = usePiPlanChrome();
   const featurePlugins = usePiFeaturePluginsStore((state) => state.payload);
@@ -195,15 +201,17 @@ export const MobileWorkspaceDrawer: React.FC<{
     const previousOverflow = document.body.style.overflow;
     if (variant === 'drawer') document.body.style.overflow = 'hidden';
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (closeMobileReviewOverlay(effectiveDirectory, screenWidth)) return;
       // The terminal owns Escape (it goes to the PTY) — don't hijack it.
-      if (event.key === 'Escape' && tabRef.current !== 'terminal') onCloseRef.current();
+      if (tabRef.current !== 'terminal') onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       if (variant === 'drawer') document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, variant]);
+  }, [effectiveDirectory, open, screenWidth, variant]);
 
   if (variant === 'drawer' && !rootRef.current) return null;
 
@@ -249,7 +257,7 @@ export const MobileWorkspaceDrawer: React.FC<{
           <Icon name="close" className="size-5" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {/* Panes stay MOUNTED once visited (hidden when inactive/closed), so
             reopening the drawer lands exactly where the user left off — an
             open diff, an edited file, an attached terminal. */}
@@ -303,6 +311,7 @@ export const MobileWorkspaceDrawer: React.FC<{
             </ErrorBoundary>
           </div>
         ) : null}
+        <MobileReviewHost />
       </div>
     </>
   );

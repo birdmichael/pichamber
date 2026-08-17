@@ -24,6 +24,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useWalkthroughStore } from '@/stores/useWalkthroughStore';
 import { WALKTHROUGH_ACTION_CLASS } from '@/components/views/walkthrough/walkthroughAction';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { WALKTHROUGH_MIN_WIDTH } from '@/lib/surfaces/registry';
 import { formatDateTimeForPreference } from '@/lib/timeFormat';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useInlineCommentDraftStore, type InlineCommentDraftTarget } from '@/stores/useInlineCommentDraftStore';
@@ -333,9 +334,9 @@ export const PullRequestSection: React.FC<{
   const { isMobile, hasTouchInput, screenWidth } = useDeviceInfo();
   const openContextSurface = useUIStore((state) => state.openContextSurface);
   const requestWalkthroughSource = useWalkthroughStore((state) => state.requestSource);
-  // Mirrors the rail's gating: the surface is not available on mobile widths or
-  // in VS Code, so neither is its entry point.
-  const showWalkthroughAction = !isMobile && screenWidth >= 768 && !isVSCodeRuntime();
+  // Same width gate as the Desktop rail. Hosted/Capacitor mobile reports
+  // `isMobile` on tablets too, so width — not that flag — decides availability.
+  const showWalkthroughAction = screenWidth >= WALKTHROUGH_MIN_WIDTH && !isVSCodeRuntime();
 
   const openGitHubSettings = React.useCallback(() => {
     setSettingsPage('github');
