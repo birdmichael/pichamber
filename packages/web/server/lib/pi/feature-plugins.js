@@ -112,12 +112,10 @@ const defaultSlotConfig = (slot) => {
     return {
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal,
       command: DEFAULT_GOAL_COMMAND,
-      enabled: false,
     };
   }
   return {
     source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot],
-    enabled: false,
   };
 };
 
@@ -126,13 +124,20 @@ const normalizeSlotConfig = (slot, raw) => {
   const entry = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const next = {
     source: normalizeFeaturePluginSource(entry.source, defaults.source),
-    enabled: typeof entry.enabled === 'boolean' ? entry.enabled : defaults.enabled,
   };
+  if (typeof entry.enabled === 'boolean') {
+    next.enabled = entry.enabled;
+  }
   if (slot === 'goal') {
     next.command = normalizeGoalCommand(entry.command, defaults.command);
   }
   return next;
 };
+
+/** Chamber `enabled` wins when set; otherwise an installed settings.json package is on. */
+export const resolveFeaturePluginEnabled = (explicitEnabled, installed) => (
+  typeof explicitEnabled === 'boolean' ? explicitEnabled : Boolean(installed)
+);
 
 export const normalizeFeaturePlugins = (raw) => {
   const input = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -148,9 +153,13 @@ const serializeFeaturePlugins = (plugins) => {
   const out = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
-    out[slot] = slot === 'goal'
-      ? { source: entry.source, command: entry.command, enabled: entry.enabled }
-      : { source: entry.source, enabled: entry.enabled };
+    const next = slot === 'goal'
+      ? { source: entry.source, command: entry.command }
+      : { source: entry.source };
+    if (typeof entry.enabled === 'boolean') {
+      next.enabled = entry.enabled;
+    }
+    out[slot] = next;
   }
   return out;
 };
@@ -267,13 +276,87 @@ export const toFeaturePluginsPayload = ({
   const slots = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
+    const installed = isFeaturePluginSourceInstalled(entry.source, configuredSources);
     slots[slot] = {
       ...entry,
-      installed: isFeaturePluginSourceInstalled(entry.source, configuredSources),
+      installed,
+      enabled: resolveFeaturePluginEnabled(entry.enabled, installed),
       presets: slotPresets(slot),
     };
   }
   return { slots };
+};
+
+const packageListSourceKind = (identity) => {
+  if (
+    identity.startsWith('git:')
+    || identity.startsWith('git@')
+    || /^https?:\/\//.test(identity)
+  ) {
+    return 'git';
+  }
+  if (identity.startsWith('local:')) return 'local';
+  return 'npm';
+};
+
+const packageListName = (identity) => {
+  if (identity.startsWith('npm:')) return identity.slice('npm:'.length);
+  if (identity.startsWith('local:')) return identity.slice('local:'.length);
+  if (identity.startsWith('git:')) return identity.slice('git:'.length);
+  return identity;
+};
+
+const addConfiguredPackagesFromSettings = ({
+  settingsPath,
+  scope,
+  packages,
+  seen,
+}) => {
+  if (!isFile(settingsPath)) return;
+  let entries = [];
+  try {
+    const settings = readJsonObject(settingsPath);
+    entries = Array.isArray(settings.packages) ? settings.packages : [];
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    try {
+      const spec = configuredPackageSource(entry);
+      if (!spec) continue;
+      const identity = featurePluginSourceIdentity(spec);
+      if (!identity) continue;
+      const source = packageListSourceKind(identity);
+      const name = packageListName(identity);
+      const key = [scope, source, identity].join(':');
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      packages.push({ name, source, scope, path: spec });
+    } catch {
+      // One unreadable package entry does not drop the rest.
+    }
+  }
+};
+
+/** Settings → Extensions packages: configured settings.json names, not npm wrapper manifests. */
+export const listPiPackages = ({ home = os.homedir(), directory } = {}) => {
+  const packages = [];
+  const seen = new Set();
+  addConfiguredPackagesFromSettings({
+    settingsPath: resolvePiSettingsPath(home),
+    scope: 'user',
+    packages,
+    seen,
+  });
+  if (typeof directory === 'string' && directory.trim()) {
+    addConfiguredPackagesFromSettings({
+      settingsPath: path.join(path.resolve(directory.trim()), '.pi', 'settings.json'),
+      scope: 'project',
+      packages,
+      seen,
+    });
+  }
+  return packages;
 };
 
 export const createSettingsJsonPackageManager = ({ home = os.homedir() } = {}) => {

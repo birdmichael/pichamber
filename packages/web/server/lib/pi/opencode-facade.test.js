@@ -1297,8 +1297,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.plan.command).toBeUndefined();
       expect(body.slots.goal.installed).toBe(false);
       expect(body.slots.plan.installed).toBe(false);
+      expect(body.slots.goal.enabled).toBe(false);
       const home = kernel.host.getPath().home;
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
+      expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
     } finally {
       kernel.dispose();
       await close();
@@ -1395,6 +1397,52 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const listed = await (await fetch(`${url}/api/command?session=${created.id}`)).json();
       expect(listed.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('recognizes an existing Pi agent without writing pichamber.json', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const agent = path.join(home, '.pi', 'agent');
+      fs.mkdirSync(agent, { recursive: true });
+      fs.writeFileSync(path.join(agent, 'settings.json'), `${JSON.stringify({
+        packages: ['npm:@narumitw/pi-goal', 'npm:pi-mcp-adapter', 'npm:pi-subagents'],
+        defaultProvider: 'bmlab',
+        defaultModel: 'grok-4.6',
+        defaultThinkingLevel: 'high',
+      }, null, 2)}\n`);
+      fs.mkdirSync(path.join(agent, 'npm'), { recursive: true });
+      fs.writeFileSync(path.join(agent, 'npm', 'package.json'), `${JSON.stringify({ name: 'pi-extensions' }, null, 2)}\n`);
+
+      const plugins = await (await fetch(`${url}/api/pi/feature-plugins`)).json();
+      expect(plugins.slots.goal).toMatchObject({ installed: true, enabled: true });
+      expect(plugins.slots.mcp).toMatchObject({ installed: true, enabled: true });
+      expect(plugins.slots.subagents).toMatchObject({ installed: true, enabled: true });
+      expect(plugins.slots.plan).toMatchObject({ installed: false, enabled: false });
+
+      const commands = await (await fetch(`${url}/api/command`)).json();
+      expect(commands.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
+      expect(commands.some((command) => command.name === 'plan')).toBe(false);
+
+      const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
+      expect(defaults.model).toBe('bmlab/grok-4.6');
+      expect(defaults.thinking).toBe('high');
+
+      const extensions = await (await fetch(`${url}/api/pi/extensions`)).json();
+      expect(extensions.packages.map((item) => item.name)).toEqual([
+        '@narumitw/pi-goal',
+        'pi-mcp-adapter',
+        'pi-subagents',
+      ]);
+      expect(extensions.packages.some((item) => item.name === 'pi-extensions')).toBe(false);
+
+      const agents = await (await fetch(`${url}/api/agent`)).json();
+      expect(agents).toEqual([expect.objectContaining({ name: 'pi' })]);
+      expect(fs.existsSync(path.join(agent, 'pichamber.json'))).toBe(false);
     } finally {
       kernel.dispose();
       await close();

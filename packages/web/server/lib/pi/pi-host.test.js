@@ -778,6 +778,30 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /run from installed Subagents without pichamber.json and keeps Plan off', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-recognize-cmd-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:@narumitw/pi-goal', 'npm:pi-mcp-adapter', 'npm:pi-subagents'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      const listed = host.listCommands('/tmp/empty-project');
+      expect(listed.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
+      expect(listed.some((command) => command.name === 'plan')).toBe(false);
+      expect(host.getFeaturePlugins().slots.goal).toMatchObject({ installed: true, enabled: true });
+      expect(host.getFeaturePlugins().slots.plan).toMatchObject({ installed: false, enabled: false });
+      expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown slash names instead of sending them as chat', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-unknown-cmd-'));
     try {

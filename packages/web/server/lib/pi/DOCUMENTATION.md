@@ -167,6 +167,21 @@ Resolution order:
    POST unknown names here; those fall through to `sendMessage` /
    `promptAsync` as a normal chat turn.
 
+## Existing Pi agent recognition
+
+Missing `{agentDir}/pichamber.json` is not an explicit disable. Feature
+Plugin slot `enabled` is the chamber flag when that boolean is present,
+otherwise `installed` from `{agentDir}/settings.json` `packages` for that
+slot's source. Nothing is auto-installed. `featurePlugins.<slot>.enabled:
+false` remains an off switch. GET paths do not write `pichamber.json`.
+Do not map `{agentDir}/agents/*.md` into `GET /api/agent`.
+
+New-session `model` / thinking use `settings.json` `defaultProvider` +
+`defaultModel` / `defaultThinkingLevel` only when `pichamber.json` has no
+pin. Settings → Extensions packages lists those configured package names
+(and project `.pi/settings.json` packages when that file exists), using
+`featurePluginSourceIdentity`. Do not walk `{agentDir}/npm/node_modules`.
+
 ## Command list
 
 `GET /api/command` (and `/command`) returns the OpenCode command shape:
@@ -358,9 +373,10 @@ disk list, and sidebar Refresh read it onto `info.parentID`.
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot
 (`installed` and `enabled` for `mcp`, default source `npm:pi-mcp-adapter`).
-Opening Feature Plugins never auto-installs the adapter. Leftover
-`~/.config/mcp/mcp.json` or `<cwd>/.mcp.json` files do not reveal those
-surfaces while the slot is off.
+An adapter already listed in `settings.json` `packages` turns the slot on
+when `pichamber.json` does not set `enabled`. Opening Feature Plugins never
+auto-installs the adapter. Leftover `~/.config/mcp/mcp.json` or
+`<cwd>/.mcp.json` files do not reveal those surfaces while the slot is off.
 
 When the slot is on:
 

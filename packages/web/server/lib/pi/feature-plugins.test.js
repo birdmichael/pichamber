@@ -11,9 +11,11 @@ import {
   isFeaturePluginSourceInstalled,
   listConfiguredPiPackageSources,
   listFeaturePluginSlashCommands,
+  listPiPackages,
   mergeFeaturePluginPatch,
   normalizeFeaturePlugins,
   readFeaturePlugins,
+  resolveFeaturePluginEnabled,
   toFeaturePluginsPayload,
   writeFeaturePlugins,
 } from './feature-plugins.js';
@@ -47,6 +49,25 @@ describe('feature plugin source identity', () => {
   });
 });
 
+const writeJson = (filePath, value) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+const writeMainstreamSettings = (home, extra = {}) => {
+  writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+    packages: [
+      'npm:@narumitw/pi-goal',
+      'npm:pi-mcp-adapter',
+      'npm:pi-subagents',
+    ],
+    defaultProvider: 'bmlab',
+    defaultModel: 'grok-4.6',
+    defaultThinkingLevel: 'high',
+    ...extra,
+  });
+};
+
 describe('feature plugin defaults and persist', () => {
   it('fills default sources without enabling or writing', () => {
     const home = makeTemp();
@@ -54,8 +75,8 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.goal).toMatchObject({
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal,
       command: 'goal',
-      enabled: false,
     });
+    expect(plugins.goal.enabled).toBeUndefined();
     expect(plugins.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
     expect(plugins.mcp.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.mcp);
     expect(plugins.subagents.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.subagents);
@@ -70,7 +91,7 @@ describe('feature plugin defaults and persist', () => {
     });
     expect(saved.goal.enabled).toBe(true);
     expect(saved.plan.enabled).toBe(true);
-    expect(saved.mcp.enabled).toBe(false);
+    expect(saved.mcp.enabled).toBeUndefined();
     const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
     expect(chamber.featurePlugins.goal).toMatchObject({
       source: 'npm:@narumitw/pi-goal',
@@ -78,6 +99,7 @@ describe('feature plugin defaults and persist', () => {
       enabled: true,
     });
     expect(chamber.featurePlugins.plan.enabled).toBe(true);
+    expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
   });
 
@@ -147,6 +169,67 @@ describe('settings.json package manager', () => {
     expect(payload.slots.plan.installed).toBe(false);
     expect(payload.slots.mcp.installed).toBe(false);
     expect(payload.slots.subagents.installed).toBe(false);
+    expect(payload.slots.goal.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
+  });
+});
+
+describe('existing Pi agent recognition', () => {
+  it('enables installed slots when pichamber.json is missing', () => {
+    const home = makeTemp();
+    writeMainstreamSettings(home);
+    const payload = toFeaturePluginsPayload({
+      plugins: readFeaturePlugins(home),
+      configuredSources: listConfiguredPiPackageSources(home),
+    });
+    expect(payload.slots.goal).toMatchObject({ installed: true, enabled: true });
+    expect(payload.slots.mcp).toMatchObject({ installed: true, enabled: true });
+    expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: true });
+    expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
+    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
+  });
+
+  it('lets an explicit chamber false win over installed packages', () => {
+    const home = makeTemp();
+    writeMainstreamSettings(home);
+    writeFeaturePlugins(home, { subagents: { enabled: false } });
+    const payload = toFeaturePluginsPayload({
+      plugins: readFeaturePlugins(home),
+      configuredSources: listConfiguredPiPackageSources(home),
+    });
+    expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: false });
+    expect(payload.slots.goal).toMatchObject({ installed: true, enabled: true });
+    expect(listFeaturePluginSlashCommands(payload)).toEqual([]);
+    expect(resolveFeaturePluginEnabled(false, true)).toBe(false);
+    expect(resolveFeaturePluginEnabled(undefined, true)).toBe(true);
+  });
+
+  it('lists settings.json package names and skips a bad entry', () => {
+    const home = makeTemp();
+    const project = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: [
+        'npm:@narumitw/pi-goal',
+        { broken: true },
+        'npm:pi-mcp-adapter',
+      ],
+    });
+    writeJson(path.join(home, '.pi', 'agent', 'npm', 'package.json'), { name: 'pi-extensions' });
+    writeJson(path.join(project, '.pi', 'settings.json'), {
+      packages: ['npm:pi-subagents', null, { source: 'npm:project-only' }],
+    });
+    const packages = listPiPackages({ home, directory: project });
+    expect(packages.map((item) => item.name)).toEqual([
+      '@narumitw/pi-goal',
+      'pi-mcp-adapter',
+      'pi-subagents',
+      'project-only',
+    ]);
+    expect(packages.some((item) => item.name === 'pi-extensions')).toBe(false);
+    expect(packages.find((item) => item.name === 'pi-subagents')).toMatchObject({
+      source: 'npm',
+      scope: 'project',
+    });
   });
 });

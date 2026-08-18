@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
-  isFeaturePluginSourceInstalled,
   listConfiguredPiPackageSources,
   readFeaturePlugins,
+  toFeaturePluginsPayload,
 } from './feature-plugins.js';
 import { resolvePiAgentDir } from './pi-resources.js';
 
@@ -43,10 +43,11 @@ const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Arra
 export const MCP_STATUS_EVENT = 'pi-mcp-adapter/status/v1';
 
 export const isMcpFeaturePluginActive = (home = os.homedir()) => {
-  const plugins = readFeaturePlugins(home);
-  const mcp = plugins.mcp;
-  if (!mcp?.enabled || !mcp.source) return false;
-  return isFeaturePluginSourceInstalled(mcp.source, listConfiguredPiPackageSources(home));
+  const payload = toFeaturePluginsPayload({
+    plugins: readFeaturePlugins(home),
+    configuredSources: listConfiguredPiPackageSources(home),
+  });
+  return Boolean(payload.slots?.mcp?.installed && payload.slots.mcp.enabled);
 };
 
 const listAdapterMcpConfigPaths = ({
