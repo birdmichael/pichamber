@@ -7,6 +7,8 @@ import {
   readPersistedModelInput,
   type PiModelInputType,
 } from '@/lib/model-context-windows';
+import type { PiThinkingLevel } from '@/components/chat/piThinking';
+import { parsePiThinkingLevel } from '@/components/chat/piThinking';
 import type { ModelMetadata } from '@/types';
 
 /**
@@ -55,6 +57,7 @@ export type CatalogCapabilityEntry = {
   modalities?: {
     input?: string[];
   };
+  reasoning_options?: unknown;
 };
 
 export type ResolvedModelCapabilities = {
@@ -97,6 +100,7 @@ export const catalogEntriesFromMetadataMap = (
       attachment: item.attachment,
       reasoning: item.reasoning,
       modalities: item.modalities,
+      reasoning_options: item.reasoning_options,
     });
   }
   return entries;
@@ -185,6 +189,69 @@ export const resolvePersistedImageInput = (input: {
   }
   const known = lookupExactVisionInput(input.id);
   return known ? [...known] : undefined;
+};
+
+const EFFORT_TO_PI: Record<string, PiThinkingLevel> = {
+  none: 'off',
+  off: 'off',
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'xhigh',
+  max: 'max',
+};
+
+const readEffortValues = (options: unknown): string[] => {
+  if (!Array.isArray(options)) return [];
+  const values: string[] = [];
+  for (const option of options) {
+    if (!option || typeof option !== 'object' || Array.isArray(option)) continue;
+    const record = option as { type?: unknown; values?: unknown };
+    if (record.type !== 'effort' || !Array.isArray(record.values)) continue;
+    for (const value of record.values) {
+      if (typeof value === 'string' && value.trim()) values.push(value.trim().toLowerCase());
+    }
+  }
+  return values;
+};
+
+const hasToggleOption = (options: unknown): boolean => (
+  Array.isArray(options)
+  && options.some((option) => option && typeof option === 'object' && !Array.isArray(option) && (option as { type?: unknown }).type === 'toggle')
+);
+
+/**
+ * Draft / no-session thinking list from models.dev `reasoning_options`.
+ * Live sessions still prefer `getAvailableThinkingLevels()`.
+ * Missing effort values stay omitted — do not invent seven levels.
+ */
+export const resolveCatalogThinkingLevels = (
+  metadata: Pick<ModelMetadata, 'reasoning' | 'reasoning_options'> | undefined,
+): PiThinkingLevel[] => {
+  if (!metadata) return [];
+  const efforts = readEffortValues(metadata.reasoning_options);
+  const levels: PiThinkingLevel[] = [];
+  const seen = new Set<PiThinkingLevel>();
+  const push = (level: PiThinkingLevel) => {
+    if (seen.has(level)) return;
+    seen.add(level);
+    levels.push(level);
+  };
+  if (efforts.length > 0) {
+    for (const effort of efforts) {
+      const mapped = EFFORT_TO_PI[effort] ?? parsePiThinkingLevel(effort);
+      if (mapped) push(mapped);
+    }
+    if (hasToggleOption(metadata.reasoning_options) && !seen.has('off')) {
+      return ['off', ...levels];
+    }
+    return levels;
+  }
+  if (hasToggleOption(metadata.reasoning_options) && metadata.reasoning === true) {
+    return ['off', 'medium'];
+  }
+  return [];
 };
 
 export const resolvePersistedReasoning = (input: {

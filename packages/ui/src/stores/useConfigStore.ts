@@ -447,6 +447,7 @@ interface ModelsDevModelEntry {
         input?: string[];
         output?: string[];
     };
+    reasoning_options?: unknown;
     cost?: {
         input?: number;
         output?: number;
@@ -587,6 +588,7 @@ const transformModelsDevResponse = (payload: unknown): Map<string, ModelMetadata
                           output: isStringArray(modelValue.modalities.output) ? modelValue.modalities.output : undefined,
                       }
                     : undefined,
+                reasoning_options: modelValue.reasoning_options,
                 cost: modelValue.cost,
                 limit: modelValue.limit,
                 knowledge: typeof modelValue.knowledge === 'string' ? modelValue.knowledge : undefined,

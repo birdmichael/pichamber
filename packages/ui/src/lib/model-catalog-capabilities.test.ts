@@ -5,6 +5,7 @@ import {
   findCatalogMetadata,
   lookupPublishedReasoning,
   resolveCatalogCapabilities,
+  resolveCatalogThinkingLevels,
   resolvePersistedImageInput,
   resolvePersistedReasoning,
 } from './model-catalog-capabilities';
@@ -102,5 +103,30 @@ describe('persisted custom-model capabilities', () => {
     ]));
     expect(resolvePersistedImageInput({ id: 'vision-pro', catalog })).toEqual(['text', 'image']);
     expect(resolvePersistedReasoning({ id: 'vision-pro', catalog })).toBe(true);
+  });
+});
+
+describe('catalog thinking levels', () => {
+  test('maps official effort values and keeps toggle off', () => {
+    expect(resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh'] }],
+    })).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['high', 'max'] }],
+    })).toEqual(['off', 'high', 'max']);
+  });
+
+  test('does not invent seven levels when the catalog is silent', () => {
+    expect(resolveCatalogThinkingLevels({ reasoning: true })).toEqual([]);
+    expect(resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'budget_tokens', min: 128, max: 32768 }],
+    })).toEqual([]);
+    expect(resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'toggle' }],
+    })).toEqual(['off', 'medium']);
   });
 });

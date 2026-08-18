@@ -39,6 +39,7 @@ import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
 import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
+import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
     clampPiThinkingLevel,
     parseAvailablePiThinkingLevels,
@@ -347,6 +348,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const setAgent = useConfigStore((state) => state.setAgent);
     const getCurrentProvider = useConfigStore((state) => state.getCurrentProvider);
     const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
+    const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
     const getCurrentAgent = useConfigStore((state) => state.getCurrentAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
 
@@ -376,9 +378,25 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     }, [isPiKernel]);
 
     const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
+    const draftThinkingLevels = React.useMemo(() => {
+        if (!isPiKernel || !currentProviderId || !currentModelId) {
+            return [];
+        }
+        return resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId));
+        // modelsMetadata is required: getModelMetadata is a stable store method
+        // and would otherwise keep the empty-catalog fallback after fetch lands.
+    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
     React.useEffect(() => {
-        if (!isPiKernel || !currentSessionIdForThinking) {
+        if (!isPiKernel) {
             setPiThinkingLevels(undefined);
+            return;
+        }
+        if (!currentSessionIdForThinking) {
+            setPiThinkingLevels(draftThinkingLevels.length > 0 ? draftThinkingLevels : undefined);
+            if (draftThinkingLevels.length > 0) {
+                const nextThinking = clampPiThinkingLevel(piThinking, draftThinkingLevels);
+                if (nextThinking) setPiThinking(nextThinking);
+            }
             return;
         }
         let cancelled = false;
@@ -391,8 +409,13 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 const available = parseAvailablePiThinkingLevels(payload.available);
                 if (available.length > 0) {
                     setPiThinkingLevels(available);
+                } else if (draftThinkingLevels.length > 0) {
+                    setPiThinkingLevels(draftThinkingLevels);
                 }
-                const nextThinking = clampPiThinkingLevel(payload.thinking ?? piThinking, available);
+                const nextThinking = clampPiThinkingLevel(
+                    payload.thinking ?? piThinking,
+                    available.length > 0 ? available : draftThinkingLevels,
+                );
                 if (nextThinking) {
                     setPiThinking(nextThinking);
                 }
@@ -401,11 +424,11 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [currentSessionIdForThinking, currentModelId, isPiKernel]);
+    }, [currentSessionIdForThinking, currentModelId, draftThinkingLevels, isPiKernel]);
 
     const visiblePiThinkingLevels = React.useMemo(
-        () => resolveVisiblePiThinkingLevels(piThinkingLevels),
-        [piThinkingLevels],
+        () => resolveVisiblePiThinkingLevels(piThinkingLevels ?? draftThinkingLevels),
+        [draftThinkingLevels, piThinkingLevels],
     );
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
