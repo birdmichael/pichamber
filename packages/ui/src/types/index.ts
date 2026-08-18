@@ -24,6 +24,7 @@ export interface ModelMetadata {
     input?: string[];
     output?: string[];
   };
+  reasoning_options?: unknown;
   cost?: {
     input?: number;
     output?: number;
