@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  clampPiThinkingLevel,
+  parseAvailablePiThinkingLevels,
   parsePiThinkingLevel,
   resolvePiThinkingChipPresentation,
+  resolveVisiblePiThinkingLevels,
 } from './piThinking';
 
 describe('parsePiThinkingLevel', () => {
@@ -58,5 +61,29 @@ describe('resolvePiThinkingChipPresentation', () => {
     const pending = resolvePiThinkingChipPresentation(undefined);
     expect(pending).toEqual({ status: 'pending' });
     expect(pending).not.toEqual({ status: 'ready', level: 'high', label: 'High' });
+  });
+});
+
+describe('available Pi thinking levels', () => {
+  test('keeps live session order and drops unknown tokens', () => {
+    expect(parseAvailablePiThinkingLevels(['low', 'medium', 'high', 'max', 'max', 'nope'])).toEqual([
+      'low', 'medium', 'high', 'max',
+    ]);
+    expect(parseAvailablePiThinkingLevels(undefined)).toEqual([]);
+    expect(parseAvailablePiThinkingLevels(['HIGH'])).toEqual([]);
+  });
+
+  test('falls back to the full Pi list until the session answers', () => {
+    expect(resolveVisiblePiThinkingLevels(undefined)).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+    ]);
+    expect(resolveVisiblePiThinkingLevels(['low', 'high'])).toEqual(['low', 'high']);
+  });
+
+  test('clamps a saved default onto the live available list', () => {
+    expect(clampPiThinkingLevel('max', ['low', 'medium', 'high'])).toBe('medium');
+    expect(clampPiThinkingLevel('high', ['low', 'high'])).toBe('high');
+    expect(clampPiThinkingLevel('off', ['low', 'high'])).toBe('low');
+    expect(clampPiThinkingLevel(undefined, undefined)).toBe('medium');
   });
 });

@@ -27,3 +27,47 @@ export function resolvePiThinkingChipPresentation(level: string | undefined): Pi
   }
   return { status: 'ready', level: parsed, label: formatEffortLabel(parsed) };
 }
+
+/**
+ * Live Pi `getAvailableThinkingLevels()` filtered to known Pi levels,
+ * keeping catalog order. Empty or unknown payloads stay omitted so the
+ * chip can keep the full list until the session answers.
+ */
+export function parseAvailablePiThinkingLevels(value: unknown): PiThinkingLevel[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const next: PiThinkingLevel[] = [];
+  const seen = new Set<PiThinkingLevel>();
+  for (const item of value) {
+    const parsed = parsePiThinkingLevel(item);
+    if (!parsed || seen.has(parsed)) {
+      continue;
+    }
+    seen.add(parsed);
+    next.push(parsed);
+  }
+  return next;
+}
+
+export function resolveVisiblePiThinkingLevels(
+  available: readonly string[] | undefined,
+): readonly PiThinkingLevel[] {
+  const parsed = parseAvailablePiThinkingLevels(available);
+  return parsed.length > 0 ? parsed : PI_THINKING_LEVELS;
+}
+
+export function clampPiThinkingLevel(
+  level: string | undefined,
+  available: readonly string[] | undefined,
+): PiThinkingLevel | undefined {
+  const parsed = parsePiThinkingLevel(level);
+  const visible = resolveVisiblePiThinkingLevels(available);
+  if (parsed && visible.includes(parsed)) {
+    return parsed;
+  }
+  if (visible.includes('medium')) {
+    return 'medium';
+  }
+  return visible[0];
+}

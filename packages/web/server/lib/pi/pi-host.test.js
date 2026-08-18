@@ -1290,6 +1290,29 @@ describe('live session command helpers', () => {
   });
 });
 
+describe('session thinking levels', () => {
+  it('reads live getAvailableThinkingLevels and clamps an unsupported pick', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Think' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    expect(host.getSessionThinking(record.id)).toEqual({
+      thinking: 'medium',
+      available: ['low', 'medium', 'high'],
+    });
+
+    const applied = await host.setSessionThinking(record.id, 'max');
+    expect(applied).toEqual({
+      applied: true,
+      thinking: 'medium',
+      available: ['low', 'medium', 'high'],
+    });
+    expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+});
+
 describe('resolvePromptModelRef', () => {
   it('reads provider/model from the OpenCode prompt body', () => {
     expect(resolvePromptModelRef({ providerID: 'anthropic', modelID: 'claude-sonnet-4-5' }))
