@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Mobile: on Pi, the expanded composer now shows a thinking-level chip next to the model, matching Desktop.
+
 ## [1.0.1] - 2026-08-18
 
 - Chat: on Pi, the thinking chip now lists only the levels the current model supports — including a new empty session after you pick the model — instead of always showing all seven.
