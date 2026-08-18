@@ -55,8 +55,10 @@ selecting it completes to `/plan`, not `/plan start`.
 Model and thinking chips stay. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
 `getAvailableThinkingLevels()`, not the full seven-level catalog, and
-clamps the current chip onto that list. OpenCode `build` / `plan` /
-custom agents still show. A Build row (session model + `/plan implement` in this session) appears
+clamps the current chip onto that list. A new-session draft with no
+session id uses models.dev `reasoning_options` for the selected model
+so picking grok-4.6 does not flash all seven levels. OpenCode `build`
+/ `plan` / custom agents still show. A Build row (session model + `/plan implement` in this session) appears
 when a ready or saved plan exists, even if the View Plan rail is closed.
 
 ## Layers

@@ -50,9 +50,11 @@ and a missing `input` becomes `["text"]` (images are omitted).
 live session: `thinkingLevel` plus `getAvailableThinkingLevels()`.
 `PATCH` still clamps an unsupported pick onto that list (`medium`, else
 the first available). The composer thinking chip renders `available`,
-not the full seven-level catalog. Missing/empty `available` keeps the
-full list until the session answers. Do not invent vendor
-`thinkingLevelMap` from `/v1/models`.
+not the full seven-level catalog. A new-session draft with no session id
+uses models.dev `reasoning_options` for the selected model id (same
+slug lookup as vision). Missing/empty catalog effort keeps the full
+list. Live `available` wins once a session exists. Do not invent
+vendor `thinkingLevelMap` from `/v1/models`.
 
 ## Desktop `ctx.ui`
 
