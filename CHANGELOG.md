@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-18
+
 - Chat: on Pi, the thinking chip now lists only the levels the current model supports — including a new empty session after you pick the model — instead of always showing all seven.
 - Settings: known vision and thinking models such as grok-4.6 now keep image support and reasoning on a custom provider, including already-saved rows, so attached photos reach the model without a re-save (close #205).
 - Mobile: on Pi, the composer Agent/Plan chip now shows the full current-side label instead of a clipped fragment. Attach, Goal, mic, and Send stay icon-sized. (close #204)
