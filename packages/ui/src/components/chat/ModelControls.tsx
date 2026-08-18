@@ -348,6 +348,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const setAgent = useConfigStore((state) => state.setAgent);
     const getCurrentProvider = useConfigStore((state) => state.getCurrentProvider);
     const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
+    const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
     const getCurrentAgent = useConfigStore((state) => state.getCurrentAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
 
@@ -382,7 +383,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             return [];
         }
         return resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId));
-    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel]);
+        // modelsMetadata is required: getModelMetadata is a stable store method
+        // and would otherwise keep the empty-catalog fallback after fetch lands.
+    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
     React.useEffect(() => {
         if (!isPiKernel) {
             setPiThinkingLevels(undefined);
