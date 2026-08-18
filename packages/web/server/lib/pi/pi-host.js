@@ -638,6 +638,37 @@ const applyEventToStore = (store, ocEvent) => {
   }
 };
 
+const readAvailableThinkingLevels = (piSession) => {
+  if (typeof piSession?.getAvailableThinkingLevels !== 'function') {
+    return [];
+  }
+  try {
+    const levels = piSession.getAvailableThinkingLevels();
+    if (!Array.isArray(levels)) return [];
+    const next = [];
+    const seen = new Set();
+    for (const item of levels) {
+      if (typeof item !== 'string') continue;
+      const level = item.trim();
+      if (!THINKING_LEVELS.includes(level) || seen.has(level)) continue;
+      seen.add(level);
+      next.push(level);
+    }
+    return next;
+  } catch {
+    return [];
+  }
+};
+
+const readSessionThinking = (piSession) => {
+  const available = readAvailableThinkingLevels(piSession);
+  const current = typeof piSession?.thinkingLevel === 'string' ? piSession.thinkingLevel.trim() : '';
+  return {
+    thinking: THINKING_LEVELS.includes(current) ? current : undefined,
+    available,
+  };
+};
+
 const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
 
 const readPiModelInput = (model) => {
@@ -3035,18 +3066,25 @@ export const createPiHost = ({
       record.info.time.updated = Date.now();
       return record;
     },
+    getSessionThinking(sessionID) {
+      const record = sessions.get(sessionID);
+      if (!record) {
+        const error = new Error('Session not found');
+        error.status = 404;
+        throw error;
+      }
+      return readSessionThinking(record.piSession);
+    },
     async setSessionThinking(sessionID, level) {
       const record = await ensureRecord(sessionID);
       if (typeof record.piSession?.setThinkingLevel !== "function") {
-        return { applied: false, thinking: level };
+        return { applied: false, ...readSessionThinking(record.piSession), thinking: level };
       }
+      const snapshot = readSessionThinking(record.piSession);
       let next = THINKING_LEVELS.includes(level) ? level : null;
-      if (typeof record.piSession.getAvailableThinkingLevels === "function") {
-        const available = record.piSession.getAvailableThinkingLevels();
-        if (Array.isArray(available) && available.length > 0) {
-          if (!next || !available.includes(next)) {
-            next = available.includes("medium") ? "medium" : available[0];
-          }
+      if (snapshot.available.length > 0) {
+        if (!next || !snapshot.available.includes(next)) {
+          next = snapshot.available.includes("medium") ? "medium" : snapshot.available[0];
         }
       }
       if (!next) {
@@ -3055,7 +3093,7 @@ export const createPiHost = ({
         throw error;
       }
       record.piSession.setThinkingLevel(next);
-      return { applied: true, thinking: next };
+      return { applied: true, thinking: next, available: snapshot.available };
     },
     async setSessionModel(sessionID, modelRef) {
       const record = await ensureRecord(sessionID);
