@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
 - Settings/Chat: on Pi, Desktop now picks up an existing Pi agent — Goal, MCP, and Subagents appear when those packages are already in settings.json, and a new session follows your Pi default model and thinking. Plan stays off until that package is installed. (close #213)
 - Mobile: on Pi, the expanded composer now shows a thinking-level chip next to the model, matching Desktop.
 

@@ -83,34 +83,44 @@ describe('feature plugin defaults and persist', () => {
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
-  it('persists source, command, and enable without installing', () => {
+  it('persists source and command without installing or emitting enabled', () => {
     const home = makeTemp();
     const saved = writeFeaturePlugins(home, {
       goal: { source: 'npm:@narumitw/pi-goal', command: 'goal', enabled: true },
       plan: { enabled: true },
     });
-    expect(saved.goal.enabled).toBe(true);
-    expect(saved.plan.enabled).toBe(true);
+    expect(saved.goal.enabled).toBeUndefined();
+    expect(saved.plan.enabled).toBeUndefined();
     expect(saved.mcp.enabled).toBeUndefined();
     const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
-    expect(chamber.featurePlugins.goal).toMatchObject({
+    expect(chamber.featurePlugins.goal).toEqual({
       source: 'npm:@narumitw/pi-goal',
       command: 'goal',
-      enabled: true,
     });
-    expect(chamber.featurePlugins.plan.enabled).toBe(true);
+    expect(chamber.featurePlugins.plan).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.plan,
+    });
     expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
+    expect(chamber.featurePlugins.subagents.enabled).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
+  });
+
+  it('does not create pichamber.json when the patch is only enabled flags', () => {
+    const home = makeTemp();
+    writeFeaturePlugins(home, { goal: { enabled: true }, plan: { enabled: false } });
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
   it('keeps featurePlugins when writing other pichamber defaults', () => {
     const home = makeTemp();
-    writeFeaturePlugins(home, { mcp: { enabled: true } });
+    writeFeaturePlugins(home, { mcp: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.mcp } });
     writePiDefaults(home, { model: 'example-provider/example-model', thinking: 'high' });
-    expect(readFeaturePlugins(home).mcp.enabled).toBe(true);
+    expect(readFeaturePlugins(home).mcp.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.mcp);
+    expect(readFeaturePlugins(home).mcp.enabled).toBeUndefined();
     expect(readPiDefaults(home).model).toBe('example-provider/example-model');
     const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
-    expect(chamber.featurePlugins.mcp.enabled).toBe(true);
+    expect(chamber.featurePlugins.mcp).toEqual({ source: DEFAULT_FEATURE_PLUGIN_SOURCES.mcp });
+    expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
     expect(chamber.model).toBe('example-provider/example-model');
   });
 
@@ -190,19 +200,50 @@ describe('existing Pi agent recognition', () => {
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
-  it('lets an explicit chamber false win over installed packages', () => {
+  it('lets installed packages win over a leftover chamber enabled false', () => {
     const home = makeTemp();
     writeMainstreamSettings(home);
-    writeFeaturePlugins(home, { subagents: { enabled: false } });
+    writeJson(path.join(home, '.pi', 'agent', 'pichamber.json'), {
+      featurePlugins: {
+        subagents: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.subagents, enabled: false },
+        goal: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal, command: 'goal', enabled: false },
+      },
+    });
     const payload = toFeaturePluginsPayload({
       plugins: readFeaturePlugins(home),
       configuredSources: listConfiguredPiPackageSources(home),
     });
-    expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: false });
+    expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.goal).toMatchObject({ installed: true, enabled: true });
-    expect(listFeaturePluginSlashCommands(payload)).toEqual([]);
-    expect(resolveFeaturePluginEnabled(false, true)).toBe(false);
-    expect(resolveFeaturePluginEnabled(undefined, true)).toBe(true);
+    expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
+    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
+    expect(readFeaturePlugins(home).subagents.enabled).toBeUndefined();
+    expect(resolveFeaturePluginEnabled(true)).toBe(true);
+    expect(resolveFeaturePluginEnabled(false)).toBe(false);
+  });
+
+  it('does not write enabled flags onto siblings when persisting one slot', () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'pichamber.json'), {
+      featurePlugins: {
+        goal: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal, command: 'goal', enabled: false },
+        plan: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.plan, enabled: false },
+        mcp: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.mcp, enabled: true },
+        subagents: { source: DEFAULT_FEATURE_PLUGIN_SOURCES.subagents, enabled: false },
+      },
+    });
+    writeFeaturePlugins(home, { goal: { command: 'ship' } });
+    const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
+    expect(chamber.featurePlugins.goal).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal,
+      command: 'ship',
+    });
+    expect(chamber.featurePlugins.plan).toEqual({ source: DEFAULT_FEATURE_PLUGIN_SOURCES.plan });
+    expect(chamber.featurePlugins.mcp).toEqual({ source: DEFAULT_FEATURE_PLUGIN_SOURCES.mcp });
+    expect(chamber.featurePlugins.subagents).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.subagents,
+    });
+    expect(JSON.stringify(chamber)).not.toContain('"enabled"');
   });
 
   it('lists settings.json package names and skips a bad entry', () => {

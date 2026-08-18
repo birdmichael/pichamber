@@ -1307,7 +1307,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('persists feature plugin enable flags and installs through settings.json packages', async () => {
+  it('persists feature plugin source and command and installs through settings.json packages', async () => {
     const idle = createInMemoryPiSession();
     const { url, close, kernel } = await startFacade({
       createSession: async () => idle,
@@ -1326,9 +1326,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       });
       expect(patched.status).toBe(200);
       const patchedBody = await patched.json();
-      expect(patchedBody.slots.goal.enabled).toBe(true);
-      expect(patchedBody.slots.plan.enabled).toBe(true);
+      expect(patchedBody.slots.goal.enabled).toBe(false);
+      expect(patchedBody.slots.plan.enabled).toBe(false);
       expect(patchedBody.slots.goal.installed).toBe(false);
+      expect(patchedBody.slots.goal.command).toBe('goal');
 
       const installed = await fetch(`${url}/api/pi/feature-plugins/goal/install`, {
         method: 'POST',
@@ -1338,6 +1339,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(installed.status).toBe(200);
       const installedBody = await installed.json();
       expect(installedBody.slots.goal.installed).toBe(true);
+      expect(installedBody.slots.goal.enabled).toBe(true);
       expect(installedBody.reload.reloaded).toContain(created.id);
       expect(idle.reloadCount).toBe(1);
 
@@ -1349,7 +1351,10 @@ describe('OpenCode facade HTTP/SSE', () => {
       const settings = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
       expect(settings.packages).toContain('npm:@narumitw/pi-goal');
       const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
-      expect(chamber.featurePlugins.goal.enabled).toBe(true);
+      expect(chamber.featurePlugins.goal.enabled).toBeUndefined();
+      expect(chamber.featurePlugins.plan.enabled).toBeUndefined();
+      expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
+      expect(chamber.featurePlugins.subagents.enabled).toBeUndefined();
 
       const removed = await fetch(`${url}/api/pi/feature-plugins/goal/uninstall`, {
         method: 'POST',
@@ -1367,7 +1372,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('reloads idle sessions when an installed Goal slot is enabled', async () => {
+  it('ignores leftover chamber enabled false and does not reload from PATCH enabled', async () => {
     const idle = createInMemoryPiSession();
     idle.registerCommand('goal', async () => {}, { description: 'Goal' });
     const { url, close, kernel } = await startFacade({
@@ -1383,17 +1388,25 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(installed.status).toBe(200);
       expect(idle.reloadCount).toBe(1);
 
+      const home = kernel.host.getPath().home;
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), `${JSON.stringify({
+        featurePlugins: { goal: { source: 'npm:@narumitw/pi-goal', command: 'goal', enabled: false } },
+      }, null, 2)}\n`);
+
+      const leftover = await (await fetch(`${url}/api/pi/feature-plugins`)).json();
+      expect(leftover.slots.goal).toMatchObject({ installed: true, enabled: true });
+
       const enabled = await fetch(`${url}/api/pi/feature-plugins`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ goal: { enabled: true } }),
+        body: JSON.stringify({ goal: { enabled: false } }),
       });
       expect(enabled.status).toBe(200);
       const enabledBody = await enabled.json();
       expect(enabledBody.slots.goal.installed).toBe(true);
       expect(enabledBody.slots.goal.enabled).toBe(true);
-      expect(enabledBody.reload.reloaded).toContain(created.id);
-      expect(idle.reloadCount).toBe(2);
+      expect(enabledBody.reload).toBeUndefined();
+      expect(idle.reloadCount).toBe(1);
 
       const listed = await (await fetch(`${url}/api/command?session=${created.id}`)).json();
       expect(listed.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);

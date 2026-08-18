@@ -2944,19 +2944,7 @@ export const createPiHost = ({
       };
     },
     async applyFeaturePluginPatch(patch) {
-      const payload = this.setFeaturePlugins(patch);
-      const shouldReload = Object.entries(patch && typeof patch === 'object' ? patch : {}).some(([slot, entry]) => (
-        isFeaturePluginSlot(slot)
-        && entry
-        && typeof entry === 'object'
-        && entry.enabled === true
-        && payload.slots[slot].installed
-      ));
-      if (!shouldReload) return payload;
-      return {
-        ...payload,
-        reload: await this.reloadIdleSessions(),
-      };
+      return this.setFeaturePlugins(patch);
     },
     async reloadIdleSessions(directory) {
       const reloaded = [];

@@ -12,12 +12,10 @@ import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
   SETTINGS_HELPER_CLASS,
-  SettingsCheckboxRow,
   SettingsSection,
 } from '@/components/sections/shared/SettingsSection';
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { useI18n } from '@/lib/i18n';
-import { reportSettingsSaveState } from '@/lib/persistence';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { cn } from '@/lib/utils';
 import { useFeaturePluginsStore } from '@/stores/useFeaturePluginsStore';
@@ -84,36 +82,6 @@ export const FeaturePluginsPage: React.FC = () => {
     void loadPlugins();
   }, [loadPlugins]);
 
-  const persistEnabled = React.useCallback(async (
-    slot: FeaturePluginSlot,
-    enabled: boolean,
-  ) => {
-    reportSettingsSaveState('saving');
-    try {
-      const response = await runtimeFetch('/api/pi/feature-plugins', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ [slot]: { enabled } }),
-      });
-      const raw = await readJson(response) as (FeaturePluginsPayload & { reload?: FeaturePluginsReloadResult }) | null;
-      const parsed = parseFeaturePluginsPayload(raw);
-      if (!response.ok || !parsed) {
-        reportSettingsSaveState('error');
-        return;
-      }
-      applyPayload(parsed);
-      reportSettingsSaveState('saved');
-      if (parsed.slots[slot].installed) {
-        await refreshSessionTitleReloadLists();
-        if ((raw?.reload?.skipped?.length ?? 0) > 0) {
-          toast.error(t('settings.featurePlugins.toast.reloadPartial'));
-        }
-      }
-    } catch {
-      reportSettingsSaveState('error');
-    }
-  }, [applyPayload, t]);
-
   const runPackageAction = React.useCallback(async (action: PendingAction) => {
     const slot = action.slot;
     setBusySlot(slot);
@@ -153,7 +121,6 @@ export const FeaturePluginsPage: React.FC = () => {
     <SettingsPageLayout
       title={t('settings.page.featurePlugins.title')}
       description={t('settings.featurePlugins.page.warning')}
-      showSaveStatus
     >
       {loadState.status === 'loading' ? (
         <SettingsSection divider={false}>
@@ -178,9 +145,6 @@ export const FeaturePluginsPage: React.FC = () => {
               ready={ready}
               isBusy={busySlot === slot}
               pendingAction={pending?.slot === slot ? pending.action : null}
-              onEnabledChange={(enabled) => {
-                void persistEnabled(slot, enabled);
-              }}
               onInstall={() => setPending({ slot, action: 'install' })}
               onUninstall={() => setPending({ slot, action: 'uninstall' })}
             />
@@ -241,7 +205,6 @@ function FeaturePluginCard({
   ready,
   isBusy,
   pendingAction,
-  onEnabledChange,
   onInstall,
   onUninstall,
 }: {
@@ -250,7 +213,6 @@ function FeaturePluginCard({
   ready: boolean;
   isBusy: boolean;
   pendingAction: PendingAction['action'] | null;
-  onEnabledChange: (enabled: boolean) => void;
   onInstall: () => void;
   onUninstall: () => void;
 }) {
@@ -287,15 +249,6 @@ function FeaturePluginCard({
         </span>
       </div>
       <div className="mt-auto space-y-3 border-t border-[var(--interactive-border)] px-4 py-4">
-        <SettingsCheckboxRow
-          checked={saved.enabled}
-          onChange={onEnabledChange}
-          label={t('settings.featurePlugins.enabled.label')}
-          info={t('settings.featurePlugins.enabled.info')}
-          ariaLabel={t('settings.featurePlugins.enabled.label')}
-          settingsItem={`${copy.settingsItem}.enabled`}
-          disabled={!ready || isBusy}
-        />
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
