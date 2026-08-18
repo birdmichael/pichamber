@@ -83,6 +83,28 @@ describe('mapPiModelsToProviders', () => {
     expect(providers[0].models['example-model'].limit).toEqual({ context: 200000, output: 8192 });
   });
 
+  it('exposes Pi image input and reasoning as provider capabilities', () => {
+    const providers = mapPiModelsToProviders([
+      {
+        id: 'grok-4.6',
+        name: 'Grok 4.6',
+        provider: 'bmlab',
+        input: ['text', 'image'],
+        reasoning: true,
+      },
+    ]);
+    expect(providers[0].models['grok-4.6']).toMatchObject({
+      reasoning: true,
+      attachment: true,
+      input: ['text', 'image'],
+      capabilities: {
+        reasoning: true,
+        attachment: true,
+        input: { text: true, audio: false, image: true, video: false, pdf: false },
+      },
+    });
+  });
+
   it('fills missing live context from models.json without overwriting a live window', () => {
     const providers = mapPiModelsToProviders(
       [{ id: 'gpt-4o', name: 'GPT-4o', provider: 'acme' }],

@@ -643,12 +643,34 @@ const toProviderModelRecord = (model) => {
   const maxTokens = Number(model.maxTokens);
   const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
   const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
+  const input = Array.isArray(model.input)
+    ? model.input.filter((item) => typeof item === 'string' && item.trim())
+    : [];
+  const hasImage = input.some((item) => item.trim().toLowerCase() === 'image');
+  const reasoning = model.reasoning === true;
   return {
     id,
     name: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id,
-    reasoning: Boolean(model.reasoning),
+    reasoning,
+    attachment: hasImage,
+    ...(hasImage ? {
+      capabilities: {
+        reasoning,
+        attachment: true,
+        input: { text: true, audio: false, image: true, video: false, pdf: false },
+        output: { text: true, audio: false, image: false, video: false, pdf: false },
+      },
+    } : reasoning ? {
+      capabilities: {
+        reasoning: true,
+        attachment: false,
+        input: { text: true, audio: false, image: false, video: false, pdf: false },
+        output: { text: true, audio: false, image: false, video: false, pdf: false },
+      },
+    } : {}),
     ...(hasContext ? { contextWindow } : {}),
     ...(hasOutput ? { maxTokens } : {}),
+    ...(input.length > 0 ? { input } : {}),
     cost: model.cost,
     ...(hasContext || hasOutput ? {
       limit: {
@@ -701,11 +723,36 @@ const applyPublicProviderConfig = (provider, config) => {
     const maxTokens = existingOutput || record.maxTokens;
     const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
     const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
-    if (!hasContext && !hasOutput) continue;
+    const existingHasImage = existing.attachment === true
+      || (Array.isArray(existing.input) && existing.input.some((item) => String(item).toLowerCase() === 'image'))
+      || existing.capabilities?.input?.image === true;
+    const existingHasReasoning = existing.reasoning === true || existing.capabilities?.reasoning === true;
+    const nextHasImage = existingHasImage || record.attachment === true;
+    const nextHasReasoning = existingHasReasoning || record.reasoning === true;
+    if (!hasContext && !hasOutput && !nextHasImage && !nextHasReasoning) continue;
     provider.models[record.id] = {
       ...existing,
+      ...(nextHasReasoning && !existingHasReasoning ? { reasoning: true } : {}),
+      ...(nextHasImage && !existingHasImage ? { attachment: true, input: ['text', 'image'] } : {}),
       ...(hasContext && !existingContext ? { contextWindow: Number(contextWindow) } : {}),
       ...(hasOutput && !existingOutput ? { maxTokens: Number(maxTokens) } : {}),
+      ...((nextHasImage && !existingHasImage) || (nextHasReasoning && !existingHasReasoning) ? {
+        capabilities: {
+          ...(existing.capabilities && typeof existing.capabilities === 'object' ? existing.capabilities : {}),
+          reasoning: nextHasReasoning,
+          attachment: nextHasImage,
+          input: {
+            text: true,
+            audio: false,
+            video: false,
+            pdf: false,
+            ...(existing.capabilities?.input && typeof existing.capabilities.input === 'object'
+              ? existing.capabilities.input
+              : {}),
+            image: nextHasImage,
+          },
+        },
+      } : {}),
       ...(hasContext || hasOutput ? {
         limit: {
           ...existingLimit,

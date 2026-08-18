@@ -10,6 +10,12 @@ import {
   resolveContextWindow,
   resolvePersistedContextWindow,
 } from '@/lib/model-context-windows';
+import {
+  piInputFromImage,
+  resolvePersistedImageInput,
+  resolvePersistedReasoning,
+  type CatalogCapabilityEntry,
+} from '@/lib/model-catalog-capabilities';
 
 export const CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
@@ -66,6 +72,8 @@ export type HeaderFieldErrors = {
 export type CustomProviderModelConfig = {
   name: string;
   contextWindow?: number;
+  input?: ['text', 'image'];
+  reasoning?: true;
 };
 
 export type CustomProviderConfig = {
@@ -99,6 +107,8 @@ export type ValidateCustomProviderInput = {
    * (edit path). Still requires env or key when false.
    */
   allowExistingAuth?: boolean;
+  /** models.dev (or equivalent) entries used to persist vision / reasoning. */
+  catalog?: readonly CatalogCapabilityEntry[];
 };
 
 export type ValidateCustomProviderResult = {
@@ -378,6 +388,14 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
         {
           name: model.name.trim(),
           ...(contextWindow !== undefined ? { contextWindow } : {}),
+          ...(piInputFromImage(resolvePersistedImageInput({
+            id: model.id.trim(),
+            catalog: input.catalog,
+          })) ? { input: ['text', 'image'] as ['text', 'image'] } : {}),
+          ...(resolvePersistedReasoning({
+            id: model.id.trim(),
+            catalog: input.catalog,
+          }) ? { reasoning: true as const } : {})
         },
       ];
     }),

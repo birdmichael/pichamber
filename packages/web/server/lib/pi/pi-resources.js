@@ -526,17 +526,44 @@ const readModelMaxTokens = (model) => {
     ?? readPositiveInt(model.limit && typeof model.limit === 'object' ? model.limit.output : undefined);
 };
 
+const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const readModelReasoning = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  return model.reasoning === true ? true : undefined;
+};
+
+const readModelImageInput = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  const input = Array.isArray(model.input) ? model.input : [];
+  if (input.some((item) => asTrimmedString(item).toLowerCase() === 'image')) {
+    return true;
+  }
+  const modalities = model.modalities && typeof model.modalities === 'object' && !Array.isArray(model.modalities)
+    ? model.modalities
+    : null;
+  const modalityInput = Array.isArray(modalities?.input) ? modalities.input : [];
+  if (modalityInput.some((item) => asTrimmedString(item).toLowerCase() === 'image')) {
+    return true;
+  }
+  return model.attachment === true ? true : undefined;
+};
+
 const toPiModelEntry = (id, model) => {
   const name = model && typeof model === 'object' && typeof model.name === 'string' && model.name.trim()
     ? model.name.trim()
     : id;
   const contextWindow = readModelContextWindow(model);
   const maxTokens = readModelMaxTokens(model);
+  const reasoning = readModelReasoning(model);
+  const image = readModelImageInput(model);
   return {
     id,
     name,
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(maxTokens !== undefined ? { maxTokens } : {}),
+    ...(reasoning ? { reasoning: true } : {}),
+    ...(image ? { input: ['text', 'image'] } : {}),
   };
 };
 

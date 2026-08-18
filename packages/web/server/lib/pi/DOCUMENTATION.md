@@ -36,6 +36,15 @@ display-only. `toProviderModelRecord` exposes `limit.context` from that
 stored value for the composer chip, context panel, and work-status usage.
 Pi reads the stored field; a missing one becomes its 128k default.
 
+The same persist writes Pi `input` and `reasoning` for a known vision or
+thinking id (`grok-4.6` → `input: ["text", "image"]` and `reasoning: true`).
+Lookup uses the official `provider/model` key first, then the same model
+id in models.dev, then the published id table. An unknown id stays omitted
+so Pi keeps `input: ["text"]` / `reasoning: false`. Save must not strip an
+already stored `input` or `reasoning`. `toProviderModelRecord` exposes
+those flags as `attachment` / `capabilities` so composer modality matches
+the kernel.
+
 ## Desktop `ctx.ui`
 
 Live `AgentSession` records call `bindExtensions({ uiContext, mode: "rpc" })`

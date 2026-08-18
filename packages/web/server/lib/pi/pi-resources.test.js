@@ -436,6 +436,37 @@ description: >
     ]);
   });
 
+  it('round-trips input and reasoning on models.json without inventing them', () => {
+    const home = makeTemp();
+    writePiProviderAuth('acme', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    const upserted = upsertPiProviderConfig({
+      home,
+      providerId: 'acme',
+      config: {
+        name: 'Acme',
+        options: { baseURL: 'https://api.acme.test/v1' },
+        models: {
+          'grok-4.6': { name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
+          mystery: { name: 'Mystery' },
+        },
+      },
+    });
+    expect(upserted.config.models).toEqual([
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(stored.providers.acme.models).toEqual([
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+    expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+  });
+
   it('writes and removes provider auth in the Pi auth.json shape', () => {
     const home = makeTemp();
     const other = writePiProviderAuth('other-provider', { type: 'api', key: 'sk-keep-me' }, { home });

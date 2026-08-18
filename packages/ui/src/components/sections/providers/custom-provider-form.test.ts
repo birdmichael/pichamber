@@ -208,7 +208,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(withContext.result?.config.models).toEqual({
-      'gpt-4o': { name: 'GPT-4o', contextWindow: 128000 },
+      'gpt-4o': { name: 'GPT-4o', contextWindow: 128000, input: ['text', 'image'] },
     });
 
     const knownEmpty = validateCustomProvider({
@@ -224,7 +224,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(knownEmpty.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000 },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const unknownEmpty = validateCustomProvider({
@@ -268,7 +268,57 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(userOverride.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000 },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000, input: ['text', 'image'], reasoning: true },
+    });
+  });
+
+  test('writes published vision and reasoning for a known id and leaves unknown ids alone', () => {
+    const known = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'grok-4.6', name: 'Grok 4.6' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(known.result?.config.models).toEqual({
+      'grok-4.6': {
+        name: 'Grok 4.6',
+        contextWindow: 500000,
+        input: ['text', 'image'],
+        reasoning: true,
+      },
+    });
+
+    const unknown = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'mystery', name: 'Mystery' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(unknown.result?.config.models).toEqual({
+      mystery: { name: 'Mystery' },
+    });
+
+    const fromCatalog = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'vision-pro', name: 'Vision Pro' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+      catalog: [{
+        id: 'vision-pro',
+        attachment: true,
+        reasoning: true,
+        modalities: { input: ['text', 'image'] },
+      }],
+    });
+    expect(fromCatalog.result?.config.models).toEqual({
+      'vision-pro': {
+        name: 'Vision Pro',
+        input: ['text', 'image'],
+        reasoning: true,
+      },
     });
   });
 });

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Settings: adding a known vision model on a custom provider now keeps image input and thinking. `grok-4.6` on a proxy like `bmlab` no longer becomes text-only, so attached photos reach the model.
 - Settings: opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.
 - Chat: on Pi, typing `@agent:build` or `@agent:plan` no longer switches the session agent, and `@` autocomplete no longer lists leftover OpenCode agents.
 - Chat: typing an unknown `/name` and pressing Enter now sends it as a normal message. The empty command popup no longer swallows the first Enter.

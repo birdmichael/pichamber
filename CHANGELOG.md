@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: adding a known vision model on a custom provider now keeps image input and thinking. `grok-4.6` on a proxy like `bmlab` no longer becomes text-only, so attached photos reach the model.
+
 ## [1.0.0] - 2026-08-18
 
 - **Pichamber 1.0.0:** first Pichamber release, independent of OpenChamber 1.18.x. The default kernel is in-process Pi.

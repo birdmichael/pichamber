@@ -16,9 +16,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Icon } from '@/components/icon/Icon';
+import { catalogEntriesFromMetadataMap } from '@/lib/model-catalog-capabilities';
 import { useI18n } from '@/lib/i18n';
 import { toast } from '@/components/ui';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { useConfigStore } from '@/stores/useConfigStore';
 import {
   addRemoteModelsToForm,
   applyModelContextChange,
@@ -69,6 +71,11 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   onDisconnect,
 }) => {
   const { t } = useI18n();
+  const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+  const catalog = React.useMemo(
+    () => catalogEntriesFromMetadataMap(modelsMetadata),
+    [modelsMetadata],
+  );
   const isEdit = mode === 'edit';
   const [form, setForm] = React.useState<CustomProviderFormState>(
     () => initialValues ?? createEmptyCustomProviderForm(),
@@ -198,6 +205,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
       disabledProviders,
       editingProviderID: isEdit ? form.providerID : undefined,
       allowExistingAuth: isEdit && allowExistingAuth,
+      catalog,
     });
     setErr(output.err);
     setModelErrors(output.models);
