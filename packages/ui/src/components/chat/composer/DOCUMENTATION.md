@@ -52,8 +52,11 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
-Model and thinking chips stay. OpenCode `build` / `plan` / custom agents still
-show. A Build row (session model + `/plan implement` in this session) appears
+Model and thinking chips stay. On Pi the thinking chip lists
+`GET /api/session/:id/thinking` `available` from live
+`getAvailableThinkingLevels()`, not the full seven-level catalog, and
+clamps the current chip onto that list. OpenCode `build` / `plan` /
+custom agents still show. A Build row (session model + `/plan implement` in this session) appears
 when a ready or saved plan exists, even if the View Plan rail is closed.
 
 ## Layers

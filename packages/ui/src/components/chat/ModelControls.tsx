@@ -39,7 +39,14 @@ import { useIsTextTruncated } from '@/hooks/useIsTextTruncated';
 import { formatEffortLabel, getCycledPrimaryAgentName, isPrimaryMode, type MobileControlsPanel } from './mobileControlsUtils';
 import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
-import { PI_THINKING_LEVELS, parsePiThinkingLevel, resolvePiThinkingChipPresentation } from './piThinking';
+import {
+    clampPiThinkingLevel,
+    parseAvailablePiThinkingLevels,
+    parsePiThinkingLevel,
+    resolvePiThinkingChipPresentation,
+    resolveVisiblePiThinkingLevels,
+    type PiThinkingLevel,
+} from './piThinking';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
 import { usePiKernel } from '@/lib/usePiKernel';
@@ -304,6 +311,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
     const [piThinking, setPiThinking] = React.useState<string | undefined>(undefined);
+    const [piThinkingLevels, setPiThinkingLevels] = React.useState<PiThinkingLevel[] | undefined>(undefined);
     const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
     const { isReady, isUnavailable } = useOpenCodeReadiness();
     const readinessLabel = isUnavailable ? t('common.unavailable') : t('common.loading');
@@ -366,6 +374,39 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             cancelled = true;
         };
     }, [isPiKernel]);
+
+    const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
+    React.useEffect(() => {
+        if (!isPiKernel || !currentSessionIdForThinking) {
+            setPiThinkingLevels(undefined);
+            return;
+        }
+        let cancelled = false;
+        void runtimeFetch(`/api/session/${currentSessionIdForThinking}/thinking`, { method: 'GET' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((payload) => {
+                if (cancelled || !payload) {
+                    return;
+                }
+                const available = parseAvailablePiThinkingLevels(payload.available);
+                if (available.length > 0) {
+                    setPiThinkingLevels(available);
+                }
+                const nextThinking = clampPiThinkingLevel(payload.thinking ?? piThinking, available);
+                if (nextThinking) {
+                    setPiThinking(nextThinking);
+                }
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [currentSessionIdForThinking, currentModelId, isPiKernel]);
+
+    const visiblePiThinkingLevels = React.useMemo(
+        () => resolveVisiblePiThinkingLevels(piThinkingLevels),
+        [piThinkingLevels],
+    );
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
         setPiThinking(level);
@@ -2004,7 +2045,46 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         );
     };
 
+    const renderMobilePiThinkingPanel = () => {
+        if (!isCompact || !isPiKernel) return null;
+        const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+        return (
+            <MobileOverlayPanel
+                open={activeMobilePanel === 'variant'}
+                onClose={closeMobilePanel}
+                title={t('chat.modelControls.thinking')}
+            >
+                <div className="flex flex-col gap-1.5">
+                    {visiblePiThinkingLevels.map((level) => {
+                        const selected = thinkingChip.status === 'ready' && thinkingChip.level === level;
+                        return (
+                            <button
+                                key={level}
+                                type="button"
+                                className={cn(
+                                    'flex w-full items-center justify-between gap-2 rounded-xl border px-2 py-1.5 text-left',
+                                    'focus:outline-none focus-visible:ring-1 focus-visible:ring-primary',
+                                    selected ? 'border-primary/30 bg-primary/10' : 'border-border/40',
+                                )}
+                                onClick={() => {
+                                    void handlePiThinkingSelect(level);
+                                    closeMobilePanel();
+                                }}
+                            >
+                                <span className="typography-meta font-medium text-foreground">{formatEffortLabel(level)}</span>
+                                {selected && <Icon name="check" className="size-4 text-primary flex-shrink-0" />}
+                            </button>
+                        );
+                    })}
+                </div>
+            </MobileOverlayPanel>
+        );
+    };
+
     const renderMobileVariantPanel = () => {
+        if (isPiKernel) {
+            return renderMobilePiThinkingPanel();
+        }
         if (!isCompact) return null;
 
         const targetProviderId = mobileVariantTarget?.providerId ?? currentProviderId;
@@ -2707,7 +2787,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         </TooltipTrigger>
                         <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(180px,calc(100vw-2rem))]">
                             <DropdownMenuLabel className="typography-ui-header font-semibold text-foreground">{t('chat.modelControls.thinking')}</DropdownMenuLabel>
-                            {PI_THINKING_LEVELS.map((level) => {
+                            {visiblePiThinkingLevels.map((level) => {
                                 const selected = thinkingChip.status === 'ready' && thinkingChip.level === level;
                                 return (
                                     <DropdownMenuItem

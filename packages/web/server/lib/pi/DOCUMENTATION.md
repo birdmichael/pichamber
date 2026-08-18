@@ -44,6 +44,16 @@ capability that pretends to be user-set. Family inference and the UI
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).
 
+## Session thinking levels
+
+`GET /api/session/:id/thinking` returns `{ thinking, available }` from the
+live session: `thinkingLevel` plus `getAvailableThinkingLevels()`.
+`PATCH` still clamps an unsupported pick onto that list (`medium`, else
+the first available). The composer thinking chip renders `available`,
+not the full seven-level catalog. Missing/empty `available` keeps the
+full list until the session answers. Do not invent vendor
+`thinkingLevelMap` from `/v1/models`.
+
 ## Desktop `ctx.ui`
 
 Live `AgentSession` records call `bindExtensions({ uiContext, mode: "rpc" })`
