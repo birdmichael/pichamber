@@ -1140,17 +1140,31 @@ export const writePiAgentSettings = (home = os.homedir(), patch = {}) => {
   return next;
 };
 
+const settingsJsonDefaultModel = (agent) => {
+  const provider = typeof agent?.defaultProvider === 'string' ? agent.defaultProvider.trim() : '';
+  const model = typeof agent?.defaultModel === 'string' ? agent.defaultModel.trim() : '';
+  if (provider && model) return `${provider}/${model}`;
+  return model;
+};
+
+const settingsJsonDefaultThinking = (agent) => (
+  THINKING_LEVELS.includes(agent?.defaultThinkingLevel) ? agent.defaultThinkingLevel : ''
+);
+
 export const readPiDefaults = (home = os.homedir()) => {
   const chamberPath = resolvePiDefaultsPath(home);
   const chamber = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
   const agent = readPiAgentSettings(home);
-  const thinking = THINKING_LEVELS.includes(chamber.thinking) ? chamber.thinking : DEFAULT_PI_SETTINGS.thinking;
+  const chamberModel = typeof chamber.model === "string" ? chamber.model.trim() : "";
+  const thinking = THINKING_LEVELS.includes(chamber.thinking)
+    ? chamber.thinking
+    : (settingsJsonDefaultThinking(agent) || DEFAULT_PI_SETTINGS.thinking);
   const chamberCompaction = typeof chamber.compaction === "boolean" ? chamber.compaction : DEFAULT_PI_SETTINGS.compaction;
   const chamberRetry = typeof chamber.retry === "boolean" ? chamber.retry : DEFAULT_PI_SETTINGS.retry;
   const compactionSettings = normalizeCompactionSettings(agent.compaction ?? chamber.compaction, chamberCompaction);
   const retrySettings = normalizeRetrySettings(agent.retry ?? chamber.retry, chamberRetry);
   return {
-    model: typeof chamber.model === "string" ? chamber.model : "",
+    model: chamberModel || settingsJsonDefaultModel(agent),
     thinking,
     compaction: compactionSettings.enabled,
     retry: retrySettings.enabled,
@@ -1310,55 +1324,6 @@ export const listPiExtensions = ({ home = os.homedir(), directory } = {}) => {
   return extensions;
 };
 
-const collectPackageJsonFiles = (root, depth = 0, results = []) => {
-  if (depth > 3 || !isDirectory(root)) return results;
-  const manifest = path.join(root, "package.json");
-  if (isFile(manifest)) {
-    results.push(manifest);
-    return results;
-  }
-  let entries = [];
-  try {
-    entries = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
-    return results;
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-    collectPackageJsonFiles(path.join(root, entry.name), depth + 1, results);
-  }
-  return results;
-};
-
-export const listPiPackageRoots = ({ home = os.homedir(), directory } = {}) => {
-  const roots = [
-    { root: path.join(resolvePiAgentDir(home), "npm"), source: "npm", scope: "user" },
-    { root: path.join(resolvePiAgentDir(home), "git"), source: "git", scope: "user" },
-  ];
-  if (directory) {
-    roots.push({ root: path.join(directory, ".pi", "npm"), source: "npm", scope: "project" });
-    roots.push({ root: path.join(directory, ".pi", "git"), source: "git", scope: "project" });
-  }
-  return roots;
-};
-
-export const listPiPackages = ({ home = os.homedir(), directory } = {}) => {
-  const packages = [];
-  const seen = new Set();
-  for (const { root, source, scope } of listPiPackageRoots({ home, directory })) {
-    for (const manifest of collectPackageJsonFiles(root)) {
-      const parsed = readJsonObject(manifest);
-      const name = typeof parsed.name === "string" && parsed.name.trim()
-        ? parsed.name.trim()
-        : path.basename(path.dirname(manifest));
-      const key = [scope, source, name].join(":");
-      if (!name || seen.has(key)) continue;
-      seen.add(key);
-      packages.push({ name, source, scope, path: path.dirname(manifest) });
-    }
-  }
-  return packages;
-};
 
 
 export const areProjectSkillsInjected = (trust) => {

@@ -21,7 +21,6 @@ import {
   upsertPiProviderConfig,
   deletePiProviderConfig,
   listPiExtensions,
-  listPiPackages,
   filterProvidersByEnabledModels,
   resolvePiDefaultModel,
   readPiProjectTrust,
@@ -284,6 +283,26 @@ description: >
     });
     expect(readPiDefaults(home).model).toBe('example-provider/example-model');
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'auth.json'))).toBe(false);
+  });
+
+  it('falls back to settings.json defaults when pichamber.json has no pin', () => {
+    const home = makeTemp();
+    const agent = path.join(home, '.pi', 'agent');
+    fs.mkdirSync(agent, { recursive: true });
+    fs.writeFileSync(path.join(agent, 'settings.json'), `${JSON.stringify({
+      defaultProvider: 'bmlab',
+      defaultModel: 'grok-4.6',
+      defaultThinkingLevel: 'high',
+    }, null, 2)}\n`);
+    const defaults = readPiDefaults(home);
+    expect(defaults.model).toBe('bmlab/grok-4.6');
+    expect(defaults.thinking).toBe('high');
+    expect(fs.existsSync(path.join(agent, 'pichamber.json'))).toBe(false);
+
+    writePiDefaults(home, { model: 'other/beta', thinking: 'low' });
+    const pinned = readPiDefaults(home);
+    expect(pinned.model).toBe('other/beta');
+    expect(pinned.thinking).toBe('low');
   });
 
   it('writes and deletes user prompt commands under ~/.pi/agent/prompts', () => {
@@ -591,23 +610,17 @@ description: >
     expect(agent.retry.maxRetries).toBe(5);
   });
 
-  it('lists user and project extensions and installed packages', () => {
+  it('lists user and project extensions', () => {
     const home = makeTemp();
     const project = makeTemp();
-    const pkgSource = 'n' + 'pm';
     fs.mkdirSync(path.join(home, '.pi', 'agent', 'extensions', 'demo-ext'), { recursive: true });
     fs.writeFileSync(path.join(home, '.pi', 'agent', 'extensions', 'demo-ext', 'index.js'), 'export default {};\n');
     fs.mkdirSync(path.join(project, '.pi', 'extensions'), { recursive: true });
     fs.writeFileSync(path.join(project, '.pi', 'extensions', 'local.js'), 'export default {};\n');
-    const userPkg = path.join(home, '.pi', 'agent', pkgSource, 'demo-pkg');
-    fs.mkdirSync(userPkg, { recursive: true });
-    fs.writeFileSync(path.join(userPkg, 'package.json'), JSON.stringify({ name: 'demo-pkg', version: '1.0.0' }));
     const extensions = listPiExtensions({ home, directory: project });
     expect(extensions.map((item) => item.name).sort()).toEqual(['demo-ext', 'local']);
     expect(extensions.find((item) => item.name === 'demo-ext').scope).toBe('user');
     expect(extensions.find((item) => item.name === 'local').scope).toBe('project');
-    const packages = listPiPackages({ home, directory: project });
-    expect(packages.some((item) => item.name === 'demo-pkg' && item.source === pkgSource && item.scope === 'user')).toBe(true);
   });
 
   it('reads and writes project trust in a temp home', () => {

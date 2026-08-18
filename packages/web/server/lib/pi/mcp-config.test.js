@@ -58,6 +58,15 @@ describe('MCP feature plugin gate', () => {
     writeFeaturePlugins(home, { mcp: { enabled: false } });
     expect(isMcpFeaturePluginActive(home)).toBe(false);
   });
+
+  it('treats an installed adapter as on when pichamber.json is missing', () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-mcp-adapter'],
+    });
+    expect(isMcpFeaturePluginActive(home)).toBe(true);
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
+  });
 });
 
 describe('adapter MCP file write rules', () => {
