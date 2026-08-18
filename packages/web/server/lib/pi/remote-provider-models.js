@@ -275,17 +275,43 @@ const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
 const readRemoteModelInput = (item) => {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
   const value = item.input;
-  if (!Array.isArray(value)) return undefined;
-  const next = [];
-  const seen = new Set();
-  for (const entry of value) {
-    if (typeof entry !== 'string') continue;
-    const token = entry.trim().toLowerCase();
-    if (!PI_MODEL_INPUT_TYPES.has(token) || seen.has(token)) continue;
-    seen.add(token);
-    next.push(token);
+  if (Array.isArray(value)) {
+    const next = [];
+    const seen = new Set();
+    for (const entry of value) {
+      if (typeof entry !== 'string') continue;
+      const token = entry.trim().toLowerCase();
+      if (!PI_MODEL_INPUT_TYPES.has(token) || seen.has(token)) continue;
+      seen.add(token);
+      next.push(token);
+    }
+    if (next.length > 0) return next;
   }
-  return next.length > 0 ? next : undefined;
+  const architecture = item.architecture && typeof item.architecture === 'object' && !Array.isArray(item.architecture)
+    ? item.architecture
+    : null;
+  const modalities = Array.isArray(architecture?.input_modalities)
+    ? architecture.input_modalities
+    : Array.isArray(item.modalities?.input)
+      ? item.modalities.input
+      : [];
+  if (modalities.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === 'image')) {
+    return ['text', 'image'];
+  }
+  return undefined;
+};
+
+const readRemoteModelReasoning = (item) => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined;
+  if (item.reasoning === true) return true;
+  const params = Array.isArray(item.supported_parameters) ? item.supported_parameters : [];
+  if (params.some((entry) => {
+    const token = typeof entry === 'string' ? entry.trim().toLowerCase() : '';
+    return token === 'reasoning' || token === 'include_reasoning';
+  })) {
+    return true;
+  }
+  return undefined;
 };
 
 export const parseRemoteModelsPayload = (body) => {
@@ -312,11 +338,13 @@ export const parseRemoteModelsPayload = (body) => {
       : id;
     const contextWindow = readRemoteContextWindow(item);
     const input = readRemoteModelInput(item);
+    const reasoning = readRemoteModelReasoning(item);
     models.push({
       id,
       name,
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(input !== undefined ? { input } : {}),
+      ...(reasoning ? { reasoning: true } : {}),
     });
   }
   return models;

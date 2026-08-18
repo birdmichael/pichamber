@@ -15,6 +15,7 @@ import {
   getPiAuthMethods,
   getPiProviderSources,
   listPiProviderPublicConfigs,
+  hydrateKnownModelCapabilities,
   writePiProviderAuth,
   removePiProviderAuth,
   upsertPiProviderConfig,
@@ -431,7 +432,7 @@ description: >
       { id: 'mystery', name: 'Mystery' },
     ]);
     expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
-      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000 },
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000, input: ['text', 'image'] },
       { id: 'mystery', name: 'Mystery' },
     ]);
   });
@@ -484,9 +485,35 @@ description: >
       { id: 'mystery', name: 'Mystery' },
     ]);
     expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
-      { id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text'] },
+      { id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
       { id: 'mystery', name: 'Mystery' },
     ]);
+  });
+
+  it('hydrates known vision and reasoning onto an existing models.json without a Settings save', () => {
+    const home = makeTemp();
+    const modelsPath = path.join(home, '.pi', 'agent', 'models.json');
+    fs.mkdirSync(path.dirname(modelsPath), { recursive: true });
+    fs.writeFileSync(modelsPath, JSON.stringify({
+      providers: {
+        bmlab: {
+          name: 'bmlab',
+          baseUrl: 'https://ai.example.test/v1',
+          models: [
+            { id: 'grok-4.6', name: 'grok-4.6', contextWindow: 500000 },
+            { id: 'mystery', name: 'Mystery' },
+          ],
+        },
+      },
+    }, null, 2));
+
+    const result = hydrateKnownModelCapabilities({ home });
+    expect(result.paths).toEqual([modelsPath]);
+    expect(JSON.parse(fs.readFileSync(modelsPath, 'utf8')).providers.bmlab.models).toEqual([
+      { id: 'grok-4.6', name: 'grok-4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
+      { id: 'mystery', name: 'Mystery' },
+    ]);
+    expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([]);
   });
 
   it('writes and removes provider auth in the Pi auth.json shape', () => {

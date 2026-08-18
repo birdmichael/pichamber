@@ -16,6 +16,7 @@ import { useDirectoryStore } from "@/stores/useDirectoryStore";
 import { useProjectsStore } from "@/stores/useProjectsStore";
 import { resolveProjectForSessionDirectory } from "@/lib/projectResolution";
 import { streamDebugEnabled } from "@/stores/utils/streamDebug";
+import { findCatalogMetadata } from "@/lib/model-catalog-capabilities";
 import { parseModelIdentifier } from "@/lib/modelIdentifier";
 import { runtimeFetch } from "@/lib/runtime-fetch";
 import { markStartupTrace, measureStartupTrace } from "@/lib/startupTrace";
@@ -3273,7 +3274,7 @@ export const useConfigStore = create<ConfigStore>()(
                         return undefined;
                     }
                     const { modelsMetadata, providers } = get();
-                    const cached = modelsMetadata.get(key);
+                    const cached = findCatalogMetadata(modelsMetadata, providerId, modelId);
                     if (cached) {
                         return cached;
                     }

@@ -23,6 +23,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useI18n } from '@/lib/i18n';
 import { parseModelIdentifier } from '@/lib/modelIdentifier';
+import { lookupModelMetadata } from '@/lib/modelMetadata';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
@@ -350,7 +351,7 @@ export const DefaultsSettings: React.FC = () => {
   // the field, and those models usually work.
   const isStructuredOutputCapable = React.useCallback(
     (providerId: string, modelId: string) =>
-      modelsMetadata.get(`${providerId}/${modelId}`)?.structured_output !== false,
+      lookupModelMetadata(modelsMetadata, providerId, modelId)?.structured_output !== false,
     [modelsMetadata]
   );
 

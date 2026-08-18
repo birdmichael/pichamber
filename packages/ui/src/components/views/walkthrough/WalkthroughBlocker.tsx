@@ -3,6 +3,7 @@ import { Icon } from '@/components/icon/Icon';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
+import { lookupModelMetadata } from '@/lib/modelMetadata';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { updateDesktopSettings } from '@/lib/persistence';
@@ -92,7 +93,7 @@ export const WalkthroughBlocker = ({
   // the same refusal one click later.
   const isStructuredOutputCapable = useCallback(
     (providerId: string, modelId: string) =>
-      modelsMetadata.get(`${providerId}/${modelId}`)?.structured_output !== false,
+      lookupModelMetadata(modelsMetadata, providerId, modelId)?.structured_output !== false,
     [modelsMetadata]
   );
 

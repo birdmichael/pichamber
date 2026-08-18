@@ -26,19 +26,21 @@ Empty string clears the override. Changing the directory does not copy
 
 ## Custom provider context windows and input
 
-Settings → Providers custom-model rows persist Pi `contextWindow` and
-`input` on that model in `{agentDir}/models.json` (and project
-`.pi/models.json`). Save must not strip a stored `["text", "image"]`.
-Empty on a known id writes that id's published window from the UI
-table (`grok-4.6` = 500k) and, when the same id is a known vision model,
-`input: ["text", "image"]`. Pi-default `["text"]` — including a live
-facade that already defaulted omitted `input` — is treated as empty, not
-as a user override. Empty on an unknown id stays omitted — do not invent
-a window or vision capability that pretends to be user-set.
-Family inference and the UI 200k fallback stay display-only.
-`toProviderModelRecord` exposes `limit.context` from the stored window
-for the composer chip, context panel, and work-status usage, and exposes
-`input` plus composer `capabilities.input` so modality matches Pi.
+Settings → Providers custom-model rows persist Pi `contextWindow`,
+`input`, and `reasoning` on that model in `{agentDir}/models.json` (and
+project `.pi/models.json`). Save must not strip a stored
+`["text", "image"]` or `reasoning: true`. Empty on a known id writes
+that id's published window (`grok-4.6` = 500k) and, when the same id is
+a known vision / thinking model, `input: ["text", "image"]` and
+`reasoning: true`. Lookup uses the official `provider/model` key first,
+then the same model id in models.dev, then the published id table. A
+live or stored Pi-default `["text"]` is empty, not a user override.
+Host startup hydrates already-saved rows for those known ids so an
+existing custom proxy does not stay text-only until the next Settings
+save. Empty on an unknown id stays omitted — do not invent a window or
+capability that pretends to be user-set. Family inference and the UI
+200k fallback stay display-only. `toProviderModelRecord` exposes
+`limit.context` and composer `capabilities` so modality matches Pi.
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).
 

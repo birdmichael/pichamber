@@ -119,8 +119,9 @@ describe('mapPiModelsToProviders', () => {
       { id: 'mystery', name: 'Mystery', provider: 'acme' },
     ]);
     expect(providers[0].models['grok-4.6'].input).toEqual(['text', 'image']);
+    expect(providers[0].models['grok-4.6'].reasoning).toBe(true);
     expect(providers[0].models['grok-4.6'].capabilities).toEqual({
-      reasoning: false,
+      reasoning: true,
       attachment: true,
       input: { text: true, image: true, audio: false, video: false, pdf: false },
     });
@@ -150,8 +151,8 @@ describe('mapPiModelsToProviders', () => {
         },
       },
     );
-    expect(kept[0].models['grok-4.6'].input).toEqual(['text']);
-    expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(false);
+    expect(kept[0].models['grok-4.6'].input).toEqual(['text', 'image']);
+    expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(true);
   });
 });
 

@@ -224,7 +224,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(knownEmpty.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const unknownEmpty = validateCustomProvider({
@@ -268,7 +268,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(userOverride.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 64000, input: ['text', 'image'], reasoning: true },
     });
   });
 
@@ -281,7 +281,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(knownVision.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const defaultText = validateCustomProvider({
@@ -297,7 +297,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(defaultText.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const storedVision = validateCustomProvider({
@@ -313,7 +313,7 @@ describe('validateCustomProvider', () => {
       existingProviderIDs: new Set(),
     });
     expect(storedVision.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const unknown = validateCustomProvider({
@@ -360,7 +360,7 @@ describe('validateCustomProvider', () => {
       allowExistingAuth: true,
     });
     expect(saved.result?.config.models).toEqual({
-      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] },
+      'grok-4.6': { name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
     });
 
     const unknownLive = providerToCustomFormState({

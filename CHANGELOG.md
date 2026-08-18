@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Settings: known vision models such as grok-4.6 now keep image support after you save them in Providers, so attached photos and local PNG reads reach the model (close #205).
+- Settings: known vision and thinking models such as grok-4.6 now keep image support and reasoning on a custom provider, including already-saved rows, so attached photos reach the model without a re-save (close #205).
 - Mobile: on Pi, the composer Agent/Plan chip now shows the full current-side label instead of a clipped fragment. Attach, Goal, mic, and Send stay icon-sized. (close #204)
 
 ## [1.0.0] - 2026-08-18
