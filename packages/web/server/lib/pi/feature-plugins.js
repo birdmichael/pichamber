@@ -125,19 +125,14 @@ const normalizeSlotConfig = (slot, raw) => {
   const next = {
     source: normalizeFeaturePluginSource(entry.source, defaults.source),
   };
-  if (typeof entry.enabled === 'boolean') {
-    next.enabled = entry.enabled;
-  }
   if (slot === 'goal') {
     next.command = normalizeGoalCommand(entry.command, defaults.command);
   }
   return next;
 };
 
-/** Chamber `enabled` wins when set; otherwise an installed settings.json package is on. */
-export const resolveFeaturePluginEnabled = (explicitEnabled, installed) => (
-  typeof explicitEnabled === 'boolean' ? explicitEnabled : Boolean(installed)
-);
+/** Chrome is on iff the slot source is already in Pi `packages`. Chamber `enabled` is ignored. */
+export const resolveFeaturePluginEnabled = (installed) => Boolean(installed);
 
 export const normalizeFeaturePlugins = (raw) => {
   const input = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -153,13 +148,9 @@ const serializeFeaturePlugins = (plugins) => {
   const out = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
-    const next = slot === 'goal'
+    out[slot] = slot === 'goal'
       ? { source: entry.source, command: entry.command }
       : { source: entry.source };
-    if (typeof entry.enabled === 'boolean') {
-      next.enabled = entry.enabled;
-    }
-    out[slot] = next;
   }
   return out;
 };
@@ -180,6 +171,20 @@ const writeChamberFile = (home, chamber) => {
 const readChamberFile = (home = os.homedir()) => (
   isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {}
 );
+
+/** Source/command writes persist. Chamber `enabled` is ignored and never written. */
+export const featurePluginPatchHasPersistableFields = (patch) => {
+  const input = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : {};
+  for (const slot of FEATURE_PLUGIN_SLOTS) {
+    if (!Object.prototype.hasOwnProperty.call(input, slot)) continue;
+    const value = input[slot];
+    if (value == null) return true;
+    if (typeof value !== 'object' || Array.isArray(value)) return true;
+    if (Object.prototype.hasOwnProperty.call(value, 'source')) return true;
+    if (Object.prototype.hasOwnProperty.call(value, 'command')) return true;
+  }
+  return false;
+};
 
 export const mergeFeaturePluginPatch = (current, patch) => {
   const base = normalizeFeaturePlugins(current);
@@ -207,14 +212,6 @@ export const mergeFeaturePluginPatch = (current, patch) => {
       }
       merged.source = source;
     }
-    if (Object.prototype.hasOwnProperty.call(value, 'enabled')) {
-      if (typeof value.enabled !== 'boolean') {
-        const error = new Error(`${slot} enabled must be a boolean`);
-        error.status = 400;
-        throw error;
-      }
-      merged.enabled = value.enabled;
-    }
     if (slot === 'goal' && Object.prototype.hasOwnProperty.call(value, 'command')) {
       const raw = typeof value.command === 'string' ? value.command.trim().replace(/^\//, '') : '';
       if (!GOAL_COMMAND_PATTERN.test(raw)) {
@@ -232,6 +229,9 @@ export const mergeFeaturePluginPatch = (current, patch) => {
 export const writeFeaturePlugins = (home = os.homedir(), patch = {}) => {
   const chamber = readChamberFile(home);
   const next = mergeFeaturePluginPatch(chamber.featurePlugins, patch);
+  if (!featurePluginPatchHasPersistableFields(patch)) {
+    return next;
+  }
   writeChamberFile(home, {
     model: typeof chamber.model === 'string' ? chamber.model : '',
     thinking: chamber.thinking,
@@ -280,7 +280,7 @@ export const toFeaturePluginsPayload = ({
     slots[slot] = {
       ...entry,
       installed,
-      enabled: resolveFeaturePluginEnabled(entry.enabled, installed),
+      enabled: resolveFeaturePluginEnabled(installed),
       presets: slotPresets(slot),
     };
   }

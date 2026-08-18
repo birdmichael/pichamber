@@ -762,7 +762,6 @@ describe('createPiHost', () => {
   it('lists /plan from the Plan slot before any session exists', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-plan-slot-cmd-'));
     try {
-      writeFeaturePlugins(home, { plan: { enabled: true } });
       await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-plan-mode');
       const host = createPiHost({
         mock: true,
@@ -879,7 +878,7 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
-  it('applyFeaturePluginPatch reloads idle sessions only when enabling an installed slot', async () => {
+  it('applyFeaturePluginPatch ignores enabled and does not reload from that overlay', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-enable-'));
     const idleSession = createInMemoryPiSession();
     idleSession.registerCommand('goal', async () => {}, { description: 'Goal' });
@@ -892,17 +891,24 @@ describe('createPiHost', () => {
       });
       const idle = await host.createSession({ directory: '/tmp/project', title: 'Idle' });
       const enabledMissing = await host.applyFeaturePluginPatch({ goal: { enabled: true } });
-      expect(enabledMissing.slots.goal.enabled).toBe(true);
+      expect(enabledMissing.slots.goal.enabled).toBe(false);
       expect(enabledMissing.slots.goal.installed).toBe(false);
       expect(enabledMissing.reload).toBeUndefined();
       expect(idleSession.reloadCount).toBe(0);
+      expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
 
       await host.installFeaturePlugin('goal', {});
       expect(idleSession.reloadCount).toBe(1);
-      const enabledInstalled = await host.applyFeaturePluginPatch({ goal: { enabled: true } });
-      expect(enabledInstalled.slots.goal.installed).toBe(true);
-      expect(enabledInstalled.reload.reloaded).toEqual([idle.id]);
-      expect(idleSession.reloadCount).toBe(2);
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), `${JSON.stringify({
+        featurePlugins: { goal: { source: 'npm:@narumitw/pi-goal', command: 'goal', enabled: false } },
+      }, null, 2)}\n`);
+      expect(host.getFeaturePlugins().slots.goal).toMatchObject({ installed: true, enabled: true });
+      const ignoredEnabled = await host.applyFeaturePluginPatch({ goal: { enabled: false } });
+      expect(ignoredEnabled.slots.goal).toMatchObject({ installed: true, enabled: true });
+      expect(ignoredEnabled.reload).toBeUndefined();
+      expect(idleSession.reloadCount).toBe(1);
+      const chamber = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'pichamber.json'), 'utf8'));
+      expect(chamber.featurePlugins.goal.enabled).toBe(false);
       expect(host.listCommands('/tmp/project', { sessionID: idle.id }).some((command) => (
         command.name === 'goal' && command.source === 'extension'
       ))).toBe(true);

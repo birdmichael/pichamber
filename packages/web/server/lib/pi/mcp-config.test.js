@@ -47,7 +47,7 @@ describe('MCP feature plugin gate', () => {
     expect(listAdapterMcpConfigs({ home, cwd }).map((item) => item.name)).toEqual(['leftover', 'project']);
   });
 
-  it('requires both installed and enabled', () => {
+  it('follows packages and ignores a leftover chamber enabled false', () => {
     const home = makeTemp();
     writeFeaturePlugins(home, { mcp: { enabled: true } });
     expect(isMcpFeaturePluginActive(home)).toBe(false);
@@ -55,8 +55,10 @@ describe('MCP feature plugin gate', () => {
       packages: ['npm:pi-mcp-adapter'],
     });
     expect(isMcpFeaturePluginActive(home)).toBe(true);
-    writeFeaturePlugins(home, { mcp: { enabled: false } });
-    expect(isMcpFeaturePluginActive(home)).toBe(false);
+    writeJson(path.join(home, '.pi', 'agent', 'pichamber.json'), {
+      featurePlugins: { mcp: { source: 'npm:pi-mcp-adapter', enabled: false } },
+    });
+    expect(isMcpFeaturePluginActive(home)).toBe(true);
   });
 
   it('treats an installed adapter as on when pichamber.json is missing', () => {

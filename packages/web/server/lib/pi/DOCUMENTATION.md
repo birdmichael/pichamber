@@ -170,11 +170,12 @@ Resolution order:
 ## Existing Pi agent recognition
 
 Missing `{agentDir}/pichamber.json` is not an explicit disable. Feature
-Plugin slot `enabled` is the chamber flag when that boolean is present,
-otherwise `installed` from `{agentDir}/settings.json` `packages` for that
-slot's source. Nothing is auto-installed. `featurePlugins.<slot>.enabled:
-false` remains an off switch. GET paths do not write `pichamber.json`.
-Do not map `{agentDir}/agents/*.md` into `GET /api/agent`.
+Plugin chrome is on when that slot's source is already in
+`{agentDir}/settings.json` `packages`. Chamber
+`featurePlugins.<slot>.enabled` is ignored on read and is never written.
+A leftover `enabled: false` does not hide chrome while the package is
+still listed. Nothing is auto-installed. GET paths do not write
+`pichamber.json`. Do not map `{agentDir}/agents/*.md` into `GET /api/agent`.
 
 New-session `model` / thinking use `settings.json` `defaultProvider` +
 `defaultModel` / `defaultThinkingLevel` only when `pichamber.json` has no
@@ -195,8 +196,8 @@ pin. Settings → Extensions packages lists those configured package names
   installed+enabled → `/run`)
 
 Optional `?session=` hydrates that session if needed, then pins the live
-`getCommands()` list. After Feature Plugins install, or enable of an already
-installed slot, idle sessions reload through `host.reloadIdleSessions()` /
+`getCommands()` list. After Feature Plugins install, idle sessions reload
+through `host.reloadIdleSessions()` /
 `POST /api/session/:id/reload` / `piSession.reload()`. The next list read
 sees whatever the live session `getCommands()` reports. `reload` is never
 merged in. Do not emit `server.connected`.
@@ -373,9 +374,9 @@ disk list, and sidebar Refresh read it onto `info.parentID`.
 
 Settings → MCP and Work Status MCP are gated on the feature-plugin slot
 (`installed` and `enabled` for `mcp`, default source `npm:pi-mcp-adapter`).
-An adapter already listed in `settings.json` `packages` turns the slot on
-when `pichamber.json` does not set `enabled`. Opening Feature Plugins never
-auto-installs the adapter. Leftover `~/.config/mcp/mcp.json` or
+`enabled` follows `packages`: an adapter already listed in `settings.json`
+turns the slot on. Chamber `enabled` is ignored. Opening Feature Plugins
+never auto-installs the adapter. Leftover `~/.config/mcp/mcp.json` or
 `<cwd>/.mcp.json` files do not reveal those surfaces while the slot is off.
 
 When the slot is on:
@@ -421,7 +422,7 @@ chat:
    so `registerCommand` runs.
 
 A new empty session lists `goal` on `GET /api/command?session=` after
-install/enable because that GET hydrates the session and idle sessions were
+install because that GET hydrates the session and idle sessions were
 reloaded. The composer Goal button may mint a draft session before
 `session.command`. Start failures stay in the modal. Do not require a
 provider/model for this command-only start.

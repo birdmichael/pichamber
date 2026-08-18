@@ -79,6 +79,9 @@ describe('feature plugin payload parsing', () => {
     expect(pageSource.includes('@xl:grid-cols-2')).toBe(true);
     expect(/(?:^|[^@\w])(?:sm|lg):/.test(pageSource)).toBe(false);
     expect(pageSource.includes('data-settings-item={copy.settingsItem}')).toBe(true);
+    expect(pageSource.includes('SettingsCheckboxRow')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.enabled')).toBe(false);
+    expect(pageSource.includes('onEnabledChange')).toBe(false);
     for (const slot of FEATURE_PLUGIN_SLOTS) {
       expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
     }
