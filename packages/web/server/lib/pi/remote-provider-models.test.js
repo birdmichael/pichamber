@@ -93,12 +93,18 @@ describe('remote-provider-models', () => {
         { id: 'local-llm', input: ['TEXT', 'image', 'audio'] },
         { id: 'empty', input: [] },
         { id: 'plain' },
+        {
+          id: 'openrouter-vision',
+          architecture: { input_modalities: ['text', 'image'] },
+          supported_parameters: ['reasoning'],
+        },
       ],
     })).toEqual([
       { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] },
       { id: 'local-llm', name: 'local-llm', input: ['text', 'image'] },
       { id: 'empty', name: 'empty' },
       { id: 'plain', name: 'plain' },
+      { id: 'openrouter-vision', name: 'openrouter-vision', input: ['text', 'image'], reasoning: true },
     ]);
   });
 

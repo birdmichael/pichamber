@@ -11,9 +11,13 @@ import {
   readPositiveContextWindow,
   resolveContextWindow,
   resolvePersistedContextWindow,
-  resolvePersistedInput,
   type PiModelInputType,
 } from '@/lib/model-context-windows';
+import {
+  resolvePersistedImageInput,
+  resolvePersistedReasoning,
+  type CatalogCapabilityEntry,
+} from '@/lib/model-catalog-capabilities';
 
 export const CUSTOM_PROVIDER_NPM = '@ai-sdk/openai-compatible';
 export const CUSTOM_PROVIDER_ID = '__custom_provider__';
@@ -73,6 +77,7 @@ export type CustomProviderModelConfig = {
   name: string;
   contextWindow?: number;
   input?: PiModelInputType[];
+  reasoning?: true;
 };
 
 export type CustomProviderConfig = {
@@ -106,6 +111,8 @@ export type ValidateCustomProviderInput = {
    * (edit path). Still requires env or key when false.
    */
   allowExistingAuth?: boolean;
+  /** models.dev (or equivalent) entries used to persist vision / reasoning. */
+  catalog?: readonly CatalogCapabilityEntry[];
 };
 
 export type ValidateCustomProviderResult = {
@@ -424,9 +431,14 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
         id,
         contextWindow: model.contextWindow,
       });
-      const modelInput = resolvePersistedInput({
+      const modelInput = resolvePersistedImageInput({
         id,
         input: model.input,
+        catalog: input.catalog,
+      });
+      const reasoning = resolvePersistedReasoning({
+        id,
+        catalog: input.catalog,
       });
       return [
         id,
@@ -434,6 +446,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
           name: model.name.trim(),
           ...(contextWindow !== undefined ? { contextWindow } : {}),
           ...(modelInput !== undefined ? { input: modelInput } : {}),
+          ...(reasoning ? { reasoning: true as const } : {}),
         },
       ];
     }),
@@ -593,7 +606,7 @@ export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProvid
       id,
       catalogContextWindow: item,
     });
-    const modelInput = resolvePersistedInput({
+    const modelInput = resolvePersistedImageInput({
       id,
       input: (item as { input?: unknown }).input,
     });
@@ -777,7 +790,7 @@ export function collapseRemoteModels(
         catalogContextWindow: catalog?.contextWindow,
       });
       const catalogInput = group.find((model) => readPersistedModelInput(model.input) !== undefined);
-      const modelInput = resolvePersistedInput({
+      const modelInput = resolvePersistedImageInput({
         id,
         input: catalogInput?.input,
       });
@@ -874,7 +887,7 @@ export function addRemoteModelsToForm(
       id,
       catalogContextWindow: model.contextWindow,
     });
-    const modelInput = resolvePersistedInput({
+    const modelInput = resolvePersistedImageInput({
       id,
       input: model.input,
     });

@@ -1,3 +1,4 @@
+import { findCatalogMetadata } from '@/lib/model-catalog-capabilities';
 import type { ModelMetadata } from '@/types';
 
 type LiveProviderModel = Record<string, unknown> & { id?: string; name?: string };
@@ -7,6 +8,12 @@ const getNumericLimit = (limit: unknown, key: 'context' | 'output') => {
   const value = (limit as Record<string, unknown>)[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 };
+
+export const lookupModelMetadata = (
+  catalog: Map<string, ModelMetadata>,
+  providerId: string,
+  modelId: string,
+): ModelMetadata | undefined => findCatalogMetadata(catalog, providerId, modelId);
 
 export const mergeModelMetadataWithLiveModel = (
   providerId: string,

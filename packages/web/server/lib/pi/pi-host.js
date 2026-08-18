@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
 import {
@@ -22,6 +23,7 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
+  hydrateKnownModelCapabilities,
   listPiProviderPublicConfigs,
   upsertPiProviderConfig,
   deletePiProviderConfig,
@@ -666,21 +668,31 @@ const capabilitiesFromPiInput = (input, reasoning) => ({
   },
 });
 
+const isPiDefaultTextInput = (input) => (
+  Array.isArray(input) && input.length === 1 && input[0] === 'text'
+);
+
 const toProviderModelRecord = (model) => {
   const id = typeof model?.id === 'string' ? model.id.trim() : '';
   if (!id) return null;
-  const contextWindow = Number(model.contextWindow);
-  const maxTokens = Number(model.maxTokens);
+  const enriched = enrichKnownModelEntry(id, model).model;
+  const contextWindow = Number(enriched.contextWindow ?? model.contextWindow);
+  const maxTokens = Number(enriched.maxTokens ?? model.maxTokens);
   const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
   const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
-  const input = readPiModelInput(model);
+  const input = readPiModelInput(enriched);
   return {
     id,
-    name: typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id,
-    reasoning: Boolean(model.reasoning),
+    name: typeof (enriched.name ?? model.name) === 'string' && String(enriched.name ?? model.name).trim()
+      ? String(enriched.name ?? model.name).trim()
+      : id,
+    reasoning: enriched.reasoning === true,
     ...(hasContext ? { contextWindow } : {}),
     ...(hasOutput ? { maxTokens } : {}),
-    ...(input ? { input, capabilities: capabilitiesFromPiInput(input, model.reasoning) } : {}),
+    ...(input || model.reasoning === true ? {
+      ...(input ? { input } : {}),
+      capabilities: capabilitiesFromPiInput(input || ['text'], enriched.reasoning),
+    } : {}),
     cost: model.cost,
     ...(hasContext || hasOutput ? {
       limit: {
@@ -729,23 +741,27 @@ const applyPublicProviderConfig = (provider, config) => {
     const existingLimit = existing.limit && typeof existing.limit === 'object' ? existing.limit : {};
     const existingContext = existing.contextWindow || existingLimit.context;
     const existingOutput = existing.maxTokens || existingLimit.output;
-    const existingInput = readPiModelInput(existing);
+    const existingInputRaw = readPiModelInput(existing);
+    const existingInput = isPiDefaultTextInput(existingInputRaw) ? undefined : existingInputRaw;
+    const existingReasoning = existing.reasoning === true || existing.capabilities?.reasoning === true;
     const contextWindow = existingContext || record.contextWindow;
     const maxTokens = existingOutput || record.maxTokens;
     const input = existingInput || record.input;
+    const reasoning = existingReasoning || record.reasoning === true;
     const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
     const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
     const hasInput = Array.isArray(input) && input.length > 0;
-    if (!hasContext && !hasOutput && !hasInput) continue;
+    if (!hasContext && !hasOutput && !hasInput && !reasoning) continue;
     provider.models[record.id] = {
       ...existing,
+      ...(reasoning && !existingReasoning ? { reasoning: true } : {}),
       ...(hasContext && !existingContext ? { contextWindow: Number(contextWindow) } : {}),
       ...(hasOutput && !existingOutput ? { maxTokens: Number(maxTokens) } : {}),
-      ...(hasInput && !existingInput ? {
-        input,
+      ...((hasInput && !existingInput) || (reasoning && !existingReasoning) ? {
+        ...(hasInput && !existingInput ? { input } : {}),
         capabilities: {
           ...(existing.capabilities && typeof existing.capabilities === 'object' ? existing.capabilities : {}),
-          ...capabilitiesFromPiInput(input, existing.reasoning ?? record.reasoning),
+          ...capabilitiesFromPiInput(input || existingInput || ['text'], reasoning),
         },
       } : {}),
       ...(hasContext || hasOutput ? {
@@ -1091,6 +1107,7 @@ export const createPiHost = ({
     if (modelRuntime || mock) return modelRuntime;
     if (modelRuntimeError) throw modelRuntimeError;
     try {
+      hydrateKnownModelCapabilities({ home, directory: defaultDirectory });
       if (typeof createModelRuntime === 'function') {
         modelRuntime = await createModelRuntime();
       } else {

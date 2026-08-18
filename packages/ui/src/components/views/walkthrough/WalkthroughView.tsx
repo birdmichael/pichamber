@@ -29,6 +29,7 @@ import {
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useUIStore } from '@/stores/useUIStore';
 import { useWalkthroughStore } from '@/stores/useWalkthroughStore';
+import { lookupModelMetadata } from '@/lib/modelMetadata';
 import { cn } from '@/lib/utils';
 import { WalkthroughBlocker } from './WalkthroughBlocker';
 import { WALKTHROUGH_ACTION_CLASS } from './walkthroughAction';
@@ -404,7 +405,7 @@ export const WalkthroughView = ({ directory }: WalkthroughViewProps) => {
 
   const isStructuredOutputCapable = useCallback(
     (providerId: string, modelId: string) =>
-      modelsMetadata.get(`${providerId}/${modelId}`)?.structured_output !== false,
+      lookupModelMetadata(modelsMetadata, providerId, modelId)?.structured_output !== false,
     [modelsMetadata]
   );
 

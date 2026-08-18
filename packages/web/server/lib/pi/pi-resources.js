@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import yaml from 'yaml';
 
+import { enrichKnownModelEntry } from './known-model-capabilities.js';
+
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 export const DEFAULT_COMPACTION_SETTINGS = {
@@ -544,6 +546,11 @@ const readModelInput = (model) => {
   return next.length > 0 ? next : undefined;
 };
 
+const readModelReasoning = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  return model.reasoning === true ? true : undefined;
+};
+
 const toPiModelEntry = (id, model) => {
   const name = model && typeof model === 'object' && typeof model.name === 'string' && model.name.trim()
     ? model.name.trim()
@@ -551,12 +558,14 @@ const toPiModelEntry = (id, model) => {
   const contextWindow = readModelContextWindow(model);
   const maxTokens = readModelMaxTokens(model);
   const input = readModelInput(model);
+  const reasoning = readModelReasoning(model);
   return {
     id,
     name,
     ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(maxTokens !== undefined ? { maxTokens } : {}),
     ...(input !== undefined ? { input } : {}),
+    ...(reasoning ? { reasoning: true } : {}),
   };
 };
 
@@ -663,6 +672,53 @@ const publicPiProviderConfig = (provider) => {
   return envName ? { ...rest, env: [envName] } : rest;
 };
 
+const enrichProviderModels = (provider) => {
+  if (!provider || typeof provider !== 'object' || Array.isArray(provider)) {
+    return { provider, changed: false };
+  }
+  const models = Array.isArray(provider.models) ? provider.models : [];
+  let changed = false;
+  const nextModels = models.map((model) => {
+    if (!model || typeof model !== 'object' || typeof model.id !== 'string') return model;
+    const enriched = enrichKnownModelEntry(model.id, model);
+    if (enriched.changed) changed = true;
+    return enriched.model;
+  });
+  return {
+    provider: changed ? { ...provider, models: nextModels } : provider,
+    changed,
+  };
+};
+
+/**
+ * Fill known vision / reasoning ids on an existing models.json without a
+ * Settings save. Missing or Pi-default `["text"]` is treated as empty.
+ * Unknown ids and explicit non-default values stay as stored.
+ */
+export const hydrateKnownModelCapabilities = ({ home = os.homedir(), directory } = {}) => {
+  const files = [resolvePiModelsPath(home)];
+  if (typeof directory === 'string' && directory.trim()) {
+    files.push(path.join(directory.trim(), '.pi', 'models.json'));
+  }
+  const hydrated = [];
+  for (const filePath of [...new Set(files)]) {
+    if (!fs.existsSync(filePath)) continue;
+    const current = readJsonObject(filePath);
+    const providers = { ...providerMap(current) };
+    let changed = false;
+    for (const [id, provider] of Object.entries(providers)) {
+      const next = enrichProviderModels(provider);
+      if (!next.changed) continue;
+      providers[id] = next.provider;
+      changed = true;
+    }
+    if (!changed) continue;
+    writeJsonFile(filePath, { ...current, providers }, 0o600);
+    hydrated.push(filePath);
+  }
+  return { paths: hydrated };
+};
+
 /**
  * User + project models.json providers without credentials.
  * Settings uses baseUrl/name/headers to decide Edit and prefill the form.
@@ -682,7 +738,7 @@ export const listPiProviderPublicConfigs = ({ home = os.homedir(), directory } =
     const project = projectProviders[id] && typeof projectProviders[id] === 'object' && !Array.isArray(projectProviders[id])
       ? projectProviders[id]
       : {};
-    result[id] = publicPiProviderConfig({ ...user, ...project });
+    result[id] = publicPiProviderConfig(enrichProviderModels({ ...user, ...project }).provider);
   }
   return result;
 };

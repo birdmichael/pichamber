@@ -16,7 +16,7 @@ import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getCurrentIntlLocale } from '@/lib/i18n';
-import { mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
+import { lookupModelMetadata, mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
 import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
 import { cn } from '@/lib/utils';
 import { useModelPickerSectionsStore } from '@/stores/useModelPickerSectionsStore';
@@ -648,7 +648,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
   let currentFlatIndex = 0;
 
   const renderRow = (entry: ModelPickerEntry, keyPrefix: string, showProviderLogo: boolean, rowIndex: number, dragHandleProps?: SortableFavoriteHandleProps | null) => {
-    const metadata = mergeModelMetadataWithLiveModel(entry.providerID, entry.model, modelsMetadata.get(`${entry.providerID}/${entry.modelID}`));
+    const metadata = mergeModelMetadataWithLiveModel(entry.providerID, entry.model, lookupModelMetadata(modelsMetadata, entry.providerID, entry.modelID));
     const contextTokens = formatModelContextTokens(metadata?.limit?.context);
     const count = selectionCount?.(entry) ?? 0;
     const isSelected = selectedModel?.providerID === entry.providerID && selectedModel.modelID === entry.modelID;
