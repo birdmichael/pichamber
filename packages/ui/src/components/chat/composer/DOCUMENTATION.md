@@ -25,8 +25,11 @@ inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
-`isPrimaryMode`. `ComposerFooter` `isMobile` and collapsed
-`MobilePillComposer` do not host that leftover chip.
+`isPrimaryMode`. The expanded mobile chip row hosts `MobileThinkingButton`
+on Pi and `MobileModelButton`; those chips open the hidden `ModelControls`
+bottom sheets (`variant` / `model` / `agent`). `ComposerFooter` `isMobile`
+and collapsed `MobilePillComposer` do not host the leftover agent chip or
+the thinking chip.
 On Pi, `@agent` mentions do not switch session personality: the send path
 does not route `@agent:build` / `@agent:plan` / leftover OpenCode names, the
 prompt language does not classify those tokens as `agent`, and `@`
@@ -52,7 +55,8 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
-Model and thinking chips stay. On Pi the thinking chip lists
+Model and thinking chips stay on the expanded mobile composer, not the
+collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
 `getAvailableThinkingLevels()`, not the full seven-level catalog, and
 clamps the current chip onto that list. A new-session draft with no

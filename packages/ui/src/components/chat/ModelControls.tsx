@@ -48,6 +48,7 @@ import {
     resolveVisiblePiThinkingLevels,
     type PiThinkingLevel,
 } from './piThinking';
+import { usePiThinkingChipStore } from './piThinkingChipStore';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
 import { usePiKernel } from '@/lib/usePiKernel';
@@ -430,6 +431,15 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         () => resolveVisiblePiThinkingLevels(piThinkingLevels ?? draftThinkingLevels),
         [draftThinkingLevels, piThinkingLevels],
     );
+
+    React.useEffect(() => {
+        usePiThinkingChipStore.getState().setLevel(isPiKernel ? piThinking : undefined);
+    }, [isPiKernel, piThinking]);
+    React.useEffect(() => {
+        return () => {
+            usePiThinkingChipStore.getState().setLevel(undefined);
+        };
+    }, []);
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
         setPiThinking(level);
