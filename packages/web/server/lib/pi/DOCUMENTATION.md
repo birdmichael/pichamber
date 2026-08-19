@@ -24,6 +24,21 @@ Empty string clears the override. Changing the directory does not copy
 `@earendil-works/pi-coding-agent` with npm and returns
 `upgrade.supported: false` (`reason: "bundled"`).
 
+## First-install project seed
+
+When `~/.config/openchamber/settings.json` is missing, or the file exists
+but has never persisted a `projects` key, settings migration walks
+`{agentDir}/sessions/` and seeds those cwds as open projects. Read `cwd`
+from the session jsonl header (first object). Do not decode the encoded
+folder name. Keep paths that still exist as directories. Skip `/tmp`,
+`/private/tmp`, `os.tmpdir()`, and any `node_modules`
+tree. Nested herdr/subagent jsonl are children, not projects. `archive/`
+stays off the list. One unreadable folder or jsonl does not drop the
+rest. `activeProjectId` / `lastDirectory` are the most recently updated
+remaining cwd. `projects: []` after Close Project is not first-install —
+do not scan again. This write does not create `{agentDir}/pichamber.json`
+and does not flatten `GET /api/session`. List stays directory-scoped.
+
 ## Custom provider context windows and input
 
 Settings → Providers custom-model rows persist Pi `contextWindow`,
