@@ -1,4 +1,11 @@
+import os from 'node:os';
+
 import { createProjectIdFromPath } from '../projects/project-id.js';
+import { resolvePiAgentDir } from '../pi/pi-resources.js';
+import {
+  discoverPiSessionProjects,
+  settingsNeverPersistedProjects,
+} from '../pi/pi-session-projects.js';
 
 const DEFAULT_NOTIFICATION_TEMPLATES = {
   completion: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
@@ -44,6 +51,10 @@ export const createSettingsRuntime = (deps) => {
     normalizeManagedRemoteTunnelPresetTokens,
     syncManagedRemoteTunnelConfigWithPresets,
     upsertManagedRemoteTunnelToken,
+    home = os.homedir(),
+    env = process.env,
+    tmpdir = os.tmpdir(),
+    discoverPiSessionProjects: discoverPiSessionProjectsFn = discoverPiSessionProjects,
   } = deps;
 
   let persistSettingsLock = Promise.resolve();
@@ -551,6 +562,102 @@ export const createSettingsRuntime = (deps) => {
     return (await Promise.all(validations)).filter((p) => p !== null);
   };
 
+  const unionProjectEntries = (seeded, incoming) => {
+    const byPath = new Map();
+    for (const project of seeded) {
+      if (project?.path) byPath.set(project.path, project);
+    }
+    for (const project of incoming) {
+      if (!project?.path) continue;
+      const existing = byPath.get(project.path);
+      byPath.set(project.path, existing ? { ...existing, ...project } : project);
+    }
+    return [...byPath.values()];
+  };
+
+  const migrateSettingsFromPiSessionProjects = async (current) => {
+    const settings = current && typeof current === 'object' ? current : {};
+    if (!settingsNeverPersistedProjects(settings)) {
+      return { settings, changed: false };
+    }
+
+    let discovered = [];
+    try {
+      discovered = await discoverPiSessionProjectsFn({
+        agentDir: resolvePiAgentDir(home, {
+          piAgentDir: settings.piAgentDir,
+          env,
+        }),
+        fsPromises,
+        path,
+        tmpdir,
+      });
+    } catch {
+      return { settings, changed: false };
+    }
+
+    if (!Array.isArray(discovered) || discovered.length === 0) {
+      return { settings, changed: false };
+    }
+
+    const now = Date.now();
+    const projects = [];
+    for (const entry of discovered) {
+      const projectPath = typeof entry?.path === 'string' ? entry.path : '';
+      const id = createProjectIdFromPath(projectPath);
+      if (!id || !projectPath) continue;
+      projects.push({
+        id,
+        path: projectPath,
+        ...(entry.label ? { label: entry.label } : {}),
+        addedAt: now,
+        lastOpenedAt: Number.isFinite(entry.lastUpdated) ? entry.lastUpdated : now,
+      });
+    }
+
+    if (projects.length === 0) {
+      return { settings, changed: false };
+    }
+
+    const newest = discovered.reduce((best, entry) => (
+      (entry?.lastUpdated || 0) > (best?.lastUpdated || 0) ? entry : best
+    ), discovered[0]);
+    const active = projects.find((project) => project.path === newest?.path) || projects[0];
+    const merged = mergePersistedSettings(settings, {
+      ...settings,
+      projects,
+      activeProjectId: active.id,
+      lastDirectory: active.path,
+    });
+    return { settings: merged, changed: true };
+  };
+
+  const restoreSeededProjectsAfterPersist = (seed, sanitized, next) => {
+    if (!seed.changed || !Array.isArray(seed.settings.projects) || seed.settings.projects.length === 0) {
+      return next;
+    }
+
+    const incomingProjects = Object.prototype.hasOwnProperty.call(sanitized, 'projects')
+      ? (sanitizeProjects(sanitized.projects) || [])
+      : null;
+    if (!incomingProjects || incomingProjects.length === 0) {
+      return {
+        ...next,
+        projects: seed.settings.projects,
+        activeProjectId: seed.settings.activeProjectId,
+        lastDirectory: seed.settings.lastDirectory,
+      };
+    }
+
+    const projects = unionProjectEntries(seed.settings.projects, incomingProjects);
+    const active = projects.find((project) => project.path === seed.settings.lastDirectory) || projects[0];
+    return {
+      ...next,
+      projects,
+      ...(active ? { activeProjectId: active.id, lastDirectory: active.path } : {}),
+    };
+  };
+
   const migrateSettingsFromLegacyLastDirectory = async (current) => {
     const settings = current && typeof current === 'object' ? current : {};
     const now = Date.now();
@@ -805,7 +912,8 @@ export const createSettingsRuntime = (deps) => {
 
   const readSettingsFromDiskMigrated = async () => {
     const current = await readSettingsFromDisk();
-    const migration1 = await migrateSettingsFromLegacyLastDirectory(current);
+    const migration0 = await migrateSettingsFromPiSessionProjects(current);
+    const migration1 = await migrateSettingsFromLegacyLastDirectory(migration0.settings);
     const migration2 = await migrateSettingsFromLegacyThemePreferences(migration1.settings);
     const migration3 = await migrateSettingsFromLegacyCollapsedProjects(migration2.settings);
     const migration4 = await migrateSettingsNotificationDefaults(migration3.settings);
@@ -813,7 +921,7 @@ export const createSettingsRuntime = (deps) => {
     const migration6 = normalizeSettingsPaths(migration5.settings);
     const migration7 = await migrateSettingsToDeterministicProjectIds(migration6.settings);
     const migration8 = migrateSettingsRemoveApprovedDirectories(migration7.settings);
-    if (migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed) {
+    if (migration0.changed || migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed) {
       await writeSettingsToDisk(migration8.settings);
     }
     return migration8.settings;
@@ -825,8 +933,10 @@ export const createSettingsRuntime = (deps) => {
       // client tokens, tunnel tokens) that must never reach the log file.
       console.log('[persistSettings] Updating fields:', Object.keys(changes || {}).join(', ') || '(none)');
       const current = await readSettingsFromDisk();
+      const seed = await migrateSettingsFromPiSessionProjects(current);
       const sanitized = sanitizeSettingsUpdate(changes);
-      let next = mergePersistedSettings(current, sanitized);
+      let next = mergePersistedSettings(seed.settings, sanitized);
+      next = restoreSeededProjectsAfterPersist(seed, sanitized, next);
 
       const normalizedState = normalizeSettingsPaths(next);
       if (normalizedState.changed) {
