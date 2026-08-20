@@ -156,8 +156,9 @@ describe('settings runtime', () => {
 
   it('seeds every existing Pi session cwd on first install and opens the newest', async () => {
     const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
-    const older = path.join(tempRoot, 'older-app');
-    const newer = path.join(tempRoot, 'newer-app');
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-projects-'));
+    const older = path.join(projectsRoot, 'older-app');
+    const newer = path.join(projectsRoot, 'newer-app');
     await fsPromises.mkdir(older, { recursive: true });
     await fsPromises.mkdir(newer, { recursive: true });
     const sessionsRoot = path.join(tempRoot, '.pi', 'agent', 'sessions');
@@ -181,13 +182,15 @@ describe('settings runtime', () => {
         code: 'ENOENT',
       });
     } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
       await cleanup();
     }
   });
 
   it('seeds when settings exist but projects has never been persisted', async () => {
     const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
-    const projectPath = path.join(tempRoot, 'existing-app');
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-existing-'));
+    const projectPath = path.join(projectsRoot, 'existing-app');
     await fsPromises.mkdir(projectPath, { recursive: true });
     await writeHeader(
       path.join(tempRoot, '.pi', 'agent', 'sessions', '--existing--', 'a.jsonl'),
@@ -202,6 +205,7 @@ describe('settings runtime', () => {
       expect(settings.activeProjectId).toBe(createProjectIdFromPath(projectPath));
       expect(settings.lastDirectory).toBe(projectPath);
     } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
       await cleanup();
     }
   });
@@ -227,7 +231,8 @@ describe('settings runtime', () => {
 
   it('keeps a first-install persist of empty projects from wiping the seed', async () => {
     const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
-    const projectPath = path.join(tempRoot, 'kept-app');
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-kept-'));
+    const projectPath = path.join(projectsRoot, 'kept-app');
     await fsPromises.mkdir(projectPath, { recursive: true });
     await writeHeader(
       path.join(tempRoot, '.pi', 'agent', 'sessions', '--kept--', 'a.jsonl'),
@@ -242,6 +247,7 @@ describe('settings runtime', () => {
       const onDisk = JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'));
       expect(onDisk.projects.map((project) => project.path)).toEqual([projectPath]);
     } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
       await cleanup();
     }
   });

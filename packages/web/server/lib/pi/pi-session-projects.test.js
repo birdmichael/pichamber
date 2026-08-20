@@ -45,7 +45,8 @@ describe('pi session project discovery', () => {
   });
 
   it('reads cwd from session headers, not encoded folder names', async () => {
-    const home = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'pi-session-projects-'));
+    // Keep-paths must not live under /tmp or os.tmpdir(); those cwds are skipped.
+    const home = await fsPromises.mkdtemp(path.join(os.homedir(), 'pi-session-projects-'));
     const older = path.join(home, 'older-app');
     const newer = path.join(home, 'newer-app');
     const missing = path.join(home, 'deleted-app');
