@@ -26,6 +26,9 @@ const createRuntime = async () => {
     normalizeManagedRemoteTunnelPresetTokens: (value) => value,
     syncManagedRemoteTunnelConfigWithPresets: async () => {},
     upsertManagedRemoteTunnelToken: async () => {},
+    home: tempRoot,
+    env: {},
+    tmpdir: path.join(tempRoot, 'skip-tmp'),
   });
 
   return {
@@ -123,6 +126,9 @@ describe('settings runtime', () => {
       normalizeManagedRemoteTunnelPresetTokens: (value) => value,
       syncManagedRemoteTunnelConfigWithPresets: async () => {},
       upsertManagedRemoteTunnelToken: async () => {},
+      home: tempRoot,
+      env: {},
+      tmpdir: path.join(tempRoot, 'skip-tmp'),
     });
 
     try {
@@ -131,6 +137,118 @@ describe('settings runtime', () => {
       await expect(fsPromises.readFile(settingsFilePath, 'utf8')).resolves.toBe(JSON.stringify({ theme: 'dark' }, null, 2));
     } finally {
       await fsPromises.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  const writeHeader = async (filePath, cwd, timestamp) => {
+    await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+    await fsPromises.writeFile(
+      filePath,
+      `${JSON.stringify({
+        type: 'session',
+        cwd,
+        timestamp: new Date(timestamp).toISOString(),
+      })}\n`,
+      'utf8',
+    );
+    await fsPromises.utimes(filePath, new Date(timestamp), new Date(timestamp));
+  };
+
+  it('seeds every existing Pi session cwd on first install and opens the newest', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-projects-'));
+    const older = path.join(projectsRoot, 'older-app');
+    const newer = path.join(projectsRoot, 'newer-app');
+    await fsPromises.mkdir(older, { recursive: true });
+    await fsPromises.mkdir(newer, { recursive: true });
+    const sessionsRoot = path.join(tempRoot, '.pi', 'agent', 'sessions');
+    await writeHeader(path.join(sessionsRoot, '--not-a-path-decode--', 'a.jsonl'), older, 1_000);
+    await writeHeader(path.join(sessionsRoot, '--also-not-decoded--', 'b.jsonl'), newer, 8_000);
+    await writeHeader(
+      path.join(sessionsRoot, '--tmp-scratch--', 'c.jsonl'),
+      path.join(os.tmpdir(), 'scratch'),
+      9_000,
+    );
+
+    try {
+      const settings = await runtime.readSettingsFromDiskMigrated();
+      const persisted = JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'));
+
+      expect(settings.projects.map((project) => project.path)).toEqual([newer, older]);
+      expect(settings.activeProjectId).toBe(createProjectIdFromPath(newer));
+      expect(settings.lastDirectory).toBe(newer);
+      expect(persisted.projects.map((project) => project.path)).toEqual([newer, older]);
+      await expect(fsPromises.stat(path.join(tempRoot, '.pi', 'agent', 'pichamber.json'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+    } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
+      await cleanup();
+    }
+  });
+
+  it('seeds when settings exist but projects has never been persisted', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-existing-'));
+    const projectPath = path.join(projectsRoot, 'existing-app');
+    await fsPromises.mkdir(projectPath, { recursive: true });
+    await writeHeader(
+      path.join(tempRoot, '.pi', 'agent', 'sessions', '--existing--', 'a.jsonl'),
+      projectPath,
+      4_000,
+    );
+    await fsPromises.writeFile(settingsFilePath, JSON.stringify({ lastDirectory: tempRoot }, null, 2), 'utf8');
+
+    try {
+      const settings = await runtime.readSettingsFromDiskMigrated();
+      expect(settings.projects.map((project) => project.path)).toEqual([projectPath]);
+      expect(settings.activeProjectId).toBe(createProjectIdFromPath(projectPath));
+      expect(settings.lastDirectory).toBe(projectPath);
+    } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
+      await cleanup();
+    }
+  });
+
+  it('does not rescan after Close Project persisted an empty projects array', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    const projectPath = path.join(tempRoot, 'closed-app');
+    await fsPromises.mkdir(projectPath, { recursive: true });
+    await writeHeader(
+      path.join(tempRoot, '.pi', 'agent', 'sessions', '--closed--', 'a.jsonl'),
+      projectPath,
+      4_000,
+    );
+    await fsPromises.writeFile(settingsFilePath, JSON.stringify({ projects: [] }, null, 2), 'utf8');
+
+    try {
+      const settings = await runtime.readSettingsFromDiskMigrated();
+      expect(settings.projects).toEqual([]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('keeps a first-install persist of empty projects from wiping the seed', async () => {
+    const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
+    const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-kept-'));
+    const projectPath = path.join(projectsRoot, 'kept-app');
+    await fsPromises.mkdir(projectPath, { recursive: true });
+    await writeHeader(
+      path.join(tempRoot, '.pi', 'agent', 'sessions', '--kept--', 'a.jsonl'),
+      projectPath,
+      4_000,
+    );
+
+    try {
+      const persisted = await runtime.persistSettings({ projects: [] });
+      expect(persisted.projects.map((project) => project.path)).toEqual([projectPath]);
+      expect(persisted.activeProjectId).toBe(createProjectIdFromPath(projectPath));
+      const onDisk = JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'));
+      expect(onDisk.projects.map((project) => project.path)).toEqual([projectPath]);
+    } finally {
+      await fsPromises.rm(projectsRoot, { recursive: true, force: true });
+      await cleanup();
     }
   });
 });

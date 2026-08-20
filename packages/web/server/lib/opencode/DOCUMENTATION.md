@@ -204,6 +204,12 @@ Transport-triggered health checks share the periodic monitor's failure accountin
   - `writeSettingsToDisk(settings)`
   - `persistSettings(changes)`
   - Persistent permission auto-accept policy is stored under `permissionAutoAccept`; execution ownership lives in `lib/permission-auto-accept/`.
+  - First-install only: when `projects` has never been persisted, migration
+    seeds open projects from `{agentDir}/sessions/` (see
+    `lib/pi/DOCUMENTATION.md` First-install project seed) before the leftover
+    `lastDirectory` single-project migration. `projects: []` is not
+    first-install. A first persist that sends `projects: []` must not wipe
+    that seed.
 
 ## Public exports (settings-helpers.js)
 - `createSettingsHelpers(dependencies)`: creates settings helper runtime for settings request/response shaping.
