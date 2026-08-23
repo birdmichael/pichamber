@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
 
-const toastInfo = mock((_title: string, _options?: unknown) => undefined)
-const openSessionFromToast = mock((_sessionId: string, _directory: string) => undefined)
+const toastInfoCalls: Array<{ title: string; options?: unknown }> = []
+const openSessionCalls: Array<{ sessionId: string; directory: string }> = []
 
 mock.module("@/components/ui", () => ({
   toast: {
-    info: toastInfo,
+    info: (title: string, options?: unknown) => {
+      toastInfoCalls.push({ title, options })
+    },
   },
 }))
 
@@ -17,7 +19,9 @@ mock.module("@/lib/i18n", () => ({
 }))
 
 mock.module("./session-navigation", () => ({
-  openSessionFromToast,
+  openSessionFromToast: (sessionId: string, directory: string) => {
+    openSessionCalls.push({ sessionId, directory })
+  },
 }))
 
 const {
@@ -28,31 +32,33 @@ const {
 
 describe("showKernelReloadInterruptedToast", () => {
   beforeEach(() => {
-    toastInfo.mockClear()
-    openSessionFromToast.mockClear()
+    toastInfoCalls.length = 0
+    openSessionCalls.length = 0
   })
 
   test("shows a sticky continue toast without an action when the session is unknown", () => {
     showKernelReloadInterruptedToast({})
 
-    expect(toastInfo).toHaveBeenCalledTimes(1)
-    expect(toastInfo).toHaveBeenCalledWith("chat.toast.opencodeRestartInterrupted.title", {
-      id: KERNEL_RELOAD_INTERRUPTED_TOAST_ID,
-      description: "chat.toast.opencodeRestartInterrupted.description",
-      duration: Infinity,
-    })
+    expect(toastInfoCalls).toEqual([{
+      title: "chat.toast.opencodeRestartInterrupted.title",
+      options: {
+        id: KERNEL_RELOAD_INTERRUPTED_TOAST_ID,
+        description: "chat.toast.opencodeRestartInterrupted.description",
+        duration: Infinity,
+      },
+    }])
   })
 
   test("adds Open session when both session and directory are present", () => {
     showKernelReloadInterruptedToast({ sessionId: "ses_1", directory: "/tmp/project" })
 
-    expect(toastInfo).toHaveBeenCalledTimes(1)
-    const options = toastInfo.mock.calls[0]?.[1] as {
+    expect(toastInfoCalls).toHaveLength(1)
+    const options = toastInfoCalls[0]?.options as {
       action?: { label?: string; onClick?: () => void }
     }
     expect(options.action?.label).toBe("chat.toast.opencodeRestartInterrupted.openSession")
     options.action?.onClick?.()
-    expect(openSessionFromToast).toHaveBeenCalledWith("ses_1", "/tmp/project")
+    expect(openSessionCalls).toEqual([{ sessionId: "ses_1", directory: "/tmp/project" }])
   })
 
   test("keeps the official notification kind", () => {
