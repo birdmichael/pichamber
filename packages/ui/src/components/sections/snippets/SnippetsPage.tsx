@@ -113,20 +113,26 @@ export const SnippetsPage: React.FC = () => {
 
   if (!selectedSnippetName) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center text-muted-foreground">
-          <Icon name="file-text" className="mx-auto mb-3 h-12 w-12 opacity-50" />
-          <p className="typography-body">{t('settings.snippets.page.empty.title')}</p>
-          <p className="typography-meta mt-1 opacity-75">{t('settings.snippets.page.empty.description')}</p>
+      <SettingsPageLayout
+        title={t('settings.page.snippets.title')}
+        description={t('settings.page.snippets.description')}
+        showSaveStatus={false}
+      >
+        <div className="flex items-center justify-center py-16">
+          <div className="text-center text-muted-foreground">
+            <Icon name="file-text" className="mx-auto mb-3 h-12 w-12 opacity-50" />
+            <p className="typography-body">{t('settings.snippets.page.empty.title')}</p>
+            <p className="typography-meta mt-1 opacity-75">{t('settings.snippets.page.empty.description')}</p>
+          </div>
         </div>
-      </div>
+      </SettingsPageLayout>
     );
   }
 
   return (
     <SettingsPageLayout
       title={isNew ? t('settings.snippets.page.title.new') : `#${selectedSnippetName}`}
-      description={selectedSnippet ? selectedSnippet.filePath : undefined}
+      description={selectedSnippet ? selectedSnippet.filePath : t('settings.page.snippets.description')}
       showSaveStatus={false}
     >
       <SettingsSection divider={false} contentClassName="space-y-0">
