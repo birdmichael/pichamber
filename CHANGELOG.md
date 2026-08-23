@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Chat/Desktop: opening Session, Walkthrough, or notes still shows the full composer helper placeholder (`@` files/agents, `/` commands and skills, `#` snippets) instead of the short helpers stub.
 - Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the title and starter chips hide and the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Chat/Desktop: `/run` in the command menu now says it runs a subagent as a one-shot workflow. Longer descriptions wrap onto a second line instead of cutting off mid-word. Prefix search and the model/thinking chips are unchanged.
+- Chat/Desktop: in the expanded composer, Enter now starts a new line and Cmd/Ctrl+Enter sends, so a long prompt is harder to send by accident. The compact composer still sends on Enter.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
 - Settings: an already-installed Feature Plugin no longer shows a live Install button next to the Installed badge. Uninstall stays.
