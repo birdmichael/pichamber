@@ -354,7 +354,10 @@ also lists `archive/`. A leftover archived jsonl still in the active dir
 is relocated after its tail-scan so the next active list skips it.
 List metadata is a tail-scan for the last `pichamber.metadata`; it does
 not full-read jsonl again after `SessionManager.list()`. Reuse that list
-item's title / firstMessage / timestamps. After `archived: ms`, stop.
+item's title / firstMessage / timestamps. Placeholder list names
+(`New session`, `Pi session`, `(no messages)`) collapse to `New session`
+so list, hydrate, and sidebar Refresh agree on one empty-session title.
+After `archived: ms`, stop.
 `GET /api/session` and `GET /api/experimental/session` honor `archived`,
 `roots`, `limit`, and `cursor` before building the response: omit truthy
 archived rows unless `archived=true`; `roots=true` keeps sessions with no

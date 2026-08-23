@@ -3,6 +3,7 @@ import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resou
 import { findProjectFiles } from './find-files.js';
 import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
+import { resolveListedSessionTitle } from './pi-host.js';
 import { getPiUpgradeStatus } from './pi-upgrade-status.js';
 
 const json = (res, status, body) => {
@@ -665,7 +666,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
           id,
           projectID: item.cwd || directory || 'pi',
           directory: item.cwd || directory,
-          title: item.name || item.firstMessage || 'Pi session',
+          title: resolveListedSessionTitle(item),
           version: 'pi',
           time: {
             created: item.created ? new Date(item.created).getTime() : Date.now(),

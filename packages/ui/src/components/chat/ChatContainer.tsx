@@ -6,6 +6,7 @@ import type { QuestionRequest } from '@/types/question';
 import { ChatInput } from './ChatInput';
 import { DraftPresetChips } from './DraftPresetChips';
 import { useInputStore } from '@/sync/input-store';
+import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChatEmptyState from './ChatEmptyState';
@@ -67,6 +68,7 @@ import { WorkStatusPanel } from './work-status/WorkStatusPanel';
 import { useWorkStatusVisibility } from './work-status/useWorkStatusVisibility';
 import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/contextPanelEmbeddedChat';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
+import { hasPendingUserTranscriptPaint, isHiddenUserMessage } from './message/hiddenUserMessage';
 import { normalizeUserDisplayParts } from './message/normalizeUserDisplayParts';
 import { findShellCommandForMessage, isUserShellMarkerMessage } from './lib/shellBridge';
 import { resolveChatPromptReadOnly } from './chatPromptReadOnly';
@@ -1119,10 +1121,31 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }, [currentSessionId, isDesktopExpandedInput, scrollRef]);
 
     const lastScrolledSessionKeyRef = React.useRef<string | null>(null);
+    const planModeEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
+    const userMessageVisibility = React.useMemo(
+        () => ({ planModeEnabled, directory: effectiveSessionDirectory }),
+        [effectiveSessionDirectory, planModeEnabled],
+    );
+    const hasVisibleTranscript = React.useMemo(
+        () => sessionMessages.some((message) => {
+            if (message.info.role === 'user') {
+                return !isHiddenUserMessage(message, userMessageVisibility);
+            }
+            return message.parts.length > 0;
+        }),
+        [sessionMessages, userMessageVisibility],
+    );
+    const pendingUserTranscriptPaint = React.useMemo(
+        () => hasPendingUserTranscriptPaint(sessionMessages, userMessageVisibility),
+        [sessionMessages, userMessageVisibility],
+    );
 
     const isSessionHydrating =
         Boolean(currentSessionId)
-        && !hasRenderableSessionSnapshot;
+        && (
+            !hasRenderableSessionSnapshot
+            || (pendingUserTranscriptPaint && !hasVisibleTranscript)
+        );
     const retrySessionLoad = React.useCallback(() => {
         if (!messagesEnabled || !currentSessionId) return;
         void sync.ensureSessionRenderable(currentSessionId, true, effectiveSessionDirectory);
@@ -1215,7 +1238,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         return null;
     }
 
-	if (isSessionHydrating && sessionMessages.length === 0 && !sessionIsWorking && !hasOverlayChrome) {
+	if (isSessionHydrating && !hasVisibleTranscript && !sessionIsWorking && !hasOverlayChrome) {
 		if (sessionMessageLoadState.status === 'error') {
 			return (
 				<div data-composer-bound className="relative flex h-full flex-col bg-background">

@@ -12,6 +12,7 @@ import {
   createInMemoryPiSession,
   createPiHost,
   isPlaceholderSessionTitle,
+  resolveListedSessionTitle,
   mapPiModelsToProviders,
   mergeLiveExtensionCommands,
   normalizePiSessionUsage,
@@ -195,7 +196,17 @@ describe('session conversation titles', () => {
     expect(isPlaceholderSessionTitle('')).toBe(true);
     expect(isPlaceholderSessionTitle('New session')).toBe(true);
     expect(isPlaceholderSessionTitle('Pi session')).toBe(true);
+    expect(isPlaceholderSessionTitle('Untitled Session')).toBe(true);
+    expect(isPlaceholderSessionTitle('(no messages)')).toBe(true);
+    expect(isPlaceholderSessionTitle('no messages')).toBe(true);
     expect(isPlaceholderSessionTitle('nihao')).toBe(false);
+  });
+
+  it('lists empty sessions as New session instead of first-message placeholders', () => {
+    expect(resolveListedSessionTitle({ firstMessage: '(no messages)' })).toBe('New session');
+    expect(resolveListedSessionTitle({ name: 'Pi session' })).toBe('New session');
+    expect(resolveListedSessionTitle({ name: 'New session', firstMessage: 'hello' })).toBe('hello');
+    expect(resolveListedSessionTitle({ name: '195-daily-ping hello' })).toBe('195-daily-ping hello');
   });
 
   it('uses the first line of the user message as the title', () => {

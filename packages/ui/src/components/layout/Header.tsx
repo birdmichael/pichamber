@@ -21,7 +21,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionWorktreeStore } from '@/sync/session-worktree-store';
 import { formatSessionWorktreeBadge } from '@/sync/session-worktree-contract';
-import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionMessagesResolved } from '@/sync/sync-context';
+import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSession, useSessionMessagesResolved } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
@@ -39,6 +39,7 @@ import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { useDeviceInfo, useTabletStandalonePwaRuntime } from '@/lib/device';
+import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { cn, hasModifier } from '@/lib/utils';
 import { McpDropdownContent } from '@/components/mcp/McpDropdown';
 import { McpIcon } from '@/components/icons/McpIcon';
@@ -559,6 +560,19 @@ export const Header: React.FC<HeaderProps> = ({
     },
     [currentSessionId],
   )));
+  const liveSession = useSession(currentSessionId);
+  const currentLiveSession = React.useMemo<HeaderSessionSnapshot | null>(() => {
+    if (!currentSessionId || !liveSession) return null;
+    const record = liveSession as typeof liveSession & { directory?: string | null; slug?: string | null };
+    return {
+      title: liveSession.title ?? null,
+      directory: record.directory ?? null,
+      created: liveSession.time?.created ?? null,
+      slug: record.slug ?? null,
+      shareUrl: liveSession.share?.url ?? null,
+      parentId: liveSession.parentID ?? null,
+    };
+  }, [currentSessionId, liveSession]);
   const activeProject = useProjectsStore(useShallow((state) => {
     if (!state.activeProjectId) {
       return null;
@@ -972,7 +986,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, [fetchAllQuotas, isUsageRefreshSpinning]);
 
   const currentSessionSnapshot = currentSessionId
-    ? currentGlobalSession ?? null
+    ? currentLiveSession ?? currentGlobalSession ?? null
     : null;
 
   const lastResolvedSessionRef = React.useRef<{
@@ -1132,9 +1146,11 @@ export const Header: React.FC<HeaderProps> = ({
     if (!currentSessionId) {
       return activeProjectLabel ?? 'Pichamber';
     }
-    const trimmedTitle = currentSession?.title?.trim();
-    return trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : 'Untitled Session';
-  }, [activeProjectLabel, currentSession?.title, currentSessionId]);
+    return resolveSessionDisplayTitle(
+      currentSession?.title,
+      t('sessions.sidebar.session.untitled'),
+    );
+  }, [activeProjectLabel, currentSession?.title, currentSessionId, t]);
   const headerDirectoryStore = useDirectoryStore(openDirectory || undefined, { bootstrap: false });
   const sync = useSync();
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);

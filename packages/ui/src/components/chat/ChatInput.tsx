@@ -129,6 +129,10 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
+import {
+    shouldDockComposerForDesktopSlashMenu,
+    shouldHideNewSessionWelcomeForDesktopSlashMenu,
+} from './slashPopupHeight';
 import { useMessageHistory } from './composer/state/useMessageHistory';
 import { useComposerDraft } from './composer/state/useComposerDraft';
 import { useDraftTarget } from './composer/state/useDraftTarget';
@@ -141,6 +145,7 @@ import {
 } from './composer/ui/DraftTargetSelectors';
 import { ComposerAutocompletePopups } from './composer/ui/ComposerAutocompletePopups';
 import { ComposerFooter } from './composer/ui/ComposerFooter';
+import { shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
 import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
@@ -170,7 +175,6 @@ const MAX_MOBILE_COMPOSER_LINES = 16;
 const MOBILE_COMPOSER_BOUND_GAP_PX = 4;
 const EMPTY_QUEUE: QueuedMessage[] = [];
 const EMPTY_SENDING_IDS: string[] = [];
-const COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH = 560;
 const renameFileForAttachmentCitation = (file: File, filename: string): File => {
     if (file.name === filename) {
         return file;
@@ -408,7 +412,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const clearGitDiffCache = useGitStore((state) => state.clearDiffCache);
     const [showAbortStatus, setShowAbortStatus] = React.useState(false);
     const setSessionAutoAccept = usePermissionStore((state) => state.setSessionAutoAccept);
-    const [isNarrowComposer, setIsNarrowComposer] = React.useState(false);
+    const [composerWidth, setComposerWidth] = React.useState(0);
     const [attachmentPreview, setAttachmentPreview] = React.useState<ToolPopupContent>({
         open: false,
         title: '',
@@ -534,15 +538,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const isComposerExpanded = isDesktopExpanded || isMobileExpanded;
     // Rounder composer on mobile (touch UI reads better with a softer corner).
     const chatInputRadius = isMobile ? '1.5rem' : 'var(--radius-xl)';
-    const useCompactChatPlaceholder = isMobile || isNarrowComposer;
+    const useCompactChatPlaceholder = shouldUseCompactChatPlaceholder({ isMobile, composerWidth });
 
     React.useEffect(() => {
         const element = dropZoneRef.current;
         if (!element) return;
 
         const updateWidth = (width: number) => {
-            const next = width > 0 && width < COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH;
-            setIsNarrowComposer((prev) => (prev === next ? prev : next));
+            setComposerWidth((prev) => (prev === width ? prev : width));
         };
 
         updateWidth(element.clientWidth);
@@ -2552,6 +2555,21 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         };
     }, []);
 
+    const desktopSlashMenuOpen = openAutocomplete === 'command';
+    const compactNewSessionForSlash = shouldDockComposerForDesktopSlashMenu({
+        isMobile,
+        isDesktopExpanded,
+        newSessionDraftOpen,
+        commandAutocompleteOpen: desktopSlashMenuOpen,
+    });
+    const hideNewSessionWelcomeForSlash = shouldHideNewSessionWelcomeForDesktopSlashMenu({
+        isMobile,
+        isDesktopExpanded,
+        newSessionDraftOpen,
+        commandAutocompleteOpen: desktopSlashMenuOpen,
+    });
+    const showNewSessionWelcome = showDesktopDraftWelcomeChrome && !hideNewSessionWelcomeForSlash;
+
     return (
         <>
         <form
@@ -2561,11 +2579,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 "relative w-full pt-0 pb-4",
                 isDesktopExpanded && 'flex h-full min-h-0 flex-col pt-4',
                 isMobileExpanded && 'flex h-full min-h-0 flex-col pt-2',
-                isMobile && 'bottom-safe-area oc-mobile-composer'
+                isMobile && 'bottom-safe-area oc-mobile-composer',
+                compactNewSessionForSlash && 'self-end',
+                // ChatContainer's new-session column uses pb-[6vh]; eat it so
+                // the docked composer-only form can sit on the true bottom.
+                compactNewSessionForSlash && !isVSCode && !isMiniChatSurface && '-mb-[6vh]',
             )}
             style={isMobile && inputBarOffset > 0 ? { marginBottom: `${inputBarOffset}px` } : undefined}
         >
-            {showDesktopDraftWelcomeChrome ? (
+            {showNewSessionWelcome ? (
                 <div className="chat-input-column mb-7 text-center">
                     <h1 className="text-balance text-2xl font-normal tracking-tight text-foreground md:text-3xl">
                         {renderDraftTitle(
@@ -2920,7 +2942,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     />
                 ) : null}
             </div>
-            {showDesktopDraftWelcomeChrome ? (
+            {showNewSessionWelcome ? (
                 <DraftPresetChips
                     onSubmit={(starter) => submitPresetPrompt(starter.submitText, starter.ref.type)}
                     className="chat-input-column mt-4"

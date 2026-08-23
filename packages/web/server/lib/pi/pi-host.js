@@ -481,11 +481,28 @@ const createSessionInfo = ({
   };
 };
 
-const PLACEHOLDER_SESSION_TITLES = new Set(['new session', 'pi session', 'untitled']);
+const PLACEHOLDER_SESSION_TITLES = new Set([
+  'new session',
+  'pi session',
+  'untitled',
+  'untitled session',
+  '(no messages)',
+  'no messages',
+]);
 
 export const isPlaceholderSessionTitle = (title) => {
   const trimmed = typeof title === 'string' ? title.trim() : '';
   return !trimmed || PLACEHOLDER_SESSION_TITLES.has(trimmed.toLowerCase());
+};
+
+export const resolveListedSessionTitle = (item) => {
+  const name = typeof item?.name === 'string' ? item.name.trim() : '';
+  if (name && !isPlaceholderSessionTitle(name)) return name;
+  const firstMessage = typeof item?.firstMessage === 'string' ? item.firstMessage.trim() : '';
+  if (firstMessage && !isPlaceholderSessionTitle(firstMessage)) {
+    return titleFromUserText(firstMessage) || 'New session';
+  }
+  return 'New session';
 };
 
 export const resolvePromptModelRef = (model) => {
@@ -1499,10 +1516,11 @@ export const createPiHost = ({
       console.warn(`[pi-host] failed to attach live Pi session ${sessionID}:`, error?.message || error);
       piSession = createInMemoryPiSession({ sessionId: sessionID });
     }
-    const title = (typeof manager.getSessionName === 'function' && manager.getSessionName())
-      || persisted?.name
-      || persisted?.firstMessage
-      || 'Pi session';
+    const title = resolveListedSessionTitle({
+      name: (typeof manager.getSessionName === 'function' && manager.getSessionName())
+        || persisted?.name,
+      firstMessage: persisted?.firstMessage,
+    });
     const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
     const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
     const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
@@ -1854,7 +1872,7 @@ export const createPiHost = ({
       id,
       projectID: item.cwd || directory || 'pi',
       directory: item.cwd || directory,
-      title: item.name || item.firstMessage || 'Pi session',
+      title: resolveListedSessionTitle(item),
       version: 'pi',
       ...(parentID ? { parentID } : {}),
       time: sessionTimeWithArchived({
