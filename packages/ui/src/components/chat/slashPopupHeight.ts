@@ -1,14 +1,40 @@
 /**
  * Desktop `/` popup height. Two-line command rows plus the keyboard-hint
  * footer made the old 256px (`max-h-64`) cap show ~3.5 rows and clip the
- * last name. The cap is large enough for a typical list to be scannable;
- * the value is snapped to whole rows so the last visible row stays intact.
+ * last name. A new-session composer is vertically centered, so the space
+ * above it is also ~256px until the form docks to the bottom while `/` is
+ * open. After that, use the space above the composer up to this cap, snapped
+ * to whole rows so the last visible name stays intact.
  */
 
 export const DESKTOP_SLASH_POPUP_DESIGN_CAP_PX = 640;
 export const DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX = 59;
-/** Keyboard-hint footer plus the popup 2px border. List padding is inside the scroller, not chrome. */
+/** Keyboard-hint footer plus the 2px popup border. List padding is inside the scroller, not chrome. */
 export const DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX = 36;
+/** CSS fallback when JS has not measured yet. Must not be `max-h-64` (256px). */
+export const DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS = 'max-h-[min(40rem,calc(100dvh-11rem))]';
+
+export function shouldDockComposerForDesktopSlashMenu(options: {
+  isMobile: boolean;
+  isDesktopExpanded: boolean;
+  newSessionDraftOpen: boolean;
+  commandAutocompleteOpen: boolean;
+}): boolean {
+  return options.commandAutocompleteOpen
+    && !options.isMobile
+    && !options.isDesktopExpanded
+    && options.newSessionDraftOpen;
+}
+
+export function measureDesktopSlashAvailablePx(options: {
+  chatTopPx: number;
+  popupBottomPx: number;
+  visualTopPx?: number;
+  gapPx?: number;
+}): number {
+  const boundaryTop = Math.max(options.chatTopPx, options.visualTopPx ?? 0);
+  return Math.max(120, Math.floor(options.popupBottomPx - boundaryTop - (options.gapPx ?? 8)));
+}
 
 export function readOverlayMaxHeight(style?: { maxHeight?: string | number }): number | undefined {
   const value = style?.maxHeight;

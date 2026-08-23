@@ -14,6 +14,8 @@ import { usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
 import {
+  DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
+  measureDesktopSlashAvailablePx,
   readOverlayMaxHeight,
   resolveDesktopSlashPopupMaxHeight,
 } from './slashPopupHeight';
@@ -97,12 +99,13 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   const itemRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const footerRef = React.useRef<HTMLDivElement | null>(null);
-  const availableMaxHeight = useMobileAutocompleteMaxHeight(containerRef, true);
+  const availableMaxHeight = useMobileAutocompleteMaxHeight(containerRef, isMobile);
+  const [desktopAvailablePx, setDesktopAvailablePx] = React.useState<number | undefined>(undefined);
   const [rowMetrics, setRowMetrics] = React.useState<{ rowHeightPx: number; chromePx: number } | null>(null);
   const popupMaxHeight = isMobile
     ? availableMaxHeight
     : resolveDesktopSlashPopupMaxHeight({
-        availablePx: availableMaxHeight,
+        availablePx: desktopAvailablePx,
         overlayMaxHeightPx: readOverlayMaxHeight(style),
         rowHeightPx: rowMetrics?.rowHeightPx,
         chromePx: rowMetrics?.chromePx,
@@ -333,32 +336,56 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   }, [selectedIndex]);
 
   React.useLayoutEffect(() => {
-    if (isMobile || loading) {
+    if (isMobile) {
       return;
     }
-    const rowEls = itemRefs.current
-      .slice(0, commands.length)
-      .filter((el): el is HTMLDivElement => el !== null);
-    const containerEl = containerRef.current;
-    if (rowEls.length === 0 || !containerEl) {
-      return;
-    }
-    const rowHeightPx = Math.round(Math.max(
-      ...rowEls.map((el) => el.getBoundingClientRect().height),
-    ));
-    if (rowHeightPx <= 0) {
-      return;
-    }
-    const footerPx = footerRef.current
-      ? Math.round(footerRef.current.getBoundingClientRect().height)
-      : 0;
-    const borderY = containerEl.offsetHeight - containerEl.clientHeight;
-    const chromePx = footerPx + borderY;
-    setRowMetrics((prev) => (
-      prev && prev.rowHeightPx === rowHeightPx && prev.chromePx === chromePx
-        ? prev
-        : { rowHeightPx, chromePx }
-    ));
+    const measure = () => {
+      const containerEl = containerRef.current;
+      if (!containerEl) {
+        return;
+      }
+      const chatArea = containerEl.closest('[data-chat-area]') ?? containerEl.closest('main');
+      if (chatArea) {
+        const availablePx = measureDesktopSlashAvailablePx({
+          chatTopPx: chatArea.getBoundingClientRect().top,
+          popupBottomPx: containerEl.getBoundingClientRect().bottom,
+          visualTopPx: window.visualViewport?.offsetTop ?? 0,
+        });
+        setDesktopAvailablePx((prev) => (prev === availablePx ? prev : availablePx));
+      }
+      if (loading) {
+        return;
+      }
+      const rowEls = itemRefs.current
+        .slice(0, commands.length)
+        .filter((el): el is HTMLDivElement => el !== null);
+      if (rowEls.length === 0) {
+        return;
+      }
+      const rowHeightPx = Math.round(Math.max(
+        ...rowEls.map((el) => el.getBoundingClientRect().height),
+      ));
+      if (rowHeightPx <= 0) {
+        return;
+      }
+      const footerPx = footerRef.current
+        ? Math.round(footerRef.current.getBoundingClientRect().height)
+        : 0;
+      const borderY = containerEl.offsetHeight - containerEl.clientHeight;
+      const chromePx = footerPx + borderY;
+      setRowMetrics((prev) => (
+        prev && prev.rowHeightPx === rowHeightPx && prev.chromePx === chromePx
+          ? prev
+          : { rowHeightPx, chromePx }
+      ));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
   }, [commands, isMobile, loading]);
 
   React.useImperativeHandle(ref, () => ({
@@ -420,7 +447,10 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   return (
     <div
       ref={containerRef}
-      className="absolute z-[100] min-w-0 w-full max-w-[450px] max-h-64 overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col"
+      className={cn(
+        'absolute z-[100] min-w-0 w-full max-w-[450px] overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col',
+        isMobile ? 'max-h-64' : DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
+      )}
       style={popupMaxHeight !== undefined ? { ...style, maxHeight: popupMaxHeight } : style}
     >
       <ScrollableOverlay preventOverscroll outerClassName="flex-1 min-h-0" className="px-0 pb-2">

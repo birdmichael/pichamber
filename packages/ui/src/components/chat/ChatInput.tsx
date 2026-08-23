@@ -128,6 +128,7 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
+import { shouldDockComposerForDesktopSlashMenu } from './slashPopupHeight';
 import { useMessageHistory } from './composer/state/useMessageHistory';
 import { useComposerDraft } from './composer/state/useComposerDraft';
 import { useDraftTarget } from './composer/state/useDraftTarget';
@@ -2542,7 +2543,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                 "relative w-full pt-0 pb-4",
                 isDesktopExpanded && 'flex h-full min-h-0 flex-col pt-4',
                 isMobileExpanded && 'flex h-full min-h-0 flex-col pt-2',
-                isMobile && 'bottom-safe-area oc-mobile-composer'
+                isMobile && 'bottom-safe-area oc-mobile-composer',
+                shouldDockComposerForDesktopSlashMenu({
+                    isMobile,
+                    isDesktopExpanded,
+                    newSessionDraftOpen,
+                    commandAutocompleteOpen: openAutocomplete === 'command',
+                }) && 'self-end',
             )}
             style={isMobile && inputBarOffset > 0 ? { marginBottom: `${inputBarOffset}px` } : undefined}
         >

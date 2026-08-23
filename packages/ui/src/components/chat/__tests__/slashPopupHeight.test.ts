@@ -3,8 +3,10 @@ import {
   DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
   DESKTOP_SLASH_POPUP_DESIGN_CAP_PX,
   DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
+  measureDesktopSlashAvailablePx,
   readOverlayMaxHeight,
   resolveDesktopSlashPopupMaxHeight,
+  shouldDockComposerForDesktopSlashMenu,
   snapSlashPopupMaxHeight,
 } from '../slashPopupHeight';
 
@@ -64,6 +66,54 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
       rowHeightPx: 59,
       chromePx: 36,
     })).toBe(36 + 3 * 59);
+  });
+
+  test('a docked 1280x800 chat column fits at least eight full described rows', () => {
+    const availablePx = measureDesktopSlashAvailablePx({
+      chatTopPx: 48,
+      popupBottomPx: 800 - 220,
+    });
+    const height = resolveDesktopSlashPopupMaxHeight({
+      availablePx,
+      rowHeightPx: DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
+      chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
+    });
+    const rows = Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX);
+    expect(availablePx >= 520).toBe(true);
+    expect(rows >= 8).toBe(true);
+    expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
+  });
+});
+
+describe('shouldDockComposerForDesktopSlashMenu', () => {
+  test('docks only a Desktop new-session composer while `/` is open', () => {
+    expect(shouldDockComposerForDesktopSlashMenu({
+      isMobile: false,
+      isDesktopExpanded: false,
+      newSessionDraftOpen: true,
+      commandAutocompleteOpen: true,
+    })).toBe(true);
+    expect(shouldDockComposerForDesktopSlashMenu({
+      isMobile: false,
+      isDesktopExpanded: false,
+      newSessionDraftOpen: true,
+      commandAutocompleteOpen: false,
+    })).toBe(false);
+    expect(shouldDockComposerForDesktopSlashMenu({
+      isMobile: true,
+      isDesktopExpanded: false,
+      newSessionDraftOpen: true,
+      commandAutocompleteOpen: true,
+    })).toBe(false);
+  });
+});
+
+describe('measureDesktopSlashAvailablePx', () => {
+  test('a centered new-session composer only has a 256px stub above it', () => {
+    expect(measureDesktopSlashAvailablePx({
+      chatTopPx: 48,
+      popupBottomPx: 48 + 256 + 8,
+    })).toBe(256);
   });
 });
 
