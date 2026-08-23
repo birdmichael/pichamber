@@ -50,6 +50,32 @@ describe('custom provider config persistence', () => {
     }).ok).toBe(false);
   });
 
+  test('validateCustomProviderConfig accepts official custom provider adapters', () => {
+    expect(validateCustomProviderConfig('ok', {
+      name: 'X',
+      npm: '@ai-sdk/openai',
+      options: { baseURL: 'https://api.example.com' },
+      models: { m: { name: 'M' } },
+      env: ['MY_KEY'],
+    }).ok).toBe(true);
+
+    expect(validateCustomProviderConfig('ok', {
+      name: 'X',
+      npm: '@ai-sdk/anthropic',
+      options: { baseURL: 'https://api.example.com' },
+      models: { m: { name: 'M' } },
+      env: ['MY_KEY'],
+    }).value.config.npm).toBe('@ai-sdk/anthropic');
+
+    expect(validateCustomProviderConfig('ok', {
+      name: 'X',
+      npm: '@ai-sdk/unknown',
+      options: { baseURL: 'https://api.example.com' },
+      models: { m: { name: 'M' } },
+      env: ['MY_KEY'],
+    }).ok).toBe(false);
+  });
+
   test('validateCustomProviderConfig rejects missing credentials', () => {
     expect(validateCustomProviderConfig('ok', {
       name: 'X',

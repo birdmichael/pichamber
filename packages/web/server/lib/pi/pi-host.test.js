@@ -62,6 +62,23 @@ describe('mapPiModelsToProviders', () => {
     });
   });
 
+  it('exposes models.json api so Settings can prefill the protocol', () => {
+    const providers = mapPiModelsToProviders(
+      [{ id: 'claude', name: 'Claude', provider: 'claude-proxy' }],
+      {
+        configs: {
+          'claude-proxy': {
+            name: 'Claude proxy',
+            baseUrl: 'https://api.example.test',
+            api: 'anthropic-messages',
+            models: [{ id: 'claude', name: 'Claude' }],
+          },
+        },
+      },
+    );
+    expect(providers[0].api).toBe('anthropic-messages');
+  });
+
   it('exposes $VAR providers as env so Settings can edit without a pasted key', () => {
     const providers = mapPiModelsToProviders([], {
       configs: {

@@ -609,9 +609,31 @@ const firstEnvName = (env) => {
   return name ? name.trim() : '';
 };
 
+const CUSTOM_PROVIDER_NPM_TO_PI_API = {
+  '@ai-sdk/openai-compatible': 'openai-completions',
+  '@ai-sdk/openai': 'openai-responses',
+  '@ai-sdk/anthropic': 'anthropic-messages',
+};
+const PI_CUSTOM_PROVIDER_APIS = new Set([
+  'openai-completions',
+  'openai-responses',
+  'anthropic-messages',
+]);
+
+const resolvePiProviderApi = (config) => {
+  const explicit = typeof config.api === 'string' ? config.api.trim() : '';
+  if (PI_CUSTOM_PROVIDER_APIS.has(explicit)) {
+    return explicit;
+  }
+  const npm = typeof config.npm === 'string' ? config.npm.trim() : '';
+  return CUSTOM_PROVIDER_NPM_TO_PI_API[npm] || 'openai-completions';
+};
+
 /**
  * Map the Settings custom-provider payload (OpenCode-shaped) onto Pi models.json.
  * Literal API keys stay in auth.json; `{env:VAR}` becomes `apiKey: "$VAR"`.
+ * Official npm adapters map onto Pi `api`: openai-chat → openai-completions,
+ * openai-responses → openai-responses, anthropic-messages → anthropic-messages.
  */
 export const mapOpenCodeProviderToPi = (config = {}) => {
   if (!config || typeof config !== 'object' || Array.isArray(config)) {
@@ -637,9 +659,7 @@ export const mapOpenCodeProviderToPi = (config = {}) => {
   if (models.length === 0) {
     throw httpError(400, 'At least one model is required');
   }
-  const api = typeof config.api === 'string' && config.api.trim()
-    ? config.api.trim()
-    : 'openai-completions';
+  const api = resolvePiProviderApi(config);
   const headers = normalizePiHeaders(options.headers) || normalizePiHeaders(config.headers);
   const envName = firstEnvName(config.env);
   const mapped = {

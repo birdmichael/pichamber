@@ -52,6 +52,7 @@ All notable changes to this project will be documented in this file.
 - Git: pull-request checks in Work status stay current as their status changes.
 - Settings/Desktop: adding an SSH remote now starts from hosts in your SSH config, with ports, install method, and passwords under Advanced. Each connection shows Connected, Connecting, or Needs attention — with the failure text and a resolve button. Disconnecting without keeping the server running now stops the remote Pichamber. Home-directory Pichamber binaries work; a missing remote kernel is reported before connect. A managed remote can also be published on that machine's network when you set a UI password.
 - UI: the default dialog close button is easier to click or tap (thanks to @rockinrimmer).
+- Settings: adding or editing a custom provider now lets you pick OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages instead of locking the form to OpenAI-compatible.
 
 ## [1.0.1] - 2026-08-18
 

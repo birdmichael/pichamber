@@ -28,6 +28,7 @@ const t = (key: string) => key;
 const baseForm = (overrides: Partial<CustomProviderFormState> = {}): CustomProviderFormState => ({
   providerID: 'custom-provider',
   name: 'Custom Provider',
+  protocol: 'openai-chat',
   baseURL: 'https://api.example.com/v1',
   apiKey: 'sk-test',
   models: [{ row: 'm0', id: 'model-a', name: 'Model A' }],
@@ -106,6 +107,26 @@ describe('validateCustomProvider', () => {
 
     expect(result.result?.apiKey).toEqual(undefined);
     expect(result.result?.config.env).toEqual(['CUSTOM_PROVIDER_KEY']);
+  });
+
+  test('uses the selected OpenCode provider adapter', () => {
+    const result = validateCustomProvider({
+      form: baseForm({ protocol: 'openai-responses' }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+
+    expect(result.result?.config.npm).toBe('@ai-sdk/openai');
+  });
+
+  test('maps Anthropic Messages onto the Anthropic adapter', () => {
+    const result = validateCustomProvider({
+      form: baseForm({ protocol: 'anthropic-messages' }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+
+    expect(result.result?.config.npm).toBe('@ai-sdk/anthropic');
   });
 
   test('rejects missing credentials', () => {
@@ -349,6 +370,7 @@ describe('validateCustomProvider', () => {
       form: {
         providerID: 'bmlab',
         name: 'bmlab',
+        protocol: 'openai-chat',
         baseURL: 'https://ai.example.test/v1',
         apiKey: 'sk-test',
         models: state.models,
@@ -377,6 +399,7 @@ describe('validateCustomProvider', () => {
       form: {
         providerID: 'bmlab',
         name: 'bmlab',
+        protocol: 'openai-chat',
         baseURL: 'https://ai.example.test/v1',
         apiKey: 'sk-test',
         models: unknownLive.models,
@@ -505,8 +528,30 @@ describe('provider edit helpers', () => {
     expect(state.name).toBe('Campus LLM');
     expect(state.baseURL).toBe('https://llm.example.edu/v1');
     expect(state.apiKey).toBe('{env:CAMPUS_KEY}');
+    expect(state.protocol).toBe('openai-chat');
     expect(state.models[0]).toEqual({ row: state.models[0].row, id: 'fast', name: 'Fast' });
     expect(state.headers[0]).toEqual({ row: state.headers[0].row, key: 'X-Campus', value: '1' });
+  });
+
+  test('prefills the protocol from a custom provider model', () => {
+    const state = providerToCustomFormState({
+      id: 'responses-api',
+      options: { baseURL: 'https://api.example.com/v1' },
+      models: [{ id: 'gpt', name: 'GPT', api: { npm: '@ai-sdk/openai' } }],
+    });
+
+    expect(state.protocol).toBe('openai-responses');
+  });
+
+  test('prefills the protocol from a Pi models.json api', () => {
+    const state = providerToCustomFormState({
+      id: 'claude-proxy',
+      api: 'anthropic-messages',
+      options: { baseURL: 'https://api.example.com' },
+      models: [{ id: 'claude', name: 'Claude' }],
+    });
+
+    expect(state.protocol).toBe('anthropic-messages');
   });
 
   test('round-trips a saved contextWindow on edit', () => {

@@ -10,11 +10,13 @@ import {
   SETTINGS_CONTROL_CLUSTER_CLASS,
   SETTINGS_NUMBER_STEPPER_ROW_CLASS,
   SETTINGS_NUMBER_UNIT_CLASS,
+  SETTINGS_SELECT_SIZE,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Icon } from '@/components/icon/Icon';
 import { catalogEntriesFromMetadataMap } from '@/lib/model-catalog-capabilities';
 import { useI18n } from '@/lib/i18n';
@@ -22,6 +24,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { toast } from '@/components/ui';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import {
+  CUSTOM_PROVIDER_PROTOCOLS,
   addRemoteModelsToForm,
   applyModelContextChange,
   applyModelIdChange,
@@ -38,6 +41,7 @@ import {
   type RemoteModelFamily,
   type CustomProviderFormState,
   type CustomProviderPersistPlan,
+  type CustomProviderProtocol,
   type CustomProviderTranslator,
   type FieldErrors,
   type HeaderFieldErrors,
@@ -344,6 +348,35 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
             aria-label={t('settings.providers.page.custom.field.providerID.label')}
           />
           {err.providerID ? <p className="mt-1 typography-meta text-[var(--status-error)]">{err.providerID}</p> : null}
+        </SettingsStackedField>
+
+        <SettingsStackedField
+          label={t('settings.providers.page.custom.field.protocol.label')}
+          info={t('settings.providers.page.custom.field.protocol.info')}
+        >
+          <Select
+            value={form.protocol}
+            onValueChange={(protocol) => {
+              if (!(protocol in CUSTOM_PROVIDER_PROTOCOLS)) {
+                return;
+              }
+              setForm((prev) => ({ ...prev, protocol: protocol as CustomProviderProtocol }));
+            }}
+            disabled={busy}
+          >
+            <SelectTrigger
+              size={SETTINGS_SELECT_SIZE}
+              className="w-full"
+              aria-label={t('settings.providers.page.custom.field.protocol.label')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="openai-chat">{t('settings.providers.page.custom.field.protocol.openaiChat')}</SelectItem>
+              <SelectItem value="openai-responses">{t('settings.providers.page.custom.field.protocol.openaiResponses')}</SelectItem>
+              <SelectItem value="anthropic-messages">{t('settings.providers.page.custom.field.protocol.anthropicMessages')}</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingsStackedField>
 
         <SettingsStackedField
