@@ -26,6 +26,7 @@ export const ContextUsageChip: React.FC<{ sessionId: string | null }> = ({ sessi
           setPercent(Math.max(0, Math.min(100, Math.round((data.tokens / data.contextLimit) * 100))));
         }
       } catch {
+        // best effort
       }
     };
     void load();

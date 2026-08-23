@@ -37,6 +37,7 @@ export const SystemMdSettings: React.FC = () => {
         setProjectReplace(data.project?.replace?.content ?? '');
         setProjectAppend(data.project?.append?.content ?? '');
       } catch {
+        // best effort
       }
     };
     void load();
