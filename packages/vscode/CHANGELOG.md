@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Sessions created outside the extension now appear in the session list without a page refresh.
 - Chat: on Pi, the empty composer helper no longer mentions `!` for shell. `@` files/agents, `/` commands and skills, and `#` snippets stay.
 - Settings/Skills: each installed skill row now shows the skill name next to its existing badges.
 - Chat: an empty session under your home folder now says you are working in `~`, matching the sidebar, instead of the raw folder name.
