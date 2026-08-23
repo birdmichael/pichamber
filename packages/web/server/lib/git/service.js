@@ -2577,6 +2577,117 @@ export async function getRangeDiff(directory, { base, head, path: filePath, cont
   return diff;
 }
 
+const BRANCH_CREATION_SOURCE_RE = /^branch: Created from (.+)$/;
+
+/**
+ * Parse a branch reflog (`git reflog show --format=%gs`) and return the
+ * ref the branch was created from, when that source is itself a named ref.
+ *
+ * Returns null when the branch was created from `HEAD@{...}` or a raw commit
+ * (detached start): the original branch name is not recorded anywhere in that
+ * case, and guessing a base from commit topology would be a heuristic, not an
+ * answer. Callers should ask the user to pick a base instead.
+ */
+export function parseBranchCreationSource(reflogText) {
+  const lines = String(reflogText || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  // Reflog lists newest entries first; the creation entry is the oldest one.
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const match = lines[index].match(BRANCH_CREATION_SOURCE_RE);
+    if (!match) continue;
+    const source = match[1].trim();
+    if (!source || /^HEAD@/.test(source) || /^[0-9a-f]{7,40}$/i.test(source)) {
+      return null;
+    }
+    return source;
+  }
+  return null;
+}
+
+/**
+ * True when `source` names this branch itself — locally or as a remote-tracking
+ * copy (`origin/<branch>`, `refs/remotes/<remote>/<branch>`).
+ *
+ * A fetched feature worktree records `branch: Created from origin/<same-branch>`.
+ * That is not a parent branch: comparing against it diffs HEAD against itself
+ * (or only unpushed commits) and silently shows zero changes. Callers must
+ * treat it as unknown and ask the user to pick a real base.
+ *
+ * A differently named parent that happens to share HEAD's commit (a brand-new
+ * branch created from `origin/main`) is NOT own-branch: Git recorded a real
+ * parent, and the empty range vs that parent is correct.
+ */
+export function isOwnBranchCreationSource(source, branchName, remotes = ['origin']) {
+  const branch = String(branchName || '').replace(/^refs\/heads\//, '').trim();
+  const ref = String(source || '').replace(/^refs\/heads\//, '').trim();
+  if (!branch || !ref) return false;
+  if (ref === branch) return true;
+  const remoteNames = Array.isArray(remotes) && remotes.length > 0 ? remotes : ['origin'];
+  for (const remote of remoteNames) {
+    const name = String(remote || '').trim();
+    if (!name) continue;
+    if (ref === `${name}/${branch}` || ref === `refs/remotes/${name}/${branch}`) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function listRemoteNames(git) {
+  try {
+    const remotes = await git.getRemotes();
+    const names = (Array.isArray(remotes) ? remotes : [])
+      .map((remote) => (typeof remote === 'string' ? remote : remote?.name))
+      .map((name) => String(name || '').trim())
+      .filter(Boolean);
+    return names.length > 0 ? names : ['origin'];
+  } catch {
+    return ['origin'];
+  }
+}
+
+/**
+ * Resolve the branch the given branch was created from, from its reflog.
+ * Returns { base: null } when git has no authoritative record (clone, detached
+ * start, reflog expired, or the recorded source is this branch / its own
+ * upstream) — callers must not fall back to main/master.
+ *
+ * Git operations stay in the workspace directory passed by the caller.
+ */
+export async function getBranchBase(directory, branch) {
+  const branchName = String(branch || '').trim();
+  if (!branchName) {
+    throw new Error('branch is required');
+  }
+
+  const { git } = await createRepositoryGitContext(directory);
+
+  let reflog = '';
+  try {
+    reflog = await git.raw(['reflog', 'show', '--format=%gs', branchName]);
+  } catch {
+    return { base: null };
+  }
+
+  const remotes = await listRemoteNames(git);
+  const source = parseBranchCreationSource(reflog);
+  if (!source || isOwnBranchCreationSource(source, branchName, remotes)) {
+    return { base: null };
+  }
+
+  const resolves = await git
+    .raw(['rev-parse', '--verify', '--quiet', source])
+    .then((value) => Boolean(String(value || '').trim()))
+    .catch(() => false);
+  if (!resolves) {
+    return { base: null };
+  }
+
+  return { base: source };
+}
+
 export async function getRangeFiles(directory, { base, head } = {}) {
   const { git } = await createRepositoryGitContext(directory);
   const baseRef = typeof base === 'string' ? base.trim() : '';
@@ -2596,11 +2707,26 @@ export async function getRangeFiles(directory, { base, head } = {}) {
     // ignore
   }
 
-  const raw = await git.raw(['diff', '--name-only', `${resolvedBase}...${headRef}`]);
-  return String(raw || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
+  // `-C` (copy detection among changed files only, so cheap) makes copies
+  // surface as C entries instead of plain additions; rename detection is on
+  // by default.
+  const raw = await git.raw(['diff', '--name-status', '-z', '-C', `${resolvedBase}...${headRef}`]);
+  // -z format: STATUS\0PATH\0[ORIG\0] repeated. For rename/copy entries
+  // (`R100`, `C75`) the first path token is the ORIGINAL path and the second
+  // is the DESTINATION — the diff (and the UI) must address the destination.
+  const tokens = String(raw || '').split('\0');
+  const files = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const status = (tokens[index] || '').trim();
+    if (!status) continue;
+    const isRenameOrCopy = status.startsWith('R') || status.startsWith('C');
+    const path = isRenameOrCopy ? (tokens[index + 2] || '').trim() : (tokens[index + 1] || '').trim();
+    index += isRenameOrCopy ? 2 : 1;
+    if (path) {
+      files.push({ path, status: status.charAt(0) });
+    }
+  }
+  return files;
 }
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'bmp', 'avif'];

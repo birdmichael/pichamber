@@ -36,8 +36,7 @@ export const SystemMdSettings: React.FC = () => {
         setGlobalAppend(data.global?.append?.content ?? '');
         setProjectReplace(data.project?.replace?.content ?? '');
         setProjectAppend(data.project?.append?.content ?? '');
-      } catch {
-      }
+      } catch { /* ignored */ }
     };
     void load();
     return () => { cancelled = true; };

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Settings: the project selector on Providers, Agents, MCP, Commands and Skills now only changes what those pages show. It used to switch the whole app, so opening another project's configuration moved your chat, session list and file tree with it.
 - Settings/General: changing the default model or agent no longer repoints an open chat that already carries a model you picked for it. Chats following the default still switch immediately.
+- **Diff:** the context-panel diff can now show every change on the current branch against its base branch. Pichamber detects the base when Git knows it, or lets you choose one once when it does not — including a worktree started from the branch's own remote, which is not treated as the base. Desktop Walkthrough stays in the same rail and can review that branch range.
 - Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.
 - Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Desktop: Linux and Windows chrome now uses File Manager / File Explorer, Alt, and Ctrl — including `Ctrl+,` in the header menu — instead of Finder, ⌥, and ⌘. macOS still shows Finder, ⌥, and ⌘.
