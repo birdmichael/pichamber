@@ -31,4 +31,39 @@ describe('useSessionDisplayStore project sorting', () => {
     expect(migrated.showRecentSection).toBe(false);
     expect(migrated.showArchivedSessions).toBe(true);
   });
+
+  test('v4→v5 keeps existing prefs and leaves the new project-view keys unset', () => {
+    const migrated = migrateSessionDisplayState(
+      { projectSortOrder: 'a-z', showRecentSection: false },
+      4,
+    );
+
+    expect(migrated.projectSortOrder).toBe('a-z');
+    expect(migrated.showRecentSection).toBe(false);
+    expect('projectDisplayMode' in migrated).toBe(false);
+    expect('singleProjectId' in migrated).toBe(false);
+  });
+});
+
+describe('useSessionDisplayStore project display', () => {
+  test('defaults to showing all projects without a selected single project', () => {
+    expect(useSessionDisplayStore.getState().projectDisplayMode).toBe('all');
+    expect(useSessionDisplayStore.getState().singleProjectId).toBeNull();
+  });
+
+  test('stores the single-project mode independently from session grouping', () => {
+    useSessionDisplayStore.getState().setProjectDisplayMode('single');
+    useSessionDisplayStore.getState().setSingleProjectId('project-alpha');
+    useSessionDisplayStore.getState().setSessionGroupingMode('flat');
+
+    expect(useSessionDisplayStore.getState().projectDisplayMode).toBe('single');
+    expect(useSessionDisplayStore.getState().singleProjectId).toBe('project-alpha');
+    expect(useSessionDisplayStore.getState().sessionGroupingMode).toBe('flat');
+
+    useSessionDisplayStore.setState({
+      projectDisplayMode: 'all',
+      singleProjectId: null,
+      sessionGroupingMode: 'by-worktree',
+    });
+  });
 });

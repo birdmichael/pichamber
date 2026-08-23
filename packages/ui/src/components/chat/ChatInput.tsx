@@ -1626,8 +1626,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
-        // Handle Enter/Ctrl+Enter based on selected follow-up behavior.
-        if (e.key === 'Enter' && !e.shiftKey && (!isMobile || e.ctrlKey || e.metaKey)) {
+        // Handle Enter/Ctrl+Enter based on selected follow-up behavior. On
+        // mobile, and in desktop focus mode, plain Enter writes a newline and
+        // only Cmd/Ctrl+Enter sends: both are surfaces for composing long
+        // prompts, where an accidental send costs more than an extra keypress.
+        const requiresModifierToSend = isMobile || isDesktopExpanded;
+        if (e.key === 'Enter' && !e.shiftKey && (!requiresModifierToSend || e.ctrlKey || e.metaKey)) {
             if (hasPendingPiExtensionUi) {
                 e.preventDefault();
                 return;
