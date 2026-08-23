@@ -39,3 +39,11 @@ export const deriveRecentSessions = (
     return activeSessionIds.has(session.id) || getSessionUpdatedAt(session) >= minUpdatedAt;
   });
 };
+
+// Recent is a fallback list. Sessions already rendered in a workspace group
+// (~, a project, or a worktree) stay only there so opening a chat cannot
+// insert a duplicate Recent bucket or shift the sidebar under the pointer.
+export const selectRecentSessionsWithoutWorkspaceGroup = (
+  sessions: Session[],
+  workspaceSessionIds: { readonly has: (id: string) => boolean },
+): Session[] => sessions.filter((session) => !workspaceSessionIds.has(session.id));

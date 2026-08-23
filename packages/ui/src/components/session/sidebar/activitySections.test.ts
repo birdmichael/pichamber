@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { Session } from '@opencode-ai/sdk/v2';
-import { deriveRecentSessions } from './activitySections';
+import { deriveRecentSessions, selectRecentSessionsWithoutWorkspaceGroup } from './activitySections';
 
 const NOW = 200_000_000;
 const RECENT = NOW - (48 * 60 * 60 * 1000);
@@ -35,5 +35,30 @@ describe('deriveRecentSessions', () => {
     const recentSession = session('recent', { updated: RECENT });
 
     expect(deriveRecentSessions([oldSession, recentSession], new Set(), NOW)).toEqual([recentSession]);
+  });
+});
+
+describe('selectRecentSessionsWithoutWorkspaceGroup', () => {
+  test('drops sessions that already have a workspace group, including the active one', () => {
+    const workspaceActive = session('workspace-active');
+    const workspaceRecent = session('workspace-recent', { updated: RECENT });
+    const orphan = session('orphan', { updated: RECENT });
+    const recent = deriveRecentSessions(
+      [workspaceActive, workspaceRecent, orphan],
+      new Set([workspaceActive.id]),
+      NOW,
+    );
+
+    expect(selectRecentSessionsWithoutWorkspaceGroup(
+      recent,
+      new Set([workspaceActive.id, workspaceRecent.id]),
+    )).toEqual([orphan]);
+  });
+
+  test('keeps ungrouped roots so Recent can still host leftover sessions', () => {
+    const orphanActive = session('orphan-active');
+    const recent = deriveRecentSessions([orphanActive], new Set([orphanActive.id]), NOW);
+
+    expect(selectRecentSessionsWithoutWorkspaceGroup(recent, new Set())).toEqual([orphanActive]);
   });
 });

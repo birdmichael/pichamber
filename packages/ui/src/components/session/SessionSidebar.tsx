@@ -78,6 +78,7 @@ import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { type SessionGroup, type SessionNode } from './sidebar/types';
 import {
   deriveRecentSessions,
+  selectRecentSessionsWithoutWorkspaceGroup,
 } from './sidebar/activitySections';
 import { useSessionPinnedStore } from '@/stores/useSessionPinnedStore';
 import {
@@ -1498,7 +1499,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       };
     };
 
-    const items = recentSessions
+    const items = selectRecentSessionsWithoutWorkspaceGroup(recentSessions, sessionSidebarMetaById)
       .map(toItem)
       .filter((item): item is NonNullable<ReturnType<typeof toItem>> => item !== null);
 
