@@ -50,6 +50,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { useProjectsStore } from '@/stores/useProjectsStore';
+import { isHiddenBtwSession } from '@/lib/sessionBtwMetadata';
 import { buildCommandPaletteFileSearchKey, scoreCommandPaletteFiles } from './commandPaletteFilesState';
 
 type CommandEntry = {
@@ -319,7 +320,8 @@ export const CommandPalette: React.FC = () => {
   // Sessions
   // ---------------------------------------------------------------------------
   const orderedActiveSessions = React.useMemo(() => {
-    return orderSessionsByLifecycleScopes(activeSessions, pinnedSessionIds, sessionOrderRanks);
+    const visibleSessions = activeSessions.filter((session) => !isHiddenBtwSession(session));
+    return orderSessionsByLifecycleScopes(visibleSessions, pinnedSessionIds, sessionOrderRanks);
   }, [activeSessions, pinnedSessionIds, sessionOrderRanks]);
 
   const allBranches = useGitAllBranches();

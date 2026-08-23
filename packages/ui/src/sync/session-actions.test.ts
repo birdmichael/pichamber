@@ -152,6 +152,14 @@ mock.module("@/lib/opencode/client", () => ({
       beforeSessionUpdateResolve?.(sessionId)
       return Promise.resolve(sessionUpdateResult.data)
     }),
+    getSession: mock((sessionId: string, directory?: string | null) => {
+      replyCalls.push({ method: "session.get", params: { sessionID: sessionId, directory } })
+      return Promise.resolve({
+        id: sessionId,
+        title: sessionId,
+        time: { created: 1, updated: 1 },
+      })
+    }),
     deleteSession: mock((sessionId: string, directory?: string | null) => {
       replyCalls.push({ method: "session.delete", params: { sessionID: sessionId, directory } })
       // Lets a test switch runtime while the delete is in flight, so the action
