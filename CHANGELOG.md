@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-24
+
 - **Settings:** Skills Catalog now browses curated GitHub skill collections as cards, with skill counts, stars, recent updates, cross-source search, and links back to each skill's repository.
 - **Sessions/Desktop:** start chats without choosing a project. They live in their own Chats section and do not inherit a project's repository or worktree. Opening a project chat still uses that project.
 - Chat: in a chat without a project, the work status card again steps aside when the context panel is open, instead of sitting next to it.
 - **Chat/Desktop:** on Pi, after installing `@narumitw/pi-btw` from Feature Plugins, type `/btw` plus a question to ask off-topic in a temporary session forked from the current chat. The answer streams in a panel above the composer. Collapse it, keep it as a full session, or discard it. The temp session stays out of the sidebar until Keep. Without that package, `/btw` is a normal chat message.
 - Chat: if Pi reloads while a response is still running, the chat now stops with an interrupted state and a notification to continue instead of hanging silently.
-- **Chat/Desktop:** on Pi, type `/btw` plus a question to ask off-topic in a temporary session forked from the current chat. The answer streams in a panel above the composer. Collapse it, keep it as a full session, or discard it. The temp session stays out of the sidebar until Keep.
 - Settings: the project selector on Providers, Agents, MCP, Commands and Skills now only changes what those pages show. It used to switch the whole app, so opening another project's configuration moved your chat, session list and file tree with it.
 - Settings/Providers: the provider you select no longer jumps to a different one on its own. Changing the chat's model or agent, and background provider refreshes, used to move the settings selection with them.
 - Settings/Projects: a project can now pin a thinking level next to its model, for models that offer levels. Both sit in one Defaults for new chats group, laid out like the Sessions defaults.
