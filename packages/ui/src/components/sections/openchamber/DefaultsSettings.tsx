@@ -48,7 +48,7 @@ const getDisplayModel = (
   return { providerId: '', modelId: '' };
 };
 
-export const resolveSessionDefaultThinkingLevels = (
+const resolveSessionDefaultThinkingLevels = (
   providerId: string,
   modelId: string,
   getModelMetadata: (
@@ -58,12 +58,12 @@ export const resolveSessionDefaultThinkingLevels = (
 ): PiThinkingLevel[] => {
   if (!providerId || !modelId) return [];
   // Levels come from Pi model capabilities. Do not invent OpenCode variants
-  // or vendor lists, and do not call resolveVisiblePiThinkingLevels() — an
+  // or vendor lists, and do not call resolveVisiblePiThinkingLevels — an
   // empty catalog must stay empty instead of falling back to all seven.
   return resolveCatalogThinkingLevels(getModelMetadata(providerId, modelId));
 };
 
-export const clampSessionDefaultThinkingLevel = (
+const clampSessionDefaultThinkingLevel = (
   current: string,
   availableLevels: readonly string[],
 ): PiThinkingLevel | undefined => {
@@ -464,6 +464,10 @@ export const DefaultsSettings: React.FC = () => {
     return null;
   }
 
+  const visibleThinkingLevel = availableLevels.length > 0
+    ? (clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels) ?? availableLevels[0])
+    : thinkingLevel;
+
   return (
     <>
       <SettingsSection title={t('settings.openchamber.defaults.title')} divider={false}>
@@ -506,7 +510,7 @@ export const DefaultsSettings: React.FC = () => {
               label={t('settings.openchamber.defaults.field.defaultThinking')}
             >
               <Select
-                value={clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels) ?? availableLevels[0]}
+                value={visibleThinkingLevel}
                 onValueChange={async (value) => {
                   setThinkingLevel(value);
                   try {
@@ -522,7 +526,7 @@ export const DefaultsSettings: React.FC = () => {
               >
                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                   <SelectValue placeholder={t('settings.openchamber.defaults.field.thinkingPlaceholder')}>
-                    {formatVariantLabel(clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels) ?? thinkingLevel)}
+                    {formatVariantLabel(visibleThinkingLevel)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>

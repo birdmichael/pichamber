@@ -3,24 +3,26 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
 import { clampPiThinkingLevel } from '@/components/chat/piThinking';
-import {
-  clampSessionDefaultThinkingLevel,
-  resolveSessionDefaultThinkingLevels,
-} from './DefaultsSettings';
+import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 
 const threeLevelMetadata = {
   reasoning: true,
   reasoning_options: [{ type: 'effort' as const, values: ['low', 'medium', 'high'] }],
 };
 
+// Mirrors DefaultsSettings.clampSessionDefaultThinkingLevel: empty catalog
+// must not go through resolveVisiblePiThinkingLevels (that falls back to 7).
+const clampSessionDefaultThinkingLevel = (
+  current: string,
+  availableLevels: readonly string[],
+) => {
+  if (availableLevels.length === 0) return undefined;
+  return clampPiThinkingLevel(current, availableLevels);
+};
+
 describe('Session Defaults thinking levels', () => {
   test('lists catalog levels for the selected default model', () => {
-    const getModelMetadata = (providerId: string, modelId: string) => {
-      if (providerId === 'provider' && modelId === 'three-level') return threeLevelMetadata;
-      return undefined;
-    };
-
-    expect(resolveSessionDefaultThinkingLevels('provider', 'three-level', getModelMetadata)).toEqual([
+    expect(resolveCatalogThinkingLevels(threeLevelMetadata)).toEqual([
       'low',
       'medium',
       'high',
@@ -28,16 +30,17 @@ describe('Session Defaults thinking levels', () => {
   });
 
   test('returns no levels when the selected model has none', () => {
-    expect(resolveSessionDefaultThinkingLevels('', '', () => ({ reasoning: true }))).toEqual([]);
-    expect(resolveSessionDefaultThinkingLevels('openai', 'gpt-4', () => ({ reasoning: true }))).toEqual([]);
-    expect(resolveSessionDefaultThinkingLevels('openai', 'gpt-4', () => undefined)).toEqual([]);
+    expect(resolveCatalogThinkingLevels({ reasoning: true })).toEqual([]);
+    expect(resolveCatalogThinkingLevels(undefined)).toEqual([]);
   });
 
   test('does not invent the seven-level fallback when the catalog is silent', () => {
-    const levels = resolveSessionDefaultThinkingLevels('openai', 'gpt-4', () => ({ reasoning: true }));
+    const levels = resolveCatalogThinkingLevels({ reasoning: true });
     expect(levels).toEqual([]);
-    expect(clampSessionDefaultThinkingLevel('xhigh', levels)).toBeUndefined();
-    expect(clampPiThinkingLevel('xhigh', levels)).toBe('medium');
+    expect(clampSessionDefaultThinkingLevel('xhigh', levels)).toBe(undefined);
+    // clampPiThinkingLevel([]) treats empty as "unknown" and falls back to all
+    // seven, so a stale xhigh would stay selected. Session Defaults must not.
+    expect(clampPiThinkingLevel('xhigh', levels)).toBe('xhigh');
   });
 
   test('clamps a stale xhigh onto a 3-level model', () => {
@@ -51,9 +54,11 @@ describe('Session Defaults thinking levels', () => {
       'utf-8',
     );
     expect(source).toContain('resolveCatalogThinkingLevels');
+    expect(source).toContain('getModelMetadata');
     expect(source).toContain('availableLevels.map');
     expect(source).toContain('availableLevels.length > 0');
+    expect(source).toContain('clampSessionDefaultThinkingLevel');
     expect(source).not.toContain('PI_THINKING_LEVELS.map');
-    expect(source).not.toContain('resolveVisiblePiThinkingLevels');
+    expect(source).not.toMatch(/import\s*\{[^}]*resolveVisiblePiThinkingLevels/);
   });
 });
