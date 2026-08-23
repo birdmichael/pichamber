@@ -19,7 +19,7 @@ type BuildLiveStreamingEntryOptions = {
     liveParts: Part[];
     showTextJustificationActivity: boolean;
     showTurnChangedFiles: boolean;
-    mergeHiddenUserTurns?: { planModeEnabled: boolean };
+    mergeHiddenUserTurns?: { planModeEnabled: boolean; directory?: string | null };
 };
 
 const withLiveParts = (
