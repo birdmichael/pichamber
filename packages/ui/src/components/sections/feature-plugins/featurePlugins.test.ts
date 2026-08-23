@@ -82,6 +82,9 @@ describe('feature plugin payload parsing', () => {
     expect(pageSource.includes('SettingsCheckboxRow')).toBe(false);
     expect(pageSource.includes('settings.featurePlugins.enabled')).toBe(false);
     expect(pageSource.includes('onEnabledChange')).toBe(false);
+    expect(pageSource.includes('settings.featurePlugins.actions.reinstall')).toBe(false);
+    expect(pageSource.includes('{saved.installed ? null : (')).toBe(true);
+    expect(pageSource.includes('if (payload.slots[slot].installed) return;')).toBe(true);
     for (const slot of FEATURE_PLUGIN_SLOTS) {
       expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
     }

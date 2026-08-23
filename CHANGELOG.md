@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the title and starter chips hide and the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
+- Settings: an already-installed Feature Plugin no longer shows a live Install button next to the Installed badge. Uninstall stays.
 - Settings/Chat: on Pi, Desktop now picks up an existing Pi agent — Goal, MCP, and Subagents appear when those packages are already in settings.json, and a new session follows your Pi default model and thinking. Plan stays off until that package is installed. (close #213)
 - Mobile: on Pi, the expanded composer now shows a thinking-level chip next to the model, matching Desktop.
 - Chat: on Pi, choosing Plan on a new session still shows Plan after you open another chat and come back. Existing chats keep their own Agent or Plan.
