@@ -19,6 +19,8 @@ import React from 'react';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { formatDirectoryName } from '@/lib/utils';
 import { getProjectDisplayLabel } from '@/lib/workspaceLabel';
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
+import { useI18n } from '@/lib/i18n';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useGitBranches, useGitStore, useIsGitRepo } from '@/stores/useGitStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -37,10 +39,19 @@ export interface DraftTargetProject {
     color?: string | null;
     iconImage?: { mime: string; updatedAt: number; source: 'custom' | 'auto' } | null;
     iconBackground?: string | null;
+    kind?: 'chat' | 'project';
 }
 
 export function useDraftTarget(enabled: boolean) {
-    const projects = useProjectsStore((state) => state.projects) as DraftTargetProject[];
+    const configuredProjects = useProjectsStore((state) => state.projects) as DraftTargetProject[];
+    const { t } = useI18n();
+    const chatProject = React.useMemo<DraftTargetProject>(() => ({
+        id: CHAT_DRAFT_PROJECT_ID,
+        path: '',
+        label: t('layout.mainTab.chat'),
+        kind: 'chat',
+    }), [t]);
+    const projects = React.useMemo(() => [chatProject, ...configuredProjects], [chatProject, configuredProjects]);
     const activeProjectId = useProjectsStore((state) => state.activeProjectId);
     const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const setActiveProjectIdOnly = useProjectsStore((state) => state.setActiveProjectIdOnly);
@@ -51,6 +62,7 @@ export function useDraftTarget(enabled: boolean) {
     const { git: runtimeGit } = useRuntimeAPIs();
 
     const selectedDraftProject = React.useMemo(() => {
+        if (newSessionDraft?.target === 'chat') return chatProject;
         const explicit = newSessionDraft?.selectedProjectId
             ? projects.find((project) => project.id === newSessionDraft.selectedProjectId) ?? null
             : null;
@@ -65,12 +77,12 @@ export function useDraftTarget(enabled: boolean) {
             return active;
         }
 
-        return projects[0] ?? null;
-    }, [activeProjectId, newSessionDraft?.selectedProjectId, projects]);
+        return configuredProjects[0] ?? chatProject;
+    }, [activeProjectId, chatProject, configuredProjects, newSessionDraft?.selectedProjectId, newSessionDraft?.target, projects]);
 
     const selectedDraftProjectPath = React.useMemo(
-        () => normalizePath(selectedDraftProject?.path ?? null),
-        [selectedDraftProject?.path],
+        () => selectedDraftProject?.kind === 'chat' ? null : normalizePath(selectedDraftProject?.path ?? null),
+        [selectedDraftProject?.kind, selectedDraftProject?.path],
     );
     const draftProjectLabel = selectedDraftProject
         ? getProjectDisplayLabel(selectedDraftProject, homeDirectory)
@@ -237,6 +249,9 @@ export function useDraftTarget(enabled: boolean) {
     }, [newSessionDraft?.open, newSessionDraft?.preserveDirectoryOverride, selectedDraftBranchIsKnown, selectedDraftDirectory]);
 
     const shouldShowDraftBranchSelector = React.useMemo(() => {
+        if (selectedDraftProject?.kind === 'chat') {
+            return false;
+        }
         if (selectedDraftProjectIsGitRepo !== true) {
             return false;
         }
@@ -247,7 +262,7 @@ export function useDraftTarget(enabled: boolean) {
             return true;
         }
         return worktreeBranchOptions.length > 0;
-    }, [isDiscoveringDraftBranches, projectRootBranchOption, selectedDraftProjectIsGitRepo, worktreeBranchOptions.length]);
+    }, [isDiscoveringDraftBranches, projectRootBranchOption, selectedDraftProject?.kind, selectedDraftProjectIsGitRepo, worktreeBranchOptions.length]);
 
     const handleDraftProjectChange = React.useCallback((projectId: string) => {
         const draft = useSessionUIStore.getState().newSessionDraft;
@@ -256,6 +271,10 @@ export function useDraftTarget(enabled: boolean) {
         }
         const project = projects.find((entry) => entry.id === projectId);
         if (!project) {
+            return;
+        }
+        if (project.kind === 'chat') {
+            setNewSessionDraftTarget({ projectId: CHAT_DRAFT_PROJECT_ID, directoryOverride: null }, { force: true });
             return;
         }
         if (activeProjectId !== projectId) {

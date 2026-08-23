@@ -35,7 +35,7 @@ const resetDraftPlanState = () => {
     currentSessionId: null,
     currentSessionDirectory: null,
     emptyComposerPlanSelected: false,
-    newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+    newSessionDraft: { draftId: 0, open: false, directoryOverride: null, parentID: null, target: 'chat' },
   })
 }
 
@@ -95,9 +95,11 @@ describe('issue 182 draft Plan send', () => {
       currentSessionId: null,
       currentSessionDirectory: null,
       newSessionDraft: {
+        draftId: 1,
         open: true,
         directoryOverride: '/projects/alpha',
         parentID: null,
+        target: 'project',
       },
     })
     useSessionUIStore.getState().setDraftPlanSelected(true)
@@ -110,10 +112,12 @@ describe('issue 182 draft Plan send', () => {
 
   test('send from a Plan-selected draft materializes once then starts plan', async () => {
     const draftSnapshot = {
+      draftId: 1,
       open: true,
       directoryOverride: '/projects/alpha',
       parentID: null,
       planSelected: true,
+      target: 'project' as const,
     }
     useSessionUIStore.setState({
       currentSessionId: null,
@@ -142,10 +146,12 @@ describe('issue 182 draft Plan send', () => {
 
   test('Agent draft send materializes once and does not start plan', async () => {
     const draftSnapshot = {
+      draftId: 1,
       open: true,
       directoryOverride: '/projects/alpha',
       parentID: null,
       planSelected: false,
+      target: 'project' as const,
     }
     useSessionUIStore.setState({
       currentSessionId: null,
@@ -207,10 +213,12 @@ describe('issue 182 draft Plan send', () => {
 
   test('sending a Plan draft consumes empty-composer Plan for the next New session', async () => {
     const draftSnapshot = {
+      draftId: 1,
       open: true,
       directoryOverride: '/projects/alpha',
       parentID: null,
       planSelected: true,
+      target: 'project' as const,
     }
     useSessionUIStore.setState({
       currentSessionId: null,

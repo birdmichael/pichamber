@@ -85,6 +85,14 @@ import { useSessionWorktreeStore } from "./session-worktree-store"
 import { getAttachedSessionDirectory } from "./session-worktree-contract"
 import { setSessionOpener } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"
+import { isVSCodeRuntime } from "@/lib/desktop"
+import {
+  CHAT_DRAFT_PROJECT_ID,
+  deleteChatDirectory,
+  isChatDirectoryPath,
+  resolveChatSessionDirectory,
+  warmChatsRootDirectory,
+} from "@/lib/chatDirectories"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
 import { persistWorktreeTopology, readPersistedWorktreeTopology } from "./worktree-topology-cache"
 import { rememberRuntimeLiveStatus } from "./runtime-live-memory"
@@ -283,6 +291,7 @@ function notifyMessageSent(sessionId: string): void {
 // ---------------------------------------------------------------------------
 
 export type NewSessionDraftState = {
+  draftId: number
   open: boolean
   selectedProjectId?: string | null
   directoryOverride: string | null
@@ -297,6 +306,8 @@ export type NewSessionDraftState = {
   initialPrompt?: string
   syntheticParts?: SyntheticContextPart[]
   targetFolderId?: string
+  target: "chat" | "project"
+  preparedChatDirectory?: string | null
 }
 
 export type ViewportAnchor = {
@@ -344,6 +355,7 @@ export type SessionUIState = {
   prepareForRuntimeSwitch: (apiBaseUrl?: string | null) => void
   restoreForRuntimeSwitch: (apiBaseUrl?: string | null) => void
   openNewSessionDraft: (options?: Partial<NewSessionDraftState> & { automatic?: boolean }) => void
+  prepareChatDraftDirectory: () => Promise<string | null>
   closeNewSessionDraft: (options?: { consumeEmptyComposerPlan?: boolean }) => void
   setNewSessionDraftTarget: (target: { projectId?: string | null; selectedProjectId?: string | null; directoryOverride?: string | null }, options?: { force?: boolean }) => void
   setDraftPreserveDirectoryOverride: (value: boolean) => void
@@ -576,10 +588,14 @@ const activateConfigForDirectory = async (directory: string | null | undefined):
 }
 
 const DEFAULT_DRAFT: NewSessionDraftState = {
+  draftId: 0,
   open: false,
   directoryOverride: null,
   parentID: null,
+  target: "chat",
 }
+let nextDraftId = 1
+const pendingChatDirectoryByDraft = new Map<string, Promise<string | null>>()
 
 const activeSessionByRuntime = new Map<string, string | null>()
 type RuntimeSessionMemory = {
@@ -657,10 +673,27 @@ export async function materializeOpenDraftSession(selection: {
     store.resolvePendingDraftWorktreeTarget(draft.pendingWorktreeRequestId, draftDirectoryOverride)
   }
 
+  const isChatDraft = draft.target === "chat"
+  if (isChatDraft) {
+    draftDirectoryOverride = await store.prepareChatDraftDirectory()
+    if (!draftDirectoryOverride) throw new Error("Failed to prepare chat directory")
+    const currentDraft = useSessionUIStore.getState().newSessionDraft
+    if (currentDraft.draftId === draft.draftId) {
+      useSessionUIStore.setState({
+        newSessionDraft: { ...currentDraft, preparedChatDirectory: null },
+      })
+    }
+  }
+
   await waitForWorktreeBootstrapIfConfigured(draftDirectoryOverride, draftProjectId)
 
   const created = await store.createSession(draft.title, draftDirectoryOverride, draft.parentID ?? null)
-  if (!created?.id) throw new Error("Failed to create session")
+  if (!created?.id) {
+    if (isChatDraft && draftDirectoryOverride && isChatDirectoryPath(draftDirectoryOverride)) {
+      await deleteChatDirectory(draftDirectoryOverride).catch(() => undefined)
+    }
+    throw new Error("Failed to create session")
+  }
 
   // The server response is authoritative. It may canonicalize a requested
   // worktree path (for example through a symlink or platform path casing).
@@ -916,7 +949,16 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     const explicitDirectory = options?.directoryOverride !== undefined
       ? normalizePath(options.directoryOverride)
       : null
-    const explicitProject = options?.selectedProjectId
+    let target = isVSCodeRuntime() ? "project" : options?.target
+    if (!target) {
+      const hasExplicitProjectTarget = options?.directoryOverride !== undefined
+        || (options?.selectedProjectId !== undefined && options.selectedProjectId !== CHAT_DRAFT_PROJECT_ID)
+        || isVSCodeRuntime()
+      target = options?.selectedProjectId === CHAT_DRAFT_PROJECT_ID || !hasExplicitProjectTarget
+        ? "chat"
+        : "project"
+    }
+    const explicitProject = target === "project" && options?.selectedProjectId
       ? projects.find((p) => p.id === options.selectedProjectId) ?? null
       : null
 
@@ -933,20 +975,24 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     const persistedProjectByDir = resolveDraftProjectForDirectory(projects, availableWorktreesByProject, persistedTarget?.directory ?? null)
     const currentDirProject = resolveDraftProjectForDirectory(projects, availableWorktreesByProject, currentDirectory)
 
-    const selectedProject = (() => {
+    const selectedProject = target === "chat" ? null : (() => {
       if (explicitProject) return explicitProject
       if (explicitDirectory !== null) return inferredProjectFromDir
       if (currentDirectory) return currentDirProject
       return persistedProjectByDir ?? persistedProjectById ?? fallbackProject
     })()
 
-    const directory = (() => {
+    const directory = target === "chat" ? null : (() => {
       if (explicitDirectory !== null) return explicitDirectory
       if (explicitProject) return normalizePath(explicitProject.path ?? null)
       if (currentDirectory) return currentDirectory
       if (persistedTarget?.directory) return persistedTarget.directory
       return normalizePath(selectedProject?.path ?? null)
     })()
+
+    if (target === "chat") {
+      warmChatsRootDirectory()
+    }
 
     persistDraftTarget({ projectId: selectedProject?.id ?? null, directory })
 
@@ -955,7 +1001,10 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       get().emptyComposerPlanSelected,
     )
     const nextDraft: NewSessionDraftState = {
+      draftId: nextDraftId++,
       open: true,
+      target,
+      preparedChatDirectory: null,
       selectedProjectId: selectedProject?.id ?? null,
       directoryOverride: directory,
       permissionAutoAcceptEnabled: options?.permissionAutoAcceptEnabled === true,
@@ -1010,8 +1059,46 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   // ---------------------------------------------------------------------------
   // closeNewSessionDraft
   // ---------------------------------------------------------------------------
+  prepareChatDraftDirectory: async () => {
+    const draft = get().newSessionDraft
+    if (!draft.open || draft.target !== "chat") return null
+    if (draft.preparedChatDirectory) return draft.preparedChatDirectory
+
+    const runtimeKey = getRuntimeKey()
+    const key = `${runtimeKey}:${draft.draftId}`
+    const existing = pendingChatDirectoryByDraft.get(key)
+    if (existing) return existing
+
+    const pending = resolveChatSessionDirectory().then(async (directory) => {
+      const current = get().newSessionDraft
+      if (
+        getRuntimeKey() !== runtimeKey
+        || !current.open
+        || current.target !== "chat"
+        || current.draftId !== draft.draftId
+      ) {
+        if (isChatDirectoryPath(directory)) {
+          await deleteChatDirectory(directory).catch(() => undefined)
+        }
+        return null
+      }
+      set({ newSessionDraft: { ...current, preparedChatDirectory: directory } })
+      return directory
+    }).finally(() => {
+      pendingChatDirectoryByDraft.delete(key)
+    })
+    pendingChatDirectoryByDraft.set(key, pending)
+    return pending
+  },
+
+  // ---------------------------------------------------------------------------
+  // closeNewSessionDraft
+  // ---------------------------------------------------------------------------
   closeNewSessionDraft: (options) => {
     const currentDraft = get().newSessionDraft
+    if (currentDraft.preparedChatDirectory && isChatDirectoryPath(currentDraft.preparedChatDirectory)) {
+      void deleteChatDirectory(currentDraft.preparedChatDirectory).catch(() => undefined)
+    }
     const nextEmptyComposerPlanSelected = resolveEmptyComposerPlanSelected({
       current: get().emptyComposerPlanSelected,
       draftOpen: currentDraft.open,
@@ -1037,7 +1124,10 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       return
     }
     const nextDraft: NewSessionDraftState = {
+        draftId: currentDraft.draftId,
         open: false,
+        target: "chat",
+        preparedChatDirectory: null,
         selectedProjectId: null,
         directoryOverride: null,
         pendingWorktreeRequestId: null,
@@ -1057,14 +1147,25 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   },
 
   setNewSessionDraftTarget: (target) => {
+    if (isVSCodeRuntime() && target.projectId === CHAT_DRAFT_PROJECT_ID) return
+    const previousDraft = get().newSessionDraft
+    if (
+      previousDraft.preparedChatDirectory
+      && target.projectId !== CHAT_DRAFT_PROJECT_ID
+      && isChatDirectoryPath(previousDraft.preparedChatDirectory)
+    ) {
+      void deleteChatDirectory(previousDraft.preparedChatDirectory).catch(() => undefined)
+    }
     let nextDirectory: string | null = null
     set((s) => {
       nextDirectory = normalizePath(target.directoryOverride ?? s.newSessionDraft.directoryOverride)
       return {
         newSessionDraft: {
           ...s.newSessionDraft,
+          target: target.projectId === CHAT_DRAFT_PROJECT_ID ? "chat" : "project",
+          preparedChatDirectory: target.projectId === CHAT_DRAFT_PROJECT_ID ? s.newSessionDraft.preparedChatDirectory : null,
           selectedProjectId: target.projectId ?? target.selectedProjectId ?? s.newSessionDraft.selectedProjectId,
-          directoryOverride: target.directoryOverride ?? s.newSessionDraft.directoryOverride,
+          directoryOverride: target.projectId === CHAT_DRAFT_PROJECT_ID ? null : target.directoryOverride ?? s.newSessionDraft.directoryOverride,
         },
       }
     })

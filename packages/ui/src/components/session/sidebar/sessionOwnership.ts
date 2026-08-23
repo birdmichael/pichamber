@@ -1,4 +1,5 @@
 import type { Session } from '@opencode-ai/sdk/v2';
+import { isChatDirectoryPath } from '@/lib/chatDirectories';
 import { normalizePath } from '@/lib/pathNormalization';
 
 type Project = {
@@ -111,7 +112,7 @@ export const createSessionOwnershipIndex = (
   const sessionsByScope = new Map<string, Set<string>>();
 
   const resolveOwner = (directory: string | null): DirectoryOwner | null => {
-    if (!directory) return null;
+    if (!directory || isChatDirectoryPath(directory)) return null;
     if (resolvedOwners.has(directory)) {
       return resolvedOwners.get(directory) ?? null;
     }

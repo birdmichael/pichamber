@@ -85,7 +85,7 @@ type Props = {
   setActiveProjectIdOnly: (id: string) => void;
   setActiveMainTab: (tab: MainTab) => void;
   setSessionSwitcherOpen: (open: boolean) => void;
-  openNewSessionDraft: (options?: { selectedProjectId?: string | null; directoryOverride?: string | null; targetFolderId?: string }) => void;
+  openNewSessionDraft: (options?: { selectedProjectId?: string | null; directoryOverride?: string | null; targetFolderId?: string; target?: 'chat' | 'project' }) => void;
   addSessionToFolder: (scopeKey: string, folderId: string, sessionId: string) => void;
   createFolderAndStartRename: (scopeKey: string, parentId?: string | null) => { id: string } | null;
   renamingFolderId: string | null;
@@ -881,7 +881,12 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
               if (projectId && projectId !== activeProjectId) setActiveProjectIdOnly(projectId);
               setActiveMainTab('chat');
               if (mobileVariant) setSessionSwitcherOpen(false);
-              openNewSessionDraft({ selectedProjectId: projectId, directoryOverride: scopeDirectory ?? group.directory, targetFolderId: folder.id });
+              openNewSessionDraft({
+                selectedProjectId: projectId,
+                directoryOverride: scopeDirectory ?? group.directory,
+                targetFolderId: folder.id,
+                target: group.draftTarget,
+              });
             }}
             hideActions={false}
             archivedBucket={group.isArchivedBucket === true}
@@ -1051,7 +1056,7 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
               )
               : bootstrapFailureNotice
                 ? bootstrapFailureNotice
-            : t('sessions.sidebar.group.empty.noSessionsInWorkspace')}
+            : group.emptyMessage ?? t('sessions.sidebar.group.empty.noSessionsInWorkspace')}
         </div>
       ) : null}
       {totalSessions > 0 && bootstrapFailureNotice ? (
@@ -1244,7 +1249,11 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
                     if (projectId && projectId !== activeProjectId) setActiveProjectIdOnly(projectId);
                     setActiveMainTab('chat');
                     if (mobileVariant) setSessionSwitcherOpen(false);
-                    openNewSessionDraft({ selectedProjectId: projectId, directoryOverride: group.directory });
+                    openNewSessionDraft({
+                      selectedProjectId: projectId,
+                      directoryOverride: group.directory,
+                      target: group.draftTarget,
+                    });
                   }}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-label={t('sessions.sidebar.group.actions.newDraftInGroupAria', { label: group.label })}

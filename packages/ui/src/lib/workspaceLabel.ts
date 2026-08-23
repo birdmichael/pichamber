@@ -1,3 +1,4 @@
+import { CHAT_DRAFT_PROJECT_ID, isChatDirectoryPath, isManagedChatDirectory } from '@/lib/chatDirectories';
 import { normalizePath } from '@/lib/pathNormalization';
 import { formatDirectoryName } from '@/lib/utils';
 
@@ -35,12 +36,23 @@ export function findOpenedProjectForDirectory<T extends { path: string }>(
 }
 
 export function resolveWelcomeWorkspaceLabel(input: {
-  projects: readonly { label?: string | null; path: string }[];
+  projects: readonly { id?: string; label?: string | null; path: string; kind?: 'chat' | 'project' }[];
   homeDirectory?: string | null;
   sessionDirectory?: string | null;
-  draftProject?: { label?: string | null; path: string } | null;
+  draftProject?: { id?: string; label?: string | null; path: string; kind?: 'chat' | 'project' } | null;
   preferSessionProject?: boolean;
 }): string | null {
+  const openedProjectPaths = new Set(
+    input.projects
+      .map((project) => normalizePath(project.path))
+      .filter((path): path is string => Boolean(path)),
+  );
+  const isChatDraft = input.draftProject?.kind === 'chat' || input.draftProject?.id === CHAT_DRAFT_PROJECT_ID;
+  if (isChatDraft && !input.preferSessionProject) return null;
+  if (isChatDirectoryPath(input.sessionDirectory) || isManagedChatDirectory(input.sessionDirectory, input.homeDirectory, openedProjectPaths)) {
+    return null;
+  }
+
   if (input.preferSessionProject) {
     const matched = findOpenedProjectForDirectory(input.projects, input.sessionDirectory);
     if (matched) return getProjectDisplayLabel(matched, input.homeDirectory);
@@ -53,7 +65,7 @@ export function resolveWelcomeWorkspaceLabel(input: {
     return null;
   }
 
-  if (input.draftProject) {
+  if (input.draftProject && input.draftProject.kind !== 'chat' && input.draftProject.id !== CHAT_DRAFT_PROJECT_ID) {
     return getProjectDisplayLabel(input.draftProject, input.homeDirectory);
   }
 
