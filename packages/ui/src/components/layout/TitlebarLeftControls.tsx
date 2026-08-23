@@ -10,6 +10,7 @@ import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControl
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { invokeDesktop } from '@/lib/desktop';
 import { useDesktopWindowControlsLayout } from '@/hooks/useDesktopWindowControlsLayout';
+import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
 
 const ICON_BUTTON_CLASS =
   'app-region-no-drag inline-flex h-8 w-8 items-center justify-center gap-2 rounded-md typography-ui-label font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary hover:bg-interactive-hover transition-colors';
@@ -34,9 +35,12 @@ export const TitlebarLeftControls: React.FC = () => {
 
   const toggleShortcut = formatShortcutForDisplay(getEffectiveShortcutCombo('toggle_sidebar', shortcutOverrides));
   const { usesFramelessChrome, side: windowControlsSide } = useDesktopWindowControlsLayout();
+  const [appMenuTooltipOpen, setAppMenuTooltipOpen] = React.useState(false);
+  const ignoreAppMenuClickRef = React.useRef(false);
 
-  const handleOpenWindowsAppMenu = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
+  const openWindowsAppMenu = React.useCallback((target: HTMLButtonElement) => {
+    setAppMenuTooltipOpen(false);
+    const rect = target.getBoundingClientRect();
     void invokeDesktop('desktop_show_app_menu', {
       x: rect.left,
       y: rect.bottom,
@@ -44,6 +48,23 @@ export const TitlebarLeftControls: React.FC = () => {
       console.warn('[titlebar] failed to open app menu', error);
     });
   }, []);
+
+  const handleAppMenuPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    ignoreAppMenuClickRef.current = activateTitlebarIconOnPointerDown({
+      button: event.button,
+      closeHoverUi: () => setAppMenuTooltipOpen(false),
+      activate: () => openWindowsAppMenu(event.currentTarget),
+    });
+  }, [openWindowsAppMenu]);
+
+  const handleAppMenuClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (ignoreAppMenuClickRef.current) {
+      ignoreAppMenuClickRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    openWindowsAppMenu(event.currentTarget);
+  }, [openWindowsAppMenu]);
 
   React.useEffect(() => {
     if (typeof document === 'undefined') {
@@ -91,18 +112,19 @@ export const TitlebarLeftControls: React.FC = () => {
         ) : null}
 
         {usesFramelessChrome ? (
-          <Tooltip>
+          <Tooltip open={appMenuTooltipOpen} onOpenChange={setAppMenuTooltipOpen}>
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={handleOpenWindowsAppMenu}
+                onPointerDown={handleAppMenuPointerDown}
+                onClick={handleAppMenuClick}
                 aria-label={t('header.actions.openAppMenuAria')}
                 className={cn(ICON_BUTTON_CLASS, 'shrink-0')}
               >
                 <Icon name="menu-2" className="h-[18px] w-[18px]" />
               </button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent side="bottom" sideOffset={6}>
               <p>{t('header.actions.openAppMenu')}</p>
             </TooltipContent>
           </Tooltip>

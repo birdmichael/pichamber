@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Chat: typing `@` with nothing to list now says there are no files or agents, matching `#` saying there are no snippets. The add-snippet row no longer shows two plus signs.
 - Settings/Skills: each installed skill row now shows the skill name next to its existing badges.
 - Settings/Desktop: External Tunnel keeps the missing cloudflared warning on Quick, Managed remote, and Managed local, and Start tunnel stays disabled with that same reason.
+- Desktop: the header hamburger now opens the app menu on the first click. Hovering its tooltip no longer eats that press.
 
 ## [1.0.1] - 2026-08-18
 
