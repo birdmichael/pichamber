@@ -68,6 +68,15 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
+Desktop `/` docks a new-session composer to the bottom of the chat column
+so the menu can use the space above it (a centered welcome only leaves
+~256px). Docking the whole welcome block is not enough: the title and
+starter chips stay in that block and leave only ~5 rows. While `/` is
+open, hide that chrome and cancel the new-session `pb-[6vh]` inset, then
+measure available height after that layout. Height comes from that space
+up to the design cap in `slashPopupHeight.ts` and snaps to whole command
+rows so the last visible name stays fully readable. Prefix filtering
+stays name-only on Pi. The CSS fallback must not be `max-h-64`.
 Model and thinking chips stay on the expanded mobile composer, not the
 collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
