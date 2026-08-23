@@ -62,6 +62,11 @@ the source at all when the chosen base exists neither locally nor on a remote â€
 a repository whose default is neither `main`, `master` nor `develop` used to be
 handed `main...<head>`, which git rejects outright.
 
+The context-panel Diff "Branch" scope can open this same walkthrough rail with
+`{ kind: 'branch', baseRef, headRef }` after git (or a one-time user pick)
+resolves the comparison base. That does not hide the Desktop Walkthrough rail;
+it only carries the range the user is already looking at.
+
 A base that exists only on a remote still works: `getRangeDiff` prefers
 `origin/<base>` when it exists, and otherwise resolves the base through whichever
 remote carries it, because a bare branch name git cannot find in `refs/heads`

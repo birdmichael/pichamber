@@ -3,9 +3,7 @@ import { isMcpSettingsAvailable } from '@/lib/settings/metadata';
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import type { SessionPlan } from '@/sync/pi-session-plan';
 
-const MOBILE_WORKSPACE_TABS = ['changes', 'files', 'terminal', 'notes', 'plan', 'mcp'] as const;
-
-export type MobileWorkspaceTab = (typeof MOBILE_WORKSPACE_TABS)[number];
+export type MobileWorkspaceTab = 'changes' | 'files' | 'terminal' | 'notes' | 'plan' | 'mcp';
 
 export const MOBILE_WORKSPACE_ALWAYS_TABS = ['changes', 'files', 'terminal', 'notes'] as const satisfies readonly MobileWorkspaceTab[];
 
