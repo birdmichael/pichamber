@@ -183,7 +183,9 @@ Use an explicit override when testing a different OpenCode CLI build or when a u
 - One-click open/reveal/open-in-app actions.
 - Desktop host switcher and deep-link imports.
 - Local and remote instance handling.
-- SSH host import, connections, logs, and port forwarding.
+- SSH host import from the user's SSH config, connections (Connected / Connecting / Needs attention), logs, and port forwarding.
+- Managed remotes look for `pichamber` (and leftover `openchamber`) on PATH and in home-directory installs. A missing remote kernel is reported before connect. Disconnect with keep-running off stops the remote server via `pichamber stop`.
+- A managed remote can bind `0.0.0.0` so other devices on the remote LAN can reach it; that requires a UI password.
 - SSH uses OpenSSH ControlMaster on macOS/Linux. Windows uses independent hidden OpenSSH processes for setup commands and each long-lived forward because Win32 OpenSSH does not support ControlMaster reliably.
 - Tunnel lifecycle integration through the web server runtime.
 - Auto-update checks, downloads, and restart/apply flow.

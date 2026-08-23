@@ -14,7 +14,7 @@ Utilisez **Paramètres → Instances distantes** dans l’application desktop po
 OpenChamber peut lire les hosts depuis votre config SSH locale, le même endroit que les commandes comme `ssh work-server` utilisent.
 
 1. Ouvrez **Paramètres → Instances distantes**.
-2. Choisissez un host dans **Saved SSH hosts**.
+2. Choisissez **Add SSH connection**, puis un host sous **From SSH config**.
 3. Si le host est un pattern, saisissez la vraie destination, par exemple `deploy@app.example.com`.
 4. Enregistrez et connectez-vous.
 
@@ -22,7 +22,7 @@ OpenChamber crée une instance distante avec cette commande SSH. Quand elle atte
 
 ## Ajouter des transferts de ports
 
-Chaque instance distante possède une section **Port Forwards**. Utilisez-la quand quelque chose d’un côté de la connexion SSH doit joindre un port de l’autre côté.
+Chaque instance distante a des transferts de ports supplémentaires sous **Advanced**. Utilisez-les quand quelque chose d’un côté de la connexion SSH doit joindre un port de l’autre côté.
 
 OpenChamber prend en charge trois types de transfert :
 

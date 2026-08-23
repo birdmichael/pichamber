@@ -14,7 +14,7 @@ description: 保存済み SSH ホストをインポートし、デスクトッ�
 OpenChamber は、`ssh work-server` のようなコマンドが使うのと同じローカル SSH config からホストを読み取れます。
 
 1. **Settings → Remote Instances** を開きます。
-2. **Saved SSH hosts** からホストを選びます。
+2. **Add SSH connection** を選び、**From SSH config** からホストを選びます。
 3. ホストがパターンの場合は、`deploy@app.example.com` のような実際の宛先を入力します。
 4. 保存して接続します。
 
@@ -22,7 +22,7 @@ OpenChamber はその SSH コマンドを使ってリモートインスタンス
 
 ## 追加のポートフォワードを加える
 
-各リモートインスタンスには **Port Forwards** セクションがあります。SSH 接続の片側にあるものが、もう片側のポートへ到達する必要があるときに使います。
+各リモートインスタンスの追加ポート転送は **Advanced** にあります。SSH 接続の片側にあるものが、もう片側のポートへ到達する必要があるときに使います。
 
 OpenChamber は 3 種類のフォワードに対応しています。
 

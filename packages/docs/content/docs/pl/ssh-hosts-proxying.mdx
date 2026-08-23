@@ -14,7 +14,7 @@ Użyj **Settings → Remote Instances** w aplikacji desktopowej, aby importować
 OpenChamber może czytać hosty z lokalnego SSH config, czyli z tego samego miejsca, którego używają polecenia takie jak `ssh work-server`.
 
 1. Otwórz **Settings → Remote Instances**.
-2. Wybierz host z **Saved SSH hosts**.
+2. Wybierz **Add SSH connection**, a następnie host z **From SSH config**.
 3. Jeśli host jest wzorcem, wpisz prawdziwy cel, na przykład `deploy@app.example.com`.
 4. Zapisz i połącz.
 
@@ -22,7 +22,7 @@ OpenChamber tworzy remote instance z tym poleceniem SSH. Gdy osiągnie stan **re
 
 ## Dodaj dodatkowe przekierowania portów
 
-Każda remote instance ma sekcję **Port Forwards**. Użyj jej, gdy coś po jednej stronie połączenia SSH musi dotrzeć do portu po drugiej stronie.
+Każda remote instance ma dodatkowe przekierowania portów w **Advanced**. Użyj ich, gdy coś po jednej stronie połączenia SSH musi dotrzeć do portu po drugiej stronie.
 
 OpenChamber obsługuje trzy typy przekierowań:
 

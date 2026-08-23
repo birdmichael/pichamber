@@ -8,6 +8,22 @@ import { spawn } from 'node:child_process';
 const LOCAL_HOST_ID = 'local';
 const DEFAULT_CONNECTION_TIMEOUT_SEC = 60;
 const DEFAULT_LOCAL_BIND_HOST = '127.0.0.1';
+// Global npm prefixes are root-owned on most distributions, so `npm install -g`
+// fails with EACCES for a normal SSH user. Everything we install goes to a
+// prefix inside the user's home instead.
+const REMOTE_USER_PREFIX = '$HOME/.pichamber/npm-global';
+const REMOTE_BUN_CANDIDATE = '"${BUN_INSTALL:-$HOME/.bun}/bin/bun"';
+// A login shell over SSH does not put home-directory installs on PATH.
+// Look in the places Pichamber, leftover OpenChamber, and bun actually land.
+const REMOTE_PATH_PREFIX = '$HOME/.pichamber/npm-global/bin:${BUN_INSTALL:-$HOME/.bun}/bin:$HOME/.local/bin:$HOME/.openchamber/npm-global/bin';
+const REMOTE_BIN_CANDIDATES = [
+  '"$HOME/.pichamber/npm-global/bin/pichamber"',
+  '"${BUN_INSTALL:-$HOME/.bun}/bin/pichamber"',
+  '"$HOME/.local/bin/pichamber"',
+  '"$HOME/.openchamber/npm-global/bin/pichamber"',
+  '"$HOME/.openchamber/npm-global/bin/openchamber"',
+  '"${BUN_INSTALL:-$HOME/.bun}/bin/openchamber"',
+];
 const DEFAULT_CONTROL_PERSIST_SEC = 300;
 const DEFAULT_READY_TIMEOUT_SEC = 30;
 const DEFAULT_RECONNECT_MAX_ATTEMPTS = 5;
@@ -804,9 +820,10 @@ export class ElectronSshManager {
         mode: instance?.remoteOpenchamber?.mode === 'external' ? 'external' : 'managed',
         keepRunning: instance?.remoteOpenchamber?.keepRunning !== false,
         ...(Number.isFinite(instance?.remoteOpenchamber?.preferredPort) ? { preferredPort: Number(instance.remoteOpenchamber.preferredPort) } : {}),
-        installMethod: ['npm', 'bun', 'download_release', 'upload_bundle'].includes(instance?.remoteOpenchamber?.installMethod)
+        installMethod: ['auto', 'npm', 'bun'].includes(instance?.remoteOpenchamber?.installMethod)
           ? instance.remoteOpenchamber.installMethod
-          : 'bun',
+          : 'auto',
+        bindHost: instance?.remoteOpenchamber?.bindHost === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1',
         uploadBundleOverSsh: Boolean(instance?.remoteOpenchamber?.uploadBundleOverSsh),
       },
       localForward: {
@@ -981,38 +998,78 @@ export class ElectronSshManager {
     return secret?.enabled && typeof secret.value === 'string' && secret.value.trim() ? secret.value.trim() : null;
   }
 
-  async remoteCommandExists(parsed, controlPath, commandName) {
-    try {
-      const output = await this.runRemoteCommand(parsed, controlPath, `command -v ${commandName} >/dev/null 2>&1 && echo yes || echo no`);
-      return output.trim() === 'yes';
-    } catch {
-      return false;
-    }
-  }
+  // A login shell over SSH does not source the user's interactive rc files, so
+  // tools installed into a home directory (bun above all) are missing from PATH
+  // even when they exist. Look at their known install locations too.
+  async resolveRemoteTool(parsed, controlPath, commandName, extraCandidates = []) {
+    const candidateList = [...extraCandidates, `"$(command -v ${commandName} 2>/dev/null)"`].join(' ');
+    const script = [
+      `for candidate in ${candidateList}; do`,
+      '  [ -n "$candidate" ] || continue;',
+      '  [ -x "$candidate" ] || continue;',
+      `  printf '%s' "$candidate";`,
+      '  exit 0;',
+      'done',
+    ].join(' ');
 
-  async currentRemoteOpenChamberVersion(parsed, controlPath) {
     try {
-      const output = await this.runRemoteCommand(parsed, controlPath, 'pichamber --version 2>/dev/null || true');
-      return parseVersionToken(output);
+      const output = await this.runRemoteCommand(parsed, controlPath, script);
+      return output.trim() || null;
     } catch {
       return null;
     }
   }
 
-  async installOpenChamberManaged(parsed, controlPath, version, preferred) {
-    const hasBun = await this.remoteCommandExists(parsed, controlPath, 'bun');
-    const hasNpm = await this.remoteCommandExists(parsed, controlPath, 'npm');
-    const commands = [];
+  // Every place Pichamber (or leftover OpenChamber) may live on the remote host,
+  // with the version each one reports. Installs land in the user prefix while an
+  // older copy can still sit on PATH, so the caller picks by version instead of
+  // trusting PATH order. Do not require the leftover OpenCode CLI.
+  async remoteOpenChamberCandidates(parsed, controlPath) {
+    const script = [
+      `for candidate in ${REMOTE_BIN_CANDIDATES.join(' ')} "$(command -v pichamber 2>/dev/null)" "$(command -v openchamber 2>/dev/null)"; do`,
+      '  [ -n "$candidate" ] || continue;',
+      '  [ -x "$candidate" ] || continue;',
+      `  printf '%s\t%s\n' "$candidate" "$("$candidate" --version 2>/dev/null | head -n 1)";`,
+      'done',
+    ].join(' ');
 
-    if (preferred === 'bun') {
-      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
-      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
-    } else if (preferred === 'npm') {
-      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
-      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
+    let output = '';
+    try {
+      output = await this.runRemoteCommand(parsed, controlPath, script);
+    } catch {
+      return [];
+    }
+
+    const candidates = [];
+    const seen = new Set();
+    for (const line of output.split(/\r?\n/)) {
+      const [binPath, versionRaw] = line.split('\t');
+      const trimmed = (binPath || '').trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      candidates.push({ binPath: trimmed, version: parseVersionToken(versionRaw || '') });
+    }
+    return candidates;
+  }
+
+  async installOpenChamberManaged(parsed, controlPath, version, preferred) {
+    const bunPath = await this.resolveRemoteTool(parsed, controlPath, 'bun', [REMOTE_BUN_CANDIDATE]);
+    const npmPath = await this.resolveRemoteTool(parsed, controlPath, 'npm');
+
+    // bun's global install already targets ~/.bun; npm is pinned to a prefix in
+    // the user's home so it never touches the root-owned global directory.
+    const bunCommand = bunPath ? `${shellQuote(bunPath)} add -g @pichamber/web@${version}` : null;
+    const npmCommand = npmPath
+      ? `mkdir -p "${REMOTE_USER_PREFIX}" && ${shellQuote(npmPath)} install -g --prefix "${REMOTE_USER_PREFIX}" @pichamber/web@${version}`
+      : null;
+
+    const commands = [];
+    if (preferred === 'npm') {
+      if (npmCommand) commands.push(npmCommand);
+      if (bunCommand) commands.push(bunCommand);
     } else {
-      if (hasBun) commands.push(`bun add -g @pichamber/web@${version}`);
-      if (hasNpm) commands.push(`npm install -g @pichamber/web@${version}`);
+      if (bunCommand) commands.push(bunCommand);
+      if (npmCommand) commands.push(npmCommand);
     }
 
     if (commands.length === 0) {
@@ -1028,7 +1085,7 @@ export class ElectronSshManager {
         lastError = error;
       }
     }
-    throw lastError || new Error('Failed to install OpenChamber on remote host');
+    throw lastError || new Error('Failed to install Pichamber on remote host');
   }
 
   async probeRemoteSystemInfo(parsed, controlPath, port, openchamberPassword) {
@@ -1072,24 +1129,34 @@ export class ElectronSshManager {
     }
   }
 
-  async startRemoteServerManaged(parsed, controlPath, instance, desiredPort) {
-    let envPrefix = 'OPENCHAMBER_RUNTIME=ssh-remote';
+  async startRemoteServerManaged(parsed, controlPath, instance, desiredPort, binPath) {
+    if (!binPath) {
+      throw new Error('Pichamber is not installed on the remote machine. Install it there, then connect again');
+    }
+
     const secret = this.configuredOpenChamberPassword(instance);
+    const remoteBindHost = instance.remoteOpenchamber?.bindHost === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1';
+    // Binding the remote server to every interface publishes its UI to the
+    // remote machine's whole network, so it may not run without a password.
+    if (remoteBindHost === '0.0.0.0' && !secret) {
+      throw new Error('Exposing the remote server to its network requires a UI password');
+    }
+
+    let envPrefix = `PATH="${REMOTE_PATH_PREFIX}:$PATH" OPENCHAMBER_RUNTIME=ssh-remote`;
     if (secret) {
       envPrefix += ` OPENCHAMBER_UI_PASSWORD=${shellQuote(secret)}`;
     }
-    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} pichamber serve --hostname 127.0.0.1 --port ${desiredPort}`);
+    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} ${shellQuote(binPath)} serve --hostname ${remoteBindHost} --port ${desiredPort}`);
     const port = output.split(/\s+/).map((token) => Number.parseInt(token, 10)).find((value) => Number.isFinite(value));
     return port || desiredPort;
   }
 
-  async stopRemoteServerBestEffort(parsed, controlPath, remotePort) {
+  // `pichamber stop` owns the daemon lifecycle. The HTTP shutdown route sits
+  // behind UI authentication, so it cannot stop a password-protected server.
+  async stopRemoteServerBestEffort(parsed, controlPath, remotePort, remoteBinPath) {
+    if (!remoteBinPath) return;
     try {
-      await this.runRemoteCommand(
-        parsed,
-        controlPath,
-        `if command -v curl >/dev/null 2>&1; then curl -fsS -X POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; elif command -v wget >/dev/null 2>&1; then wget -qO- --method=POST http://127.0.0.1:${remotePort}/api/system/shutdown >/dev/null 2>&1 || true; fi`,
-      );
+      await this.runRemoteCommand(parsed, controlPath, `${shellQuote(remoteBinPath)} stop --port ${remotePort}`);
     } catch {
     }
   }
@@ -1143,35 +1210,45 @@ export class ElectronSshManager {
       const port = instance.remoteOpenchamber.preferredPort;
       this.setStatus(instance.id, 'server_detecting', 'Probing external OpenChamber server', null, null, port, false, 0, false);
       await this.probeRemoteSystemInfo(parsed, controlPath, port, this.configuredOpenChamberPassword(instance));
-      return { remotePort: port, startedByUs: false };
+      return { remotePort: port, startedByUs: false, remoteBinPath: null };
     }
 
-    this.setStatus(instance.id, 'remote_probe', 'Checking remote OpenChamber installation');
-    const installedVersion = await this.currentRemoteOpenChamberVersion(parsed, controlPath);
-    if (!installedVersion) {
-      this.setStatus(instance.id, 'installing', 'Installing OpenChamber on remote host');
+    this.setStatus(instance.id, 'remote_probe', 'Checking remote Pichamber installation');
+    const installed = await this.remoteOpenChamberCandidates(parsed, controlPath);
+    let binary = installed.find((candidate) => candidate.version === this.appVersion) || null;
+
+    if (!binary) {
+      const existing = installed[0] || null;
+      if (existing) {
+        this.setStatus(instance.id, 'updating', `Updating remote Pichamber from ${existing.version || 'unknown'} to ${this.appVersion}`);
+      } else {
+        this.setStatus(instance.id, 'installing', 'Installing Pichamber on remote host');
+      }
       await this.installOpenChamberManaged(parsed, controlPath, this.appVersion, instance.remoteOpenchamber.installMethod);
-    } else if (installedVersion !== this.appVersion) {
-      this.setStatus(instance.id, 'updating', `Updating remote OpenChamber from ${installedVersion} to ${this.appVersion}`);
-      await this.installOpenChamberManaged(parsed, controlPath, this.appVersion, instance.remoteOpenchamber.installMethod);
+
+      const afterInstall = await this.remoteOpenChamberCandidates(parsed, controlPath);
+      binary = afterInstall.find((candidate) => candidate.version === this.appVersion) || afterInstall[0] || existing;
+      if (!binary) {
+        throw new Error('Pichamber is not installed on the remote machine. Install it there, then connect again');
+      }
     }
 
-    this.setStatus(instance.id, 'server_detecting', 'Detecting managed OpenChamber server');
+    this.setStatus(instance.id, 'server_detecting', 'Detecting managed Pichamber server');
     let remotePort = instance.remoteOpenchamber.preferredPort || null;
     let startedByUs = false;
     if (remotePort && !(await this.remoteServerRunning(parsed, controlPath, remotePort, this.configuredOpenChamberPassword(instance)))) {
       remotePort = null;
     }
     if (!remotePort) {
-      this.setStatus(instance.id, 'server_starting', 'Starting managed OpenChamber server');
+      this.setStatus(instance.id, 'server_starting', 'Starting managed Pichamber server');
       const desiredPort = instance.remoteOpenchamber.preferredPort || randomPortCandidate(instance.id);
-      remotePort = await this.startRemoteServerManaged(parsed, controlPath, instance, desiredPort);
+      remotePort = await this.startRemoteServerManaged(parsed, controlPath, instance, desiredPort, binary.binPath);
       startedByUs = true;
     }
     if (!(await this.remoteServerRunning(parsed, controlPath, remotePort, this.configuredOpenChamberPassword(instance)))) {
-      throw new Error('Managed OpenChamber server failed to become reachable');
+      throw new Error('Managed Pichamber server failed to become reachable');
     }
-    return { remotePort, startedByUs };
+    return { remotePort, startedByUs, remoteBinPath: binary.binPath };
   }
 
   async disconnectInternal(id, reportIdle) {
@@ -1186,7 +1263,7 @@ export class ElectronSshManager {
 
     if (session) {
       if (session.startedByUs && session.remotePort && session.instance.remoteOpenchamber.mode === 'managed' && !session.instance.remoteOpenchamber.keepRunning) {
-        await this.stopRemoteServerBestEffort(session.parsed, session.controlPath, session.remotePort);
+        await this.stopRemoteServerBestEffort(session.parsed, session.controlPath, session.remotePort, session.remoteBinPath);
       }
       await this.stopControlMasterBestEffort(session.parsed, session.controlPath);
       const auth = this.sshAuth.get(session.parsed);
@@ -1247,6 +1324,7 @@ export class ElectronSshManager {
       mainForward: null,
       mainForwardDetached: false,
       extraForwards: [],
+      remoteBinPath: null,
     };
     this.sessions.set(id, session);
 
@@ -1262,9 +1340,10 @@ export class ElectronSshManager {
       throw new Error(`Unsupported remote OS: ${remoteOs}`);
     }
 
-    const { remotePort, startedByUs } = await this.ensureRemoteServer(instance, parsed, controlPath);
+    const { remotePort, startedByUs, remoteBinPath } = await this.ensureRemoteServer(instance, parsed, controlPath);
     session.remotePort = remotePort;
     session.startedByUs = startedByUs;
+    session.remoteBinPath = remoteBinPath;
     this.setStatus(id, 'forwarding', 'Setting up port forwards', null, null, remotePort, startedByUs, 0, false);
 
     const bindHost = sanitizeBindHost(instance.localForward?.bindHost);

@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Settings/Desktop: External Tunnel keeps the missing cloudflared warning on Quick, Managed remote, and Managed local, and Start tunnel stays disabled with that same reason.
 - Desktop: the header hamburger now opens the app menu on the first click. Hovering its tooltip no longer eats that press.
 - Settings: Remote Instances, Git, Extensions, Skills Catalog, and Snippets now show a short page subtitle. Snippets Total matches the other lists, and Remote Instances no longer repeats its title or the empty SSH message.
+- Settings/Desktop: adding an SSH remote now starts from hosts in your SSH config, with ports, install method, and passwords under Advanced. Each connection shows Connected, Connecting, or Needs attention — with the failure text and a resolve button. Disconnecting without keeping the server running now stops the remote Pichamber. Home-directory Pichamber binaries work; a missing remote kernel is reported before connect. A managed remote can also be published on that machine's network when you set a UI password.
 
 ## [1.0.1] - 2026-08-18
 

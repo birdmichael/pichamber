@@ -14,7 +14,7 @@ description: 데스크톱 앱에서 저장된 SSH 호스트를 가져오고 추�
 OpenChamber는 로컬 SSH config의 호스트를 읽을 수 있습니다. `ssh work-server` 같은 명령이 사용하는 같은 위치입니다.
 
 1. **Settings → Remote Instances**를 엽니다.
-2. **Saved SSH hosts**에서 호스트를 선택합니다.
+2. **Add SSH connection**을 선택한 뒤 **From SSH config**에서 호스트를 고릅니다.
 3. 호스트가 패턴이면 `deploy@app.example.com` 같은 실제 대상을 입력합니다.
 4. 저장하고 연결합니다.
 
@@ -22,7 +22,7 @@ OpenChamber는 이 SSH 명령으로 remote instance를 만듭니다. 상태가 *
 
 ## 추가 포트 포워딩 추가
 
-각 remote instance에는 **Port Forwards** 섹션이 있습니다. SSH 연결의 한쪽에서 다른 쪽의 포트에 접근해야 할 때 사용하세요.
+각 remote instance의 추가 포트 포워딩은 **Advanced**에 있습니다. SSH 연결의 한쪽에서 다른 쪽의 포트에 접근해야 할 때 사용하세요.
 
 OpenChamber는 세 가지 포워딩 유형을 지원합니다:
 

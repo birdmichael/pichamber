@@ -626,6 +626,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => ctx.isDesktop,
   },
   {
+    id: 'remote-instances.add-ssh',
+    page: 'remote-instances',
+    titleKey: 'settings.remoteInstances.sidebar.actions.addSshInstance',
+    descriptionKey: 'settings.remoteInstances.page.addDialog.description',
+    keywords: ['ssh', 'config', 'host', 'import', 'connect', 'remote', 'advanced'],
+    isAvailable: (ctx) => ctx.isDesktop,
+  },
+  {
     id: 'behavior.system-prompt-optimization',
     page: 'behavior',
     titleKey: 'settings.behavior.page.section.systemPromptOptimization',

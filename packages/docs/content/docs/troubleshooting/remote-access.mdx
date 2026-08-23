@@ -10,7 +10,7 @@ When you can't reach OpenChamber from your phone or another machine, the fix dep
 ## Check the basics first
 
 - open `http://localhost:3000` on the same computer first — if that fails, it's not a remote problem; see [OpenCode connection](/troubleshooting/opencode-connection/)
-- confirm the server is running with `openchamber status`
+- confirm the server is running with `pichamber status`
 
 ## Paired device won't connect
 
@@ -31,10 +31,10 @@ See [Tunnels](/tunnels/) for the full setup.
 
 ## Remote instance won't connect (desktop)
 
-When a [remote instance](/remote-instances/) stalls, OpenChamber names the step that failed:
+When a [remote instance](/remote-instances/) stalls, the row shows **Needs attention** with the failure text and a resolve button when the desktop app can fix it:
 
 - **auth** — your SSH or UI password was rejected; re-enter it
-- **install / start** — OpenChamber couldn't set up or start the server on the remote machine; check that machine's requirements
+- **install / start** — Pichamber couldn't set up or start the server on the remote machine. A missing remote Pichamber kernel is reported before connect. Install it there and try again
 - **forwarding** — the connection is up but the port isn't reaching you; try a different local port
 
 ## Behind your own server
