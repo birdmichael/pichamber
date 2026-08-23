@@ -201,6 +201,7 @@ Important properties:
 - `setParams()` attaches runtime context
 - parameter changes advance an entry revision; stale queued, successful, and failed requests cannot update a newer authority
 - `startWatching()` / `stopWatching()` are for true live PR consumers only
+- Work Status and other passive readers use `useFreshestPrVisualSummaryForBranch` / `getFreshestPrStatusForBranch` so checks follow the live remote-keyed entry instead of a stale automatic key
 - `refreshTargets()` supports one-shot multi-target bootstrap without turning on live watching
 - runtime reset disposes timers, watchers, API references, and request ownership while inert namespaced snapshots remain isolated
 - persisted cache is versioned, TTL-filtered, and bounded for page refresh continuity, not broad background syncing
