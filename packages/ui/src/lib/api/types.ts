@@ -157,6 +157,22 @@ export interface GetGitRangeDiffOptions {
   contextLines?: number;
 }
 
+export interface GetGitRangeFilesOptions {
+  base: string;
+  head: string;
+}
+
+/** One changed file in a `base...head` range, with its change letter (A/M/D/R/C). */
+export interface GitRangeFileEntry {
+  path: string;
+  status: string;
+}
+
+export interface GitBranchBaseResponse {
+  /** Null when git has no authoritative record of where the branch started. */
+  base: string | null;
+}
+
 export interface GitFileDiffResponse {
   original: string;
   modified: string;
@@ -466,6 +482,8 @@ export interface GitAPI {
   getGitDiff(directory: string, options: GetGitDiffOptions): Promise<GitDiffResponse>;
   getGitFileDiff(directory: string, options: GetGitFileDiffOptions): Promise<GitFileDiffResponse>;
   getGitRangeDiff?(directory: string, options: GetGitRangeDiffOptions): Promise<GitDiffResponse>;
+  getGitRangeFiles?(directory: string, options: GetGitRangeFilesOptions): Promise<GitRangeFileEntry[]>;
+  getBranchBase?(directory: string, branch: string): Promise<GitBranchBaseResponse>;
   revertGitFile(directory: string, filePath: string, options?: { scope?: 'all' | 'working' }): Promise<void>;
   stageGitFile(directory: string, filePath: string): Promise<void>;
   stageGitFiles?(directory: string, filePaths: string[]): Promise<void>;
