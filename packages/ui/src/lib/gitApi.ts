@@ -119,6 +119,24 @@ export async function getGitRangeDiff(
   return gitHttp.getGitRangeDiff(directory, options);
 }
 
+export async function getGitRangeFiles(
+  directory: string,
+  options: import('./api/types').GetGitRangeFilesOptions
+): Promise<import('./api/types').GitRangeFileEntry[]> {
+  const runtime = getRuntimeGit();
+  if (runtime?.getGitRangeFiles) return runtime.getGitRangeFiles(directory, options);
+  return gitHttp.getGitRangeFiles(directory, options);
+}
+
+export async function getBranchBase(
+  directory: string,
+  branch: string
+): Promise<import('./api/types').GitBranchBaseResponse> {
+  const runtime = getRuntimeGit();
+  if (runtime?.getBranchBase) return runtime.getBranchBase(directory, branch);
+  return gitHttp.getBranchBase(directory, branch);
+}
+
 export async function revertGitFile(
   directory: string,
   filePath: string,

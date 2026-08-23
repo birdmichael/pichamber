@@ -3,6 +3,9 @@ import type {
   GitDiffResponse,
   GetGitDiffOptions,
   GetGitRangeDiffOptions,
+  GetGitRangeFilesOptions,
+  GitRangeFileEntry,
+  GitBranchBaseResponse,
   GitFileDiffResponse,
   GetGitFileDiffOptions,
   GitBranch,
@@ -246,6 +249,62 @@ export async function getGitRangeDiff(
   }
 
   return response.json();
+}
+
+export async function getGitRangeFiles(
+  directory: string,
+  options: GetGitRangeFilesOptions
+): Promise<GitRangeFileEntry[]> {
+  const { base, head } = options;
+  if (!base || !head) {
+    throw new Error('base and head are required to fetch git range files');
+  }
+
+  const response = await runtimeFetch(
+    buildUrl(`${API_BASE}/range-files`, directory, { base, head })
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get git range files: ${response.statusText}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Failed to get git range files: invalid response');
+  }
+  const files = (payload as { files?: unknown }).files;
+  if (!Array.isArray(files)) {
+    throw new Error('Failed to get git range files: invalid response');
+  }
+  return files.filter((entry): entry is GitRangeFileEntry => {
+    if (!entry || typeof entry !== 'object') return false;
+    const candidate = entry as { path?: unknown; status?: unknown };
+    return typeof candidate.path === 'string' && typeof candidate.status === 'string';
+  });
+}
+
+export async function getBranchBase(
+  directory: string,
+  branch: string
+): Promise<GitBranchBaseResponse> {
+  if (!branch) {
+    throw new Error('branch is required to get branch base');
+  }
+
+  const response = await runtimeFetch(
+    buildUrl(`${API_BASE}/branch-base`, directory, { branch })
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to get branch base: ${response.statusText}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Failed to get branch base: invalid response');
+  }
+  const base = (payload as { base?: unknown }).base;
+  return { base: typeof base === 'string' && base.trim() ? base.trim() : null };
 }
 
 export async function getGitFileDiff(directory: string, options: GetGitFileDiffOptions): Promise<GitFileDiffResponse> {
