@@ -87,6 +87,17 @@ describe("applySessionEventToGlobalSessions", () => {
     expect(upsertedSessions.map((session) => session.time.updated)).toEqual([30])
   })
 
+  test("upserts a session.created event immediately so the sidebar can show it", () => {
+    const created = buildSession("CLI session", { created: 40, updated: 40 })
+
+    applySessionEventToGlobalSessions({
+      type: "session.created",
+      properties: { info: created },
+    } as Event)
+
+    expect(upsertedSessions).toEqual([created])
+  })
+
   test("applies substantive session updates immediately", () => {
     currentSessions = [buildSession("Initial", { created: 1, updated: 10 })]
 
