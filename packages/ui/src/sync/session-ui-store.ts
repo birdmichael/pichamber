@@ -87,7 +87,11 @@ import { getRuntimeKey } from "@/lib/runtime-switch"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
 import { persistWorktreeTopology, readPersistedWorktreeTopology } from "./worktree-topology-cache"
 import { rememberRuntimeLiveStatus } from "./runtime-live-memory"
-import { applyDraftPlanStartAfterMaterialize } from "./pi-session-plan"
+import {
+  applyDraftPlanStartAfterMaterialize,
+  resolveEmptyComposerPlanSelected,
+  resolveOpenedDraftPlanSelected,
+} from "./pi-session-plan"
 import { usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
 
 export type { AttachedFile }
@@ -276,7 +280,7 @@ export type NewSessionDraftState = {
   selectedProjectId?: string | null
   directoryOverride: string | null
   permissionAutoAcceptEnabled?: boolean
-  /** Local Agent/Plan intent. Must not mint a session until send. */
+  /** Local Agent/Plan intent on the open draft. Must not mint a session until send. */
   planSelected?: boolean
   pendingWorktreeRequestId?: string | null
   bootstrapPendingDirectory?: string | null
@@ -306,6 +310,8 @@ export type SessionUIState = {
   currentSessionId: string | null
   currentSessionDirectory: string | null
   newSessionDraft: NewSessionDraftState
+  /** Last empty-composer Agent/Plan. Survives sidebar switches; consumed on send. */
+  emptyComposerPlanSelected: boolean
   abortPromptSessionId: string | null
   abortPromptExpiresAt: number | null
   error: string | null
@@ -331,7 +337,7 @@ export type SessionUIState = {
   prepareForRuntimeSwitch: (apiBaseUrl?: string | null) => void
   restoreForRuntimeSwitch: (apiBaseUrl?: string | null) => void
   openNewSessionDraft: (options?: Partial<NewSessionDraftState> & { automatic?: boolean }) => void
-  closeNewSessionDraft: () => void
+  closeNewSessionDraft: (options?: { consumeEmptyComposerPlan?: boolean }) => void
   setNewSessionDraftTarget: (target: { projectId?: string | null; selectedProjectId?: string | null; directoryOverride?: string | null }, options?: { force?: boolean }) => void
   setDraftPreserveDirectoryOverride: (value: boolean) => void
   setDraftPermissionAutoAcceptEnabled: (enabled: boolean) => void
@@ -721,6 +727,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   currentSessionId: null,
   currentSessionDirectory: null,
   newSessionDraft: { ...DEFAULT_DRAFT },
+  emptyComposerPlanSelected: false,
   abortPromptSessionId: null,
   abortPromptExpiresAt: null,
   error: null,
@@ -933,11 +940,16 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     persistDraftTarget({ projectId: selectedProject?.id ?? null, directory })
 
+    const planSelected = resolveOpenedDraftPlanSelected(
+      options?.planSelected,
+      get().emptyComposerPlanSelected,
+    )
     const nextDraft: NewSessionDraftState = {
       open: true,
       selectedProjectId: selectedProject?.id ?? null,
       directoryOverride: directory,
       permissionAutoAcceptEnabled: options?.permissionAutoAcceptEnabled === true,
+      planSelected,
       pendingWorktreeRequestId: options?.pendingWorktreeRequestId ?? null,
       bootstrapPendingDirectory: normalizePath(options?.bootstrapPendingDirectory ?? null),
       preserveDirectoryOverride: options?.preserveDirectoryOverride === true,
@@ -988,8 +1000,14 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   // ---------------------------------------------------------------------------
   // closeNewSessionDraft
   // ---------------------------------------------------------------------------
-  closeNewSessionDraft: () => {
+  closeNewSessionDraft: (options) => {
     const currentDraft = get().newSessionDraft
+    const nextEmptyComposerPlanSelected = resolveEmptyComposerPlanSelected({
+      current: get().emptyComposerPlanSelected,
+      draftOpen: currentDraft.open,
+      draftPlanSelected: currentDraft.planSelected,
+      consume: options?.consumeEmptyComposerPlan === true,
+    })
     if (
       !currentDraft.open
       && currentDraft.selectedProjectId == null
@@ -1004,6 +1022,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       && currentDraft.targetFolderId === undefined
       && currentDraft.permissionAutoAcceptEnabled === undefined
       && currentDraft.planSelected === undefined
+      && nextEmptyComposerPlanSelected === get().emptyComposerPlanSelected
     ) {
       return
     }
@@ -1022,6 +1041,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       }
     set({
       newSessionDraft: nextDraft,
+      emptyComposerPlanSelected: nextEmptyComposerPlanSelected,
     })
     writeRuntimeSessionMemory(runtimeMemoryKey(), { draft: nextDraft })
   },
@@ -1060,7 +1080,10 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   setDraftPlanSelected: (selected) =>
     set((s) => {
       if (!s.newSessionDraft?.open) return s
-      return { newSessionDraft: { ...s.newSessionDraft, planSelected: selected } }
+      return {
+        emptyComposerPlanSelected: selected,
+        newSessionDraft: { ...s.newSessionDraft, planSelected: selected },
+      }
     }),
 
   acknowledgeSessionAbort: (sessionId) =>
@@ -1454,7 +1477,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       const session = await createSessionAction(title, dir, parentID ?? null, metadata)
       if (!session) return null
 
-      get().closeNewSessionDraft()
+      get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
 
       if (targetFolderId) {
         const scopeKey = directoryOverride || get().lastLoadedDirectory || session.directory
