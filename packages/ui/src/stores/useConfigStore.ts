@@ -188,10 +188,6 @@ const sanitizePersistedSelectedProviderId = (providerId: string | undefined): st
     providerId === ADD_PROVIDER_SENTINEL ? "" : (providerId ?? "")
 );
 
-const preserveAddProviderSelection = (currentSelectedProviderId: string | undefined, nextProviderId: string): string => (
-    currentSelectedProviderId === ADD_PROVIDER_SENTINEL ? ADD_PROVIDER_SENTINEL : nextProviderId
-);
-
 const normalizeOptionalString = (value: unknown): string | undefined => {
     if (typeof value !== "string") {
         return undefined;
@@ -1635,10 +1631,15 @@ export const useConfigStore = create<ConfigStore>()(
                                 const currentSelectedProviderId = state.activeDirectoryKey === directoryKey
                                     ? state.selectedProviderId
                                     : baseSnapshot.selectedProviderId;
-                                // Preserve the add-provider sentinel so a background refresh does not
-                                // navigate the user out of the in-progress add-provider form (issue #1765).
-                                const selectedProviderId = currentSelectedProviderId === ADD_PROVIDER_SENTINEL
-                                    || processedProviders.some((provider) => provider.id === currentSelectedProviderId)
+                                // The Providers settings selection belongs to the user, not to this
+                                // loader. A refresh may report a different provider set — an OpenCode
+                                // restart drops plugin-registered providers until they re-register,
+                                // and a Pi models refresh can reorder or omit a provider that is
+                                // still selected — and re-deriving a selection here yanked the open
+                                // provider away mid-edit. Keep whatever is selected; only fill in
+                                // an empty one. The add-provider sentinel is kept for the same
+                                // reason (issue #1765).
+                                const selectedProviderId = currentSelectedProviderId
                                     ? currentSelectedProviderId
                                     : (resolvedModel?.providerId ?? processedProviders[0]?.id ?? "");
 
@@ -1749,12 +1750,17 @@ export const useConfigStore = create<ConfigStore>()(
                                         nextState.currentProviderId = parsed.providerId;
                                         nextState.currentModelId = parsed.modelId;
                                         nextState.currentVariant = currentVariant;
-                                        nextState.selectedProviderId = parsed.providerId;
 
                                         nextSnapshot.currentProviderId = parsed.providerId;
                                         nextSnapshot.currentModelId = parsed.modelId;
                                         nextSnapshot.currentVariant = currentVariant;
-                                        nextSnapshot.selectedProviderId = parsed.providerId;
+
+                                        // Only adopt this as the settings selection when the user has
+                                        // none; a failed refresh must not move an existing one.
+                                        if (!state.selectedProviderId) {
+                                            nextState.selectedProviderId = parsed.providerId;
+                                            nextSnapshot.selectedProviderId = parsed.providerId;
+                                        }
                                     }
                                 }
                             }
@@ -1797,14 +1803,12 @@ export const useConfigStore = create<ConfigStore>()(
                             ...baseSnapshot,
                             currentProviderId: providerId,
                             currentModelId: newModelId,
-                            selectedProviderId: providerId,
                             selectionSource: "manual",
                         };
 
                         return {
                             currentProviderId: providerId,
                             currentModelId: newModelId,
-                            selectedProviderId: providerId,
                             selectionSource: "manual",
                             directoryScoped: {
                                 ...state.directoryScoped,
@@ -2482,7 +2486,6 @@ export const useConfigStore = create<ConfigStore>()(
                                     currentProviderId: providerId,
                                     currentModelId: modelId,
                                     currentVariant: variant,
-                                    selectedProviderId: preserveAddProviderSelection(state.selectedProviderId, providerId),
                                     selectionSource: "manual",
                                 };
 
@@ -2490,7 +2493,6 @@ export const useConfigStore = create<ConfigStore>()(
                                     currentProviderId: providerId,
                                     currentModelId: modelId,
                                     currentVariant: variant,
-                                    selectedProviderId: preserveAddProviderSelection(state.selectedProviderId, providerId),
                                     selectionSource: "manual",
                                     directoryScoped: {
                                         ...state.directoryScoped,
@@ -2642,7 +2644,6 @@ export const useConfigStore = create<ConfigStore>()(
                                     currentProviderId: resolvedProviderId,
                                     currentModelId: resolvedModelId,
                                     currentVariant: resolvedVariant,
-                                    selectedProviderId: preserveAddProviderSelection(state.selectedProviderId, resolvedProviderId),
                                 }
                                 : {}),
                             selectionSource: "auto",
@@ -2661,7 +2662,6 @@ export const useConfigStore = create<ConfigStore>()(
                             nextState.currentProviderId = resolvedProviderId;
                             nextState.currentModelId = resolvedModelId;
                             nextState.currentVariant = resolvedVariant;
-                            nextState.selectedProviderId = preserveAddProviderSelection(state.selectedProviderId, resolvedProviderId);
                         }
 
                         return nextState;
@@ -2743,7 +2743,6 @@ export const useConfigStore = create<ConfigStore>()(
                         const currentProviderId = isActive ? state.currentProviderId : baseSnapshot.currentProviderId;
                         const currentModelId = isActive ? state.currentModelId : baseSnapshot.currentModelId;
                         const currentVariant = isActive ? state.currentVariant : baseSnapshot.currentVariant;
-                        const currentSelectedProviderId = isActive ? state.selectedProviderId : baseSnapshot.selectedProviderId;
                         const nextSelection = resolveSelectionWithManualGuard({
                             agents,
                             providers,
@@ -2768,7 +2767,6 @@ export const useConfigStore = create<ConfigStore>()(
                                     currentProviderId: nextSelection.providerId,
                                     currentModelId: nextSelection.modelId,
                                     currentVariant: nextSelection.variant,
-                                    selectedProviderId: preserveAddProviderSelection(currentSelectedProviderId, nextSelection.providerId),
                                 }
                                 : {}),
                             selectionSource: nextSelection.selectionSource,
@@ -2787,7 +2785,6 @@ export const useConfigStore = create<ConfigStore>()(
                                     state.currentProviderId !== nextSelection.providerId
                                     || state.currentModelId !== nextSelection.modelId
                                     || state.currentVariant !== nextSelection.variant
-                                    || state.selectedProviderId !== preserveAddProviderSelection(currentSelectedProviderId, nextSelection.providerId)
                                 ))
                             ));
 
@@ -2807,7 +2804,6 @@ export const useConfigStore = create<ConfigStore>()(
                                 nextState.currentProviderId = nextSelection.providerId;
                                 nextState.currentModelId = nextSelection.modelId;
                                 nextState.currentVariant = nextSelection.variant;
-                                nextState.selectedProviderId = preserveAddProviderSelection(currentSelectedProviderId, nextSelection.providerId);
                             }
                         }
 
