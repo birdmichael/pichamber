@@ -2461,6 +2461,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
                                 <div
+                                    aria-label={isReady ? currentModelDisplayName : readinessLabel}
                                     className={cn(
                                         'model-controls__model-trigger flex items-center gap-1.5 cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
                                         buttonHeight
@@ -3142,7 +3143,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             <div className={inlineClassName}>
                 <div
                     className={cn(
-                        'flex items-center min-w-0 flex-1 justify-end',
+                        'model-controls__row flex items-center min-w-0 flex-1 justify-end',
                         inlineGapClass,
                         isMobile && 'overflow-hidden'
                     )}
