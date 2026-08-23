@@ -145,7 +145,10 @@ export const FeaturePluginsPage: React.FC = () => {
               ready={ready}
               isBusy={busySlot === slot}
               pendingAction={pending?.slot === slot ? pending.action : null}
-              onInstall={() => setPending({ slot, action: 'install' })}
+              onInstall={() => {
+                if (payload.slots[slot].installed) return;
+                setPending({ slot, action: 'install' });
+              }}
               onUninstall={() => setPending({ slot, action: 'uninstall' })}
             />
           ))}
@@ -250,16 +253,18 @@ function FeaturePluginCard({
       </div>
       <div className="mt-auto space-y-3 border-t border-[var(--interactive-border)] px-4 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={!ready || isBusy}
-            onClick={onInstall}
-          >
-            {isBusy && pendingAction === 'install'
-              ? t('settings.featurePlugins.actions.installing')
-              : t('settings.featurePlugins.actions.install')}
-          </Button>
+          {saved.installed ? null : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!ready || isBusy}
+              onClick={onInstall}
+            >
+              {isBusy && pendingAction === 'install'
+                ? t('settings.featurePlugins.actions.installing')
+                : t('settings.featurePlugins.actions.install')}
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
