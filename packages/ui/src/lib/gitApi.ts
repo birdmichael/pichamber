@@ -1,5 +1,6 @@
 
 import * as gitHttp from './gitApiHttp';
+import { collectPullRequestTemplate, collectRecentCommitSubjects } from './gitGenerationContext';
 import { opencodeClient } from './opencode/client';
 import { renderMagicPrompt } from './magicPrompts';
 import { requestSmallModel } from './smallModelRequest';
@@ -275,9 +276,11 @@ export async function generateCommitMessage(
     selectedFiles: files.length,
   });
 
+  const recentCommits = await collectRecentCommitSubjects(directory, getGitLog);
   const visiblePrompt = await renderMagicPrompt('git.commit.generate.visible');
   const hiddenPrompt = await renderMagicPrompt('git.commit.generate.instructions', {
     selected_files: files.map((file) => `- ${file}`).join('\n'),
+    recent_commits: recentCommits,
   });
 
   try {
@@ -401,7 +404,8 @@ export async function generatePullRequestDescription(
       return `${line}\n${indentedBody}`;
     }).join('\n'),
     changed_files: changedFiles.length > 0 ? changedFiles.map((file) => `- ${file}`).join('\n') : '- none detected',
-    additional_context_block: payload.context?.trim() ? `\nAdditional context:\n${payload.context.trim()}` : '',
+    additional_context_block: payload.context?.trim() ? `\n\nAdditional context:\n${payload.context.trim()}` : '',
+    pr_template_block: await collectPullRequestTemplate(directory),
   });
 
   const parsePrStructured = (structured: Record<string, unknown> | null) => ({
