@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.
 - Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
 - Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.

@@ -18,6 +18,8 @@ import React from 'react';
 
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { formatDirectoryName } from '@/lib/utils';
+import { getProjectDisplayLabel } from '@/lib/workspaceLabel';
+import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useGitBranches, useGitStore, useIsGitRepo } from '@/stores/useGitStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -37,14 +39,10 @@ export interface DraftTargetProject {
     iconBackground?: string | null;
 }
 
-/** A project's display name, falling back to its directory name. */
-export function getProjectDisplayLabel(project: { label?: string; path: string }): string {
-    return project.label?.trim() || formatDirectoryName(project.path);
-}
-
 export function useDraftTarget(enabled: boolean) {
     const projects = useProjectsStore((state) => state.projects) as DraftTargetProject[];
     const activeProjectId = useProjectsStore((state) => state.activeProjectId);
+    const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const setActiveProjectIdOnly = useProjectsStore((state) => state.setActiveProjectIdOnly);
     const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
     const setNewSessionDraftTarget = useSessionUIStore((s) => s.setNewSessionDraftTarget);
@@ -74,7 +72,9 @@ export function useDraftTarget(enabled: boolean) {
         () => normalizePath(selectedDraftProject?.path ?? null),
         [selectedDraftProject?.path],
     );
-    const draftProjectLabel = selectedDraftProject ? getProjectDisplayLabel(selectedDraftProject) : null;
+    const draftProjectLabel = selectedDraftProject
+        ? getProjectDisplayLabel(selectedDraftProject, homeDirectory)
+        : null;
 
     const selectedDraftProjectBranches = useGitBranches(selectedDraftProjectPath);
     const selectedDraftProjectBranchesFetchedAt = useGitStore(

@@ -8,7 +8,7 @@ own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
 On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
-An existing session with zero messages uses the same Desktop welcome chrome as New session: the same `DraftPresetChips` the installed packages allow, plus the Session panel. Chip click still submits through the composer send path on that session; it does not mint another chat.
+An existing session with zero messages uses the same Desktop welcome chrome as New session: the same `DraftPresetChips` the installed packages allow, plus the Session panel. The welcome title uses the same friendly workspace label as the sidebar (`~` for the home folder, or the opened project's name), not the raw last path segment. Chip click still submits through the composer send path on that session; it does not mint another chat.
 
 OpenChamber Session Goal stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
 When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows

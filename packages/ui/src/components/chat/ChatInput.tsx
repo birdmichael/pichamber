@@ -79,6 +79,7 @@ import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { shouldShowDesktopDraftWelcomeChrome } from '@/lib/draftStarters';
+import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
 import { wrapSystemReminder } from '@/lib/systemReminder';
@@ -331,6 +332,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     ).current;
     const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
     const fallbackDirectory = useDirectoryStore((s) => s.currentDirectory);
+    const homeDirectory = useDirectoryStore((s) => s.homeDirectory);
     const currentDirectory = useEffectiveDirectory() ?? fallbackDirectory;
     const currentSessionDirectoryForSync = useSessionUIStore(
         React.useCallback((s) => currentSessionId ? s.getDirectoryForSession(currentSessionId) : null, [currentSessionId]),
@@ -2369,7 +2371,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const {
         projects: draftProjects,
         selectedDraftProject,
-        draftProjectLabel,
         selectedDraftDirectory,
         selectedDraftBranchLabel,
         selectedDraftBranchIsKnown,
@@ -2380,6 +2381,21 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         handleDraftProjectChange,
         handleDraftDirectoryChange,
     } = useDraftTarget(showDraftTargetSelectors);
+    const welcomeWorkspaceLabel = React.useMemo(() => resolveWelcomeWorkspaceLabel({
+        projects: draftProjects,
+        homeDirectory,
+        sessionDirectory: currentSessionDirectoryForSync ?? currentDirectory,
+        draftProject: selectedDraftProject,
+        preferSessionProject: emptySessionWelcome && !newSessionDraftOpen,
+    }), [
+        currentDirectory,
+        currentSessionDirectoryForSync,
+        draftProjects,
+        emptySessionWelcome,
+        homeDirectory,
+        newSessionDraftOpen,
+        selectedDraftProject,
+    ]);
 
     const chatSurfaceMode = useChatSurfaceMode();
     const isMiniChatSurface = chatSurfaceMode === 'mini-chat';
@@ -2591,10 +2607,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 <div className="chat-input-column mb-7 text-center">
                     <h1 className="text-balance text-2xl font-normal tracking-tight text-foreground md:text-3xl">
                         {renderDraftTitle(
-                            draftProjectLabel
-                                ? t('chat.emptyState.draftTitleWithProject', { project: draftProjectLabel })
+                            welcomeWorkspaceLabel
+                                ? t('chat.emptyState.draftTitleWithProject', { project: welcomeWorkspaceLabel })
                                 : t('chat.emptyState.draftTitle'),
-                            draftProjectLabel,
+                            welcomeWorkspaceLabel,
                         )}
                     </h1>
                 </div>

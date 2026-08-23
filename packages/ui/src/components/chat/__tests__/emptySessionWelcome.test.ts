@@ -11,6 +11,7 @@ describe('empty existing session welcome chrome', () => {
   test('ChatInput shares New session title and starter chips when emptySessionWelcome is set', () => {
     expect(chatInputSource).toContain('shouldShowDesktopDraftWelcomeChrome');
     expect(chatInputSource).toContain('emptySessionWelcome');
+    expect(chatInputSource).toContain('resolveWelcomeWorkspaceLabel');
     expect(chatInputSource).toContain('<DraftPresetChips');
     expect(chatInputSource).not.toMatch(
       /newSessionDraftOpen && !isDesktopExpanded && !isMobile && !isVSCode && !isMiniChatSurface/,
@@ -23,6 +24,7 @@ describe('empty existing session welcome chrome', () => {
     expect(emptyStateReturn).toBeGreaterThan(-1);
     const emptyStateBlock = chatContainerSource.slice(emptyStateReturn, emptyStateReturn + 2400);
     expect(emptyStateBlock).toContain('<DraftWelcome');
+    expect(emptyStateBlock).toContain('sessionDirectory={effectiveSessionDirectory}');
     expect(emptyStateBlock).toContain('emptySessionWelcome');
     expect(emptyStateBlock).toContain('<WorkStatusPanel');
     expect(emptyStateBlock).toContain('sessionId={currentSessionId}');
