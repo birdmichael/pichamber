@@ -14,9 +14,11 @@ import { useI18n } from '@/lib/i18n';
 import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { getWorktreeFirstSeenAt } from '../worktreeFirstSeen';
+import { shouldRenderSidebarWorktreeGroup } from '../visibleWorkspaceGroups';
 
 type Args = {
   homeDirectory: string | null;
+  openedProjectPaths: ReadonlySet<string>;
   worktreeMetadata: Map<string, WorktreeMetadata>;
   pinnedSessionIds: Set<string>;
   sessionOrderRanks: ReadonlyMap<string, number>;
@@ -218,7 +220,18 @@ export const useSessionGrouping = (args: Args) => {
       });
 
       // VS Code groups strictly by open workspace — no per-worktree subgroups.
-      const worktreeGroups = args.isVSCode ? [] : sortedWorktrees;
+      // Empty leftover worktrees (Cursor/cloud checkouts, unused tmp paths)
+      // stay off the sidebar unless they are themselves an opened project.
+      const worktreeGroups = args.isVSCode
+        ? []
+        : sortedWorktrees.filter((meta) => {
+          const directory = normalizePath(meta.path) ?? meta.path;
+          return shouldRenderSidebarWorktreeGroup({
+            directory,
+            sessionCount: (groupedNodes.get(directory) ?? []).length,
+            openedProjectPaths: args.openedProjectPaths,
+          });
+        });
       worktreeGroups.forEach((meta) => {
         const directory = normalizePath(meta.path) ?? meta.path;
         const currentBranch = args.gitBranches.get(directory)?.trim() || null;
@@ -262,7 +275,7 @@ export const useSessionGrouping = (args: Args) => {
 
       return groups;
     },
-    [args.homeDirectory, args.worktreeMetadata, args.pinnedSessionIds, args.sessionOrderRanks, args.gitBranches, args.isVSCode, t],
+    [args.homeDirectory, args.openedProjectPaths, args.worktreeMetadata, args.pinnedSessionIds, args.sessionOrderRanks, args.gitBranches, args.isVSCode, t],
   );
 
   return {

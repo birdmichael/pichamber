@@ -33,12 +33,16 @@ describe('pi session project discovery', () => {
     expect(settingsNeverPersistedProjects({ projects: [{ path: '/repo' }] })).toBe(false);
   });
 
-  it('skips tmp, private tmp, and node_modules trees', () => {
+  it('skips tmp, node_modules, and leftover Cursor/cloud worktree paths', () => {
     expect(isSkippedPiSessionProjectCwd('/tmp/scratch', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/private/tmp/scratch', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/var/folders/zz/T/work', { tmpdir: '/var/folders/zz/T' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/var/tmp/scratch', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/repo/node_modules/pkg', { tmpdir: '/var/tmp' })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/home/box/.cursor/worktrees/app', { tmpdir: '/var/tmp' })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/worktrees/cursor/desktop-create-pr-e123', { tmpdir: '/var/tmp' })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/repo/.git/worktrees/feature', { tmpdir: '/var/tmp' })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/repo/.worktrees/cursor-desktop-plan-side-p456', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/repo/app', { tmpdir: '/var/tmp' })).toBe(false);
     expect(projectLabelFromPath('/repo/app')).toBe('app');
     expect(projectLabelFromPath('/')).toBe('Root');
@@ -52,10 +56,12 @@ describe('pi session project discovery', () => {
     const missing = path.join(home, 'deleted-app');
     const tmpProject = path.join(home, 'tmp-work');
     const nestedModules = path.join(home, 'app', 'node_modules', 'pkg');
+    const leftoverCursor = path.join(home, 'worktrees', 'cursor', 'desktop-create-pr-e123');
     await fsPromises.mkdir(older, { recursive: true });
     await fsPromises.mkdir(newer, { recursive: true });
     await fsPromises.mkdir(tmpProject, { recursive: true });
     await fsPromises.mkdir(nestedModules, { recursive: true });
+    await fsPromises.mkdir(leftoverCursor, { recursive: true });
 
     const sessionsRoot = path.join(home, '.pi', 'agent', 'sessions');
     const olderDir = path.join(sessionsRoot, '--encoded-older-name--');
@@ -63,6 +69,7 @@ describe('pi session project discovery', () => {
     const missingDir = path.join(sessionsRoot, '--encoded-missing-name--');
     const tmpDir = path.join(sessionsRoot, '--encoded-tmp-name--');
     const modulesDir = path.join(sessionsRoot, '--encoded-modules-name--');
+    const leftoverDir = path.join(sessionsRoot, '--encoded-cursor-name--');
     const unreadableDir = path.join(sessionsRoot, '--encoded-bad-name--');
     const archiveOnly = path.join(sessionsRoot, 'archive');
 
@@ -71,6 +78,7 @@ describe('pi session project discovery', () => {
     await writeSessionJsonl(path.join(missingDir, 'c.jsonl'), missing, 9_000);
     await writeSessionJsonl(path.join(tmpDir, 'd.jsonl'), path.join(os.tmpdir(), 'scratch'), 8_000);
     await writeSessionJsonl(path.join(modulesDir, 'e.jsonl'), nestedModules, 7_000);
+    await writeSessionJsonl(path.join(leftoverDir, 'f.jsonl'), leftoverCursor, 8_500);
     await fsPromises.mkdir(path.join(unreadableDir, 'child'), { recursive: true });
     await writeSessionJsonl(path.join(unreadableDir, 'child', 'nested.jsonl'), older, 6_000);
     await fsPromises.writeFile(path.join(unreadableDir, 'broken.jsonl'), '{not-json\n', 'utf8');
