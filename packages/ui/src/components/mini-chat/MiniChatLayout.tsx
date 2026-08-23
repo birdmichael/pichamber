@@ -253,7 +253,8 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   return (
     <header
       className={cn(
-        'flex items-center gap-3 bg-background pr-3',
+        'flex items-center gap-3 bg-background',
+        usesFramelessChrome && windowControlsSide === 'right' ? 'pr-0' : 'pr-3',
         hasMacTrafficLights ? 'pl-[5.5rem]' : 'pl-3',
         usesFramelessChrome ? 'h-12' : macosHeaderSizeClass || 'min-h-14',
       )}

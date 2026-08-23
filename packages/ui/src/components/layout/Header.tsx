@@ -2056,7 +2056,8 @@ export const Header: React.FC<HeaderProps> = ({
     <div
       onMouseDown={handleDragStart}
       className={cn(
-        'app-region-drag relative flex h-12 select-none items-center pr-3',
+        'app-region-drag relative flex h-12 select-none items-center',
+        usesFramelessChrome && windowControlsSide === 'right' ? 'pr-0' : 'pr-3',
         macosHeaderSizeClass
       )}
       style={webWindowControlsOverlayStyle}

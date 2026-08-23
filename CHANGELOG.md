@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.
 - Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Desktop: Linux and Windows chrome now uses File Manager / File Explorer, Alt, and Ctrl — including `Ctrl+,` in the header menu — instead of Finder, ⌥, and ⌘. macOS still shows Finder, ⌥, and ⌘.
+- Desktop/Windows: the close button now aligns correctly with the rest of the window chrome.
 - Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.
 - Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
 - Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.
