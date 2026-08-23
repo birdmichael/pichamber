@@ -80,6 +80,17 @@ describe('i18n dictionaries', () => {
     }
   });
 
+  test('composer @/# empty states name files/agents or snippets, and add snippet has no extra plus', () => {
+    expect(enDict['chat.fileMentionAutocomplete.empty']).toBe('No files or agents found');
+    expect(enDict['chat.snippetAutocomplete.empty']).toBe('No snippets found');
+    expect(enDict['chat.snippetAutocomplete.action.addNew']).toBe('Add new snippet');
+
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['chat.snippetAutocomplete.action.addNew'], locale).not.toMatch(/^\s*\+/);
+      expect(dictionary['chat.fileMentionAutocomplete.empty'], locale).not.toBe('No matches found');
+    }
+  });
+
   test('command palette copy describes sessions, actions, and files', () => {
     expect(enDict['commandPalette.description']).toBe('Search sessions, actions, and files.');
     expect(enDict['commandPalette.input.placeholder']).toBe('Search sessions, actions, files...');

@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Chat: on Pi, choosing Plan on a new session still shows Plan after you open another chat and come back. Existing chats keep their own Agent or Plan.
 - Settings: on Pi, Sessions → Enabled models now shows the provider on each row, so two providers with the same model are not mistaken for one model.
 - Settings/Appearance: Light Theme and Dark Theme now list the product theme as Pichamber instead of OpenChamber. Existing selections still apply.
+- Chat: typing `@` with nothing to list now says there are no files or agents, matching `#` saying there are no snippets. The add-snippet row no longer shows two plus signs.
 
 ## [1.0.1] - 2026-08-18
 
