@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
 - Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.
 - Chat/Desktop: while a reply streams, the model status line under the last message now turns into the finished message's info row in place, instead of jumping when the reply completes.
+- Chat: newly sent messages and syntax-highlighted code blocks no longer briefly flicker. Bash output can also grow with its content instead of being cut off.
 - Sessions/Desktop: the sidebar no longer lists empty leftover workspaces such as Cursor `cursor/desktop-…` checkouts that are not opened projects. Settings → Projects is unchanged, and an opened project with no chats still shows once.
 - Sessions/Desktop: opening a chat no longer adds a second Recent copy at the top of the sidebar. The row stays in its workspace group, so the list does not jump under the pointer.
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and a readable model name (it may shorten, but not to a single letter), without overlapping Agent, mic, or Send.
