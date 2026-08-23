@@ -91,13 +91,19 @@ export interface DiscoveredSkill {
 }
 
 /** Directory that contains SKILL.md, used when the list payload omits `name`. */
-function skillNameFromPath(filePath: string): string {
+export function skillNameFromPath(filePath: string): string {
   const normalizedPath = filePath.replace(/\\/g, '/');
   const parts = normalizedPath.split('/').filter(Boolean);
   if (parts.length >= 2 && parts[parts.length - 1].toLowerCase() === 'skill.md') {
     return parts[parts.length - 2];
   }
   return parts[parts.length - 1] || '';
+}
+
+/** Runtime skill name, or the SKILL.md directory stem. Does not invent a label. */
+export function skillListLabel(skill: Pick<DiscoveredSkill, 'name' | 'path'>): string {
+  const runtimeName = typeof skill.name === 'string' ? skill.name.trim() : '';
+  return runtimeName || skillNameFromPath(skill.path || '');
 }
 
 /** Parse the domain group folder from a skill file path.
@@ -302,7 +308,10 @@ export const useSkillsStore = create<SkillsStore>()(
                 const data = await response.json();
                 const rawSkills: RawSkillResponse[] = data.skills || [];
                 const configSkills: DiscoveredSkill[] = rawSkills.map((s) => ({
-                  name: (typeof s.name === 'string' ? s.name.trim() : '') || skillNameFromPath(s.path || ''),
+                  name: skillListLabel({
+                    name: typeof s.name === 'string' ? s.name : '',
+                    path: s.path || '',
+                  }),
                   path: s.path,
                   scope: s.scope ?? 'user',
                   source: s.source ?? inferSkillSourceFromPath(s.path || ''),

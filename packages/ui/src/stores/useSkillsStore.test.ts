@@ -58,7 +58,28 @@ mock.module('./utils/safeStorage', () => ({
   }),
 }));
 
-const { invalidateSkillsLoadCache, useSkillsStore } = await import('./useSkillsStore');
+const { invalidateSkillsLoadCache, skillListLabel, skillNameFromPath, useSkillsStore } = await import('./useSkillsStore');
+
+describe('skillListLabel', () => {
+  test('prefers the runtime name and does not invent a substitute', () => {
+    expect(skillListLabel({
+      name: 'changelog-authoring',
+      path: '/workspace/.agents/skills/other-stem/SKILL.md',
+    })).toBe('changelog-authoring');
+  });
+
+  test('uses the SKILL.md directory stem when name is blank', () => {
+    expect(skillNameFromPath('/workspace/.agents/skills/blank-row-skill/SKILL.md')).toBe('blank-row-skill');
+    expect(skillListLabel({
+      name: '   ',
+      path: '/workspace/.agents/skills/blank-row-skill/SKILL.md',
+    })).toBe('blank-row-skill');
+  });
+
+  test('returns empty when both name and path are missing', () => {
+    expect(skillListLabel({ name: '', path: '' })).toBe('');
+  });
+});
 
 describe('useSkillsStore directory resolution', () => {
   beforeEach(() => {
