@@ -190,10 +190,16 @@ export function routeMessage(params: {
       (cmdName === 'run' && isFeaturePluginSlotActive(featurePlugins, 'subagents'))
       || (cmdName === 'plan' && isFeaturePluginSlotActive(featurePlugins, 'plan'))
       || (cmdName === 'goal' && isFeaturePluginSlotActive(featurePlugins, 'goal'))
-    const isCommand = syncCommands.find((c) => c.name === cmdName)
+    // `/btw` is a registered live command, but the composer owns the fork
+    // panel. Do not POST session.command — unknown names stay chat, and /btw
+    // is intercepted in ChatInput before this router.
+    const isClientOwnedSlash = cmdName === 'btw'
+    const isCommand = !isClientOwnedSlash && (
+      syncCommands.find((c) => c.name === cmdName)
       || storeCommands.find((c) => c.name === cmdName)
       || useSkillsStore.getState().skills.some((s) => s.name === cmdName)
       || isFeaturePluginSlash
+    )
 
     if (isCommand) {
       return optimisticSend({

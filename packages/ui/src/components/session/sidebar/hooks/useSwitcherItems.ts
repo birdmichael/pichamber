@@ -11,6 +11,7 @@ import { compareSessionsByLifecycleOrder, useSessionOrderingStore } from '@/sync
 import { isChatDirectoryPath } from '@/lib/chatDirectories';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { isHiddenBtwSession } from '@/lib/sessionBtwMetadata';
 
 export type SwitcherItem = {
   node: SessionNode;
@@ -100,6 +101,7 @@ export const useSwitcherItems = (enabled: boolean, options: SwitcherItemsOptions
 
     const childrenByParent = new Map<string, Session[]>();
     for (const session of activeSessions) {
+      if (isHiddenBtwSession(session)) continue;
       const parentId = (session as Session & { parentID?: string | null }).parentID;
       if (!parentId) continue;
       if (session.time?.archived) continue;
@@ -117,6 +119,7 @@ export const useSwitcherItems = (enabled: boolean, options: SwitcherItemsOptions
     const isVSCode = isVSCodeRuntime();
     const parents = activeSessions
       .filter((session) => !session.time?.archived)
+      .filter((session) => !isHiddenBtwSession(session))
       .filter((session) => !(session as Session & { parentID?: string | null }).parentID)
       .filter((session) => !isVSCode || !isChatDirectoryPath(resolveGlobalSessionDirectory(session)))
       .filter((session) => {

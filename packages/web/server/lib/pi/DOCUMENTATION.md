@@ -183,7 +183,8 @@ Resolution order:
    `session.prompt` path as the Pi CLI.
 6. Unknown name — 404 when this route is called. The composer does not
    POST unknown names here; those fall through to `sendMessage` /
-   `promptAsync` as a normal chat turn.
+   `promptAsync` as a normal chat turn. `/btw` is a listed builtin, but
+   the composer owns the fork panel and does not POST this route.
 
 ## Existing Pi agent recognition
 
@@ -206,7 +207,10 @@ pin. Settings → Extensions packages lists those configured package names
 `GET /api/command` (and `/command`) returns the OpenCode command shape:
 
 - builtins + markdown prompts from `listPiCommands` (`compact`, `login`,
-  custom prompts from `{agentDir}/prompts` — not `reload`)
+  `btw`, custom prompts from `{agentDir}/prompts` — not `reload`).
+  `/btw` is listed so the slash menu can show it; the composer intercepts
+  the command and forks via the existing session host. It does not go
+  through `POST /api/session/:id/command`.
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
 - Feature Plugins slash names that must appear before a session exists

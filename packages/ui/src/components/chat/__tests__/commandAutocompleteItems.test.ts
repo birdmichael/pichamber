@@ -209,6 +209,7 @@ describe('filterPiSlashCommands', () => {
       { name: 'compact' },
       { name: 'reload' },
       { name: 'login' },
+      { name: 'btw', isOpenChamber: true },
       { name: 'pr-review' },
       { name: 'model' },
       { name: 'thinking' },
@@ -225,6 +226,7 @@ describe('filterPiSlashCommands', () => {
     expect(filterPiSlashCommands(commands, true).map((item) => item.name)).toEqual([
       'compact',
       'login',
+      'btw',
       'pr-review',
       'schedule-task',
       'catch-up',

@@ -140,13 +140,16 @@ model picker, only shows providers with a usable login. The in-panel picker on a
 blocked walkthrough writes this setting too, so recovering from a refusal never
 silently changes the model behind commit messages.
 
-A settings or `opencode.json` `small_model` override can still name a provider
-with no usable login (neither `auth.json` nor `provider.<id>.options.apiKey`).
-`describeSmallModel` reports that as `hasLogin: false`, readiness refuses with
-`reason: 'no-provider-login'` and omits the unusable model so the panel cannot
-present it as selected, and generation maps the same code to HTTP 401. The UI
-disables Generate and keeps the picker on authenticated providers only — it does
-not surface a raw auth error or a special login blocker for this case.
+A settings or leftover OpenCode `opencode.json` `small_model` override can still
+name a provider with no usable login (neither `auth.json` nor
+`provider.<id>.options.apiKey`). On the default Pi kernel the same refusal uses
+`~/.pi/agent` (`pichamber.json` / `models.json` / `auth.json`) and does not
+invent a second provider. `describeSmallModel` reports that as `hasLogin: false`,
+readiness refuses with `reason: 'no-provider-login'` and omits the unusable
+model so the panel cannot present it as selected, and generation maps the same
+code to HTTP 401. The UI disables Generate and keeps the picker on authenticated
+providers only — it does not surface a raw auth error or a special login
+blocker for this case.
 
 ## Output language
 
