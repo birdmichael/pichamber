@@ -13,6 +13,7 @@ import type { TurnActivityGroup, TurnChangedFile, TurnGroupingContext } from '..
 import { cn } from '@/lib/utils';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
 import { isEmptyTextPart, extractTextContent } from './partUtils';
+import { getUserMessageContentOverflowClass } from './userBubbleLayout';
 import { FadeInOnReveal } from './FadeInOnReveal';
 import { Button } from '@/components/ui/button';
 import { SaveProjectPlanDialog } from '@/components/session/SaveProjectPlanDialog';
@@ -722,16 +723,14 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
 
     return (
         <div
-            className="relative w-full group/message"
+            className="relative w-full min-w-0 group/message"
             style={CONTAIN_LAYOUT_STYLE}
             onTouchStart={isTouchContext && canCopyMessage && hasCopyableText ? revealCopyHint : undefined}
         >
             <div
                 className={cn(
-                    'leading-relaxed text-foreground/90 text-base overflow-x-hidden',
-                    useStickyScrollableUserContent
-                        ? 'overflow-y-auto overscroll-contain scrollbar-none'
-                        : 'overflow-y-hidden'
+                    'leading-relaxed text-foreground/90 text-base',
+                    getUserMessageContentOverflowClass(useStickyScrollableUserContent),
                 )}
                 style={useStickyScrollableUserContent ? { maxHeight: 'calc(var(--chat-scroll-height, 100dvh) * 0.4)' } : undefined}
             >

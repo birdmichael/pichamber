@@ -1071,6 +1071,16 @@ html:not(.dark) .chat-scroll {
   margin-bottom: 0;
 }
 
+/* Collapsed user prompts apply -webkit-line-clamp on the wrapper. The
+   markdown renderer uses display:contents on [data-md-block], so the real
+   boxes are inner block elements (`p`, headings, lists). Line-clamp cannot
+   clamp those descendants — inline them the same way collapsed code is
+   inlined. Keep this scoped to the user bubble. */
+.user-text-collapsed [data-md-block] > * {
+  display: inline;
+  margin: 0;
+}
+
 /* Tool cards (code size) and reasoning (meta size, dimmed) are intentionally
    compact — keep their paragraphs tight, matching prior behavior. */
 .markdown-content.markdown-tool p,
