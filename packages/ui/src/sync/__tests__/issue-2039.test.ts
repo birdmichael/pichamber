@@ -329,9 +329,11 @@ describe("issue 2039 draft auto-accept", () => {
       currentSessionId: null,
       currentSessionDirectory: null,
       newSessionDraft: {
+        draftId: 0,
         open: false,
         directoryOverride: null,
         parentID: null,
+        target: "chat",
       },
     })
   })

@@ -252,7 +252,7 @@ describe('sendMessage captured target', () => {
     useSessionUIStore.setState({
       currentSessionId: 'session-current',
       currentSessionDirectory: '/current/project',
-      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+      newSessionDraft: { open: false, draftId: 0, target: "chat", directoryOverride: null, parentID: null },
     });
 
     originalSendMessage = opencodeClient.sendMessage;
@@ -361,7 +361,7 @@ describe('openNewSessionDraft project binding', () => {
     useSessionUIStore.setState({
       currentSessionId: null,
       currentSessionDirectory: null,
-      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+      newSessionDraft: { open: false, draftId: 0, target: "chat", directoryOverride: null, parentID: null },
       availableWorktreesByProject: new Map(),
     });
     useProjectsStore.setState({
@@ -371,24 +371,26 @@ describe('openNewSessionDraft project binding', () => {
     useDirectoryStore.getState().setDirectory(projectB.path, { showOverlay: false });
   });
 
-  test('keeps implicit draft on current directory when active project differs', () => {
+  test('opens a chat draft when no project target is specified', () => {
     useSessionUIStore.getState().openNewSessionDraft();
     const draft = useSessionUIStore.getState().newSessionDraft;
 
     expect(draft.open).toBe(true);
-    expect(draft.selectedProjectId).toBe(projectB.id);
-    expect(draft.directoryOverride).toBe(projectB.path);
+    expect(draft.target).toBe('chat');
+    expect(draft.selectedProjectId).toBeNull();
+    expect(draft.directoryOverride).toBeNull();
   });
 
-  test('does not attach active project when current directory is unmatched', () => {
+  test('does not inherit the current directory for an implicit chat draft', () => {
     useDirectoryStore.getState().setDirectory('/external/worktree', { showOverlay: false });
 
     useSessionUIStore.getState().openNewSessionDraft();
     const draft = useSessionUIStore.getState().newSessionDraft;
 
     expect(draft.open).toBe(true);
+    expect(draft.target).toBe('chat');
     expect(draft.selectedProjectId).toBeNull();
-    expect(draft.directoryOverride).toBe('/external/worktree');
+    expect(draft.directoryOverride).toBeNull();
   });
 
   test('respects explicit directoryOverride over active project', () => {
@@ -396,6 +398,7 @@ describe('openNewSessionDraft project binding', () => {
     const draft = useSessionUIStore.getState().newSessionDraft;
 
     expect(draft.open).toBe(true);
+    expect(draft.target).toBe('project');
     expect(draft.directoryOverride).toBe('/projects/beta/src');
   });
 
@@ -404,6 +407,7 @@ describe('openNewSessionDraft project binding', () => {
     const draft = useSessionUIStore.getState().newSessionDraft;
 
     expect(draft.open).toBe(true);
+    expect(draft.target).toBe('project');
     expect(draft.selectedProjectId).toBe(projectB.id);
   });
 });
@@ -416,7 +420,7 @@ describe('createSession draft lifecycle', () => {
     useSessionUIStore.setState({
       currentSessionId: null,
       currentSessionDirectory: null,
-      newSessionDraft: { open: true, directoryOverride: '/projects/alpha', parentID: null, title: 'Draft title' },
+      newSessionDraft: { open: true, draftId: 1, target: "project", directoryOverride: '/projects/alpha', parentID: null, title: 'Draft title' },
     });
   });
 
@@ -483,13 +487,15 @@ describe('sendMessage draft snapshot (issues #2222 / #2315)', () => {
     useSessionUIStore.setState({
       currentSessionId: null,
       currentSessionDirectory: null,
-      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+      newSessionDraft: { open: false, draftId: 0, target: "chat", directoryOverride: null, parentID: null },
     });
   });
 
   test('draft send snapshots the draft; switching to another project mid-flight still targets the materialized session', async () => {
     const draftSnapshot = {
       open: true,
+      draftId: 1,
+      target: 'project',
       directoryOverride: '/projects/alpha',
       parentID: null,
       title: 'Project A draft',
@@ -529,7 +535,7 @@ describe('sendMessage draft snapshot (issues #2222 / #2315)', () => {
     useSessionUIStore.setState({
       currentSessionId: 'session-project-a',
       currentSessionDirectory: '/projects/alpha',
-      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+      newSessionDraft: { open: false, draftId: 0, target: "chat", directoryOverride: null, parentID: null },
     });
 
     const sendPromise = useSessionUIStore.getState().sendMessage(

@@ -64,6 +64,7 @@ describe('chat directories', () => {
   test('deletes managed chat directories but leaves project directories alone', async () => {
     await deleteChatDirectory('/Users/tester/.config/openchamber/chats/2026-08-21/session-a');
     await deleteChatDirectory('/Users/tester/project');
+    await deleteChatDirectory('/Users/tester');
     expect(deletedDirectories).toEqual(['/Users/tester/.config/openchamber/chats/2026-08-21/session-a']);
   });
 });
