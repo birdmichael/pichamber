@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Chat/Desktop: opening Session, Walkthrough, or notes still shows the full composer helper placeholder (`@` files/agents, `/` commands and skills, `#` snippets) instead of the short helpers stub.
 - Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the title and starter chips hide and the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Chat/Desktop: `/run` in the command menu now says it runs a subagent as a one-shot workflow. Longer descriptions wrap onto a second line instead of cutting off mid-word. Prefix search and the model/thinking chips are unchanged.
+- Chat/Desktop: in the expanded composer, Enter now starts a new line and Cmd/Ctrl+Enter sends, so a long prompt is harder to send by accident. The compact composer still sends on Enter.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
 - Settings: an already-installed Feature Plugin no longer shows a live Install button next to the Installed badge. Uninstall stays.
@@ -29,6 +30,7 @@ All notable changes to this project will be documented in this file.
 - Settings/Desktop: External Tunnel keeps the missing cloudflared warning on Quick, Managed remote, and Managed local, and Start tunnel stays disabled with that same reason.
 - Desktop: the header hamburger now opens the app menu on the first click. Hovering its tooltip no longer eats that press.
 - Settings: Remote Instances, Git, Extensions, Skills Catalog, and Snippets now show a short page subtitle. Snippets Total matches the other lists, and Remote Instances no longer repeats its title or the empty SSH message.
+- Git: generated commit messages now match the repository's recent commit style and language, and generating a pull request description picks up the repo's own PR template when it has one instead of a fixed Summary/Why/Testing layout.
 - Settings/Desktop: adding an SSH remote now starts from hosts in your SSH config, with ports, install method, and passwords under Advanced. Each connection shows Connected, Connecting, or Needs attention — with the failure text and a resolve button. Disconnecting without keeping the server running now stops the remote Pichamber. Home-directory Pichamber binaries work; a missing remote kernel is reported before connect. A managed remote can also be published on that machine's network when you set a UI password.
 
 ## [1.0.1] - 2026-08-18
