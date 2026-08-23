@@ -15,6 +15,7 @@
 - Root session menus can quickly create a worktree from the session directory's current branch and move the full session subtree there while idle.
 - Directory loading is demand-driven: the sidebar publishes one complete priority plan for all known project/worktree directories, while the sync layer owns bounded execution.
 - When multiple configured projects are checkouts of the same Git repository, exactly one project owns the shared worktree topology: the configured canonical primary root when present, otherwise the first configured source for that repository. Any worktree path that is also a configured project is omitted from subordinate worktree groups, so every directory has one sidebar location while remaining part of bootstrap demand.
+- Settings → Projects is the opened-project list. Sidebar workspace groups are those projects (home/`~` only when that path is an opened project or a real session home shown as a project). Empty leftover worktree groups — Cursor/cloud `cursor/desktop-…` checkouts, tmp paths, unused linked worktrees — are not rendered and are not bootstrap demand. A worktree that has sessions still appears. An opened project with zero sessions still shows once as empty.
 
 ## VS Code grouping
 
@@ -53,6 +54,7 @@ Wording reuses `sessions.sidebar.*` via `apps/mobileSessionChromeKeys.ts`. Impor
 - `sortableItems.tsx`: DnD sortable wrapper for project ordering plus the sticky zone-band project header and its action affordances.
 - `sessionFolderDnd.tsx`: Folder/session DnD scope and wrappers for dropping/moving sessions into folders.
 - `sessionOwnership.ts`: Resolves session directories once into shared project/worktree ownership and folder-scope indexes.
+- `visibleWorkspaceGroups.ts`: Decides whether a worktree subgroup may render. Opened Settings projects stay; empty leftover worktrees that are not projects do not.
 
 ### Hooks
 

@@ -42,6 +42,15 @@ export const isSkippedPiSessionProjectCwd = (cwd, options = {}) => {
   const resolved = pathMod.resolve(normalized);
   const segments = resolved.split(/[/\\]/).filter(Boolean);
   if (segments.includes('node_modules')) return true;
+  if (segments.includes('.cursor')) return true;
+  if (segments.includes('.git') && segments.includes('worktrees')) return true;
+  const base = segments[segments.length - 1] || '';
+  if (/^cursor-desktop-/i.test(base)) return true;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (segments[index] === 'cursor' && /^desktop-/i.test(segments[index + 1] || '')) {
+      return true;
+    }
+  }
 
   const tmpRoots = [];
   const tmpdir = typeof options.tmpdir === 'string' && options.tmpdir.trim()

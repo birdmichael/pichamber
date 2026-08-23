@@ -17,6 +17,7 @@ import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { formatSessionCompactDateLabel } from './sidebar/utils';
 import type { SessionNode } from './sidebar/types';
 import { useI18n } from '@/lib/i18n';
+import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { cn } from '@/lib/utils';
 
 type SecondaryMeta = SwitcherItem['secondaryMeta'];
@@ -195,7 +196,10 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
   const unseenCount = useSessionUnseenCount(session.id);
 
   const isActive = currentSessionId === session.id;
-  const sessionTitle = session.title?.trim() || t('sessions.sidebar.session.untitled');
+  const sessionTitle = resolveSessionDisplayTitle(
+    session.title,
+    t('sessions.sidebar.session.untitled'),
+  );
   const isSubtask = Boolean((session as Session & { parentID?: string | null }).parentID);
   const needsAttention = unseenCount > 0 && (!isSubtask || notifyOnSubtasks);
   const statusType = sessionStatus?.type ?? 'idle';

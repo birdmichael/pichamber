@@ -8,6 +8,7 @@ own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
 On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
+An existing session with zero messages uses the same Desktop welcome chrome as New session: the same `DraftPresetChips` the installed packages allow, plus the Session panel. Chip click still submits through the composer send path on that session; it does not mint another chat.
 
 OpenChamber Session Goal stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
 When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows
@@ -31,6 +32,12 @@ inside its chip so the row cannot overprint Agent, mic, or Send. Labels
 collapse to icons only as a last resort, and the chip tooltip/aria-label
 keeps the same words. The leftover OpenCode agent label still hides first.
 Agent/Plan is a separate chip and is not part of that collapse.
+The empty-composer helper placeholder follows the same Desktop rule:
+a typical ~1280 window with Session, Walkthrough, or notes open still
+shows `@ for files/agents; / for commands and skills; ! for shell; # for
+snippets`. The short `Use @ / ! # for helpers` stub is only for true
+mobile or an actually tiny editor (`shouldUseCompactChatPlaceholder`),
+not a normal right rail. `MobilePillComposer` always uses the stub.
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
 `isPrimaryMode`. The expanded mobile chip row hosts `MobileThinkingButton`
 on Pi and `MobileModelButton`; those chips open the hidden `ModelControls`
@@ -48,10 +55,12 @@ dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
 fetch. On a new-session draft, choosing Plan is local composer intent: it does
-not `createSession` or leave the draft. Send uses the same Agent materialize
-path, then `/plan start` on that new session if Plan is not already on, then
-the prompt. An already-open session still runs `/plan start` / save / exit on
-that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
+not `createSession` or leave the draft. That intent stays on the empty
+composer after you open another session and come back, until you send or
+pick Agent. An already-open session still shows its own stored Agent or Plan.
+Send uses the same Agent materialize path, then `/plan start` on that new
+session if Plan is not already on, then the prompt. An already-open session
+still runs `/plan start` / save / exit on that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
 and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
 does not host those controls; they appear after expand). The left cluster
 class `composer-mobile-actions` still clamps attach / Goal to a 24px icon
@@ -62,6 +71,15 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
+Desktop `/` docks a new-session composer to the bottom of the chat column
+so the menu can use the space above it (a centered welcome only leaves
+~256px). Docking the whole welcome block is not enough: the title and
+starter chips stay in that block and leave only ~5 rows. While `/` is
+open, hide that chrome and cancel the new-session `pb-[6vh]` inset, then
+measure available height after that layout. Height comes from that space
+up to the design cap in `slashPopupHeight.ts` and snaps to whole command
+rows so the last visible name stays fully readable. Prefix filtering
+stays name-only on Pi. The CSS fallback must not be `max-h-64`.
 Model and thinking chips stay on the expanded mobile composer, not the
 collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live

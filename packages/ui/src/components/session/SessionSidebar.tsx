@@ -111,6 +111,7 @@ import { getGitHubPrStatusKey, useGitHubPrStatusStore } from '@/stores/useGitHub
 import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents';
 import { buildSessionBootstrapDemands } from './sidebar/sessionBootstrapDemands';
 import { recordWorktreesSeen } from './sidebar/worktreeFirstSeen';
+import { normalizeOpenedProjectPaths } from './sidebar/visibleWorkspaceGroups';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { streamPerfCount, streamPerfMark } from '@/stores/utils/streamDebug';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
@@ -395,6 +396,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
 
   const projects = useProjectsStore((state) => state.projects);
+  const openedProjectPaths = React.useMemo(
+    () => normalizeOpenedProjectPaths(projects.map((project) => project.path)),
+    [projects],
+  );
   const activeProjectId = useProjectsStore((state) => state.activeProjectId);
   const removeProject = useProjectsStore((state) => state.removeProject);
   const setActiveProjectIdOnly = useProjectsStore((state) => state.setActiveProjectIdOnly);
@@ -714,6 +719,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     buildGroupedSessions,
   } = useSessionGrouping({
     homeDirectory,
+    openedProjectPaths,
     worktreeMetadata,
     pinnedSessionIds,
     sessionOrderRanks,

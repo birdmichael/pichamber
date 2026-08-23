@@ -13,6 +13,12 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
+import {
+  DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
+  measureDesktopSlashAvailablePx,
+  readOverlayMaxHeight,
+  resolveDesktopSlashPopupMaxHeight,
+} from './slashPopupHeight';
 
 type CommandSource = 'openchamber' | 'opencode' | 'skill';
 
@@ -92,12 +98,18 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   const keyboardNavigationRef = React.useRef(false);
   const itemRefs = React.useRef<(HTMLDivElement | null)[]>([]);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const availableMaxHeight = useMobileAutocompleteMaxHeight(containerRef, true);
-  const popupMaxHeight = availableMaxHeight === undefined
-    ? undefined
-    : isMobile
-      ? availableMaxHeight
-      : Math.min(256, availableMaxHeight);
+  const footerRef = React.useRef<HTMLDivElement | null>(null);
+  const availableMaxHeight = useMobileAutocompleteMaxHeight(containerRef, isMobile);
+  const [desktopAvailablePx, setDesktopAvailablePx] = React.useState<number | undefined>(undefined);
+  const [rowMetrics, setRowMetrics] = React.useState<{ rowHeightPx: number; chromePx: number } | null>(null);
+  const popupMaxHeight = isMobile
+    ? availableMaxHeight
+    : resolveDesktopSlashPopupMaxHeight({
+        availablePx: desktopAvailablePx,
+        overlayMaxHeightPx: readOverlayMaxHeight(style),
+        rowHeightPx: rowMetrics?.rowHeightPx,
+        chromePx: rowMetrics?.chromePx,
+      });
   const ignoreClickRef = React.useRef(false);
   const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
   const pointerMovedRef = React.useRef(false);
@@ -323,6 +335,69 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     });
   }, [selectedIndex]);
 
+  React.useLayoutEffect(() => {
+    if (isMobile) {
+      return;
+    }
+    const measure = () => {
+      const containerEl = containerRef.current;
+      if (!containerEl) {
+        return;
+      }
+      const chatArea = containerEl.closest('[data-chat-area]') ?? containerEl.closest('main');
+      if (chatArea) {
+        const availablePx = measureDesktopSlashAvailablePx({
+          chatTopPx: chatArea.getBoundingClientRect().top,
+          popupBottomPx: containerEl.getBoundingClientRect().bottom,
+          visualTopPx: window.visualViewport?.offsetTop ?? 0,
+        });
+        setDesktopAvailablePx((prev) => (prev === availablePx ? prev : availablePx));
+      }
+      if (loading) {
+        return;
+      }
+      const rowEls = itemRefs.current
+        .slice(0, commands.length)
+        .filter((el): el is HTMLDivElement => el !== null);
+      if (rowEls.length === 0) {
+        return;
+      }
+      const rowHeightPx = Math.round(Math.max(
+        ...rowEls.map((el) => el.getBoundingClientRect().height),
+      ));
+      if (rowHeightPx <= 0) {
+        return;
+      }
+      const footerPx = footerRef.current
+        ? Math.round(footerRef.current.getBoundingClientRect().height)
+        : 0;
+      const borderY = containerEl.offsetHeight - containerEl.clientHeight;
+      const chromePx = footerPx + borderY;
+      setRowMetrics((prev) => (
+        prev && prev.rowHeightPx === rowHeightPx && prev.chromePx === chromePx
+          ? prev
+          : { rowHeightPx, chromePx }
+      ));
+    };
+    measure();
+    const containerEl = containerRef.current;
+    const observed = [
+      containerEl?.closest('[data-chat-area]') ?? containerEl?.closest('main'),
+      containerEl?.closest('form'),
+    ].filter((el): el is Element => el != null);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    for (const el of observed) {
+      resizeObserver?.observe(el);
+    }
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [commands, isMobile, loading]);
+
   React.useImperativeHandle(ref, () => ({
     handleKeyDown: (key: string) => {
       const total = commands.length;
@@ -382,7 +457,10 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   return (
     <div
       ref={containerRef}
-      className="absolute z-[100] min-w-0 w-full max-w-[450px] max-h-64 overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col"
+      className={cn(
+        'absolute z-[100] min-w-0 w-full max-w-[450px] overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col',
+        isMobile ? 'max-h-64' : DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
+      )}
       style={popupMaxHeight !== undefined ? { ...style, maxHeight: popupMaxHeight } : style}
     >
       <ScrollableOverlay preventOverscroll outerClassName="flex-1 min-h-0" className="px-0 pb-2">
@@ -509,7 +587,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         )}
       </ScrollableOverlay>
       {!isMobile && (
-        <div className="px-3 pt-1 pb-1.5 border-t typography-meta text-muted-foreground">
+        <div ref={footerRef} className="px-3 pt-1 pb-1.5 border-t typography-meta text-muted-foreground">
           {t('chat.autocomplete.keyboardHint')}
         </div>
       )}

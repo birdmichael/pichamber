@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Icon } from "@/components/icon/Icon";
 import type { Session } from '@opencode-ai/sdk/v2';
 import { useI18n } from '@/lib/i18n';
+import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 
 export type DeleteSessionConfirmState = {
   session: Session;
@@ -24,6 +25,7 @@ export function SessionDeleteConfirmDialog(props: {
   const { t } = useI18n();
   const { value, setValue, showDeletionDialog, setShowDeletionDialog, onConfirm } = props;
   const untitledSession = t('sessions.sidebar.session.untitled');
+  const sessionTitle = resolveSessionDisplayTitle(value?.session.title, untitledSession);
 
   return (
     <Dialog open={Boolean(value)} onOpenChange={(open) => { if (!open) setValue(null); }}>
@@ -37,28 +39,28 @@ export function SessionDeleteConfirmDialog(props: {
               ? value.archivedBucket
                 ? value.descendantCount === 1
                   ? t('sessions.sidebar.dialogs.deleteSession.withOneSubtask', {
-                    sessionTitle: value.session.title || untitledSession,
+                    sessionTitle,
                     count: value.descendantCount,
                   })
                   : t('sessions.sidebar.dialogs.deleteSession.withManySubtasks', {
-                    sessionTitle: value.session.title || untitledSession,
+                    sessionTitle,
                     count: value.descendantCount,
                   })
                 : value.descendantCount === 1
                   ? t('sessions.sidebar.dialogs.archiveSession.withOneSubtask', {
-                    sessionTitle: value.session.title || untitledSession,
+                    sessionTitle,
                     count: value.descendantCount,
                   })
                   : t('sessions.sidebar.dialogs.archiveSession.withManySubtasks', {
-                  sessionTitle: value.session.title || untitledSession,
+                  sessionTitle,
                   count: value.descendantCount,
                 })
               : value?.archivedBucket
                 ? t('sessions.sidebar.dialogs.deleteSession.single', {
-                  sessionTitle: value?.session.title || untitledSession,
+                  sessionTitle,
                 })
                 : t('sessions.sidebar.dialogs.archiveSession.single', {
-                  sessionTitle: value?.session.title || untitledSession,
+                  sessionTitle,
                 })}
           </DialogDescription>
         </DialogHeader>
