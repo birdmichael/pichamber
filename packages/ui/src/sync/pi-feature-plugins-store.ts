@@ -70,3 +70,11 @@ const isPiSubagentsPluginAvailable = (payload: FeaturePluginsPayload | null | un
 export const usePiSubagentsPluginAvailable = (): boolean => (
   usePiFeaturePluginsStore((state) => isPiSubagentsPluginAvailable(state.payload))
 );
+
+const isPiBtwPluginAvailable = (payload: FeaturePluginsPayload | null | undefined): boolean => (
+  Boolean(payload?.slots.btw.installed && payload.slots.btw.enabled)
+);
+
+export const usePiBtwPluginAvailable = (): boolean => (
+  usePiFeaturePluginsStore((state) => isPiBtwPluginAvailable(state.payload))
+);

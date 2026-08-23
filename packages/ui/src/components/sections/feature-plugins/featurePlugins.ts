@@ -1,6 +1,6 @@
 import type { I18nKey } from '@/lib/i18n';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents'] as const;
+export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw'] as const;
 
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
@@ -9,9 +9,13 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   plan: 'npm:@narumitw/pi-plan-mode',
   mcp: 'npm:pi-mcp-adapter',
   subagents: 'npm:pi-subagents',
+  btw: 'npm:@narumitw/pi-btw',
 };
 
-const DEFAULT_GOAL_COMMAND = 'goal';
+const DEFAULT_FEATURE_PLUGIN_COMMANDS: Partial<Record<FeaturePluginSlot, string>> = {
+  goal: 'goal',
+  btw: 'btw',
+};
 
 export interface FeaturePluginSlotState {
   source: string;
@@ -55,26 +59,29 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
     infoKey: 'settings.featurePlugins.slot.subagents.info',
     settingsItem: 'feature-plugins.subagents',
   },
+  btw: {
+    titleKey: 'settings.featurePlugins.slot.btw.title',
+    infoKey: 'settings.featurePlugins.slot.btw.info',
+    settingsItem: 'feature-plugins.btw',
+  },
 };
 
 function emptyFeaturePluginSlot(slot: FeaturePluginSlot): FeaturePluginSlotState {
+  const command = DEFAULT_FEATURE_PLUGIN_COMMANDS[slot];
   return {
     source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot],
     enabled: false,
     installed: false,
-    ...(slot === 'goal' ? { command: DEFAULT_GOAL_COMMAND } : {}),
+    ...(command ? { command } : {}),
     presets: [{ id: 'default', source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot] }],
   };
 }
 
 export function emptyFeaturePluginsPayload(): FeaturePluginsPayload {
   return {
-    slots: {
-      goal: emptyFeaturePluginSlot('goal'),
-      plan: emptyFeaturePluginSlot('plan'),
-      mcp: emptyFeaturePluginSlot('mcp'),
-      subagents: emptyFeaturePluginSlot('subagents'),
-    },
+    slots: Object.fromEntries(
+      FEATURE_PLUGIN_SLOTS.map((slot) => [slot, emptyFeaturePluginSlot(slot)]),
+    ) as FeaturePluginsPayload['slots'],
   };
 }
 
@@ -103,7 +110,9 @@ export function parseFeaturePluginsPayload(value: unknown): FeaturePluginsPayloa
       enabled: record.enabled,
       installed: record.installed,
       presets,
-      ...(slot === 'goal' && typeof record.command === 'string' ? { command: record.command } : {}),
+      ...(DEFAULT_FEATURE_PLUGIN_COMMANDS[slot] && typeof record.command === 'string'
+        ? { command: record.command }
+        : {}),
     };
   }
   return next;

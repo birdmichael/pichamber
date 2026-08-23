@@ -24,7 +24,8 @@ import { useSnippetsStore } from '@/stores/useSnippetsStore';
 import { appendInlineComments } from '@/lib/messages/inlineComments';
 import { renderMagicPrompt } from '@/lib/magicPrompts';
 import { startReviewFlow } from '@/lib/reviewFlow';
-import { destroyBtwSession, startBtwSession, type BtwSessionRef } from '@/lib/btw';
+import { destroyBtwSession, shouldInterceptBtwSlash, startBtwSession, type BtwSessionRef } from '@/lib/btw';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { BtwPanel } from './btw/BtwPanel';
 import { useBtwPanelState } from './btw/useBtwPanelState';
 import { getRuntimeKey } from '@/lib/runtime-switch';
@@ -264,6 +265,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
+    const btwPluginAvailable = useFeaturePluginSlotActive('btw', isPiKernel);
     const canUseOpenCodeSessionStubs = canOfferOpenCodeSessionStub(isPiKernel);
     // Track if we restored a draft on mount (for text selection)
     const initialDraftRef = React.useRef<string | null>(null);
@@ -356,7 +358,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             : null),
         [btwDirectory, btwSessionId, currentSessionId],
     );
-    const isBtwActive = Boolean(btwSessionRef) && !btwPanel.collapsed;
+    const isBtwActive = btwPluginAvailable && Boolean(btwSessionRef) && !btwPanel.collapsed;
     const activeRuntimeKey = getRuntimeKey();
     const chatDraftIdentity = React.useMemo(
         () => createChatDraftIdentity(
@@ -1236,7 +1238,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 }
                 return;
             }
-            if (commandName === 'btw' && currentSessionId) {
+            if (shouldInterceptBtwSlash(commandName, btwPluginAvailable) && currentSessionId) {
                 const question = argument.trim();
                 if (!question) {
                     toast.error(t('chat.btw.toast.emptyArgument'));
@@ -2698,7 +2700,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 </div>
             ) : null}
             <div className={cn('chat-input-column relative overflow-visible', isComposerExpanded && 'flex flex-1 min-h-0 flex-col')}>
-                {currentSessionId ? <BtwPanel parentSessionId={currentSessionId} panel={btwPanel} /> : null}
+                {btwPluginAvailable && currentSessionId ? <BtwPanel parentSessionId={currentSessionId} panel={btwPanel} /> : null}
                 <AttachedFilesList onShowPopup={handleShowAttachmentPreview} />
                 <QueuedMessageChips
                     onEditMessage={handleQueuedMessageEdit}

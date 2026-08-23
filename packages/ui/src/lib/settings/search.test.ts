@@ -397,6 +397,7 @@ describe('settings search', () => {
       { query: '@narumitw/pi-plan-mode', id: 'feature-plugins.plan' },
       { query: 'pi-mcp-adapter', id: 'feature-plugins.mcp' },
       { query: 'pi-subagents', id: 'feature-plugins.subagents' },
+      { query: '@narumitw/pi-btw', id: 'feature-plugins.btw' },
     ] as const;
 
     for (const { query, id } of queries) {

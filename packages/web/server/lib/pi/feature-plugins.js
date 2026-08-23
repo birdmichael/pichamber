@@ -8,16 +8,22 @@ import {
   resolvePiSettingsPath,
 } from './pi-resources.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
   plan: 'npm:@narumitw/pi-plan-mode',
   mcp: 'npm:pi-mcp-adapter',
   subagents: 'npm:pi-subagents',
+  btw: 'npm:@narumitw/pi-btw',
 };
 
-const DEFAULT_GOAL_COMMAND = 'goal';
+const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
+  goal: 'goal',
+  btw: 'btw',
+};
+
+const DEFAULT_GOAL_COMMAND = DEFAULT_FEATURE_PLUGIN_COMMANDS.goal;
 
 const GOAL_COMMAND_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const NPM_SPEC_PATTERN = /^(?:npm:)?(@[^/]+\/[^@\s]+|[^@/\s:]+)(?:@.+)?$/;
@@ -108,15 +114,13 @@ export const isFeaturePluginSourceInstalled = (source, configuredSources = []) =
 );
 
 const defaultSlotConfig = (slot) => {
-  if (slot === 'goal') {
-    return {
-      source: DEFAULT_FEATURE_PLUGIN_SOURCES.goal,
-      command: DEFAULT_GOAL_COMMAND,
-    };
-  }
-  return {
+  const next = {
     source: DEFAULT_FEATURE_PLUGIN_SOURCES[slot],
   };
+  if (DEFAULT_FEATURE_PLUGIN_COMMANDS[slot]) {
+    next.command = DEFAULT_FEATURE_PLUGIN_COMMANDS[slot];
+  }
+  return next;
 };
 
 const normalizeSlotConfig = (slot, raw) => {
@@ -125,7 +129,7 @@ const normalizeSlotConfig = (slot, raw) => {
   const next = {
     source: normalizeFeaturePluginSource(entry.source, defaults.source),
   };
-  if (slot === 'goal') {
+  if (DEFAULT_FEATURE_PLUGIN_COMMANDS[slot]) {
     next.command = normalizeGoalCommand(entry.command, defaults.command);
   }
   return next;
@@ -148,7 +152,7 @@ const serializeFeaturePlugins = (plugins) => {
   const out = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
-    out[slot] = slot === 'goal'
+    out[slot] = DEFAULT_FEATURE_PLUGIN_COMMANDS[slot]
       ? { source: entry.source, command: entry.command }
       : { source: entry.source };
   }
@@ -212,10 +216,10 @@ export const mergeFeaturePluginPatch = (current, patch) => {
       }
       merged.source = source;
     }
-    if (slot === 'goal' && Object.prototype.hasOwnProperty.call(value, 'command')) {
+    if (DEFAULT_FEATURE_PLUGIN_COMMANDS[slot] && Object.prototype.hasOwnProperty.call(value, 'command')) {
       const raw = typeof value.command === 'string' ? value.command.trim().replace(/^\//, '') : '';
       if (!GOAL_COMMAND_PATTERN.test(raw)) {
-        const error = new Error('Goal command is invalid');
+        const error = new Error(`${slot} command is invalid`);
         error.status = 400;
         throw error;
       }
@@ -262,6 +266,14 @@ export const listFeaturePluginSlashCommands = (payload) => {
     listed.push({
       name: 'run',
       description: 'Run a subagent as a one-shot workflow',
+      source: 'extension',
+    });
+  }
+  const btw = payload?.slots?.btw;
+  if (btw?.installed && btw.enabled) {
+    listed.push({
+      name: typeof btw.command === 'string' && btw.command.trim() ? btw.command.trim() : 'btw',
+      description: 'Ask a side question in a temporary forked session',
       source: 'extension',
     });
   }

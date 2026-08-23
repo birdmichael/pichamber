@@ -196,11 +196,11 @@ describe('filterPiSlashCommands', () => {
     ).map((item) => item.name)).toEqual(['plan-feature', 'plan']);
     expect(ensureLiveFeatureSlashCommands(
       filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
-      { isPiKernel: true, planPluginAvailable: true, subagentsPluginAvailable: true },
-    ).map((item) => item.name)).toEqual(['plan-feature', 'plan', 'run']);
+      { isPiKernel: true, planPluginAvailable: true, subagentsPluginAvailable: true, btwPluginAvailable: true },
+    ).map((item) => item.name)).toEqual(['plan-feature', 'plan', 'run', 'btw']);
     expect(ensureLiveFeatureSlashCommands(
       filterPiSlashCommands([{ name: 'plan-feature', isOpenChamber: true }], true),
-      { isPiKernel: true, planPluginAvailable: false, subagentsPluginAvailable: false },
+      { isPiKernel: true, planPluginAvailable: false, subagentsPluginAvailable: false, btwPluginAvailable: false },
     ).map((item) => item.name)).toEqual(['plan-feature']);
   });
 
@@ -210,6 +210,7 @@ describe('filterPiSlashCommands', () => {
       { name: 'reload' },
       { name: 'login' },
       { name: 'btw', isOpenChamber: true },
+      { name: 'btw', agent: 'pi' },
       { name: 'pr-review' },
       { name: 'model' },
       { name: 'thinking' },
@@ -364,6 +365,16 @@ describe('resolveSlashMenuDescription', () => {
       { name: 'run' },
       { runDescription: 'Run a subagent as a one-shot workflow' },
     )).toBe('Run a subagent as a one-shot workflow');
+  });
+
+  test('uses product copy for /btw when provided', () => {
+    expect(resolveSlashMenuDescription(
+      { name: 'btw', description: 'Ask a side question in a temporary forked session' },
+      {
+        runDescription: 'Run a subagent as a one-shot workflow',
+        btwDescription: 'Ask a side question in a temporary child session without derailing this chat.',
+      },
+    )).toBe('Ask a side question in a temporary child session without derailing this chat.');
   });
 
   test('keeps other command descriptions and still ignores description text in prefix search', () => {

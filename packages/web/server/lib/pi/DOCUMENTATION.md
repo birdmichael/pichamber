@@ -183,8 +183,10 @@ Resolution order:
    `session.prompt` path as the Pi CLI.
 6. Unknown name — 404 when this route is called. The composer does not
    POST unknown names here; those fall through to `sendMessage` /
-   `promptAsync` as a normal chat turn. `/btw` is a listed builtin, but
+   `promptAsync` as a normal chat turn. `/btw` is a Feature Plugin
+   command (slot `btw`, `npm:@narumitw/pi-btw`). When that slot is on,
    the composer owns the fork panel and does not POST this route.
+   Without the package, `/btw` is an unknown slash and stays chat.
 
 ## Existing Pi agent recognition
 
@@ -207,16 +209,18 @@ pin. Settings → Extensions packages lists those configured package names
 `GET /api/command` (and `/command`) returns the OpenCode command shape:
 
 - builtins + markdown prompts from `listPiCommands` (`compact`, `login`,
-  `btw`, custom prompts from `{agentDir}/prompts` — not `reload`).
-  `/btw` is listed so the slash menu can show it; the composer intercepts
-  the command and forks via the existing session host. It does not go
-  through `POST /api/session/:id/command`.
+  custom prompts from `{agentDir}/prompts` — not `reload`).
 - live extension commands from sessions in the request directory
   (`source: "extension"`)
 - Feature Plugins slash names that must appear before a session exists
   (Plan slot installed+enabled → `/plan`; Subagents slot
-  installed+enabled → `/run`). `/run` copy is user-facing
-  ("Run a subagent as a one-shot workflow"), not plugin jargon.
+  installed+enabled → `/run`; Btw slot installed+enabled → `/btw`).
+  `/run` copy is user-facing ("Run a subagent as a one-shot workflow"),
+  not plugin jargon. `/btw` is listed as `source: "extension"` so the
+  slash menu can show it; the composer intercepts the command and forks
+  via the existing session host. It does not go through
+  `POST /api/session/:id/command`. Without the package, `/btw` is not
+  listed.
 
 Optional `?session=` hydrates that session if needed, then pins the live
 `getCommands()` list. After Feature Plugins install, idle sessions reload

@@ -839,6 +839,38 @@ describe('routeMessage skill invocation', () => {
     expect(sendMessageCalls).toHaveLength(0);
   });
 
+  test('sends /btw as a plain message even when the Btw slot is on', async () => {
+    setFeaturePluginSlot('btw', { installed: true, enabled: true });
+
+    await routeMessage({
+      sessionId: 'session-btw',
+      directory: '/skills/project',
+      content: '/btw what is kafka',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls).toHaveLength(1);
+    expect(sendMessageCalls[0].text).toBe('/btw what is kafka');
+    expect(sendCommandCalls).toHaveLength(0);
+  });
+
+  test('sends /btw as a plain message when the Btw slot is off', async () => {
+    setFeaturePluginSlot('btw', { installed: false, enabled: false });
+
+    await routeMessage({
+      sessionId: 'session-btw',
+      directory: '/skills/project',
+      content: '/btw what is kafka',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendMessageCalls).toHaveLength(1);
+    expect(sendMessageCalls[0].text).toBe('/btw what is kafka');
+    expect(sendCommandCalls).toHaveLength(0);
+  });
+
   test('sends an unknown slash token as a plain message', async () => {
     await routeMessage({
       sessionId: 'session-skill',

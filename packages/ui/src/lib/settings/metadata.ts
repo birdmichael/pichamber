@@ -159,7 +159,7 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
     title: 'Feature Plugins',
     group: 'opencode',
     kind: 'single',
-    keywords: ['feature', 'plugins', 'goal', 'plan', 'mcp', 'subagents', 'pi', 'npm'],
+    keywords: ['feature', 'plugins', 'goal', 'plan', 'mcp', 'subagents', 'btw', 'pi', 'npm'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

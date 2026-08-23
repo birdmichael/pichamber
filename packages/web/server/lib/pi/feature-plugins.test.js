@@ -41,6 +41,7 @@ describe('feature plugin source identity', () => {
     expect(featurePluginSourceIdentity('npm:@narumitw/pi-goal@0.1.0')).toBe('npm:@narumitw/pi-goal');
     expect(featurePluginSourcesMatch('npm:pi-mcp-adapter', 'pi-mcp-adapter@2.9.0')).toBe(true);
     expect(featurePluginSourcesMatch('npm:@narumitw/pi-goal', 'npm:@narumitw/pi-plan-mode')).toBe(false);
+    expect(featurePluginSourcesMatch('npm:@narumitw/pi-btw', '@narumitw/pi-btw')).toBe(true);
   });
 
   it('keeps local paths distinct from npm names', () => {
@@ -80,6 +81,10 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
     expect(plugins.mcp.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.mcp);
     expect(plugins.subagents.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.subagents);
+    expect(plugins.btw).toMatchObject({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.btw,
+      command: 'btw',
+    });
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -151,6 +156,23 @@ describe('feature plugin slash commands', () => {
     expect(listFeaturePluginSlashCommands({
       slots: { subagents: { installed: true, enabled: false } },
     })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { btw: { installed: true, enabled: true } },
+    })).toEqual([{
+      name: 'btw',
+      description: 'Ask a side question in a temporary forked session',
+      source: 'extension',
+    }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { btw: { installed: true, enabled: false } },
+    })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { btw: { installed: true, enabled: true, command: 'btw' } },
+    })).toEqual([{
+      name: 'btw',
+      description: 'Ask a side question in a temporary forked session',
+      source: 'extension',
+    }]);
   });
 });
 
@@ -179,8 +201,23 @@ describe('settings.json package manager', () => {
     expect(payload.slots.plan.installed).toBe(false);
     expect(payload.slots.mcp.installed).toBe(false);
     expect(payload.slots.subagents.installed).toBe(false);
+    expect(payload.slots.btw.installed).toBe(false);
     expect(payload.slots.goal.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
+  });
+
+  it('enables Btw when packages lists @narumitw/pi-btw with or without the npm prefix', () => {
+    const withPrefix = toFeaturePluginsPayload({
+      plugins: normalizeFeaturePlugins({}),
+      configuredSources: ['npm:@narumitw/pi-btw'],
+    });
+    const withoutPrefix = toFeaturePluginsPayload({
+      plugins: normalizeFeaturePlugins({}),
+      configuredSources: ['@narumitw/pi-btw'],
+    });
+    expect(withPrefix.slots.btw).toMatchObject({ installed: true, enabled: true, command: 'btw' });
+    expect(withoutPrefix.slots.btw).toMatchObject({ installed: true, enabled: true, command: 'btw' });
+    expect(listFeaturePluginSlashCommands(withPrefix).map((item) => item.name)).toEqual(['btw']);
   });
 });
 
@@ -196,6 +233,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.mcp).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
@@ -216,6 +254,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.goal).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(readFeaturePlugins(home).subagents.enabled).toBeUndefined();
     expect(resolveFeaturePluginEnabled(true)).toBe(true);
@@ -242,6 +281,10 @@ describe('existing Pi agent recognition', () => {
     expect(chamber.featurePlugins.mcp).toEqual({ source: DEFAULT_FEATURE_PLUGIN_SOURCES.mcp });
     expect(chamber.featurePlugins.subagents).toEqual({
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.subagents,
+    });
+    expect(chamber.featurePlugins.btw).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.btw,
+      command: 'btw',
     });
     expect(JSON.stringify(chamber)).not.toContain('"enabled"');
   });

@@ -10,7 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
-import { usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
+import { refreshFeaturePlugins, usePiBtwPluginAvailable, usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey, resolveSlashMenuDescription } from './commandAutocompleteItems';
 import {
@@ -79,6 +79,11 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
   const isPiKernel = usePiKernel();
   const planPluginAvailable = usePiPlanPluginAvailable();
   const subagentsPluginAvailable = usePiSubagentsPluginAvailable();
+  const btwPluginAvailable = usePiBtwPluginAvailable();
+
+  React.useEffect(() => {
+    if (isPiKernel) void refreshFeaturePlugins();
+  }, [isPiKernel]);
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const sessionMessages = useSessionMessages(currentSessionId ?? '');
   const hasMessagesInCurrentSession = sessionMessages.length > 0;
@@ -181,10 +186,6 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           ),
           { id: 'openchamber:compact', name: 'compact', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
           ...(hasSession
-            ? [{ id: 'openchamber:btw', name: 'btw', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.btwDescription'), isOpenChamber: true }]
-            : []
-          ),
-          ...(hasSession
             ? [{ id: 'openchamber:summary', name: 'summary', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isOpenChamber: true }]
             : []
           ),
@@ -227,7 +228,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         ];
         const allCommands = ensureLiveFeatureSlashCommands(
           filterPiSlashCommands(mergeCommandAutocompleteItems(builtInCommands, customCommands, skillCommands), isPiKernel),
-          { isPiKernel, planPluginAvailable, subagentsPluginAvailable },
+          { isPiKernel, planPluginAvailable, subagentsPluginAvailable, btwPluginAvailable },
         );
 
         const allowInitCommand = !hasMessagesInCurrentSession;
@@ -266,10 +267,6 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
             : []
           ),
           { id: 'openchamber:compact', name: 'compact', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
-          ...(hasSession
-            ? [{ id: 'openchamber:btw', name: 'btw', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.btwDescription'), isOpenChamber: true }]
-            : []
-          ),
           ...(hasSession
             ? [{ id: 'openchamber:summary', name: 'summary', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isOpenChamber: true }]
             : []
@@ -314,7 +311,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
 
         const fallbackCommands = ensureLiveFeatureSlashCommands(
           filterPiSlashCommands(builtInCommands, isPiKernel),
-          { isPiKernel, planPluginAvailable, subagentsPluginAvailable },
+          { isPiKernel, planPluginAvailable, subagentsPluginAvailable, btwPluginAvailable },
         );
         const matchesQuery = isPiKernel ? commandMatchesPiSlashQuery : commandMatchesSearch;
         const filtered = (searchQuery
@@ -328,7 +325,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     };
 
     loadCommands();
-  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel, planPluginAvailable, subagentsPluginAvailable]);
+  }, [searchQuery, hasMessagesInCurrentSession, hasSession, canStartSessionCommand, canUseReviewHandoffFlow, commandsWithMetadata, skills, t, isPiKernel, planPluginAvailable, subagentsPluginAvailable, btwPluginAvailable]);
 
   React.useEffect(() => {
     setSelectedIndex(0);
@@ -484,6 +481,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
               const isOpenChamberBadge = command.isOpenChamber;
               const description = resolveSlashMenuDescription(command, {
                 runDescription: t('chat.commandAutocomplete.command.runDescription'),
+                btwDescription: t('chat.commandAutocomplete.command.btwDescription'),
               });
               return (
                 <div

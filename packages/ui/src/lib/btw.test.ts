@@ -55,7 +55,7 @@ mock.module('@/sync/sync-refs', () => ({
   }),
 }));
 
-const { btwSessionTitle, startBtwSession, destroyBtwSession, promoteBtwSession, filterBtwTailMessages } =
+const { btwSessionTitle, shouldInterceptBtwSlash, startBtwSession, destroyBtwSession, promoteBtwSession, filterBtwTailMessages } =
   await import('@/lib/btw');
 const { isHiddenBtwSession } = await import('@/lib/sessionBtwMetadata');
 const { useBtwStore } = await import('@/stores/useBtwStore');
@@ -106,6 +106,14 @@ beforeEach(() => {
 describe('btwSessionTitle', () => {
   test('prefixes the question', () => {
     expect(btwSessionTitle('what is kafka')).toBe('btw: what is kafka');
+  });
+});
+
+describe('shouldInterceptBtwSlash', () => {
+  test('intercepts /btw only when the Feature Plugin slot is active', () => {
+    expect(shouldInterceptBtwSlash('btw', true)).toBe(true);
+    expect(shouldInterceptBtwSlash('btw', false)).toBe(false);
+    expect(shouldInterceptBtwSlash('plan', true)).toBe(false);
   });
 });
 

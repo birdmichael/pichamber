@@ -48,7 +48,7 @@ async function readJson(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
 }
 
-/** Catalog of four fixed slots. Do not copy these boxed cards onto General / Appearance / Chat. */
+/** Catalog of five fixed slots. Do not copy these boxed cards onto General / Appearance / Chat. */
 export const FeaturePluginsPage: React.FC = () => {
   const { t } = useI18n();
   const [loadState, setLoadState] = React.useState<LoadState>({ status: 'loading' });

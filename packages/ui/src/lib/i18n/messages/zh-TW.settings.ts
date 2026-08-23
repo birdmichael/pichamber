@@ -2221,6 +2221,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.mcp.info': '安裝 MCP 轉接器。安裝後即可使用工作狀態 MCP 與設定 → MCP。此頁面不會啟動 /mcp。',
   'settings.featurePlugins.slot.subagents.title': 'Subagents',
   'settings.featurePlugins.slot.subagents.info': '安裝 Subagents 套件。安裝後即可使用工作狀態與可寫入的子工作階段。此頁面不會啟動 /subagents-fleet。',
+  'settings.featurePlugins.slot.btw.title': 'Btw',
+  'settings.featurePlugins.slot.btw.info': '安裝 Btw 套件。安裝後，可用 /btw 在暫時工作階段提出旁支問題。此頁面不會啟動 /btw。',
   'settings.featurePlugins.status.installed': '已安裝',
   'settings.featurePlugins.status.notInstalled': '未安裝',
   'settings.featurePlugins.actions.install': '安裝',

@@ -1293,10 +1293,13 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.plan.source).toBe('npm:@narumitw/pi-plan-mode');
       expect(body.slots.mcp.source).toBe('npm:pi-mcp-adapter');
       expect(body.slots.subagents.source).toBe('npm:pi-subagents');
+      expect(body.slots.btw.source).toBe('npm:@narumitw/pi-btw');
       expect(body.slots.goal.command).toBe('goal');
+      expect(body.slots.btw.command).toBe('btw');
       expect(body.slots.plan.command).toBeUndefined();
       expect(body.slots.goal.installed).toBe(false);
       expect(body.slots.plan.installed).toBe(false);
+      expect(body.slots.btw.installed).toBe(false);
       expect(body.slots.goal.enabled).toBe(false);
       const home = kernel.host.getPath().home;
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
@@ -1355,6 +1358,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(chamber.featurePlugins.plan.enabled).toBeUndefined();
       expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
       expect(chamber.featurePlugins.subagents.enabled).toBeUndefined();
+      expect(chamber.featurePlugins.btw.enabled).toBeUndefined();
 
       const removed = await fetch(`${url}/api/pi/feature-plugins/goal/uninstall`, {
         method: 'POST',
@@ -1436,10 +1440,12 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(plugins.slots.mcp).toMatchObject({ installed: true, enabled: true });
       expect(plugins.slots.subagents).toMatchObject({ installed: true, enabled: true });
       expect(plugins.slots.plan).toMatchObject({ installed: false, enabled: false });
+      expect(plugins.slots.btw).toMatchObject({ installed: false, enabled: false });
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
       expect(commands.some((command) => command.name === 'plan')).toBe(false);
+      expect(commands.some((command) => command.name === 'btw')).toBe(false);
 
       const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
       expect(defaults.model).toBe('bmlab/grok-4.6');
@@ -1462,12 +1468,59 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('lists /btw as an extension command only after the Btw package is installed', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const before = await (await fetch(`${url}/api/command`)).json();
+      expect(before.some((command) => command.name === 'btw')).toBe(false);
+
+      const installed = await fetch(`${url}/api/pi/feature-plugins/btw/install`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(installed.status).toBe(200);
+      const installedBody = await installed.json();
+      expect(installedBody.slots.btw).toMatchObject({
+        installed: true,
+        enabled: true,
+        command: 'btw',
+        source: 'npm:@narumitw/pi-btw',
+      });
+
+      const listed = await (await fetch(`${url}/api/command`)).json();
+      expect(listed.find((command) => command.name === 'btw')).toMatchObject({
+        name: 'btw',
+        source: 'extension',
+      });
+      expect(listed.some((command) => command.name === 'btw' && command.source === 'builtin')).toBe(false);
+
+      const home = kernel.host.getPath().home;
+      const settings = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8'));
+      expect(settings.packages).toContain('npm:@narumitw/pi-btw');
+
+      const removed = await fetch(`${url}/api/pi/feature-plugins/btw/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(removed.status).toBe(200);
+      expect((await removed.json()).slots.btw.installed).toBe(false);
+      const after = await (await fetch(`${url}/api/command`)).json();
+      expect(after.some((command) => command.name === 'btw')).toBe(false);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('keeps builtin commands when GET /api/command pins a missing session', async () => {
     const { url, close, kernel } = await startFacade();
     try {
       const listed = await (await fetch(`${url}/api/command?session=ses_missing`)).json();
       expect(listed.some((command) => command.name === 'compact')).toBe(true);
       expect(listed.some((command) => command.name === 'goal')).toBe(false);
+      expect(listed.some((command) => command.name === 'btw')).toBe(false);
     } finally {
       kernel.dispose();
       await close();
