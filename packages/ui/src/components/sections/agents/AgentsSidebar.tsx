@@ -18,7 +18,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { useAgentsStore, isAgentBuiltIn, isAgentHidden, type AgentScope, type AgentDraft } from '@/stores/useAgentsStore';
+import { useSettingsDirectory } from '@/hooks/useSettingsDirectory';
+import { selectAgentsForDirectory, useAgentsStore, isAgentBuiltIn, isAgentHidden, type AgentScope, type AgentDraft } from '@/stores/useAgentsStore';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
@@ -115,7 +116,6 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
 
   const {
     selectedAgentName,
-    agents,
     setSelectedAgent,
     setAgentDraft,
     createAgent,
@@ -123,7 +123,6 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
     loadAgents,
   } = useAgentsStore(useShallow((s) => ({
     selectedAgentName: s.selectedAgentName,
-    agents: s.agents,
     setSelectedAgent: s.setSelectedAgent,
     setAgentDraft: s.setAgentDraft,
     createAgent: s.createAgent,
@@ -131,9 +130,14 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
     loadAgents: s.loadAgents,
   })));
 
+  // Settings browses whichever project its own selector points at; the app
+  // stays where it is.
+  const settingsDirectory = useSettingsDirectory();
+  const agents = useAgentsStore((state) => selectAgentsForDirectory(state, settingsDirectory));
+
   React.useEffect(() => {
-    loadAgents();
-  }, [loadAgents]);
+    void loadAgents(settingsDirectory);
+  }, [loadAgents, settingsDirectory]);
 
   const bgClass = 'bg-background';
 
@@ -185,7 +189,7 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
 
     setIsConfirmActionPending(true);
     try {
-      const result = await deleteAgent(confirmActionAgent.name, (confirmActionAgent as Agent & { scope?: AgentScope }).scope);
+      const result = await deleteAgent(confirmActionAgent.name, (confirmActionAgent as Agent & { scope?: AgentScope }).scope, settingsDirectory);
 
       if (result.ok) {
         if (result.requiresManualRestart) {
@@ -293,11 +297,11 @@ export const AgentsSidebar: React.FC<AgentsSidebarProps> = ({ onItemSelect }) =>
       permission: rulesetToPermissionConfig(renameDialogAgent.permission),
       disable: renameExt.disable,
       scope: renameExt.scope,
-    });
+    }, settingsDirectory);
 
     if (createResult.ok) {
       // Delete old agent
-      const deleteResult = await deleteAgent(renameDialogAgent.name, renameExt.scope);
+      const deleteResult = await deleteAgent(renameDialogAgent.name, renameExt.scope, settingsDirectory);
       if (deleteResult.ok) {
         if (createResult.requiresManualRestart || deleteResult.requiresManualRestart) {
           toast.warning(t('settings.agents.page.toast.savedManualRestart'));
