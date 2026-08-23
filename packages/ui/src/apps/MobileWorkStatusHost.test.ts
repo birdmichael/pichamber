@@ -31,7 +31,15 @@ describe('MobileWorkStatusHost', () => {
     expect(metadataSource).toContain('MobileWorkStatusHost');
     expect(metadataSource).not.toContain('UsageProviderCards');
     expect(visibilitySource).toContain('const layoutAllows = !isMobile && !isVSCode && !contextPanelOpen');
+    expect(visibilitySource).toContain('useEffectiveDirectory');
+    expect(visibilitySource).toContain('normalizeContextPanelDirectoryKey');
     expect(chatContainerSource).toContain('workStatusPanelMountable = !isMobile');
+    expect(chatContainerSource).toContain('isManagedChatContext');
+    expect(chatContainerSource).toContain('repositoryEnabled={!isManagedChatContext}');
+    expect(chatContainerSource).toContain('useWorkStatusVisibility({');
+    expect(chatContainerSource).not.toContain('directory: workStatusDirectory');
+    expect(hostSource).toContain('repositoryEnabled && sectionVisible(\'repository\')');
+    expect(metadataSource).toContain('repositoryEnabled={!isManagedChatContext}');
   });
 
   test('hides usage quotas on Pi and keeps session / repository rows', () => {

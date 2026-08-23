@@ -45,7 +45,11 @@ exactly as it already does when the context panel opens.
 
 - the user switched it off;
 - the runtime is mobile or VS Code;
-- the context panel is open for the active directory;
+- the context panel is open for the directory the app is effectively on —
+  looked up through `useEffectiveDirectory` and `normalizeContextPanelDirectoryKey`,
+  the same key the rail and the panel use. It is deliberately **not** the
+  directory this panel reports about: a managed Chat reports about none, and
+  that empty key answered "closed" for a context panel that was plainly open;
 - the row cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
   `WORK_STATUS_PANEL_WIDTH` of panel.
 
@@ -59,6 +63,11 @@ mode. It remains available on a new-session draft and on an existing session
 with no messages yet — project, cwd, and MCP still exist without a transcript.
 When the draft targets a project or pending worktree, the panel uses that
 directory for project, MCP, and usage readouts before a session exists.
+
+Managed Chats never render or warm the Project repository section. A Chat draft
+also passes no fallback directory to the panel, so an active project's branch
+cannot leak into the draft while directory-independent sections remain
+available.
 
 `rowRef` is a **callback ref, not an object ref**. An object ref gives no signal
 when the node attaches, so the measuring effect read `.current`, found nothing
