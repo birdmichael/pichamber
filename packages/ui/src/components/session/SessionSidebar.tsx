@@ -18,6 +18,8 @@ import { useUIStore } from '@/stores/useUIStore';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { useGitStore, useGitAllBranches, useGitRepoStatusMap } from '@/stores/useGitStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { isCapacitorApp } from '@/lib/platform';
+import { resolveEffectiveSingleProjectId } from './sidebar/projectDisplay';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { NewWorktreeDialog } from './NewWorktreeDialog';
 import { useSessionFoldersStore } from '@/stores/useSessionFoldersStore';
@@ -466,9 +468,8 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const archivedSessionStructure = useGlobalSessionsStore(useShallow(
     (state) => state.archivedSessions.map(getSessionStructuralSignature).sort(),
   ));
-  const globalSessionSnapshot = useGlobalSessionsStore.getState();
-  const globalActiveSessions = globalSessionSnapshot.activeSessions;
-  const archivedSessions = globalSessionSnapshot.archivedSessions;
+  const globalActiveSessions = useGlobalSessionsStore((state) => state.activeSessions);
+  const archivedSessions = useGlobalSessionsStore((state) => state.archivedSessions);
   const liveFallbackCacheRef = React.useRef<{ signature: string; sessions: Session[] }>({
     signature: '',
     sessions: [],
@@ -1018,10 +1019,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const stableHandleRestoreSession = useStableRenderCallback(handleRestoreSession);
   const stableCreateFolderAndStartRename = useStableRenderCallback(createFolderAndStartRename);
 
-  const showMoreGroupSessions = React.useCallback((groupId: string, currentVisibleCount: number) => {
+  const showMoreGroupSessions = React.useCallback((groupId: string, currentVisibleCount: number, increment = 7) => {
     setVisibleSessionCountByGroup((prev) => {
       const next = new Map(prev);
-      next.set(groupId, currentVisibleCount + 7);
+      next.set(groupId, currentVisibleCount + increment);
       return next;
     });
   }, []);
@@ -1228,7 +1229,13 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   }
 
   const showRecentSection = useSessionDisplayStore((state) => state.showRecentSection);
+  const projectDisplayMode = useSessionDisplayStore((state) => state.projectDisplayMode);
+  const singleProjectId = useSessionDisplayStore((state) => state.singleProjectId);
+  const setSingleProjectId = useSessionDisplayStore((state) => state.setSingleProjectId);
   const showArchivedSessions = useSessionDisplayStore((state) => state.showArchivedSessions);
+  const supportsSingleProjectMode = !isVSCode && !isCapacitorApp();
+  const isSingleProjectMode = projectDisplayMode === 'single' && supportsSingleProjectMode;
+  const shouldShowRecentSection = showRecentSection && !isSingleProjectMode;
   const projectSortOrder = useSessionDisplayStore((state) => state.projectSortOrder);
   const stickyZoneHeaders = useSessionDisplayStore((state) => state.stickyZoneHeaders);
   const manualProjectOrder = useProjectsStore((state) => state.manualProjectOrder);
@@ -1277,6 +1284,10 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     githubAuthChecked,
     updateStore,
     showRecentSection,
+    shouldShowRecentSection,
+    projectDisplayMode,
+    singleProjectId,
+    isSingleProjectMode,
     showArchivedSessions,
     projectSortOrder,
     projectRepoStatus,
@@ -1456,13 +1467,13 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   }, [projectSections, homeDirectory]);
 
   const recentSessions = React.useMemo(() => {
-    if (!showRecentSection || isVSCode) {
+    if (!shouldShowRecentSection || isVSCode) {
       return [];
     }
 
     return deriveRecentSessions(sessions, activeSessionIdSet)
       .sort((a, b) => compareSessionsByLifecycleOrder(a, b, pinnedSessionIds, sessionOrderRanks));
-  }, [activeSessionIdSet, isVSCode, pinnedSessionIds, sessionOrderRanks, sessions, showRecentSection]);
+  }, [activeSessionIdSet, isVSCode, pinnedSessionIds, sessionOrderRanks, sessions, shouldShowRecentSection]);
 
   // Prefetch is wired below, after recentSessions is computed.
 
@@ -1470,7 +1481,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     // VS Code renders the full grouped project view (one group per open
     // workspace, folders + pinned native); the flat "recent" activity list is
     // web/desktop-only.
-    if (isVSCode || !showRecentSection) {
+    if (isVSCode || !shouldShowRecentSection) {
       return [];
     }
 
@@ -1506,7 +1517,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     return [
       { key: 'active-now' as const, title: t('sessions.sidebar.activity.recentTitle'), items },
     ];
-  }, [filterSessionNodesForSearch, hasSessionSearchQuery, isVSCode, normalizedSessionSearchQuery, recentSessions, sessionSidebarMetaById, showRecentSection, t]);
+  }, [filterSessionNodesForSearch, hasSessionSearchQuery, isVSCode, normalizedSessionSearchQuery, recentSessions, sessionSidebarMetaById, shouldShowRecentSection, t]);
 
   const hasActivitySectionItems = React.useMemo(
     () => activitySections.some((section) => section.items.length > 0),
@@ -1536,6 +1547,17 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
           : section
       ));
   }, [flatSectionsForRender, sectionsForRender, showInlineArchived, useGroupedSections]);
+  const effectiveSingleProjectId = React.useMemo(() => (
+    resolveEffectiveSingleProjectId(
+      isSingleProjectMode,
+      singleProjectId,
+      activeProjectId,
+      projectSections.map((section) => section.project.id),
+    )
+  ), [activeProjectId, isSingleProjectMode, projectSections, singleProjectId]);
+  const handleSingleProjectSelect = React.useCallback((projectId: string) => {
+    setSingleProjectId(projectId);
+  }, [setSingleProjectId]);
 
   // Discover/refresh PR status for expanded projects' worktree branches so
   // session rows can tint their branch marker and show PR state in tooltips.
@@ -1755,6 +1777,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         normalizedSessionSearchQuery={normalizedSessionSearchQuery}
         groupSearchDataByGroup={groupSearchDataByGroup}
         visibleSessionCount={visibleSessionCountByGroup.get(groupKey)}
+        sessionBatchSize={isSingleProjectMode && sessionGroupingMode === 'flat' ? 20 : undefined}
         collapsedGroups={collapsedGroups}
         hideDirectoryControls={hideDirectoryControls}
         collapsedFolderIds={collapsedFolderIds}
@@ -1797,6 +1820,8 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       normalizedSessionSearchQuery,
       groupSearchDataByGroup,
       visibleSessionCountByGroup,
+      isSingleProjectMode,
+      sessionGroupingMode,
       collapsedGroups,
       hideDirectoryControls,
       collapsedFolderIds,
@@ -1941,6 +1966,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
 
       <SidebarHeader
         hideDirectoryControls={hideDirectoryControls}
+        showProjectDisplayControls={supportsSingleProjectMode}
         showRecentControls={!isVSCode}
         handleOpenDirectoryDialog={handleOpenDirectoryDialog}
         onOpenScheduled={() => {
@@ -1973,7 +1999,11 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         hasSharedSessions={hasActivitySectionItems}
         sectionsForRender={sectionsForSidebarRender}
         projectSections={projectSections}
+        projectPickerSections={projectSections}
         activeProjectId={activeProjectId}
+        singleProjectMode={isSingleProjectMode}
+        singleProjectId={effectiveSingleProjectId}
+        setSingleProjectId={handleSingleProjectSelect}
         showOnlyMainWorkspace={showOnlyMainWorkspace}
         hasSessionSearchQuery={hasSessionSearchQuery}
         emptyState={emptyState}

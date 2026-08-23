@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Chat: app links such as `spotify://` now ask before opening another app, and you can trust a scheme in Settings on this device. File paths in messages open from the session's project even if you last browsed another project. On Desktop, files opened from outside the workspace stay readable after their temporary access expires.
+- Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.
 - Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Desktop: Linux and Windows chrome now uses File Manager / File Explorer, Alt, and Ctrl — including `Ctrl+,` in the header menu — instead of Finder, ⌥, and ⌘. macOS still shows Finder, ⌥, and ⌘.
 - Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.

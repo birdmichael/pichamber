@@ -20,6 +20,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 
 type Props = {
   hideDirectoryControls: boolean;
+  showProjectDisplayControls: boolean;
   showRecentControls: boolean;
   handleOpenDirectoryDialog: () => void;
   onOpenScheduled: () => void;
@@ -45,6 +46,7 @@ export function SidebarHeader(props: Props): React.ReactNode {
   const { t } = useI18n();
   const {
     hideDirectoryControls,
+    showProjectDisplayControls,
     showRecentControls,
     handleOpenDirectoryDialog,
     onOpenScheduled,
@@ -74,6 +76,9 @@ export function SidebarHeader(props: Props): React.ReactNode {
   const setSessionGroupingMode = useSessionDisplayStore((state) => state.setSessionGroupingMode);
   const stickyZoneHeaders = useSessionDisplayStore((state) => state.stickyZoneHeaders);
   const toggleStickyZoneHeaders = useSessionDisplayStore((state) => state.toggleStickyZoneHeaders);
+  const projectDisplayMode = useSessionDisplayStore((state) => state.projectDisplayMode);
+  const setProjectDisplayMode = useSessionDisplayStore((state) => state.setProjectDisplayMode);
+  const isSingleProjectMode = showProjectDisplayControls && projectDisplayMode === 'single';
   const isPiKernel = usePiKernel();
   const importInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -270,6 +275,25 @@ export function SidebarHeader(props: Props): React.ReactNode {
                     {projectSortOrder === order ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
                   </DropdownMenuItem>
                 ))}
+                {showProjectDisplayControls ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{t('sessions.sidebar.header.projectDisplay.label')}</DropdownMenuLabel>
+                    {([
+                      ['all', 'sessions.sidebar.header.projectDisplay.all'],
+                      ['single', 'sessions.sidebar.header.projectDisplay.single'],
+                    ] as const).map(([mode, labelKey]) => (
+                      <DropdownMenuItem
+                        key={mode}
+                        onClick={() => setProjectDisplayMode(mode)}
+                        className="flex items-center justify-between"
+                      >
+                        <span>{t(labelKey)}</span>
+                        {projectDisplayMode === mode ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>{t('sessions.sidebar.header.grouping.label')}</DropdownMenuLabel>
                 {([
@@ -286,7 +310,7 @@ export function SidebarHeader(props: Props): React.ReactNode {
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                {showRecentControls ? (
+                {showRecentControls && !isSingleProjectMode ? (
                   <DropdownMenuItem
                     onClick={toggleRecentSection}
                     className="flex items-center justify-between"
@@ -302,15 +326,19 @@ export function SidebarHeader(props: Props): React.ReactNode {
                   <span>{t('sessions.sidebar.header.displayMode.stickyHeaders')}</span>
                   {stickyZoneHeaders ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={collapseAllProjects} className="flex items-center gap-2">
-                  <Icon name="contract-up-down" className="h-4 w-4" />
-                  <span>{t('sessions.sidebar.header.displayMode.collapseAll')}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={expandAllProjects} className="flex items-center gap-2">
-                  <Icon name="expand-up-down" className="h-4 w-4" />
-                  <span>{t('sessions.sidebar.header.displayMode.expandAll')}</span>
-                </DropdownMenuItem>
+                {!isSingleProjectMode ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={collapseAllProjects} className="flex items-center gap-2">
+                      <Icon name="contract-up-down" className="h-4 w-4" />
+                      <span>{t('sessions.sidebar.header.displayMode.collapseAll')}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={expandAllProjects} className="flex items-center gap-2">
+                      <Icon name="expand-up-down" className="h-4 w-4" />
+                      <span>{t('sessions.sidebar.header.displayMode.expandAll')}</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
