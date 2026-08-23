@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Settings: changing the default model or agent no longer repoints an open chat that already carries a model you picked for it. Chats following the default still switch immediately.
 - Chat: app links such as `spotify://` now ask before opening another app, and you can trust a scheme in Settings on this device. File paths in messages open from the session's project even if you last browsed another project.
 - Sessions created outside the extension now appear in the session list without a page refresh.
 - Chat: on Pi, the empty composer helper no longer mentions `!` for shell. `@` files/agents, `/` commands and skills, and `#` snippets stay.
