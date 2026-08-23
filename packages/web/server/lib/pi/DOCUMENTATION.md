@@ -294,8 +294,12 @@ or the production getter injects it.
 ## Session reload
 
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
-does not 409. Process-wide `host.reload()` / `POST /api/config/reload` still
-refuse with 409 while any targeted session is streaming or compacting.
+does not 409. A busy or compacting target still 409s. Process-wide
+`host.reload()` / `POST /api/config/reload` still refuse with 409 while any
+targeted session is compacting. A streaming or stuck-busy turn is aborted and
+settled as interrupted (`session.error` plus one `openchamber:notification`
+with kind `opencode-restart-interrupted`) so the chat can continue instead of
+hanging. Compaction is unchanged.
 
 After `piSession.reload()` (or factory replace), the host calls the same
 `bindExtensions({ uiContext, mode: "rpc" })` used on create. Attach-only

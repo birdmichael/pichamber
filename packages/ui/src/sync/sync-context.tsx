@@ -69,6 +69,7 @@ import {
   type SessionMaterializationRequest,
 } from "./materialization"
 import { openSessionFromToast } from "./session-navigation"
+import { KERNEL_RELOAD_INTERRUPTED_KIND, showKernelReloadInterruptedToast } from "./kernel-reload-interrupted-toast"
 import { getPermissionToastKey, showPermissionNeededToast } from "./permission-toast"
 import { getRuntimeLiveStatusSeed, LIVE_STATUS_TTL_MS } from "./runtime-live-memory"
 import { getRuntimeKey } from "@/lib/runtime-switch"
@@ -460,6 +461,15 @@ const handleUiNotificationEvent = (payload: Event, fallbackDirectory: string): b
   }
 
   const notification = properties as UiNotificationPayload
+  const kind = asOptionalString(notification.kind)
+  const sessionId = asOptionalString(notification.sessionId)
+  const directory = asOptionalString(notification.directory)
+    ?? (fallbackDirectory && fallbackDirectory !== "global" ? fallbackDirectory : undefined)
+
+  if (kind === KERNEL_RELOAD_INTERRUPTED_KIND) {
+    showKernelReloadInterruptedToast({ sessionId, directory })
+  }
+
   if ((notification.desktopNotificationDelivered === true || notification.desktopStdoutActive === true) && getRuntimeKey() === "local") {
     return true
   }
@@ -473,9 +483,9 @@ const handleUiNotificationEvent = (payload: Event, fallbackDirectory: string): b
     title: asOptionalString(notification.title),
     body: asOptionalString(notification.body),
     tag: asOptionalString(notification.tag),
-    kind: asOptionalString(notification.kind),
-    sessionId: asOptionalString(notification.sessionId),
-    directory: asOptionalString(notification.directory) ?? (fallbackDirectory && fallbackDirectory !== "global" ? fallbackDirectory : undefined),
+    kind,
+    sessionId,
+    directory,
     requireHidden: notification.requireHidden === true,
   }).catch((error) => {
     console.warn("[notifications] failed to dispatch UI notification", error)

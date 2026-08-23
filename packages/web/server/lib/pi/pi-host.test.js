@@ -580,22 +580,36 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
-  it('reload refuses while a session is streaming', async () => {
+  it('reload interrupts a streaming session instead of hanging', async () => {
+    const events = [];
     const host = createPiHost({
       mock: true,
       createSession: async () => createInMemoryPiSession({
         chunks: ['one ', 'two ', 'three'],
         chunkDelayMs: 40,
       }),
+      onEvent(_directory, event) {
+        events.push(event);
+      },
     });
     const record = await host.createSession({ directory: '/tmp/project' });
     const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
     await new Promise((resolve) => setTimeout(resolve, 10));
-    await expect(host.reload()).rejects.toMatchObject({
-      status: 409,
-      message: 'Wait for the current response to finish before reloading.',
+    const result = await host.reload();
+    expect(result).toMatchObject({
+      reloaded: true,
+      kernel: 'pi',
+      interruptedSessionIds: [record.id],
     });
-    await host.abort(record.id);
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    expect(events.some((event) => event.type === 'session.error')).toBe(true);
+    expect(events.some((event) => (
+      event.type === 'openchamber:notification'
+      && event.properties?.kind === 'opencode-restart-interrupted'
+      && event.properties?.sessionId === record.id
+    ))).toBe(true);
+    expect(String(events.find((event) => event.type === 'openchamber:notification')?.properties?.body || ''))
+      .not.toMatch(/OpenCode/);
     await prompt;
     host.dispose();
   });

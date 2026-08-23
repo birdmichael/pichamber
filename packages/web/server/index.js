@@ -1141,6 +1141,23 @@ const openCodeLifecycleRuntime = createOpenCodeLifecycleRuntime({
     } catch (error) {
       console.warn('Failed to rebind message stream after OpenCode restart:', error?.message ?? error);
     }
+    try {
+      const { sessionIds } = sessionRuntime.interruptBusySessionsAfterRestart();
+      if (sessionIds.length > 0) {
+        const multiple = sessionIds.length > 1;
+        broadcastUiNotification({
+          title: multiple ? 'Chats interrupted' : 'Chat interrupted',
+          body: multiple
+            ? 'The kernel restarted during running responses. Send a message in each chat to continue.'
+            : 'The kernel restarted during a running response. Send a message to continue.',
+          tag: 'opencode-restart-interrupted',
+          kind: 'opencode-restart-interrupted',
+          sessionId: sessionIds[0],
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to reconcile sessions after kernel restart:', error?.message ?? error);
+    }
   },
   getManagedOpenCodeEnv: async () => {
     const settings = await readSettingsFromDiskMigrated().catch(() => null);

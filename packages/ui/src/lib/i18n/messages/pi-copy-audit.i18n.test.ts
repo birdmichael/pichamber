@@ -32,6 +32,7 @@ const PI_VISIBLE_KEYS = [
   'settings.view.actions.reloadOpenCodeTooltip',
   'settings.mcp.page.auth.waitingForOpenCode',
   'settings.openchamber.defaults.summaryOpenCodeDefault',
+  'chat.toast.opencodeRestartInterrupted.description',
 ] as const;
 
 const OPENCODE_KERNEL_LOCATION_KEYS = [

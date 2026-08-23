@@ -228,4 +228,37 @@ describe('session runtime', () => {
     expect(runtime.getSessionStateSnapshot()).toEqual({});
     expect(runtime.getSessionAttentionSnapshot()).toEqual({});
   });
+
+  it('interrupts busy and retry sessions after a kernel restart', () => {
+    const events = [];
+    const runtime = createSessionRuntime({
+      writeSseEvent() {},
+      getNotificationClients: () => new Set(),
+      broadcastEvent: (event) => events.push(event),
+    });
+    runtimes.push(runtime);
+    const status = (sessionID, type) => runtime.processOpenCodeSsePayload({
+      type: 'session.status',
+      properties: { sessionID, status: { type } },
+    });
+
+    status('session-busy-1', 'busy');
+    status('session-busy-2', 'retry');
+    status('session-busy-3', 'busy');
+    status('session-idle', 'idle');
+    events.length = 0;
+
+    expect(runtime.interruptBusySessionsAfterRestart()).toEqual({
+      sessionIds: ['session-busy-1', 'session-busy-2', 'session-busy-3'],
+    });
+    expect(runtime.getActiveSessionCount()).toBe(0);
+    expect(events.filter((event) => event.type === 'openchamber:session-status')).toHaveLength(3);
+    expect(events.filter((event) => event.type === 'session.error')).toHaveLength(3);
+    expect(events.filter((event) => event.type === 'session.error')[0].properties.error.name)
+      .toBe('MessageAbortedError');
+
+    events.length = 0;
+    expect(runtime.interruptBusySessionsAfterRestart()).toEqual({ sessionIds: [] });
+    expect(events).toEqual([]);
+  });
 });
