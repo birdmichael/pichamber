@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - **Diff:** the context-panel diff can now show every change on the current branch against its base branch. Pichamber detects the base when Git knows it, or lets you choose one once when it does not — including a worktree started from the branch's own remote, which is not treated as the base. Desktop Walkthrough stays in the same rail and can review that branch range.
 - Diff: creating an inline comment now opens the chat and focuses the composer for your follow-up.
 - Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.
+- Dictation: speech is now transcribed after you stop recording. The composer shows a live waveform and timer, and long recordings split at pauses instead of cutting words.
 - Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Desktop: Linux and Windows chrome now uses File Manager / File Explorer, Alt, and Ctrl — including `Ctrl+,` in the header menu — instead of Finder, ⌥, and ⌘. macOS still shows Finder, ⌥, and ⌘.
 - Desktop/Windows: the close button now aligns correctly with the rest of the window chrome.
