@@ -24,6 +24,12 @@ import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useI18n } from '@/lib/i18n';
 import { parseModelIdentifier } from '@/lib/modelIdentifier';
 import { lookupModelMetadata } from '@/lib/modelMetadata';
+import {
+  isPiEnabledModelRowChecked,
+  listPiEnabledModelRows,
+  nextPiEnabledModels,
+  type PiEnabledModelRow,
+} from '@/lib/multirun/piModels';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 
@@ -68,7 +74,7 @@ export const DefaultsSettings: React.FC = () => {
   const [maxRetries, setMaxRetries] = React.useState(3);
   const [baseDelayMs, setBaseDelayMs] = React.useState(2000);
   const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
-  const [catalogModels, setCatalogModels] = React.useState<Array<{ key: string; label: string }>>([]);
+  const [catalogModels, setCatalogModels] = React.useState<PiEnabledModelRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
@@ -168,17 +174,7 @@ export const DefaultsSettings: React.FC = () => {
             headers: { Accept: 'application/json' },
           });
           if (modelsResponse.ok) {
-            const payload = await modelsResponse.json() as {
-              providers?: Array<{ id?: string; models?: Record<string, { id?: string; name?: string }> }>;
-            };
-            const items: Array<{ key: string; label: string }> = [];
-            for (const provider of payload.providers || []) {
-              if (!provider?.id || !provider.models) continue;
-              for (const [modelId, model] of Object.entries(provider.models)) {
-                const key = `${provider.id}/${modelId}`;
-                items.push({ key, label: model?.name || modelId });
-              }
-            }
+            const items = listPiEnabledModelRows(await modelsResponse.json());
             setCatalogModels(items);
             if (isPiKernel && items[0]?.key) {
               setDefaultModel((current) => current && current.trim() ? current : items[0].key);
@@ -669,19 +665,14 @@ export const DefaultsSettings: React.FC = () => {
               </div>
               <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
                 {catalogModels.map((item) => {
-                  const checked = enabledModels.length === 0 || enabledModels.includes(item.key);
+                  const checked = isPiEnabledModelRowChecked(item, enabledModels);
                   return (
                     <SettingsCheckboxRow
                       key={item.key}
                       settingsItem="sessions.enabled-models"
                       checked={checked}
                       onChange={(nextChecked) => {
-                        const allKeys = catalogModels.map((model) => model.key);
-                        const current = enabledModels.length === 0 ? allKeys : enabledModels;
-                        const next = nextChecked
-                          ? Array.from(new Set([...current, item.key]))
-                          : current.filter((key) => key !== item.key);
-                        const persisted = next.length === 0 || next.length === allKeys.length ? [] : next;
+                        const persisted = nextPiEnabledModels(catalogModels, enabledModels, item, nextChecked);
                         setEnabledModels(persisted);
                         reportSettingsSaveState('saving');
                         void runtimeFetch('/api/pi/defaults', {
