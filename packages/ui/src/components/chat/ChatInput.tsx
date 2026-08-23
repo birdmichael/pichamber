@@ -141,6 +141,7 @@ import {
 } from './composer/ui/DraftTargetSelectors';
 import { ComposerAutocompletePopups } from './composer/ui/ComposerAutocompletePopups';
 import { ComposerFooter } from './composer/ui/ComposerFooter';
+import { shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
 import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
@@ -170,7 +171,6 @@ const MAX_MOBILE_COMPOSER_LINES = 16;
 const MOBILE_COMPOSER_BOUND_GAP_PX = 4;
 const EMPTY_QUEUE: QueuedMessage[] = [];
 const EMPTY_SENDING_IDS: string[] = [];
-const COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH = 560;
 const renameFileForAttachmentCitation = (file: File, filename: string): File => {
     if (file.name === filename) {
         return file;
@@ -398,7 +398,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     const clearGitDiffCache = useGitStore((state) => state.clearDiffCache);
     const [showAbortStatus, setShowAbortStatus] = React.useState(false);
     const setSessionAutoAccept = usePermissionStore((state) => state.setSessionAutoAccept);
-    const [isNarrowComposer, setIsNarrowComposer] = React.useState(false);
+    const [composerWidth, setComposerWidth] = React.useState(0);
     const [attachmentPreview, setAttachmentPreview] = React.useState<ToolPopupContent>({
         open: false,
         title: '',
@@ -524,15 +524,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     const isComposerExpanded = isDesktopExpanded || isMobileExpanded;
     // Rounder composer on mobile (touch UI reads better with a softer corner).
     const chatInputRadius = isMobile ? '1.5rem' : 'var(--radius-xl)';
-    const useCompactChatPlaceholder = isMobile || isNarrowComposer;
+    const useCompactChatPlaceholder = shouldUseCompactChatPlaceholder({ isMobile, composerWidth });
 
     React.useEffect(() => {
         const element = dropZoneRef.current;
         if (!element) return;
 
         const updateWidth = (width: number) => {
-            const next = width > 0 && width < COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH;
-            setIsNarrowComposer((prev) => (prev === next ? prev : next));
+            setComposerWidth((prev) => (prev === width ? prev : width));
         };
 
         updateWidth(element.clientWidth);

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and model name as text, without overlapping Agent, mic, or Send.
+- Chat/Desktop: opening Session, Walkthrough, or notes still shows the full composer helper placeholder (`@` files/agents, `/` commands, `!` shell, `#` snippets) instead of the short helpers stub.
 - Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
