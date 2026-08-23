@@ -17,6 +17,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { SyncProvider, useSessions } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { SyncRuntimeEffects } from './AppEffects';
+import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
 import { PiExtensionUiNotifyToasts } from '@/components/chat/PiExtensionUiNotifyToasts';
 import { useAppFontEffects } from './useAppFontEffects';
 import { useMiniChatKeyboardShortcuts } from '@/hooks/useMiniChatKeyboardShortcuts';
@@ -323,6 +324,7 @@ export function ElectronMiniChatApp({ apis }: ElectronMiniChatAppProps) {
             <div className="h-full text-foreground bg-background">
               <ElectronMiniChatContent config={config} />
               <PiExtensionUiNotifyToasts />
+              <AppLinkConfirmDialog />
               <Toaster position="top-center" />
             </div>
           </TooltipProvider>

@@ -7,6 +7,7 @@ import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { Button } from '@/components/ui/button';
 import { OpenChamberLogo } from '@/components/ui/OpenChamberLogo';
 import { MultiRunLauncher } from '@/components/multirun';
+import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
 import { ScheduledTasksDialog } from '@/components/session/ScheduledTasksDialog';
 import { ChatView } from '@/components/views/ChatView';
 import { PlanView } from '@/components/views/PlanView';
@@ -1334,6 +1335,7 @@ export function MobileApp({ apis }: MobileAppProps) {
                 switchRuntimeEndpoint({ apiBaseUrl: '', clientToken: null, runtimeKey: 'mobile-disconnected' });
                 setConnectionEpoch((value) => value + 1);
               }} />
+              <AppLinkConfirmDialog />
               <Toaster position="top-center" offset="calc(var(--oc-safe-area-top, 0px) + 16px)" />
               {isInitialized ? <ConfigUpdateOverlay /> : null}
             </div>

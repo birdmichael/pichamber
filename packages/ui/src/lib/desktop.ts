@@ -633,8 +633,20 @@ export const requestDirectoryAccess = async (
 
 const isDesktopFileGrantResult = (
   value: unknown
-): value is { path?: unknown; outsideFileGrant?: unknown } => (
+): value is { path?: unknown; outsideFileGrant?: unknown; expiresAt?: unknown } => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const isDesktopExistingFileGrantResult = (
+  value: unknown
+): value is { path: string; outsideFileGrant: string; expiresAt: number } => (
+  isDesktopFileGrantResult(value)
+  && typeof value.path === 'string'
+  && value.path.length > 0
+  && typeof value.outsideFileGrant === 'string'
+  && value.outsideFileGrant.length > 0
+  && typeof value.expiresAt === 'number'
+  && Number.isFinite(value.expiresAt)
 );
 
 export const requestFileAccess = async (
@@ -679,7 +691,10 @@ export const requestFileAccess = async (
 
 export const requestExistingFileAccess = async (
   path: string
-): Promise<{ success: boolean; path?: string; outsideFileGrant?: string; error?: string }> => {
+): Promise<
+  | { success: true; path: string; outsideFileGrant: string; expiresAt: number }
+  | { success: false; error: string }
+> => {
   const targetPath = typeof path === 'string' ? path.trim() : '';
   if (!targetPath) {
     return { success: false, error: 'Path is required' };
@@ -690,15 +705,15 @@ export const requestExistingFileAccess = async (
 
   try {
     const selected = await getDesktopBridge()?.grantFileAccess?.(targetPath);
-    if (!isDesktopFileGrantResult(selected)) {
+    if (!isDesktopExistingFileGrantResult(selected)) {
       return { success: false, error: 'File access was not granted' };
     }
-    const grantedPath = typeof selected.path === 'string' ? selected.path : '';
-    const outsideFileGrant = typeof selected.outsideFileGrant === 'string' ? selected.outsideFileGrant : '';
-    if (!grantedPath || !outsideFileGrant) {
-      return { success: false, error: 'File access was not granted' };
-    }
-    return { success: true, path: grantedPath, outsideFileGrant };
+    return {
+      success: true,
+      path: selected.path,
+      outsideFileGrant: selected.outsideFileGrant,
+      expiresAt: selected.expiresAt,
+    };
   } catch (error) {
     console.warn('Failed to request existing file access', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
