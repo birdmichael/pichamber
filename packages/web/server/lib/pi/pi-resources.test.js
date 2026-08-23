@@ -121,6 +121,7 @@ description: >
     const commands = listPiCommands({ home, directory: project });
     expect(commands.some((command) => command.name === 'compact' && command.source === 'builtin')).toBe(true);
     expect(commands.some((command) => command.name === 'login' && command.source === 'builtin')).toBe(true);
+    expect(commands.some((command) => command.name === 'btw' && command.source === 'builtin')).toBe(true);
     expect(commands.some((command) => command.name === 'reload')).toBe(false);
     expect(commands.some((command) => command.name === 'model')).toBe(false);
     expect(commands.some((command) => command.name === 'thinking')).toBe(false);

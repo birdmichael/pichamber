@@ -5,6 +5,8 @@ import path from 'path';
 import express from 'express';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { isPiKernelEnabled } from '../pi/kernel.js';
+
 // ---------------------------------------------------------------------------
 // Regression for https://github.com/openchamber/openchamber/issues/2607
 // "[Bug] Why say so?" (walkthrough panel)
@@ -16,11 +18,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 //
 // After the fix: readiness refuses with `no-provider-login`, and generation
 // answers 401 with the same structured code so the UI can show a blocker.
+//
+// Default kernel is Pi. Isolate `~/.pi/agent` and name a catalog model with no
+// login — leftover OpenCode `opencode.json` is not the product small-model
+// source and must not invent a second provider.
 // ---------------------------------------------------------------------------
 
 const TEMP_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'oc-home-2607-'));
+const PI_AGENT_DIR = path.join(TEMP_HOME, '.pi', 'agent');
 process.env.HOME = TEMP_HOME;
+process.env.PI_CODING_AGENT_DIR = PI_AGENT_DIR;
 process.env.OPENCHAMBER_DATA_DIR = path.join(TEMP_HOME, '.config', 'openchamber');
+delete process.env.DEEPSEEK_API_KEY;
 
 const CATALOG = {
   deepseek: {
@@ -70,11 +79,40 @@ let callSmallModel;
 describe('issue 2607 — walkthrough blocks unauthenticated providers', () => {
   beforeAll(async () => {
     setupGitRepo();
-    fs.writeFileSync(
-      path.join(REPO_DIR, 'opencode.json'),
-      JSON.stringify({ small_model: 'deepseek/deepseek-v4-flash' }, null, 2),
-      'utf8',
-    );
+    if (isPiKernelEnabled()) {
+      fs.mkdirSync(PI_AGENT_DIR, { recursive: true });
+      fs.writeFileSync(
+        path.join(PI_AGENT_DIR, 'models.json'),
+        JSON.stringify({
+          providers: {
+            deepseek: {
+              baseUrl: 'https://api.deepseek.com',
+              api: 'openai-completions',
+              apiKey: '$DEEPSEEK_API_KEY',
+              models: [{
+                id: 'deepseek-v4-flash',
+                name: 'DeepSeek V4 Flash',
+                contextWindow: 128_000,
+                maxTokens: 8_192,
+              }],
+            },
+          },
+        }, null, 2),
+        'utf8',
+      );
+      fs.writeFileSync(
+        path.join(PI_AGENT_DIR, 'pichamber.json'),
+        JSON.stringify({ model: 'deepseek/deepseek-v4-flash' }, null, 2),
+        'utf8',
+      );
+      fs.writeFileSync(path.join(PI_AGENT_DIR, 'auth.json'), '{}\n', 'utf8');
+    } else {
+      fs.writeFileSync(
+        path.join(REPO_DIR, 'opencode.json'),
+        JSON.stringify({ small_model: 'deepseek/deepseek-v4-flash' }, null, 2),
+        'utf8',
+      );
+    }
 
     walkthrough = await import('./index.js');
     callSmallModel = await import('../small-model/call.js');

@@ -522,7 +522,7 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
     const isTouchContext = Boolean(hasTouchInput ?? isMobile);
     const hasCopyableText = Boolean(hasTextContent);
     const showUserContent = userActionsMode !== 'external-actions';
-    const showUserActions = userActionsMode !== 'external-content';
+    const showUserActions = userActionsMode !== 'external-content' && chatSurfaceMode !== 'peek';
     const useStickyScrollableUserContent = stickyUserHeaderEnabled && userActionsMode === 'inline';
 
     const clearCopyHintTimeout = React.useCallback(() => {
@@ -569,7 +569,7 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
         [hasCopyableText, isTouchContext, onCopyMessage, revealCopyHint]
     );
 
-    const effectiveOnFork = chatSurfaceMode === 'mini-chat' ? undefined : onFork;
+    const effectiveOnFork = chatSurfaceMode === 'mini-chat' || chatSurfaceMode === 'peek' ? undefined : onFork;
     const timestamp = React.useMemo(() => {
         void locale;
         if (typeof messageCreatedAt !== 'number' || messageCreatedAt <= 0) return null;
@@ -994,7 +994,7 @@ const AssistantMessageActionButtons = React.memo(({
                     <TooltipContent sideOffset={6}>{t('chat.messageBody.actions.copyAnswer')}</TooltipContent>
                 </Tooltip>
             )}
-            {reviewTransferAction && chatSurfaceMode !== 'mini-chat' ? (
+            {reviewTransferAction && chatSurfaceMode !== 'mini-chat' && chatSurfaceMode !== 'peek' ? (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
@@ -1022,7 +1022,7 @@ const AssistantMessageActionButtons = React.memo(({
                     <TooltipContent sideOffset={6}>{reviewTransferAction.tooltip}</TooltipContent>
                 </Tooltip>
             ) : null}
-            {chatSurfaceMode !== 'mini-chat' ? <Tooltip>
+            {chatSurfaceMode !== 'mini-chat' && chatSurfaceMode !== 'peek' ? <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
                         type="button"
@@ -1047,7 +1047,7 @@ const AssistantMessageActionButtons = React.memo(({
                 </TooltipTrigger>
                 <TooltipContent sideOffset={6}>{isSharing ? t('chat.messageBody.actions.savingImage') : t('chat.messageBody.actions.saveAsImage')}</TooltipContent>
             </Tooltip> : null}
-            {chatSurfaceMode !== 'mini-chat' && showMessageTTSButtons && hasCopyableText && (
+            {chatSurfaceMode !== 'mini-chat' && chatSurfaceMode !== 'peek' && showMessageTTSButtons && hasCopyableText && (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <Button
@@ -1231,7 +1231,7 @@ const AssistantMessageBody = React.memo(({
 
     const openContextPreview = useUIStore((state) => state.openContextPreview);
     const isVSCode = isVSCodeRuntime();
-    const isMiniChatSurface = chatSurfaceMode === 'mini-chat';
+    const isMiniChatSurface = chatSurfaceMode === 'mini-chat' || chatSurfaceMode === 'peek';
     const canUseProjectPlanActions = !isVSCode && !isMiniChatSurface && !isMobile;
     const canShowMultiRunAction = !isVSCode && !isMiniChatSurface && !isMobile;
 
