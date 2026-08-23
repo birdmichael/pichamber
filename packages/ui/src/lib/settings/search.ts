@@ -961,14 +961,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
   {
     id: 'skills.catalog.source',
     page: 'skills.catalog',
-    titleKey: 'settings.skills.catalog.page.section.sourceRepository',
-    keywords: ['catalog', 'repository', 'source', 'refresh'],
+    titleKey: 'settings.skills.catalog.page.section.sources',
+    keywords: ['catalog', 'repository', 'source', 'refresh', 'stars', 'github'],
   },
   {
     id: 'skills.catalog.search',
     page: 'skills.catalog',
-    titleKey: 'settings.skills.catalog.shared.field.searchSkillsPlaceholder',
-    keywords: ['find skills', 'install skills', 'catalog search'],
+    titleKey: 'settings.skills.catalog.page.searchAllPlaceholder',
+    keywords: ['find skills', 'install skills', 'catalog search', 'cross-source'],
   },
   {
     id: 'skills.catalog.add-catalog',
