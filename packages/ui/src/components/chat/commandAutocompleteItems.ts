@@ -117,13 +117,14 @@ export function filterPiSettingsCommands<T extends { name: string }>(commands: T
  * Untrusted project skills, OpenCode leftovers, and chip-owned commands stay
  * out. In-app Pichamber starters (`/catch-up`, `/plan-feature`, and the rest
  * of the empty-session chips) stay: they send magic prompts through the Pi
- * session host, not leftover OpenCode flows.
+ * session host, not leftover OpenCode flows. `/btw` is a live Desktop command
+ * (fork via the Pi session host), not an OpenCode leftover.
  */
 export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
   const kept: T[] = [];
   for (const command of commands) {
-    if (command.isOpenChamber && !isPichamberStarterSlashCommand(command.name)) continue;
+    if (command.isOpenChamber && !isPichamberStarterSlashCommand(command.name) && command.name !== 'btw') continue;
     if (command.isSkill) {
       if (command.injected === false) continue;
       const slashName = toPiSkillSlashName(command.name);

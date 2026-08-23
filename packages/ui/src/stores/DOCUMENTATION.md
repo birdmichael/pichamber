@@ -47,6 +47,11 @@ These stores coordinate visible app state, navigation, selected tabs, dialogs, a
 body the detail response or a previous successful load already has. List
 fetch failure keeps the previous command list.
 
+`useBtwStore` keeps only transient `/btw` panel UI (`collapsed`,
+`creating`, `destroying`) keyed by parent session id. Panel identity is
+session metadata (`openchamber.btwSessionID` on the parent, `kind: 'btw'`
+on the fork) — not this store.
+
 `useFeaturePluginsStore` caches `GET /api/pi/feature-plugins`. Fetch failure is not treated as an authoritative empty slot list: a prior successful payload is kept, and MCP Settings / Work Status stay hidden until a successful `installed && enabled` payload arrives. Leftover adapter config files are not a visibility signal.
 
 Context-panel session chats mount only the active chat iframe. After installing

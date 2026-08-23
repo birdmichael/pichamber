@@ -15,6 +15,7 @@ import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { getWorktreeFirstSeenAt } from '../worktreeFirstSeen';
 import { shouldRenderSidebarWorktreeGroup } from '../visibleWorkspaceGroups';
+import { isHiddenBtwSession } from '@/lib/sessionBtwMetadata';
 
 type Args = {
   homeDirectory: string | null;
@@ -77,6 +78,7 @@ export const useSessionGrouping = (args: Args) => {
     ) => {
       const normalizedProjectRoot = normalizePath(projectRoot ?? null);
       const sortedProjectSessions = dedupeSessionsById(projectSessions)
+        .filter((session) => !isHiddenBtwSession(session))
         .sort((a, b) => compareSessionsByLifecycleOrder(a, b, args.pinnedSessionIds, args.sessionOrderRanks));
 
       const sessionMap = new Map(sortedProjectSessions.map((session) => [session.id, session]));
