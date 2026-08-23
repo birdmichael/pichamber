@@ -15,7 +15,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useGitIdentitiesStore } from '@/stores/useGitIdentitiesStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useFileSystemAccess } from '@/hooks/useFileSystemAccess';
-import { cn } from '@/lib/utils';
+import { cn, getModifierLabel, getOpenInFolderLabelKey } from '@/lib/utils';
 import { toast } from '@/components/ui';
 import { IdentityDropdown } from '@/components/views/git/GitHeader';
 import { runtimeFetch } from '@/lib/runtime-fetch';
@@ -361,9 +361,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
   const hasHighlightedBrowseItem = Boolean(
     highlightedRow && (highlightedRow.type === 'up' || (highlightedRow.type === 'directory' && !highlightedRow.disabled))
   );
-  const submitModifierLabel = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-    ? '⌘'
-    : 'Ctrl';
+  const submitModifierLabel = getModifierLabel();
   const submitActionLabel = isAlreadyAdded
     ? t('directoryExplorerDialog.actions.alreadyAdded')
     : isCloneMode
@@ -740,7 +738,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
       <div className={cn('flex w-full flex-row justify-end gap-2 sm:w-auto', isMobile && 'justify-stretch')}>
         {canRequestAccess ? (
           <Button variant="ghost" size="xs" onClick={handleOpenInFinder} disabled={isConfirming || isOpeningFinder || isCloneMode}>
-            {isOpeningFinder ? t('directoryExplorerDialog.actions.openingFinder') : t('directoryExplorerDialog.actions.openInFinder')}
+            {isOpeningFinder ? t('directoryExplorerDialog.actions.openingFinder') : t(getOpenInFolderLabelKey())}
           </Button>
         ) : null}
         <Button variant="ghost" size="xs" onClick={() => setIsCloneMode((value) => !value)} disabled={isConfirming || isOpeningFinder} className={cn(isMobile && 'flex-1')}>

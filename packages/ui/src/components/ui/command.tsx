@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
 
-import { cn } from "@/lib/utils"
+import { cn, isMacOS } from "@/lib/utils"
 import { ScrollableOverlay } from "@/components/ui/ScrollableOverlay";
 import { Icon } from "@/components/icon/Icon";
 
@@ -141,20 +141,48 @@ function CommandShortcut({
   const renderKey = (keyLabel: string) => {
     const normalized = keyLabel.trim().toLowerCase();
 
-    if (normalized === 'ctrl' || normalized === 'control') {
+    if (normalized === 'ctrl' || normalized === 'control' || normalized === '⌃' || normalized === '^') {
       return (
         <span className="text-xs font-medium">
-          ctrl
+          {isMacOS() ? '⌃' : 'Ctrl'}
         </span>
       );
     }
 
     if (normalized === 'cmd' || normalized === '⌘' || normalized === 'command' || normalized === 'meta') {
-      return <Icon name="command" className="size-3.5" />;
+      return isMacOS()
+        ? <Icon name="command" className="size-3.5" />
+        : (
+          <span className="text-xs font-medium">
+            Ctrl
+          </span>
+        );
+    }
+
+    if (normalized === 'alt' || normalized === 'option' || normalized === '⌥') {
+      return (
+        <span className="text-xs font-medium">
+          {isMacOS() ? '⌥' : 'Alt'}
+        </span>
+      );
     }
 
     if (normalized === 'shift' || normalized === '⇧') {
-      return <Icon name="arrow-up" className="size-3.5" />;
+      return isMacOS()
+        ? <Icon name="arrow-up" className="size-3.5" />
+        : (
+          <span className="text-xs font-medium">
+            Shift
+          </span>
+        );
+    }
+
+    if (normalized === 'comma') {
+      return (
+        <span className="text-xs font-medium">
+          ,
+        </span>
+      );
     }
 
     return (

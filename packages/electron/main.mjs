@@ -31,6 +31,7 @@ import {
   readLinuxAutostartEnabled,
   setLinuxAutostartEnabled,
 } from './linux-autostart.mjs';
+import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
@@ -4908,7 +4909,7 @@ const buildAutoHiddenMenu = () => {
     dispatchAction('copy');
   };
 
-  return Menu.buildFromTemplate([
+  return Menu.buildFromTemplate(decorateMenuTemplateForPlatform([
     {
       label: APP_DISPLAY_NAME,
       submenu: [
@@ -5012,7 +5013,7 @@ const buildAutoHiddenMenu = () => {
         { label: 'Join Discord', click: () => shell.openExternal(DISCORD_INVITE_URL) },
       ],
     },
-  ]);
+  ]));
 };
 
 contextMenu({

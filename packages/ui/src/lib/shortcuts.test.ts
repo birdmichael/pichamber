@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   eventMatchesShortcutPrefix,
+  formatShortcutForDisplay,
   getEffectiveShortcutPrefix,
   isShortcutPrefixHeld,
   UNASSIGNED_SHORTCUT,
@@ -76,5 +77,58 @@ describe('eventMatchesShortcutPrefix', () => {
 
   test('false for an unassigned prefix', () => {
     expect(eventMatchesShortcutPrefix(keydown('1', { ctrl: true }), UNASSIGNED_SHORTCUT)).toBe(false);
+  });
+});
+
+const withPlatform = <T>(
+  options: { userAgent: string; desktop?: boolean },
+  run: () => T,
+): T => {
+  const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { userAgent: options.userAgent, platform: '' },
+  });
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: options.desktop
+      ? { __OPENCHAMBER_ELECTRON__: { runtime: 'electron' } }
+      : {},
+  });
+  try {
+    return run();
+  } finally {
+    if (previousNavigator) {
+      Object.defineProperty(globalThis, 'navigator', previousNavigator);
+    } else {
+      Reflect.deleteProperty(globalThis, 'navigator');
+    }
+    if (previousWindow) {
+      Object.defineProperty(globalThis, 'window', previousWindow);
+    } else {
+      Reflect.deleteProperty(globalThis, 'window');
+    }
+  }
+};
+
+describe('formatShortcutForDisplay', () => {
+  test('Linux desktop uses Ctrl/Alt and a comma glyph, not Mac symbols', () => {
+    withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
+      expect(formatShortcutForDisplay('mod+alt+v')).toBe('Ctrl + Alt + V');
+      expect(formatShortcutForDisplay('alt+g')).toBe('Alt + G');
+      expect(formatShortcutForDisplay('ctrl+]')).toBe('Ctrl + ]');
+      expect(formatShortcutForDisplay('ctrl+[')).toBe('Ctrl + [');
+      expect(formatShortcutForDisplay('mod+comma')).toBe('Ctrl + ,');
+    });
+  });
+
+  test('macOS desktop keeps ⌘/⌥/⌃', () => {
+    withPlatform({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', desktop: true }, () => {
+      expect(formatShortcutForDisplay('mod+alt+v')).toBe('⌘ + ⌥ + V');
+      expect(formatShortcutForDisplay('alt+g')).toBe('⌥ + G');
+      expect(formatShortcutForDisplay('ctrl+]')).toBe('⌃ + ]');
+      expect(formatShortcutForDisplay('mod+comma')).toBe('⌘ + ,');
+    });
   });
 });
