@@ -285,24 +285,6 @@ export const DefaultsSettings: React.FC = () => {
     return variant.charAt(0).toUpperCase() + variant.slice(1);
   }, [t]);
 
-  const handleVariantChange = React.useCallback(
-    async (variant: string) => {
-      const newValue = variant === DEFAULT_VARIANT_VALUE ? undefined : variant || undefined;
-      setDefaultVariant(newValue);
-      setSettingsDefaultVariant(newValue);
-      if (!chatHasOwnModel) {
-        setCurrentVariant(newValue);
-      }
-
-      try {
-        await updateDesktopSettings({ defaultVariant: newValue ?? '' });
-      } catch (error) {
-        console.warn('Failed to save default variant:', error);
-      }
-    },
-    [chatHasOwnModel, setCurrentVariant, setSettingsDefaultVariant]
-  );
-
   const handleAgentChange = React.useCallback(
     async (agentName: string) => {
       const newValue = agentName || undefined;
