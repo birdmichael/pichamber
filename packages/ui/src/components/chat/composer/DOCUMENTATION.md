@@ -31,6 +31,12 @@ inside its chip so the row cannot overprint Agent, mic, or Send. Labels
 collapse to icons only as a last resort, and the chip tooltip/aria-label
 keeps the same words. The leftover OpenCode agent label still hides first.
 Agent/Plan is a separate chip and is not part of that collapse.
+The empty-composer helper placeholder follows the same Desktop rule:
+a typical ~1280 window with Session, Walkthrough, or notes open still
+shows `@ for files/agents; / for commands and skills; ! for shell; # for
+snippets`. The short `Use @ / ! # for helpers` stub is only for true
+mobile or an actually tiny editor (`shouldUseCompactChatPlaceholder`),
+not a normal right rail. `MobilePillComposer` always uses the stub.
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
 `isPrimaryMode`. The expanded mobile chip row hosts `MobileThinkingButton`
 on Pi and `MobileModelButton`; those chips open the hidden `ModelControls`
