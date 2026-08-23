@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Session Defaults thinking levels now follow the selected model, the same as the composer chip and project defaults.
+
 ## [1.1.0] - 2026-08-24
 
 - **Settings:** Skills Catalog now browses curated GitHub skill collections as cards, with skill counts, stars, recent updates, cross-source search, and links back to each skill's repository.

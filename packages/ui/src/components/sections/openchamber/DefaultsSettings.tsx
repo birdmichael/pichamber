@@ -34,6 +34,8 @@ import {
 } from '@/lib/multirun/piModels';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
+import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
+import { clampPiThinkingLevel, type PiThinkingLevel } from '@/components/chat/piThinking';
 
 const getDisplayModel = (
   storedModel: string | undefined
@@ -44,6 +46,29 @@ const getDisplayModel = (
   }
 
   return { providerId: '', modelId: '' };
+};
+
+export const resolveSessionDefaultThinkingLevels = (
+  providerId: string,
+  modelId: string,
+  getModelMetadata: (
+    providerId: string,
+    modelId: string,
+  ) => Parameters<typeof resolveCatalogThinkingLevels>[0],
+): PiThinkingLevel[] => {
+  if (!providerId || !modelId) return [];
+  // Levels come from Pi model capabilities. Do not invent OpenCode variants
+  // or vendor lists, and do not call resolveVisiblePiThinkingLevels() — an
+  // empty catalog must stay empty instead of falling back to all seven.
+  return resolveCatalogThinkingLevels(getModelMetadata(providerId, modelId));
+};
+
+export const clampSessionDefaultThinkingLevel = (
+  current: string,
+  availableLevels: readonly string[],
+): PiThinkingLevel | undefined => {
+  if (availableLevels.length === 0) return undefined;
+  return clampPiThinkingLevel(current, availableLevels);
 };
 
 export const DefaultsSettings: React.FC = () => {
@@ -74,6 +99,7 @@ export const DefaultsSettings: React.FC = () => {
   const setShowDeletionDialog = useUIStore((state) => state.setShowDeletionDialog);
   const providers = useConfigStore((state) => state.providers);
   const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+  const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
 
   const [defaultModel, setDefaultModel] = React.useState<string | undefined>();
   const [defaultVariant, setDefaultVariant] = React.useState<string | undefined>();
@@ -92,9 +118,19 @@ export const DefaultsSettings: React.FC = () => {
   const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
   const [catalogModels, setCatalogModels] = React.useState<PiEnabledModelRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
   const parsedModel = React.useMemo(() => getDisplayModel(defaultModel), [defaultModel]);
+  const availableLevels = React.useMemo(
+    () => resolveSessionDefaultThinkingLevels(
+      parsedModel.providerId,
+      parsedModel.modelId,
+      getModelMetadata,
+    ),
+    // modelsMetadata is required: getModelMetadata is a stable store method
+    // and would otherwise keep the empty-catalog fallback after fetch lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
+    [getModelMetadata, modelsMetadata, parsedModel],
+  );
 
   React.useEffect(() => {
     const loadSettings = async () => {
@@ -406,6 +442,24 @@ export const DefaultsSettings: React.FC = () => {
     }
   }, [chatHasOwnModel, defaultVariant, setCurrentVariant, setSettingsDefaultVariant, supportsVariants]);
 
+  React.useEffect(() => {
+    if (isLoading || availableLevels.length === 0) {
+      return;
+    }
+    const nextThinking = clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels);
+    if (!nextThinking || nextThinking === thinkingLevel) {
+      return;
+    }
+    setThinkingLevel(nextThinking);
+    void runtimeFetch('/api/pi/defaults', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thinking: nextThinking }),
+    }).catch((error) => {
+      console.warn('Failed to clamp Pi thinking level:', error);
+    });
+  }, [availableLevels, isLoading, thinkingLevel]);
+
   if (isLoading) {
     return null;
   }
@@ -446,12 +500,13 @@ export const DefaultsSettings: React.FC = () => {
               />
             </SettingsFieldRow>
 
+            {availableLevels.length > 0 ? (
             <SettingsFieldRow
               settingsItem="sessions.default-thinking"
               label={t('settings.openchamber.defaults.field.defaultThinking')}
             >
               <Select
-                value={thinkingLevel}
+                value={clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels) ?? availableLevels[0]}
                 onValueChange={async (value) => {
                   setThinkingLevel(value);
                   try {
@@ -467,11 +522,11 @@ export const DefaultsSettings: React.FC = () => {
               >
                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                   <SelectValue placeholder={t('settings.openchamber.defaults.field.thinkingPlaceholder')}>
-                    {formatVariantLabel(thinkingLevel)}
+                    {formatVariantLabel(clampSessionDefaultThinkingLevel(thinkingLevel, availableLevels) ?? thinkingLevel)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {PI_THINKING_LEVELS.map((level) => (
+                  {availableLevels.map((level) => (
                     <SelectItem key={level} value={level}>
                       {formatVariantLabel(level)}
                     </SelectItem>
@@ -479,6 +534,7 @@ export const DefaultsSettings: React.FC = () => {
                 </SelectContent>
               </Select>
             </SettingsFieldRow>
+            ) : null}
 
             {shouldShowOpenCodeAgentPicker(isPiKernel) ? (
             <SettingsFieldRow
