@@ -624,12 +624,16 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('returns 409 from config reload while a session is streaming', async () => {
+  it('interrupts a streaming session on config reload instead of hanging', async () => {
+    const events = [];
     const { url, close, kernel } = await startFacade({
       createSession: async () => createInMemoryPiSession({
         chunks: ['one ', 'two ', 'three'],
         chunkDelayMs: 40,
       }),
+    });
+    const unsubscribe = kernel.bus.subscribeEvent((event) => {
+      events.push(event?.payload ?? event);
     });
     try {
       const created = await (await fetch(`${url}/api/session`, {
@@ -644,12 +648,24 @@ describe('OpenCode facade HTTP/SSE', () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 15));
       const response = await fetch(`${url}/api/config/reload`, { method: 'POST' });
-      expect(response.status).toBe(409);
+      expect(response.status).toBe(200);
       const payload = await response.json();
-      expect(payload.error).toBe('Wait for the current response to finish before reloading.');
+      expect(payload).toMatchObject({
+        success: true,
+        kernel: 'pi',
+        interruptedSessionIds: [created.id],
+      });
+      const status = await (await fetch(`${url}/api/session/status`)).json();
+      expect(status[created.id]).toBeUndefined();
+      expect(events.some((event) => event.type === 'session.error')).toBe(true);
+      expect(events.some((event) => (
+        event.type === 'openchamber:notification'
+        && event.properties?.kind === 'opencode-restart-interrupted'
+      ))).toBe(true);
       const listed = await (await fetch(`${url}/api/session`)).json();
       expect(listed.some((item) => item.id === created.id)).toBe(true);
     } finally {
+      unsubscribe?.();
       kernel.dispose();
       await close();
     }

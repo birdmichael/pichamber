@@ -118,6 +118,28 @@ const sessionBlocksPiReload = (record) => {
   return null;
 };
 
+const KERNEL_RELOAD_INTERRUPTED_KIND = 'opencode-restart-interrupted';
+const KERNEL_RELOAD_INTERRUPTED_ERROR = {
+  name: 'MessageAbortedError',
+  message: 'The running turn was interrupted when the Pi kernel reloaded.',
+};
+
+const buildKernelReloadInterruptedNotification = (records) => {
+  const sessionIds = records.map((record) => record.id);
+  const first = records[0];
+  const multiple = sessionIds.length > 1;
+  return {
+    title: multiple ? 'Chats interrupted' : 'Chat interrupted',
+    body: multiple
+      ? 'Pi restarted during running responses. Send a message in each chat to continue.'
+      : 'Pi restarted during a running response. Send a message to continue.',
+    tag: KERNEL_RELOAD_INTERRUPTED_KIND,
+    kind: KERNEL_RELOAD_INTERRUPTED_KIND,
+    sessionId: first?.id,
+    directory: first?.directory,
+  };
+};
+
 const asCustomToolList = (value) => {
   if (!value) return undefined;
   if (Array.isArray(value)) {
@@ -1274,6 +1296,26 @@ export const createPiHost = ({
     emitTranslated(record, { type: 'agent_settled' });
   };
 
+  const interruptRecordForKernelReload = async (record) => {
+    try {
+      record.extensionUI?.cancelAll?.();
+    } catch {
+    }
+    try {
+      await record.piSession?.abort?.();
+    } catch {
+    }
+    forceSettleRecord(record);
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.error',
+      properties: {
+        sessionID: record.id,
+        error: KERNEL_RELOAD_INTERRUPTED_ERROR,
+      },
+    });
+  };
+
   const attachSession = (record) => {
     const unsubscribe = record.piSession.subscribe((piEvent) => {
       emitTranslated(record, piEvent);
@@ -2405,14 +2447,28 @@ export const createPiHost = ({
         };
       }
 
+      const processWideTargets = [];
       for (const record of sessions.values()) {
         if (directory && record.directory !== directory) continue;
-        const blocked = sessionBlocksPiReload(record);
-        if (blocked) {
-          const error = new Error(blocked);
+        processWideTargets.push(record);
+      }
+      for (const record of processWideTargets) {
+        if (record?.piSession?.isCompacting) {
+          const error = new Error(RELOAD_WAIT_FOR_COMPACTION);
           error.status = 409;
           throw error;
         }
+      }
+      const interruptedRecords = processWideTargets.filter((record) => sessionBlocksPiReload(record));
+      for (const record of interruptedRecords) {
+        await interruptRecordForKernelReload(record);
+      }
+      if (interruptedRecords.length > 0) {
+        emit(interruptedRecords[0].directory || 'global', {
+          id: createEventId(),
+          type: 'openchamber:notification',
+          properties: buildKernelReloadInterruptedNotification(interruptedRecords),
+        });
       }
 
       modelRuntime = null;
@@ -2456,6 +2512,7 @@ export const createPiHost = ({
         sessions: sessions.size,
         skills: skills.length,
         commands: commands.length,
+        interruptedSessionIds: interruptedRecords.map((record) => record.id),
       };
     },
     async reloadSessionRecords(options = {}) {
