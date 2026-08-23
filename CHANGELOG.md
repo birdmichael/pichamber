@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Mobile: on Pi, the expanded composer now shows a thinking-level chip next to the model, matching Desktop.
 - Chat: on Pi, choosing Plan on a new session still shows Plan after you open another chat and come back. Existing chats keep their own Agent or Plan.
 - Settings: on Pi, Sessions → Enabled models now shows the provider on each row, so two providers with the same model are not mistaken for one model.
+- Settings/Appearance: Light Theme and Dark Theme now list the product theme as Pichamber instead of OpenChamber. Existing selections still apply.
 
 ## [1.0.1] - 2026-08-18
 
