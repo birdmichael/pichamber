@@ -55,10 +55,12 @@ dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
 fetch. On a new-session draft, choosing Plan is local composer intent: it does
-not `createSession` or leave the draft. Send uses the same Agent materialize
-path, then `/plan start` on that new session if Plan is not already on, then
-the prompt. An already-open session still runs `/plan start` / save / exit on
-that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
+not `createSession` or leave the draft. That intent stays on the empty
+composer after you open another session and come back, until you send or
+pick Agent. An already-open session still shows its own stored Agent or Plan.
+Send uses the same Agent materialize path, then `/plan start` on that new
+session if Plan is not already on, then the prompt. An already-open session
+still runs `/plan start` / save / exit on that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
 and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
 does not host those controls; they appear after expand). The left cluster
 class `composer-mobile-actions` still clamps attach / Goal to a 24px icon

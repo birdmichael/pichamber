@@ -9,7 +9,9 @@ import {
   parseSessionPlan,
   planBuildAvailable,
   planToggleAction,
+  resolveEmptyComposerPlanSelected,
   resolveFooterPlanSelected,
+  resolveOpenedDraftPlanSelected,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
@@ -131,6 +133,32 @@ describe('plan toggle and build dispatch', () => {
       draftOpen: true,
       draftPlanSelected: true,
     })).toBe(false);
+  });
+
+  test('empty-composer Plan survives sidebar navigation and is consumed on send or Agent', () => {
+    expect(resolveEmptyComposerPlanSelected({
+      current: false,
+      draftOpen: true,
+      draftPlanSelected: true,
+    })).toBe(true);
+    expect(resolveEmptyComposerPlanSelected({
+      current: true,
+      draftOpen: false,
+    })).toBe(true);
+    expect(resolveEmptyComposerPlanSelected({
+      current: true,
+      draftOpen: true,
+      draftPlanSelected: false,
+    })).toBe(false);
+    expect(resolveEmptyComposerPlanSelected({
+      current: true,
+      draftOpen: true,
+      draftPlanSelected: true,
+      consume: true,
+    })).toBe(false);
+    expect(resolveOpenedDraftPlanSelected(undefined, true)).toBe(true);
+    expect(resolveOpenedDraftPlanSelected(false, true)).toBe(false);
+    expect(resolveOpenedDraftPlanSelected(undefined, false)).toBe(false);
   });
 
   test('existing-session Plan toggle stays on that session and never creates one', async () => {
