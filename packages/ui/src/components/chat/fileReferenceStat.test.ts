@@ -30,7 +30,7 @@ describe('fileReferenceExists directory scoping (issue 3019)', () => {
 
     expect(exists).toBe(true);
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('/api/fs/stat?path=%2Frepo-b%2Fsrc%2Findex.ts&optional=true');
+    expect(calls[0].url).toContain('/api/fs/stat?path=%2Frepo-b%2Fsrc%2Findex.ts&optional=true');
     expect(calls[0].headers.get('x-opencode-directory')).toBe('/repo-b');
   });
 

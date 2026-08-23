@@ -19,9 +19,12 @@ const sanitizeHooks: {
   afterSanitizeAttributes?: (node: unknown) => void;
 } = {};
 
-Object.assign(globalThis, {
-  window: {},
-  HTMLAnchorElement: TestAnchorElement,
+if (typeof globalThis.window === 'undefined') {
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {} });
+}
+Object.defineProperty(globalThis, 'HTMLAnchorElement', {
+  configurable: true,
+  value: TestAnchorElement,
 });
 
 mock.module('dompurify', () => ({
