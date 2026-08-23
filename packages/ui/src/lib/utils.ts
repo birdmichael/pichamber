@@ -28,6 +28,12 @@ export const getRevealLabelKey = (): I18nKey => {
   return 'common.revealPath.fileManager';
 };
 
+/** Open-in-folder chrome for pickers (Finder / File Explorer / File Manager). */
+export const getOpenInFolderLabelKey = (): I18nKey => {
+  if (isMacOS()) return 'directoryExplorerDialog.actions.openInFinder';
+  return getRevealLabelKey();
+};
+
 /**
  * Checks if the platform-appropriate modifier key is pressed.
  * On macOS desktop app: Cmd (metaKey), on other platforms or web: Ctrl (ctrlKey).

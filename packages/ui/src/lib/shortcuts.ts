@@ -31,12 +31,19 @@ const MODIFIER_KEY_MAP: Record<string, ShortcutModifier> = {
   'command': 'mod',
 };
 
-const DISPLAY_LABEL_MAP: Record<ShortcutModifier, string> = {
-  'mod': isMacOS() && isDesktopShell() ? '⌘' : 'Ctrl',
-  'shift': '⇧',
-  'alt': '⌥',
-  'option': '⌥',
-  'ctrl': '⌃',
+const getModifierDisplayLabel = (modifier: ShortcutModifier): string => {
+  const isDesktopMac = isMacOS() && isDesktopShell();
+  switch (modifier) {
+    case 'mod':
+      return isDesktopMac ? '⌘' : 'Ctrl';
+    case 'shift':
+      return isMacOS() ? '⇧' : 'Shift';
+    case 'alt':
+    case 'option':
+      return isMacOS() ? '⌥' : 'Alt';
+    case 'ctrl':
+      return isMacOS() ? '⌃' : 'Ctrl';
+  }
 };
 
 // Physical `event.key` values (lowercased) that satisfy each modifier while a
@@ -424,7 +431,7 @@ export function formatShortcutForDisplay(combo: ShortcutCombo): string {
 
   for (const modifier of MODIFIER_PRIORITY) {
     if (parsed.modifiers.has(modifier)) {
-      parts.push(DISPLAY_LABEL_MAP[modifier]);
+      parts.push(getModifierDisplayLabel(modifier));
     }
   }
 

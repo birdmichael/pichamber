@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, isMacOS } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionMessages } from '@/sync/sync-context';
 import { useCommandsStore } from '@/stores/useCommandsStore';
@@ -450,7 +450,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         if (command.isBuiltIn) {
           return <Icon name="flashlight" className="h-3.5 w-3.5 text-yellow-500" />;
         }
-        return <Icon name="command" className="h-3.5 w-3.5 text-muted-foreground" />;
+        return <Icon name={isMacOS() ? 'command' : 'slash-commands-2'} className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
 
