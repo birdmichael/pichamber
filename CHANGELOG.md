@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
+- Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and model name as text, without overlapping Agent, mic, or Send.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.

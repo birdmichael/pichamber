@@ -128,7 +128,7 @@ Current consumers:
 
 - `SessionSidebar.tsx`
 - `SessionNodeItem.tsx`
-- `Header.tsx`
+- `Header.tsx` (session title prefers the live directory session, same as the sidebar row; the global active cache and the same-id 2s snapshot are fallbacks only)
 - agent/session activity surfaces using `useGlobalSessionStatus()` / `useAllSessionStatuses()`
 
 Cross-directory selectors subscribe to the narrow child-store field they aggregate. Session aggregation listens to `state.session`. Live busy/retry state is also maintained in `global-session-status.ts`, where each row subscribes to one session ID instead of scanning every child store. Events update the index incrementally; authoritative per-directory status snapshots seed it, clear sessions omitted as idle, and reconcile missed events. Unrelated streaming events such as `message.part.delta` must not trigger global session/status scans.

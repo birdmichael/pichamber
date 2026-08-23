@@ -12,6 +12,7 @@ import { applyRetryOverlay } from './lib/turns/applyRetryOverlay';
 import { buildLiveStreamingEntry } from './lib/turns/streamingTailEntry';
 import { getNormalizedMessageForDisplay, hasCompactionPart } from './lib/messageDisplayNormalization';
 import { useUIStore } from '@/stores/useUIStore';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { isHiddenUserMessage } from './message/hiddenUserMessage';
 import { FadeInDisabledProvider } from './message/FadeInOnReveal';
@@ -508,9 +509,10 @@ const TurnBlock = React.memo(({
     reviewTransferDirection,
 }: TurnBlockProps) => {
     const planModeEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
+    const sessionDirectory = useEffectiveDirectory();
     const userMessageHidden = React.useMemo(
-        () => isHiddenUserMessage(turn.userMessage, { planModeEnabled }),
-        [planModeEnabled, turn.userMessage]
+        () => isHiddenUserMessage(turn.userMessage, { planModeEnabled, directory: sessionDirectory }),
+        [planModeEnabled, sessionDirectory, turn.userMessage]
     );
     const turnUiState = turnUiStates.get(turn.turnId) ?? { isExpanded: defaultActivityExpanded };
     const handleToggleTurnGroup = React.useCallback(() => {
@@ -1226,8 +1228,8 @@ const StreamingTailContent: React.FC<{
         liveParts,
         showTextJustificationActivity: chatRenderMode === 'sorted',
         showTurnChangedFiles,
-        mergeHiddenUserTurns: { planModeEnabled },
-    }), [activeStreamingMessageId, chatRenderMode, entry, liveParts, showTurnChangedFiles, planModeEnabled]);
+        mergeHiddenUserTurns: { planModeEnabled, directory },
+    }), [activeStreamingMessageId, chatRenderMode, directory, entry, liveParts, showTurnChangedFiles, planModeEnabled]);
 
     return (
         <MessageListEntry
@@ -1383,6 +1385,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
         showTextJustificationActivity: chatRenderMode === 'sorted',
         showTurnChangedFiles,
         planModeEnabled,
+        directory,
     });
     const hasUngroupedStaticEntries = projection.ungroupedMessageIds.size > 0;
     const staticEntryMessages = hasUngroupedStaticEntries ? displayMessages : EMPTY_STATIC_ENTRY_MESSAGES;

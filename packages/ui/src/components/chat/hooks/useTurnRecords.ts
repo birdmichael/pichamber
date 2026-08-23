@@ -9,6 +9,7 @@ interface UseTurnRecordsOptions {
     showTextJustificationActivity: boolean;
     showTurnChangedFiles: boolean;
     planModeEnabled: boolean;
+    directory?: string | null;
 }
 
 export interface TurnRecordsResult {
@@ -28,17 +29,20 @@ export const useTurnRecords = (
     const previousShowTextJustificationActivityRef = React.useRef(options.showTextJustificationActivity);
     const previousShowTurnChangedFilesRef = React.useRef(options.showTurnChangedFiles);
     const previousPlanModeEnabledRef = React.useRef(options.planModeEnabled);
+    const previousDirectoryRef = React.useRef(options.directory);
 
     if (
         previousSessionKeyRef.current !== options.sessionKey
         || previousShowTextJustificationActivityRef.current !== options.showTextJustificationActivity
         || previousShowTurnChangedFilesRef.current !== options.showTurnChangedFiles
         || previousPlanModeEnabledRef.current !== options.planModeEnabled
+        || previousDirectoryRef.current !== options.directory
     ) {
         previousSessionKeyRef.current = options.sessionKey;
         previousShowTextJustificationActivityRef.current = options.showTextJustificationActivity;
         previousShowTurnChangedFilesRef.current = options.showTurnChangedFiles;
         previousPlanModeEnabledRef.current = options.planModeEnabled;
+        previousDirectoryRef.current = options.directory;
         previousProjectionRef.current = null;
         staticTurnsRef.current = [];
         streamingTurnRef.current = undefined;
@@ -48,11 +52,11 @@ export const useTurnRecords = (
         previousProjectionRef.current = null;
         staticTurnsRef.current = [];
         streamingTurnRef.current = undefined;
-    }, [options.sessionKey, options.showTextJustificationActivity, options.showTurnChangedFiles, options.planModeEnabled]);
+    }, [options.directory, options.sessionKey, options.showTextJustificationActivity, options.showTurnChangedFiles, options.planModeEnabled]);
 
     const projection = React.useMemo(() => {
         const sessionKey = options.sessionKey ?? '';
-        const mergeKey = options.planModeEnabled ? 'merge:plan' : 'merge';
+        const mergeKey = `${options.planModeEnabled ? 'merge:plan' : 'merge'}:${options.directory ?? ''}`;
         const cacheKey = buildProjectionCacheKey(
             sessionKey,
             messages,
@@ -71,7 +75,7 @@ export const useTurnRecords = (
                 previousProjection: previousProjectionRef.current,
                 showTextJustificationActivity: options.showTextJustificationActivity,
                 showTurnChangedFiles: options.showTurnChangedFiles,
-                mergeHiddenUserTurns: { planModeEnabled: options.planModeEnabled },
+                mergeHiddenUserTurns: { planModeEnabled: options.planModeEnabled, directory: options.directory },
             });
             previousProjectionRef.current = nextProjection;
 
@@ -79,7 +83,7 @@ export const useTurnRecords = (
 
             return nextProjection;
         });
-    }, [messages, options.showTextJustificationActivity, options.showTurnChangedFiles, options.sessionKey, options.planModeEnabled]);
+    }, [messages, options.directory, options.showTextJustificationActivity, options.showTurnChangedFiles, options.sessionKey, options.planModeEnabled]);
 
     const staticTurns = React.useMemo(() => {
         const nextStatic = projection.turns.length <= 1

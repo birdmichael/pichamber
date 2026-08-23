@@ -1,5 +1,9 @@
 import type { Part } from '@opencode-ai/sdk/v2';
 
+import { normalizePath } from '@/lib/pathNormalization';
+
+import { extractTextContent, isEmptyTextPart } from './partUtils';
+
 const GITHUB_ISSUE_CONTEXT_PREFIX = 'GitHub issue context (JSON)';
 const GITHUB_PR_CONTEXT_PREFIX = 'GitHub pull request context (JSON)';
 
@@ -89,8 +93,39 @@ const shouldKeepSyntheticUserText = (text: string, planModeEnabled: boolean): bo
     return false;
 };
 
-export const normalizeUserDisplayParts = (parts: Part[], options?: { planModeEnabled?: boolean }): Part[] => {
+export const isSessionDirectoryChromeText = (
+    text: string,
+    directory?: string | null,
+): boolean => {
+    const normalizedText = normalizePath(text);
+    const normalizedDirectory = normalizePath(directory);
+    return Boolean(normalizedText && normalizedDirectory && normalizedText === normalizedDirectory);
+};
+
+const filePartLabel = (part: Part): string => {
+    const record = part as { filename?: unknown; url?: unknown; path?: unknown };
+    if (typeof record.filename === 'string' && record.filename.trim()) return record.filename;
+    if (typeof record.path === 'string' && record.path.trim()) return record.path;
+    if (typeof record.url === 'string' && record.url.trim()) return record.url;
+    return '';
+};
+
+const isSessionDirectoryChromePart = (part: Part, directory?: string | null): boolean => {
+    if (part.type === 'text') {
+        return isSessionDirectoryChromeText(extractTextContent(part), directory);
+    }
+    if (part.type === 'file' || part.type === 'image') {
+        return isSessionDirectoryChromeText(filePartLabel(part), directory);
+    }
+    return false;
+};
+
+export const normalizeUserDisplayParts = (parts: Part[], options?: {
+    planModeEnabled?: boolean;
+    directory?: string | null;
+}): Part[] => {
     const planModeEnabled = options?.planModeEnabled === true;
+    const directory = options?.directory;
     return parts
         .filter((part) => {
             const synthetic = (part as { synthetic?: boolean }).synthetic === true;
@@ -127,5 +162,11 @@ export const normalizeUserDisplayParts = (parts: Part[], options?: { planModeEna
                 }
             }
             return part;
+        })
+        .filter((part) => {
+            if (isSessionDirectoryChromePart(part, directory)) {
+                return false;
+            }
+            return !isEmptyTextPart(part);
         });
 };
