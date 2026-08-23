@@ -88,10 +88,12 @@ describe('listPiEnabledModelRows', () => {
       }],
     })).toEqual([{
       key: 'live-provider/example-model',
-      label: 'Example Model',
+      label: 'Example Model · live-provider',
       providerId: 'live-provider',
+      providerLabel: 'live-provider',
       modelId: 'example-model',
-      aliases: ['Example Model', 'example-model', 'live-provider/Example Model'],
+      modelLabel: 'Example Model',
+      aliases: ['live-provider/Example Model'],
     }]);
   });
 
@@ -107,10 +109,12 @@ describe('listPiEnabledModelRows', () => {
     });
     expect(rows).toEqual([{
       key: 'live-provider/example-model',
-      label: 'Example Model',
+      label: 'Example Model · live-provider',
       providerId: 'live-provider',
+      providerLabel: 'live-provider',
       modelId: 'example-model',
-      aliases: ['Example Model', 'example-model', 'live-provider/Example Model'],
+      modelLabel: 'Example Model',
+      aliases: ['live-provider/Example Model'],
     }]);
   });
 
@@ -126,19 +130,63 @@ describe('listPiEnabledModelRows', () => {
     })).toEqual([
       {
         key: 'live-provider/alpha',
-        label: 'Alpha',
+        label: 'Alpha · live-provider',
         providerId: 'live-provider',
+        providerLabel: 'live-provider',
         modelId: 'alpha',
-        aliases: ['alpha'],
+        modelLabel: 'Alpha',
+        aliases: [],
       },
       {
         key: 'live-provider/alpha-fast',
-        label: 'Alpha Fast',
+        label: 'Alpha Fast · live-provider',
         providerId: 'live-provider',
+        providerLabel: 'live-provider',
         modelId: 'alpha-fast',
-        aliases: ['alpha-fast'],
+        modelLabel: 'Alpha Fast',
+        aliases: [],
       },
     ]);
+  });
+
+  test('lists the same model id once per provider and shows the provider on each row', () => {
+    const rows = listPiEnabledModelRows({
+      providers: [
+        {
+          id: 'alpha-provider',
+          name: 'Alpha Provider',
+          models: { 'shared-model': { id: 'shared-model', name: 'Shared Model' } },
+        },
+        {
+          id: 'beta-provider',
+          name: 'Beta Provider',
+          models: { 'shared-model': { id: 'shared-model', name: 'shared-model' } },
+        },
+      ],
+    });
+    expect(rows).toEqual([
+      {
+        key: 'alpha-provider/shared-model',
+        label: 'Shared Model · Alpha Provider',
+        providerId: 'alpha-provider',
+        providerLabel: 'Alpha Provider',
+        modelId: 'shared-model',
+        modelLabel: 'Shared Model',
+        aliases: [],
+      },
+      {
+        key: 'beta-provider/shared-model',
+        label: 'shared-model · Beta Provider',
+        providerId: 'beta-provider',
+        providerLabel: 'Beta Provider',
+        modelId: 'shared-model',
+        modelLabel: 'shared-model',
+        aliases: [],
+      },
+    ]);
+    expect(nextPiEnabledModels(rows, [], rows[0], false)).toEqual(['beta-provider/shared-model']);
+    expect(isPiEnabledModelRowChecked(rows[0], ['beta-provider/shared-model'])).toBe(false);
+    expect(isPiEnabledModelRowChecked(rows[1], ['beta-provider/shared-model'])).toBe(true);
   });
 
   test('does not merge models just because one id matches another display name with a distinct identity', () => {

@@ -27,7 +27,9 @@ export type PiEnabledModelRow = {
   key: string;
   label: string;
   providerId: string;
+  providerLabel: string;
   modelId: string;
+  modelLabel: string;
   aliases: string[];
 };
 
@@ -147,15 +149,36 @@ const uniqueCatalogModels = (models: CatalogModel[]): CatalogModel[] => {
   return unique;
 };
 
+const formatEnabledModelLabel = (modelLabel: string, providerLabel: string): string => (
+  `${modelLabel} · ${providerLabel}`
+);
+
 const rowAliases = (providerId: string, model: CatalogModel): string[] => {
   const aliases = new Set<string>();
-  for (const token of [model.id, ...model.sourceKeys]) {
-    if (!token) continue;
-    aliases.add(token);
+  for (const token of model.sourceKeys) {
+    if (!token || token === model.id) continue;
     aliases.add(`${providerId}/${token}`);
   }
-  aliases.delete(`${providerId}/${model.id}`);
   return [...aliases].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+};
+
+const rowMatchesEnabledToken = (
+  row: Pick<PiEnabledModelRow, 'key' | 'providerId' | 'modelId' | 'aliases'>,
+  token: string,
+): boolean => {
+  if (token === row.key || token === `${row.providerId}/${row.modelId}`) return true;
+  if (row.aliases.includes(token)) return true;
+  return token === row.modelId;
+};
+
+const resolveEnabledRowKeys = (
+  rows: readonly PiEnabledModelRow[],
+  enabledModels: string[],
+): string[] => {
+  if (enabledModels.length === 0) return rows.map((item) => item.key);
+  return rows
+    .filter((item) => enabledModels.some((token) => rowMatchesEnabledToken(item, token)))
+    .map((item) => item.key);
 };
 
 export const listPiEnabledModelRows = (catalog: unknown): PiEnabledModelRow[] => {
@@ -168,15 +191,19 @@ export const listPiEnabledModelRows = (catalog: unknown): PiEnabledModelRow[] =>
   for (const provider of providers) {
     const providerId = asNonEmptyString(provider?.id);
     if (!providerId) continue;
+    const providerLabel = asNonEmptyString(provider?.name) ?? providerId;
     for (const model of uniqueCatalogModels(toCatalogModels(provider.models))) {
       const key = `${providerId}/${model.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const modelLabel = model.name || model.id;
       rows.push({
         key,
-        label: model.name || model.id,
+        label: formatEnabledModelLabel(modelLabel, providerLabel),
         providerId,
+        providerLabel,
         modelId: model.id,
+        modelLabel,
         aliases: rowAliases(providerId, model),
       });
     }
@@ -189,10 +216,7 @@ export const isPiEnabledModelRowChecked = (
   enabledModels: string[],
 ): boolean => {
   if (enabledModels.length === 0) return true;
-  if (isModelEnabled(row.providerId, row.modelId, enabledModels)) {
-    return true;
-  }
-  return row.aliases.some((alias) => enabledModels.includes(alias));
+  return enabledModels.some((token) => rowMatchesEnabledToken(row, token));
 };
 
 export const nextPiEnabledModels = (
@@ -201,13 +225,10 @@ export const nextPiEnabledModels = (
   row: PiEnabledModelRow,
   nextChecked: boolean,
 ): string[] => {
-  const identity = new Set([row.key, row.modelId, ...row.aliases]);
-  const current = (enabledModels.length === 0 ? rows.map((item) => item.key) : enabledModels)
-    .filter((item) => !identity.has(item));
-  const next = nextChecked ? [...current, row.key] : current;
-  const enabledKeys = rows
-    .filter((item) => isPiEnabledModelRowChecked(item, next))
-    .map((item) => item.key);
+  const current = new Set(resolveEnabledRowKeys(rows, enabledModels));
+  if (nextChecked) current.add(row.key);
+  else current.delete(row.key);
+  const enabledKeys = rows.map((item) => item.key).filter((key) => current.has(key));
   if (enabledKeys.length === 0 || enabledKeys.length === rows.length) {
     return [];
   }
