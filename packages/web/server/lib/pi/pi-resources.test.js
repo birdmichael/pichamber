@@ -383,30 +383,6 @@ description: >
     expect(upserted.providerId).toBe('acme');
     expect(upserted.config.baseUrl).toBe('https://api.acme.test/v1');
     expect(upserted.config.api).toBe('openai-completions');
-
-    const responses = upsertPiProviderConfig({
-      home,
-      providerId: 'responses',
-      config: {
-        npm: '@ai-sdk/openai',
-        name: 'Responses',
-        options: { baseURL: 'https://api.responses.test/v1' },
-        models: { gpt: { name: 'GPT' } },
-      },
-    });
-    expect(responses.config.api).toBe('openai-responses');
-
-    const anthropic = upsertPiProviderConfig({
-      home,
-      providerId: 'claude-proxy',
-      config: {
-        npm: '@ai-sdk/anthropic',
-        name: 'Claude proxy',
-        options: { baseURL: 'https://api.anthropic.test' },
-        models: { claude: { name: 'Claude' } },
-      },
-    });
-    expect(anthropic.config.api).toBe('anthropic-messages');
     expect(upserted.config.models).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6' }]);
     expect(upserted.config.headers).toEqual({ 'X-Custom-Header': 'from-settings' });
     expect(upserted.config).not.toHaveProperty('apiKey');
@@ -448,6 +424,38 @@ description: >
         models: { x: { name: 'X' } },
       },
     })).toThrow(/API key or \{env:VAR\}/);
+  });
+
+  it('maps official custom-provider npm adapters onto Pi api values', () => {
+    const home = makeTemp();
+    writePiProviderAuth('responses', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    writePiProviderAuth('claude-proxy', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+
+    const responses = upsertPiProviderConfig({
+      home,
+      providerId: 'responses',
+      config: {
+        npm: '@ai-sdk/openai',
+        name: 'Responses',
+        options: { baseURL: 'https://api.responses.test/v1' },
+        models: { gpt: { name: 'GPT' } },
+      },
+    });
+    expect(responses.config.api).toBe('openai-responses');
+
+    const anthropic = upsertPiProviderConfig({
+      home,
+      providerId: 'claude-proxy',
+      config: {
+        npm: '@ai-sdk/anthropic',
+        name: 'Claude proxy',
+        options: { baseURL: 'https://api.anthropic.test' },
+        models: { claude: { name: 'Claude' } },
+      },
+    });
+    expect(anthropic.config.api).toBe('anthropic-messages');
+    expect(JSON.stringify(responses)).not.toContain('sk-test');
+    expect(JSON.stringify(anthropic)).not.toContain('sk-test');
   });
 
   it('persists contextWindow on models.json and round-trips it on the public config', () => {
