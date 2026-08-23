@@ -628,10 +628,9 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   React.useEffect(() => {
     if (editingId !== session.id) return;
     const handleDocMouseDown = (e: MouseEvent) => {
-      // The same session can be rendered twice (recent + project), each with
-      // its own rename form. A click inside ANY rename form for this session
-      // must not count as "outside", or the sibling instance would save and
-      // exit the rename mid-edit.
+      // A session is only in Recent or a workspace group, never both. Still
+      // ignore clicks inside this session's rename form so the outside-click
+      // save does not fire on the input itself.
       const target = e.target as HTMLElement | null;
       const withinRenameForm = target?.closest?.(`[data-session-rename-form="${CSS.escape(session.id)}"]`);
       if (formRef.current && !withinRenameForm) {
