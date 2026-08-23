@@ -37,6 +37,13 @@ type ProjectSection = {
 const TOP_FADE_MAX_SIZE = 48;
 const TOP_FADE_MIN_SIZE = 32;
 const TOP_FADE_CLEAR_MAX_SIZE = 24;
+type ActivitySectionKey = 'chats' | 'active-now';
+
+const readActivitySectionKey = (element: Element): ActivitySectionKey | null => {
+  const key = element.getAttribute('data-sidebar-activity-sentinel');
+  if (key === 'chats' || key === 'active-now') return key;
+  return null;
+};
 
 const getProjectLabel = (project: ProjectSection['project'], homeDirectory: string | null): string => (
   formatProjectLabel(
@@ -135,6 +142,7 @@ function SidebarProjectsListComponent(props: Props): React.ReactNode {
   // can resolve the scrolling ancestor synchronously (no getComputedStyle
   // walk) and skip the cost of a style recalc on every render.
   const scrollContainerRef = React.useRef<HTMLElement | null>(null);
+  const [leadingActivitySection, setLeadingActivitySection] = React.useState<ActivitySectionKey>('chats');
   // Keep per-scroll measurements out of React state so the interaction guard
   // can read the current fade boundary without rerendering the sidebar.
   const topFadeSizeRef = React.useRef(0);
@@ -167,6 +175,38 @@ function SidebarProjectsListComponent(props: Props): React.ReactNode {
       syncTopFade(scrollContainerRef.current);
     }
   }, [enableStickyFade, hasProjectScroller, syncTopFade]);
+  React.useEffect(() => {
+    const root = scrollContainerRef.current;
+    if (!enableStickyFade || !root || !props.hasSharedSessions) return;
+
+    const sentinels = Array.from(root.querySelectorAll<HTMLElement>('[data-sidebar-activity-sentinel]'));
+    if (sentinels.length === 0) return;
+    const stuckSections = new Set<ActivitySectionKey>();
+    const syncLeadingSection = (): void => {
+      let nextSection = sentinels[0] ? readActivitySectionKey(sentinels[0]) : null;
+      for (const sentinel of sentinels) {
+        const key = readActivitySectionKey(sentinel);
+        if (key && stuckSections.has(key)) nextSection = key;
+      }
+      if (nextSection) setLeadingActivitySection((current) => current === nextSection ? current : nextSection);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      const rootTop = root.getBoundingClientRect().top;
+      for (const entry of entries) {
+        const key = readActivitySectionKey(entry.target);
+        if (!key) continue;
+        if (!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? rootTop)) {
+          stuckSections.add(key);
+        } else {
+          stuckSections.delete(key);
+        }
+      }
+      syncLeadingSection();
+    }, { root, threshold: 0 });
+    sentinels.forEach((sentinel) => observer.observe(sentinel));
+    syncLeadingSection();
+    return () => observer.disconnect();
+  }, [enableStickyFade, props.hasSharedSessions, props.topContent]);
   let stuckProject: ProjectSection['project'] | null = null;
   for (const section of props.projectSections) {
     if (props.stuckProjectHeaders.has(section.project.id)) {
@@ -393,9 +433,11 @@ function SidebarProjectsListComponent(props: Props): React.ReactNode {
             />
           ) : (
             <>
-              <Icon name="history" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/80" />
+              <Icon name={leadingActivitySection === 'chats' ? 'chat-4' : 'history'} className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/80" />
               <span className="truncate text-[14px] font-semibold lowercase text-foreground">
-                {t('sessions.sidebar.activity.recentTitle')}
+                {t(leadingActivitySection === 'chats'
+                  ? 'sessions.sidebar.activity.chatsTitle'
+                  : 'sessions.sidebar.activity.recentTitle')}
               </span>
             </>
           )}

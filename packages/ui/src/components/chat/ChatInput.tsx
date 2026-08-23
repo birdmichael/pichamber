@@ -79,6 +79,8 @@ import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { shouldShowDesktopDraftWelcomeChrome } from '@/lib/draftStarters';
+import { isManagedChatDirectory } from '@/lib/chatDirectories';
+import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
@@ -333,6 +335,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
     const fallbackDirectory = useDirectoryStore((s) => s.currentDirectory);
     const homeDirectory = useDirectoryStore((s) => s.homeDirectory);
+    const composerProjects = useProjectsStore((s) => s.projects);
     const currentDirectory = useEffectiveDirectory() ?? fallbackDirectory;
     const currentSessionDirectoryForSync = useSessionUIStore(
         React.useCallback((s) => currentSessionId ? s.getDirectoryForSession(currentSessionId) : null, [currentSessionId]),
@@ -354,6 +357,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const setNewSessionDraftTarget = useSessionUIStore((s) => s.setNewSessionDraftTarget);
     const setDraftPermissionAutoAcceptEnabled = useSessionUIStore((s) => s.setDraftPermissionAutoAcceptEnabled);
     const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
+    const prepareChatDraftDirectory = useSessionUIStore((s) => s.prepareChatDraftDirectory);
+    React.useEffect(() => {
+        if (!newSessionDraftOpen || newSessionDraft.target !== 'chat' || !message.trim()) return;
+        void prepareChatDraftDirectory();
+    }, [message, newSessionDraft.target, newSessionDraftOpen, prepareChatDraftDirectory]);
     const abortPromptSessionId = useSessionUIStore((s) => s.abortPromptSessionId);
     const clearAbortPrompt = useSessionUIStore((s) => s.clearAbortPrompt);
     const attachedFiles = useInputStore((s) => s.attachedFiles);
@@ -2473,8 +2481,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     const handleMobileNewSession = React.useCallback(() => {
         if (newSessionDraftOpen) return;
-        openNewSessionDraft(currentDirectory ? { directoryOverride: currentDirectory } : undefined);
-    }, [newSessionDraftOpen, openNewSessionDraft, currentDirectory]);
+        const openedProjectPaths = new Set(composerProjects.map((project) => project.path).filter(Boolean));
+        openNewSessionDraft(
+            currentDirectory && !isManagedChatDirectory(currentDirectory, homeDirectory, openedProjectPaths)
+                ? { directoryOverride: currentDirectory }
+                : undefined,
+        );
+    }, [composerProjects, currentDirectory, homeDirectory, newSessionDraftOpen, openNewSessionDraft]);
 
     /** The dictation engine listens for this globally; the composer only asks. */
     const toggleDictation = React.useCallback(() => {

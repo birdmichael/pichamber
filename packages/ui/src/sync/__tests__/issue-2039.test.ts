@@ -74,6 +74,8 @@ mock.module("@/lib/opencode/client", () => ({
   opencodeClient: {
     getDirectory: () => null,
     setDirectory: mock(() => undefined),
+    getFilesystemHome: mock(async () => "/home/tester"),
+    createDirectory: mock(async (path: string) => ({ success: true, path })),
   },
 }))
 

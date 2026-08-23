@@ -60,7 +60,9 @@ function ProjectLabel({ project, theme }: { project: DraftTargetProject; theme: 
     const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const projectIconName = project.icon ? PROJECT_ICON_MAP[project.icon] : null;
     const iconColor = getProjectIconColor(project.color);
-    const fallbackIcon = projectIconName ? (
+    const fallbackIcon = project.kind === 'chat' ? (
+        <Icon name="chat-4" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+    ) : projectIconName ? (
         <Icon name={projectIconName} className="h-3.5 w-3.5 shrink-0" style={iconColor ? { color: iconColor } : undefined} />
     ) : (
         <Icon name="folder" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" style={iconColor ? { color: iconColor } : undefined} />
@@ -118,7 +120,9 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
                     className="h-7 min-w-0 w-fit max-w-[42vw] sm:max-w-[18rem] border-transparent bg-transparent px-1.5 hover:bg-transparent data-[popup-open]:bg-transparent"
                 >
                     <SelectValue>
-                        {<ProjectLabel project={selectedProject} theme={theme} />}
+                        {selectedProject.kind === 'chat'
+                            ? <span className="truncate">{t('chat.chatInput.chooseProject')}</span>
+                            : <ProjectLabel project={selectedProject} theme={theme} />}
                     </SelectValue>
                 </SelectTrigger>
                 <SelectContent fitContent>
@@ -198,7 +202,9 @@ export function MobileDraftTargetTriggers(
                 className="inline-flex h-7 min-w-0 max-w-[42vw] flex-shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 typography-micro font-medium text-foreground/80 hover:bg-[var(--interactive-hover)]"
                 onClick={() => onOpenPicker('project')}
             >
-                {<ProjectLabel project={selectedProject} theme={theme} />}
+                {selectedProject.kind === 'chat'
+                    ? <span className="truncate">{t('chat.chatInput.chooseProject')}</span>
+                    : <ProjectLabel project={selectedProject} theme={theme} />}
                 <Icon name="arrow-down-s" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             </button>
             {showBranchSelector ? (

@@ -8,6 +8,8 @@ import { useGitAllBranches } from '@/stores/useGitStore';
 import type { SessionNode } from '../types';
 import { isPathWithinProject } from '../utils';
 import { compareSessionsByLifecycleOrder, useSessionOrderingStore } from '@/sync/session-ordering';
+import { isChatDirectoryPath } from '@/lib/chatDirectories';
+import { isVSCodeRuntime } from '@/lib/desktop';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
 export type SwitcherItem = {
@@ -112,9 +114,11 @@ export const useSwitcherItems = (enabled: boolean, options: SwitcherItemsOptions
       list.sort((a, b) => compareSessionsByLifecycleOrder(a, b, pinnedSessionIds, sessionOrderRanks));
     });
 
+    const isVSCode = isVSCodeRuntime();
     const parents = activeSessions
       .filter((session) => !session.time?.archived)
       .filter((session) => !(session as Session & { parentID?: string | null }).parentID)
+      .filter((session) => !isVSCode || !isChatDirectoryPath(resolveGlobalSessionDirectory(session)))
       .filter((session) => {
         if (!scopeProjectId) return true;
         const directory = resolveGlobalSessionDirectory(session);

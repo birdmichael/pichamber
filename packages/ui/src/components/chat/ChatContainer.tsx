@@ -42,6 +42,7 @@ import { Button } from '@/components/ui/button';
 import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { Icon } from "@/components/icon/Icon";
 import { cn } from '@/lib/utils';
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
 import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -529,6 +530,8 @@ const renderDraftTitle = (title: string, projectLabel: string | null): React.Rea
 const DraftWelcome: React.FC<{ sessionDirectory?: string | null }> = ({ sessionDirectory }) => {
     const { t } = useI18n();
     const selectedProjectId = useSessionUIStore((state) => state.newSessionDraft.selectedProjectId ?? null);
+    const draftTarget = useSessionUIStore((state) => state.newSessionDraft.target);
+    const draftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft.open));
     const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const projects = useProjectsStore((state) => state.projects);
     const activeProjectId = useProjectsStore((state) => state.activeProjectId);
@@ -545,10 +548,12 @@ const DraftWelcome: React.FC<{ sessionDirectory?: string | null }> = ({ sessionD
             projects,
             homeDirectory,
             sessionDirectory,
-            draftProject,
-            preferSessionProject: Boolean(sessionDirectory),
+            draftProject: draftOpen && draftTarget === 'chat'
+              ? { id: CHAT_DRAFT_PROJECT_ID, path: '', kind: 'chat' }
+              : draftProject,
+            preferSessionProject: Boolean(sessionDirectory) && !(draftOpen && draftTarget === 'chat'),
         });
-    }, [activeProjectId, homeDirectory, projects, selectedProjectId, sessionDirectory]);
+    }, [activeProjectId, draftOpen, draftTarget, homeDirectory, projects, selectedProjectId, sessionDirectory]);
 
     return (
         <div className="oc-draft-center flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">

@@ -5,6 +5,7 @@ import { useI18n } from '@/lib/i18n';
 import { useDeviceInfo } from '@/lib/device';
 import { isDesktopShell } from '@/lib/desktop';
 import { sessionEvents } from '@/lib/sessionEvents';
+import { getChatsRootForHome, getChatsRootFromDirectory, isChatDirectoryPath, isManagedChatDirectory } from '@/lib/chatDirectories';
 import { formatDirectoryName, cn } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useChildStoreManager, useGlobalSessionStatus } from '@/sync/sync-context';
@@ -40,7 +41,7 @@ import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { SessionGroupSection } from './sidebar/SessionGroupSection';
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { SidebarNav } from './sidebar/SidebarNav';
-import { SidebarActivitySections } from './sidebar/SidebarActivitySections';
+import { SidebarActivitySections, type ActivityItem } from './sidebar/SidebarActivitySections';
 import { SidebarFooter } from './sidebar/SidebarFooter';
 import {
   getSessionRecordsReloadBlockReason,
@@ -538,11 +539,17 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       merged.push(session);
     });
 
-    return merged.filter((session) => isKnownActiveSessionDirectory(session, knownSessionDirectories, {
-      allowUnknownDirectory: !isVSCode,
-      allowEmptyDirectorySet: !isVSCode,
-    }));
-  }, [globalActiveSessions, isVSCode, knownSessionDirectories, liveFallbackSessions]);
+    return merged.filter((session) => (
+      (!isVSCode && (
+        isChatDirectoryPath(session.directory)
+        || isManagedChatDirectory(session.directory, homeDirectory, openedProjectPaths)
+      ))
+      || isKnownActiveSessionDirectory(session, knownSessionDirectories, {
+        allowUnknownDirectory: !isVSCode,
+        allowEmptyDirectorySet: !isVSCode,
+      })
+    ));
+  }, [globalActiveSessions, homeDirectory, isVSCode, knownSessionDirectories, liveFallbackSessions, openedProjectPaths]);
 
   const persistenceSessions = React.useMemo(
     () => [...globalActiveSessions, ...archivedSessions],
@@ -1460,9 +1467,25 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       return [];
     }
 
-    return deriveRecentSessions(sessions, activeSessionIdSet)
-      .sort((a, b) => compareSessionsByLifecycleOrder(a, b, pinnedSessionIds, sessionOrderRanks));
-  }, [activeSessionIdSet, isVSCode, pinnedSessionIds, sessionOrderRanks, sessions, showRecentSection]);
+    return deriveRecentSessions(
+      sessions.filter((session) => !isManagedChatDirectory(session.directory, homeDirectory, openedProjectPaths)),
+      activeSessionIdSet,
+    ).sort((a, b) => compareSessionsByLifecycleOrder(a, b, pinnedSessionIds, sessionOrderRanks));
+  }, [activeSessionIdSet, homeDirectory, isVSCode, openedProjectPaths, pinnedSessionIds, sessionOrderRanks, sessions, showRecentSection]);
+
+  const chatSessions = React.useMemo(() => sessions
+    .filter((session) => (
+      !session.parentID
+      && !session.time?.archived
+      && isManagedChatDirectory(session.directory, homeDirectory, openedProjectPaths)
+    ))
+    .sort((a, b) => compareSessionsByLifecycleOrder(a, b, pinnedSessionIds, sessionOrderRanks)), [
+    homeDirectory,
+    openedProjectPaths,
+    pinnedSessionIds,
+    sessionOrderRanks,
+    sessions,
+  ]);
 
   // Prefetch is wired below, after recentSessions is computed.
 
@@ -1470,7 +1493,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     // VS Code renders the full grouped project view (one group per open
     // workspace, folders + pinned native); the flat "recent" activity list is
     // web/desktop-only.
-    if (isVSCode || !showRecentSection) {
+    if (isVSCode) {
       return [];
     }
 
@@ -1499,17 +1522,23 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       };
     };
 
-    const items = selectRecentSessionsWithoutWorkspaceGroup(recentSessions, sessionSidebarMetaById)
+    const recentItems = showRecentSection
+      ? selectRecentSessionsWithoutWorkspaceGroup(recentSessions, sessionSidebarMetaById)
+        .map(toItem)
+        .filter((item): item is NonNullable<ReturnType<typeof toItem>> => item !== null)
+      : [];
+
+    const chatItems = chatSessions
       .map(toItem)
       .filter((item): item is NonNullable<ReturnType<typeof toItem>> => item !== null);
-
     return [
-      { key: 'active-now' as const, title: t('sessions.sidebar.activity.recentTitle'), items },
+      { key: 'chats' as const, title: t('sessions.sidebar.activity.chatsTitle'), items: chatItems },
+      { key: 'active-now' as const, title: t('sessions.sidebar.activity.recentTitle'), items: recentItems },
     ];
-  }, [filterSessionNodesForSearch, hasSessionSearchQuery, isVSCode, normalizedSessionSearchQuery, recentSessions, sessionSidebarMetaById, showRecentSection, t]);
+  }, [chatSessions, filterSessionNodesForSearch, hasSessionSearchQuery, isVSCode, normalizedSessionSearchQuery, recentSessions, sessionSidebarMetaById, showRecentSection, t]);
 
   const hasActivitySectionItems = React.useMemo(
-    () => activitySections.some((section) => section.items.length > 0),
+    () => activitySections.some((section) => section.key === 'chats' || section.items.length > 0),
     [activitySections],
   );
 
@@ -1831,20 +1860,6 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     ],
   );
 
-  const topContent = React.useMemo(
-    () => (!isVSCode && showRecentSection && !hasSessionSearchQuery) ? (
-      <SidebarActivitySections
-        sections={activitySections}
-        renderSessionNode={renderSessionNode}
-        editingId={editingId}
-        openSidebarMenuKey={openSidebarMenuKey}
-        expansionState={recentExpandedParents}
-        variant="section"
-        isDesktopShellRuntime={isDesktopShellRuntime}
-      />
-    ) : null,
-    [activitySections, editingId, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderSessionNode, showRecentSection],
-  );
   const isInlineEditing = Boolean(renamingFolderId || editingId || editingProjectDialogId);
 
   const {
@@ -1892,6 +1907,55 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     }
     openNewSessionDraft();
   }, [mobileVariant, openNewSessionDraft, setActiveMainTab, setSessionSwitcherOpen]);
+
+  const renderChatsSection = React.useCallback((items: ActivityItem[]) => {
+    const chatsRoot = getChatsRootForHome(homeDirectory)
+      ?? items.map((item) => getChatsRootFromDirectory(item.node.session.directory)).find(Boolean)
+      ?? null;
+    if (!chatsRoot) return items.map((item) => renderSessionNode(item.node, 0, item.groupDirectory));
+
+    const folderDirectories = [
+      chatsRoot,
+      ...items.map((item) => normalizePath(item.node.session.directory ?? null)).filter((directory): directory is string => Boolean(directory)),
+    ];
+    const folderScopes = Array.from(new Set(folderDirectories)).map((directory) => ({
+      scopeKey: directory,
+      directory,
+    }));
+    const group: SessionGroup = {
+      id: 'managed-chats',
+      label: '',
+      branch: null,
+      description: null,
+      isMain: true,
+      worktree: null,
+      directory: chatsRoot,
+      folderScopeKey: chatsRoot,
+      folderScopes,
+      draftTarget: 'chat',
+      emptyMessage: t('sessions.sidebar.activity.chatsEmpty'),
+      sessions: items.map((item) => item.node),
+    };
+    return renderGroupSessions(group, 'managed-chats', null, true);
+  }, [homeDirectory, renderGroupSessions, renderSessionNode, t]);
+
+  const topContent = React.useMemo(
+    () => (!isVSCode && !hasSessionSearchQuery && hasActivitySectionItems) ? (
+      <SidebarActivitySections
+        sections={activitySections}
+        renderSessionNode={renderSessionNode}
+        editingId={editingId}
+        openSidebarMenuKey={openSidebarMenuKey}
+        expansionState={recentExpandedParents}
+        variant="section"
+        isDesktopShellRuntime={isDesktopShellRuntime}
+        onNewChat={handleOpenNewSessionDraftFromHeader}
+        alwaysShowActions={alwaysShowSidebarActions}
+        renderChatsSection={renderChatsSection}
+      />
+    ) : null,
+    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewSessionDraftFromHeader, hasActivitySectionItems, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode],
+  );
 
   return (
     // One shared tooltip provider for the whole sidebar: session tooltips open

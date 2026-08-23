@@ -44,6 +44,12 @@ describe('pi session project discovery', () => {
     expect(isSkippedPiSessionProjectCwd('/repo/.git/worktrees/feature', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/repo/.worktrees/cursor-desktop-plan-side-p456', { tmpdir: '/var/tmp' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/repo/app', { tmpdir: '/var/tmp' })).toBe(false);
+    expect(isSkippedPiSessionProjectCwd('/home/box/.config/openchamber/chats/2026-08-21/session-a', {
+      tmpdir: '/var/tmp',
+      home: '/home/box',
+    })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/home/box', { tmpdir: '/var/tmp', home: '/home/box' })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/home/box/pichamber', { tmpdir: '/var/tmp', home: '/home/box' })).toBe(false);
     expect(projectLabelFromPath('/repo/app')).toBe('app');
     expect(projectLabelFromPath('/')).toBe('Root');
   });

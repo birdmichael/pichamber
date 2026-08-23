@@ -1,7 +1,20 @@
 import { describe, expect, test } from 'bun:test'
-import type { OpencodeClient } from '@opencode-ai/sdk/v2'
+import type { OpencodeClient, Session } from '@opencode-ai/sdk/v2'
 
-import { globalSessionListQuery, listGlobalSessionPages, splitGlobalSessionsByArchived } from './globalSessions'
+import { filterManagedChatsForRuntime, globalSessionListQuery, listGlobalSessionPages, splitGlobalSessionsByArchived } from './globalSessions'
+
+describe('filterManagedChatsForRuntime', () => {
+  const chat = { id: 'chat', directory: '/home/.config/openchamber/chats/2026-08-21/session-a' } as Session
+  const project = { id: 'project', directory: '/repo/app' } as Session
+
+  test('hides managed chats in VS Code', () => {
+    expect(filterManagedChatsForRuntime([chat, project], true)).toEqual([project])
+  })
+
+  test('keeps managed chats on web and desktop', () => {
+    expect(filterManagedChatsForRuntime([chat, project], false)).toEqual([chat, project])
+  })
+})
 
 describe('globalSessionListQuery', () => {
   test('Pi default load does not pass archived: true', () => {

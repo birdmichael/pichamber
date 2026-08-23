@@ -6,6 +6,7 @@ import * as sessionActions from '@/sync/session-actions';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
+import { isManagedChatDirectory } from '@/lib/chatDirectories';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
@@ -38,6 +39,9 @@ export const useKeyboardShortcuts = () => {
   const armAbortPrompt = useSessionUIStore((s) => s.armAbortPrompt);
   const clearAbortPrompt = useSessionUIStore((s) => s.clearAbortPrompt);
   const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
+  const currentSessionDirectory = useSessionUIStore((s) => s.currentSessionDirectory);
+  const homeDirectory = useDirectoryStore((s) => s.homeDirectory);
+  const keyboardProjects = useProjectsStore((s) => s.projects);
   const abortCurrentOperation = sessionActions.abortCurrentOperation;
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const toggleHelpDialog = useUIStore((s) => s.toggleHelpDialog);
@@ -322,7 +326,10 @@ export const useKeyboardShortcuts = () => {
           return;
         }
 
-        openNewSessionDraft();
+        const openedProjectPaths = new Set(keyboardProjects.map((project) => project.path).filter(Boolean));
+        openNewSessionDraft(currentSessionId && currentSessionDirectory && !isManagedChatDirectory(currentSessionDirectory, homeDirectory, openedProjectPaths)
+          ? { directoryOverride: currentSessionDirectory }
+          : undefined);
         return;
       }
 
@@ -718,6 +725,9 @@ export const useKeyboardShortcuts = () => {
     armAbortPrompt,
     resetAbortPriming,
     currentSessionId,
+    currentSessionDirectory,
+    homeDirectory,
+    keyboardProjects,
     isPiKernel,
     currentDirectory,
     effectiveDirectory,

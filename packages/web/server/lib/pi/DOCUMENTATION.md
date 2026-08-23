@@ -32,8 +32,9 @@ but has never persisted a `projects` key, settings migration walks
 from the session jsonl header (first object). Do not decode the encoded
 folder name. Keep paths that still exist as directories. Skip `/tmp`,
 `/private/tmp`, `os.tmpdir()`, any `node_modules` tree, `.cursor`
-trees, `.git/worktrees` metadata dirs, and leftover Cursor/cloud
-checkout names (`cursor/desktop-…`, `cursor-desktop-…`). Nested
+trees, `.git/worktrees` metadata dirs, leftover Cursor/cloud
+checkout names (`cursor/desktop-…`, `cursor-desktop-…`), isolated
+`~/.config/openchamber/chats` descendants, and the exact home folder. Nested
 herdr/subagent jsonl are children, not projects. `archive/`
 stays off the list. One unreadable folder or jsonl does not drop the
 rest. `activeProjectId` / `lastDirectory` are the most recently updated
