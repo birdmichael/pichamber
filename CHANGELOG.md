@@ -38,6 +38,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: the header hamburger now opens the app menu on the first click. Hovering its tooltip no longer eats that press.
 - Settings: Remote Instances, Git, Extensions, Skills Catalog, and Snippets now show a short page subtitle. Snippets Total matches the other lists, and Remote Instances no longer repeats its title or the empty SSH message.
 - Git: generated commit messages now match the repository's recent commit style and language, and generating a pull request description picks up the repo's own PR template when it has one instead of a fixed Summary/Why/Testing layout.
+- Settings/Desktop: adding an SSH remote now starts from hosts in your SSH config, with ports, install method, and passwords under Advanced. Each connection shows Connected, Connecting, or Needs attention — with the failure text and a resolve button. Disconnecting without keeping the server running now stops the remote Pichamber. Home-directory Pichamber binaries work; a missing remote kernel is reported before connect. A managed remote can also be published on that machine's network when you set a UI password.
 
 ## [1.0.1] - 2026-08-18
 

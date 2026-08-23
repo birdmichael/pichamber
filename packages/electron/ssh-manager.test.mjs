@@ -289,4 +289,176 @@ describe('ElectronSshManager', () => {
     });
     expect(settings.desktopHosts).toEqual([{ id: 'ssh-1', label: 'SSH Host', url: localUrl, apiUrl: localUrl, clientToken: 'ssh-client-token' }]);
   });
+
+  test('installs Pichamber into a home-owned npm prefix instead of the root-owned global one', async () => {
+    const commands = [];
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.resolveRemoteTool = async (_parsed, _controlPath, name) => (name === 'npm' ? '/usr/bin/npm' : null);
+    manager.runRemoteCommand = async (_parsed, _controlPath, script) => {
+      commands.push(script);
+      return '';
+    };
+
+    await manager.installOpenChamberManaged({ destination: 'user@example.test', args: [] }, '/tmp/control.sock', '1.2.3', 'auto');
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain('--prefix "$HOME/.pichamber/npm-global"');
+    expect(commands[0]).not.toMatch(/npm install -g @pichamber/);
+  });
+
+  test('lists every remote Pichamber binary with its reported version', async () => {
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.runRemoteCommand = async () => [
+      '/home/pi/.pichamber/npm-global/bin/pichamber\t1.2.3',
+      '/usr/bin/pichamber\t0.9.0',
+      '',
+    ].join('\n');
+
+    const candidates = await manager.remoteOpenChamberCandidates({ destination: 'user@example.test', args: [] }, '/tmp/control.sock');
+
+    expect(candidates).toEqual([
+      { binPath: '/home/pi/.pichamber/npm-global/bin/pichamber', version: '1.2.3' },
+      { binPath: '/usr/bin/pichamber', version: '0.9.0' },
+    ]);
+  });
+
+  test('starts the resolved Pichamber binary rather than whatever PATH exposes', async () => {
+    let started = '';
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.runRemoteCommand = async (_parsed, _controlPath, script) => {
+      started = script;
+      return '4321\n';
+    };
+
+    const instance = { id: 'ssh-1', auth: {}, remoteOpenchamber: { mode: 'managed' } };
+    const port = await manager.startRemoteServerManaged(
+      { destination: 'user@example.test', args: [] },
+      '/tmp/control.sock',
+      instance,
+      4321,
+      '/home/pi/.pichamber/npm-global/bin/pichamber',
+    );
+
+    expect(port).toBe(4321);
+    expect(started).toContain("'/home/pi/.pichamber/npm-global/bin/pichamber' serve");
+    expect(started).toContain('$HOME/.pichamber/npm-global/bin:');
+    expect(started).not.toContain('OPENCODE_BINARY=');
+  });
+
+  test('refuses to start when the remote machine has no Pichamber kernel', async () => {
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.runRemoteCommand = async () => {
+      throw new Error('should not start the server without a kernel');
+    };
+
+    await expect(manager.startRemoteServerManaged(
+      { destination: 'user@example.test', args: [] },
+      '/tmp/control.sock',
+      { id: 'ssh-1', auth: {}, remoteOpenchamber: { mode: 'managed' } },
+      4321,
+      '',
+    )).rejects.toThrow(/Pichamber is not installed/);
+  });
+
+  test('prefers a bun that only exists in the home directory over npm', async () => {
+    const commands = [];
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.resolveRemoteTool = async (_parsed, _controlPath, name) =>
+      (name === 'bun' ? '/home/pi/.bun/bin/bun' : '/usr/bin/npm');
+    manager.runRemoteCommand = async (_parsed, _controlPath, script) => {
+      commands.push(script);
+      return '';
+    };
+
+    await manager.installOpenChamberManaged({ destination: 'user@example.test', args: [] }, '/tmp/control.sock', '1.2.3', 'auto');
+
+    expect(commands).toEqual(["'/home/pi/.bun/bin/bun' add -g @pichamber/web@1.2.3"]);
+  });
+
+  test('stops a remote server it started through the CLI, not the authenticated HTTP route', async () => {
+    const scripts = [];
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    manager.runRemoteCommand = async (_parsed, _controlPath, script) => {
+      scripts.push(script);
+      return '';
+    };
+
+    await manager.stopRemoteServerBestEffort(
+      { destination: 'user@example.test', args: [] },
+      '/tmp/control.sock',
+      41777,
+      '/home/pi/.bun/bin/pichamber',
+    );
+
+    expect(scripts).toEqual(["'/home/pi/.bun/bin/pichamber' stop --port 41777"]);
+  });
+
+  test('publishes the remote server to its network only with a UI password', async () => {
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    let started = '';
+    manager.runRemoteCommand = async (_parsed, _controlPath, script) => {
+      started = script;
+      return '4321\n';
+    };
+
+    const parsed = { destination: 'user@example.test', args: [] };
+    const exposed = {
+      id: 'ssh-1',
+      auth: {},
+      remoteOpenchamber: { mode: 'managed', bindHost: '0.0.0.0' },
+    };
+
+    await expect(manager.startRemoteServerManaged(parsed, '/tmp/control.sock', exposed, 4321, '/bin/pichamber'))
+      .rejects.toThrow(/requires a UI password/);
+
+    const secured = {
+      ...exposed,
+      auth: { openchamberPassword: { enabled: true, value: 'remote-secret', store: 'settings' } },
+    };
+    await manager.startRemoteServerManaged(parsed, '/tmp/control.sock', secured, 4321, '/bin/pichamber');
+    expect(started).toContain('--hostname 0.0.0.0');
+  });
+
+  test('reads leftover download_release install method as auto', () => {
+    const manager = new ElectronSshManager({
+      settingsFilePath: path.join(os.tmpdir(), 'unused-settings.json'),
+      appVersion: '1.2.3',
+      emit: () => undefined,
+    });
+    const sanitized = manager.sanitizeInstance({
+      id: 'ssh-1',
+      sshCommand: 'ssh user@example.test',
+      remoteOpenchamber: { installMethod: 'download_release' },
+    });
+    expect(sanitized.remoteOpenchamber.installMethod).toBe('auto');
+    expect(sanitized.remoteOpenchamber.bindHost).toBe('127.0.0.1');
+  });
 });

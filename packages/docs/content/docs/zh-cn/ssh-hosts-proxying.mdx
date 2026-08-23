@@ -14,7 +14,7 @@ description: 在桌面应用中导入已保存的 SSH 主机并添加额外的 S
 OpenChamber 可以读取你本地 SSH config 中的主机，也就是 `ssh work-server` 这类命令使用的同一个地方。
 
 1. 打开 **Settings → Remote Instances**。
-2. 从 **Saved SSH hosts** 中选择一个主机。
+2. 选择 **Add SSH connection**，然后从 **From SSH config** 里挑一台主机。
 3. 如果主机是 pattern，输入真实目标，例如 `deploy@app.example.com`。
 4. 保存并连接。
 
@@ -22,7 +22,7 @@ OpenChamber 会用这个 SSH 命令创建 remote instance。当状态到达 **re
 
 ## 添加额外端口转发
 
-每个 remote instance 都有 **Port Forwards** 区域。当 SSH 连接一侧需要访问另一侧的端口时使用它。
+每个 remote instance 的额外端口转发在 **Advanced** 里。当 SSH 连接一侧需要访问另一侧的端口时使用它们。
 
 OpenChamber 支持三种转发类型：
 

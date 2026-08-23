@@ -371,6 +371,25 @@ describe('settings search', () => {
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });
 
+  test('finds desktop SSH add from SSH-config wording and hides it off Desktop', () => {
+    const getPageTitle = (page: string) => page;
+    const desktopResults = buildSettingsSearchResults({
+      query: 'ssh config',
+      runtimeCtx: { ...runtimeCtx, isDesktop: true, isWeb: false },
+      t,
+      getPageTitle,
+    });
+    const webResults = buildSettingsSearchResults({
+      query: 'ssh config',
+      runtimeCtx,
+      t,
+      getPageTitle,
+    });
+
+    expect(desktopResults.some((result) => result.id === 'remote-instances.add-ssh')).toBe(true);
+    expect(webResults.some((result) => result.id === 'remote-instances.add-ssh')).toBe(false);
+  });
+
   test('lands Feature Plugins search on each slot card', () => {
     const getPageTitle = (page: string) => page;
     const queries = [

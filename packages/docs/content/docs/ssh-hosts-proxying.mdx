@@ -14,15 +14,15 @@ Use **Settings → Remote Instances** in the desktop app to import saved SSH hos
 OpenChamber can read hosts from your local SSH config, the same place used by commands like `ssh work-server`.
 
 1. Open **Settings → Remote Instances**.
-2. Choose a host from **Saved SSH hosts**.
+2. Choose **Add SSH connection**, then pick a host under **From SSH config**.
 3. If the host is a pattern, enter the real destination, such as `deploy@app.example.com`.
 4. Save and connect.
 
-OpenChamber creates a remote instance using that SSH command. When it reaches **ready**, the remote OpenChamber UI opens in the desktop app.
+Pichamber creates a remote instance using that SSH command. When the row shows **Connected**, the remote Pichamber UI opens in the desktop app.
 
 ## Add extra port forwards
 
-Each remote instance has a **Port Forwards** section. Use it when something on one side of the SSH connection needs to reach a port on the other side.
+Each remote instance has extra port forwards under **Advanced**. Use them when something on one side of the SSH connection needs to reach a port on the other side.
 
 OpenChamber supports three forward types:
 
