@@ -2294,6 +2294,16 @@ export const createPiHost = ({
       if (modelRef) {
         await this.setSessionModel(sessionID, modelRef);
       }
+      const requestedThinking = typeof body.variant === 'string' ? body.variant.trim()
+        : typeof body.thinking === 'string' ? body.thinking.trim()
+        : '';
+      if (requestedThinking && THINKING_LEVELS.includes(requestedThinking)) {
+        try {
+          await this.setSessionThinking(sessionID, requestedThinking);
+        } catch {
+          // Keep the session's current thinking when the pin is unsupported.
+        }
+      }
       const text = extractPromptText(body.parts) || (typeof body.text === 'string' ? body.text : '');
       if (!text) {
         const error = new Error('Message must have at least one text part');

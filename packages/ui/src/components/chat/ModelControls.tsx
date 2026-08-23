@@ -364,7 +364,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 if (cancelled || !payload) {
                     return;
                 }
-                const nextThinking = parsePiThinkingLevel(payload.thinking);
+                const projectPin = parsePiThinkingLevel(useConfigStore.getState().currentVariant);
+                const nextThinking = projectPin ?? parsePiThinkingLevel(payload.thinking);
                 if (nextThinking) {
                     setPiThinking(nextThinking);
                 }
@@ -395,7 +396,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         if (!currentSessionIdForThinking) {
             setPiThinkingLevels(draftThinkingLevels.length > 0 ? draftThinkingLevels : undefined);
             if (draftThinkingLevels.length > 0) {
-                const nextThinking = clampPiThinkingLevel(piThinking, draftThinkingLevels);
+                const pinned = parsePiThinkingLevel(currentVariant);
+                const nextThinking = clampPiThinkingLevel(pinned ?? piThinking, draftThinkingLevels);
                 if (nextThinking) setPiThinking(nextThinking);
             }
             return;

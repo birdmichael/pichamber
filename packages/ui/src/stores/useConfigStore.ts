@@ -16,7 +16,8 @@ import { useDirectoryStore } from "@/stores/useDirectoryStore";
 import { useProjectsStore } from "@/stores/useProjectsStore";
 import { resolveProjectForSessionDirectory } from "@/lib/projectResolution";
 import { streamDebugEnabled } from "@/stores/utils/streamDebug";
-import { findCatalogMetadata } from "@/lib/model-catalog-capabilities";
+import { findCatalogMetadata, resolveCatalogThinkingLevels } from "@/lib/model-catalog-capabilities";
+import { parsePiThinkingLevel } from "@/components/chat/piThinking";
 import { parseModelIdentifier } from "@/lib/modelIdentifier";
 import { runtimeFetch } from "@/lib/runtime-fetch";
 import { markStartupTrace, measureStartupTrace } from "@/lib/startupTrace";
@@ -292,20 +293,24 @@ const resolveDefaultAgentModelSelection = ({
     agents,
     providers,
     projectDefaultModel,
+    projectDefaultVariant,
     settingsDefaultAgent,
     settingsDefaultModel,
     settingsDefaultVariant,
     opencodeDefaultAgent,
     opencodeDefaultModel,
+    modelsMetadata,
 }: {
     agents: Agent[];
     providers: ProviderWithModelList[];
     projectDefaultModel?: string;
+    projectDefaultVariant?: string;
     settingsDefaultAgent?: string;
     settingsDefaultModel?: string;
     settingsDefaultVariant?: string;
     opencodeDefaultAgent?: string;
     opencodeDefaultModel?: string;
+    modelsMetadata: Map<string, ModelMetadata>;
 }): DefaultAgentModelSelection => {
     if (agents.length === 0) {
         return { agentName: undefined };
@@ -318,9 +323,18 @@ const resolveDefaultAgentModelSelection = ({
         const model = providers
             .find((provider) => provider.id === providerId)
             ?.models.find((entry) => entry.id === modelId) as { variants?: Record<string, unknown> } | undefined;
-        return model?.variants && Object.prototype.hasOwnProperty.call(model.variants, variant)
-            ? variant
-            : undefined;
+        if (model?.variants && Object.prototype.hasOwnProperty.call(model.variants, variant)) {
+            return variant;
+        }
+        const parsed = parsePiThinkingLevel(variant);
+        if (!parsed) {
+            return undefined;
+        }
+        const metadata = findCatalogMetadata(modelsMetadata, providerId, modelId)
+            ?? (model
+                ? { id: modelId, providerId, reasoning: Boolean((model as { reasoning?: boolean }).reasoning) }
+                : undefined);
+        return resolveCatalogThinkingLevels(metadata).includes(parsed) ? parsed : undefined;
     };
 
     // --- Agent cascade ---
@@ -356,7 +370,9 @@ const resolveDefaultAgentModelSelection = ({
         if (parsed && hasProviderModel(providers, parsed.providerId, parsed.modelId)) {
             providerId = parsed.providerId;
             modelId = parsed.modelId;
-            variant = resolveVariant(providerId, modelId, projectDefaultModel ? undefined : settingsDefaultVariant);
+            // A project default carries its own variant; the settings variant
+            // belongs to the settings model and must not leak onto it.
+            variant = resolveVariant(providerId, modelId, projectDefaultModel ? projectDefaultVariant : settingsDefaultVariant);
         }
     }
 
@@ -1100,7 +1116,7 @@ interface ConfigStore {
     cycleCurrentVariant: () => void;
     getCurrentModelVariants: () => string[];
     setAgent: (agentName: string | undefined) => void;
-    applyDefaultModelAgentSelection: (options?: { projectDefaultModel?: string }) => void;
+    applyDefaultModelAgentSelection: (options?: { projectDefaultModel?: string; projectDefaultVariant?: string }) => void;
     applyOpenCodeConfigDefaults: (directory?: string | null, source?: string, config?: Config) => void;
     setSelectedProvider: (providerId: string) => void;
     setSettingsDefaultModel: (model: string | undefined) => void;
@@ -2240,6 +2256,7 @@ export const useConfigStore = create<ConfigStore>()(
                                 settingsDefaultVariant: openChamberDefaults.defaultVariant,
                                 opencodeDefaultAgent,
                                 opencodeDefaultModel,
+                                modelsMetadata: get().modelsMetadata,
                             });
                             const resolvedAgentName = resolvedDefault.agentName ?? safeAgents[0].name;
                             const resolvedProviderId = resolvedDefault.providerId;
@@ -2596,6 +2613,7 @@ export const useConfigStore = create<ConfigStore>()(
                         settingsDefaultAgent,
                         opencodeDefaultAgent,
                         opencodeDefaultModel,
+                        modelsMetadata,
                     } = get();
 
                     if (agents.length === 0 || providers.length === 0) {
@@ -2611,11 +2629,13 @@ export const useConfigStore = create<ConfigStore>()(
                         agents,
                         providers,
                         projectDefaultModel: options?.projectDefaultModel,
+                        projectDefaultVariant: options?.projectDefaultVariant,
                         settingsDefaultAgent,
                         settingsDefaultModel,
                         settingsDefaultVariant,
                         opencodeDefaultAgent,
                         opencodeDefaultModel,
+                        modelsMetadata,
                     });
 
                     if (!resolvedAgentName) {
@@ -2730,6 +2750,7 @@ export const useConfigStore = create<ConfigStore>()(
                             settingsDefaultVariant: state.settingsDefaultVariant,
                             opencodeDefaultAgent,
                             opencodeDefaultModel,
+                            modelsMetadata: state.modelsMetadata,
                         });
 
                         if (!resolved.agentName) {

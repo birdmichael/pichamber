@@ -390,6 +390,25 @@ describe('settings search', () => {
     expect(webResults.some((result) => result.id === 'remote-instances.add-ssh')).toBe(false);
   });
 
+  test('finds project default model and thinking on Settings → Projects', () => {
+    const getPageTitle = (page: string) => page;
+    const modelResults = buildSettingsSearchResults({
+      query: 'project model',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+    const thinkingResults = buildSettingsSearchResults({
+      query: 'project thinking',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t,
+      getPageTitle,
+    });
+
+    expect(modelResults.some((result) => result.id === 'projects.default-model')).toBe(true);
+    expect(thinkingResults.some((result) => result.id === 'projects.default-thinking')).toBe(true);
+  });
+
   test('lands Feature Plugins search on each slot card', () => {
     const getPageTitle = (page: string) => page;
     const queries = [

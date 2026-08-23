@@ -644,6 +644,7 @@ export interface ProjectEntry {
   iconBackground?: string | null;
   color?: string | null;
   defaultModel?: string;
+  defaultVariant?: string;
   addedAt?: number;
   lastOpenedAt?: number;
   sidebarCollapsed?: boolean;

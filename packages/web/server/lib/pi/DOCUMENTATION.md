@@ -89,9 +89,16 @@ live session: `thinkingLevel` plus `getAvailableThinkingLevels()`.
 the first available). The composer thinking chip renders `available`,
 not the full seven-level catalog. A new-session draft with no session id
 uses models.dev `reasoning_options` for the selected model id (same
-slug lookup as vision). Missing/empty catalog effort keeps the full
-list. Live `available` wins once a session exists. Do not invent
-vendor `thinkingLevelMap` from `/v1/models`.
+slug lookup as vision). Missing/empty catalog effort hides the control —
+do not invent seven levels. Live `available` wins once a session exists.
+Do not invent vendor `thinkingLevelMap` from `/v1/models`.
+
+`promptAsync` applies `body.variant` or `body.thinking` through
+`setSessionThinking` when the value is a known Pi level. An unsupported
+pin keeps the session's current thinking. Settings → Projects stores the
+pin as official `project.defaultVariant` next to `defaultModel`; map it
+through that existing project setting. Do not write it to global
+`PATCH /api/pi/defaults`.
 
 ## Desktop `ctx.ui`
 
@@ -219,7 +226,8 @@ still listed. Nothing is auto-installed. GET paths do not write
 
 New-session `model` / thinking use `settings.json` `defaultProvider` +
 `defaultModel` / `defaultThinkingLevel` only when `pichamber.json` has no
-pin. Settings → Extensions packages lists those configured package names
+pin. A project `defaultModel` / `defaultVariant` wins for new chats in
+that project. Settings → Extensions packages lists those configured package names
 (and project `.pi/settings.json` packages when that file exists), using
 `featurePluginSourceIdentity`. Do not walk `{agentDir}/npm/node_modules`.
 
