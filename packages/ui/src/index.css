@@ -754,31 +754,59 @@ html:not(.dark) .chat-scroll {
 /* Model/agent controls: progressively collapse labels as the row narrows.
    Hide priority (most aggressive first → most resilient last): agent, variant, model.
 
-   Desktop (Electron/web, not VS Code): a typical ~1280 window with Session,
-   Walkthrough, or notes open leaves this container around 10–20rem. Thinking
-   and model names must stay readable there. Hide those labels only as a last
-   resort; long model names still truncate/marquee. Leftover OpenCode agent
-   still hides first. Agent/Plan is a separate chip and is not collapsed here. */
+   Desktop (Electron/web, not VS Code): a typical ~1280 window with a right
+   panel (~355px chat column) must keep thinking + model as non-overlapping
+   text. Thinking and Agent/Plan keep their natural width. The model chip is
+   the flex child that shrinks; its name truncates/marquees inside
+   overflow:hidden so labels cannot paint onto the next chip. Icon-only is
+   last resort only. Leftover OpenCode agent still hides first. */
 @container model-controls (max-width: 22rem) {
   :root:not(.vscode-runtime) .model-controls__agent-label {
     display: none;
   }
 }
 
-@container model-controls (max-width: 20rem) {
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
+  overflow: hidden;
+}
+
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
+  min-width: 0;
+  overflow: hidden;
+}
+
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .model-controls__model-trigger {
+  max-width: 100%;
+}
+
+@container model-controls (max-width: 22rem) {
   :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
-    column-gap: 0.5rem;
+    column-gap: 0.375rem;
   }
 }
 
-/* Floor the label boxes so flex shrink cannot erase the words before the
-   last-resort hide rules fire. */
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
 :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-label {
   flex-shrink: 0;
 }
 
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-trigger {
+  min-width: 0;
+  overflow: hidden;
+}
+
 :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
-  min-width: 4.5rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
+  max-width: 100%;
 }
 
 @container model-controls (max-width: 8rem) {
