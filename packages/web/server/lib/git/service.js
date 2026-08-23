@@ -2607,9 +2607,52 @@ export function parseBranchCreationSource(reflogText) {
 }
 
 /**
+ * True when `source` names this branch itself — locally or as a remote-tracking
+ * copy (`origin/<branch>`, `refs/remotes/<remote>/<branch>`).
+ *
+ * A fetched feature worktree records `branch: Created from origin/<same-branch>`.
+ * That is not a parent branch: comparing against it diffs HEAD against itself
+ * (or only unpushed commits) and silently shows zero changes. Callers must
+ * treat it as unknown and ask the user to pick a real base.
+ *
+ * A differently named parent that happens to share HEAD's commit (a brand-new
+ * branch created from `origin/main`) is NOT own-branch: Git recorded a real
+ * parent, and the empty range vs that parent is correct.
+ */
+export function isOwnBranchCreationSource(source, branchName, remotes = ['origin']) {
+  const branch = String(branchName || '').replace(/^refs\/heads\//, '').trim();
+  const ref = String(source || '').replace(/^refs\/heads\//, '').trim();
+  if (!branch || !ref) return false;
+  if (ref === branch) return true;
+  const remoteNames = Array.isArray(remotes) && remotes.length > 0 ? remotes : ['origin'];
+  for (const remote of remoteNames) {
+    const name = String(remote || '').trim();
+    if (!name) continue;
+    if (ref === `${name}/${branch}` || ref === `refs/remotes/${name}/${branch}`) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function listRemoteNames(git) {
+  try {
+    const remotes = await git.getRemotes();
+    const names = (Array.isArray(remotes) ? remotes : [])
+      .map((remote) => (typeof remote === 'string' ? remote : remote?.name))
+      .map((name) => String(name || '').trim())
+      .filter(Boolean);
+    return names.length > 0 ? names : ['origin'];
+  } catch {
+    return ['origin'];
+  }
+}
+
+/**
  * Resolve the branch the given branch was created from, from its reflog.
  * Returns { base: null } when git has no authoritative record (clone, detached
- * start, reflog expired) — callers must not fall back to main/master.
+ * start, reflog expired, or the recorded source is this branch / its own
+ * upstream) — callers must not fall back to main/master.
  *
  * Git operations stay in the workspace directory passed by the caller.
  */
@@ -2628,8 +2671,9 @@ export async function getBranchBase(directory, branch) {
     return { base: null };
   }
 
+  const remotes = await listRemoteNames(git);
   const source = parseBranchCreationSource(reflog);
-  if (!source || source === branchName) {
+  if (!source || isOwnBranchCreationSource(source, branchName, remotes)) {
     return { base: null };
   }
 

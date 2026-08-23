@@ -28,6 +28,7 @@ import {
   getDiff,
   getFileDiff,
   parseBranchCreationSource,
+  isOwnBranchCreationSource,
   getBranchBase,
   getRangeFiles,
 } from './service.js';
@@ -1221,12 +1222,45 @@ describe.runIf(canRunGit())('getBranchBase', () => {
     expect(result.base).toBe('origin/react');
   });
 
+  it('returns null when the creation source is the branch own remote-tracking ref', async () => {
+    // Desktop worktrees of a fetched PR branch record
+    // `branch: Created from origin/<same-branch>`. That is not a parent.
+    const { repository } = createRepositoryWithRemote();
+    runGit(repository, ['checkout', '-b', 'feature']);
+    runGit(repository, ['push', '-u', 'origin', 'feature']);
+    runGit(repository, ['checkout', 'next']);
+    runGit(repository, ['branch', '-D', 'feature']);
+    runGit(repository, ['checkout', '-b', 'feature', 'origin/feature']);
+
+    const result = await getBranchBase(repository, 'feature');
+
+    expect(result.base).toBeNull();
+  });
+
   it('returns null when git has no named creation source', async () => {
     const { repository } = createRepositoryWithRemote();
     // The initial branch was created by `git init -b`, not from a named ref.
     const result = await getBranchBase(repository, 'next');
 
     expect(result.base).toBeNull();
+  });
+});
+
+describe('isOwnBranchCreationSource', () => {
+  it('rejects the branch itself and origin/<same-branch>', () => {
+    expect(isOwnBranchCreationSource(
+      'origin/cursor/branch-vs-base-diff-de94',
+      'cursor/branch-vs-base-diff-de94'
+    )).toBe(true);
+    expect(isOwnBranchCreationSource(
+      'cursor/branch-vs-base-diff-de94',
+      'cursor/branch-vs-base-diff-de94'
+    )).toBe(true);
+  });
+
+  it('keeps a differently named parent even when HEAD still matches that commit', () => {
+    expect(isOwnBranchCreationSource('origin/react', 'feature')).toBe(false);
+    expect(isOwnBranchCreationSource('origin/main', 'feature')).toBe(false);
   });
 });
 

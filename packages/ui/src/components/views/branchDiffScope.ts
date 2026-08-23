@@ -63,6 +63,31 @@ export const coerceDiffScope = <T extends string>(
 ): T | 'working' => (scope === 'branch' && !branchScopeAvailable ? 'working' : scope);
 
 /**
+ * True when a reflog creation source names this branch itself — locally or as
+ * a remote-tracking copy (`origin/<branch>`). A worktree started from
+ * `origin/<same-branch>` records that as the creation source, but comparing
+ * against it diffs the branch against itself and silently shows 0 changes.
+ *
+ * A differently named parent (`origin/main`) is usable even when HEAD still
+ * points at that commit: Git recorded a real parent.
+ */
+export const isOwnBranchCreationSource = (
+  source: string | null,
+  currentBranch: string | null,
+  remotes: readonly string[] = ['origin']
+): boolean => {
+  const branch = currentBranch?.replace(/^refs\/heads\//, '').trim() ?? '';
+  const ref = source?.replace(/^refs\/heads\//, '').trim() ?? '';
+  if (!branch || !ref) return false;
+  if (ref === branch) return true;
+  const remoteNames = remotes.length > 0 ? remotes : ['origin'];
+  return remoteNames.some((remote) => {
+    const name = remote.trim();
+    return Boolean(name) && (ref === `${name}/${branch}` || ref === `refs/remotes/${name}/${branch}`);
+  });
+};
+
+/**
  * Identity of one `base...head` range in one repository. Range-cache entries
  * are only valid within a single range: the same file path can carry different
  * content under a different base or head, so a cache keyed by path alone leaks

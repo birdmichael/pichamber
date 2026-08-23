@@ -7,9 +7,40 @@ import {
     coerceDiffScope,
     isBranchScopeAvailable,
     isBranchScopeDefinitelyUnavailable,
+    isOwnBranchCreationSource,
     useRangeKeyedCache,
     useBoundedDirectoryRetry,
 } from './branchDiffScope';
+
+describe('isOwnBranchCreationSource', () => {
+    test('rejects the branch itself and its origin-tracking copy', () => {
+        expect(isOwnBranchCreationSource('cursor/branch-vs-base-diff-de94', 'cursor/branch-vs-base-diff-de94')).toBe(true);
+        expect(isOwnBranchCreationSource('origin/cursor/branch-vs-base-diff-de94', 'cursor/branch-vs-base-diff-de94')).toBe(true);
+        expect(isOwnBranchCreationSource(
+            'refs/remotes/origin/cursor/branch-vs-base-diff-de94',
+            'cursor/branch-vs-base-diff-de94'
+        )).toBe(true);
+    });
+
+    test('keeps a differently named parent, including origin/main', () => {
+        // A brand-new branch created from origin/main still has HEAD at that
+        // commit; the source is a real parent and must stay usable.
+        expect(isOwnBranchCreationSource('origin/main', 'cursor/branch-vs-base-diff-de94')).toBe(false);
+        expect(isOwnBranchCreationSource('main', 'feature')).toBe(false);
+        expect(isOwnBranchCreationSource('origin/react', 'feature')).toBe(false);
+    });
+
+    test('honors a non-origin remote name when provided', () => {
+        expect(isOwnBranchCreationSource('upstream/feature', 'feature', ['upstream'])).toBe(true);
+        expect(isOwnBranchCreationSource('upstream/feature', 'feature', ['origin'])).toBe(false);
+    });
+
+    test('rejects empty or missing names', () => {
+        expect(isOwnBranchCreationSource(null, 'feature')).toBe(false);
+        expect(isOwnBranchCreationSource('origin/feature', null)).toBe(false);
+        expect(isOwnBranchCreationSource('', 'feature')).toBe(false);
+    });
+});
 
 describe('coerceDiffScope', () => {
     test('keeps the branch scope while it is offered', () => {

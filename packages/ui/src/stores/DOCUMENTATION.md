@@ -168,8 +168,9 @@ reuses the choice instead of asking again.
 - Keys are `runtime + directory + branch`. A base picked for one feature branch
   is not an answer for another branch of the same repository.
 - The store is bounded (100 entries) and persisted. It is not live git
-  authority: reflog detection still wins when git knows the source, and an
-  explicit override only outranks a missing detection.
+  authority. DiffView uses an explicit override when one exists; otherwise it
+  uses the reflog source. A source that names this branch or `origin/<branch>`
+  is treated as missing detection so the one-time picker can run.
 - Do not guess `main`/`master` when both detection and override are empty.
 
 ### `useGitHubPrStatusStore.ts`

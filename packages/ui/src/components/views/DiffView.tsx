@@ -4,7 +4,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useGitStore, useGitStatus, useIsGitRepo, useGitLoadingStatus } from '@/stores/useGitStore';
 import { useGitBaseBranchStore, gitBaseBranchEntryKey } from '@/stores/useGitBaseBranchStore';
-import { coerceDiffScope, branchRangeKey, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
+import { coerceDiffScope, branchRangeKey, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, isOwnBranchCreationSource, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
 import { getBranchBase, getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { cn } from '@/lib/utils';
@@ -1233,8 +1233,17 @@ export const DiffView: React.FC<DiffViewProps> = ({
     }, [currentBranch, effectiveDirectory, showBranchOption]);
 
     // Explicit user choice outranks the detected source; both are real answers
-    // from git or the user — never a main/master guess.
-    const branchBase = baseOverride ?? detectedBranchBase;
+    // from git or the user — never a main/master guess. A detected source that
+    // names this branch (or origin/<this-branch>) is not a parent: treat it as
+    // unknown so the one-time picker appears instead of a 0-file self-diff.
+    const usableDetectedBranchBase = isOwnBranchCreationSource(
+        detectedBranchBase,
+        currentBranch,
+        branches?.defaultBranches ? Object.keys(branches.defaultBranches) : ['origin']
+    )
+        ? null
+        : detectedBranchBase;
+    const branchBase = baseOverride ?? usableDetectedBranchBase;
 
     const [branchFiles, setBranchFiles] = React.useState<GitRangeFileEntry[] | null>(null);
     const [branchFilesError, setBranchFilesError] = React.useState<string | null>(null);
