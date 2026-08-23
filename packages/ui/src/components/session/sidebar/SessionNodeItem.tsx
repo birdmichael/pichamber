@@ -15,6 +15,7 @@ import { dropdownMenuItemClass, dropdownMenuPopupClass, dropdownMenuSeparatorCla
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
+import { isManagedChatDirectory } from '@/lib/chatDirectories';
 import { toast } from '@/components/ui';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,6 +33,7 @@ import { nodeContainsSessionId, nodeHasPinnedMembershipChange, selectQuestionBad
 import type { SessionNodeChildRenderExtras, SessionNodeRenderExtras } from './sessionNodeItemUtils';
 import type { SessionNode } from './types';
 import { formatProjectLabel, formatSessionCompactDateLabel, formatSessionDateLabel, normalizePath, renderHighlightedText } from './utils';
+import { useDirectoryStore as useDirectoryRootStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { getGitHubPrStatusKey, usePrVisualSummary } from '@/stores/useGitHubPrStatusStore';
@@ -400,6 +402,13 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   const sessionDirectory =
     normalizePath((session as Session & { directory?: string | null }).directory ?? null)
     ?? normalizePath(groupDirectory ?? null);
+  const homeDirectory = useDirectoryRootStore((state) => state.homeDirectory);
+  const nodeProjects = useProjectsStore((state) => state.projects);
+  const openedProjectPaths = React.useMemo(
+    () => new Set(nodeProjects.map((project) => project.path).filter(Boolean)),
+    [nodeProjects],
+  );
+  const isChatSession = isManagedChatDirectory(sessionDirectory, homeDirectory, openedProjectPaths);
   // Multi-select scope: sessions are flat per project, so selection groups by
   // project (falling back to the directory when no project is known) — a
   // selection must survive mixing sessions from different worktrees.
@@ -1000,7 +1009,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
           </Item>
         </>
       ) : null}
-      {!isSubtaskSession && !archivedBucket && !isVSCode ? (
+      {!isSubtaskSession && !archivedBucket && !isVSCode && !isChatSession ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <span className="block">

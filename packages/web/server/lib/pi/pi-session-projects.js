@@ -69,6 +69,13 @@ export const isSkippedPiSessionProjectCwd = (cwd, options = {}) => {
     }
   }
 
+  if (normalized.includes('/.config/openchamber/chats')) return true;
+
+  const home = typeof options.home === 'string' && options.home.trim()
+    ? pathMod.resolve(options.home)
+    : pathMod.resolve(os.homedir());
+  if (resolved === home) return true;
+
   return false;
 };
 

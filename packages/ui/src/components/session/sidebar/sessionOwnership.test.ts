@@ -78,6 +78,21 @@ describe('createSessionOwnershipIndex', () => {
     ]);
   });
 
+  test('does not assign managed chat directories to a parent home project', () => {
+    const ownership = createSessionOwnershipIndex(
+      [
+        { id: 'chat', directory: '/Users/tester/.config/openchamber/chats/2026-08-21/session-a' },
+        { id: 'home-project', directory: '/Users/tester/src' },
+      ] as Session[],
+      [{ id: 'home', normalizedPath: '/Users/tester' }],
+      new Map(),
+      false,
+    );
+
+    expect(ownership.bySessionId.has('chat')).toBe(false);
+    expect(ownership.bySessionId.get('home-project')?.projectId).toBe('home');
+  });
+
   test('requires exact workspace directories in VS Code', () => {
     const ownership = createSessionOwnershipIndex(
       [

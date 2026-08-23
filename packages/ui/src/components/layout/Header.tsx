@@ -23,6 +23,8 @@ import { useSessionWorktreeStore } from '@/sync/session-worktree-store';
 import { formatSessionWorktreeBadge } from '@/sync/session-worktree-contract';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSession, useSessionMessagesResolved } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
+import { isManagedChatDirectory } from '@/lib/chatDirectories';
+import { useDirectoryStore as useDirectoryRootStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
 import { useGitBranchLabel, useGitStore } from '@/stores/useGitStore';
@@ -539,6 +541,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getContextUsage = useSessionUIStore((state) => state.getContextUsage);
   const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
+  const draftTarget = useSessionUIStore((state) => state.newSessionDraft?.target ?? 'chat');
+  const homeDirectory = useDirectoryRootStore((state) => state.homeDirectory);
+  const headerProjects = useProjectsStore((state) => state.projects);
+  const openedProjectPaths = React.useMemo(
+    () => new Set(headerProjects.map((project) => project.path).filter(Boolean)),
+    [headerProjects],
+  );
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const currentSessionMessagesResolved = useSessionMessagesResolved(currentSessionId ?? '');
   const currentSessionStatus = useGlobalSessionStatus(currentSessionId ?? '');
@@ -1138,7 +1147,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Whether the title carries a second line under it. Hoisted because the
   // session menu's vertical alignment depends on the same answer.
-  const showHeaderMetaRow = !workStatusPanelVisible
+  const isChatContext = isNewSessionDraftOpen
+    ? draftTarget === 'chat'
+    : isManagedChatDirectory(sessionDirectory, homeDirectory, openedProjectPaths);
+  const showHeaderMetaRow = !isChatContext && !workStatusPanelVisible
     && Boolean(activeProjectLabel || currentBranchLabel || (!isNewSessionDraftOpen && worktreeBadgeKind));
 
 
@@ -2209,7 +2221,7 @@ export const Header: React.FC<HeaderProps> = ({
                       )
                     ) : null}
                     <DropdownMenuItem onClick={() => void exportCurrentSession()}><Icon name="download" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.exportMarkdown')}</DropdownMenuItem>
-                    {!isVSCode && currentSession && !currentSession.parentId ? (
+                    {!isVSCode && !isChatContext && currentSession && !currentSession.parentId ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="block">

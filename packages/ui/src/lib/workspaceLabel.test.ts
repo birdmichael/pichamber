@@ -67,13 +67,32 @@ describe('resolveWelcomeWorkspaceLabel', () => {
     })).toBe('pichamber');
   });
 
-  test('existing session without a matching project still formats home as ~', () => {
+  test('home session that is not an opened project is a chat with no workspace label', () => {
     expect(resolveWelcomeWorkspaceLabel({
       projects: [pichamberProject],
       homeDirectory: HOME,
       sessionDirectory: HOME,
       preferSessionProject: true,
-    })).toBe('~');
+    })).toBeNull();
+  });
+
+  test('chat draft has no workspace label', () => {
+    expect(resolveWelcomeWorkspaceLabel({
+      projects,
+      homeDirectory: HOME,
+      draftProject: { id: 'openchamber:chats', path: '', kind: 'chat' },
+      preferSessionProject: false,
+    })).toBeNull();
+  });
+
+  test('managed chat directory does not inherit a parent home project label', () => {
+    expect(resolveWelcomeWorkspaceLabel({
+      projects,
+      homeDirectory: HOME,
+      sessionDirectory: `${HOME}/.config/openchamber/chats/2026-08-21/session-a`,
+      draftProject: homeProject,
+      preferSessionProject: true,
+    })).toBeNull();
   });
 
   test('new-session draft uses the selected draft project', () => {
