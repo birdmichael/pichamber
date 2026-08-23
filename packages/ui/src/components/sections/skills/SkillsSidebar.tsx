@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { useSkillsStore, type DiscoveredSkill } from '@/stores/useSkillsStore';
+import { skillListLabel, useSkillsStore, type DiscoveredSkill } from '@/stores/useSkillsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
@@ -447,6 +447,7 @@ const SkillListItem: React.FC<SkillListItemProps> = ({
 }) => {
   const { t } = useI18n();
   const isMobile = isMobileDeviceViaCSS();
+  const displayName = skillListLabel(skill);
   const sourceLabel = t(skillSourceBadgeKey(skill.source));
   const badgeClassName = 'typography-micro text-muted-foreground bg-[var(--surface-muted)] px-1 rounded flex-shrink-0 leading-none pb-px border border-[var(--interactive-border)]/50';
   const isBuiltIn = isBuiltInSkill(skill);
@@ -472,17 +473,19 @@ const SkillListItem: React.FC<SkillListItemProps> = ({
   );
   return (
     <ContextMenu open={!isBuiltIn && isContextMenuOpen} onOpenChange={setIsContextMenuOpen}>
-      <ContextMenuTrigger render={<div className={cn('group relative flex items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover', skill.injected === false && 'opacity-70')} onContextMenu={!isMobile && !isBuiltIn ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
+      <ContextMenuTrigger render={<div className={cn('group relative flex w-full min-w-0 items-center rounded-md px-1.5 py-1 transition-all duration-200 select-none', isSelected ? 'bg-interactive-selection' : 'hover:bg-interactive-hover', skill.injected === false && 'opacity-70')} onContextMenu={!isMobile && !isBuiltIn ? (e) => { e.preventDefault(); setIsContextMenuOpen(true); } : undefined} />}>
       <div className="flex min-w-0 flex-1 items-center">
         <button
           onClick={onSelect}
-          className="flex min-w-0 flex-1 flex-col gap-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           tabIndex={0}
+          title={displayName || undefined}
         >
-          <div className="flex items-center gap-1.5">
-            <span className="typography-ui-label font-normal truncate text-foreground">
-              {skill.name}
-            </span>
+          {/* Name is its own line so flex-shrink-0 badges cannot collapse it in the 280px split sidebar. */}
+          <span className="min-w-0 w-full truncate typography-ui-label font-normal text-foreground">
+            {displayName}
+          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
             <span className={badgeClassName}>
               {skill.scope}
             </span>
