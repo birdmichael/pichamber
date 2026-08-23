@@ -270,14 +270,21 @@ function TooltipContent({
   return (
     <TooltipPartBoundary>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={sideOffset} side={side} align={align} className="z-50">
+        <BaseTooltip.Positioner
+          sideOffset={sideOffset}
+          side={side}
+          align={align}
+          className="pointer-events-none z-50"
+        >
           <BaseTooltip.Popup
             data-slot="tooltip-content"
             className={cn(
               // data-instant is set when moving between grouped tooltips
               // (shared TooltipProvider): reposition without replaying the
               // full exit/enter animation.
-              "oc-glass-tooltip text-[var(--surface-elevated-foreground)] border border-border/60 transition-all duration-150 ease-out data-[starting-style]:opacity-0 data-[starting-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[instant]:transition-none data-[instant]:duration-0 z-50 w-fit origin-[var(--transform-origin)] rounded-xl px-3 py-1.5 typography-meta text-balance overflow-hidden",
+              // pointer-events-none keeps the hover surface from eating the
+              // first click on the trigger (titlebar hamburger / settings gear).
+              "oc-glass-tooltip pointer-events-none text-[var(--surface-elevated-foreground)] border border-border/60 transition-all duration-150 ease-out data-[starting-style]:opacity-0 data-[starting-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[instant]:transition-none data-[instant]:duration-0 z-50 w-fit origin-[var(--transform-origin)] rounded-xl px-3 py-1.5 typography-meta text-balance overflow-hidden",
               className
             )}
             style={{ ...style }}
