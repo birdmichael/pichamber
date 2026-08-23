@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn, getModifierLabel } from '@/lib/utils';
 import { useUIStore } from '@/stores/useUIStore';
+import { useSettingsDirectory } from '@/hooks/useSettingsDirectory';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { filterVisibleAgents, useAgentsStore } from '@/stores/useAgentsStore';
 import { useCommandsStore } from '@/stores/useCommandsStore';
@@ -297,23 +298,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   }, [visiblePages]);
 
   const activeProjectId = useProjectsStore((state) => state.activeProjectId);
+  const settingsDirectory = useSettingsDirectory();
 
-  // Load stores when project changes or when a page becomes active.
+  // Load stores when the settings project changes or a page becomes active.
   React.useEffect(() => {
     if (!isSettingsDialogOpen && !runtimeCtx.isVSCode && !isWindowed) {
       return;
     }
 
     if (settingsSlug === 'agents') {
-      void useAgentsStore.getState().loadAgents();
+      void useAgentsStore.getState().loadAgents(settingsDirectory);
       return;
     }
     if (settingsSlug === 'commands') {
-      void useCommandsStore.getState().loadCommands();
+      void useCommandsStore.getState().loadCommands(settingsDirectory);
       return;
     }
     if (settingsSlug === 'mcp') {
-      void useMcpConfigStore.getState().loadMcpConfigs();
+      void useMcpConfigStore.getState().loadMcpConfigs({ directory: settingsDirectory });
       return;
     }
     if (settingsSlug === 'plugins') {
@@ -321,13 +323,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       return;
     }
     if (settingsSlug === 'skills.installed' || settingsSlug === 'skills.catalog') {
-      void useSkillsStore.getState().loadSkills();
+      void useSkillsStore.getState().loadSkills(settingsDirectory);
       void useSkillsCatalogStore.getState().loadCatalog();
     }
     if (settingsSlug === 'snippets') {
       void useSnippetsStore.getState().loadSnippets();
     }
-  }, [activeProjectId, isSettingsDialogOpen, isWindowed, runtimeCtx.isVSCode, settingsSlug]);
+    // `activeProjectId` still matters: the settings directory follows the active
+    // project until the user picks another one in the Settings selector.
+  }, [activeProjectId, isSettingsDialogOpen, isWindowed, runtimeCtx.isVSCode, settingsDirectory, settingsSlug]);
 
   const openPage = React.useCallback((slug: SettingsPageSlug) => {
     setSettingsPage(slug);

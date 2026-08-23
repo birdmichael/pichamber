@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: the project selector on Providers, Agents, MCP, Commands and Skills now only changes what those pages show. It used to switch the whole app, so opening another project's configuration moved your chat, session list and file tree with it.
+- Settings/General: changing the default model or agent no longer repoints an open chat that already carries a model you picked for it. Chats following the default still switch immediately.
 - Chat: app links such as `spotify://` now ask before opening another app, and you can trust a scheme in Settings on this device. File paths in messages open from the session's project even if you last browsed another project. On Desktop, files opened from outside the workspace stay readable after their temporary access expires.
 - **Diff:** the context-panel diff can now show every change on the current branch against its base branch. Pichamber detects the base when Git knows it, or lets you choose one once when it does not — including a worktree started from the branch's own remote, which is not treated as the base. Desktop Walkthrough stays in the same rail and can review that branch range.
 - Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.

@@ -217,6 +217,38 @@ These rules are important. Breaking them tends to reintroduce idle CPU churn, st
 9. Global session refresh must remain bounded and failure-isolated per directory.
 10. Global session cache must not drive live activity indicators or message-loading state.
 
+### Configuration stores and the Settings directory
+
+`useAgentsStore`, `useCommandsStore`, `useSkillsStore`, `useMcpConfigStore` and
+the provider half of `useConfigStore` describe **one project's configuration**.
+Two surfaces read them at once: the app (chat, autocompletes, pickers), which
+wants the active project, and Settings, whose own project selector may point
+somewhere else.
+
+Each of them therefore keeps two things:
+
+- a per-directory map (`agentsByDirectory`, `commandsByDirectory`,
+  `skillsByDirectory`, `serversByDirectory`, `directoryScoped`);
+- a flat mirror (`agents`, `commands`, `skills`, `mcpServers`, `providers`) that
+  tracks the **active** project only.
+
+Every loader and mutation takes an explicit directory; omitting it means the
+active project, which is what non-Settings callers pass. A load for another
+directory writes the map and leaves the mirror alone, so browsing another
+project in Settings cannot change what chat sees. Components select through
+`selectAgentsForDirectory` / `selectCommandsForDirectory` /
+`selectSkillsForDirectory` / `selectMcpServersForDirectory` /
+`selectProvidersForDirectory`, which return stored arrays.
+
+Settings resolves its directory through `useSettingsDirectory`, backed by
+`useUIStore.settingsProjectPath`. That selection is Settings-local and not
+persisted: it follows the active project until the user picks another one. The
+Settings project selector must never call `setActiveProject` — that relocates
+the chat, the session list and the file tree.
+
+Failure is still not empty: a failed load restores that directory's previous
+list rather than clearing it.
+
 ## Selector Rules
 
 Use leaf selectors.
