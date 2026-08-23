@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Chat/Desktop:** on Pi, type `/btw` plus a question to ask off-topic in a temporary session forked from the current chat. The answer streams in a panel above the composer. Collapse it, keep it as a full session, or discard it. The temp session stays out of the sidebar until Keep.
+- Sidebar: switch between the full project list and a focused view of one project. Sessions created outside Pichamber now also appear in the sidebar and Recent list without a page refresh.
 - Chat/Desktop: an empty session under your home folder now says "What are we working on in ~?" like the sidebar, instead of the raw folder name. An opened project still uses that project's name.
 - Desktop: Linux and Windows chrome now uses File Manager / File Explorer, Alt, and Ctrl — including `Ctrl+,` in the header menu — instead of Finder, ⌥, and ⌘. macOS still shows Finder, ⌥, and ⌘.
 - Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.
@@ -17,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Chat/Desktop: opening Session, Walkthrough, or notes still shows the full composer helper placeholder (`@` files/agents, `/` commands and skills, `#` snippets) instead of the short helpers stub.
 - Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the title and starter chips hide and the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Chat/Desktop: `/run` in the command menu now says it runs a subagent as a one-shot workflow. Longer descriptions wrap onto a second line instead of cutting off mid-word. Prefix search and the model/thinking chips are unchanged.
+- Chat/Desktop: in the expanded composer, Enter now starts a new line and Cmd/Ctrl+Enter sends, so a long prompt is harder to send by accident. The compact composer still sends on Enter.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
 - Settings: an already-installed Feature Plugin no longer shows a live Install button next to the Installed badge. Uninstall stays.
@@ -30,6 +32,7 @@ All notable changes to this project will be documented in this file.
 - Settings/Desktop: External Tunnel keeps the missing cloudflared warning on Quick, Managed remote, and Managed local, and Start tunnel stays disabled with that same reason.
 - Desktop: the header hamburger now opens the app menu on the first click. Hovering its tooltip no longer eats that press.
 - Settings: Remote Instances, Git, Extensions, Skills Catalog, and Snippets now show a short page subtitle. Snippets Total matches the other lists, and Remote Instances no longer repeats its title or the empty SSH message.
+- Git: generated commit messages now match the repository's recent commit style and language, and generating a pull request description picks up the repo's own PR template when it has one instead of a fixed Summary/Why/Testing layout.
 
 ## [1.0.1] - 2026-08-18
 

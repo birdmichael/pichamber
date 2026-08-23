@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
+import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { useSessionWorktreeStore } from './session-worktree-store';
 import { expandSlashCommandGoalObjective, routeMessage, useSessionUIStore } from './session-ui-store';
 import { setActionRefs, setOptimisticRefs } from './session-actions';
@@ -405,6 +406,56 @@ describe('openNewSessionDraft project binding', () => {
 
     expect(draft.open).toBe(true);
     expect(draft.selectedProjectId).toBe(projectB.id);
+  });
+});
+
+describe('setCurrentSession single-project picker', () => {
+  const projectA = { id: 'proj-a', path: '/projects/alpha', label: 'Alpha' };
+  const projectB = { id: 'proj-b', path: '/projects/beta', label: 'Beta' };
+
+  beforeEach(() => {
+    useSessionUIStore.setState({
+      currentSessionId: null,
+      currentSessionDirectory: null,
+      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+      availableWorktreesByProject: new Map(),
+    });
+    useProjectsStore.setState({
+      projects: [projectA, projectB],
+      activeProjectId: projectA.id,
+    });
+    useDirectoryStore.getState().setDirectory(projectA.path, { showOverlay: false });
+    useSessionDisplayStore.setState({
+      projectDisplayMode: 'all',
+      singleProjectId: projectA.id,
+    });
+  });
+
+  afterEach(() => {
+    useSessionDisplayStore.setState({
+      projectDisplayMode: 'all',
+      singleProjectId: null,
+    });
+  });
+
+  test('opening a materialized session with a confirmed directory updates the picker', () => {
+    useSessionUIStore.getState().setCurrentSession('session-project-b', '/projects/beta');
+
+    expect(useSessionDisplayStore.getState().singleProjectId).toBe(projectB.id);
+  });
+
+  test('opening a new-session draft does not update the picker', () => {
+    useSessionUIStore.getState().openNewSessionDraft({ selectedProjectId: projectB.id });
+
+    expect(useSessionDisplayStore.getState().singleProjectId).toBe(projectA.id);
+  });
+
+  test('a guessed directory does not update the picker', () => {
+    useDirectoryStore.getState().setDirectory(projectB.path, { showOverlay: false });
+
+    useSessionUIStore.getState().setCurrentSession('session-unknown');
+
+    expect(useSessionDisplayStore.getState().singleProjectId).toBe(projectA.id);
   });
 });
 
