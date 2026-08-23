@@ -577,6 +577,18 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['label', 'display name', 'project metadata'],
   },
   {
+    id: 'projects.default-model',
+    page: 'projects',
+    titleKey: 'settings.projects.page.field.projectModel',
+    keywords: ['model', 'default', 'new chat', 'project metadata'],
+  },
+  {
+    id: 'projects.default-thinking',
+    page: 'projects',
+    titleKey: 'settings.projects.page.field.projectThinking',
+    keywords: ['thinking', 'variant', 'reasoning', 'effort', 'model', 'project metadata'],
+  },
+  {
     id: 'projects.accent-color',
     page: 'projects',
     titleKey: 'settings.projects.page.field.accentColor',

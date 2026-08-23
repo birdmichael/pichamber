@@ -410,6 +410,15 @@ const sanitizeProjects = (value: unknown): DesktopSettings['projects'] | undefin
     if (typeof candidate.color === 'string' && candidate.color.trim().length > 0) {
       project.color = candidate.color.trim();
     }
+    if (typeof candidate.defaultModel === 'string' && candidate.defaultModel.includes('/')) {
+      const defaultModel = candidate.defaultModel.trim();
+      if (defaultModel) {
+        project.defaultModel = defaultModel;
+        if (typeof candidate.defaultVariant === 'string' && candidate.defaultVariant.trim().length > 0) {
+          project.defaultVariant = candidate.defaultVariant.trim();
+        }
+      }
+    }
     if (candidate.iconBackground === null) {
       (project as unknown as Record<string, unknown>).iconBackground = null;
     } else {

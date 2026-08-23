@@ -3,6 +3,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/icon/Icon';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  SettingsFieldRow,
+  SETTINGS_CUSTOM_TRIGGER_CLASS,
+  SETTINGS_SELECT_ROW_TRIGGER_CLASS,
+  SETTINGS_SELECT_SIZE,
+} from '@/components/sections/shared/SettingsSection';
+import { useConfigStore } from '@/stores/useConfigStore';
+import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { PROJECT_COLORS, PROJECT_ICONS, PROJECT_COLOR_MAP as COLOR_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useI18n } from '@/lib/i18n';
@@ -19,9 +29,17 @@ type ProjectIdentityFieldsProps = {
   form: ProjectIdentityFormState;
 };
 
+const NO_VARIANT_VALUE = '__default__';
+
+const formatVariantLabel = (variant: string): string => variant.charAt(0).toUpperCase() + variant.slice(1);
+
 export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ form }) => {
   const { t } = useI18n();
   const { currentTheme } = useThemeSystem();
+  const isPiKernel = usePiKernel();
+  const providers = useConfigStore((state) => state.providers);
+  const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+  const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
   const {
     name,
     setName,
@@ -32,7 +50,9 @@ export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ fo
     iconBackground,
     setIconBackground,
     parsedDefaultModel,
+    defaultVariant,
     handleDefaultModelChange,
+    handleDefaultVariantChange,
     isUploadingIcon,
     isRemovingCustomIcon,
     isDiscoveringIcon,
@@ -52,6 +72,24 @@ export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ fo
     currentIconImage,
     project,
   } = form;
+
+  const availableLevels = React.useMemo(() => {
+    const { providerId, modelId } = parsedDefaultModel;
+    if (!providerId || !modelId) return [];
+    if (isPiKernel) {
+      // Levels come from Pi model capabilities (GET /api/pi/models + catalog
+      // reasoning_options). Do not invent OpenCode variants or vendor lists.
+      return resolveCatalogThinkingLevels(getModelMetadata(providerId, modelId));
+    }
+    const model = providers
+      .find((provider) => provider.id === providerId)
+      ?.models.find((entry) => entry.id === modelId) as { variants?: Record<string, unknown> } | undefined;
+    const variants = model?.variants;
+    return variants ? Object.keys(variants) : [];
+    // modelsMetadata is required: getModelMetadata is a stable store method
+    // and would otherwise keep the empty-catalog fallback after fetch lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
+  }, [getModelMetadata, isPiKernel, modelsMetadata, parsedDefaultModel, providers]);
 
   if (!project) {
     return null;
@@ -75,16 +113,51 @@ export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ fo
       </ProjectSettingsSubsection>
 
       <ProjectSettingsSubsection
-        title={t('settings.projects.page.field.defaultModel')}
-        info={t('settings.projects.page.field.defaultModelDescription')}
-        settingsItem="projects.default-model"
+        title={t('settings.projects.page.section.chatDefaults')}
+        info={t('settings.projects.page.section.chatDefaultsDescription')}
+        contentClassName="space-y-0"
       >
-        <ModelSelector
-          providerId={parsedDefaultModel.providerId}
-          modelId={parsedDefaultModel.modelId}
-          onChange={handleDefaultModelChange}
-          className={cn('h-8 min-h-8 rounded-md px-3 max-w-48', PROJECT_SETTINGS_CONTROL_WIDTH)}
-        />
+        <SettingsFieldRow
+          settingsItem="projects.default-model"
+          label={t('settings.projects.page.field.projectModel')}
+        >
+          <ModelSelector
+            providerId={parsedDefaultModel.providerId}
+            modelId={parsedDefaultModel.modelId}
+            onChange={handleDefaultModelChange}
+            className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+          />
+        </SettingsFieldRow>
+
+        {availableLevels.length > 0 ? (
+          <SettingsFieldRow
+            settingsItem="projects.default-thinking"
+            label={t('settings.projects.page.field.projectThinking')}
+          >
+            <Select
+              value={defaultVariant ?? NO_VARIANT_VALUE}
+              onValueChange={(value) => handleDefaultVariantChange(value === NO_VARIANT_VALUE ? undefined : value)}
+            >
+              <SelectTrigger
+                size={SETTINGS_SELECT_SIZE}
+                className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}
+                aria-label={t('settings.projects.page.field.projectThinking')}
+              >
+                <SelectValue>
+                  {defaultVariant
+                    ? formatVariantLabel(defaultVariant)
+                    : t('settings.projects.page.option.thinkingDefault')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_VARIANT_VALUE}>{t('settings.projects.page.option.thinkingDefault')}</SelectItem>
+                {availableLevels.map((level) => (
+                  <SelectItem key={level} value={level}>{formatVariantLabel(level)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingsFieldRow>
+        ) : null}
       </ProjectSettingsSubsection>
 
       <ProjectSettingsSubsection

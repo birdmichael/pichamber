@@ -1407,6 +1407,21 @@ describe('live session command helpers', () => {
 });
 
 describe('session thinking levels', () => {
+  it('promptAsync applies body.variant as session thinking', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Think pin' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    await host.promptAsync(record.id, {
+      variant: 'high',
+      parts: [{ type: 'text', text: 'go' }],
+    });
+
+    expect(record.piSession.thinkingLevel).toBe('high');
+    host.dispose();
+  });
+
   it('reads live getAvailableThinkingLevels and clamps an unsupported pick', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Think' });

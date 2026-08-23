@@ -106,6 +106,33 @@ describe('settings normalization runtime - symlink resolution', () => {
       expect(result[0].path).toBe('/resolved/missing/path');
     });
 
+    it('keeps defaultVariant only when the project has a provider/model default', () => {
+      const runtime = createTestRuntime();
+      const result = runtime.sanitizeProjects([
+        {
+          id: 'with-model',
+          path: '/repo/with-model',
+          defaultModel: 'xai/grok-4.6',
+          defaultVariant: 'high',
+          addedAt: 1000,
+          lastOpenedAt: 1000,
+        },
+        {
+          id: 'variant-only',
+          path: '/repo/variant-only',
+          defaultVariant: 'high',
+          addedAt: 1000,
+          lastOpenedAt: 1000,
+        },
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].defaultModel).toBe('xai/grok-4.6');
+      expect(result[0].defaultVariant).toBe('high');
+      expect(result[1].defaultModel).toBeUndefined();
+      expect(result[1].defaultVariant).toBeUndefined();
+    });
+
     it('deduplicates projects that resolve to the same realpath', () => {
       const runtime = createTestRuntime({
         realpathSync: (p) => p.startsWith('/symlink') ? '/real/project' : p,

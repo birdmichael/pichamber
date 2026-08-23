@@ -1093,4 +1093,112 @@ describe('useConfigStore provider persistence', () => {
     expect(state.currentProviderId).toBe('manual');
     expect(state.selectionSource).toBe('manual');
   });
+
+  test('applyDefaultModelAgentSelection applies a project thinking pin from catalog levels', () => {
+    useConfigStore.setState({
+      activeDirectoryKey: DIRECTORY,
+      providers: [provider('xai', 'grok-4.6')],
+      agents: [testAgent('build')],
+      settingsDefaultVariant: 'low',
+      currentProviderId: 'other',
+      currentModelId: 'other-model',
+      currentVariant: undefined,
+      modelsMetadata: new Map([
+        ['xai/grok-4.6', {
+          id: 'grok-4.6',
+          providerId: 'xai',
+          reasoning: true,
+          reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+        }],
+      ]),
+      directoryScoped: {},
+    });
+
+    useConfigStore.getState().applyDefaultModelAgentSelection({
+      projectDefaultModel: 'xai/grok-4.6',
+      projectDefaultVariant: 'high',
+    });
+
+    const state = useConfigStore.getState();
+    expect(state.currentProviderId).toBe('xai');
+    expect(state.currentModelId).toBe('grok-4.6');
+    expect(state.currentVariant).toBe('high');
+  });
+
+  test('applyDefaultModelAgentSelection ignores a project pin the catalog does not offer', () => {
+    useConfigStore.setState({
+      activeDirectoryKey: DIRECTORY,
+      providers: [provider('xai', 'grok-4.6')],
+      agents: [testAgent('build')],
+      settingsDefaultVariant: 'high',
+      currentProviderId: 'other',
+      currentModelId: 'other-model',
+      currentVariant: 'medium',
+      modelsMetadata: new Map([
+        ['xai/grok-4.6', {
+          id: 'grok-4.6',
+          providerId: 'xai',
+          reasoning: true,
+        }],
+      ]),
+      directoryScoped: {},
+    });
+
+    useConfigStore.getState().applyDefaultModelAgentSelection({
+      projectDefaultModel: 'xai/grok-4.6',
+      projectDefaultVariant: 'high',
+    });
+
+    const state = useConfigStore.getState();
+    expect(state.currentProviderId).toBe('xai');
+    expect(state.currentModelId).toBe('grok-4.6');
+    expect(state.currentVariant).toBe(undefined);
+  });
+
+  test('applyDefaultModelAgentSelection does not leak settings variant onto a project model', () => {
+    useConfigStore.setState({
+      activeDirectoryKey: DIRECTORY,
+      providers: [provider('xai', 'grok-4.6')],
+      agents: [testAgent('build')],
+      settingsDefaultVariant: 'high',
+      currentProviderId: 'other',
+      currentModelId: 'other-model',
+      currentVariant: undefined,
+      modelsMetadata: new Map([
+        ['xai/grok-4.6', {
+          id: 'grok-4.6',
+          providerId: 'xai',
+          reasoning: true,
+          reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+        }],
+      ]),
+      directoryScoped: {},
+    });
+
+    useConfigStore.getState().applyDefaultModelAgentSelection({
+      projectDefaultModel: 'xai/grok-4.6',
+    });
+
+    expect(useConfigStore.getState().currentVariant).toBe(undefined);
+  });
+
+  test('applyDefaultModelAgentSelection accepts an OpenCode leftover variant on the project model', () => {
+    useConfigStore.setState({
+      activeDirectoryKey: DIRECTORY,
+      providers: [provider('openai', 'gpt-5.5', { low: {}, high: {} })],
+      agents: [testAgent('build')],
+      currentProviderId: 'other',
+      currentModelId: 'other-model',
+      currentVariant: undefined,
+      modelsMetadata: new Map(),
+      directoryScoped: {},
+    });
+
+    useConfigStore.getState().applyDefaultModelAgentSelection({
+      projectDefaultModel: 'openai/gpt-5.5',
+      projectDefaultVariant: 'high',
+    });
+
+    expect(useConfigStore.getState().currentVariant).toBe('high');
+  });
 });
