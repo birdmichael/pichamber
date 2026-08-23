@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui';
-import { useAgentsStore, isAgentBuiltIn, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
+import { useSettingsDirectory } from '@/hooks/useSettingsDirectory';
+import { selectAgentsForDirectory, useAgentsStore, isAgentBuiltIn, type AgentConfig, type AgentMutationResult, type AgentScope } from '@/stores/useAgentsStore';
 import { PI_NATIVE_AGENT_NAME, useSelectPiAgentWhenUnset } from './piAgentSelection';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useShallow } from 'zustand/react/shallow';
@@ -63,7 +64,6 @@ export const AgentsPage: React.FC = () => {
     getAgentByName,
     createAgent,
     updateAgent,
-    agents,
     agentDraft,
     setAgentDraft,
   } = useAgentsStore(useShallow((s) => ({
@@ -71,12 +71,15 @@ export const AgentsPage: React.FC = () => {
     getAgentByName: s.getAgentByName,
     createAgent: s.createAgent,
     updateAgent: s.updateAgent,
-    agents: s.agents,
     agentDraft: s.agentDraft,
     setAgentDraft: s.setAgentDraft,
   })));
 
-  const selectedAgent = selectedAgentName ? getAgentByName(selectedAgentName) : null;
+  // Settings browses whichever project its own selector points at; the app
+  // stays where it is.
+  const settingsDirectory = useSettingsDirectory();
+  const agents = useAgentsStore((state) => selectAgentsForDirectory(state, settingsDirectory));
+  const selectedAgent = selectedAgentName ? getAgentByName(selectedAgentName, settingsDirectory) : null;
   const isNewAgent = Boolean(agentDraft && agentDraft.name === selectedAgentName && !selectedAgent);
   const isPiNativeReadOnly = isPiKernel && !isNewAgent && (
     (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === PI_NATIVE_AGENT_NAME
@@ -243,12 +246,12 @@ export const AgentsPage: React.FC = () => {
 
       let result: AgentMutationResult;
       if (isNewAgent) {
-        result = await createAgent(config);
+        result = await createAgent(config, settingsDirectory);
         if (result.ok) {
           setAgentDraft(null); // Clear draft after successful creation
         }
       } else {
-        result = await updateAgent(agentName, config);
+        result = await updateAgent(agentName, config, settingsDirectory);
       }
 
       if (result.ok) {
