@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'bun:test';
 import {
+  DESKTOP_SLASH_DESCRIPTION_CLASS,
   DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
   DESKTOP_SLASH_POPUP_DESIGN_CAP_PX,
   DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
@@ -17,6 +18,10 @@ import {
 
 const chatInputSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../ChatInput.tsx'),
+  'utf-8',
+);
+const commandAutocompleteSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../CommandAutocomplete.tsx'),
   'utf-8',
 );
 
@@ -36,9 +41,9 @@ describe('snapSlashPopupMaxHeight', () => {
       rowHeightPx: DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
       chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
     });
-    expect(Math.floor((256 - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX)).toBe(3);
+    expect(Math.floor((256 - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX)).toBe(2);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
-    expect(Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX)).toBe(3);
+    expect(Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX)).toBe(2);
   });
 
   test('always lands on a whole number of rows', () => {
@@ -63,13 +68,13 @@ describe('snapSlashPopupMaxHeight', () => {
 });
 
 describe('resolveDesktopSlashPopupMaxHeight', () => {
-  test('the design cap fits at least eight full described rows', () => {
+  test('the design cap fits at least seven full wrapped-description rows', () => {
     const height = resolveDesktopSlashPopupMaxHeight({
       rowHeightPx: DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
       chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
     });
     const rows = Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX);
-    expect(rows >= 8).toBe(true);
+    expect(rows >= 7).toBe(true);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
     expect(height <= DESKTOP_SLASH_POPUP_DESIGN_CAP_PX).toBe(true);
   });
@@ -87,7 +92,7 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
     })).toBe(36 + 3 * 59);
   });
 
-  test('a docked 1280x800 chat column fits at least eight full described rows', () => {
+  test('a docked 1280x800 chat column fits at least six full wrapped-description rows', () => {
     const availablePx = measureDesktopSlashAvailablePx({
       chatTopPx: 48,
       popupBottomPx: 800 - 220,
@@ -99,19 +104,19 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
     });
     const rows = Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX);
     expect(availablePx >= 520).toBe(true);
-    expect(rows >= 8).toBe(true);
+    expect(rows >= 6).toBe(true);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
   });
 
-  test('docking with the welcome title and chips still in the form stays under eight rows', () => {
+  test('docking with the welcome title and chips still in the form stays under six rows', () => {
     const availablePx = measureDesktopSlashAvailablePx({
       chatTopPx: 48,
       popupBottomPx: 474,
     });
-    expect(describedRowsForAvailablePx(availablePx) >= 8).toBe(false);
+    expect(describedRowsForAvailablePx(availablePx) >= 6).toBe(false);
   });
 
-  test('hiding welcome chrome on a 1280x800 new session fits at least eight full described rows', () => {
+  test('hiding welcome chrome on a 1280x800 new session fits at least six full wrapped-description rows', () => {
     const availablePx = measureDesktopSlashAvailablePx({
       chatTopPx: 48,
       popupBottomPx: 572,
@@ -123,7 +128,7 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
     });
     const rows = describedRowsForAvailablePx(availablePx);
     expect(availablePx >= 508).toBe(true);
-    expect(rows >= 8).toBe(true);
+    expect(rows >= 6).toBe(true);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
   });
 });
@@ -169,6 +174,14 @@ describe('shouldDockComposerForDesktopSlashMenu', () => {
     expect(chatInputSource.includes('shouldHideNewSessionWelcomeForDesktopSlashMenu')).toBe(true);
     expect(chatInputSource.includes('showNewSessionWelcome')).toBe(true);
     expect(chatInputSource.includes('-mb-[6vh]')).toBe(true);
+  });
+
+  test('Desktop slash descriptions wrap instead of clipping mid-word', () => {
+    expect(DESKTOP_SLASH_DESCRIPTION_CLASS.includes('line-clamp-2')).toBe(true);
+    expect(DESKTOP_SLASH_DESCRIPTION_CLASS.includes('whitespace-normal')).toBe(true);
+    expect(DESKTOP_SLASH_DESCRIPTION_CLASS.includes('truncate')).toBe(false);
+    expect(commandAutocompleteSource.includes('DESKTOP_SLASH_DESCRIPTION_CLASS')).toBe(true);
+    expect(commandAutocompleteSource.includes('typography-meta text-muted-foreground mt-0.5 truncate')).toBe(false);
   });
 });
 

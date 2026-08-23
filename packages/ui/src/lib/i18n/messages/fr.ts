@@ -2991,6 +2991,7 @@ export const dict = {
   'chat.commandAutocomplete.command.debugDescription': 'Investigation guidée de la cause racine d’un bug avant de proposer une correction.',
   'chat.commandAutocomplete.command.weighDescription': 'Comparer 2 à 3 approches avec compromis et recommandation avant de vous engager.',
   'chat.commandAutocomplete.command.exploreDescription': 'Vous orienter dans ce codebase : tour d’ensemble de l’architecture et des parties principales.',
+  'chat.commandAutocomplete.command.runDescription': 'Exécuter un sous-agent comme flux de travail ponctuel',
   'chat.questionCard.submitFailed': 'Impossible d’envoyer la réponse',
   'chat.questionCard.dismissFailed': 'Impossible d’ignorer la question',
   'chat.questionCard.noLongerPending': 'Cette question n’attend plus de réponse.',

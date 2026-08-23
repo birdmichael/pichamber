@@ -2047,6 +2047,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.commandAutocomplete.command.debugDescription": "Кероване дослідження першопричини бага перед тим, як пропонувати фікс.",
   "chat.commandAutocomplete.command.weighDescription": "Зважити 2-3 підходи з trade-offs і рекомендацією перш ніж братися до роботи.",
   "chat.commandAutocomplete.command.exploreDescription": "Зорієнтуватись у кодовій базі: високорівневий тур архітектурою й основними частинами.",
+  "chat.commandAutocomplete.command.runDescription": "Запустити субагента як одноразовий робочий процес",
   "chat.commandAutocomplete.badge.skill": "навичка",
   "chat.commandAutocomplete.badge.command": "команда",
   "chat.contextUsage.label": "Context used",

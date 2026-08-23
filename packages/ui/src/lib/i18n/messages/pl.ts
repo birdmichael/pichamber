@@ -814,6 +814,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.commandAutocomplete.command.debugDescription': 'Prowadzone badanie pierwotnej przyczyny błędu przed zaproponowaniem poprawki.',
   'chat.commandAutocomplete.command.weighDescription': 'Rozważ 2-3 podejścia z kompromisami i rekomendacją, zanim się zdecydujesz.',
   'chat.commandAutocomplete.command.exploreDescription': 'Zorientuj się w bazie kodu: ogólny przegląd architektury i głównych części.',
+  'chat.commandAutocomplete.command.runDescription': 'Uruchom subagenta jako jednorazowy przepływ pracy',
   'chat.commandAutocomplete.badge.skill': 'skill',
   'chat.commandAutocomplete.badge.command': 'polecenie',
   'chat.contextUsage.label': 'Context used',

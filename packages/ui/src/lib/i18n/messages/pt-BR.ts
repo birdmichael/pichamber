@@ -2047,6 +2047,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.commandAutocomplete.command.debugDescription": "Investigação guiada da causa raiz de um bug antes de propor uma correção.",
   "chat.commandAutocomplete.command.weighDescription": "Compare 2-3 abordagens com seus prós e contras e uma recomendação antes de decidir.",
   "chat.commandAutocomplete.command.exploreDescription": "Oriente-se neste código: um tour geral pela arquitetura e pelas partes principais.",
+  "chat.commandAutocomplete.command.runDescription": "Executar um subagente como um fluxo de trabalho único",
   "chat.commandAutocomplete.badge.skill": "habilidade",
   "chat.commandAutocomplete.badge.command": "comando",
   "chat.contextUsage.label": "Context used",

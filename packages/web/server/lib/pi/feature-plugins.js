@@ -261,7 +261,7 @@ export const listFeaturePluginSlashCommands = (payload) => {
   if (subagents?.installed && subagents.enabled) {
     listed.push({
       name: 'run',
-      description: 'Run one subagent through workflowScript',
+      description: 'Run a subagent as a one-shot workflow',
       source: 'extension',
     });
   }

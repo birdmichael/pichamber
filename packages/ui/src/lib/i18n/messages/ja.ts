@@ -2065,6 +2065,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.commandAutocomplete.command.debugDescription': '修正を提案する前に、バグのガイド付き根本原因調査。',
   'chat.commandAutocomplete.command.weighDescription': 'トレードオフと推奨事項を含む2～3のアプローチを比較検討してからコミット。',
   'chat.commandAutocomplete.command.exploreDescription': 'このコードベースに慣れる: アーキテクチャと主要部分の概要ツアー。',
+  'chat.commandAutocomplete.command.runDescription': 'サブエージェントをワンショットのワークフローとして実行',
   'chat.commandAutocomplete.badge.skill': 'スキル',
   'chat.commandAutocomplete.badge.command': 'コマンド',
   'chat.contextUsage.label': 'Context used',

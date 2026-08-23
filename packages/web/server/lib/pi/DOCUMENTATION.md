@@ -210,7 +210,8 @@ pin. Settings → Extensions packages lists those configured package names
   (`source: "extension"`)
 - Feature Plugins slash names that must appear before a session exists
   (Plan slot installed+enabled → `/plan`; Subagents slot
-  installed+enabled → `/run`)
+  installed+enabled → `/run`). `/run` copy is user-facing
+  ("Run a subagent as a one-shot workflow"), not plugin jargon.
 
 Optional `?session=` hydrates that session if needed, then pins the live
 `getCommands()` list. After Feature Plugins install, idle sessions reload

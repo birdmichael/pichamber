@@ -12,8 +12,9 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey, resolveSlashMenuDescription } from './commandAutocompleteItems';
 import {
+  DESKTOP_SLASH_DESCRIPTION_CLASS,
   DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
   measureDesktopSlashAvailablePx,
   readOverlayMaxHeight,
@@ -473,6 +474,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
             {commands.map((command, index) => {
               const isSystem = command.isBuiltIn;
               const isOpenChamberBadge = command.isOpenChamber;
+              const description = resolveSlashMenuDescription(command, {
+                runDescription: t('chat.commandAutocomplete.command.runDescription'),
+              });
               return (
                 <div
                   key={command.id}
@@ -569,9 +573,9 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
                         </span>
                       )}
                     </div>
-                    {command.description && !isMobile && (
-                      <div className="typography-meta text-muted-foreground mt-0.5 truncate">
-                        {command.description}
+                    {description && !isMobile && (
+                      <div className={DESKTOP_SLASH_DESCRIPTION_CLASS}>
+                        {description}
                       </div>
                     )}
                   </div>

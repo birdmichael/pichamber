@@ -2071,6 +2071,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.commandAutocomplete.command.debugDescription': '수정안을 제시하기 전에 버그의 근본 원인을 단계적으로 조사합니다.',
   'chat.commandAutocomplete.command.weighDescription': '결정하기 전에 2~3가지 접근 방식을 장단점과 함께 비교하고 추천을 제시합니다.',
   'chat.commandAutocomplete.command.exploreDescription': '코드베이스에 대한 방향을 잡습니다: 아키텍처와 주요 부분을 한눈에 살펴봅니다.',
+  'chat.commandAutocomplete.command.runDescription': '서브에이전트를 일회성 워크플로로 실행합니다',
   'chat.commandAutocomplete.badge.skill': '스킬',
   'chat.commandAutocomplete.badge.command': '명령',
   'chat.contextUsage.label': 'Context used',

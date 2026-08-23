@@ -2035,6 +2035,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.commandAutocomplete.command.debugDescription': '在提出修复方案前，引导式地排查 bug 的根本原因。',
   'chat.commandAutocomplete.command.weighDescription': '在动手前，权衡 2-3 种方案的利弊并给出推荐。',
   'chat.commandAutocomplete.command.exploreDescription': '快速熟悉这个代码库：对架构和主要部分的概览。',
+  'chat.commandAutocomplete.command.runDescription': '运行一个子智能体（一次性工作流）',
   'chat.commandAutocomplete.badge.skill': '技能',
   'chat.commandAutocomplete.badge.command': '命令',
   'chat.contextUsage.label': '上下文占用',

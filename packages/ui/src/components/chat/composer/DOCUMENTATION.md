@@ -86,10 +86,12 @@ starter chips stay in that block and leave only ~5 rows. While `/` is
 open, hide that chrome and cancel the new-session `pb-[6vh]` inset, then
 measure available height after that layout. Height comes from that space
 up to the design cap in `slashPopupHeight.ts` and snaps to whole command
-rows so the last visible name stays fully readable. Prefix filtering
-stays name-only on Pi. The CSS fallback must not be `max-h-64`.
-Model and thinking chips stay on the expanded mobile composer, not the
-collapsed pill. On Pi the thinking chip lists
+rows so the last visible name stays fully readable. Descriptions wrap
+onto a second line at word boundaries so a typical command stays
+understandable; `/run` uses plain-language copy, not plugin jargon.
+Prefix filtering stays name-only on Pi. The CSS fallback must not be
+`max-h-64`. Model and thinking chips stay off `/` and on the expanded
+mobile composer, not the collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
 `getAvailableThinkingLevels()`, not the full seven-level catalog, and
 clamps the current chip onto that list. A new-session draft with no

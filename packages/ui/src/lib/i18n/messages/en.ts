@@ -2069,6 +2069,7 @@ export const dict = {
   'chat.commandAutocomplete.command.debugDescription': 'Guided root-cause investigation for a bug before proposing a fix.',
   'chat.commandAutocomplete.command.weighDescription': 'Weigh 2-3 approaches with trade-offs and a recommendation before you commit.',
   'chat.commandAutocomplete.command.exploreDescription': 'Get oriented in this codebase: a high-level tour of the architecture and main parts.',
+  'chat.commandAutocomplete.command.runDescription': 'Run a subagent as a one-shot workflow',
   'chat.commandAutocomplete.badge.skill': 'skill',
   'chat.commandAutocomplete.badge.command': 'command',
   'chat.contextUsage.label': 'Context used',

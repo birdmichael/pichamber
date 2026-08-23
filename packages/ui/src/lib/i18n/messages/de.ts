@@ -1900,6 +1900,7 @@ export const dict = {
   'chat.commandAutocomplete.command.debugDescription': 'Geführte Ursachenforschung für einen Fehler, bevor eine Lösung vorgeschlagen wird.',
   'chat.commandAutocomplete.command.weighDescription': 'Zwei bis drei Ansätze mit Kompromissen und einer Empfehlung bewerten, bevor du dich entscheidest.',
   'chat.commandAutocomplete.command.exploreDescription': 'Vertraut machen mit diesem Codebase: Eine Übersicht über die Architektur und Hauptbestandteile.',
+  'chat.commandAutocomplete.command.runDescription': 'Einen Subagenten als einmaligen Workflow ausführen',
   'chat.commandAutocomplete.badge.skill': 'Fähigkeit',
   'chat.commandAutocomplete.badge.command': 'Befehl',
   'chat.contextUsage.label': 'Context used',
