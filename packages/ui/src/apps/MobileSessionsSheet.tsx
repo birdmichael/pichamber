@@ -63,6 +63,10 @@ import {
   listProjectWorktrees,
   partitionWorktreesByRegisteredProject,
 } from '@/lib/worktrees/worktreeManager';
+import {
+  normalizeOpenedProjectPaths,
+  shouldRenderSidebarWorktreeGroup,
+} from '@/components/session/sidebar/visibleWorkspaceGroups';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { mergeLiveSessionWithGlobalSession, refreshGlobalSessions, useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { useMobileSessionExpansionStore } from '@/stores/useMobileSessionExpansionStore';
@@ -1115,9 +1119,21 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
       return bucket;
     };
 
+    const openedProjectPaths = normalizeOpenedProjectPaths(nodes.map((node) => node.project.path));
     for (const node of nodes) {
       ensureBucket(node, node.project.path, null);
-      for (const worktree of node.project.worktrees) ensureBucket(node, worktree.path, worktree);
+      for (const worktree of node.project.worktrees) {
+        // Sessions create leftover worktree buckets when they match. Empty
+        // Cursor/cloud or tmp checkouts that are not opened projects stay off
+        // the list, matching Desktop sidebar groups.
+        if (shouldRenderSidebarWorktreeGroup({
+          directory: worktree.path,
+          sessionCount: 0,
+          openedProjectPaths,
+        })) {
+          ensureBucket(node, worktree.path, worktree);
+        }
+      }
     }
 
     for (const session of sessions) {

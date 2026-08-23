@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Sessions/Desktop: the sidebar no longer lists empty leftover workspaces such as Cursor `cursor/desktop-…` checkouts that are not opened projects. Settings → Projects is unchanged, and an opened project with no chats still shows once.
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and model name as text, without overlapping Agent, mic, or Send.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.

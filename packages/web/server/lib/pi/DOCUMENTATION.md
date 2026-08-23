@@ -31,8 +31,10 @@ but has never persisted a `projects` key, settings migration walks
 `{agentDir}/sessions/` and seeds those cwds as open projects. Read `cwd`
 from the session jsonl header (first object). Do not decode the encoded
 folder name. Keep paths that still exist as directories. Skip `/tmp`,
-`/private/tmp`, `os.tmpdir()`, and any `node_modules`
-tree. Nested herdr/subagent jsonl are children, not projects. `archive/`
+`/private/tmp`, `os.tmpdir()`, any `node_modules` tree, `.cursor`
+trees, `.git/worktrees` metadata dirs, and leftover Cursor/cloud
+checkout names (`cursor/desktop-…`, `cursor-desktop-…`). Nested
+herdr/subagent jsonl are children, not projects. `archive/`
 stays off the list. One unreadable folder or jsonl does not drop the
 rest. `activeProjectId` / `lastDirectory` are the most recently updated
 remaining cwd. `projects: []` after Close Project is not first-install —
