@@ -11,8 +11,9 @@ import React from 'react';
  *
  * Returns an inline max-height in px, or undefined when disabled. NOTE: the
  * inline value REPLACES any `max-h-*` class (it does not combine) — on mobile
- * the popup is allowed to grow all the way to the boundary, unlike the
- * desktop design cap.
+ * the popup is allowed to grow all the way to the boundary. Desktop `/`
+ * still measures this available space, then applies the design cap and
+ * whole-row snap in `slashPopupHeight.ts`.
  */
 export const useMobileAutocompleteMaxHeight = (
     containerRef: React.RefObject<HTMLElement | null>,

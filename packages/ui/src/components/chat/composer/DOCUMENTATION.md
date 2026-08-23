@@ -62,6 +62,10 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
+Desktop `/` uses the space above the composer up to the design cap in
+`slashPopupHeight.ts` and snaps that height to whole command rows so the
+last visible name stays fully readable. Prefix filtering stays name-only
+on Pi.
 Model and thinking chips stay on the expanded mobile composer, not the
 collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live

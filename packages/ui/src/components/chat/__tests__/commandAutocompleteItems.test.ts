@@ -321,6 +321,22 @@ describe('commandMatchesPiSlashQuery', () => {
     expect(commandMatchesPiSlashQuery({ name: 'login' }, '')).toBe(true);
   });
 
+  test('name prefix keeps /run and /plan plus /plan-feature', () => {
+    const commands = [
+      { name: 'run' },
+      { name: 'plan' },
+      { name: 'plan-feature' },
+      { name: 'compact' },
+    ];
+    expect(commands.filter((item) => commandMatchesPiSlashQuery(item, 'run')).map((item) => item.name)).toEqual([
+      'run',
+    ]);
+    expect(commands.filter((item) => commandMatchesPiSlashQuery(item, 'plan')).map((item) => item.name)).toEqual([
+      'plan',
+      'plan-feature',
+    ]);
+  });
+
   test('prefix /re does not suggest /reload', () => {
     const commands = filterPiSlashCommands([
       { name: 'compact' },
