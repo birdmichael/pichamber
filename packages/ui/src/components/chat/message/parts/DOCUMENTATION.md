@@ -57,7 +57,11 @@ Use this doc when you ask an agent to change tool/header/description behavior.
 - Assistant markdown treats raw HTML as inert visible text. The final generated
   HTML is sanitized as defense in depth, with script and style elements
   forbidden, so message content cannot inject active DOM or application-wide
-  CSS into any runtime surface.
+  CSS into any runtime surface. Custom application schemes such as
+  `spotify://` stay in the href after sanitization, but opening them always
+  goes through confirmation (or a locally trusted scheme) rather than
+  `openExternalUrl`. File-path probes send the session directory as
+  `x-opencode-directory` so a last-browsed project cannot hide a real path.
 - Final assistant Markdown rendering is independent from image gallery
   extraction: gallery presence never changes the chat body. Assistant image
   syntax consistently renders as a shared image icon followed by its filename,
