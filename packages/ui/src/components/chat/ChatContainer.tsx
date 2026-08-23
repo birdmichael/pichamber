@@ -42,7 +42,7 @@ import { Button } from '@/components/ui/button';
 import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { Icon } from "@/components/icon/Icon";
 import { cn } from '@/lib/utils';
-import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, isChatDirectoryPath } from '@/lib/chatDirectories';
 import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -813,12 +813,16 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const isVSCode = isVSCodeRuntime();
     const chatSurfaceMode = useChatSurfaceMode();
     const draftOpen = Boolean(newSessionDraft?.open);
+    const isManagedChatContext = draftOpen
+        ? newSessionDraft?.target === 'chat'
+        : isChatDirectoryPath(effectiveSessionDirectory);
     // A draft can target another project or a pending worktree before it has a
     // session. Keep the panel on that same directory so its project, MCP, and
     // usage readouts describe where the draft will run rather than the project
-    // the user came from.
+    // the user came from. Managed Chats pass no fallback directory so an
+    // active project's branch cannot leak into the card.
     const workStatusDirectory = draftOpen
-        ? newSessionDraft?.bootstrapPendingDirectory ?? newSessionDraft?.directoryOverride ?? effectiveSessionDirectory
+        ? (isManagedChatContext ? null : newSessionDraft?.bootstrapPendingDirectory ?? newSessionDraft?.directoryOverride ?? effectiveSessionDirectory)
         : effectiveSessionDirectory;
     const initError = useGlobalSyncStore((s) => s.error);
     // Despite the historical name, this now covers mobile too: the mobile
@@ -830,7 +834,6 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     // row that holds both columns, so its width never depends on the panel's
     // own visibility.
     const { rowRef: workStatusRowRef, visible: workStatusVisible, fits: workStatusFits } = useWorkStatusVisibility({
-        directory: workStatusDirectory,
         isMobile,
         isVSCode,
     });
@@ -1235,6 +1238,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 							visible={showWorkStatusOverlay}
 							sessionId={null}
 							directory={workStatusDirectory ?? null}
+							repositoryEnabled={!isManagedChatContext}
 						/>
 					) : null}
 				</div>
@@ -1243,6 +1247,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 						visible={showWorkStatusPanel}
 						sessionId={null}
 						directory={workStatusDirectory ?? null}
+						repositoryEnabled={!isManagedChatContext}
 					/>
 				) : null}
 			</div>
@@ -1366,6 +1371,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 							visible={showWorkStatusOverlay}
 							sessionId={currentSessionId}
 							directory={workStatusDirectory ?? null}
+							repositoryEnabled={!isManagedChatContext}
 						/>
 					) : null}
 				</div>
@@ -1374,6 +1380,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 						visible={showWorkStatusPanel}
 						sessionId={currentSessionId}
 						directory={workStatusDirectory ?? null}
+						repositoryEnabled={!isManagedChatContext}
 					/>
 				) : null}
 			</div>
@@ -1444,6 +1451,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                     visible={showWorkStatusOverlay}
                     sessionId={currentSessionId ?? null}
                     directory={workStatusDirectory ?? null}
+                    repositoryEnabled={!isManagedChatContext}
                 />
             ) : null}
 
@@ -1466,6 +1474,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 visible={showWorkStatusPanel}
                 sessionId={currentSessionId ?? null}
                 directory={workStatusDirectory ?? null}
+                repositoryEnabled={!isManagedChatContext}
             />
         ) : null}
         </div>

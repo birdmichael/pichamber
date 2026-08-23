@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { computeContextUsage } from '@/components/chat/work-status/contextUsage';
+import { isChatDirectoryPath } from '@/lib/chatDirectories';
 import { useTabletLayout } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { clampPercent, resolveUsageTone } from '@/lib/quota';
@@ -65,7 +66,8 @@ const SessionMetadataOverlay: React.FC<{
   anchorRef: React.RefObject<HTMLElement | null>;
   sessionId: string | null;
   directory: string | null;
-}> = ({ open, onClose, anchorRef, sessionId, directory }) => {
+  repositoryEnabled?: boolean;
+}> = ({ open, onClose, anchorRef, sessionId, directory, repositoryEnabled = true }) => {
   const { t } = useI18n();
   const panelRef = React.useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = React.useState(open);
@@ -179,7 +181,7 @@ const SessionMetadataOverlay: React.FC<{
             : null),
         }}
       >
-        <MobileWorkStatusHost sessionId={sessionId} directory={directory} />
+        <MobileWorkStatusHost sessionId={sessionId} directory={directory} repositoryEnabled={repositoryEnabled} />
       </div>
       <style>{`
         @keyframes session-metadata-in {
@@ -211,8 +213,11 @@ export const MobileSessionMetadataButton = React.memo(function MobileSessionMeta
   const { t } = useI18n();
   const metadataTriggerRef = React.useRef<HTMLButtonElement>(null);
   const newSessionDraft = useSessionUIStore((state) => state.newSessionDraft);
+  const isManagedChatContext = newSessionDraft?.open
+    ? newSessionDraft.target === 'chat'
+    : isChatDirectoryPath(effectiveDirectory);
   const workStatusDirectory = (newSessionDraft?.open
-    ? newSessionDraft.bootstrapPendingDirectory ?? newSessionDraft.directoryOverride ?? effectiveDirectory
+    ? (isManagedChatContext ? null : newSessionDraft.bootstrapPendingDirectory ?? newSessionDraft.directoryOverride ?? effectiveDirectory)
     : effectiveDirectory) ?? null;
   const workStatusSessionId = newSessionDraft?.open ? null : currentSessionId;
   const sessionMessages = useSessionMessages(workStatusSessionId ?? '', workStatusDirectory || undefined);
@@ -253,6 +258,7 @@ export const MobileSessionMetadataButton = React.memo(function MobileSessionMeta
         anchorRef={metadataTriggerRef}
         sessionId={workStatusSessionId}
         directory={workStatusDirectory}
+        repositoryEnabled={!isManagedChatContext}
       />
     </>
   );

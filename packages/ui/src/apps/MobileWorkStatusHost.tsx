@@ -21,7 +21,9 @@ import { useUIStore } from '@/stores/useUIStore';
 export const MobileWorkStatusHost: React.FC<{
   sessionId: string | null;
   directory: string | null;
-}> = ({ sessionId, directory }) => {
+  /** Managed Chats have no project repository, even if another project remains active. */
+  repositoryEnabled?: boolean;
+}> = ({ sessionId, directory, repositoryEnabled = true }) => {
   const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
   const isPiKernel = usePiKernel();
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
@@ -42,7 +44,7 @@ export const MobileWorkStatusHost: React.FC<{
         sessionId={sessionId}
         directory={directory}
         showSession={sectionVisible('session')}
-        showRepository={sectionVisible('repository')}
+        showRepository={repositoryEnabled && sectionVisible('repository')}
         goalRow={<WorkStatusGoalRow sessionId={sessionId} directory={directory} />}
       />
       {sectionVisible('usage') ? <WorkStatusUsageSection /> : null}
