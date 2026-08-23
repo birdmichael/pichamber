@@ -117,14 +117,15 @@ export function filterPiSettingsCommands<T extends { name: string }>(commands: T
  * Untrusted project skills, OpenCode leftovers, and chip-owned commands stay
  * out. In-app Pichamber starters (`/catch-up`, `/plan-feature`, and the rest
  * of the empty-session chips) stay: they send magic prompts through the Pi
- * session host, not leftover OpenCode flows. `/btw` is a live Desktop command
- * (fork via the Pi session host), not an OpenCode leftover.
+ * session host, not leftover OpenCode flows. `/btw` is a Feature Plugin
+ * command (listed only when `@narumitw/pi-btw` is installed), not an
+ * always-on OpenChamber leftover.
  */
 export function filterPiSlashCommands<T extends PiSlashCommandItem>(commands: T[], isPiKernel: boolean): T[] {
   if (!isPiKernel) return commands;
   const kept: T[] = [];
   for (const command of commands) {
-    if (command.isOpenChamber && !isPichamberStarterSlashCommand(command.name) && command.name !== 'btw') continue;
+    if (command.isOpenChamber && !isPichamberStarterSlashCommand(command.name)) continue;
     if (command.isSkill) {
       if (command.injected === false) continue;
       const slashName = toPiSkillSlashName(command.name);
@@ -159,11 +160,15 @@ export function commandMatchesPiSlashQuery(command: { name: string }, query: str
 /** `/run` always uses product copy. Plugin jargon such as workflowScript must not reach the menu. */
 export function resolveSlashMenuDescription(
   command: { name: string; description?: string },
-  copy: { runDescription: string },
+  copy: { runDescription: string; btwDescription?: string },
 ): string | undefined {
   if (command.name === 'run') {
     const runDescription = copy.runDescription.replace(/\s+/g, ' ').trim();
     return runDescription || undefined;
+  }
+  if (command.name === 'btw' && copy.btwDescription) {
+    const btwDescription = copy.btwDescription.replace(/\s+/g, ' ').trim();
+    return btwDescription || undefined;
   }
   const description = typeof command.description === 'string'
     ? command.description.replace(/\s+/g, ' ').trim()
@@ -186,6 +191,7 @@ export function ensureLiveFeatureSlashCommands<T extends PiSlashCommandItem>(
     isPiKernel: boolean;
     planPluginAvailable: boolean;
     subagentsPluginAvailable?: boolean;
+    btwPluginAvailable?: boolean;
   },
 ): T[] {
   if (!options.isPiKernel) return commands;
@@ -195,6 +201,9 @@ export function ensureLiveFeatureSlashCommands<T extends PiSlashCommandItem>(
   }
   if (options.subagentsPluginAvailable && !next.some((command) => command.name === 'run')) {
     next.push({ name: 'run', agent: 'pi' } as T);
+  }
+  if (options.btwPluginAvailable && !next.some((command) => command.name === 'btw')) {
+    next.push({ name: 'btw', agent: 'pi' } as T);
   }
   return next;
 }

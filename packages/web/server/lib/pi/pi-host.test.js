@@ -788,6 +788,44 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /btw from installed Btw as an extension command and omits it without the package', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-btw-slot-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => command.name === 'btw')).toBe(false);
+      expect(host.getFeaturePlugins().slots.btw).toMatchObject({ installed: false, enabled: false });
+      host.dispose();
+
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-btw');
+      const installed = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(installed.listCommands('/tmp/empty-project').find((command) => command.name === 'btw')).toMatchObject({
+        name: 'btw',
+        source: 'extension',
+        description: 'Ask a side question in a temporary forked session',
+      });
+      expect(installed.listCommands('/tmp/empty-project').some((command) => (
+        command.name === 'btw' && command.source === 'builtin'
+      ))).toBe(false);
+      expect(installed.getFeaturePlugins().slots.btw).toMatchObject({
+        installed: true,
+        enabled: true,
+        command: 'btw',
+        source: 'npm:@narumitw/pi-btw',
+      });
+      installed.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('lists /run from installed Subagents without pichamber.json and keeps Plan off', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-recognize-cmd-'));
     try {
@@ -807,8 +845,10 @@ describe('createPiHost', () => {
         description: 'Run a subagent as a one-shot workflow',
       });
       expect(listed.some((command) => command.name === 'plan')).toBe(false);
+      expect(listed.some((command) => command.name === 'btw')).toBe(false);
       expect(host.getFeaturePlugins().slots.goal).toMatchObject({ installed: true, enabled: true });
       expect(host.getFeaturePlugins().slots.plan).toMatchObject({ installed: false, enabled: false });
+      expect(host.getFeaturePlugins().slots.btw).toMatchObject({ installed: false, enabled: false });
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
       host.dispose();
     } finally {

@@ -24,8 +24,10 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
     expect(payload.slots.mcp.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.mcp);
     expect(payload.slots.subagents.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.subagents);
+    expect(payload.slots.btw.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.btw);
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
+    expect(payload.slots.btw.command).toBe('btw');
     expect(payload.slots.plan.command).toEqual(undefined);
   });
 
@@ -35,7 +37,7 @@ describe('feature plugin payload parsing', () => {
     expect(parseFeaturePluginsPayload({ slots: { goal: { source: 'npm:@narumitw/pi-goal' } } })).toBeNull();
   });
 
-  test('accepts a complete four-slot payload', () => {
+  test('accepts a complete five-slot payload', () => {
     const parsed = parseFeaturePluginsPayload({
       slots: {
         goal: {
@@ -48,10 +50,30 @@ describe('feature plugin payload parsing', () => {
         plan: { source: 'npm:@narumitw/pi-plan-mode', enabled: false, installed: false, presets: [] },
         mcp: { source: 'npm:pi-mcp-adapter', enabled: false, installed: false, presets: [] },
         subagents: { source: 'npm:pi-subagents', enabled: false, installed: false, presets: [] },
+        btw: {
+          source: 'npm:@narumitw/pi-btw',
+          command: 'btw',
+          enabled: true,
+          installed: true,
+          presets: [{ id: 'default', source: 'npm:@narumitw/pi-btw' }],
+        },
       },
     });
     expect(parsed?.slots.goal.installed).toBe(true);
+    expect(parsed?.slots.btw.installed).toBe(true);
+    expect(parsed?.slots.btw.command).toBe('btw');
     expect(parsed?.slots.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
+  });
+
+  test('rejects a four-slot payload that omits btw', () => {
+    expect(parseFeaturePluginsPayload({
+      slots: {
+        goal: { source: 'npm:@narumitw/pi-goal', enabled: false, installed: false, presets: [] },
+        plan: { source: 'npm:@narumitw/pi-plan-mode', enabled: false, installed: false, presets: [] },
+        mcp: { source: 'npm:pi-mcp-adapter', enabled: false, installed: false, presets: [] },
+        subagents: { source: 'npm:pi-subagents', enabled: false, installed: false, presets: [] },
+      },
+    })).toBeNull();
   });
 
   test('shows the default package name without the npm protocol prefix', () => {
@@ -60,14 +82,16 @@ describe('feature plugin payload parsing', () => {
     expect(featurePluginPackageLabel('plan')).toBe('@narumitw/pi-plan-mode');
     expect(featurePluginPackageLabel('mcp')).toBe('pi-mcp-adapter');
     expect(featurePluginPackageLabel('subagents')).toBe('pi-subagents');
+    expect(featurePluginPackageLabel('btw')).toBe('@narumitw/pi-btw');
   });
 
-  test('keeps Settings search IDs on the four slot cards', () => {
+  test('keeps Settings search IDs on the five slot cards', () => {
     expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
       'feature-plugins.goal',
       'feature-plugins.plan',
       'feature-plugins.mcp',
       'feature-plugins.subagents',
+      'feature-plugins.btw',
     ]);
   });
 

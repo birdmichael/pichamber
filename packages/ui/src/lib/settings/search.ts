@@ -877,6 +877,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
+    id: 'feature-plugins.btw',
+    page: 'feature-plugins',
+    titleKey: 'settings.featurePlugins.slot.btw.title',
+    descriptionKey: 'settings.featurePlugins.slot.btw.info',
+    keywords: ['btw', 'pi-btw', '@narumitw/pi-btw', 'npm', 'install'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'snippets.create',
     page: 'snippets',
     titleKey: 'settings.snippets.sidebar.actions.create',

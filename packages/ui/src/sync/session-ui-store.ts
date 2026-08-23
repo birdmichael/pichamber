@@ -190,9 +190,9 @@ export function routeMessage(params: {
       (cmdName === 'run' && isFeaturePluginSlotActive(featurePlugins, 'subagents'))
       || (cmdName === 'plan' && isFeaturePluginSlotActive(featurePlugins, 'plan'))
       || (cmdName === 'goal' && isFeaturePluginSlotActive(featurePlugins, 'goal'))
-    // `/btw` is a registered live command, but the composer owns the fork
-    // panel. Do not POST session.command — unknown names stay chat, and /btw
-    // is intercepted in ChatInput before this router.
+    // `/btw` is a Feature Plugin command. When the slot is on, ChatInput
+    // intercepts it for the fork panel. Never POST session.command — unknown
+    // names stay chat, and a missed intercept must not hit the plugin TUI.
     const isClientOwnedSlash = cmdName === 'btw'
     const isCommand = !isClientOwnedSlash && (
       syncCommands.find((c) => c.name === cmdName)

@@ -97,6 +97,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.mcp.info': 'Installs the MCP adapter package. After install, Work Status MCP and Settings → MCP become available. This page does not start /mcp.',
   'settings.featurePlugins.slot.subagents.title': 'Subagents',
   'settings.featurePlugins.slot.subagents.info': 'Installs the Subagents package. After install, Work Status and writable child sessions become available. This page does not start /subagents-fleet.',
+  'settings.featurePlugins.slot.btw.title': 'Btw',
+  'settings.featurePlugins.slot.btw.info': 'Installs the Btw package. After install, /btw asks a side question in a temporary session. This page does not start /btw.',
   'settings.featurePlugins.status.installed': 'Installed',
   'settings.featurePlugins.status.notInstalled': 'Not installed',
   'settings.featurePlugins.actions.install': 'Install',

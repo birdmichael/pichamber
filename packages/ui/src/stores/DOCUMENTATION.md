@@ -50,7 +50,9 @@ fetch failure keeps the previous command list.
 `useBtwStore` keeps only transient `/btw` panel UI (`collapsed`,
 `creating`, `destroying`) keyed by parent session id. Panel identity is
 session metadata (`openchamber.btwSessionID` on the parent, `kind: 'btw'`
-on the fork) — not this store.
+on the fork) — not this store. The composer intercepts `/btw` and mounts
+the peek panel only when Feature Plugins `btw` (`npm:@narumitw/pi-btw`)
+is installed and enabled.
 
 `useFeaturePluginsStore` caches `GET /api/pi/feature-plugins`. Fetch failure is not treated as an authoritative empty slot list: a prior successful payload is kept, and MCP Settings / Work Status stay hidden until a successful `installed && enabled` payload arrives. Leftover adapter config files are not a visibility signal.
 

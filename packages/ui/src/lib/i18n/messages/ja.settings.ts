@@ -98,6 +98,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.mcp.info': 'MCP アダプターをインストールします。インストール後、Work Status MCP と設定 → MCP が使えます。このページは /mcp を起動しません。',
   'settings.featurePlugins.slot.subagents.title': 'Subagents',
   'settings.featurePlugins.slot.subagents.info': 'Subagents パッケージをインストールします。インストール後、Work Status と書き込み可能な子セッションが使えます。このページは /subagents-fleet を起動しません。',
+  'settings.featurePlugins.slot.btw.title': 'Btw',
+  'settings.featurePlugins.slot.btw.info': 'Btw パッケージをインストールします。インストール後、/btw で一時セッションに脇の質問を送れます。このページは /btw を起動しません。',
   'settings.featurePlugins.status.installed': 'インストール済み',
   'settings.featurePlugins.status.notInstalled': '未インストール',
   'settings.featurePlugins.actions.install': 'インストール',

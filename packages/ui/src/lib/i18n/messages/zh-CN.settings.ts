@@ -98,6 +98,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.mcp.info': '安装 MCP 适配器。安装后即可使用工作状态 MCP 和设置 → MCP。此页面不会启动 /mcp。',
   'settings.featurePlugins.slot.subagents.title': 'Subagents',
   'settings.featurePlugins.slot.subagents.info': '安装 Subagents 软件包。安装后即可使用工作状态和可写子会话。此页面不会启动 /subagents-fleet。',
+  'settings.featurePlugins.slot.btw.title': 'Btw',
+  'settings.featurePlugins.slot.btw.info': '安装 Btw 软件包。安装后，可用 /btw 在临时会话中提出旁支问题。此页面不会启动 /btw。',
   'settings.featurePlugins.status.installed': '已安装',
   'settings.featurePlugins.status.notInstalled': '未安装',
   'settings.featurePlugins.actions.install': '安装',

@@ -98,6 +98,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.mcp.info': 'Instala el adaptador MCP. Tras instalarlo, MCP en Work Status y Ajustes → MCP quedan disponibles. Esta página no inicia /mcp.',
   'settings.featurePlugins.slot.subagents.title': 'Subagents',
   'settings.featurePlugins.slot.subagents.info': 'Instala el paquete Subagents. Tras instalarlo, Work Status y las sesiones hijas escribibles quedan disponibles. Esta página no inicia /subagents-fleet.',
+  'settings.featurePlugins.slot.btw.title': 'Btw',
+  'settings.featurePlugins.slot.btw.info': 'Instala el paquete Btw. Tras instalarlo, /btw hace una pregunta secundaria en una sesión temporal. Esta página no inicia /btw.',
   'settings.featurePlugins.status.installed': 'Instalado',
   'settings.featurePlugins.status.notInstalled': 'No instalado',
   'settings.featurePlugins.actions.install': 'Instalar',

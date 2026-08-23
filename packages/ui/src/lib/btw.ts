@@ -33,6 +33,11 @@ export type StartBtwInput = {
 
 export const btwSessionTitle = (question: string): string => `btw: ${question}`;
 
+/** Composer intercepts `/btw` only when the Feature Plugin slot is active. */
+export function shouldInterceptBtwSlash(commandName: string, pluginAvailable: boolean): boolean {
+  return commandName === 'btw' && pluginAvailable;
+}
+
 /**
  * Insert the fork into its directory child store so live sync can see it
  * immediately, mirroring `forkFromMessage` in session-actions. The fork is

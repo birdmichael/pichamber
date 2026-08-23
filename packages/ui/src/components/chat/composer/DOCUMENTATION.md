@@ -57,7 +57,9 @@ On Pi, `@agent` mentions do not switch session personality: the send path
 does not route `@agent:build` / `@agent:plan` / leftover OpenCode names, the
 prompt language does not classify those tokens as `agent`, and `@`
 autocomplete does not list leftover OpenCode agents. Unknown `/name` stays
-chat. The OpenCode kernel keeps `@agent` mentions. The leftover mobile Pi
+chat. `/btw` is intercepted for the Desktop fork panel only when Feature
+Plugins `btw` (`npm:@narumitw/pi-btw`) is installed; without that package
+it is an unknown slash and sends as chat. The OpenCode kernel keeps `@agent` mentions. The leftover mobile Pi
 chip hide is already shipped (`shouldShowComposerAgentChip`).
 When the Pi Plan plugin is installed and enabled, that slot is one **Agent / Plan**
 dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The

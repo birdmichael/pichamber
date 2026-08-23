@@ -50,7 +50,6 @@ export const resolvePiDefaultModel = (stored, providers = []) => {
 export const BUILTIN_COMMANDS = [
   { name: 'compact', description: 'Compact session context', source: 'builtin', template: '' },
   { name: 'login', description: 'Authenticate a provider', source: 'builtin', template: '' },
-  { name: 'btw', description: 'Ask a side question in a temporary forked session', source: 'builtin', template: '' },
 ];
 
 /** Reserved so custom prompts cannot collide with chip-owned or host-only actions. */
