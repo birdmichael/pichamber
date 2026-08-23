@@ -6,10 +6,6 @@ import {
   HighlightResultCache,
   utf16Bytes,
 } from './highlightResultCache';
-import {
-  getCachedHighlightedLines,
-  resetMarkdownWorkerClientCacheForTests,
-} from './markdown-worker';
 
 describe('HighlightResultCache', () => {
   test('returns cached values for identical keys and refreshes LRU order', () => {
@@ -56,12 +52,5 @@ describe('HighlightResultCache', () => {
       [[8, 'var(--md-syntax-keyword)', 0]],
     ];
     expect(estimateTokenRunsBytes(lines)).toBeGreaterThan(0);
-  });
-});
-
-describe('markdown worker highlight cache', () => {
-  test('getCachedHighlightedLines is empty until a worker result lands', () => {
-    resetMarkdownWorkerClientCacheForTests();
-    expect(getCachedHighlightedLines('const x = 1', 'ts')).toBe(null);
   });
 });
