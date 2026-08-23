@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, test } from 'bun:test';
 import {
   DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
@@ -7,8 +11,23 @@ import {
   readOverlayMaxHeight,
   resolveDesktopSlashPopupMaxHeight,
   shouldDockComposerForDesktopSlashMenu,
+  shouldHideNewSessionWelcomeForDesktopSlashMenu,
   snapSlashPopupMaxHeight,
 } from '../slashPopupHeight';
+
+const chatInputSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../ChatInput.tsx'),
+  'utf-8',
+);
+
+function describedRowsForAvailablePx(availablePx: number): number {
+  const height = resolveDesktopSlashPopupMaxHeight({
+    availablePx,
+    rowHeightPx: DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
+    chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
+  });
+  return Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX);
+}
 
 describe('snapSlashPopupMaxHeight', () => {
   test('the old 256px cap leaves a clipped remainder on described rows', () => {
@@ -83,6 +102,30 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
     expect(rows >= 8).toBe(true);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
   });
+
+  test('docking with the welcome title and chips still in the form stays under eight rows', () => {
+    const availablePx = measureDesktopSlashAvailablePx({
+      chatTopPx: 48,
+      popupBottomPx: 474,
+    });
+    expect(describedRowsForAvailablePx(availablePx) >= 8).toBe(false);
+  });
+
+  test('hiding welcome chrome on a 1280x800 new session fits at least eight full described rows', () => {
+    const availablePx = measureDesktopSlashAvailablePx({
+      chatTopPx: 48,
+      popupBottomPx: 572,
+    });
+    const height = resolveDesktopSlashPopupMaxHeight({
+      availablePx,
+      rowHeightPx: DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX,
+      chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
+    });
+    const rows = describedRowsForAvailablePx(availablePx);
+    expect(availablePx >= 508).toBe(true);
+    expect(rows >= 8).toBe(true);
+    expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
+  });
 });
 
 describe('shouldDockComposerForDesktopSlashMenu', () => {
@@ -105,6 +148,27 @@ describe('shouldDockComposerForDesktopSlashMenu', () => {
       newSessionDraftOpen: true,
       commandAutocompleteOpen: true,
     })).toBe(false);
+  });
+
+  test('hides the new-session title and starter chips on that same Desktop `/` moment', () => {
+    const open = {
+      isMobile: false,
+      isDesktopExpanded: false,
+      newSessionDraftOpen: true,
+      commandAutocompleteOpen: true,
+    };
+    const closed = { ...open, commandAutocompleteOpen: false };
+    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(open)).toBe(true);
+    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(closed)).toBe(false);
+    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(open)).toBe(
+      shouldDockComposerForDesktopSlashMenu(open),
+    );
+  });
+
+  test('ChatInput hides welcome chrome and cancels the 6vh inset while Desktop `/` is open', () => {
+    expect(chatInputSource.includes('shouldHideNewSessionWelcomeForDesktopSlashMenu')).toBe(true);
+    expect(chatInputSource.includes('showNewSessionWelcome')).toBe(true);
+    expect(chatInputSource.includes('-mb-[6vh]')).toBe(true);
   });
 });
 

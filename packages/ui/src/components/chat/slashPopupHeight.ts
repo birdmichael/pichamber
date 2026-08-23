@@ -3,8 +3,11 @@
  * footer made the old 256px (`max-h-64`) cap show ~3.5 rows and clip the
  * last name. A new-session composer is vertically centered, so the space
  * above it is also ~256px until the form docks to the bottom while `/` is
- * open. After that, use the space above the composer up to this cap, snapped
- * to whole rows so the last visible name stays intact.
+ * open. Docking the whole welcome block is not enough: the title and starter
+ * chips stay in that block and steal the list viewport (observed ~5 rows /
+ * ~295px on 1280×800). Hide that chrome in the same turn, cancel the
+ * new-session `pb-[6vh]` inset, then measure the space above the composer
+ * and snap to whole rows so the last visible name stays intact.
  */
 
 export const DESKTOP_SLASH_POPUP_DESIGN_CAP_PX = 640;
@@ -24,6 +27,13 @@ export function shouldDockComposerForDesktopSlashMenu(options: {
     && !options.isMobile
     && !options.isDesktopExpanded
     && options.newSessionDraftOpen;
+}
+
+/** Same moment as the dock: drop the title and starter chips so they cannot steal list height. */
+export function shouldHideNewSessionWelcomeForDesktopSlashMenu(
+  options: Parameters<typeof shouldDockComposerForDesktopSlashMenu>[0],
+): boolean {
+  return shouldDockComposerForDesktopSlashMenu(options);
 }
 
 export function measureDesktopSlashAvailablePx(options: {

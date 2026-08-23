@@ -128,7 +128,10 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
-import { shouldDockComposerForDesktopSlashMenu } from './slashPopupHeight';
+import {
+    shouldDockComposerForDesktopSlashMenu,
+    shouldHideNewSessionWelcomeForDesktopSlashMenu,
+} from './slashPopupHeight';
 import { useMessageHistory } from './composer/state/useMessageHistory';
 import { useComposerDraft } from './composer/state/useComposerDraft';
 import { useDraftTarget } from './composer/state/useDraftTarget';
@@ -2533,6 +2536,26 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         };
     }, []);
 
+    const desktopSlashMenuOpen = openAutocomplete === 'command';
+    const compactNewSessionForSlash = shouldDockComposerForDesktopSlashMenu({
+        isMobile,
+        isDesktopExpanded,
+        newSessionDraftOpen,
+        commandAutocompleteOpen: desktopSlashMenuOpen,
+    });
+    const hideNewSessionWelcomeForSlash = shouldHideNewSessionWelcomeForDesktopSlashMenu({
+        isMobile,
+        isDesktopExpanded,
+        newSessionDraftOpen,
+        commandAutocompleteOpen: desktopSlashMenuOpen,
+    });
+    const showNewSessionWelcome = newSessionDraftOpen
+        && !isDesktopExpanded
+        && !isMobile
+        && !isVSCode
+        && !isMiniChatSurface
+        && !hideNewSessionWelcomeForSlash;
+
     return (
         <>
         <form
@@ -2543,16 +2566,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                 isDesktopExpanded && 'flex h-full min-h-0 flex-col pt-4',
                 isMobileExpanded && 'flex h-full min-h-0 flex-col pt-2',
                 isMobile && 'bottom-safe-area oc-mobile-composer',
-                shouldDockComposerForDesktopSlashMenu({
-                    isMobile,
-                    isDesktopExpanded,
-                    newSessionDraftOpen,
-                    commandAutocompleteOpen: openAutocomplete === 'command',
-                }) && 'self-end',
+                compactNewSessionForSlash && 'self-end',
+                // ChatContainer's new-session column uses pb-[6vh]; eat it so
+                // the docked composer-only form can sit on the true bottom.
+                compactNewSessionForSlash && !isVSCode && !isMiniChatSurface && '-mb-[6vh]',
             )}
             style={isMobile && inputBarOffset > 0 ? { marginBottom: `${inputBarOffset}px` } : undefined}
         >
-            {newSessionDraftOpen && !isDesktopExpanded && !isMobile && !isVSCode && !isMiniChatSurface ? (
+            {showNewSessionWelcome ? (
                 <div className="chat-input-column mb-7 text-center">
                     <h1 className="text-balance text-2xl font-normal tracking-tight text-foreground md:text-3xl">
                         {renderDraftTitle(
@@ -2907,7 +2928,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                     />
                 ) : null}
             </div>
-            {newSessionDraftOpen && !isDesktopExpanded && !isMobile && !isVSCode && !isMiniChatSurface ? (
+            {showNewSessionWelcome ? (
                 <DraftPresetChips
                     onSubmit={(starter) => submitPresetPrompt(starter.submitText, starter.ref.type)}
                     className="chat-input-column mt-4"

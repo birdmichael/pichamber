@@ -380,9 +380,19 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
       ));
     };
     measure();
+    const containerEl = containerRef.current;
+    const observed = [
+      containerEl?.closest('[data-chat-area]') ?? containerEl?.closest('main'),
+      containerEl?.closest('form'),
+    ].filter((el): el is Element => el != null);
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    for (const el of observed) {
+      resizeObserver?.observe(el);
+    }
     window.addEventListener('resize', measure);
     window.visualViewport?.addEventListener('resize', measure);
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('resize', measure);
     };
