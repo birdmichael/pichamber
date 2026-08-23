@@ -383,7 +383,7 @@ const BtwExpandedSheet: React.FC<{
     const contentRef = React.useRef<HTMLDivElement | null>(null);
     const handleBodyScroll = useAutoScroll(bodyRef, contentRef, !data.isEmpty);
     const BTW_FRAME_CHROME_PX = 48;
-    const availableMaxHeight = useMobileAutocompleteMaxHeight(bodyRef, true, 520 + BTW_FRAME_CHROME_PX);
+    const availableMaxHeight = useMobileAutocompleteMaxHeight(bodyRef, true);
     const mobileMaxHeight = availableMaxHeight !== undefined
         ? Math.max(120, availableMaxHeight - BTW_FRAME_CHROME_PX)
         : undefined;
