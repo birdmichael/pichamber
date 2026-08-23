@@ -44,6 +44,7 @@ import { SyncProvider } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { AboutDialog } from '@/components/ui/AboutDialog';
+import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
 import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
 import { registerRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useUIStore } from '@/stores/useUIStore';
@@ -956,6 +957,7 @@ function App({ apis }: AppProps) {
                     <>
                       <ConfigUpdateOverlay />
                       <AboutDialogWrapper />
+                      <AppLinkConfirmDialog />
                       {showMemoryDebug && (
                         <MemoryDebugPanel onClose={() => setShowMemoryDebug(false)} />
                       )}

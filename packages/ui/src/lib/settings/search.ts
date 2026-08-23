@@ -182,6 +182,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['telemetry', 'analytics'],
   },
   {
+    id: 'general.app-links',
+    page: 'general',
+    titleKey: 'settings.openchamber.appLinks.title',
+    descriptionKey: 'settings.openchamber.appLinks.info',
+    keywords: ['security', 'app link', 'deep link', 'scheme', 'protocol', 'obsidian', 'notion', 'spotify'],
+  },
+  {
     id: 'chat.render-mode',
     page: 'chat',
     titleKey: 'settings.openchamber.visual.section.chatRenderMode',

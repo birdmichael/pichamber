@@ -5,6 +5,7 @@ import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
 import { registerRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
+import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { OpenCodeUpdateToast } from '@/components/update/OpenCodeUpdateToast';
@@ -129,6 +130,7 @@ export function VSCodeApp({ apis }: VSCodeAppProps) {
                 <VSCodeLayout />
                 <OpenCodeUpdateToast />
                 <Toaster position="top-center" />
+                <AppLinkConfirmDialog />
                 <ConfigUpdateOverlay />
               </div>
             </TooltipProvider>
