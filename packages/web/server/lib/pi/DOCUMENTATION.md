@@ -42,6 +42,25 @@ remaining cwd. `projects: []` after Close Project is not first-install —
 do not scan again. This write does not create `{agentDir}/pichamber.json`
 and does not flatten `GET /api/session`. List stays directory-scoped.
 
+## Custom provider protocols
+
+Settings → Providers custom add/edit includes an API protocol field matching
+official OpenChamber 1.20.0 (`openai-chat`, `openai-responses`,
+`anthropic-messages`). The form still writes the official npm adapter on the
+OpenCode-shaped payload. `mapOpenCodeProviderToPi` maps that onto Pi
+`models.json` `api`:
+
+| Form protocol | npm | Pi `api` |
+|---|---|---|
+| `openai-chat` | `@ai-sdk/openai-compatible` | `openai-completions` |
+| `openai-responses` | `@ai-sdk/openai` | `openai-responses` |
+| `anthropic-messages` | `@ai-sdk/anthropic` | `anthropic-messages` |
+
+Do not invent leftover OpenCode plugins or hardcode a provider id.
+`GET /api/provider` exposes `api` so Edit prefills the same protocol.
+Config-defined customs skip the standalone auth panel; credentials stay on
+the custom form. Models still come from Pi at runtime.
+
 ## Custom provider context windows and input
 
 Settings → Providers custom-model rows persist Pi `contextWindow`,

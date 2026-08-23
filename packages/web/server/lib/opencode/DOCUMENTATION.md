@@ -61,8 +61,8 @@ This module provides OpenCode server integration utilities for the web server ru
 
 ## Public exports (providers.js)
 - `getProviderSources(providerId, workingDirectory)`: Resolves which OpenCode config layers define a provider.
-- `upsertProviderConfig(providerId, config, workingDirectory, scope?, options?)`: Validates and writes a custom OpenAI-compatible provider block (`npm`, `name`, `options.baseURL`, `models`, optional `env`/`headers`) into the user/project/custom config layer. Does not store API keys. Requires `config.env` or `options.hasStoredAuth` (auth already written via OpenCode `auth.set`). Edit flows must pass the provider's effective existing layer (`custom` > `project` > `user`) so updates do not create a global user override.
-- `validateCustomProviderConfig(providerId, config, options?)`: Structural validation for custom provider payloads (id format, http(s) base URL, models, credentials via `env` or `hasStoredAuth`).
+- `upsertProviderConfig(providerId, config, workingDirectory, scope?, options?)`: Validates and writes a custom provider block (`npm` from `@ai-sdk/openai-compatible`, `@ai-sdk/openai`, or `@ai-sdk/anthropic`; `name`; `options.baseURL`; `models`; optional `env`/`headers`) into the user/project/custom config layer. Does not store API keys. Requires `config.env` or `options.hasStoredAuth` (auth already written via OpenCode `auth.set`). Edit flows must pass the provider's effective existing layer (`custom` > `project` > `user`) so updates do not create a global user override.
+- `validateCustomProviderConfig(providerId, config, options?)`: Structural validation for custom provider payloads (id format, allowed npm adapter, http(s) base URL, models, credentials via `env` or `hasStoredAuth`).
 - `removeProviderConfig(providerId, workingDirectory, scope?)`: Removes a provider block from the selected config layer.
 
 ## Public exports (shared.js)
@@ -91,7 +91,7 @@ This module provides OpenCode server integration utilities for the web server ru
   - `POST /api/opencode/directory` (validates and activates an existing project directory; `{ create: true }` explicitly creates the requested project directory before activation, including outside the previously active workspace)
   - `GET /api/provider/:providerId/source`
   - `POST /api/provider/models` (lists remote OpenAI-compatible models from the form `baseURL` + API key or a stored Pi key; stored keys are only sent to the saved provider origin; does not follow redirects; never returns credentials. Failure is distinct from an empty list.)
-  - `PUT /api/provider` (OpenCode kernel only: create/update custom OpenAI-compatible provider config in OpenCode user/project/custom layers via `scope`; secrets stay in auth via the OpenCode auth API. Pi kernel uses the facade and `~/.pi/agent` instead.)
+  - `PUT /api/provider` (OpenCode kernel only: create/update custom provider config in OpenCode user/project/custom layers via `scope`, using `@ai-sdk/openai-compatible`, `@ai-sdk/openai`, or `@ai-sdk/anthropic`; secrets stay in auth via the OpenCode auth API. Pi kernel uses the facade and `~/.pi/agent` instead.)
   - `DELETE /api/provider/:providerId/auth` (OpenCode kernel only; Pi kernel uses the facade)
 - Owns lazy auth library loading for provider auth checks/removal.
 - Keeps route behavior independent from composition root; `index.js` now supplies dependencies only.

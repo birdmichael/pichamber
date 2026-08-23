@@ -791,6 +791,9 @@ const applyPublicProviderConfig = (provider, config) => {
       ...(headers ? { headers } : {}),
     };
   }
+  if (typeof config.api === 'string' && config.api.trim()) {
+    provider.api = config.api.trim();
+  }
   if (Array.isArray(config.env)) {
     const env = config.env
       .filter((entry) => typeof entry === 'string' && entry.trim())

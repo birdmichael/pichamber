@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { shouldLoadAvailableProviders } from './providerAvailability';
+import { requiresProviderAuth, shouldLoadAvailableProviders } from './providerAvailability';
 import {
   getOAuthAuthMethods,
   normalizeAuthType,
@@ -12,6 +12,13 @@ describe('ProvidersPage available provider loading', () => {
   test('loads available providers only in add-provider mode', () => {
     expect(shouldLoadAvailableProviders(false)).toBe(false);
     expect(shouldLoadAvailableProviders(true)).toBe(true);
+  });
+
+  test('skips the standalone auth panel for config-defined custom providers', () => {
+    expect(requiresProviderAuth(true, false, false)).toBe(true);
+    expect(requiresProviderAuth(true, true, false)).toBe(false);
+    expect(requiresProviderAuth(true, false, true)).toBe(false);
+    expect(requiresProviderAuth(false, false, false)).toBe(false);
   });
 });
 
