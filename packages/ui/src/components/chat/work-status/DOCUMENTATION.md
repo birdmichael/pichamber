@@ -55,9 +55,10 @@ and Capacitor wrap the same section components in `MobileWorkStatusHost`
 That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
 
 `ChatContainer` additionally suppresses it in mini-chat and in expanded-input
-mode. It remains available on a new-session draft: when the draft targets a
-project or pending worktree, the panel uses that directory for project, MCP,
-and usage readouts before a session exists.
+mode. It remains available on a new-session draft and on an existing session
+with no messages yet — project, cwd, and MCP still exist without a transcript.
+When the draft targets a project or pending worktree, the panel uses that
+directory for project, MCP, and usage readouts before a session exists.
 
 `rowRef` is a **callback ref, not an object ref**. An object ref gives no signal
 when the node attaches, so the measuring effect read `.current`, found nothing

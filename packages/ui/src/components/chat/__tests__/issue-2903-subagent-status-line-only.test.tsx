@@ -236,9 +236,12 @@ describe('issue #2903 busy embedded subagent status-line-only', () => {
     expect(emptyStateReturn).toBeGreaterThan(-1);
     const emptyStateBlock = chatContainerSource.slice(
       emptyStateReturn,
-      emptyStateReturn + 1600,
+      emptyStateReturn + 2400,
     );
-    expect(emptyStateBlock).toContain('<ChatEmptyState');
+    expect(emptyStateBlock).toContain('<DraftWelcome');
+    expect(emptyStateBlock).toContain('<WorkStatusPanel');
+    expect(emptyStateBlock).toContain('emptySessionWelcome');
+    expect(emptyStateBlock).not.toContain('<ChatEmptyState');
     expect(emptyStateBlock).not.toContain('<StatusRowContainer />');
   });
 

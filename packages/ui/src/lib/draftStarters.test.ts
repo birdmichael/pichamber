@@ -7,6 +7,7 @@ import {
     getBuiltInStarter,
     isPichamberStarterSlashCommand,
     PICHAMBER_STARTER_SLASH_COMMANDS,
+    shouldShowDesktopDraftWelcomeChrome,
 } from './draftStarters';
 
 describe('empty-session welcome chips', () => {
@@ -18,6 +19,36 @@ describe('empty-session welcome chips', () => {
         expect(names).toContain('plan-feature');
         expect(getBuiltInStarter('catch-up')?.command).toBe('/catch-up');
         expect(getBuiltInStarter('plan-feature')?.command).toBe('/plan-feature');
+    });
+
+    test('desktop welcome chrome is the same for New session and an empty existing session', () => {
+        const desktop = {
+            isDesktopExpanded: false,
+            isMobile: false,
+            isVSCode: false,
+            isMiniChatSurface: false,
+        };
+        expect(shouldShowDesktopDraftWelcomeChrome({
+            ...desktop,
+            newSessionDraftOpen: true,
+            emptySessionWelcome: false,
+        })).toBe(true);
+        expect(shouldShowDesktopDraftWelcomeChrome({
+            ...desktop,
+            newSessionDraftOpen: false,
+            emptySessionWelcome: true,
+        })).toBe(true);
+        expect(shouldShowDesktopDraftWelcomeChrome({
+            ...desktop,
+            newSessionDraftOpen: false,
+            emptySessionWelcome: false,
+        })).toBe(false);
+        expect(shouldShowDesktopDraftWelcomeChrome({
+            ...desktop,
+            isMobile: true,
+            newSessionDraftOpen: true,
+            emptySessionWelcome: true,
+        })).toBe(false);
     });
 
     test('every built-in starter is a Pichamber slash command', () => {

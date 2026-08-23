@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.
 - Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
 - Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and model name as text, without overlapping Agent, mic, or Send.

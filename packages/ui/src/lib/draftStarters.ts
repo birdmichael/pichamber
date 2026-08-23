@@ -56,6 +56,25 @@ export function areDraftPresetChipsVisible(options: {
     return options.visible;
 }
 
+/**
+ * Desktop (non-compact) empty chrome: title + starter chips live in ChatInput.
+ * New-session draft and an existing session with zero messages share this surface.
+ * Compact layouts (mobile / VS Code / mini-chat) use DraftWelcome instead.
+ */
+export function shouldShowDesktopDraftWelcomeChrome(options: {
+    newSessionDraftOpen: boolean;
+    emptySessionWelcome: boolean;
+    isDesktopExpanded: boolean;
+    isMobile: boolean;
+    isVSCode: boolean;
+    isMiniChatSurface: boolean;
+}): boolean {
+    if (options.isDesktopExpanded || options.isMobile || options.isVSCode || options.isMiniChatSurface) {
+        return false;
+    }
+    return options.newSessionDraftOpen || options.emptySessionWelcome;
+}
+
 const BUILTIN_BY_NAME = new Map<string, BuiltInStarter>(BUILTIN_STARTERS.map((s) => [s.name, s]));
 
 export const getBuiltInStarter = (name: string): BuiltInStarter | undefined => BUILTIN_BY_NAME.get(name);

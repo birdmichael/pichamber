@@ -1318,37 +1318,49 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
 	if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome) {
 		return (
-			// No transform here either — same fixed-positioning constraint as the
-			// draft branch above.
-			<div data-composer-bound className="relative flex flex-col h-full bg-background">
-				{returnToParentButton}
-				<div
-					className={cn(
-                        'relative min-h-0',
-                        isDesktopExpandedInput
-                            ? 'absolute inset-0 opacity-0 pointer-events-none'
-                            : 'flex-1'
-                    )}
-                    aria-hidden={isDesktopExpandedInput}
-                >
-                    {!isDesktopExpandedInput ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <ChatEmptyState />
-                        </div>
-                    ) : null}
-                </div>
-                <div
-                    className={cn(
-                        'relative z-10',
-						isDesktopExpandedInput
-							? 'flex-1 min-h-0 bg-background'
-							: 'bg-background'
-					)}
-				>
-                    {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+			// Same welcome chrome as New session: starter chips + Session panel.
+			// No transform here — same fixed-positioning constraint as the draft
+			// branch above.
+			<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
+				<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col bg-background">
+					{returnToParentButton}
+					{useCompactDraftLayout && !isDesktopExpandedInput ? <DraftWelcome /> : null}
+					<div
+						className={cn(
+							'relative z-10 flex min-h-0',
+							isDesktopExpandedInput
+								? 'flex-1 bg-background'
+								: useCompactDraftLayout
+									? 'bg-background px-0'
+									: 'flex-1 items-center justify-center bg-background px-0 pb-[6vh]'
+						)}
+					>
+						{promptReadOnly ? <ReadOnlyPromptBanner /> : (
+							<ChatInput
+								active={active}
+								scrollToBottom={scrollToBottomOnSend}
+								emptySessionWelcome
+							/>
+						)}
+					</div>
+					{workStatusOverlayMountable ? (
+						<WorkStatusPanel
+							overlay
+							visible={showWorkStatusOverlay}
+							sessionId={currentSessionId}
+							directory={workStatusDirectory ?? null}
+						/>
+					) : null}
 				</div>
-            </div>
-        );
+				{workStatusPanelMountable ? (
+					<WorkStatusPanel
+						visible={showWorkStatusPanel}
+						sessionId={currentSessionId}
+						directory={workStatusDirectory ?? null}
+					/>
+				) : null}
+			</div>
+		);
     }
 
 	return (

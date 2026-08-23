@@ -78,6 +78,7 @@ import { togglePermissionAutoAccept } from './permissionAutoAccept';
 import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
+import { shouldShowDesktopDraftWelcomeChrome } from '@/lib/draftStarters';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
 import { wrapSystemReminder } from '@/lib/systemReminder';
@@ -231,6 +232,11 @@ interface ChatInputProps {
     onOpenSettings?: () => void;
     scrollToBottom?: () => void;
     active?: boolean;
+    /**
+     * Existing session with no transcript chrome yet. Shares the New session
+     * title + starter chips; does not open a draft or mint another session.
+     */
+    emptySessionWelcome?: boolean;
 }
 
 const resolveChatDraftIdentity = (sessionId: string | null): ChatDraftIdentity | null => {
@@ -244,7 +250,12 @@ const resolveChatDraftIdentity = (sessionId: string | null): ChatDraftIdentity |
     return createChatDraftIdentity(getRuntimeKey(), directory, sessionId);
 };
 
-const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollToBottom, active = true }) => {
+const ChatInputComponent: React.FC<ChatInputProps> = ({
+    onOpenSettings,
+    scrollToBottom,
+    active = true,
+    emptySessionWelcome = false,
+}) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
     const canUseOpenCodeSessionStubs = canOfferOpenCodeSessionStub(isPiKernel);
@@ -2372,6 +2383,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
 
     const chatSurfaceMode = useChatSurfaceMode();
     const isMiniChatSurface = chatSurfaceMode === 'mini-chat';
+    const showDesktopDraftWelcomeChrome = shouldShowDesktopDraftWelcomeChrome({
+        newSessionDraftOpen,
+        emptySessionWelcome,
+        isDesktopExpanded,
+        isMobile,
+        isVSCode,
+        isMiniChatSurface,
+    });
 
     const hasPendingChanges = React.useMemo(() => {
         if (isMiniChatSurface) {
@@ -2549,12 +2568,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         newSessionDraftOpen,
         commandAutocompleteOpen: desktopSlashMenuOpen,
     });
-    const showNewSessionWelcome = newSessionDraftOpen
-        && !isDesktopExpanded
-        && !isMobile
-        && !isVSCode
-        && !isMiniChatSurface
-        && !hideNewSessionWelcomeForSlash;
+    const showNewSessionWelcome = showDesktopDraftWelcomeChrome && !hideNewSessionWelcomeForSlash;
 
     return (
         <>
