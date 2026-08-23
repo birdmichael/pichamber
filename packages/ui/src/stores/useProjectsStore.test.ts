@@ -50,8 +50,8 @@ describe("useProjectsStore settings synchronization", () => {
     } as DesktopSettings)
 
     const project = useProjectsStore.getState().projects.find((entry) => entry.path === "/repo/variant-only")
-    expect(project?.defaultModel).toBeUndefined()
-    expect(project?.defaultVariant).toBeUndefined()
+    expect(project?.defaultModel).toBe(undefined)
+    expect(project?.defaultVariant).toBe(undefined)
   })
 
   test("updateProjectMeta clears the thinking pin when the model is removed", () => {
@@ -76,7 +76,7 @@ describe("useProjectsStore settings synchronization", () => {
     })
 
     const updated = useProjectsStore.getState().projects.find((entry) => entry.path === "/repo/clear-pin")
-    expect(updated?.defaultModel).toBeUndefined()
-    expect(updated?.defaultVariant).toBeUndefined()
+    expect(updated?.defaultModel).toBe(undefined)
+    expect(updated?.defaultVariant).toBe(undefined)
   })
 })

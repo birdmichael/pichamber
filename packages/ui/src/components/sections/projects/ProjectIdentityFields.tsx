@@ -86,6 +86,9 @@ export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ fo
       ?.models.find((entry) => entry.id === modelId) as { variants?: Record<string, unknown> } | undefined;
     const variants = model?.variants;
     return variants ? Object.keys(variants) : [];
+    // modelsMetadata is required: getModelMetadata is a stable store method
+    // and would otherwise keep the empty-catalog fallback after fetch lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
   }, [getModelMetadata, isPiKernel, modelsMetadata, parsedDefaultModel, providers]);
 
   if (!project) {

@@ -1152,7 +1152,7 @@ describe('useConfigStore provider persistence', () => {
     const state = useConfigStore.getState();
     expect(state.currentProviderId).toBe('xai');
     expect(state.currentModelId).toBe('grok-4.6');
-    expect(state.currentVariant).toBeUndefined();
+    expect(state.currentVariant).toBe(undefined);
   });
 
   test('applyDefaultModelAgentSelection does not leak settings variant onto a project model', () => {
@@ -1179,7 +1179,7 @@ describe('useConfigStore provider persistence', () => {
       projectDefaultModel: 'xai/grok-4.6',
     });
 
-    expect(useConfigStore.getState().currentVariant).toBeUndefined();
+    expect(useConfigStore.getState().currentVariant).toBe(undefined);
   });
 
   test('applyDefaultModelAgentSelection accepts an OpenCode leftover variant on the project model', () => {

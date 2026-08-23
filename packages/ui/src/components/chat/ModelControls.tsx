@@ -387,6 +387,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId));
         // modelsMetadata is required: getModelMetadata is a stable store method
         // and would otherwise keep the empty-catalog fallback after fetch lands.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
     }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
     React.useEffect(() => {
         if (!isPiKernel) {
@@ -427,7 +428,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [currentSessionIdForThinking, currentModelId, draftThinkingLevels, isPiKernel]);
+        // piThinking is a fallback only; including it would re-run after every chip write.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- draft pin follows currentVariant
+    }, [currentSessionIdForThinking, currentModelId, currentVariant, draftThinkingLevels, isPiKernel]);
 
     const visiblePiThinkingLevels = React.useMemo(
         () => resolveVisiblePiThinkingLevels(piThinkingLevels ?? draftThinkingLevels),
