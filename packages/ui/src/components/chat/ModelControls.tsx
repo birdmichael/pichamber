@@ -2469,7 +2469,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                 >
                                     {!isReady ? (
                                         <>
-                                            <Icon name="loader-4" className={cn(controlIconSize, 'animate-spin text-muted-foreground flex-shrink-0')} />
+                                            <Icon name="loader-4" className={cn(controlIconSize, 'model-controls__model-icon animate-spin text-muted-foreground flex-shrink-0')} />
                                             <span className={cn(
                                                 'model-controls__model-label',
                                                 controlTextSize,
@@ -2482,19 +2482,19 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                         <>
                                             <ProviderLogo
                                                 providerId={currentProviderId}
-                                                className={cn(controlIconSize, 'flex-shrink-0')}
+                                                className={cn(controlIconSize, 'model-controls__model-icon flex-shrink-0')}
                                             />
                                             <Icon name="pencil-ai" className={cn(controlIconSize, 'text-primary/60 hidden')} />
                                         </>
                                     ) : (
-                                        <Icon name="pencil-ai" className={cn(controlIconSize, 'text-muted-foreground')} />
+                                        <Icon name="pencil-ai" className={cn(controlIconSize, 'model-controls__model-icon text-muted-foreground')} />
                                     )}
                                     {isReady && (
                                         <span
                                             ref={modelLabelRef}
                                             key={`${currentProviderId}-${currentModelId}`}
                                             className={cn(
-                                                'model-controls__model-label min-w-0 overflow-hidden truncate',
+                                                'model-controls__model-label overflow-hidden truncate',
                                                 controlTextSize,
                                                 'font-medium whitespace-nowrap text-foreground',
                                                 'max-w-[260px]'
@@ -3151,11 +3151,13 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     <div className="model-controls__variant-slot shrink-0 overflow-hidden">
                         {renderVariantSelector()}
                     </div>
-                    <div className="model-controls__model-slot min-w-0 overflow-hidden">
+                    <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
                     {renderAgentSelector()}
-                    <PiPlanModeToggle />
+                    <div className="model-controls__plan-slot">
+                        <PiPlanModeToggle />
+                    </div>
                 </div>
             </div>
 

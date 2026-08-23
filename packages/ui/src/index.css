@@ -754,12 +754,14 @@ html:not(.dark) .chat-scroll {
 /* Model/agent controls: progressively collapse labels as the row narrows.
    Hide priority (most aggressive first → most resilient last): agent, variant, model.
 
-   Desktop (Electron/web, not VS Code): a typical ~1280 window with a right
-   panel (~355px chat column) must keep thinking + model as non-overlapping
-   text. Thinking and Agent/Plan keep their natural width. The model chip is
-   the flex child that shrinks; its name truncates/marquees inside
-   overflow:hidden so labels cannot paint onto the next chip. Icon-only is
-   last resort only. Leftover OpenCode agent still hides first. */
+   Desktop (Electron/web, not VS Code): a typical ~1280 window with Session
+   (~0.45 rail) keeps thinking + the full runtime model name. Walkthrough and
+   other ~0.6 rails leave a narrower composer (~170px model-controls row).
+   Thinking keeps its natural width. The model name keeps a readable floor
+   (several letters + ellipsis — never a single glyph). The provider glyph
+   hides on that squeeze so the name can use the slot. Agent/Plan yields
+   next so chips cannot overlap. Icon-only is last resort only. Leftover
+   OpenCode agent still hides first. Do not hardcode a provider/model name. */
 @container model-controls (max-width: 22rem) {
   :root:not(.vscode-runtime) .model-controls__agent-label {
     display: none;
@@ -771,7 +773,7 @@ html:not(.dark) .chat-scroll {
 }
 
 :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
-  min-width: 0;
+  min-width: 5.5rem;
   overflow: hidden;
 }
 
@@ -800,13 +802,29 @@ html:not(.dark) .chat-scroll {
 }
 
 :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
-  min-width: 0;
+  min-width: 5ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
 :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
   max-width: 100%;
+}
+
+@container model-controls (max-width: 14rem) {
+  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-icon {
+    display: none;
+  }
+
+  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
+    min-width: 3.25rem;
+  }
 }
 
 @container model-controls (max-width: 8rem) {
