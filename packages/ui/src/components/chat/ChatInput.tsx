@@ -145,7 +145,7 @@ import {
 } from './composer/ui/DraftTargetSelectors';
 import { ComposerAutocompletePopups } from './composer/ui/ComposerAutocompletePopups';
 import { ComposerFooter } from './composer/ui/ComposerFooter';
-import { shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
+import { chatHelperPlaceholderKey, shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
 import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
@@ -2848,7 +2848,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                                 placeholder={currentSessionId || newSessionDraftOpen
                                     ? inputMode === 'shell'
                                         ? t('chat.chatInput.placeholder.shell')
-                                        : t(useCompactChatPlaceholder ? 'chat.chatInput.placeholder.chatCompact' : 'chat.chatInput.placeholder.chat')
+                                        : t(chatHelperPlaceholderKey({ compact: useCompactChatPlaceholder, isPiKernel }))
                                     : t('chat.chatInput.placeholder.selectSession')}
                                 editable={Boolean(currentSessionId || newSessionDraftOpen)}
                                 autoCorrect={isMobile}

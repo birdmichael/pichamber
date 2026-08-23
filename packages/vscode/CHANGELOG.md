@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Chat: on Pi, the empty composer helper no longer mentions `!` for shell. `@` files/agents, `/` commands and skills, and `#` snippets stay.
 - Chat: on Pi, the thinking chip now lists only the levels the current model supports — including a new empty session after you pick the model — instead of always showing all seven.
 - Settings: known vision and thinking models such as grok-4.6 now keep image support and reasoning on a custom provider, including already-saved rows, so attached photos reach the model without a re-save.
 - Settings: opening an existing custom command now shows its Command Template. Save stays off until you edit, so an untouched save cannot wipe the prompt body.

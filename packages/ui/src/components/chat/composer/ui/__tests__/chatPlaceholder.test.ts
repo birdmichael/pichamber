@@ -7,11 +7,13 @@ import { describe, expect, test } from 'bun:test';
 import {
   COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH,
   DESKTOP_RIGHT_RAIL_CHAT_COLUMN_PX,
+  chatHelperPlaceholderKey,
   shouldUseCompactChatPlaceholder,
 } from '../chatPlaceholder';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const chatInputSource = readFileSync(join(__dirname, '../../../ChatInput.tsx'), 'utf-8');
+const mobilePillSource = readFileSync(join(__dirname, '../MobilePillComposer.tsx'), 'utf-8');
 
 describe('shouldUseCompactChatPlaceholder', () => {
   test('keeps the full helper line on a typical Desktop chat column with a right rail', () => {
@@ -58,6 +60,28 @@ describe('shouldUseCompactChatPlaceholder', () => {
 
   test('ChatInput uses the helper instead of a local width cutoff', () => {
     expect(chatInputSource).toContain('shouldUseCompactChatPlaceholder');
+    expect(chatInputSource).toContain('chatHelperPlaceholderKey');
     expect(chatInputSource).not.toMatch(/COMPACT_CHAT_PLACEHOLDER_MAX_WIDTH\s*=\s*560/);
+  });
+
+  test('MobilePillComposer uses the same kernel helper key as ChatInput', () => {
+    expect(mobilePillSource).toContain('chatHelperPlaceholderKey');
+    expect(mobilePillSource).not.toContain("'chat.chatInput.placeholder.chatCompact'");
+  });
+});
+
+describe('chatHelperPlaceholderKey', () => {
+  test('omits leftover OpenCode shell copy on Pi', () => {
+    expect(chatHelperPlaceholderKey({ compact: false, isPiKernel: true }))
+      .toBe('chat.chatInput.placeholder.chatPi');
+    expect(chatHelperPlaceholderKey({ compact: true, isPiKernel: true }))
+      .toBe('chat.chatInput.placeholder.chatCompactPi');
+  });
+
+  test('keeps leftover OpenCode shell copy off Pi', () => {
+    expect(chatHelperPlaceholderKey({ compact: false, isPiKernel: false }))
+      .toBe('chat.chatInput.placeholder.chat');
+    expect(chatHelperPlaceholderKey({ compact: true, isPiKernel: false }))
+      .toBe('chat.chatInput.placeholder.chatCompact');
   });
 });

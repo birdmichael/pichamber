@@ -103,6 +103,24 @@ describe('Pi copy audit', () => {
     }
   });
 
+  test('Pi composer helper placeholders do not promise ! or shell', () => {
+    const leftoverShellHelper = /!|shell|シェル|셸|powłok/i;
+
+    for (const dictionary of Object.values(localeDictionaries)) {
+      expect(leftoverShellHelper.test(dictionary['chat.chatInput.placeholder.chatPi'])).toBe(false);
+      expect(leftoverShellHelper.test(dictionary['chat.chatInput.placeholder.chatCompactPi'])).toBe(false);
+      expect(dictionary['chat.chatInput.placeholder.chatPi'].includes('@')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatPi'].includes('/')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatPi'].includes('#')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatCompactPi'].includes('@')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatCompactPi'].includes('/')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatCompactPi'].includes('#')).toBe(true);
+
+      expect(dictionary['chat.chatInput.placeholder.chat'].includes('!')).toBe(true);
+      expect(dictionary['chat.chatInput.placeholder.chatCompact'].includes('!')).toBe(true);
+    }
+  });
+
   test('mobile chrome does not reintroduce OpenChamber', () => {
     for (const dictionary of Object.values(localeDictionaries)) {
       for (const key of MOBILE_CHROME_KEYS) {
