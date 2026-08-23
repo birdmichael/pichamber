@@ -265,7 +265,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             withTooltip
                         />
                     </div>
-                    <div className={cn('flex items-center flex-1 justify-end', footerGapClass, 'md:gap-x-3')}>
+                    <div className={cn('flex items-center flex-1 justify-end min-w-0', footerGapClass)}>
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
                             radius={chatInputRadius}

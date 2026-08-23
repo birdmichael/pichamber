@@ -24,6 +24,13 @@ On Pi it also no longer mounts the footer context-usage percent chip;
 inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
+On Desktop (not VS Code), the thinking-level and model chips keep their
+runtime labels when a right-hand panel narrows the composer. Thinking and
+Agent/Plan keep their natural width; the model name truncates or marquees
+inside its chip so the row cannot overprint Agent, mic, or Send. Labels
+collapse to icons only as a last resort, and the chip tooltip/aria-label
+keeps the same words. The leftover OpenCode agent label still hides first.
+Agent/Plan is a separate chip and is not part of that collapse.
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
 `isPrimaryMode`. The expanded mobile chip row hosts `MobileThinkingButton`
 on Pi and `MobileModelButton`; those chips open the hidden `ModelControls`

@@ -2461,8 +2461,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         <TooltipTrigger asChild>
                             <DropdownMenuTrigger asChild>
                                 <div
+                                    aria-label={isReady ? currentModelDisplayName : readinessLabel}
                                     className={cn(
-                                        'model-controls__model-trigger flex items-center gap-1.5 cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        'model-controls__model-trigger flex items-center gap-1.5 cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0 overflow-hidden',
                                         buttonHeight
                                     )}
                                 >
@@ -2493,9 +2494,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                             ref={modelLabelRef}
                                             key={`${currentProviderId}-${currentModelId}`}
                                             className={cn(
-                                                'model-controls__model-label overflow-hidden',
+                                                'model-controls__model-label min-w-0 overflow-hidden truncate',
                                                 controlTextSize,
-                                                'font-medium whitespace-nowrap text-foreground min-w-0',
+                                                'font-medium whitespace-nowrap text-foreground',
                                                 'max-w-[260px]'
                                             )}
                                         >
@@ -2762,9 +2763,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         className={cn(
                             'model-controls__variant-label',
                             controlTextSize,
-                            'font-medium truncate min-w-0',
-                            isCompact && isMobile && 'max-w-[60px]',
-                            !isCompact && isDesktop ? 'max-w-[180px]' : undefined,
+                            'font-medium truncate',
+                            isCompact && isMobile && 'max-w-[60px] min-w-0',
+                            !isCompact && isDesktop ? 'max-w-[180px] shrink-0' : 'min-w-0',
                             colorClass,
                         )}
                     >
@@ -2809,7 +2810,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                     aria-busy={thinkingChip.status === 'pending'}
                                     aria-label={thinkingAriaLabel}
                                     className={cn(
-                                        'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 shrink-0 overflow-hidden',
                                         buttonHeight,
                                     )}
                                 >
@@ -2888,7 +2889,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                         <DropdownMenuTrigger asChild>
                             <div
                                 className={cn(
-                                    'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                    'model-controls__variant-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 shrink-0 overflow-hidden',
                                     buttonHeight,
                                 )}
                             >
@@ -3142,13 +3143,17 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             <div className={inlineClassName}>
                 <div
                     className={cn(
-                        'flex items-center min-w-0 flex-1 justify-end',
+                        'model-controls__row flex items-center min-w-0 flex-1 justify-end',
                         inlineGapClass,
                         isMobile && 'overflow-hidden'
                     )}
                 >
-                    {renderVariantSelector()}
-                    {renderModelSelector()}
+                    <div className="model-controls__variant-slot shrink-0 overflow-hidden">
+                        {renderVariantSelector()}
+                    </div>
+                    <div className="model-controls__model-slot min-w-0 overflow-hidden">
+                        {renderModelSelector()}
+                    </div>
                     {renderAgentSelector()}
                     <PiPlanModeToggle />
                 </div>
