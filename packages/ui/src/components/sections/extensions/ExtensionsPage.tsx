@@ -40,7 +40,11 @@ export const ExtensionsPage: React.FC = () => {
   });
 
   return (
-    <SettingsPageLayout title={t('settings.page.extensions.title')} showSaveStatus={false}>
+    <SettingsPageLayout
+      title={t('settings.page.extensions.title')}
+      description={t('settings.page.extensions.description')}
+      showSaveStatus={false}
+    >
       {showExtensionsSection ? (
         <SettingsSection
           title={t('settings.extensions.page.extensions.title')}

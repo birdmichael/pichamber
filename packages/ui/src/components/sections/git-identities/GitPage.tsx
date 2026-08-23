@@ -119,6 +119,7 @@ export const GitPage: React.FC = () => {
     <>
       <SettingsPageLayout
         title={t('settings.page.git.title')}
+        description={t('settings.page.git.description')}
         showSaveStatus
       >
         <GitHubSettings />

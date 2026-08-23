@@ -1386,7 +1386,10 @@ export const RemoteInstancesPage: React.FC = () => {
 
   if (!draft) {
     return (
-      <SettingsPageLayout title={t('settings.page.remoteInstances.title')}>
+      <SettingsPageLayout
+        title={t('settings.page.remoteInstances.title')}
+        description={t('settings.remoteInstances.page.description')}
+      >
         {clientAuth ? (
           <SettingsSection
             title={t('settings.remoteInstances.clientAuth.title')}
@@ -1771,7 +1774,7 @@ export const RemoteInstancesPage: React.FC = () => {
         </Dialog>
 
         {showInstanceManagement ? <SettingsSection
-          title={t('settings.remoteInstances.sidebar.title')}
+          title={t('settings.remoteInstances.page.section.connections')}
           description={t('settings.remoteInstances.sidebar.total', { count: instances.length })}
           headerAction={(
             <Button type="button" size="xs" className="!font-normal" onClick={() => setSshAddDialogOpen(true)}>
@@ -1784,7 +1787,7 @@ export const RemoteInstancesPage: React.FC = () => {
             {isLoading ? (
               <p className="typography-meta text-muted-foreground">{t('settings.remoteInstances.page.import.loading')}</p>
             ) : instances.length === 0 ? (
-              <p className="typography-meta text-muted-foreground">{t('settings.remoteInstances.page.import.noneFound')}</p>
+              <p className="typography-meta text-muted-foreground">{t('settings.remoteInstances.page.empty.noConnections')}</p>
             ) : instances.map((instance) => {
               const instanceStatus = statusesById[instance.id];
               const title = instance.nickname?.trim() || instance.sshParsed?.destination || instance.id;

@@ -169,6 +169,7 @@ export const SkillsCatalogPage: React.FC<SkillsCatalogPageProps> = ({ mode, onMo
     <>
       <SettingsPageLayout
         title={t('settings.skills.catalog.page.title')}
+        description={t('settings.page.skillsCatalog.description')}
         showSaveStatus={false}
       >
       {showModeTabs && (
