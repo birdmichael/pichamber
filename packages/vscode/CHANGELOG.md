@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Settings: Session Defaults thinking levels now follow the selected model, the same as the composer chip and project defaults.
 - Settings/Providers: the provider you select no longer jumps to a different one on its own. Changing the chat's model or agent, and background provider refreshes, used to move the settings selection with them.
 - Settings: changing the default model or agent no longer repoints an open chat that already carries a model you picked for it. Chats following the default still switch immediately.
 - Chat: app links such as `spotify://` now ask before opening another app, and you can trust a scheme in Settings on this device. File paths in messages open from the session's project even if you last browsed another project.
