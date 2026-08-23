@@ -15,6 +15,7 @@ import {
 } from '@/lib/messages/inlineMessageLinks';
 import { prepareUserMarkdownContent, SKILL_TOKEN_PATTERN } from './userTextPartContent';
 import { extractTerminalContexts } from '@/lib/messages/terminalContext';
+import { USER_TEXT_COLLAPSED_CLASS, isUserTextOverflowing } from '../userBubbleLayout';
 
 type PartWithText = Part & { text?: string; content?: string; value?: string };
 
@@ -75,7 +76,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
         if (!collapsibleUserMessages || isExpanded) return;
 
         const checkTruncation = () => {
-            setIsTruncated(el.scrollHeight > el.clientHeight);
+            setIsTruncated(isUserTextOverflowing(el));
         };
 
         checkTruncation();
@@ -145,7 +146,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
         // Measure at click time instead of trusting the observed flag: whether
         // the text is clipped right now is what decides if expanding does
         // anything, and the flag can still be catching up on a fresh message.
-        if (collapsibleUserMessages && !isExpanded && element.scrollHeight > element.clientHeight) {
+        if (collapsibleUserMessages && !isExpanded && isUserTextOverflowing(element)) {
             setIsTruncated(true);
             setIsExpanded(true);
         }
@@ -229,7 +230,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
     }
 
     return (
-        <div className="relative" key={part.id || `${messageId}-user-text`}>
+        <div className="relative min-w-0" key={part.id || `${messageId}-user-text`}>
             {collapsibleUserMessages && isExpanded && (
                 <button
                     type="button"
@@ -242,10 +243,10 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
             )}
             <div
                 className={cn(
-                    "break-words font-sans typography-markdown-body",
+                    "min-w-0 break-words font-sans typography-markdown-body",
                     isExpanded && "pb-3",
                     normalizedRenderingMode === 'plain' && 'whitespace-pre-wrap',
-                    isCollapsed && "line-clamp-2",
+                    isCollapsed && ["line-clamp-2", USER_TEXT_COLLAPSED_CLASS],
                     collapsibleUserMessages && isTruncated && !isExpanded && "cursor-pointer"
                 )}
                 ref={textRef}
@@ -258,6 +259,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
                             "[&_.markdown-content>*:first-child]:mt-0 [&_.markdown-content>*:last-child]:mb-0",
                             isCollapsed && [
                                 "[&_.markdown-content>*]:my-0",
+                                "[&_p]:inline",
                                 "[&_[data-component='markdown-code']]:my-0",
                                 "[&_[data-component='markdown-code']]:inline",
                                 "[&_[data-component='markdown-code']]:border-0",

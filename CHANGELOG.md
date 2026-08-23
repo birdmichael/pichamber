@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: long user messages wrap inside the bubble instead of clipping to a single line.
 - Settings: Session Defaults thinking levels now follow the selected model, the same as the composer chip and project defaults.
 
 ## [1.1.0] - 2026-08-24
