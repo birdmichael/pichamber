@@ -16,8 +16,10 @@ import { StopIcon } from '@/components/icons/StopIcon';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
 import { useI18n } from '@/lib/i18n';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import type { Theme } from '@/types/theme';
+import { chatHelperPlaceholderKey } from './chatPlaceholder';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
 
 export interface MobilePillComposerProps {
@@ -45,6 +47,7 @@ export interface MobilePillComposerProps {
 
 export function MobilePillComposer(props: MobilePillComposerProps) {
     const { t } = useI18n();
+    const isPiKernel = usePiKernel();
     const {
         message,
         sessionId: currentSessionId,
@@ -110,7 +113,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
                         {message.trim()
                             ? message
                             : currentSessionId || newSessionDraftOpen
-                                ? t('chat.chatInput.placeholder.chatCompact')
+                                ? t(chatHelperPlaceholderKey({ compact: true, isPiKernel }))
                                 : t('chat.chatInput.placeholder.selectSession')}
                     </span>
                 </button>

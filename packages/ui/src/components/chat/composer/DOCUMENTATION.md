@@ -34,10 +34,13 @@ keeps the same words. The leftover OpenCode agent label still hides first.
 Agent/Plan is a separate chip and is not part of that collapse.
 The empty-composer helper placeholder follows the same Desktop rule:
 a typical ~1280 window with Session, Walkthrough, or notes open still
-shows `@ for files/agents; / for commands and skills; ! for shell; # for
-snippets`. The short `Use @ / ! # for helpers` stub is only for true
-mobile or an actually tiny editor (`shouldUseCompactChatPlaceholder`),
-not a normal right rail. `MobilePillComposer` always uses the stub.
+shows the full helper line (`chatHelperPlaceholderKey`). On Pi that is
+`@ for files/agents; / for commands and skills; # for snippets` — no
+`!` / shell, because `/shell` stays hidden and typing `!` does not open
+a popup. Leftover OpenCode still mentions `!`. The short
+`Use @ / # for helpers` stub (Pi) is only for true mobile or an actually
+tiny editor (`shouldUseCompactChatPlaceholder`), not a normal right rail.
+`MobilePillComposer` always uses the stub and the same kernel picker.
 `MobileAgentButton` uses that same helper after `getVisibleAgents()` and
 `isPrimaryMode`. The expanded mobile chip row hosts `MobileThinkingButton`
 on Pi and `MobileModelButton`; those chips open the hidden `ModelControls`
