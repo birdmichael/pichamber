@@ -106,7 +106,7 @@ the Session block.
 | Context + cost | `contextUsage.ts` over `useSessionMessages`, `Session.cost` | see below — the store getters cannot serve this |
 | Branch, ahead/behind, attention | `useGitStore` directory state | warmed via `runBackgroundNetworkTask(ensureStatus)` and refreshed from Git mutation hints |
 | Changed files | `useGitStore` status `files` + `diffStats` | working tree, not session-authored edits |
-| PR + checks | `usePrVisualSummary` | **read-only** |
+| PR + checks | `useFreshestPrVisualSummaryForBranch` | **read-only**; follows the freshest remote-keyed entry for the branch |
 | Subagents | Pi: host run list (live `subagent` tool-call session id, not leftover status-file ghosts). OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card. Terminal rows without an id are omitted. Catalog / management `subagent` calls (`list`, `status`, `guide`, …) are not rows and do not mint an empty child chat. |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
 | Usage | `components/usage/usageGroups.ts` over `useQuotaStore` | OpenCode provider quotas only. Hidden on Pi (`isWorkStatusSectionAvailable`); session context % / cost stay in the Session block |
@@ -162,6 +162,10 @@ The panel never calls `startWatching`. PR watching is owned by the background
 tracker, and its concurrency gate exists because per-consumer PR fetches once
 saturated the browser's connection pool and stalled startup for ~20s. A panel
 that started a watch per open session would reintroduce exactly that fan-out.
+The PR surface can watch a concrete remote while passive readers initially know
+only the automatic remote key, so the panel reads the freshest entry for the
+directory and branch across remote keys. This keeps its PR and checks rows in
+sync with the live PR surface without adding another request owner.
 
 ### Changed files come from git status, not the session
 
