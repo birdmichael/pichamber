@@ -40,8 +40,8 @@ describe('useSessionDisplayStore project sorting', () => {
 
     expect(migrated.projectSortOrder).toBe('a-z');
     expect(migrated.showRecentSection).toBe(false);
-    expect(migrated.projectDisplayMode).toBeUndefined();
-    expect(migrated.singleProjectId).toBeUndefined();
+    expect('projectDisplayMode' in migrated).toBe(false);
+    expect('singleProjectId' in migrated).toBe(false);
   });
 });
 
