@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 
 import {
   activateTitlebarIconOnPointerDown,
@@ -13,32 +13,40 @@ describe('titlebarIconActivate', () => {
   });
 
   test('primary pointerdown closes hover UI and runs the action once', () => {
-    const closeHoverUi = mock(() => {});
-    const activate = mock(() => {});
+    let closeCount = 0;
+    let activateCount = 0;
 
     const consumed = activateTitlebarIconOnPointerDown({
       button: 0,
-      closeHoverUi,
-      activate,
+      closeHoverUi: () => {
+        closeCount += 1;
+      },
+      activate: () => {
+        activateCount += 1;
+      },
     });
 
     expect(consumed).toBe(true);
-    expect(closeHoverUi).toHaveBeenCalledTimes(1);
-    expect(activate).toHaveBeenCalledTimes(1);
+    expect(closeCount).toBe(1);
+    expect(activateCount).toBe(1);
   });
 
   test('non-primary pointerdown leaves the action for a later click', () => {
-    const closeHoverUi = mock(() => {});
-    const activate = mock(() => {});
+    let closeCount = 0;
+    let activateCount = 0;
 
     const consumed = activateTitlebarIconOnPointerDown({
       button: 2,
-      closeHoverUi,
-      activate,
+      closeHoverUi: () => {
+        closeCount += 1;
+      },
+      activate: () => {
+        activateCount += 1;
+      },
     });
 
     expect(consumed).toBe(false);
-    expect(closeHoverUi).not.toHaveBeenCalled();
-    expect(activate).not.toHaveBeenCalled();
+    expect(closeCount).toBe(0);
+    expect(activateCount).toBe(0);
   });
 });
