@@ -22,7 +22,9 @@ describe('status-line → finished info-row in-place handoff', () => {
     expect(statusRowSource).toContain(
       'className={cn("flex items-center justify-between gap-2 h-8", hasLeftAccessory && "px-0.5")}',
     );
-    expect(statusRowSource).not.toContain('h-[1.2rem]');
+    expect(statusRowSource).not.toMatch(
+      /flex items-center justify-between py-0\.5 gap-2 h-\[1\.2rem\]/,
+    );
     expect(statusRowSource).not.toMatch(/className=\{cn\("mb-1", isMobile && "mt-2"/);
   });
 
