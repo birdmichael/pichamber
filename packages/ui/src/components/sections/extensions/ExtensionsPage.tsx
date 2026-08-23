@@ -24,9 +24,7 @@ export const ExtensionsPage: React.FC = () => {
         if (cancelled) return;
         setExtensions(Array.isArray(data.extensions) ? data.extensions : []);
         setPackages(Array.isArray(data.packages) ? data.packages : []);
-      } catch {
-        // best effort
-      } finally {
+      } catch { /* ignored */ } finally {
         if (!cancelled) setLoading(false);
       }
     };

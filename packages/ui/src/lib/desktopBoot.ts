@@ -303,17 +303,13 @@ export const persistDesktopBootOutcome = (outcome: DesktopBootOutcome | null | u
   try {
     getSessionStorage()?.setItem(PICHAMBER_BOOT_OUTCOME_KEY, JSON.stringify(outcome));
     (window as { __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: unknown }).__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = outcome;
-  } catch {
-    // best effort
-  }
+  } catch { /* ignored */ }
 };
 
 export const markInitialLoadingDismissed = () => {
   try {
     getSessionStorage()?.setItem(PICHAMBER_SPLASH_DISMISSED_KEY, '1');
-  } catch {
-    // best effort
-  }
+  } catch { /* ignored */ }
 };
 
 const readRawBootOutcome = (): unknown => {

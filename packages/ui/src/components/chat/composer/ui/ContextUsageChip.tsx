@@ -25,9 +25,7 @@ export const ContextUsageChip: React.FC<{ sessionId: string | null }> = ({ sessi
         if (typeof data.tokens === 'number' && typeof data.contextLimit === 'number' && data.contextLimit > 0) {
           setPercent(Math.max(0, Math.min(100, Math.round((data.tokens / data.contextLimit) * 100))));
         }
-      } catch {
-        // best effort
-      }
+      } catch { /* ignored */ }
     };
     void load();
     const timer = window.setInterval(() => { void load(); }, 8000);

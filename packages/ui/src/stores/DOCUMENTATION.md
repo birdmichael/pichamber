@@ -163,6 +163,21 @@ Important properties:
 - branch persistence is versioned, bounded, runtime-scoped, and claims the ambiguous legacy cache once
 - diff data has per-directory and aggregate count/UTF-8-byte limits; oversized single entries are rejected
 
+### `useGitBaseBranchStore.ts`
+
+`useGitBaseBranchStore` remembers an explicit per-branch base when git has no
+authoritative record of where a branch started. The context-panel Diff "Branch"
+scope uses this after a one-time picker; a later checkout of the same branch
+reuses the choice instead of asking again.
+
+- Keys are `runtime + directory + branch`. A base picked for one feature branch
+  is not an answer for another branch of the same repository.
+- The store is bounded (100 entries) and persisted. It is not live git
+  authority. DiffView uses an explicit override when one exists; otherwise it
+  uses the reflog source. A source that names this branch or `origin/<branch>`
+  is treated as missing detection so the one-time picker can run.
+- Do not guess `main`/`master` when both detection and override are empty.
+
 ### `useGitHubPrStatusStore.ts`
 
 `useGitHubPrStatusStore` is a centralized PR cache keyed by a collision-safe tuple of runtime, directory, branch, and requested remote.
