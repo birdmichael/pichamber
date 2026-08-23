@@ -1141,6 +1141,29 @@ const _inFlightProviders = new Map<string, Promise<void>>();
 const _inFlightAgents = new Map<string, Promise<boolean>>();
 let _initializeAppInFlight: Promise<void> | null = null;
 
+/**
+ * Providers of one project. Returns a stored array, so components can select it
+ * directly and re-render only when that project's list is replaced.
+ *
+ * Settings pages browse a project the app is not on; everything else wants the
+ * active one, which is what an omitted directory resolves to.
+ */
+export const selectProvidersForDirectory = (
+    state: Pick<ConfigStore, "providers" | "directoryScoped" | "activeDirectoryKey">,
+    directory?: string | null,
+): ProviderWithModelList[] => {
+    if (directory === undefined) {
+        return state.providers;
+    }
+    const directoryKey = toConfigDirectoryKey(directory);
+    if (directoryKey === state.activeDirectoryKey) {
+        return state.providers;
+    }
+    return state.directoryScoped[directoryKey]?.providers ?? EMPTY_PROVIDERS;
+};
+
+const EMPTY_PROVIDERS: ProviderWithModelList[] = [];
+
 export const useConfigStore = create<ConfigStore>()(
     devtools(
         persist(

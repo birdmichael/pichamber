@@ -669,6 +669,13 @@ interface UIStore {
   settingsPage: string;
   settingsHasOpenedOnce: boolean;
   settingsProjectsSelectedId: string | null;
+  /**
+   * Project the Settings pages are looking at. `null` follows the app's active
+   * project. Settings browses another project's configuration without moving
+   * the chat, the session list or the file tree, so this is its own state and
+   * not a second writer of the active project.
+   */
+  settingsProjectPath: string | null;
   settingsRemoteInstancesSelectedId: string | null;
   eventStreamStatus: EventStreamStatus;
   eventStreamHint: string | null;
@@ -846,6 +853,7 @@ interface UIStore {
   setSidebarSection: (section: SidebarSection) => void;
   setSettingsPage: (slug: string) => void;
   setSettingsProjectsSelectedId: (projectId: string | null) => void;
+  setSettingsProjectPath: (path: string | null) => void;
   setSettingsRemoteInstancesSelectedId: (instanceId: string | null) => void;
   setEventStreamStatus: (status: EventStreamStatus, hint?: string | null) => void;
   setShowReasoningTraces: (value: boolean) => void;
@@ -1012,6 +1020,7 @@ export const useUIStore = create<UIStore>()(
         settingsPage: 'home',
         settingsHasOpenedOnce: false,
         settingsProjectsSelectedId: null,
+        settingsProjectPath: null,
         settingsRemoteInstancesSelectedId: null,
         eventStreamStatus: 'idle',
         eventStreamHint: null,
@@ -1792,6 +1801,11 @@ export const useUIStore = create<UIStore>()(
 
         setSettingsPage: (slug) => {
           set({ settingsPage: slug });
+        },
+
+        setSettingsProjectPath: (path) => {
+          const trimmed = path?.trim();
+          set({ settingsProjectPath: trimmed ? trimmed : null });
         },
 
         setSettingsProjectsSelectedId: (projectId) => {
