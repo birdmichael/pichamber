@@ -26,9 +26,10 @@ describe('snapSlashPopupMaxHeight', () => {
       rowHeightPx: 59,
       chromePx: 36,
     });
+    expect(height).toBe(36 + 7 * 59);
     expect((height - 36) % 59).toBe(0);
-    expect(height).toBeLessThanOrEqual(500);
-    expect(Math.floor((height - 36) / 59)).toBeGreaterThanOrEqual(1);
+    expect(height <= 500).toBe(true);
+    expect(Math.floor((height - 36) / 59) >= 1).toBe(true);
   });
 
   test('keeps at least one row when the window is short', () => {
@@ -47,9 +48,9 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
       chromePx: DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX,
     });
     const rows = Math.floor((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) / DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX);
-    expect(rows).toBeGreaterThanOrEqual(8);
+    expect(rows >= 8).toBe(true);
     expect((height - DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX) % DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX).toBe(0);
-    expect(height).toBeLessThanOrEqual(DESKTOP_SLASH_POPUP_DESIGN_CAP_PX);
+    expect(height <= DESKTOP_SLASH_POPUP_DESIGN_CAP_PX).toBe(true);
   });
 
   test('respects measured available space and overlay placement', () => {
@@ -70,6 +71,6 @@ describe('readOverlayMaxHeight', () => {
   test('reads numeric and CSS-pixel overlay caps', () => {
     expect(readOverlayMaxHeight({ maxHeight: 260 })).toBe(260);
     expect(readOverlayMaxHeight({ maxHeight: '260px' })).toBe(260);
-    expect(readOverlayMaxHeight({})).toBeUndefined();
+    expect(readOverlayMaxHeight({})).toEqual(undefined);
   });
 });
