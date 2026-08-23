@@ -93,7 +93,7 @@ const shouldKeepSyntheticUserText = (text: string, planModeEnabled: boolean): bo
     return false;
 };
 
-export const isSessionDirectoryChromeText = (
+const isSessionDirectoryChromeText = (
     text: string,
     directory?: string | null,
 ): boolean => {
@@ -114,8 +114,12 @@ const isSessionDirectoryChromePart = (part: Part, directory?: string | null): bo
     if (part.type === 'text') {
         return isSessionDirectoryChromeText(extractTextContent(part), directory);
     }
-    if (part.type === 'file' || part.type === 'image') {
+    if (part.type === 'file') {
         return isSessionDirectoryChromeText(filePartLabel(part), directory);
+    }
+    const labeledPath = filePartLabel(part);
+    if (labeledPath) {
+        return isSessionDirectoryChromeText(labeledPath, directory);
     }
     return false;
 };

@@ -20,7 +20,7 @@ type HiddenCache = {
 
 const hiddenByParts = new WeakMap<Part[], HiddenCache>();
 
-export type UserMessageVisibilityOptions = {
+type UserMessageVisibilityOptions = {
     planModeEnabled: boolean;
     directory?: string | null;
 };
