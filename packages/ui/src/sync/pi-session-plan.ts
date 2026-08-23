@@ -127,6 +127,27 @@ export const resolveFooterPlanSelected = (input: {
   return Boolean(input.draftOpen && !trimmedSessionID(input.sessionID) && input.draftPlanSelected);
 };
 
+/**
+ * Last Agent/Plan choice for the empty composer.
+ * Sidebar navigation keeps it; send or an explicit Agent pick consumes it.
+ */
+export const resolveEmptyComposerPlanSelected = (input: {
+  current: boolean;
+  draftOpen: boolean;
+  draftPlanSelected?: boolean;
+  consume?: boolean;
+}): boolean => {
+  if (input.consume) return false;
+  if (input.draftOpen && input.draftPlanSelected !== undefined) return input.draftPlanSelected;
+  return input.current;
+};
+
+/** Restore last empty-composer Plan when a new-session draft reopens. */
+export const resolveOpenedDraftPlanSelected = (
+  option: boolean | undefined,
+  emptyComposerPlanSelected: boolean,
+): boolean => option ?? emptyComposerPlanSelected;
+
 export const shouldStartPlanAfterDraftMaterialize = (
   draftPlanSelected?: boolean,
   status?: SessionPlanStatus | null,

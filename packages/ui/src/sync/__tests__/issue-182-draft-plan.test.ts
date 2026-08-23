@@ -22,9 +22,34 @@ mock.module('../pi-session-plan-store', () => ({
 
 const { opencodeClient } = await import('@/lib/opencode/client')
 const { useConfigStore } = await import('@/stores/useConfigStore')
+const { useDirectoryStore } = await import('@/stores/useDirectoryStore')
+const { useProjectsStore } = await import('@/stores/useProjectsStore')
 const { setActionRefs, setOptimisticRefs } = await import('../session-actions')
 const { useSessionUIStore } = await import('../session-ui-store')
 type OpencodeClient = Parameters<typeof setActionRefs>[0]
+
+const projectAlpha = { id: 'proj-alpha', path: '/projects/alpha', label: 'Alpha' }
+
+const resetDraftPlanState = () => {
+  useSessionUIStore.setState({
+    currentSessionId: null,
+    currentSessionDirectory: null,
+    emptyComposerPlanSelected: false,
+    newSessionDraft: { open: false, directoryOverride: null, parentID: null },
+  })
+}
+
+const openAlphaDraft = () => {
+  useProjectsStore.setState({
+    projects: [projectAlpha],
+    activeProjectId: projectAlpha.id,
+  })
+  useDirectoryStore.getState().setDirectory(projectAlpha.path, { showOverlay: false })
+  useSessionUIStore.getState().openNewSessionDraft({
+    selectedProjectId: projectAlpha.id,
+    directoryOverride: projectAlpha.path,
+  })
+}
 
 describe('issue 182 draft Plan send', () => {
   let originalSendMessage: typeof opencodeClient.sendMessage
@@ -62,11 +87,7 @@ describe('issue 182 draft Plan send', () => {
   afterEach(() => {
     opencodeClient.sendMessage = originalSendMessage
     opencodeClient.createSession = originalCreateSession
-    useSessionUIStore.setState({
-      currentSessionId: null,
-      currentSessionDirectory: null,
-      newSessionDraft: { open: false, directoryOverride: null, parentID: null },
-    })
+    resetDraftPlanState()
   })
 
   test('draft Plan select stores local intent and does not create a session', () => {
@@ -148,5 +169,74 @@ describe('issue 182 draft Plan send', () => {
     expect(createSessionCalls).toHaveLength(1)
     expect(planStarts).toEqual([])
     expect(sendMessageCalls).toHaveLength(1)
+  })
+
+  test('draft Plan survives opening a history session and returning to New session', () => {
+    openAlphaDraft()
+    useSessionUIStore.getState().setDraftPlanSelected(true)
+
+    expect(useSessionUIStore.getState().emptyComposerPlanSelected).toBe(true)
+    expect(createSessionCalls).toHaveLength(0)
+
+    useSessionUIStore.getState().setCurrentSession('ses_history_agent', '/projects/alpha')
+
+    expect(useSessionUIStore.getState().newSessionDraft.open).toBe(false)
+    expect(useSessionUIStore.getState().currentSessionId).toBe('ses_history_agent')
+    expect(useSessionUIStore.getState().emptyComposerPlanSelected).toBe(true)
+    expect(createSessionCalls).toHaveLength(0)
+
+    openAlphaDraft()
+
+    expect(useSessionUIStore.getState().currentSessionId).toBeNull()
+    expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true)
+    expect(useSessionUIStore.getState().newSessionDraft.planSelected).toBe(true)
+    expect(createSessionCalls).toHaveLength(0)
+  })
+
+  test('explicit Agent pick on the empty composer stays Agent after a session switch', () => {
+    openAlphaDraft()
+    useSessionUIStore.getState().setDraftPlanSelected(true)
+    useSessionUIStore.getState().setDraftPlanSelected(false)
+    useSessionUIStore.getState().setCurrentSession('ses_history_agent', '/projects/alpha')
+    openAlphaDraft()
+
+    expect(useSessionUIStore.getState().newSessionDraft.planSelected).toBe(false)
+    expect(useSessionUIStore.getState().emptyComposerPlanSelected).toBe(false)
+    expect(createSessionCalls).toHaveLength(0)
+  })
+
+  test('sending a Plan draft consumes empty-composer Plan for the next New session', async () => {
+    const draftSnapshot = {
+      open: true,
+      directoryOverride: '/projects/alpha',
+      parentID: null,
+      planSelected: true,
+    }
+    useSessionUIStore.setState({
+      currentSessionId: null,
+      currentSessionDirectory: null,
+      emptyComposerPlanSelected: true,
+      newSessionDraft: draftSnapshot,
+    })
+
+    await useSessionUIStore.getState().sendMessage(
+      'plan this feature',
+      'provider-a',
+      'model-a',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'normal',
+      { draftSnapshot },
+    )
+
+    expect(useSessionUIStore.getState().emptyComposerPlanSelected).toBe(false)
+    expect(createSessionCalls).toHaveLength(1)
+    expect(planStarts).toEqual([{ sessionID: 'ses_issue_182', action: 'start' }])
+
+    openAlphaDraft()
+    expect(useSessionUIStore.getState().newSessionDraft.planSelected).toBe(false)
   })
 })

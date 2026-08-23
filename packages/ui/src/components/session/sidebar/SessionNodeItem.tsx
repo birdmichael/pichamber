@@ -46,6 +46,7 @@ import { sessionGoalStatusColor, sessionGoalStatusLabelKey } from '@/lib/session
 import { getRuntimeBearerTokenSync } from '@/lib/runtime-auth';
 import { getRuntimeApiBaseUrl } from '@/lib/runtime-switch';
 import { parseMultiRunSessionTitle } from '@/lib/multirun/title';
+import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { MultiRunFusionDialog } from '@/components/multirun/MultiRunFusionDialog';
 import { FusionIcon } from '@/components/icons/FusionIcon';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
@@ -466,7 +467,10 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
       <Icon name="target" className="h-3 w-3" style={{ color: sessionGoalStatusColor[sessionGoal.status] }} />
     </span>
   ) : null;
-  const sessionTitle = resolvedSession.title || t('sessions.sidebar.session.untitled');
+  const sessionTitle = resolveSessionDisplayTitle(
+    resolvedSession.title,
+    t('sessions.sidebar.session.untitled'),
+  );
   const hasChildren = node.children.length > 0;
   const isPinnedSession = isSessionPinned(pinnedSessionIds, sessionDirectory, session.id);
   // Per-render-context expansion key: the same session can appear in both

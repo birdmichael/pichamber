@@ -32,6 +32,7 @@ import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { areOptionalRenderRelevantMessagesEqual, areRenderRelevantMessagesEqual, areRelevantTurnGroupingContextsEqual } from './message/renderCompare';
 import type { ReviewTransferDirection } from '@/lib/reviewFlow';
 import { toast } from 'sonner';
+import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useI18n } from '@/lib/i18n';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { getContextObligatoryMessages } from '@/lib/contextObligatoryMessages';
@@ -210,6 +211,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
     const sessionId = message.info.sessionID;
     const planModeEnabled = useFeatureFlagsStore((state) => state.planModeEnabled);
+    const sessionDirectory = useEffectiveDirectory();
 
     // Keep non-active-turn rows detached from context-store churn.
     const { currentContextAgent, savedSessionAgentSelection } = useContextStore(
@@ -225,8 +227,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             return safeParts;
         }
 
-        return normalizeUserDisplayParts(safeParts, { planModeEnabled });
-    }, [isUser, message.parts, planModeEnabled]);
+        return normalizeUserDisplayParts(safeParts, { planModeEnabled, directory: sessionDirectory });
+    }, [isUser, message.parts, planModeEnabled, sessionDirectory]);
 
     const previousUserMetadata = React.useMemo(() => {
         if (isUser || !previousMessage) {
@@ -592,13 +594,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     const isLastAssistantInTurn = turnGroupingContext?.isLastAssistantInTurn ?? false;
 
     const previousIsHiddenUserMessage = React.useMemo(
-        () => !isUser && isHiddenUserMessage(previousMessage, { planModeEnabled }),
-        [isUser, planModeEnabled, previousMessage]
+        () => !isUser && isHiddenUserMessage(previousMessage, { planModeEnabled, directory: sessionDirectory }),
+        [isUser, planModeEnabled, previousMessage, sessionDirectory]
     );
 
     const nextIsHiddenUserMessage = React.useMemo(
-        () => !isUser && isHiddenUserMessage(nextMessage, { planModeEnabled }),
-        [isUser, planModeEnabled, nextMessage]
+        () => !isUser && isHiddenUserMessage(nextMessage, { planModeEnabled, directory: sessionDirectory }),
+        [isUser, nextMessage, planModeEnabled, sessionDirectory]
     );
 
     const isFollowedByAssistant = React.useMemo(() => {

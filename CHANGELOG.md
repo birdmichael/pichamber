@@ -4,12 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat/Desktop: opening an empty session now shows the same starter chips and Session panel as New session, instead of "Start a new chat" with the right-hand panel gone.
+- Sessions/Desktop: switching chats now keeps the header title matched to the selected sidebar row. Empty sessions use one untitled label instead of Untitled, (no messages), and Pi session.
+- Chat/Desktop: opening a history session no longer flashes a blank user bubble or a workspace-path chip before the message text appears.
 - Sessions/Desktop: the sidebar no longer lists empty leftover workspaces such as Cursor `cursor/desktop-…` checkouts that are not opened projects. Settings → Projects is unchanged, and an opened project with no chats still shows once.
 - Chat/Desktop: opening Session, Walkthrough, or another right-hand panel still shows the composer thinking level and model name as text, without overlapping Agent, mic, or Send.
+- Chat/Desktop: opening Session, Walkthrough, or notes still shows the full composer helper placeholder (`@` files/agents, `/` commands, `!` shell, `#` snippets) instead of the short helpers stub.
+- Chat/Desktop: the `/` command menu now uses the space above the composer — on a new session the title and starter chips hide and the composer drops to the bottom so the list can show about eight full rows — and no longer clips the last command name.
 - Settings/Desktop: first install with no OpenChamber settings now opens every existing Pi project and selects the most recently used one. Closing a project still stays closed after relaunch. (close #217)
 - Settings: Feature Plugin on/off now follows Pi packages only. There is no separate Desktop Enabled checkbox.
 - Settings/Chat: on Pi, Desktop now picks up an existing Pi agent — Goal, MCP, and Subagents appear when those packages are already in settings.json, and a new session follows your Pi default model and thinking. Plan stays off until that package is installed. (close #213)
 - Mobile: on Pi, the expanded composer now shows a thinking-level chip next to the model, matching Desktop.
+- Chat: on Pi, choosing Plan on a new session still shows Plan after you open another chat and come back. Existing chats keep their own Agent or Plan.
 
 ## [1.0.1] - 2026-08-18
 

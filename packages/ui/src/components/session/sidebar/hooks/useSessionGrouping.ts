@@ -11,6 +11,7 @@ import {
 import { compareSessionsByLifecycleOrder, getSessionLifecycleOrderValue } from '@/sync/session-ordering';
 import { formatDirectoryName, formatPathForDisplay } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { getWorktreeFirstSeenAt } from '../worktreeFirstSeen';
 import { shouldRenderSidebarWorktreeGroup } from '../visibleWorkspaceGroups';
@@ -35,8 +36,12 @@ export const useSessionGrouping = (args: Args) => {
 
   const buildSessionSearchText = React.useCallback((session: Session): string => {
     const sessionDirectory = normalizePath((session as Session & { directory?: string | null }).directory ?? null) ?? '';
-    const sessionTitle = (session.title || t('sessions.sidebar.session.untitled')).trim();
-    return `${sessionTitle} ${sessionDirectory}`.toLowerCase();
+    const rawTitle = typeof session.title === 'string' ? session.title.trim() : '';
+    const sessionTitle = resolveSessionDisplayTitle(
+      session.title,
+      t('sessions.sidebar.session.untitled'),
+    );
+    return `${sessionTitle} ${rawTitle} ${sessionDirectory}`.toLowerCase();
   }, [t]);
 
   const filterSessionNodesForSearch = React.useCallback(
