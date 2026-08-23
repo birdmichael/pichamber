@@ -253,6 +253,14 @@ persisted: it follows the active project until the user picks another one. The
 Settings project selector must never call `setActiveProject` — that relocates
 the chat, the session list and the file tree.
 
+`useConfigStore.selectedProviderId` is the Settings → Providers sidebar
+selection, not the chat's current model. It stays on the provider the
+user picked on that page. Chat model or agent changes (`setProvider`,
+`setAgent`, default-model apply) and provider-list refreshes leave that
+selection in place. An empty selection may still be filled from the
+refreshed list (or the first provider on first open). The add-provider
+sentinel stays selected across those same updates.
+
 Failure is still not empty: a failed load restores that directory's previous
 list rather than clearing it.
 
