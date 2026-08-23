@@ -1,10 +1,9 @@
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
 const SESSION_PLAN_STATUSES = ['off', 'active', 'ready', 'saved', 'implementing'] as const;
-const SESSION_PLAN_ACTIONS = ['start', 'save', 'implement', 'exit', 'resume'] as const;
 
 export type SessionPlanStatus = (typeof SESSION_PLAN_STATUSES)[number];
-export type SessionPlanAction = (typeof SESSION_PLAN_ACTIONS)[number];
+export type SessionPlanAction = 'start' | 'save' | 'implement' | 'exit' | 'resume';
 
 export type SessionPlan = {
   status: SessionPlanStatus;
