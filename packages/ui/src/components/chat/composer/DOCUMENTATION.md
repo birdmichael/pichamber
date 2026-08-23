@@ -26,12 +26,17 @@ inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
 On Desktop (not VS Code), the thinking-level and model chips keep their
-runtime labels when a right-hand panel narrows the composer. Thinking and
-Agent/Plan keep their natural width; the model name truncates or marquees
-inside its chip so the row cannot overprint Agent, mic, or Send. Labels
-collapse to icons only as a last resort, and the chip tooltip/aria-label
-keeps the same words. The leftover OpenCode agent label still hides first.
-Agent/Plan is a separate chip and is not part of that collapse.
+runtime labels when a right-hand panel narrows the composer. Session-width
+rails keep thinking plus the full model name. Walkthrough and similarly
+narrow rails (~0.6) still show thinking and a readable model name
+(ellipsis of a few letters is fine; a single glyph is not). The provider
+glyph hides on that squeeze so the name can use the slot; Agent/Plan
+yields next. The model name is the runtime display string — do not
+hardcode a provider, and do not move the chip into `/`. Labels collapse
+to icons only as a last resort, and the chip tooltip/aria-label keeps the
+same words. The leftover OpenCode agent label still hides first.
+Agent/Plan is a separate chip and is not part of the thinking/model
+collapse.
 The empty-composer helper placeholder follows the same Desktop rule:
 a typical ~1280 window with Session, Walkthrough, or notes open still
 shows the full helper line (`chatHelperPlaceholderKey`). On Pi that is
