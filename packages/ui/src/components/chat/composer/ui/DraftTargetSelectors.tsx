@@ -24,10 +24,12 @@ import {
 } from '@/components/ui/select';
 import { useI18n } from '@/lib/i18n';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
+import { getProjectDisplayLabel } from '@/lib/workspaceLabel';
 import { createWorktreeDraft } from '@/lib/worktreeSessionCreator';
+import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import type { Theme } from '@/types/theme';
 import { normalizePath } from '../attachments/filePaths';
-import { getProjectDisplayLabel, type DraftTargetProject } from '../state/useDraftTarget';
+import { type DraftTargetProject } from '../state/useDraftTarget';
 
 export interface BranchOption {
     value: string;
@@ -55,6 +57,7 @@ const getProjectIconColor = (projectColor?: string | null): string | undefined =
 
 /** A project's icon (custom image, configured icon, or a folder) plus its name. */
 function ProjectLabel({ project, theme }: { project: DraftTargetProject; theme: Theme }) {
+    const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const projectIconName = project.icon ? PROJECT_ICON_MAP[project.icon] : null;
     const iconColor = getProjectIconColor(project.color);
     const fallbackIcon = projectIconName ? (
@@ -81,7 +84,7 @@ function ProjectLabel({ project, theme }: { project: DraftTargetProject; theme: 
                     />
                 </span>
             ) : fallbackIcon}
-            <span className="truncate">{getProjectDisplayLabel(project)}</span>
+            <span className="truncate">{getProjectDisplayLabel(project, homeDirectory)}</span>
         </span>
     );
 }
@@ -225,6 +228,7 @@ export function MobileDraftTargetSheets(
     },
 ) {
     const { t } = useI18n();
+    const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
     const {
         projects,
         selectedProject,
@@ -262,7 +266,7 @@ export function MobileDraftTargetSheets(
                             .filter((project) => {
                                 const needle = query.trim().toLowerCase();
                                 if (!needle) return true;
-                                return getProjectDisplayLabel(project).toLowerCase().includes(needle)
+                                return getProjectDisplayLabel(project, homeDirectory).toLowerCase().includes(needle)
                                     || project.path.toLowerCase().includes(needle);
                             })
                             .map((project) => (

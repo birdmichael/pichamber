@@ -41,7 +41,9 @@ import { useDeviceInfo } from '@/lib/device';
 import { Button } from '@/components/ui/button';
 import { OverlayScrollbar } from '@/components/ui/OverlayScrollbar';
 import { Icon } from "@/components/icon/Icon";
-import { cn, formatDirectoryName } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
+import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 
 // New sync system imports
@@ -510,11 +512,6 @@ const ReadOnlyPromptBanner: React.FC = () => {
     );
 };
 
-const getProjectDisplayLabel = (project: { label?: string; path: string }): string => {
-    const label = project.label?.trim();
-    return label || formatDirectoryName(project.path);
-};
-
 const renderDraftTitle = (title: string, projectLabel: string | null): React.ReactNode => {
     if (!projectLabel) return title;
     const projectIndex = title.indexOf(projectLabel);
@@ -529,16 +526,29 @@ const renderDraftTitle = (title: string, projectLabel: string | null): React.Rea
     );
 };
 
-const DraftWelcome: React.FC = () => {
+const DraftWelcome: React.FC<{ sessionDirectory?: string | null }> = ({ sessionDirectory }) => {
     const { t } = useI18n();
     const selectedProjectId = useSessionUIStore((state) => state.newSessionDraft.selectedProjectId ?? null);
-    const projectLabel = useProjectsStore(React.useCallback((state) => {
-        const projectId = selectedProjectId ?? state.activeProjectId;
-        const project = (projectId
-            ? state.projects.find((candidate) => candidate.id === projectId)
-            : null) ?? state.projects[0] ?? null;
-        return project ? getProjectDisplayLabel(project) : null;
-    }, [selectedProjectId]));
+    const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
+    const projects = useProjectsStore((state) => state.projects);
+    const activeProjectId = useProjectsStore((state) => state.activeProjectId);
+    const projectLabel = React.useMemo(() => {
+        const draftProject = (selectedProjectId
+            ? projects.find((candidate) => candidate.id === selectedProjectId)
+            : null)
+            ?? (activeProjectId
+                ? projects.find((candidate) => candidate.id === activeProjectId)
+                : null)
+            ?? projects[0]
+            ?? null;
+        return resolveWelcomeWorkspaceLabel({
+            projects,
+            homeDirectory,
+            sessionDirectory,
+            draftProject,
+            preferSessionProject: Boolean(sessionDirectory),
+        });
+    }, [activeProjectId, homeDirectory, projects, selectedProjectId, sessionDirectory]);
 
     return (
         <div className="oc-draft-center flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
@@ -1324,7 +1334,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 			<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
 				<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col bg-background">
 					{returnToParentButton}
-					{useCompactDraftLayout && !isDesktopExpandedInput ? <DraftWelcome /> : null}
+					{useCompactDraftLayout && !isDesktopExpandedInput ? (
+						<DraftWelcome sessionDirectory={effectiveSessionDirectory} />
+					) : null}
 					<div
 						className={cn(
 							'relative z-10 flex min-h-0',
