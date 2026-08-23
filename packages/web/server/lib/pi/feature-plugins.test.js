@@ -145,7 +145,7 @@ describe('feature plugin slash commands', () => {
       slots: { subagents: { installed: true, enabled: true } },
     })).toEqual([{
       name: 'run',
-      description: 'Run one subagent through workflowScript',
+      description: 'Run a subagent as a one-shot workflow',
       source: 'extension',
     }]);
     expect(listFeaturePluginSlashCommands({

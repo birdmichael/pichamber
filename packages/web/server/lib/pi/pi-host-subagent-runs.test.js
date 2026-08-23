@@ -337,6 +337,9 @@ describe('Pi host subagent runs', () => {
         }],
       });
     }, { description: 'Run one subagent through workflowScript' });
+    expect(host.listCommands('/tmp/project').find((command) => command.name === 'run')).toMatchObject({
+      description: 'Run a subagent as a one-shot workflow',
+    });
     const result = await host.runCommand(parent.id, {
       command: 'run',
       arguments: 'scout 只回复一个词：ok',

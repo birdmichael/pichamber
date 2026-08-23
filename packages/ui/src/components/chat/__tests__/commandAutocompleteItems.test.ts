@@ -10,6 +10,7 @@ import {
   filterPiSlashCommands,
   mergeCommandAutocompleteItems,
   resolveCommandAutocompleteKey,
+  resolveSlashMenuDescription,
   toPiSkillSlashName,
 } from '../commandAutocompleteItems';
 
@@ -348,6 +349,30 @@ describe('commandMatchesPiSlashQuery', () => {
     expect(commands.filter((item) => commandMatchesPiSlashQuery(item, 're')).map((item) => item.name)).toEqual([
       'review-pr',
     ]);
+  });
+});
+
+describe('resolveSlashMenuDescription', () => {
+  test('replaces /run plugin jargon with product copy', () => {
+    expect(resolveSlashMenuDescription(
+      { name: 'run', description: 'Run one subagent through workflowScript' },
+      { runDescription: 'Run a subagent as a one-shot workflow' },
+    )).toBe('Run a subagent as a one-shot workflow');
+    expect(resolveSlashMenuDescription(
+      { name: 'run' },
+      { runDescription: 'Run a subagent as a one-shot workflow' },
+    )).toBe('Run a subagent as a one-shot workflow');
+  });
+
+  test('keeps other command descriptions and still ignores description text in prefix search', () => {
+    const catchUp = {
+      name: 'catch-up',
+      description: 'Re-establish context: what you were doing and where to pick up.',
+    };
+    expect(resolveSlashMenuDescription(catchUp, {
+      runDescription: 'Run a subagent as a one-shot workflow',
+    })).toBe(catchUp.description);
+    expect(commandMatchesPiSlashQuery(catchUp, 're-establish')).toBe(false);
   });
 });
 

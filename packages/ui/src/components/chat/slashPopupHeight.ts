@@ -1,19 +1,23 @@
 /**
- * Desktop `/` popup height. Two-line command rows plus the keyboard-hint
- * footer made the old 256px (`max-h-64`) cap show ~3.5 rows and clip the
- * last name. A new-session composer is vertically centered, so the space
- * above it is also ~256px until the form docks to the bottom while `/` is
- * open. Docking the whole welcome block is not enough: the title and starter
- * chips stay in that block and steal the list viewport (observed ~5 rows /
- * ~295px on 1280×800). Hide that chrome in the same turn, cancel the
- * new-session `pb-[6vh]` inset, then measure the space above the composer
- * and snap to whole rows so the last visible name stays intact.
+ * Desktop `/` popup height. Command rows are the name plus up to two wrapped
+ * description lines. The old 256px (`max-h-64`) cap showed a clipped last
+ * name on shorter one-line-description rows. A new-session composer is
+ * vertically centered, so the space above it is also ~256px until the form
+ * docks to the bottom while `/` is open. Docking the whole welcome block is
+ * not enough: the title and starter chips stay in that block and steal the
+ * list viewport (observed ~5 short rows / ~295px on 1280×800). Hide that
+ * chrome in the same turn, cancel the new-session `pb-[6vh]` inset, then
+ * measure the space above the composer and snap to whole rows so the last
+ * visible name stays intact.
  */
 
 export const DESKTOP_SLASH_POPUP_DESIGN_CAP_PX = 640;
-export const DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX = 59;
+/** Name + up to two wrapped description lines, including `py-2` row padding. */
+export const DESKTOP_SLASH_POPUP_ROW_ESTIMATE_PX = 78;
 /** Keyboard-hint footer plus the 2px popup border. List padding is inside the scroller, not chrome. */
 export const DESKTOP_SLASH_POPUP_CHROME_ESTIMATE_PX = 36;
+/** Desktop slash descriptions wrap at word boundaries; two lines fit a typical command. */
+export const DESKTOP_SLASH_DESCRIPTION_CLASS = 'typography-meta text-muted-foreground mt-0.5 line-clamp-2 whitespace-normal break-words';
 /** CSS fallback when JS has not measured yet. Must not be `max-h-64` (256px). */
 export const DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS = 'max-h-[min(40rem,calc(100dvh-11rem))]';
 

@@ -801,7 +801,11 @@ describe('createPiHost', () => {
         defaultDirectory: '/tmp/empty-project',
       });
       const listed = host.listCommands('/tmp/empty-project');
-      expect(listed.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
+      expect(listed.find((command) => command.name === 'run')).toMatchObject({
+        name: 'run',
+        source: 'extension',
+        description: 'Run a subagent as a one-shot workflow',
+      });
       expect(listed.some((command) => command.name === 'plan')).toBe(false);
       expect(host.getFeaturePlugins().slots.goal).toMatchObject({ installed: true, enabled: true });
       expect(host.getFeaturePlugins().slots.plan).toMatchObject({ installed: false, enabled: false });

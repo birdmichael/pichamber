@@ -155,6 +155,21 @@ export function commandMatchesPiSlashQuery(command: { name: string }, query: str
   return commandHasPiSlashPrefix(command, query);
 }
 
+/** `/run` always uses product copy. Plugin jargon such as workflowScript must not reach the menu. */
+export function resolveSlashMenuDescription(
+  command: { name: string; description?: string },
+  copy: { runDescription: string },
+): string | undefined {
+  if (command.name === 'run') {
+    const runDescription = copy.runDescription.replace(/\s+/g, ' ').trim();
+    return runDescription || undefined;
+  }
+  const description = typeof command.description === 'string'
+    ? command.description.replace(/\s+/g, ' ').trim()
+    : '';
+  return description || undefined;
+}
+
 /** Live PI `/plan` must stay visible next to `/plan-feature`, including empty drafts. */
 export function ensureLivePlanSlashCommand<T extends PiSlashCommandItem>(
   commands: T[],
