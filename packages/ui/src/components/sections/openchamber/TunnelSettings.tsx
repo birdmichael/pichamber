@@ -18,6 +18,10 @@ import { formatTimeForPreference } from '@/lib/timeFormat';
 import { useUIStore, type TimeFormatPreference } from '@/stores/useUIStore';
 import { SettingsSection, SettingsGroupTitle, SETTINGS_SELECT_SIZE, SETTINGS_FIELD_LABEL_CLASS, SETTINGS_CALLOUT_TITLE_CLASS } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
+import {
+  formatMissingTunnelProviderCliReason,
+  isRequiredTunnelProviderCliMissing,
+} from '@/components/sections/openchamber/tunnelSettingsAvailability';
 
 type TunnelState =
   | 'checking'
@@ -361,6 +365,7 @@ export const TunnelSettings: React.FC = () => {
   const [isSavingTtl, setIsSavingTtl] = React.useState(false);
   const [isSavingMode, setIsSavingMode] = React.useState(false);
   const [tunnelProvider, setTunnelProvider] = React.useState<string>('cloudflare');
+  const [dependencyAvailable, setDependencyAvailable] = React.useState<boolean | null>(null);
   const [dependencyInstallInfo, setDependencyInstallInfo] = React.useState<TunnelDependencyInstallInfo>(() => createTunnelDependencyInstallInfo('cloudflare'));
   const [providerCapabilities, setProviderCapabilities] = React.useState<TunnelProviderCapability[]>([]);
   const [tunnelMode, setTunnelMode] = React.useState<TunnelMode>('quick');
@@ -487,13 +492,27 @@ export const TunnelSettings: React.FC = () => {
     }
     return createTunnelDependencyInstallInfo(tunnelProvider);
   }, [dependencyInstallInfo, tunnelProvider]);
+  const missingRequiredProviderCli = isRequiredTunnelProviderCliMissing({
+    dependencyAvailable,
+    mode: tunnelMode,
+  });
+  const missingProviderCliReason = missingRequiredProviderCli
+    ? formatMissingTunnelProviderCliReason({
+      notFound: t('settings.openchamber.tunnel.notAvailable.dependencyNotFound', {
+        dependency: displayedDependencyInstallInfo.dependency,
+      }),
+      installHint: t('settings.openchamber.tunnel.notAvailable.installHint'),
+    })
+    : null;
   const openExternal = React.useCallback(async (url: string) => {
     await openExternalUrl(url);
   }, []);
 
   const applyDependencyCheck = React.useCallback((checkData: TunnelCheckResponse, fallbackProvider: string): boolean => {
     setDependencyInstallInfo(createTunnelDependencyInstallInfo(fallbackProvider, checkData));
-    return checkData.available === true;
+    const available = checkData.available === true;
+    setDependencyAvailable(available);
+    return available;
   }, []);
 
   const refreshTunnelDependencyCheck = React.useCallback(async (provider: string, signal?: AbortSignal): Promise<boolean | null> => {
@@ -918,6 +937,11 @@ export const TunnelSettings: React.FC = () => {
     setErrorMessage(null);
     setManagedRemoteValidationError(null);
 
+    if (isRequiredTunnelProviderCliMissing({ dependencyAvailable, mode: tunnelMode })) {
+      setState('not-available');
+      return;
+    }
+
     if (tunnelMode === 'managed-local' && managedLocalConfigPath && !hasAllowedManagedLocalConfigExtension(managedLocalConfigPath)) {
       setErrorMessage(managedLocalConfigExtensionError);
       toast.error(managedLocalConfigExtensionError);
@@ -1027,6 +1051,7 @@ export const TunnelSettings: React.FC = () => {
       toast.error(t('settings.openchamber.tunnel.toast.startFailed'));
     }
   }, [
+    dependencyAvailable,
     managedLocalConfigExtensionError,
     managedRemoteTunnelPresets,
     saveTunnelSettings,
@@ -1098,15 +1123,19 @@ export const TunnelSettings: React.FC = () => {
   const handleModeChange = React.useCallback(async (value: TunnelMode) => {
     setManagedRemoteValidationError(null);
     setErrorMessage(null);
-    if (state !== 'active' && state !== 'stopping' && state !== 'starting') {
-      setState('idle');
+    if (state === 'error') {
+      setState(
+        isRequiredTunnelProviderCliMissing({ dependencyAvailable, mode: value })
+          ? 'not-available'
+          : 'idle'
+      );
     }
 
     await saveTunnelSettings({
       tunnelMode: value,
       managedRemoteTunnelPresets,
     });
-  }, [managedRemoteTunnelPresets, saveTunnelSettings, state]);
+  }, [dependencyAvailable, managedRemoteTunnelPresets, saveTunnelSettings, state]);
 
   const persistSelectedPreset = React.useCallback(async (preset: ManagedRemoteTunnelPreset, presets: ManagedRemoteTunnelPreset[]) => {
     try {
@@ -1302,8 +1331,8 @@ export const TunnelSettings: React.FC = () => {
         </section>
       )}
 
-      {state === 'not-available' && (
-        <section className="space-y-2 px-2 pb-2 pt-0">
+      {missingRequiredProviderCli && (
+        <section id="tunnel-missing-provider-cli" className="space-y-2 px-2 pb-2 pt-0">
           <div className="flex items-start gap-2 rounded-lg border border-[var(--status-warning)]/30 bg-[var(--status-warning)]/5 p-3">
             <Icon name="error-warning" className="mt-0.5 size-4 shrink-0 text-[var(--status-warning)]" />
             <div className="space-y-1">
@@ -1799,21 +1828,28 @@ export const TunnelSettings: React.FC = () => {
                 </div>
               )}
 
-              <Button size="sm"
-                variant="outline"
-                onClick={handleStart}
-                disabled={
-                  state === 'starting'
-                  || isSavingMode
-                  || (tunnelMode === 'managed-remote' && !selectedPreset)
-                  || (tunnelMode === 'managed-local' && isManagedLocalConfigPathInvalid)
-                }
-                className={cn(primaryCtaClass, state === 'starting' && 'opacity-70')}
+              <span
+                className="inline-flex"
+                title={missingProviderCliReason ?? undefined}
               >
-                {state === 'starting'
-                  ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.openchamber.tunnel.actions.startingTunnel')}</>
-                  : t('settings.openchamber.tunnel.actions.startTunnel')}
-              </Button>
+                <Button size="sm"
+                  variant="outline"
+                  onClick={handleStart}
+                  disabled={
+                    state === 'starting'
+                    || isSavingMode
+                    || missingRequiredProviderCli
+                    || (tunnelMode === 'managed-remote' && !selectedPreset)
+                    || (tunnelMode === 'managed-local' && isManagedLocalConfigPathInvalid)
+                  }
+                  aria-describedby={missingRequiredProviderCli ? 'tunnel-missing-provider-cli' : undefined}
+                  className={cn(primaryCtaClass, state === 'starting' && 'opacity-70')}
+                >
+                  {state === 'starting'
+                    ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.openchamber.tunnel.actions.startingTunnel')}</>
+                    : t('settings.openchamber.tunnel.actions.startTunnel')}
+                </Button>
+              </span>
             </div>
           )}
 
@@ -1867,15 +1903,21 @@ export const TunnelSettings: React.FC = () => {
 
           <div className="pt-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm"
-                variant="outline"
-                onClick={handleStart}
-                disabled={state === 'stopping' || isSavingMode || (tunnelMode === 'managed-local' && isManagedLocalConfigPathInvalid)}
-                className={primaryCtaClass}
+              <span
+                className="inline-flex"
+                title={missingProviderCliReason ?? undefined}
               >
-                <Icon name="restart" className="size-3.5" />
-                {t('settings.openchamber.tunnel.actions.newConnectLink')}
-              </Button>
+                <Button size="sm"
+                  variant="outline"
+                  onClick={handleStart}
+                  disabled={state === 'stopping' || isSavingMode || missingRequiredProviderCli || (tunnelMode === 'managed-local' && isManagedLocalConfigPathInvalid)}
+                  aria-describedby={missingRequiredProviderCli ? 'tunnel-missing-provider-cli' : undefined}
+                  className={primaryCtaClass}
+                >
+                  <Icon name="restart" className="size-3.5" />
+                  {t('settings.openchamber.tunnel.actions.newConnectLink')}
+                </Button>
+              </span>
 
               <Button size="sm"
                 variant="ghost"
@@ -1895,7 +1937,20 @@ export const TunnelSettings: React.FC = () => {
       {state === 'error' && errorMessage && (
         <section className="space-y-3 px-2 pb-2 pt-0">
           <p className="typography-meta text-[var(--status-error)]">{errorMessage}</p>
-          <Button size="sm" variant="ghost" onClick={handleStart}>{t('settings.openchamber.tunnel.actions.retry')}</Button>
+          <span
+            className="inline-flex"
+            title={missingProviderCliReason ?? undefined}
+          >
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleStart}
+              disabled={missingRequiredProviderCli}
+              aria-describedby={missingRequiredProviderCli ? 'tunnel-missing-provider-cli' : undefined}
+            >
+              {t('settings.openchamber.tunnel.actions.retry')}
+            </Button>
+          </span>
         </section>
       )}
       </div>
