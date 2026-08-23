@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Settings:** Skills Catalog now browses curated GitHub skill collections as cards, with skill counts, stars, recent updates, cross-source search, and links back to each skill's repository.
 - **Sessions/Desktop:** start chats without choosing a project. They live in their own Chats section and do not inherit a project's repository or worktree. Opening a project chat still uses that project.
 - Chat: in a chat without a project, the work status card again steps aside when the context panel is open, instead of sitting next to it.
 - **Chat/Desktop:** on Pi, after installing `@narumitw/pi-btw` from Feature Plugins, type `/btw` plus a question to ask off-topic in a temporary session forked from the current chat. The answer streams in a panel above the composer. Collapse it, keep it as a full session, or discard it. The temp session stays out of the sidebar until Keep. Without that package, `/btw` is a normal chat message.

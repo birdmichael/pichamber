@@ -30,6 +30,29 @@ const FALLBACK_SOURCES: SkillsCatalogSource[] = [
     sourceType: 'github',
   },
   {
+    id: 'openai',
+    label: 'OpenAI',
+    description: "OpenAI's curated skills",
+    source: 'openai/skills',
+    defaultSubpath: 'skills/.curated',
+    sourceType: 'github',
+  },
+  {
+    id: 'cursor',
+    label: 'Cursor',
+    description: "Cursor's plugin skills",
+    source: 'cursor/plugins',
+    defaultSubpath: 'pstack/skills',
+    sourceType: 'github',
+  },
+  {
+    id: 'mattpocock',
+    label: 'Matt Pocock',
+    description: 'Matt Pocock skills collection',
+    source: 'mattpocock/skills',
+    sourceType: 'github',
+  },
+  {
     id: 'clawdhub',
     label: 'ClawHub',
     description: 'Community skill registry with vector search',
@@ -42,6 +65,12 @@ const SKILLS_CATALOG_LOAD_CACHE_TTL_MS = 5000;
 const DEFAULT_SKILLS_CATALOG_CACHE_KEY = '__default__';
 const skillsCatalogLastLoadedAt = new Map<string, number>();
 const skillsCatalogLoadInFlight = new Map<string, Promise<boolean>>();
+const sourceLoadInFlight = new Map<string, Promise<boolean>>();
+let activeSourceLoads = 0;
+
+const isClawdHubSource = (source: SkillsCatalogSource | undefined): boolean => (
+  source?.source === 'clawdhub:registry' || source?.sourceType === 'clawdhub'
+);
 
 const getSkillsCatalogCacheKey = (directory: string | null): string => {
   return directory?.trim() || DEFAULT_SKILLS_CATALOG_CACHE_KEY;
@@ -222,71 +251,100 @@ export const useSkillsCatalogStore = create<SkillsCatalogState>()(
           return false;
         }
 
+        // Deduplicate concurrent loads of the same source: the background
+        // loader effect can restart while a request for this source is
+        // already in flight.
+        if (!options?.refresh) {
+          const inFlight = sourceLoadInFlight.get(sourceId);
+          if (inFlight) {
+            return inFlight;
+          }
+        }
+
+        activeSourceLoads += 1;
         set({ isLoadingSource: true, lastCatalogError: null });
 
-        try {
-          const currentDirectory = getRequestDirectory();
-          const refresh = options?.refresh ? '&refresh=true' : '';
-          const queryParams = currentDirectory
-            ? `?directory=${encodeURIComponent(currentDirectory)}&sourceId=${encodeURIComponent(sourceId)}${refresh}`
-            : `?sourceId=${encodeURIComponent(sourceId)}${refresh}`;
+        const request = (async () => {
+          try {
+            const currentDirectory = getRequestDirectory();
+            const refresh = options?.refresh ? '&refresh=true' : '';
+            const queryParams = currentDirectory
+              ? `?directory=${encodeURIComponent(currentDirectory)}&sourceId=${encodeURIComponent(sourceId)}${refresh}`
+              : `?sourceId=${encodeURIComponent(sourceId)}${refresh}`;
 
-          const response = await runtimeFetch(`/api/config/skills/catalog/source${queryParams}`, {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-          });
-
-          const payload = (await response.json().catch(() => null)) as SkillsCatalogSourceResponse | null;
-          const hasItems = Array.isArray((payload as SkillsCatalogSourceResponse | null)?.items);
-          if (!response.ok || (!payload?.ok && !hasItems)) {
-            const fallback = await runtimeFetch(`/api/config/skills/catalog${queryParams}`, {
+            const response = await runtimeFetch(`/api/config/skills/catalog/source${queryParams}`, {
               method: 'GET',
               headers: { Accept: 'application/json' },
             });
-            const fallbackPayload = (await fallback.json().catch(() => null)) as SkillsCatalogResponse | null;
-            const fallbackItems = fallbackPayload?.itemsBySource?.[sourceId];
-            if (fallback.ok && fallbackPayload?.ok && Array.isArray(fallbackItems)) {
-              set((state) => ({
-                itemsBySource: { ...state.itemsBySource, [sourceId]: fallbackItems },
-                pageInfoBySource: { ...state.pageInfoBySource, [sourceId]: { nextCursor: null } },
-                loadedSourceIds: { ...state.loadedSourceIds, [sourceId]: true },
-                clawdhubHasMoreBySource: { ...state.clawdhubHasMoreBySource, [sourceId]: false },
-              }));
-              return true;
+
+            const payload = (await response.json().catch(() => null)) as SkillsCatalogSourceResponse | null;
+            const hasItems = Array.isArray((payload as SkillsCatalogSourceResponse | null)?.items);
+            if (!response.ok || (!payload?.ok && !hasItems)) {
+              const fallback = await runtimeFetch(`/api/config/skills/catalog${queryParams}`, {
+                method: 'GET',
+                headers: { Accept: 'application/json' },
+              });
+              const fallbackPayload = (await fallback.json().catch(() => null)) as SkillsCatalogResponse | null;
+              const fallbackItems = fallbackPayload?.itemsBySource?.[sourceId];
+              if (fallback.ok && fallbackPayload?.ok && Array.isArray(fallbackItems)) {
+                set((state) => ({
+                  itemsBySource: { ...state.itemsBySource, [sourceId]: fallbackItems },
+                  pageInfoBySource: { ...state.pageInfoBySource, [sourceId]: { nextCursor: null } },
+                  loadedSourceIds: { ...state.loadedSourceIds, [sourceId]: true },
+                  clawdhubHasMoreBySource: { ...state.clawdhubHasMoreBySource, [sourceId]: false },
+                }));
+                return true;
+              }
+
+              set({
+                lastCatalogError: payload?.error || { kind: 'unknown', message: `Failed to load source (${response.status})` },
+              });
+              return false;
             }
 
+            const items = payload?.items || [];
+            const nextCursor = payload?.nextCursor ?? null;
+
+            set((state) => ({
+              itemsBySource: { ...state.itemsBySource, [sourceId]: items },
+              pageInfoBySource: { ...state.pageInfoBySource, [sourceId]: { nextCursor } },
+              loadedSourceIds: { ...state.loadedSourceIds, [sourceId]: true },
+              clawdhubHasMoreBySource: {
+                ...state.clawdhubHasMoreBySource,
+                [sourceId]: items.length > 0,
+              },
+            }));
+
+            return true;
+          } catch (error) {
             set({
-              lastCatalogError: payload?.error || { kind: 'unknown', message: `Failed to load source (${response.status})` },
+              lastCatalogError: { kind: 'unknown', message: error instanceof Error ? error.message : String(error) },
             });
             return false;
+          } finally {
+            activeSourceLoads -= 1;
+            if (activeSourceLoads === 0) {
+              set({ isLoadingSource: false });
+            }
           }
+        })();
 
-          const items = payload?.items || [];
-          const nextCursor = payload?.nextCursor ?? null;
-
-          set((state) => ({
-            itemsBySource: { ...state.itemsBySource, [sourceId]: items },
-            pageInfoBySource: { ...state.pageInfoBySource, [sourceId]: { nextCursor } },
-            loadedSourceIds: { ...state.loadedSourceIds, [sourceId]: true },
-            clawdhubHasMoreBySource: {
-              ...state.clawdhubHasMoreBySource,
-              [sourceId]: items.length > 0,
-            },
-          }));
-
-          return true;
-        } catch (error) {
-          set({
-            lastCatalogError: { kind: 'unknown', message: error instanceof Error ? error.message : String(error) },
-          });
-          return false;
+        sourceLoadInFlight.set(sourceId, request);
+        try {
+          return await request;
         } finally {
-          set({ isLoadingSource: false });
+          if (sourceLoadInFlight.get(sourceId) === request) {
+            sourceLoadInFlight.delete(sourceId);
+          }
         }
       },
 
       loadMoreClawdHub: async () => {
-        const selectedSourceId = get().selectedSourceId;
+        const state = get();
+        const selected = state.sources.find((source) => source.id === state.selectedSourceId);
+        const selectedSourceId = isClawdHubSource(selected)
+          ? selected?.id ?? null
+          : (state.sources.find(isClawdHubSource)?.id ?? null);
         if (!selectedSourceId) {
           return false;
         }

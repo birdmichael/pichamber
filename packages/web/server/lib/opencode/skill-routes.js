@@ -46,6 +46,7 @@ export const registerSkillRoutes = (app, dependencies) => {
     getCachedScan,
     setCachedScan,
     parseSkillRepoSource,
+    fetchGitHubRepoMetas,
     scanSkillsRepository,
     installSkillsFromRepository,
     scanClawdHubPage,
@@ -258,7 +259,26 @@ export const registerSkillRoutes = (app, dependencies) => {
       }));
 
       const sources = [...curatedSources, ...customSources];
-      const sourcesForUi = sources.map(({ gitIdentityId, ...rest }) => rest);
+
+      const githubRepos = sources
+        .map((src) => parseSkillRepoSource(src.source))
+        .filter((parsed) => parsed.ok && parsed.host === 'github.com')
+        .map((parsed) => parsed.normalizedRepo);
+      const repoMetas = typeof fetchGitHubRepoMetas === 'function'
+        ? await fetchGitHubRepoMetas(githubRepos)
+        : {};
+
+      const sourcesForUi = sources.map(({ gitIdentityId, ...rest }) => {
+        const parsed = parseSkillRepoSource(rest.source);
+        const meta = parsed.ok && parsed.host === 'github.com'
+          ? repoMetas[parsed.normalizedRepo] || {}
+          : {};
+        return {
+          ...rest,
+          stars: typeof meta.stars === 'number' ? meta.stars : null,
+          repoUpdatedAt: typeof meta.repoUpdatedAt === 'string' ? meta.repoUpdatedAt : null,
+        };
+      });
 
       res.json({ ok: true, sources: sourcesForUi, itemsBySource: {}, pageInfoBySource: {} });
     } catch (error) {

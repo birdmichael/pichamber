@@ -77,6 +77,7 @@ const startSkillsApp = ({ projectRoot, extraDependencies = {} }) => {
     scanClawdHubPage: async () => ({ ok: false }),
     installSkillsFromClawdHub: async () => ({ ok: false }),
     isClawdHubSource: () => false,
+    fetchGitHubRepoMetas: async () => ({}),
     getProfiles: () => [],
     getProfile: () => null,
     ...extraDependencies,
@@ -409,5 +410,81 @@ describe('skill-routes Pi config skills', () => {
     expect(body.sources.md.description).toBe(description);
     expect(body.sources.md.description).not.toBe('|');
     expect(body.sources.md.instructions).toBe('Ask clarifying questions first.');
+  });
+});
+
+describe('skills catalog GitHub metadata', () => {
+  /** @type {string | null} */
+  let projectRoot = null;
+  /** @type {{ close: () => Promise<void> } | null} */
+  let appHandle = null;
+
+  afterEach(async () => {
+    if (appHandle) {
+      await appHandle.close();
+      appHandle = null;
+    }
+    if (projectRoot) {
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('attaches stars and repoUpdatedAt for GitHub sources and leaves ClawHub empty', async () => {
+    projectRoot = createTempProject();
+    appHandle = startSkillsApp({
+      projectRoot,
+      extraDependencies: {
+        getCuratedSkillsSources: () => [
+          {
+            id: 'anthropic',
+            label: 'Anthropic',
+            source: 'anthropics/skills',
+            sourceType: 'github',
+          },
+          {
+            id: 'clawdhub',
+            label: 'ClawHub',
+            source: 'clawdhub:registry',
+            sourceType: 'clawdhub',
+          },
+        ],
+        parseSkillRepoSource: (source) => {
+          if (source === 'anthropics/skills') {
+            return { ok: true, host: 'github.com', normalizedRepo: 'anthropics/skills' };
+          }
+          return { ok: false };
+        },
+        fetchGitHubRepoMetas: async (repos) => {
+          expect(repos).toEqual(['anthropics/skills']);
+          return {
+            'anthropics/skills': { stars: 42, repoUpdatedAt: '2026-08-01T00:00:00Z' },
+          };
+        },
+      },
+    });
+
+    const response = await fetch(`${appHandle.baseUrl}/api/config/skills/catalog`);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.sources).toEqual([
+      {
+        id: 'anthropic',
+        label: 'Anthropic',
+        source: 'anthropics/skills',
+        sourceType: 'github',
+        stars: 42,
+        repoUpdatedAt: '2026-08-01T00:00:00Z',
+      },
+      {
+        id: 'clawdhub',
+        label: 'ClawHub',
+        source: 'clawdhub:registry',
+        sourceType: 'clawdhub',
+        stars: null,
+        repoUpdatedAt: null,
+      },
+    ]);
   });
 });

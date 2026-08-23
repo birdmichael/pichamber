@@ -46,4 +46,9 @@ describe('skills catalog ClawHub label', () => {
     expect(clawhub).toBeDefined();
     expect(clawhub?.label).toBe('ClawHub');
   });
+
+  test('fallback sources include official GitHub collections', () => {
+    const ids = useSkillsCatalogStore.getState().sources.map((source) => source.id);
+    expect(ids).toEqual(['anthropic', 'openai', 'cursor', 'mattpocock', 'clawdhub']);
+  });
 });

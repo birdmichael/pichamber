@@ -6,7 +6,9 @@ This module provides skill discovery, scanning, and installation capabilities fo
 ## Entrypoints and structure
 - `packages/web/server/lib/skills-catalog/`: Skills catalog module directory containing all skill-related functionality.
   - `cache.js`: In-memory cache for scan results with TTL support.
-  - `curated-sources.js`: Predefined skill sources (Anthropic, ClawHub).
+  - `curated-sources.js`: Predefined skill sources (Anthropic, OpenAI, Cursor, Matt Pocock, ClawHub).
+  - `github-meta.js`: Best-effort GitHub repository metadata (stars, last push) with in-memory TTL cache.
+  - `disk-cache.js`: Shared JSON persistence for catalog caches in the OpenChamber data dir.
   - `git.js`: Git operations helpers for cloning and auth error detection.
   - `install.js`: Skills installation from git repositories.
   - `scan.js`: Skills scanning from git repositories.
@@ -28,8 +30,12 @@ The following functions are exported and used by the web server:
 - `clearCache()`: Clear all cached scan results.
 
 ### Curated Sources (`curated-sources.js`)
-- `getCuratedSkillsSources()`: Return list of curated skill sources (Anthropic, ClawHub).
+- `getCuratedSkillsSources()`: Return list of curated skill sources (Anthropic, OpenAI, Cursor, Matt Pocock, ClawHub).
 - `CURATED_SKILLS_SOURCES`: Constant array of predefined sources.
+
+### GitHub Repository Metadata (`github-meta.js`)
+- `fetchGitHubRepoMetas(normalizedRepos)`: Fetch `{ stars, repoUpdatedAt }` for GitHub `owner/repo` strings. Best-effort: failures resolve to `null`; in-flight requests deduplicate; results cached in memory and on disk (`skills-github-meta.json`) for three hours.
+- `clearGitHubMetaCache()`: Test-only cache reset.
 
 ### Source Parsing (`source.js`)
 - `parseSkillRepoSource(source, { subpath })`: Parse git repository source string into structured object with SSH/HTTPS clone URLs, normalized repo, and effective subpath. Supports SSH URLs, HTTPS URLs, and shorthand `owner/repo[/subpath]` format.
@@ -153,8 +159,8 @@ The following functions are internal helpers used by exported functions:
 
 ### Cache Management
 - Cache keys include `normalizedRepo`, `subpath`, and `identityId` for isolation.
-- Default TTL is 30 minutes; can be overridden via `ttlMs` parameter.
-- Cache is in-memory (not persisted across restarts).
+- Default TTL is 30 minutes for scan results; GitHub repository metadata is cached for three hours.
+- Scan results stay in memory. GitHub metadata also persists to `skills-github-meta.json` in the OpenChamber data dir.
 
 ### Security Considerations
 - Path traversal protection in `copyDirectoryNoSymlinks`: resolves real paths and checks containment.

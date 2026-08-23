@@ -1275,6 +1275,10 @@ export interface SkillsCatalogSource {
   source: string;
   defaultSubpath?: string;
   sourceType?: SkillsCatalogSourceType;
+  /** GitHub repository star count (null when unavailable) */
+  stars?: number | null;
+  /** GitHub repository last-push timestamp, ISO (null when unavailable) */
+  repoUpdatedAt?: string | null;
 }
 
 interface SkillsCatalogItemInstalledBadge {
