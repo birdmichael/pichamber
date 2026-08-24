@@ -39,7 +39,6 @@ import { PreviewToggleButton } from '@/components/views/PreviewToggleButton';
 import { SkillsCatalogPage } from './catalog/SkillsCatalogPage';
 import {
   defaultNewSkillLocation,
-  defaultSkillSource,
   getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
