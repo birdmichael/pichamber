@@ -10,6 +10,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import {
   cancelPiExtensionUi,
   isFreeformOtherOption,
+  isTypeSomethingOption,
   isPiExtensionUiNotFoundError,
   replyPiExtensionUi,
 } from '@/sync/pi-extension-ui';
@@ -278,7 +279,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className={cn('typography-meta break-all', isSelected ? 'text-foreground font-medium' : 'text-foreground/80')}>
-                              {other ? t('chat.piExtensionUi.other') : parsed.label}
+                              {other && !isTypeSomethingOption(option) ? t('chat.piExtensionUi.other') : parsed.label}
                             </span>
                             {!other && parsed.description ? (
                               <div className="typography-micro text-muted-foreground break-words">{parsed.description}</div>

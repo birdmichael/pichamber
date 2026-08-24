@@ -1279,6 +1279,37 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('maps an installed question tool onto Desktop select after bind', async () => {
+    const definition = {
+      name: 'question',
+      execute: async () => ({ content: [{ type: 'text', text: 'TUI path' }] }),
+    };
+    const piSession = createInMemoryPiSession();
+    const originalGet = piSession.getToolDefinition.bind(piSession);
+    piSession.getToolDefinition = (name) => (
+      name === 'question' ? definition : originalGet(name)
+    );
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => piSession,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Question tool' });
+    const pending = definition.execute('call_1', {
+      question: 'How wide?',
+      options: [{ label: 'One file' }],
+    }, undefined, undefined, { ui: host.getExtensionUI(record.id).context, mode: 'rpc' });
+    const [prompt] = await waitForExtensionPrompts(host, record.id);
+    expect(prompt.kind).toBe('select');
+    expect(prompt.options?.at(-1)).toBe('2. Type something.');
+    expect(host.replyExtensionUI(record.id, prompt.id, '1. One file')).toBe(true);
+    await expect(pending).resolves.toMatchObject({
+      content: [{ type: 'text', text: 'User selected: 1. One file' }],
+      details: { answer: 'One file', wasCustom: false },
+    });
+    host.dispose();
+  });
+
   it('reload({ sessionID }) re-binds Desktop ctx.ui after piSession.reload()', async () => {
     const piSession = createInMemoryPiSession();
     const host = createPiHost({
