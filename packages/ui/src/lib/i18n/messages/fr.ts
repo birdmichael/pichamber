@@ -2657,6 +2657,8 @@ export const dict = {
   'updateDialog.actions.downloadUpdate': 'Télécharger la mise à jour',
   'updateDialog.status.downloading': 'Téléchargement...',
   'updateDialog.actions.restartToUpdate': 'Redémarrer pour mettre à jour',
+  'updateDialog.actions.openGitHubRelease': 'Ouvrir la release GitHub',
+  'updateDialog.manualInstall.unsignedMac': 'Cette version Mac ne peut pas installer les mises à jour dans l’app. Ouvrez la release GitHub et remplacez Pichamber.app par celle du .dmg.',
   'updateDialog.actions.updateNow': 'Mettre à jour maintenant',
   'updateDialog.actions.openMobileUpdate': 'Ouvrir la mise à jour',
   'updateDialog.changelog.title': 'Nouveautés',

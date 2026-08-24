@@ -3023,6 +3023,8 @@ export const dict = {
   'updateDialog.actions.downloadUpdate': 'Download Update',
   'updateDialog.status.downloading': 'Downloading...',
   'updateDialog.actions.restartToUpdate': 'Restart to Update',
+  'updateDialog.actions.openGitHubRelease': 'Open GitHub release',
+  'updateDialog.manualInstall.unsignedMac': 'This Mac build cannot install updates in-place. Open the GitHub release and replace Pichamber.app from the .dmg.',
   'updateDialog.actions.updateNow': 'Update Now',
   'updateDialog.actions.openMobileUpdate': 'Open update',
   'updateDialog.status.updating': 'Updating...',

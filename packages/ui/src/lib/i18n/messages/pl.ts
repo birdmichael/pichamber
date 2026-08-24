@@ -3001,6 +3001,8 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.actions.downloadUpdate': 'Pobierz aktualizację',
   'updateDialog.actions.openMobileUpdate': 'Otwórz aktualizację',
   'updateDialog.actions.restartToUpdate': 'Uruchom ponownie, aby zaktualizować',
+  'updateDialog.actions.openGitHubRelease': 'Otwórz wydanie na GitHubie',
+  'updateDialog.manualInstall.unsignedMac': 'Ta kompilacja na Maca nie może instalować aktualizacji w aplikacji. Otwórz wydanie na GitHubie i zastąp Pichamber.app wersją z pliku .dmg.',
   'updateDialog.actions.updateNow': 'Aktualizuj teraz',
   'updateDialog.error.takingLonger': 'Aktualizacja trwa dłużej niż oczekiwano. Poczekaj chwilę i odśwież albo uruchom: pichamber update',
   'updateDialog.error.updateFailed': 'Aktualizacja nie powiodła się',

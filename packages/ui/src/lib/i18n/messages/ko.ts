@@ -3023,6 +3023,8 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.actions.downloadUpdate': '업데이트 다운로드',
   'updateDialog.status.downloading': '다운로드 중…',
   'updateDialog.actions.restartToUpdate': '업데이트를 위해 재시작',
+  'updateDialog.actions.openGitHubRelease': 'GitHub 릴리스 열기',
+  'updateDialog.manualInstall.unsignedMac': '이 Mac 빌드는 앱 안에서 업데이트를 설치할 수 없습니다. GitHub 릴리스를 열고 .dmg의 Pichamber.app으로 교체하세요.',
   'updateDialog.actions.updateNow': '지금 업데이트',
   'updateDialog.actions.openMobileUpdate': '업데이트 열기',
   'updateDialog.status.updating': '업데이트 중…',

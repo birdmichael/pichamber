@@ -2989,6 +2989,8 @@ export const dict: Record<I18nKey, string> = {
   "updateDialog.actions.downloadUpdate": "Завантажити оновлення",
   "updateDialog.status.downloading": "Завантаження...",
   "updateDialog.actions.restartToUpdate": "Перезапустити, щоб оновити",
+  "updateDialog.actions.openGitHubRelease": "Відкрити реліз на GitHub",
+  "updateDialog.manualInstall.unsignedMac": "Ця збірка для Mac не може встановлювати оновлення в програмі. Відкрийте реліз на GitHub і замініть Pichamber.app версією з .dmg.",
   "updateDialog.actions.updateNow": "Оновити зараз",
   "updateDialog.actions.openMobileUpdate": "Відкрити оновлення",
   "updateDialog.status.updating": "Оновлення...",

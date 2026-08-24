@@ -2986,6 +2986,8 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.actions.downloadUpdate': '下載更新',
   'updateDialog.status.downloading': '下載中...',
   'updateDialog.actions.restartToUpdate': '重新啟動以更新',
+  'updateDialog.actions.openGitHubRelease': '開啟 GitHub 發布頁',
+  'updateDialog.manualInstall.unsignedMac': '此 Mac 版本無法在應用程式內安裝更新。請開啟 GitHub 發布頁，用 .dmg 中的 Pichamber.app 取代現有應用程式。',
   'updateDialog.actions.updateNow': '立即更新',
   'updateDialog.actions.openMobileUpdate': '開啟更新',
   'updateDialog.status.updating': '更新中...',

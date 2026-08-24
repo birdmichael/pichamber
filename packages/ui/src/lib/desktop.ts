@@ -20,6 +20,8 @@ export type UpdateInfo = {
   releaseUrl?: string;
   downloadUrl?: string;
   nextSuggestedCheckInSec?: number;
+  /** Desktop only. False for unsigned / ad-hoc Mac builds that cannot quitAndInstall. */
+  canInstallInPlace?: boolean;
   // Web-specific fields
   packageManager?: string;
   updateCommand?: string;
@@ -810,10 +812,11 @@ export const downloadDesktopUpdate = async (
 
 export const restartToApplyUpdate = async (): Promise<boolean> => {
   if (!hasDesktopInvoke()) {
-    return false;
+    throw new Error('Desktop restart only works on Local instance');
   }
 
-  return restartDesktopApp();
+  await invokeDesktop('desktop_restart');
+  return true;
 };
 
 export const restartDesktopApp = async (): Promise<boolean> => {

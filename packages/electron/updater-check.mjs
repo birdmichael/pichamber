@@ -37,6 +37,29 @@ export const checkForDesktopUpdate = async ({ autoUpdater, currentVersion, pendi
     updateInfo,
     updateResult,
     nextVersion,
-    pendingUpdate: available ? { version: nextVersion, electronUpdate: updateResult } : null,
+    pendingUpdate: mergeDesktopPendingUpdate(
+      pendingUpdate,
+      available ? { version: nextVersion, electronUpdate: updateResult } : null,
+    ),
   };
+};
+
+/**
+ * A later check for the same available version must keep `downloaded`.
+ * A newer version or an authoritative "no update" result starts clean.
+ */
+export const mergeDesktopPendingUpdate = (previous, next) => {
+  if (!next) return null;
+  if (
+    previous
+    && previous.downloaded === true
+    && previous.version === next.version
+  ) {
+    return {
+      ...next,
+      downloaded: true,
+      electronUpdate: next.electronUpdate || previous.electronUpdate,
+    };
+  }
+  return next;
 };

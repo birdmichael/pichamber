@@ -16,7 +16,13 @@ import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
 import { sanitizeRuntimeRequestHeaders } from './runtime-request-headers.mjs';
-import { assertUpdaterCapability } from './updater-capability.mjs';
+import {
+  assertUpdaterCapability,
+  canInstallDesktopUpdateInPlace,
+  describeInPlaceInstallFailure,
+  inspectMacAppCodeSign,
+  resolveDesktopReleaseUrl,
+} from './updater-capability.mjs';
 import { checkForDesktopUpdate } from './updater-check.mjs';
 import { resolveUpdaterChannel } from './updater-channel.mjs';
 import { resolveUpdaterFeed } from './updater-feed.mjs';
@@ -3113,6 +3119,28 @@ const compareSemver = (left, right) => {
   return 0;
 };
 
+let cachedMacCodeSign = undefined;
+
+const resolveMacAppBundlePath = (execPath = process.execPath) => (
+  process.platform === 'darwin' ? path.resolve(execPath, '../../..') : execPath
+);
+
+const getMacCodeSign = () => {
+  if (cachedMacCodeSign !== undefined) return cachedMacCodeSign;
+  if (process.platform !== 'darwin') {
+    cachedMacCodeSign = { signed: true, adhoc: false, identity: null };
+    return cachedMacCodeSign;
+  }
+  cachedMacCodeSign = inspectMacAppCodeSign({ appPath: resolveMacAppBundlePath() });
+  return cachedMacCodeSign;
+};
+
+const resolveInPlaceInstallCapability = () => canInstallDesktopUpdateInPlace({
+  platform: process.platform,
+  packaged: app.isPackaged,
+  macCodeSign: getMacCodeSign(),
+});
+
 const setupAutoUpdater = () => {
   if (!app.isPackaged) {
     return;
@@ -4471,7 +4499,15 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     case 'desktop_check_for_updates': {
       const currentVersion = APP_VERSION;
       if (!app.isPackaged) {
-        return { available: false, currentVersion, version: null, body: null, date: null };
+        return {
+          available: false,
+          currentVersion,
+          version: null,
+          body: null,
+          date: null,
+          canInstallInPlace: false,
+          releaseUrl: resolveDesktopReleaseUrl({}),
+        };
       }
       assertUpdaterCapability({ packaged: app.isPackaged });
       const autoUpdater = getAutoUpdater();
@@ -4485,6 +4521,8 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         (typeof updateInfo?.releaseNotes === 'string' && updateInfo.releaseNotes.trim() ? updateInfo.releaseNotes : null) ||
         await parseRelevantChangelogNotes(currentVersion, nextVersion);
       state.pendingUpdate = pendingUpdate;
+      const canInstallInPlace = resolveInPlaceInstallCapability();
+      const releaseUrl = resolveDesktopReleaseUrl({ version: available ? nextVersion : null });
       return {
         available,
         currentVersion,
@@ -4493,6 +4531,8 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         date:
           (typeof updateInfo?.releaseDate === 'string' && updateInfo.releaseDate) ||
           null,
+        canInstallInPlace,
+        releaseUrl,
       };
     }
 
@@ -4545,7 +4585,13 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     case 'desktop_restart': {
       const applyUpdate = Boolean(state.pendingUpdate?.downloaded && app.isPackaged);
       if (applyUpdate) assertUpdaterCapability({ packaged: app.isPackaged });
-      log.info(`[electron] desktop_restart applyUpdate=${applyUpdate} packaged=${app.isPackaged}`);
+      const canInstallInPlace = resolveInPlaceInstallCapability();
+      log.info(`[electron] desktop_restart applyUpdate=${applyUpdate} packaged=${app.isPackaged} canInstallInPlace=${canInstallInPlace}`);
+      if (applyUpdate && !canInstallInPlace) {
+        throw new Error(describeInPlaceInstallFailure({
+          version: state.pendingUpdate?.version,
+        }));
+      }
       if (applyUpdate && process.platform === 'darwin' && typeof app.isInApplicationsFolder === 'function') {
         try {
           if (!app.isInApplicationsFolder()) {
@@ -4557,9 +4603,9 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
         }
       }
       if (applyUpdate) {
-        // Match the working updater pattern closely: only bypass the macOS
-        // hide-on-close / quit-confirmation guards, leave the rest of the
-        // updater-driven quit/install sequence alone.
+        // Do not pretend success: quitAndInstall() on unsigned/ad-hoc Mac
+        // throws after a deferred IPC reply. Call it here so the renderer
+        // sees the failure, then send the user to the GitHub dmg.
         state.quitRequested = true;
         state.installingUpdate = true;
         state.quitConfirmationPending = false;
@@ -4569,20 +4615,26 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
           } catch {
           }
         }
+        try {
+          killSidecar();
+          getAutoUpdater().quitAndInstall();
+        } catch (err) {
+          state.quitRequested = false;
+          state.installingUpdate = false;
+          log.error('[electron] desktop_restart quitAndInstall failed', err);
+          throw new Error(describeInPlaceInstallFailure({
+            version: state.pendingUpdate?.version,
+            cause: err,
+          }));
+        }
+        return null;
       }
-      // Defer so the IPC reply flushes before the app starts shutting down.
-      // Without this, quitAndInstall() can race with the renderer's pending
-      // invoke and the restart appears to do nothing from the UI side.
+      // Defer a plain relaunch so the IPC reply flushes first.
       setImmediate(() => {
         try {
-          if (applyUpdate) {
-            killSidecar();
-            getAutoUpdater().quitAndInstall();
-          } else {
-            prepareForQuit();
-            app.relaunch();
-            app.exit(0);
-          }
+          prepareForQuit();
+          app.relaunch();
+          app.exit(0);
         } catch (err) {
           log.error('[electron] desktop_restart failed', err);
         }

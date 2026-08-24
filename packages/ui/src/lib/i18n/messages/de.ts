@@ -2833,6 +2833,8 @@ export const dict = {
   'updateDialog.actions.downloadUpdate': 'Update herunterladen',
   'updateDialog.status.downloading': 'Herunterladen...',
   'updateDialog.actions.restartToUpdate': 'Neu starten zum Aktualisieren',
+  'updateDialog.actions.openGitHubRelease': 'GitHub-Release öffnen',
+  'updateDialog.manualInstall.unsignedMac': 'Dieses Mac-Build kann Updates nicht in der App installieren. Öffne das GitHub-Release und ersetze Pichamber.app durch die Version aus der .dmg.',
   'updateDialog.actions.updateNow': 'Jetzt aktualisieren',
   'updateDialog.actions.openMobileUpdate': 'Update öffnen',
   'updateDialog.status.updating': 'Aktualisierung läuft...',

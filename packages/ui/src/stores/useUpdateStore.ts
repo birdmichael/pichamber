@@ -13,6 +13,8 @@ import {
 } from '@/lib/desktop';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { getClientPlatform, isCapacitorApp } from '@/lib/platform';
+import { resolveDesktopUpdateReleaseUrl, shouldOfferDesktopInPlaceInstall } from '@/lib/desktopUpdateInstall';
+import { openExternalUrl } from '@/lib/url';
 
 declare const __APP_VERSION__: string | undefined;
 
@@ -263,10 +265,13 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
   },
 
   downloadUpdate: async () => {
-    const { available, runtimeType } = get();
+    const { available, runtimeType, info } = get();
 
     // For web runtime, there's no download - user uses in-app update or CLI
     if (runtimeType !== 'desktop' || !available) {
+      return;
+    }
+    if (!shouldOfferDesktopInPlaceInstall(runtimeType, info)) {
       return;
     }
 
@@ -308,17 +313,21 @@ export const useUpdateStore = create<UpdateStore>()((set, get) => ({
   },
 
   restartToUpdate: async () => {
-    const { downloaded, runtimeType } = get();
+    const { downloaded, runtimeType, info } = get();
 
-    if (runtimeType !== 'desktop' || !downloaded) {
+    if (runtimeType !== 'desktop') {
+      return;
+    }
+    if (!shouldOfferDesktopInPlaceInstall(runtimeType, info)) {
+      await openExternalUrl(resolveDesktopUpdateReleaseUrl(info));
+      return;
+    }
+    if (!downloaded) {
       return;
     }
 
     try {
-      const ok = await restartToApplyUpdate();
-      if (!ok) {
-        throw new Error('Desktop restart only works on Local instance');
-      }
+      await restartToApplyUpdate();
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to restart',

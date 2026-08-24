@@ -10,6 +10,7 @@ import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { Icon } from "@/components/icon/Icon";
 import { cn } from '@/lib/utils';
 import type { UpdateInfo, UpdateProgress } from '@/lib/desktop';
+import { resolveDesktopUpdateReleaseUrl, shouldOfferDesktopInPlaceInstall } from '@/lib/desktopUpdateInstall';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { openExternalUrl } from '@/lib/url';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
@@ -30,8 +31,6 @@ interface UpdateDialogProps {
   /** Runtime type to show different UI for desktop vs web */
   runtimeType?: 'desktop' | 'web' | 'vscode' | 'mobile' | null;
 }
-
-const GITHUB_RELEASES_URL = 'https://github.com/birdmichael/pichamber/releases';
 
 type ChangelogSection = {
   version: string;
@@ -207,10 +206,9 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
   const [webUpdateState, setWebUpdateState] = useState<WebUpdateState>('idle');
   const [webError, setWebError] = useState<string | null>(null);
 
-  const releaseUrl = info?.version
-    ? (info.releaseUrl || `${GITHUB_RELEASES_URL}/tag/v${info.version}`)
-    : GITHUB_RELEASES_URL;
+  const releaseUrl = resolveDesktopUpdateReleaseUrl(info);
   const mobileUpdateUrl = info?.downloadUrl || releaseUrl;
+  const offerInPlaceInstall = shouldOfferDesktopInPlaceInstall(runtimeType, info);
 
   const progressPercent = progress?.total
     ? Math.round((progress.downloaded / progress.total) * 100)
@@ -218,6 +216,7 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
 
   const isWebRuntime = runtimeType === 'web';
   const isMobileRuntime = runtimeType === 'mobile';
+  const isDesktopRuntime = runtimeType === 'desktop';
   const updateCommand = info?.updateCommand || 'pichamber update';
 
   // Reset state when dialog closes
@@ -444,6 +443,12 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
             </div>
           )}
 
+          {isDesktopRuntime && !offerInPlaceInstall && (
+            <div className="p-3 mt-4 rounded-lg border border-[var(--interactive-border)] bg-[var(--surface-elevated)]/30">
+              <p className="text-sm text-foreground">{t('updateDialog.manualInstall.unsignedMac')}</p>
+            </div>
+          )}
+
           {/* Desktop progress bar */}
           {!isWebRuntime && !isMobileRuntime && downloading && (
             <div className="space-y-2 mt-4">
@@ -482,7 +487,19 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
 
           <div className="flex-1 flex justify-end">
             {/* Desktop Buttons */}
-            {!isWebRuntime && !isMobileRuntime && !downloaded && !downloading && (
+            {isDesktopRuntime && !offerInPlaceInstall && (
+              <Button
+                onClick={() => {
+                  void handleOpenExternal(releaseUrl);
+                }}
+                size="default"
+              >
+                <Icon name="external-link" className="h-4 w-4" />
+                {t('updateDialog.actions.openGitHubRelease')}
+              </Button>
+            )}
+
+            {isDesktopRuntime && offerInPlaceInstall && !downloaded && !downloading && (
               <button
                 onClick={onDownload}
                 className="flex items-center justify-center gap-2 px-5 py-2 rounded-md text-sm font-medium bg-[var(--primary-base)] text-[var(--primary-foreground)] hover:opacity-90 transition-opacity"
@@ -492,7 +509,7 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
               </button>
             )}
 
-            {!isWebRuntime && !isMobileRuntime && downloading && (
+            {isDesktopRuntime && offerInPlaceInstall && downloading && (
               <button
                 disabled
                 className="flex items-center justify-center gap-2 px-5 py-2 rounded-md text-sm font-medium bg-[var(--primary-base)]/50 text-[var(--primary-foreground)] cursor-not-allowed"
@@ -502,7 +519,7 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
               </button>
             )}
 
-            {!isWebRuntime && !isMobileRuntime && downloaded && (
+            {isDesktopRuntime && offerInPlaceInstall && downloaded && (
               <button
                 onClick={onRestart}
                 className="flex items-center justify-center gap-2 px-5 py-2 rounded-md text-sm font-medium bg-[var(--status-success)] text-white hover:opacity-90 transition-opacity"
