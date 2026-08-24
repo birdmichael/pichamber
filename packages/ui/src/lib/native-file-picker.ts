@@ -7,34 +7,18 @@
 let nativeFilePickerDepth = 0;
 let holdUntilMs = 0;
 const HOLD_AFTER_MS = 400;
-const listeners = new Set<() => void>();
-
-function notify(): void {
-  for (const listener of listeners) {
-    listener();
-  }
-}
 
 export function beginNativeFilePicker(): void {
   nativeFilePickerDepth += 1;
-  notify();
 }
 
 export function endNativeFilePicker(): void {
   nativeFilePickerDepth = Math.max(0, nativeFilePickerDepth - 1);
   holdUntilMs = Date.now() + HOLD_AFTER_MS;
-  notify();
 }
 
 export function isNativeFilePickerActive(): boolean {
   return nativeFilePickerDepth > 0 || Date.now() < holdUntilMs;
-}
-
-export function subscribeNativeFilePicker(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
 }
 
 export function resetNativeFilePickerForTests(): void {

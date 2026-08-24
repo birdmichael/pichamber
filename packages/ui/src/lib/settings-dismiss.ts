@@ -6,20 +6,34 @@ const OPEN_SETTINGS_OVERLAY_SELECTOR = [
   '[data-slot="popover-content"][data-open]',
 ].join(',');
 
-export function hasOpenSettingsOverlay(root: ParentNode = document): boolean {
-  return Boolean(root.querySelector(OPEN_SETTINGS_OVERLAY_SELECTOR));
+function resolveRoot(root?: ParentNode | null): ParentNode | null {
+  if (root) {
+    return root;
+  }
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  return document;
 }
 
-export function hasNestedSettingsDialog(root: ParentNode = document): boolean {
-  return root.querySelectorAll('[role="dialog"]').length > 1;
+export function hasOpenSettingsOverlay(root?: ParentNode | null): boolean {
+  return Boolean(resolveRoot(root)?.querySelector(OPEN_SETTINGS_OVERLAY_SELECTOR));
 }
 
-export function hasSettingsEscapeForm(root: ParentNode = document): boolean {
-  return Boolean(root.querySelector('[data-settings-escape-form]'));
+function hasNestedSettingsDialog(root?: ParentNode | null): boolean {
+  return (resolveRoot(root)?.querySelectorAll('[role="dialog"]').length ?? 0) > 1;
+}
+
+export function hasSettingsEscapeForm(root?: ParentNode | null): boolean {
+  return Boolean(resolveRoot(root)?.querySelector('[data-settings-escape-form]'));
+}
+
+function hasClosest(target: EventTarget | null): target is EventTarget & { closest: (selector: string) => unknown } {
+  return Boolean(target && typeof (target as { closest?: unknown }).closest === 'function');
 }
 
 export function isEventInsideSettingsView(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest('[data-settings-view="true"]'));
+  return hasClosest(target) && Boolean(target.closest('[data-settings-view="true"]'));
 }
 
 export type SettingsDismissDetails = {

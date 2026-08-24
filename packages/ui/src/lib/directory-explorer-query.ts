@@ -12,11 +12,6 @@ export function normalizeDirectoryExplorerQuery(query: string): string {
   return trimmed;
 }
 
-export function isTildeDirectoryQuery(query: string): boolean {
-  const normalized = normalizeDirectoryExplorerQuery(query);
-  return normalized === '~/' || normalized.startsWith('~/');
-}
-
 export function expandTildeDirectoryPath(value: string, homeDirectory: string): string {
   const trimmed = value.trim();
   if (!homeDirectory) {
@@ -61,7 +56,9 @@ export function resolveDirectoryExplorerQuery(
         filter = after.slice(lastSlash + 1);
       }
     }
-    const tildeDirectory = relativeDirectory ? `~/${relativeDirectory}` : '~/';
+    const tildeDirectory = relativeDirectory
+      ? `~/${relativeDirectory}${filter ? '' : '/'}`
+      : '~/';
     return {
       directory: expandTildeDirectoryPath(tildeDirectory, homeDirectory),
       filter,

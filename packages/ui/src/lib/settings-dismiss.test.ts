@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { beginNativeFilePicker, endNativeFilePicker, resetNativeFilePickerForTests } from './native-file-picker';
+import { beginNativeFilePicker, resetNativeFilePickerForTests } from './native-file-picker';
 import {
   hasOpenSettingsOverlay,
   hasSettingsEscapeForm,

@@ -29,7 +29,6 @@ import {
   type FilesystemErrorReason,
 } from '@/lib/api/files-errors';
 import {
-  normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
   shouldFetchDirectoryExplorerListing,
 } from '@/lib/directory-explorer-query';
@@ -241,12 +240,10 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
     [availableGitIdentities, selectedGitIdentityId]
   );
 
-  const browseQuery = React.useMemo(() => normalizeDirectoryExplorerQuery(query), [query]);
   const resolvedExplorerQuery = React.useMemo(
     () => resolveDirectoryExplorerQuery(query, explorerRootDirectory),
     [explorerRootDirectory, query]
   );
-  const browseDirectoryDisplayPath = React.useMemo(() => getBrowseDirectoryPath(browseQuery), [browseQuery]);
   const browseFilterQuery = resolvedExplorerQuery.filter;
   const browseDirectoryAbsolutePath = resolvedExplorerQuery.directory;
 
@@ -290,7 +287,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
     return () => {
       cancelled = true;
     };
-  }, [browseDirectoryAbsolutePath, browseReloadKey, open]);
+  }, [browseDirectoryAbsolutePath, browseReloadKey, explorerRootDirectory, open]);
 
   const filteredEntries = React.useMemo(() => {
     const lowerFilter = browseFilterQuery.toLowerCase();
