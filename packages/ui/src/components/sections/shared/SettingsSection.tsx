@@ -407,12 +407,14 @@ export const SettingsCheckboxRow: React.FC<SettingsCheckboxRowProps> = ({
         }
       }}
     >
-      <Checkbox
-        checked={checked}
-        onChange={onChange}
-        disabled={disabled}
-        ariaLabel={ariaLabel}
-      />
+      <span className="flex h-5 shrink-0 items-center">
+        <Checkbox
+          checked={checked}
+          onChange={onChange}
+          disabled={disabled}
+          ariaLabel={ariaLabel}
+        />
+      </span>
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className={SETTINGS_FIELD_LABEL_CLASS}>{label}</span>

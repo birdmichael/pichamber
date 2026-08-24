@@ -43,8 +43,8 @@ interface ManagedRemoteTunnelPreset {
 }
 
 const BOOTSTRAP_TTL_OPTIONS: TtlOption[] = [
-  { value: '1800000', label: '30m', ms: 30 * 60 * 1000 },
   { value: '180000', label: '3m', ms: 3 * 60 * 1000 },
+  { value: '1800000', label: '30m', ms: 30 * 60 * 1000 },
   { value: '7200000', label: '2h', ms: 2 * 60 * 60 * 1000 },
   { value: '28800000', label: '8h', ms: 8 * 60 * 60 * 1000 },
   { value: '86400000', label: '24h', ms: 24 * 60 * 60 * 1000 },

@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings/Desktop: folder and file browse buttons keep Settings open and show the native picker instead of closing the window with nothing to pick.
+- Settings/Desktop: the sidebar Settings gear opens on the first click, and Ctrl+, (⌘+, on Mac) opens Settings even when the key arrives as a comma code.
+- Settings: the Settings window now follows Light/Dark instead of staying cream in dark mode.
+- Settings: Feature Plugins shows Uninstall only when that package is already installed.
+- Settings/Git: New Identity → Auth Method token now shows a token field (and host) instead of hiding SSH with no replacement.
+- Settings: Voice always shows a voice selector and Preview for browser/OpenAI/say, and puts the API Key hint on its own line.
+- Settings: Commands loads the `/goal` and `/mcp` templates instead of leaving the textarea empty, and choosing a command no longer closes Settings.
+- Settings: Esc or Cancel on a new snippet abandons the draft form instead of closing Settings.
+- Settings: Skills Catalog install copy matches the two Destination choices (User/Pi, Project/Pi), and Esc closes the Install dialog.
+- Settings: Projects Add project directory expands `~/` to home folders instead of showing no matches.
+- Settings: External Tunnel Connect-link TTL options are now 3m, 30m, 2h, 8h, 24h.
+- Settings: the Sessions model-picker capability popover stays above the settings list instead of clipping under it.
+- Settings: Reload themes shows a success or error toast.
+- Settings/Desktop: launch-at-login, tray, and keep-awake sit under Desktop app, separate from Network Access. Save and restart is outline and disabled until something changed.
+- Settings: the LAN checkbox lines up with its label, and New MCP Server Name lines up with its input.
+- Settings: Skills + opens the new-skill form on the first click. Session work status counts only injected skills, and Untrusted copy says those skills stay listed but are not injected.
+- Settings: Providers Connect keeps Other/Custom visible when the catalog is empty, and says so instead of a search that hides it.
 - Desktop: on unsigned or ad-hoc Mac builds, Restart to Update no longer pretends to succeed. The app opens the GitHub release so you can replace Pichamber.app from the .dmg.
 - Desktop: dismissing the Pi update toast — Dismiss or OK — keeps that version hidden until a newer Pi version is available.
 - Chat: after the multi-run model picker is closed, Esc now closes the New multi-run form, same as Cancel.

@@ -5,6 +5,7 @@ import os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createRequire } from 'module';
+import { upsertGitCredential } from './credentials.js';
 
 const fsp = fs.promises;
 const require = createRequire(import.meta.url);
@@ -2085,6 +2086,13 @@ export async function setLocalIdentity(directory, profile) {
         'local'
       );
       await git.raw(['config', '--local', '--unset', 'core.sshCommand']).catch(() => {});
+      if (typeof profile.token === 'string' && profile.token.trim()) {
+        upsertGitCredential({
+          host: profile.host,
+          username: profile.userName,
+          token: profile.token,
+        });
+      }
     }
 
     if (profile.signCommits === true && typeof profile.signingKey === 'string' && profile.signingKey.trim()) {

@@ -556,8 +556,20 @@ export function eventMatchesShortcut(
 
   const eventKey = keyToShortcutToken(eventKeyRaw);
   const expectedKey = keyToShortcutToken(parsed.key);
+  if (eventKey === expectedKey) {
+    return true;
+  }
 
-  return eventKey === expectedKey;
+  // Layouts and IME can rewrite event.key for punctuation. Ctrl+, on Linux
+  // desktop often arrives as an empty or localized key with code Comma.
+  if (expectedKey === 'comma' && event.code === 'Comma') {
+    return true;
+  }
+  if (expectedKey === 'period' && event.code === 'Period') {
+    return true;
+  }
+
+  return false;
 }
 
 export function getModifierLabel(): string {

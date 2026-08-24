@@ -838,16 +838,18 @@ export const VoiceSettings: React.FC = () => {
                             {/* OpenAI API Key */}
                             {voiceProvider === 'openai' && (
                                 <div className="space-y-1.5">
-                                    <span className={cn(SETTINGS_FIELD_LABEL_CLASS, !isOpenAIAvailable && "text-[var(--status-error)]")}>
-                                        {t('settings.voice.page.field.apiKey')}
-                                    </span>
-                                    <span className={cn(SETTINGS_HELPER_CLASS, !isOpenAIAvailable && "text-[var(--status-error)]/80")}>
-                                        {isOpenAIAvailable && !openaiApiKey
-                                          ? t('settings.voice.page.field.apiKeyHintUsingConfig')
-                                          : !isOpenAIAvailable
-                                            ? t('settings.voice.page.field.apiKeyHintRequired')
-                                            : t('settings.voice.page.field.apiKeyHintProvide')}
-                                    </span>
+                                    <div className="space-y-0.5">
+                                        <span className={cn(SETTINGS_FIELD_LABEL_CLASS, !isOpenAIAvailable && "text-[var(--status-error)]")}>
+                                            {t('settings.voice.page.field.apiKey')}
+                                        </span>
+                                        <p className={cn(SETTINGS_HELPER_CLASS, !isOpenAIAvailable && "text-[var(--status-error)]/80")}>
+                                            {isOpenAIAvailable && !openaiApiKey
+                                              ? t('settings.voice.page.field.apiKeyHintUsingConfig')
+                                              : !isOpenAIAvailable
+                                                ? t('settings.voice.page.field.apiKeyHintRequired')
+                                                : t('settings.voice.page.field.apiKeyHintProvide')}
+                                        </p>
+                                    </div>
                                     <div className={cn('relative', SETTINGS_CONTROL_CLUSTER_CLASS)}>
                                         <input
                                             type="password"
@@ -899,10 +901,10 @@ export const VoiceSettings: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <span className={SETTINGS_FIELD_LABEL_CLASS}>API Key</span>
-                                        <span className={SETTINGS_HELPER_CLASS}>
-                                            Optional
-                                        </span>
+                                        <div className="space-y-0.5">
+                                            <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.voice.page.field.apiKey')}</span>
+                                            <p className={SETTINGS_HELPER_CLASS}>{t('settings.voice.page.field.apiKeyOptional')}</p>
+                                        </div>
                                         <div className={cn('relative', SETTINGS_CONTROL_CLUSTER_CLASS)}>
                                             <input
                                                 type="password"
@@ -988,9 +990,9 @@ export const VoiceSettings: React.FC = () => {
                                         </>
                                     )}
 
-                                    {voiceProvider === 'openai' && isOpenAIAvailable && (
+                                    {voiceProvider === 'openai' && (
                                         <>
-                                            <Select value={openaiVoice} onValueChange={setOpenaiVoice}>
+                                            <Select value={openaiVoice} onValueChange={setOpenaiVoice} disabled={!isOpenAIAvailable}>
                                                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                                                     <SelectValue placeholder={t('settings.voice.page.field.selectVoicePlaceholder')} />
                                                 </SelectTrigger>
@@ -1000,7 +1002,7 @@ export const VoiceSettings: React.FC = () => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewOpenAIVoice} title={t('settings.voice.page.actions.preview')}>
+                                            <Button size="xs" variant="ghost" onClick={previewOpenAIVoice} title={t('settings.voice.page.actions.preview')} disabled={!isOpenAIAvailable}>
                                                 {isOpenAIPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
@@ -1010,11 +1012,11 @@ export const VoiceSettings: React.FC = () => {
                                         <span className={SETTINGS_HELPER_CLASS}>{t('settings.voice.page.field.configuredAbove')}</span>
                                     )}
 
-                                    {voiceProvider === 'say' && isSayAvailable && sayVoices.length > 0 && (
+                                    {voiceProvider === 'say' && (
                                         <>
-                                            <Select value={sayVoice} onValueChange={setSayVoice}>
+                                            <Select value={sayVoice} onValueChange={setSayVoice} disabled={!isSayAvailable || sayVoices.length === 0}>
                                                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
-                                                    <SelectValue placeholder={t('settings.voice.page.field.selectVoicePlaceholder')} />
+                                                    <SelectValue placeholder={sayVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.selectVoicePlaceholder')} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {sayVoices.map((v) => (
@@ -1022,17 +1024,21 @@ export const VoiceSettings: React.FC = () => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewVoice} title={t('settings.voice.page.actions.preview')}>
+                                            <Button size="xs" variant="ghost" onClick={previewVoice} title={t('settings.voice.page.actions.preview')} disabled={!isSayAvailable || sayVoices.length === 0}>
                                                 {isPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
                                     )}
 
-                                    {voiceProvider === 'browser' && filteredBrowserVoices.length > 0 && (
+                                    {voiceProvider === 'browser' && (
                                         <>
-                                            <Select value={browserVoice || '$auto'} onValueChange={(value) => setBrowserVoice(value === '$auto' ? '' : value)}>
+                                            <Select
+                                                value={browserVoice || '$auto'}
+                                                onValueChange={(value) => setBrowserVoice(value === '$auto' ? '' : value)}
+                                                disabled={filteredBrowserVoices.length === 0}
+                                            >
                                                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
-                                                    <SelectValue placeholder={t('settings.voice.page.field.auto')} />
+                                                    <SelectValue placeholder={filteredBrowserVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.auto')} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="$auto">{t('settings.voice.page.field.auto')}</SelectItem>
@@ -1041,7 +1047,7 @@ export const VoiceSettings: React.FC = () => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewBrowserVoice} title={t('settings.voice.page.actions.preview')}>
+                                            <Button size="xs" variant="ghost" onClick={previewBrowserVoice} title={t('settings.voice.page.actions.preview')} disabled={filteredBrowserVoices.length === 0}>
                                                 {isBrowserPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
@@ -1160,10 +1166,10 @@ export const VoiceSettings: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <span className={SETTINGS_FIELD_LABEL_CLASS}>API Key</span>
-                                    <span className={SETTINGS_HELPER_CLASS}>
-                                        Optional
-                                    </span>
+                                    <div className="space-y-0.5">
+                                        <span className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.voice.page.field.apiKey')}</span>
+                                        <p className={SETTINGS_HELPER_CLASS}>{t('settings.voice.page.field.apiKeyOptional')}</p>
+                                    </div>
                                     <div className={cn('relative', SETTINGS_CONTROL_CLUSTER_CLASS)}>
                                         <input
                                             type="password"

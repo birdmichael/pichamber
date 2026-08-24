@@ -175,4 +175,33 @@ describe('useCommandsStore', () => {
       template: '',
     }]);
   });
+
+  test('loadCommands keeps a listed prompt template when the detail payload is empty', async () => {
+    listCommandsWithDetailsImpl = async () => [{
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      source: 'prompt',
+      agent: 'pi',
+      template: 'Help me write a Goal.\n\n$ARGUMENTS',
+    }];
+    runtimeFetchImpl = async () => new Response(JSON.stringify({
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      source: 'prompt',
+      template: '',
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const result = await useCommandsStore.getState().loadCommands();
+
+    expect(result).toBe(true);
+    expect(useCommandsStore.getState().commands).toEqual([{
+      name: 'goal',
+      description: 'Turn a task into a Goal',
+      source: 'prompt',
+      agent: 'pi',
+      template: 'Help me write a Goal.\n\n$ARGUMENTS',
+    }]);
+  });
 });

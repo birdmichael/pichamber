@@ -6,6 +6,7 @@ import type { ThemeMode } from '@/types/theme';
 import { useUIStore } from '@/stores/useUIStore';
 import { useMessageQueueStore, type FollowUpBehavior } from '@/stores/messageQueueStore';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui';
 import { Button } from '@/components/ui/button';
 import { NumberInput } from '@/components/ui/number-input';
 import { Input } from '@/components/ui/input';
@@ -945,7 +946,15 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 onClick={() => {
                                                     const startedAt = Date.now();
                                                     setThemesReloading(true);
-                                                    void reloadCustomThemes().finally(() => {
+                                                    void reloadCustomThemes()
+                                                        .then((ok) => {
+                                                            if (ok) {
+                                                                toast.success(t('settings.openchamber.visual.toast.themesReloaded'));
+                                                            } else {
+                                                                toast.error(t('settings.openchamber.visual.toast.themesReloadFailed'));
+                                                            }
+                                                        })
+                                                        .finally(() => {
                                                         const elapsed = Date.now() - startedAt;
                                                         if (elapsed < 500) {
                                                             window.setTimeout(() => {

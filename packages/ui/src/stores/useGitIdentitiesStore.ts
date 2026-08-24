@@ -23,6 +23,7 @@ export interface GitIdentityProfile {
   userEmail: string;
   authType?: GitIdentityAuthType;
   sshKey?: string | null;
+  token?: string | null;
   signCommits?: boolean;
   signingKey?: string | null;
   host?: string | null;

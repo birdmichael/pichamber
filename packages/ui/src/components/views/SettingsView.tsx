@@ -1083,7 +1083,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   };
 
   return (
-    <div ref={containerRef} data-settings-view="true" className={cn('relative flex h-full min-h-0 flex-col overflow-hidden bg-background')}>
+    <div ref={containerRef} data-settings-view="true" className={cn('relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-background)] text-[var(--surface-foreground)]')}>
       {isMobile ? (
         <div
           className={cn(

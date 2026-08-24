@@ -68,6 +68,7 @@ export function createProfile(profileData) {
     userEmail: profileData.userEmail,
     authType: profileData.authType || 'ssh',
     sshKey: profileData.sshKey || null,
+    token: profileData.token || null,
     signCommits: profileData.signCommits,
     signingKey: profileData.signingKey || null,
     host: profileData.host || null,

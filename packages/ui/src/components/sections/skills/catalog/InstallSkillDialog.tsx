@@ -174,7 +174,17 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenChange(false);
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{t('settings.skills.catalog.installSkill.title')}</DialogTitle>
             <DialogDescription>
@@ -182,7 +192,7 @@ export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, on
               {' '}
               <span className="font-semibold text-foreground">{item.skillName}</span>
               {' '}
-              {t('settings.skills.catalog.installSkill.descriptionSuffix')}
+              {t('settings.skills.catalog.installSkill.descriptionSuffix', { count: locationOptions.length })}
             </DialogDescription>
           </DialogHeader>
 

@@ -28,6 +28,11 @@ import {
   isFilesystemError,
   type FilesystemErrorReason,
 } from '@/lib/api/files-errors';
+import {
+  normalizeDirectoryExplorerQuery,
+  resolveDirectoryExplorerQuery,
+  shouldFetchDirectoryExplorerListing,
+} from '@/lib/directory-explorer-query';
 
 interface DirectoryExplorerDialogProps {
   open: boolean;
@@ -73,11 +78,6 @@ const getBrowseDirectoryPath = (value: string): string => {
   return value.slice(0, lastSeparator + 1);
 };
 
-const getBrowseLeafPathSegment = (value: string): string => {
-  const lastSeparator = getLastPathSeparatorIndex(value);
-  return value.slice(lastSeparator + 1);
-};
-
 const getBrowseParentPath = (value: string): string | null => {
   const trimmed = trimTrailingSeparators(value.trim());
   if (!trimmed || trimmed === '~' || trimmed === '~/' || trimmed === '/') return null;
@@ -99,13 +99,6 @@ const normalizeDirectoryPath = (path: string | null | undefined): string | null 
   const normalized = trimTrailingSeparators(normalizeSeparators(path.trim()));
   if (!normalized) return null;
   return normalized.toLowerCase();
-};
-
-const displayPathToAbsolutePath = (value: string, homeDirectory: string): string => {
-  const trimmed = value.trim();
-  if (trimmed === '~') return homeDirectory;
-  if (trimmed.startsWith('~/')) return `${homeDirectory}${trimmed.slice(1)}`;
-  return trimmed;
 };
 
 const isPrimaryModifierPressed = (event: React.KeyboardEvent<HTMLInputElement>): boolean => {
@@ -248,18 +241,17 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
     [availableGitIdentities, selectedGitIdentityId]
   );
 
-  const browseDirectoryDisplayPath = React.useMemo(() => getBrowseDirectoryPath(query), [query]);
-  const browseFilterQuery = React.useMemo(
-    () => (hasTrailingPathSeparator(query) ? '' : getBrowseLeafPathSegment(query)),
-    [query]
+  const browseQuery = React.useMemo(() => normalizeDirectoryExplorerQuery(query), [query]);
+  const resolvedExplorerQuery = React.useMemo(
+    () => resolveDirectoryExplorerQuery(query, explorerRootDirectory),
+    [explorerRootDirectory, query]
   );
-  const browseDirectoryAbsolutePath = React.useMemo(
-    () => explorerRootDirectory ? displayPathToAbsolutePath(browseDirectoryDisplayPath, explorerRootDirectory) : '',
-    [browseDirectoryDisplayPath, explorerRootDirectory]
-  );
+  const browseDirectoryDisplayPath = React.useMemo(() => getBrowseDirectoryPath(browseQuery), [browseQuery]);
+  const browseFilterQuery = resolvedExplorerQuery.filter;
+  const browseDirectoryAbsolutePath = resolvedExplorerQuery.directory;
 
   React.useEffect(() => {
-    if (!open || !browseDirectoryAbsolutePath) {
+    if (!open || !shouldFetchDirectoryExplorerListing(browseDirectoryAbsolutePath, explorerRootDirectory)) {
       setEntries([]);
       setBrowseErrorReason(null);
       return;
@@ -331,8 +323,13 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
   }, [query, rows.length]);
 
   const targetPath = React.useMemo(() => {
-    if (!explorerRootDirectory) return '';
-    return trimTrailingSeparators(displayPathToAbsolutePath(query, explorerRootDirectory));
+    const resolved = resolveDirectoryExplorerQuery(query, explorerRootDirectory);
+    if (!shouldFetchDirectoryExplorerListing(resolved.directory, explorerRootDirectory)) {
+      return '';
+    }
+    return trimTrailingSeparators(resolved.filter
+      ? `${resolved.directory.replace(/\/$/, '')}/${resolved.filter}`
+      : resolved.directory);
   }, [explorerRootDirectory, query]);
   const normalizedTargetPath = normalizeDirectoryPath(targetPath);
   const isAlreadyAdded = Boolean(normalizedTargetPath && addedProjectPaths.has(normalizedTargetPath));

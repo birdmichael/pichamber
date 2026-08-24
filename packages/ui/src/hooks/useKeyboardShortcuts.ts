@@ -234,6 +234,19 @@ export const useKeyboardShortcuts = () => {
       }, delay || 0);
     };
 
+    const handleOpenSettingsCapture = (e: KeyboardEvent) => {
+      if (isTerminalEventTarget(e.target)) {
+        return;
+      }
+      if (!eventMatchesShortcut(e, combo('open_settings'))) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      const { isSettingsDialogOpen } = useUIStore.getState();
+      setSettingsDialogOpen(!isSettingsDialogOpen);
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || isTerminalEventTarget(e.target)) {
         return;
@@ -359,13 +372,6 @@ export const useKeyboardShortcuts = () => {
             activeElement.focus({ preventScroll: true });
           }
         });
-        return;
-      }
-
-      if (eventMatchesShortcut(e, combo('open_settings'))) {
-        e.preventDefault();
-        const { isSettingsDialogOpen } = useUIStore.getState();
-        setSettingsDialogOpen(!isSettingsDialogOpen);
         return;
       }
 
@@ -702,6 +708,7 @@ export const useKeyboardShortcuts = () => {
     window.addEventListener('keyup', handleKeyUp, true);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('keydown', handleTerminalShortcutCapture, true);
+    window.addEventListener('keydown', handleOpenSettingsCapture, true);
     window.addEventListener('keydown', handleEscapeKeyDownCapture, true);
     window.addEventListener('keydown', handleKeyDown);
 
@@ -710,6 +717,7 @@ export const useKeyboardShortcuts = () => {
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('keydown', handleTerminalShortcutCapture, true);
+      window.removeEventListener('keydown', handleOpenSettingsCapture, true);
       window.removeEventListener('keydown', handleEscapeKeyDownCapture, true);
       window.removeEventListener('keydown', handleKeyDown);
     };

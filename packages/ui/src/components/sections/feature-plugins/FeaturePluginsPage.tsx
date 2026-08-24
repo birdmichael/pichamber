@@ -265,17 +265,19 @@ function FeaturePluginCard({
                 : t('settings.featurePlugins.actions.install')}
             </Button>
           )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!ready || isBusy || !saved.installed}
-            onClick={onUninstall}
-          >
-            {isBusy && pendingAction === 'uninstall'
-              ? t('settings.featurePlugins.actions.uninstalling')
-              : t('settings.featurePlugins.actions.uninstall')}
-          </Button>
+          {saved.installed ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!ready || isBusy}
+              onClick={onUninstall}
+            >
+              {isBusy && pendingAction === 'uninstall'
+                ? t('settings.featurePlugins.actions.uninstalling')
+                : t('settings.featurePlugins.actions.uninstall')}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

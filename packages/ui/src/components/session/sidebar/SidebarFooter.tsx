@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
+import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
 
 type Props = {
   onOpenSettings: () => void;
@@ -47,7 +48,19 @@ export function SidebarFooter({
         <>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button type="button" onClick={onOpenSettings} className={footerButtonClassName} aria-label={t('sessions.sidebar.footer.actions.settings')}>
+              <button
+                type="button"
+                onPointerDown={(event) => {
+                  activateTitlebarIconOnPointerDown({
+                    button: event.button,
+                    closeHoverUi: () => {},
+                    activate: onOpenSettings,
+                  });
+                }}
+                onClick={onOpenSettings}
+                className={footerButtonClassName}
+                aria-label={t('sessions.sidebar.footer.actions.settings')}
+              >
                 <Icon name="settings-3" className="h-4.5 w-4.5" />
               </button>
             </TooltipTrigger>

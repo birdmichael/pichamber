@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  eventMatchesShortcut,
   eventMatchesShortcutPrefix,
   formatShortcutForDisplay,
   getEffectiveShortcutPrefix,
@@ -48,9 +49,13 @@ describe('isShortcutPrefixHeld', () => {
   });
 });
 
-const keydown = (key: string, mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean }): KeyboardEvent =>
+const keydown = (
+  key: string,
+  mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean; code?: string } = {},
+): KeyboardEvent =>
   ({
     key,
+    code: mods.code ?? '',
     metaKey: mods.meta ?? false,
     ctrlKey: mods.ctrl ?? false,
     shiftKey: mods.shift ?? false,
@@ -111,6 +116,20 @@ const withPlatform = <T>(
     }
   }
 };
+
+describe('eventMatchesShortcut', () => {
+  test('matches Ctrl+, from event.code when event.key is empty', () => {
+    withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
+      expect(eventMatchesShortcut(keydown('', { ctrl: true, code: 'Comma' }), 'mod+comma')).toBe(true);
+    });
+  });
+
+  test('rejects Ctrl+, without the modifier', () => {
+    withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
+      expect(eventMatchesShortcut(keydown(',', { code: 'Comma' }), 'mod+comma')).toBe(false);
+    });
+  });
+});
 
 describe('formatShortcutForDisplay', () => {
   test('Linux desktop uses Ctrl/Alt and a comma glyph, not Mac symbols', () => {
