@@ -665,11 +665,12 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
               tabIndex={-1}
               onClick={() => { if (!disabled) onSelect(entry); }}
               onKeyDown={(event) => {
-                if (disabled) return;
-                if (event.key === 'Enter' || event.key === ' ') {
+                if (event.key === ' ' && !disabled) {
                   event.preventDefault();
                   onSelect(entry);
+                  return;
                 }
+                handleKeyDown(event);
               }}
               onMouseEnter={handleMouseActivity}
               onMouseMove={handleMouseActivity}
@@ -844,7 +845,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
   };
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col" data-model-picker-list="" onKeyDown={handleKeyDown}>
       <div className="px-2 py-1 border-b border-border/40">
         <div className="relative">
           <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -965,6 +966,6 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
       <div className="px-3 pt-1 pb-1.5 border-t border-border/40 typography-micro text-muted-foreground">
         <ModelPickerFooter store={selectionStore} flatModelList={flatModelList} footerContent={footerContent} fallback={labels.keyboardHint} />
       </div>
-    </>
+    </div>
   );
 };

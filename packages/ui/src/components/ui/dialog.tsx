@@ -139,6 +139,8 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-2 bottom-safe-area sm:flex-row sm:justify-end",
+        // Button defaults to lowercase; dialog actions keep locale sentence case.
+        "[&_[data-slot=button]]:normal-case",
         className
       )}
       {...props}

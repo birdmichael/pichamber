@@ -270,10 +270,10 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
             ) : null}
           </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
+            <Button variant="ghost" size="sm" className="normal-case" onClick={() => onOpenChange(false)} disabled={submitting}>
               {t('rightSidebar.contextNotesTodo.sendDialog.actions.cancel')}
             </Button>
-            <Button size="sm" onClick={handleSubmit} disabled={!canConfirm || submitting}>
+            <Button size="sm" className="normal-case" onClick={handleSubmit} disabled={!canConfirm || submitting}>
               {submitting
                 ? t('rightSidebar.contextNotesTodo.sendDialog.actions.sending')
                 : t('rightSidebar.contextNotesTodo.sendDialog.actions.send')}

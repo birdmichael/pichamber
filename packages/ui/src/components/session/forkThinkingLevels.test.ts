@@ -48,6 +48,7 @@ describe('resolveForkThinkingLevels', () => {
     );
     expect(source).toContain('resolveForkThinkingLevels');
     expect(source).toContain('thinkingLevels.length > 0');
+    expect(source).toContain('normal-case');
     expect(source).not.toMatch(/grok|bmlab/);
   });
 });

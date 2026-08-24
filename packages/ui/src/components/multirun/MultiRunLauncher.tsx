@@ -687,12 +687,13 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
               type="button"
               variant="ghost"
               size="sm"
+              className="normal-case"
               onClick={onCancel}
             >
               {t('multirun.launcher.actions.cancel')}
             </Button>
           ) : null}
-          <Button type="submit" size="sm" disabled={!isValid || isSubmitting}>
+          <Button type="submit" size="sm" className="normal-case" disabled={!isValid || isSubmitting}>
             {isSubmitting ? (
               t('multirun.launcher.actions.creating')
             ) : (

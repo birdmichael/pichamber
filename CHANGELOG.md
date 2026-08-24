@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: Save project plan, Start new session, and New multi-run action buttons now show Cancel, Save, Send, and Start in sentence case.
 - Chat: Esc on the multi-run model picker now closes only the picker, not the whole New multi-run form.
 - Chat: the fork-session thinking dropdown now lists the selected model's live Pi thinking levels, and hides when that model has none.
 - Chat: Save as plan writes a Markdown file into the project's `.pichamber/plans` folder and the toast includes that path. Esc or Cancel still does not write.
