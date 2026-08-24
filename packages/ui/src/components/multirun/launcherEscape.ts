@@ -21,10 +21,14 @@ export const resetLauncherOverlays = (): void => {
   openOverlayIds.clear();
 };
 
+const hasGetAttribute = (node: unknown): node is { getAttribute: (name: string) => string | null } => (
+  typeof (node as { getAttribute?: unknown })?.getAttribute === 'function'
+);
+
 const hasOpenPopupAttribute = (root: ParentNode): boolean => {
   const nodes = root.querySelectorAll('[data-popup-open]');
   for (const node of nodes) {
-    if (!(node instanceof Element)) continue;
+    if (!hasGetAttribute(node)) continue;
     const value = node.getAttribute('data-popup-open');
     if (value === null) continue;
     if (value === 'false' || value === '0') continue;

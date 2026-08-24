@@ -23,7 +23,7 @@ describe('messageImages', () => {
         state: {
           attachments: [{ type: 'file', mimeType: 'image/jpeg', filename: 'shot.jpg' }],
         },
-      } as Part,
+      } as unknown as Part,
     ])).toBe(true);
   });
 

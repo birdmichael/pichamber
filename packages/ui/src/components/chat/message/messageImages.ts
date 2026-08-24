@@ -10,11 +10,13 @@ const asRecord = (value: unknown): Record<string, unknown> | null => (
     : null
 );
 
-export const isImageFilePart = (part: Part | null | undefined): boolean => {
+const isImageFilePart = (part: Part | null | undefined): boolean => {
   if (!part) return false;
-  const record = part as Part & { mime?: unknown; mimeType?: unknown; type?: unknown };
-  if (record.type === 'image') return true;
-  if (record.type === 'file') {
+  const record = asRecord(part);
+  if (!record) return false;
+  const type = record.type;
+  if (type === 'image') return true;
+  if (type === 'file') {
     return isImageMime(record.mime) || isImageMime(record.mimeType);
   }
   return false;
@@ -29,7 +31,7 @@ const attachmentLooksLikeImage = (value: unknown): boolean => {
   return isImageMime(record.mime) || isImageMime(record.mimeType);
 };
 
-export const partHasImage = (part: Part | null | undefined): boolean => {
+const partHasImage = (part: Part | null | undefined): boolean => {
   if (!part) return false;
   if (isImageFilePart(part)) return true;
 
@@ -46,7 +48,7 @@ export const partsHaveImage = (parts: readonly Part[] | null | undefined): boole
   Boolean(parts?.some(partHasImage))
 );
 
-export type SavableMessageImage = {
+type SavableMessageImage = {
   fileName: string;
   dataUrl: string;
 };
@@ -70,12 +72,12 @@ const readDataUrl = (record: Record<string, unknown>): string | null => {
 };
 
 const collectFromRecord = (record: Record<string, unknown>, collected: SavableMessageImage[]): void => {
-  if (!(record.type === 'image' || record.type === 'file' || isImageMime(record.mime) || isImageMime(record.mimeType))) {
-    return;
-  }
-  if (record.type === 'file' && !isImageMime(record.mime) && !isImageMime(record.mimeType) && record.type !== 'image') {
-    return;
-  }
+  const type = record.type;
+  const looksLikeImage = type === 'image'
+    || (type === 'file' && (isImageMime(record.mime) || isImageMime(record.mimeType)))
+    || isImageMime(record.mime)
+    || isImageMime(record.mimeType);
+  if (!looksLikeImage) return;
   const dataUrl = readDataUrl(record);
   if (!dataUrl) return;
   collected.push({

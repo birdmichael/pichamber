@@ -2,7 +2,7 @@ import type { Session } from '@opencode-ai/sdk/v2';
 
 import { parseMultiRunSessionTitle, type ParsedMultiRunTitle } from './title';
 
-export const isSameMultiRunGroup = (
+const isSameMultiRunGroup = (
   left: ParsedMultiRunTitle,
   right: ParsedMultiRunTitle,
 ): boolean => (
