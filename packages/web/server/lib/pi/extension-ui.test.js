@@ -65,6 +65,20 @@ describe('Desktop ExtensionUIContext', () => {
     await expect(later).resolves.toBe('Yes');
   });
 
+  it('maps custom onto an in-chat editor instead of returning undefined', async () => {
+    const { controller } = createController();
+    const pending = controller.context.custom();
+    const [prompt] = controller.list();
+    expect(prompt.kind).toBe('editor');
+    expect(controller.reply(prompt.id, '  typed on Desktop  ')).toBe(true);
+    await expect(pending).resolves.toEqual({ answer: 'typed on Desktop', wasCustom: true });
+
+    const cancelled = controller.context.custom();
+    const [second] = controller.list();
+    expect(controller.cancel(second.id)).toBe(true);
+    await expect(cancelled).resolves.toBeUndefined();
+  });
+
   it('wires confirm, input, editor, and notify', async () => {
     const { controller, events } = createController();
 

@@ -74,6 +74,7 @@ import {
 } from './session-archive.js';
 import { includeArchivedSessions } from './session-list-query.js';
 import { createExtensionUIController } from './extension-ui.js';
+import { adaptQuestionToolForDesktop } from './question-desktop.js';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
@@ -1348,6 +1349,7 @@ export const createPiHost = ({
         uiContext: record.extensionUI.context,
         mode: 'rpc',
       });
+      adaptQuestionToolForDesktop(record.piSession, record.extensionUI.context);
     } catch (error) {
       console.warn(`[pi-host] bindExtensions failed for ${record.id}:`, error?.message || error);
     }

@@ -116,7 +116,8 @@ unbound sessions stay `ui_unavailable`.
 | `confirm` | Modal confirm / cancel → boolean |
 | `input` / `editor` | In-chat text field. Plan **Other** is a `select` option, then `editor` |
 | `notify` | Toast via `pi.ui.notify` |
-| TUI-only (`custom`, widgets, terminal input) | No-op |
+| `custom` | No TUI factory. Installed Pi `question` is remapped onto `select` + `editor` (see Question tool). Other `custom()` callers get an in-chat editor, not silent `undefined` |
+| TUI-only (widgets, terminal input) | No-op |
 
 Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session. Composer **Stop** calls `host.abort()`, which cancels every waiting `ctx.ui` prompt on that session **and** force-publishes `session.idle` even when Pi `abort()` is a no-op (the turn already finished or never emitted `agent_settled`).
 
@@ -131,6 +132,18 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 - `POST /api/pi/ui/:id/cancel` `{ sessionID }`
 
 `GET /api/question` stays `[]` on Pi.
+
+## Question tool
+
+The installed Pi `question` extension (official example / `@earendil-works` question tool) is TUI-only: it returns "UI not available" unless `ctx.mode === "tui"`, then calls `ctx.ui.custom` with a TUI Editor and an extra `{ label: "Type something.", isOther: true }` option. Desktop stays `mode: "rpc"` and does not run that factory.
+
+After `bindExtensions`, the host replaces that tool's `execute` (`adaptQuestionToolForDesktop` in `question-desktop.js`) so Desktop can answer it:
+
+1. `ctx.ui.select` with the model options plus a numbered `Type something.` option.
+2. A chosen option returns the official `{ answer, wasCustom: false, index }` result.
+3. `Type something.` / `Type something` (and numbered variants) is Other: the in-chat card opens `CustomAnswerTextarea`, then `editor` consumes the stashed text the same way Plan Other does.
+
+`isFreeformOtherOption` in the shared UI matches those Type something labels as well as existing `Other` labels. This is not OpenCode `/api/question`. Plan select-only cards without Other still have no textarea.
 
 ## Plan questions
 
@@ -466,7 +479,10 @@ in `extension-ui.js` and speaks `pi.ui.asked` / `pi.ui.settled` / `pi.ui.notify`
 - `POST /api/pi/ui/:id/reply` and `/cancel` resolve the waiting extension
   promise. Confirm uses a desktop dialog; select / input / editor render as
   in-chat cards. Notify is a desktop toast.
-- This is not OpenCode `/api/question` or `sdk.question.reply`.
+- Installed Pi `question` is remapped onto that same select + editor card
+  (Type something is Other). `ctx.ui.custom` is not a TUI and is not a
+  silent `undefined`. This is not OpenCode `/api/question` or
+  `sdk.question.reply`.
 
 `@narumitw/pi-goal` can call `ctx.ui.confirm` when replacing an existing goal.
 

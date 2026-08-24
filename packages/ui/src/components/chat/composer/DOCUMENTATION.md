@@ -32,7 +32,8 @@ provider/model catalog row, then the published table for that model id.
 They do not use a fuzzy other-provider leftover or max-output tokens.
 While a QuestionCard or pending Desktop `ctx.ui` input card is waiting, the
 composer does not autofocus and does not steal keystrokes from that
-textarea.
+textarea. A Pi `question` select card treats `Type something.` as Other
+and uses the same textarea.
 On Desktop (not VS Code), the thinking-level and model chips keep their
 runtime labels when a right-hand panel narrows the composer. Session-width
 rails keep thinking plus the full model name. Walkthrough and similarly

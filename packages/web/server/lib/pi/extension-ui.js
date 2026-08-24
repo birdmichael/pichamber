@@ -189,6 +189,16 @@ export const createExtensionUIController = ({
       const level = type === 'warning' || type === 'error' ? type : 'info';
       publish(UI_NOTIFY, { message: text, level });
     },
+    async custom() {
+      // Desktop cannot run a TUI factory. The installed `question` tool is
+      // remapped onto select + editor (see question-desktop.js). Other
+      // `custom()` callers get an in-chat editor instead of silent undefined
+      // (which the question tool treats as cancel).
+      const text = await context.editor('');
+      if (text === undefined) return undefined;
+      const answer = String(text).trim();
+      return answer ? { answer, wasCustom: true } : undefined;
+    },
   };
 
   return {

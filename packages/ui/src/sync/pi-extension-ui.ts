@@ -108,9 +108,17 @@ export const parsePiExtensionUiNotify = (value: unknown): PiExtensionUiNotify | 
   };
 };
 
-export const isFreeformOtherOption = (option: string): boolean => (
-  /^(?:\d+\.\s*)?other\b/i.test(option.trim())
+const FREEFORM_OTHER_OPTION = /^(?:\d+\.\s*)?other\b/i;
+const TYPE_SOMETHING_OPTION = /^(?:\d+\.\s*)?type something\.?\s*$/i;
+
+export const isTypeSomethingOption = (option: string): boolean => (
+  TYPE_SOMETHING_OPTION.test(option.trim())
 );
+
+export const isFreeformOtherOption = (option: string): boolean => {
+  const trimmed = option.trim();
+  return FREEFORM_OTHER_OPTION.test(trimmed) || TYPE_SOMETHING_OPTION.test(trimmed);
+};
 
 export const displaySelectOption = (option: string): { label: string; description?: string; raw: string } => {
   const numbered = option.replace(/^\d+\.\s*/, '');

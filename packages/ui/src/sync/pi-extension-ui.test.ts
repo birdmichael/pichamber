@@ -44,6 +44,7 @@ mock.module('@/lib/runtime-fetch', () => ({
 import {
   displaySelectOption,
   isFreeformOtherOption,
+  isTypeSomethingOption,
   parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
   parsePiExtensionUiPromptList,
@@ -109,12 +110,27 @@ describe('parsePiExtensionUiPrompt', () => {
 describe('plan-question option helpers', () => {
   test('detects Other and splits numbered label/description', () => {
     expect(isFreeformOtherOption('2. Other (free-form)')).toBe(true);
+    expect(isFreeformOtherOption('Other')).toBe(true);
     expect(isFreeformOtherOption('1. Fast path — ship now')).toBe(false);
     expect(displaySelectOption('1. Fast path — ship the smallest change')).toEqual({
       label: 'Fast path',
       description: 'ship the smallest change',
       raw: '1. Fast path — ship the smallest change',
     });
+  });
+
+  test('treats Type something as Other, including numbered variants', () => {
+    expect(isTypeSomethingOption('Type something.')).toBe(true);
+    expect(isTypeSomethingOption('Type something')).toBe(true);
+    expect(isTypeSomethingOption('3. Type something.')).toBe(true);
+    expect(isTypeSomethingOption('3. Type something')).toBe(true);
+    expect(isFreeformOtherOption('Type something.')).toBe(true);
+    expect(isFreeformOtherOption('Type something')).toBe(true);
+    expect(isFreeformOtherOption('3. Type something.')).toBe(true);
+    expect(isFreeformOtherOption('3. Type something')).toBe(true);
+    expect(isTypeSomethingOption('Type something else')).toBe(false);
+    expect(isFreeformOtherOption('Type something else')).toBe(false);
+    expect(isFreeformOtherOption('1. Fast path — ship now')).toBe(false);
   });
 });
 
