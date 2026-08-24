@@ -2671,6 +2671,7 @@ export const dict = {
   'mobileUpdate.toast.actions.dismiss': 'Ignorer',
   'piUpdate.toast.available.title': 'Pi {version} disponible',
   'piUpdate.toast.actions.dismiss': 'Ignorer',
+  'piUpdate.toast.actions.ok': 'OK',
   'opencodeUpdate.toast.available.title': 'Mise à jour Pi',
   'opencodeUpdate.toast.available.description': 'Version {version} disponible.',
   'opencodeUpdate.toast.actions.update': 'Mise à jour',

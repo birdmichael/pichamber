@@ -117,15 +117,20 @@ export interface OpenCodeUpdateToastDismissInput {
 }
 
 /**
- * Persist-and-hide path for Dismiss, the toast OK/close control, and
- * `onDismiss`. Idempotent for the same version.
+ * Hide-then-persist path for Dismiss, the toast OK/close control, and
+ * `onDismiss`. Hide first so a persist throw cannot leave the Infinity
+ * toast on screen. Idempotent for the same version.
  */
 export const dismissOpenCodeUpdateToast = (input: OpenCodeUpdateToastDismissInput): string => {
   const version = rememberOpenCodeUpdateToastDismiss(input.version);
-  if (version) {
-    input.persistDismissedVersion(version);
-  }
   input.hideToast();
+  if (version) {
+    try {
+      input.persistDismissedVersion(version);
+    } catch {
+      // In-memory remember already blocks re-show for this JS realm.
+    }
+  }
   return version;
 };
 

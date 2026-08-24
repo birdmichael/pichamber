@@ -3022,6 +3022,7 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.status.waitingForServer': 'Oczekiwanie na serwer...',
   'piUpdate.toast.available.title': 'Pi {version} jest dostępne',
   'piUpdate.toast.actions.dismiss': 'Odrzuć',
+  'piUpdate.toast.actions.ok': 'OK',
   'opencodeUpdate.toast.available.title': 'Aktualizacja Pi',
   'opencodeUpdate.toast.available.description': 'Wersja {version} dostępna.',
   'opencodeUpdate.toast.actions.update': 'Aktualizuj',

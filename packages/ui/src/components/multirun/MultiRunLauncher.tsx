@@ -107,6 +107,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
   const [isLoadingSetupCommands, setIsLoadingSetupCommands] = React.useState(false);
   const [isolateRuns, setIsolateRuns] = React.useState(true);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const launcherRootRef = React.useRef<HTMLFormElement>(null);
 
   const currentDirectory = useDirectoryStore((state) => state.currentDirectory ?? null);
   const homeDirectory = useDirectoryStore((state) => state.homeDirectory ?? null);
@@ -236,7 +237,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
     if (!onCancel) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (!shouldCloseLauncherFormOnEscape(isLauncherOverlayOpen())) return;
+      if (!shouldCloseLauncherFormOnEscape(isLauncherOverlayOpen(launcherRootRef.current))) return;
       e.preventDefault();
       e.stopPropagation();
       onCancel();
@@ -423,7 +424,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
   const configuredSetupCount = setupCommands.filter((cmd) => cmd.trim()).length;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full bg-background">
+    <form ref={launcherRootRef} onSubmit={handleSubmit} className="flex flex-col h-full bg-background">
       {!isWindowed ? (
         <header
           onMouseDown={handleDragStart}

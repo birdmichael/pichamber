@@ -2999,6 +2999,7 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.actions.dismiss': '忽略',
   'piUpdate.toast.available.title': 'Pi {version} 可用',
   'piUpdate.toast.actions.dismiss': '忽略',
+  'piUpdate.toast.actions.ok': '確定',
   'opencodeUpdate.toast.available.title': 'Pi 更新',
   'opencodeUpdate.toast.available.description': '版本 {version} 可安裝。',
   'opencodeUpdate.toast.actions.update': '更新',

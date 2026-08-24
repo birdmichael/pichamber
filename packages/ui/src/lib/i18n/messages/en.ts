@@ -3036,6 +3036,7 @@ export const dict = {
   'mobileUpdate.toast.actions.dismiss': 'Dismiss',
   'piUpdate.toast.available.title': 'Pi {version} available',
   'piUpdate.toast.actions.dismiss': 'Dismiss',
+  'piUpdate.toast.actions.ok': 'OK',
   'opencodeUpdate.toast.available.title': 'Pi update',
   'opencodeUpdate.toast.available.description': 'Version {version} available.',
   'opencodeUpdate.toast.actions.update': 'Update',

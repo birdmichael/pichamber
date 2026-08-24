@@ -5,12 +5,15 @@
  * the same Esc closes the form (same as Cancel).
  *
  * Prefer the in-memory overlay registry (authoritative React state) over DOM
- * sniffing. The model picker also mounts `[data-model-picker-list]` and sets
- * `data-popup-open="true"` on the trigger. Empty-string attributes still count
- * as open; explicit `false` / `0` do not.
+ * sniffing. Scope DOM checks to the launcher root when provided: ChatView
+ * stays mounted (invisible) under the form and keeps a model picker list
+ * and Prompt Navigator listbox in the document.
  *
- * Do not treat a bare `[role="listbox"]` as open: the hidden chat
- * Prompt Navigator rail keeps that role mounted while the launcher is up.
+ * Count only actually-open popups. Closed Base UI Select / menu popups stay
+ * in the DOM with `data-slot="select-content"` / `dropdown-menu-content`.
+ * `[data-model-picker-list]` is also present on the hidden chat picker, so
+ * its presence is not an open overlay. Empty-string `data-popup-open` still
+ * counts as open; explicit `false` / `0` do not.
  */
 
 const openOverlayIds = new Set<string>();
@@ -47,9 +50,8 @@ export const isLauncherOverlayOpen = (root: ParentNode | null | undefined = type
   return Boolean(
     hasOpenPopupAttribute(root)
     || root.querySelector('[data-launcher-overlay]')
-    || root.querySelector('[data-model-picker-list]')
-    || root.querySelector('[data-slot="select-content"]')
-    || root.querySelector('[data-slot="dropdown-menu-content"]'),
+    || root.querySelector('[data-slot="select-content"][data-open]')
+    || root.querySelector('[data-slot="dropdown-menu-content"][data-open]'),
   );
 };
 

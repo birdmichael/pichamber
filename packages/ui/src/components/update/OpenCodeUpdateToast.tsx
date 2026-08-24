@@ -27,6 +27,8 @@ const UPDATE_TOAST_DISMISSED_VERSION_KEY = 'opencode-update-toast-dismissed-vers
 
 export const OpenCodeUpdateToast: React.FC = () => {
   const { t } = useI18n();
+  const tRef = React.useRef(t);
+  tRef.current = t;
   const isPiKernel = usePiKernel();
   const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
   const seenVersionsRef = React.useRef(new Set<string>());
@@ -51,7 +53,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
     if (isPiKernel || upgradingRef.current) return;
     upgradingRef.current = true;
     toast.dismiss(UPDATE_TOAST_ID);
-    toast.message(t('opencodeUpdate.toast.upgrading.title'), {
+    toast.message(tRef.current('opencodeUpdate.toast.upgrading.title'), {
       id: UPGRADE_TOAST_ID,
       description: t('opencodeUpdate.toast.upgrading.description'),
       duration: Infinity,
@@ -135,31 +137,36 @@ export const OpenCodeUpdateToast: React.FC = () => {
       };
 
       if (isPiKernel) {
-        toast.info(t('piUpdate.toast.available.title', { version }), {
+        // Pass action so toast.info does not inject a no-op OK. Both
+        // buttons hide the toast; Linux Electron also needs no-drag on
+        // the toaster or the header drag region swallows the click.
+        toast.info(tRef.current('piUpdate.toast.available.title', { version }), {
           id: UPDATE_TOAST_ID,
           duration: Infinity,
-          // Shared toast.info adds an OK close control when action is omitted.
-          // Persist on that close, Dismiss, swipe, and the sonner X alike.
           onDismiss: dismiss,
+          action: {
+            label: tRef.current('piUpdate.toast.actions.ok'),
+            onClick: dismiss,
+          },
           cancel: {
-            label: t('piUpdate.toast.actions.dismiss'),
+            label: tRef.current('piUpdate.toast.actions.dismiss'),
             onClick: dismiss,
           },
         });
         return;
       }
 
-      toast.info(t('opencodeUpdate.toast.available.title'), {
+      toast.info(tRef.current('opencodeUpdate.toast.available.title'), {
         id: UPDATE_TOAST_ID,
-        description: t('opencodeUpdate.toast.available.description', { version }),
+        description: tRef.current('opencodeUpdate.toast.available.description', { version }),
         duration: Infinity,
         onDismiss: dismiss,
         action: {
-          label: t('opencodeUpdate.toast.actions.update'),
+          label: tRef.current('opencodeUpdate.toast.actions.update'),
           onClick: runUpgrade,
         },
         cancel: {
-          label: t('opencodeUpdate.toast.actions.dismiss'),
+          label: tRef.current('opencodeUpdate.toast.actions.dismiss'),
           onClick: dismiss,
         },
       });
@@ -214,7 +221,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
       unsubscribeRuntime();
       window.removeEventListener('openchamber:opencode-update-available', onUpdateAvailable);
     };
-  }, [isPiKernel, runUpgrade, showOpenCodeUpdateNotifications, t]);
+  }, [isPiKernel, runUpgrade, showOpenCodeUpdateNotifications]);
 
   return null;
 };

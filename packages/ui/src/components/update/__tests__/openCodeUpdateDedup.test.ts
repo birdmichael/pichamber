@@ -223,8 +223,8 @@ describe('openCode update toast dismiss path', () => {
             }),
         ).toBe('0.84.3');
 
-        expect(persisted).toEqual(['0.84.3', '0.84.3']);
         expect(hidden).toBe(2);
+        expect(persisted).toEqual(['0.84.3', '0.84.3']);
         expect(resolveDismissedOpenCodeUpdateVersion(null)).toBe('0.84.3');
         expect(
             shouldShowOpenCodeUpdateToast({
@@ -237,6 +237,29 @@ describe('openCode update toast dismiss path', () => {
             shouldShowOpenCodeUpdateToast({
                 version: '0.84.3',
                 dismissedVersion: resolveDismissedOpenCodeUpdateVersion('0.84.3'),
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+    });
+
+    test('hides the toast even when persist throws', () => {
+        let hidden = 0;
+        expect(
+            dismissOpenCodeUpdateToast({
+                version: '0.84.3',
+                persistDismissedVersion: () => {
+                    throw new Error('settings write failed');
+                },
+                hideToast: () => {
+                    hidden += 1;
+                },
+            }),
+        ).toBe('0.84.3');
+        expect(hidden).toBe(1);
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: resolveDismissedOpenCodeUpdateVersion(null),
                 seenVersions: new Set(),
             }),
         ).toBe(false);

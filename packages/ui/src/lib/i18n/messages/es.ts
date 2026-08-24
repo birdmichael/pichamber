@@ -3002,6 +3002,7 @@ export const dict: Record<I18nKey, string> = {
   "mobileUpdate.toast.actions.dismiss": "Descartar",
   "piUpdate.toast.available.title": "Pi {version} disponible",
   "piUpdate.toast.actions.dismiss": "Descartar",
+  "piUpdate.toast.actions.ok": "Aceptar",
   "opencodeUpdate.toast.available.title": "Actualización de Pi",
   "opencodeUpdate.toast.available.description": "Versión {version} disponible.",
   "opencodeUpdate.toast.actions.update": "Actualizar",

@@ -37,16 +37,22 @@ function usePinnedToastStyles(shadow: string) {
   React.useEffect(() => {
     if (typeof document === "undefined") return
 
+    const applyNoDrag = (el: HTMLElement) => {
+      el.classList.add("app-region-no-drag")
+      el.style.setProperty("-webkit-app-region", "no-drag")
+    }
+
     const apply = (el: HTMLElement) => {
       el.style.setProperty("box-shadow", shadow, "important")
       el.style.setProperty("outline", "none", "important")
+      applyNoDrag(el)
+      el.querySelectorAll<HTMLElement>("button").forEach(applyNoDrag)
       if (el.getAttribute("tabindex") === "0") el.setAttribute("tabindex", "-1")
     }
 
     const applyToAll = () => {
-      document
-        .querySelectorAll<HTMLElement>("[data-sonner-toast]")
-        .forEach(apply)
+      document.querySelectorAll<HTMLElement>("[data-sonner-toaster]").forEach(applyNoDrag)
+      document.querySelectorAll<HTMLElement>("[data-sonner-toast]").forEach(apply)
     }
 
     applyToAll()
@@ -84,20 +90,19 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={isDark ? "dark" : "light"}
-      className="toaster group"
+      className="toaster group app-region-no-drag"
       closeButton={false}
       toastOptions={{
         classNames: {
           toast:
-            "group/toast toast !rounded-[var(--radius-xl)] !border-0 !px-3.5 !py-3 !gap-2.5 !text-foreground [&_[data-cancel]+[data-button]]:!ml-2",
+            "group/toast toast app-region-no-drag !rounded-[var(--radius-xl)] !border-0 !px-3.5 !py-3 !gap-2.5 !text-foreground [&_[data-cancel]+[data-button]]:!ml-2",
+          actionButton: "!rounded-[var(--radius-md)] app-region-no-drag !bg-[var(--primary-base)] !text-[var(--primary-foreground)] hover:!opacity-85 !px-2 !py-1 typography-meta !font-medium transition-opacity",
+          cancelButton:
+            "!rounded-[var(--radius-md)] app-region-no-drag !bg-[var(--interactive-hover)] !text-foreground hover:!bg-[var(--interactive-active)] !px-2 !py-1 typography-meta !font-medium transition-colors",
           title: "typography-ui-label !font-medium !text-foreground",
           description: "typography-meta !text-muted-foreground !mt-0.5",
-          actionButton:
-            "!rounded-[var(--radius-md)] !bg-[var(--primary-base)] !text-[var(--primary-foreground)] hover:!opacity-85 !px-2 !py-1 typography-meta !font-medium transition-opacity",
-          cancelButton:
-            "!rounded-[var(--radius-md)] !bg-[var(--interactive-hover)] !text-foreground hover:!bg-[var(--interactive-active)] !px-2 !py-1 typography-meta !font-medium transition-colors",
           closeButton:
-            "!rounded-[var(--radius-md)] !bg-[var(--interactive-hover)] !text-foreground hover:!bg-[var(--interactive-active)]",
+            "!rounded-[var(--radius-md)] app-region-no-drag !bg-[var(--interactive-hover)] !text-foreground hover:!bg-[var(--interactive-active)]",
           icon: "!text-muted-foreground",
           success: "[&_[data-icon]]:!text-[var(--status-success)]",
           error: "[&_[data-icon]]:!text-[var(--status-error)]",
