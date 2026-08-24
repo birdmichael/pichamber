@@ -70,6 +70,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
   const [signCommits, setSignCommits] = React.useState(false);
   const [signingKey, setSigningKey] = React.useState('');
   const [host, setHost] = React.useState('');
+  const [token, setToken] = React.useState('');
   const [color, setColor] = React.useState('keyword');
   const [icon, setIcon] = React.useState('branch');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -86,6 +87,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
       setUserEmail('');
       setAuthType('token');
       setSshKey('');
+      setToken('');
       setSignCommits(false);
       setSigningKey('');
       setHost(importData.host);
@@ -97,6 +99,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
       setUserEmail('');
       setAuthType('ssh');
       setSshKey('');
+      setToken('');
       setSignCommits(false);
       setSigningKey('');
       setHost('');
@@ -108,6 +111,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
       setUserEmail(selectedProfile.userEmail);
       setAuthType(selectedProfile.authType || 'ssh');
       setSshKey(selectedProfile.sshKey || '');
+      setToken(selectedProfile.token || '');
       setSignCommits(selectedProfile.signCommits === true);
       setSigningKey(selectedProfile.signingKey || '');
       setHost(selectedProfile.host || '');
@@ -121,6 +125,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
         setUserEmail(global.userEmail);
         setAuthType(global.authType || 'ssh');
         setSshKey(global.sshKey || '');
+        setToken('');
         setSignCommits(false);
         setSigningKey('');
         setHost(global.host || '');
@@ -152,6 +157,7 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
         userEmail: userEmail.trim(),
         authType,
         sshKey: authType === 'ssh' ? (sshKey.trim() || null) : null,
+        token: authType === 'token' ? (token.trim() || null) : null,
         signCommits,
         signingKey: signingKey.trim() || null,
         host: authType === 'token' ? (host.trim() || null) : null,
@@ -410,22 +416,40 @@ export const GitIdentityEditorDialog: React.FC<GitIdentityEditorDialogProps> = (
                   </div>
 
                   {authType === 'token' && (
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <label className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.gitIdentities.editor.field.host')}</label>
-                        <span className="text-[var(--status-error)] text-xs">*</span>
-                        <SettingsInfoHint contentClassName="max-w-xs">
-                          {t('settings.gitIdentities.editor.field.hostTooltip')}
-                        </SettingsInfoHint>
+                    <>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <label className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.gitIdentities.editor.field.authToken')}</label>
+                          <SettingsInfoHint contentClassName="max-w-xs">
+                            {t('settings.gitIdentities.editor.field.tokenTooltip')}
+                          </SettingsInfoHint>
+                        </div>
+                        <Input
+                          type="password"
+                          value={token}
+                          onChange={(e) => setToken(e.target.value)}
+                          placeholder={t('settings.gitIdentities.editor.field.tokenPlaceholder')}
+                          autoComplete="off"
+                          className="h-8 font-mono text-xs"
+                        />
                       </div>
-                      <Input
-                        value={host}
-                        onChange={(e) => setHost(e.target.value)}
-                        placeholder={t('settings.gitIdentities.editor.field.hostPlaceholder')}
-                        required
-                        className="h-8 font-mono text-xs"
-                      />
-                    </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <label className={SETTINGS_FIELD_LABEL_CLASS}>{t('settings.gitIdentities.editor.field.host')}</label>
+                          <span className="text-[var(--status-error)] text-xs">*</span>
+                          <SettingsInfoHint contentClassName="max-w-xs">
+                            {t('settings.gitIdentities.editor.field.hostTooltip')}
+                          </SettingsInfoHint>
+                        </div>
+                        <Input
+                          value={host}
+                          onChange={(e) => setHost(e.target.value)}
+                          placeholder={t('settings.gitIdentities.editor.field.hostPlaceholder')}
+                          required
+                          className="h-8 font-mono text-xs"
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
               </>

@@ -418,6 +418,13 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['archive', 'delete', 'expire'],
   },
   {
+    id: 'sessions.desktop-app',
+    page: 'general',
+    titleKey: 'settings.openchamber.desktopApp.title',
+    keywords: ['desktop', 'app', 'login', 'tray', 'awake'],
+    isAvailable: (ctx) => ctx.isDesktopLocalOrigin,
+  },
+  {
     id: 'sessions.desktop-launch-at-login',
     page: 'general',
     titleKey: 'settings.openchamber.desktopNetwork.field.launchAtLogin',

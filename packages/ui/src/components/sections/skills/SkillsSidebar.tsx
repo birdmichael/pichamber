@@ -50,6 +50,7 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
   const [deleteDialogSkill, setDeleteDialogSkill] = React.useState<DiscoveredSkill | null>(null);
   const [isDeletePending, setIsDeletePending] = React.useState(false);
   const [openMenuSkill, setOpenMenuSkill] = React.useState<string | null>(null);
+  const ignoreCreateClickRef = React.useRef(false);
 
   const {
     selectedSkillName,
@@ -234,7 +235,19 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
             data-settings-item="skills.create"
             variant="ghost"
             className="h-7 w-7 px-0 -my-1 text-muted-foreground"
-            onClick={handleCreateNew}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              ignoreCreateClickRef.current = true;
+              handleCreateNew();
+            }}
+            onClick={(event) => {
+              if (ignoreCreateClickRef.current) {
+                ignoreCreateClickRef.current = false;
+                event.preventDefault();
+                return;
+              }
+              handleCreateNew();
+            }}
           >
             <Icon name="add" className="h-3.5 w-3.5" />
           </Button>

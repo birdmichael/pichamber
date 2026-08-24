@@ -39,3 +39,39 @@ export function discoverGitCredentials() {
 
   return credentials;
 }
+
+export function upsertGitCredential({ host, username, token }) {
+  const safeHost = typeof host === 'string' ? host.trim().replace(/^https?:\/\//, '').split('/')[0] : '';
+  const password = typeof token === 'string' ? token.trim() : '';
+  if (!safeHost || !password) {
+    return false;
+  }
+
+  const user = typeof username === 'string' && username.trim() ? username.trim() : 'x-access-token';
+  const nextLine = `https://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${safeHost}`;
+
+  let existing = [];
+  try {
+    if (fs.existsSync(GIT_CREDENTIALS_PATH)) {
+      existing = fs.readFileSync(GIT_CREDENTIALS_PATH, 'utf8').split('\n');
+    }
+  } catch {
+    existing = [];
+  }
+
+  const kept = existing.filter((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return false;
+    }
+    try {
+      return new URL(trimmed).hostname !== safeHost;
+    } catch {
+      return true;
+    }
+  });
+  kept.push(nextLine);
+
+  fs.writeFileSync(GIT_CREDENTIALS_PATH, `${kept.join('\n')}\n`, { mode: 0o600 });
+  return true;
+}

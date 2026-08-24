@@ -346,9 +346,12 @@ export const DesktopNetworkSettings: React.FC = () => {
   }
 
   return (
-    <SettingsSection title={t('settings.openchamber.desktopNetwork.title')}>
-      <div className="space-y-3">
-        {(launchAtLoginSupported || isMacDesktop || minimizeToTraySupported || keepAwakeSupported) ? (
+    <>
+      {(launchAtLoginSupported || isMacDesktop || minimizeToTraySupported || keepAwakeSupported) ? (
+        <SettingsSection
+          settingsItem="sessions.desktop-app"
+          title={t('settings.openchamber.desktopApp.title')}
+        >
           <div className={SETTINGS_OPTION_STACK_CLASS}>
             {launchAtLoginSupported ? (
               <SettingsCheckboxRow
@@ -407,8 +410,11 @@ export const DesktopNetworkSettings: React.FC = () => {
               />
             ) : null}
           </div>
-        ) : null}
+        </SettingsSection>
+      ) : null}
 
+      <SettingsSection title={t('settings.openchamber.desktopNetwork.title')}>
+        <div className="space-y-3">
         <SettingsStackedField
           settingsItem="sessions.desktop-ui-password"
           label={(
@@ -483,6 +489,7 @@ export const DesktopNetworkSettings: React.FC = () => {
           <Button
             type="button"
             size="xs"
+            variant={isDirty ? 'default' : 'outline'}
             onClick={handleSaveAndRestart}
             disabled={saveDisabled}
             className="shrink-0 !font-normal"
@@ -492,5 +499,6 @@ export const DesktopNetworkSettings: React.FC = () => {
         </div>
       </div>
     </SettingsSection>
+    </>
   );
 };

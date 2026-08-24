@@ -7,7 +7,7 @@ export interface ThemeContextValue {
   availableThemes: Theme[];
   setTheme: (themeId: string) => void;
   customThemesLoading: boolean;
-  reloadCustomThemes: () => Promise<void>;
+  reloadCustomThemes: () => Promise<boolean>;
   isSystemPreference: boolean;
   setSystemPreference: (use: boolean) => void;
   themeMode: ThemeMode;

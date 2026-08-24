@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   defaultSkillSource,
+  getSkillCatalogInstallLocations,
   getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
@@ -50,6 +51,17 @@ describe('skillLocations', () => {
       'settings.skills.location.option.projectPi.label',
       'settings.skills.location.option.userAgents.label',
       'settings.skills.location.option.projectAgents.label',
+    ]);
+  });
+
+  test('catalog install Destination is User/Project for the current kernel only', () => {
+    expect(getSkillCatalogInstallLocations(true).map((option) => option.value)).toEqual([
+      'user-pi',
+      'project-pi',
+    ]);
+    expect(getSkillCatalogInstallLocations(false).map((option) => option.value)).toEqual([
+      'user-opencode',
+      'project-opencode',
     ]);
   });
 

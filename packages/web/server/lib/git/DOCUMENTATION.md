@@ -8,8 +8,8 @@ This module provides Git repository operations for the web server runtime, inclu
   - `index.js`: Public API entry point imported by `packages/web/server/index.js`.
   - `routes.js`: Express route registration for `/api/git/*` endpoints.
   - `service.js`: Core Git operations (repository, branch, worktree, commit, merge/rebase, status/diff, log).
-  - `credentials.js`: Git credentials management.
-  - `identity-storage.js`: Git identity (user.name, user.email) storage.
+  - `credentials.js`: Git credentials management. `discoverGitCredentials()` lists hosts/usernames from `~/.git-credentials` without exposing secrets. `upsertGitCredential({ host, username, token })` writes a host PAT/password into that file at mode 0600 and never logs the token.
+  - `identity-storage.js`: Git identity (user.name, user.email, authType, sshKey/host/token) storage. Token values are persisted on the profile and must not be logged.
 
 ## Public API
 
@@ -20,7 +20,7 @@ The following functions are exported and used by the web server:
 - `getGlobalIdentity()`: Get global Git user.name, user.email, and core.sshCommand.
 - `getCurrentIdentity(directory)`: Get local Git identity (fallback to global if not set locally).
 - `hasLocalIdentity(directory)`: Check if local Git identity is configured.
-- `setLocalIdentity(directory, profile)`: Set local Git identity (userName, userEmail, authType, sshKey/host).
+- `setLocalIdentity(directory, profile)`: Set local Git identity (userName, userEmail, authType, sshKey/host/token). Token auth writes the PAT into `~/.git-credentials` for that host when provided.
 - `getRemoteUrl(directory, remoteName)`: Get URL for a specific remote.
 
 ### Status and Diff Operations

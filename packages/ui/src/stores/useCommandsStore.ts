@@ -98,8 +98,12 @@ const resolveCommandTemplate = (
   data: CommandConfigDetail | null,
   previous?: Command,
 ): string | undefined => {
-  if (typeof data?.template === 'string') {
-    return data.template;
+  const detailTemplate = typeof data?.template === 'string' ? data.template : undefined;
+  const isBuiltin = isCommandBuiltIn(cmd) || cmd.source === 'builtin';
+  // Empty detail templates are authoritative for builtins (they have no body).
+  // For prompts, an empty detail must not wipe a listed / previously loaded body.
+  if (detailTemplate !== undefined && (detailTemplate.length > 0 || isBuiltin)) {
+    return detailTemplate;
   }
   if (typeof cmd.template === 'string') {
     return cmd.template;
@@ -107,7 +111,7 @@ const resolveCommandTemplate = (
   if (typeof previous?.template === 'string') {
     return previous.template;
   }
-  return undefined;
+  return detailTemplate;
 };
 
 const mergeListedCommand = (

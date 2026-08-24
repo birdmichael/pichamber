@@ -2,6 +2,7 @@ import React from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { SettingsView } from './SettingsView';
 
 interface SettingsWindowProps {
@@ -17,21 +18,16 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
   const { t } = useI18n();
   const descriptionId = React.useId();
 
-  const hasOpenFloatingMenu = React.useCallback(() => {
-    if (typeof document === 'undefined') {
-      return false;
-    }
-
-    return Boolean(
-      document.querySelector('[data-slot="dropdown-menu-content"][data-open], [data-slot="select-content"][data-open]')
-    );
-  }, []);
-
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={(next) => {
-        if (!next && hasOpenFloatingMenu()) return;
+      onOpenChange={(next, eventDetails) => {
+        if (shouldBlockSettingsDismiss(next, eventDetails)) {
+          if (!next && eventDetails?.reason === 'escape-key') {
+            notifySettingsEscapeForm();
+          }
+          return;
+        }
         onOpenChange(next);
       }}
     >
@@ -50,7 +46,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
               'relative flex min-h-0 flex-col pointer-events-auto',
               'w-[90vw] max-w-[1200px] h-[85vh] max-h-[900px]',
               'rounded-xl border shadow-none overflow-hidden origin-center',
-              'bg-background',
+              'bg-[var(--surface-background)] text-[var(--surface-foreground)]',
               'transition-all duration-150 ease-out',
               'data-[starting-style]:opacity-0 data-[starting-style]:scale-[0.98]',
               'data-[ending-style]:opacity-0 data-[ending-style]:scale-[0.98]',

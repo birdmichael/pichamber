@@ -1625,11 +1625,12 @@ export const McpPage: React.FC = () => {
             {isNewServer && (
               <SettingsFieldRow
                 label={t('settings.mcp.page.server.name')}
+                className="@xl:items-start"
                 // The scope select carries words now, not a lone icon, so the
                 // control cluster has to be allowed to bound itself and wrap.
                 // Left at its default (fit-width, no shrink) the pair ran past
                 // the edge of the settings pane in a narrow dialog.
-                controlClassName="flex-wrap @xl:w-auto @xl:flex-1"
+                controlClassName="flex-wrap items-center @xl:w-auto @xl:flex-1"
               >
                   <Input
                     value={draftName}

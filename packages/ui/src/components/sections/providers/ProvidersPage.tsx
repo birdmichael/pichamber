@@ -615,7 +615,8 @@ export const ProvidersPage: React.FC = () => {
                           {(() => {
                             const query = providerSearchQuery.toLowerCase();
                             const customLabel = t('settings.providers.page.custom.optionLabel');
-                            const customMatches = !query
+                            const customMatches = unconnectedProviders.length === 0
+                              || !query
                               || customLabel.toLowerCase().includes(query)
                               || 'other'.includes(query)
                               || 'custom'.includes(query);
@@ -627,6 +628,11 @@ export const ProvidersPage: React.FC = () => {
                             }
                             return (
                               <>
+                                {unconnectedProviders.length === 0 && !query ? (
+                                  <p className="px-2 py-2 typography-meta text-muted-foreground">
+                                    {t('settings.providers.page.connect.emptyCatalog')}
+                                  </p>
+                                ) : null}
                                 {filtered.map((provider) => (
                                   <DropdownMenuItem
                                     key={provider.id}

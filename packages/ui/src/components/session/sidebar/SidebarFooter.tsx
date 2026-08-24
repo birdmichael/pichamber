@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
+import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
 
 type Props = {
   onOpenSettings: () => void;
@@ -19,7 +20,7 @@ type Props = {
   refreshTooltip?: string;
 };
 
-const footerButtonClassName = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-interactive-hover/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
+const footerButtonClassName = 'app-region-no-drag inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-interactive-hover/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
 
 export function SidebarFooter({
   onOpenSettings,
@@ -36,6 +37,25 @@ export function SidebarFooter({
   refreshTooltip,
 }: Props): React.ReactNode {
   const { t } = useI18n();
+  const [settingsTooltipOpen, setSettingsTooltipOpen] = React.useState(false);
+  const ignoreSettingsClickRef = React.useRef(false);
+
+  const handleSettingsPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    ignoreSettingsClickRef.current = activateTitlebarIconOnPointerDown({
+      button: event.button,
+      closeHoverUi: () => setSettingsTooltipOpen(false),
+      activate: onOpenSettings,
+    });
+  }, [onOpenSettings]);
+
+  const handleSettingsClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (ignoreSettingsClickRef.current) {
+      ignoreSettingsClickRef.current = false;
+      event.preventDefault();
+      return;
+    }
+    onOpenSettings();
+  }, [onOpenSettings]);
 
   if (!showRuntimeButtons && !showUpdateButton) {
     return null;
@@ -45,9 +65,15 @@ export function SidebarFooter({
     <div className="flex shrink-0 items-center justify-start gap-1 px-2.5 py-2">
       {showRuntimeButtons ? (
         <>
-          <Tooltip>
+          <Tooltip open={settingsTooltipOpen} onOpenChange={setSettingsTooltipOpen}>
             <TooltipTrigger asChild>
-              <button type="button" onClick={onOpenSettings} className={footerButtonClassName} aria-label={t('sessions.sidebar.footer.actions.settings')}>
+              <button
+                type="button"
+                onPointerDown={handleSettingsPointerDown}
+                onClick={handleSettingsClick}
+                className={footerButtonClassName}
+                aria-label={t('sessions.sidebar.footer.actions.settings')}
+              >
                 <Icon name="settings-3" className="h-4.5 w-4.5" />
               </button>
             </TooltipTrigger>

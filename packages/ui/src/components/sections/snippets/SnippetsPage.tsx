@@ -16,14 +16,16 @@ import {
   SETTINGS_SELECT_SIZE,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 export const SnippetsPage: React.FC = () => {
   const { t } = useI18n();
-  const { selectedSnippetName, snippets, snippetDraft, setSnippetDraft, updateSnippet, createSnippet } = useSnippetsStore(useShallow((s) => ({
+  const { selectedSnippetName, snippets, snippetDraft, setSnippetDraft, setSelectedSnippet, updateSnippet, createSnippet } = useSnippetsStore(useShallow((s) => ({
     selectedSnippetName: s.selectedSnippetName,
     snippets: s.snippets,
     snippetDraft: s.snippetDraft,
     setSnippetDraft: s.setSnippetDraft,
+    setSelectedSnippet: s.setSelectedSnippet,
     updateSnippet: s.updateSnippet,
     createSnippet: s.createSnippet,
   })));
@@ -81,6 +83,27 @@ export const SnippetsPage: React.FC = () => {
     return description !== initial.description || aliases !== initial.aliases || content !== initial.content;
   }, [aliases, content, description, draftName, draftScope, isNew]);
 
+  const abandonNewDraft = React.useCallback(() => {
+    setSnippetDraft(null);
+    setSelectedSnippet(null);
+  }, [setSelectedSnippet, setSnippetDraft]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isNew || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isNew]);
+
   const handleSave = async () => {
     const snippetName = isNew ? draftName.trim().replace(/\s+/g, '-') : selectedSnippetName?.trim();
     if (!snippetName) {
@@ -135,6 +158,18 @@ export const SnippetsPage: React.FC = () => {
       description={selectedSnippet ? selectedSnippet.filePath : t('settings.page.snippets.description')}
       showSaveStatus={false}
     >
+      <div
+        ref={formRef}
+        data-settings-escape-form={isNew ? 'true' : undefined}
+        onKeyDown={(event) => {
+          if (!isNew || event.key !== 'Escape') {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          abandonNewDraft();
+        }}
+      >
       <SettingsSection divider={false} contentClassName="space-y-0">
         {isNew ? (
           <SettingsFieldRow label="#">
@@ -179,12 +214,18 @@ export const SnippetsPage: React.FC = () => {
           <SettingsInfoHint>{t('settings.snippets.page.hint')}</SettingsInfoHint>
         </div>
         <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder={t('settings.snippets.page.field.contentPlaceholder')} rows={12} className="mt-1.5 w-full font-mono typography-meta min-h-[160px] max-h-[60vh] bg-transparent" />
-        <div className="pt-3">
+        <div className="flex items-center gap-2 pt-3">
           <Button onClick={handleSave} disabled={isSaving || !isDirty} size="xs" className="!font-normal">
             {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}
           </Button>
+          {isNew ? (
+            <Button type="button" variant="ghost" size="xs" className="!font-normal" onClick={abandonNewDraft}>
+              {t('settings.common.actions.cancel')}
+            </Button>
+          ) : null}
         </div>
       </SettingsSection>
+      </div>
     </SettingsPageLayout>
   );
 };

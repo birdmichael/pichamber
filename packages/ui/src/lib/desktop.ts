@@ -4,6 +4,7 @@ import type { DraftStarterRef } from '@/lib/draftStarters';
 import type { MobileKeyboardMode } from '@/lib/mobileKeyboardMode';
 import { getRuntimeApiBaseUrl, getRuntimeKey } from '@/lib/runtime-switch';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
+import { withNativeFilePicker } from '@/lib/native-file-picker';
 
 type ManagedRemoteTunnelPreset = {
   id: string;
@@ -613,21 +614,23 @@ export const requestDirectoryAccess = async (
 ): Promise<{ success: boolean; path?: string; projectId?: string; error?: string }> => {
   // Desktop shell on local instance: use native folder picker.
   if (canRequestNativeDirectoryAccess()) {
-    try {
-      const selected = await getDesktopBridge()?.openDialog?.({
-        directory: true,
-        multiple: false,
-        title: 'Select Working Directory',
-        ...(directoryPath ? { defaultPath: directoryPath } : {}),
-      });
-      if (!selected || typeof selected !== 'string') {
-        return { success: false, error: 'Directory selection cancelled' };
+    return withNativeFilePicker(async () => {
+      try {
+        const selected = await getDesktopBridge()?.openDialog?.({
+          directory: true,
+          multiple: false,
+          title: 'Select Working Directory',
+          ...(directoryPath ? { defaultPath: directoryPath } : {}),
+        });
+        if (!selected || typeof selected !== 'string') {
+          return { success: false, error: 'Directory selection cancelled' };
+        }
+        return { success: true, path: selected };
+      } catch (error) {
+        console.warn('Failed to request directory access', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
-      return { success: true, path: selected };
-    } catch (error) {
-      console.warn('Failed to request directory access', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   }
 
   return { success: false, error: 'Native directory picker not available' };
@@ -655,37 +658,39 @@ export const requestFileAccess = async (
   options?: { filters?: Array<{ name: string; extensions: string[] }>; defaultPath?: string }
 ): Promise<{ success: boolean; path?: string; outsideFileGrant?: string; error?: string }> => {
   if (hasDesktopInvoke() && isDesktopLocalOriginActive()) {
-    try {
-      const selected = await getDesktopBridge()?.openDialog?.({
-        directory: false,
-        multiple: false,
-        title: 'Select File',
-        returnGrant: true,
-        ...(options?.filters ? { filters: options.filters } : {}),
-        ...(options?.defaultPath ? { defaultPath: options.defaultPath } : {}),
-      });
-      if (!selected) {
-        return { success: false, error: 'File selection cancelled' };
+    return withNativeFilePicker(async () => {
+      try {
+        const selected = await getDesktopBridge()?.openDialog?.({
+          directory: false,
+          multiple: false,
+          title: 'Select File',
+          returnGrant: true,
+          ...(options?.filters ? { filters: options.filters } : {}),
+          ...(options?.defaultPath ? { defaultPath: options.defaultPath } : {}),
+        });
+        if (!selected) {
+          return { success: false, error: 'File selection cancelled' };
+        }
+        if (typeof selected === 'string') {
+          return { success: true, path: selected };
+        }
+        if (!isDesktopFileGrantResult(selected)) {
+          return { success: false, error: 'File selection cancelled' };
+        }
+        const path = typeof selected.path === 'string' ? selected.path : '';
+        if (!path) {
+          return { success: false, error: 'File selection cancelled' };
+        }
+        return {
+          success: true,
+          path,
+          outsideFileGrant: typeof selected.outsideFileGrant === 'string' ? selected.outsideFileGrant : undefined,
+        };
+      } catch (error) {
+        console.warn('Failed to request file access', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
       }
-      if (typeof selected === 'string') {
-        return { success: true, path: selected };
-      }
-      if (!isDesktopFileGrantResult(selected)) {
-        return { success: false, error: 'File selection cancelled' };
-      }
-      const path = typeof selected.path === 'string' ? selected.path : '';
-      if (!path) {
-        return { success: false, error: 'File selection cancelled' };
-      }
-      return {
-        success: true,
-        path,
-        outsideFileGrant: typeof selected.outsideFileGrant === 'string' ? selected.outsideFileGrant : undefined,
-      };
-    } catch (error) {
-      console.warn('Failed to request file access', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   }
 
   return { success: false, error: 'Native file picker not available' };

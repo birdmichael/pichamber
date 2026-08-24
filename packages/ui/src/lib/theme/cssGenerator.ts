@@ -69,6 +69,8 @@ export class CSSVariableGenerator {
 
     vars.push(`  --background: ${theme.colors.surface.background} !important;`);
     vars.push(`  --foreground: ${theme.colors.surface.foreground} !important;`);
+    vars.push(`  --color-background: ${theme.colors.surface.background} !important;`);
+    vars.push(`  --color-foreground: ${theme.colors.surface.foreground} !important;`);
 
     vars.push(`  --muted: ${theme.colors.surface.muted} !important;`);
     vars.push(`  --muted-foreground: ${theme.colors.surface.mutedForeground} !important;`);
@@ -186,6 +188,7 @@ const sidebarBaseRgb = hexToRgb(theme.colors.surface.muted);
     document.head.appendChild(style);
 
     document.documentElement.setAttribute('data-theme', theme.metadata.variant);
+    document.documentElement.style.colorScheme = theme.metadata.variant === 'dark' ? 'dark' : 'light';
 
   }
 

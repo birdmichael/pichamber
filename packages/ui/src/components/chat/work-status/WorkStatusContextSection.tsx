@@ -26,7 +26,11 @@ export const WorkStatusContextSection: React.FC<Props> = ({ sessionId, directory
   const { t } = useI18n();
 
   const session = useSession(sessionId ?? '', directory ?? undefined);
-  const skills = useSkillsStore((state) => state.skills);
+  const allSkills = useSkillsStore((state) => state.skills);
+  const skills = React.useMemo(
+    () => allSkills.filter((skill) => skill.injected !== false),
+    [allSkills],
+  );
   const mcpStatus = useMcpStore(
     React.useCallback((state) => state.getStatusForDirectory(directory), [directory]),
   );

@@ -268,7 +268,7 @@ export function ThemeSystemProvider({ children, defaultThemeId }: ThemeSystemPro
 
   const reloadCustomThemes = useCallback(async () => {
     if (typeof window === 'undefined' || isVSCode) {
-      return;
+      return false;
     }
 
     const runtimeKey = getRuntimeKey();
@@ -285,20 +285,21 @@ export function ThemeSystemProvider({ children, defaultThemeId }: ThemeSystemPro
 
       if (res.status === 401) {
         // UI auth gate will handle prompting; avoid noisy retries here.
-        return;
+        return false;
       }
 
       if (!res.ok) {
-        return;
+        return false;
       }
 
       const payload = await res.json();
-      if (request !== customThemesRequestRef.current || runtimeKey !== getRuntimeKey()) return;
+      if (request !== customThemesRequestRef.current || runtimeKey !== getRuntimeKey()) return false;
       const incoming = Array.isArray(payload?.themes) ? payload.themes : [];
       const normalized = incoming.filter(isValidTheme);
       setCustomThemes(normalized);
+      return true;
     } catch {
-      // ignore
+      return false;
     } finally {
       if (request === customThemesRequestRef.current && runtimeKey === getRuntimeKey()) {
         setCustomThemesLoading(false);

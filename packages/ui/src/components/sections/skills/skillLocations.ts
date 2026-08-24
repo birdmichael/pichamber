@@ -37,6 +37,11 @@ export function getSkillLocationOptions(isPiKernel: boolean) {
   return isPiKernel ? PI_SKILL_LOCATION_OPTIONS : OPENCODE_SKILL_LOCATION_OPTIONS;
 }
 
+/** Catalog install Destination: kernel User/Project only, not .agents. */
+export function getSkillCatalogInstallLocations(isPiKernel: boolean) {
+  return getSkillLocationOptions(isPiKernel).filter((option) => option.source !== 'agents');
+}
+
 export function defaultSkillSource(isPiKernel: boolean): 'pi' | 'opencode' {
   return isPiKernel ? 'pi' : 'opencode';
 }
