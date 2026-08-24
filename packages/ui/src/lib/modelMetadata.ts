@@ -1,5 +1,6 @@
 import { findCatalogMetadata } from '@/lib/model-catalog-capabilities';
 import { lookupExactContextWindow } from '@/lib/model-context-windows';
+import { getCurrentIntlLocale } from '@/lib/i18n';
 import type { ModelMetadata } from '@/types';
 
 type LiveProviderModel = Record<string, unknown> & { id?: string; name?: string };
@@ -58,6 +59,18 @@ export const resolveDisplayedContextWindow = ({
   ?? getNumericLimit(exactCatalog?.limit, 'context')
   ?? lookupExactContextWindow(modelId ?? (typeof live?.id === 'string' ? live.id : ''))
 );
+
+export const formatModelContextTokens = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '';
+  if (value === 0) return '0';
+  const formatted = new Intl.NumberFormat(getCurrentIntlLocale(), {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  }).format(value);
+  return formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted;
+};
 
 export const lookupModelMetadata = (
   catalog: Map<string, ModelMetadata>,

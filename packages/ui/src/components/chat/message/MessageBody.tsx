@@ -603,7 +603,7 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
                             : 'translate-x-0',
                     alwaysShowActions || isMessageCopied
                         ? 'pointer-events-auto opacity-100'
-                        : 'pointer-events-none opacity-0 transition-opacity duration-150 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-hover/user-actions:pointer-events-auto group-hover/user-actions:opacity-100 group-hover/user-shell:pointer-events-auto group-hover/user-shell:opacity-100'
+                        : 'pointer-events-none opacity-0 transition-opacity duration-150 has-[[data-visible=true]]:pointer-events-auto has-[[data-visible=true]]:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-hover/user-actions:pointer-events-auto group-hover/user-actions:opacity-100 group-hover/user-shell:pointer-events-auto group-hover/user-shell:opacity-100'
                 )}
             >
                 {timestamp ? (
@@ -2336,7 +2336,7 @@ const AssistantMessageBody = React.memo(({
                                 'flex items-center gap-1.5',
                                 alwaysShowMessageActions || isTouchContext
                                     ? undefined
-                                    : 'pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100'
+                                    : 'pointer-events-none opacity-0 transition-opacity duration-150 has-[[data-visible=true]]:pointer-events-auto has-[[data-visible=true]]:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100'
                             )}
                             data-message-action-group="true"
                         >

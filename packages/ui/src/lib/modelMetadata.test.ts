@@ -2,10 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import type { ModelMetadata } from '@/types';
 import {
   findExactCatalogMetadata,
+  formatModelContextTokens,
+  lookupModelMetadata,
   mergeModelMetadataWithLiveModel,
   readLiveModelContextWindow,
   resolveDisplayedContextWindow,
 } from './modelMetadata';
+import { toPiRuntimeModelProviders } from './multirun/piModels';
 
 const catalogRow = (providerId: string, context: number): ModelMetadata => ({
   id: 'grok-4.6',
@@ -113,5 +116,48 @@ describe('mergeModelMetadataWithLiveModel', () => {
     expect(recent?.limit?.context).toBe(256000);
     expect(fork?.limit?.context).toBe(256000);
     expect(multiRun?.limit?.context).toBe(256000);
+  });
+
+  test('Recent, Fork ModelSelector, and multi-run format the same K string', () => {
+    const providers = toPiRuntimeModelProviders({
+      providers: [{
+        id: 'acme',
+        name: 'Acme',
+        models: {
+          example: {
+            id: 'example',
+            name: 'Example',
+            contextWindow: 256000,
+            limit: { context: 256000, output: 8192 },
+          },
+        },
+      }],
+    });
+    const live = providers[0]?.models?.[0];
+    expect(live).toBeTruthy();
+
+    const fuzzyOtherProvider: ModelMetadata = {
+      id: 'example',
+      providerId: 'other',
+      limit: { context: 128000 },
+    };
+    const modelsMetadata = new Map<string, ModelMetadata>([
+      ['other/example', fuzzyOtherProvider],
+    ]);
+
+    const recent = mergeModelMetadataWithLiveModel('acme', live!, fuzzyOtherProvider);
+    const fork = mergeModelMetadataWithLiveModel(
+      'acme',
+      live!,
+      lookupModelMetadata(modelsMetadata, 'acme', 'example'),
+    );
+    const multiRun = mergeModelMetadataWithLiveModel('acme', live!);
+
+    const recentK = formatModelContextTokens(recent?.limit?.context);
+    const forkK = formatModelContextTokens(fork?.limit?.context);
+    const multiRunK = formatModelContextTokens(multiRun?.limit?.context);
+    expect(recentK).toBe(forkK);
+    expect(forkK).toBe(multiRunK);
+    expect(recentK).toBe(formatModelContextTokens(256000));
   });
 });
