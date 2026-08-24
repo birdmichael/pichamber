@@ -218,9 +218,12 @@ export const useHasPendingPiExtensionUiPrompt = (sessionID: string | null | unde
   })
 );
 
+/** Bottom-dock cards: pending select/input/editor only. Settled replies live on the asking tool turn. */
 export const selectTranscriptPiExtensionUiPrompts = (
   prompts: PiExtensionUiPrompt[],
-): PiExtensionUiPrompt[] => prompts.filter((prompt) => prompt.kind !== 'confirm');
+): PiExtensionUiPrompt[] => prompts.filter((prompt) => (
+  prompt.kind !== 'confirm' && prompt.status === 'pending'
+));
 
 export const selectPendingConfirmPrompt = (
   prompts: PiExtensionUiPrompt[],

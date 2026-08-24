@@ -26,6 +26,11 @@ Use this doc when you ask an agent to change tool/header/description behavior.
 - `ToolPart.tsx`
   - Renders expandable tool rows (bash/edit/write/question/task + fallback).
   - Controls expandable header title/description/diff stats/timer and expanded output body.
+  - `question` and `plan_mode_question` keep Q&A on that tool turn. Pending
+    Desktop cards may sit in the chat bottom dock; settled answers do not.
+    Parse OpenCode `"Q"="A"` output and Desktop Pi `User selected` /
+    `User wrote` / `User cancelled` plus `{ question, options }` input and
+    `details.answer`. `questionToolItems.ts` owns that materialization.
   - If you want to change expandable tool layout, edit here.
 
 - `taskToolModel.ts`

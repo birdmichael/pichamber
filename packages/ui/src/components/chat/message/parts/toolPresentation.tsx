@@ -59,7 +59,7 @@ export const getToolIcon = (toolName: string) => {
     if (tool === 'openchamber_web' || tool === 'pichamber_web') {
         return <Icon name="global" className={iconClass} />;
     }
-    if (tool === 'question') {
+    if (tool === 'question' || tool === 'plan_mode_question') {
         return <Icon name="survey" className={iconClass} />;
     }
     if (tool === 'lsp') {

@@ -83,6 +83,11 @@ import { useStreamingTextThrottle } from '../../hooks/useStreamingTextThrottle';
 import { getStreamingOutputAppend, getToolOutput } from './toolOutput';
 import { toAbsoluteFilePath } from '@/lib/path-utils';
 import { getToolDescriptionFallback } from './toolRenderUtils';
+import {
+    isQuestionToolName,
+    questionItemsFromToolPart,
+    questionToolDescription,
+} from './questionToolItems';
 import { ApplyPatchFileButtons } from './ApplyPatchFileButtons';
 import { openApplyPatchFileInEditor } from './applyPatchEditorAction';
 
@@ -403,27 +408,6 @@ const getToolDiagnosticSection = (
     };
 };
 
-// Parse question tool output: "User has answered your questions: "Q1"="A1", "Q2"="A2". You can now..."
-const parseQuestionOutput = (output: string): Array<{ question: string; answer: string }> | null => {
-    const match = output.match(/^User has answered your questions:\s*(.+?)\.\s*You can now/s);
-    if (!match) return null;
-
-    const pairs: Array<{ question: string; answer: string }> = [];
-    const content = match[1];
-
-    // Match "question"="answer" pairs, handling multiline answers
-    const pairRegex = /"([^"]+)"="([^"]*(?:[^"\\]|\\.)*)"/g;
-    let pairMatch;
-    while ((pairMatch = pairRegex.exec(content)) !== null) {
-        pairs.push({
-            question: pairMatch[1],
-            answer: pairMatch[2],
-        });
-    }
-
-    return pairs.length > 0 ? pairs : null;
-};
-
 const getToolDescriptionPath = (part: ToolPartType, state: ToolStateUnion, currentDirectory: string): string | null => {
     const stateWithData = state as ToolStateWithMetadata;
     const metadata = stateWithData.metadata;
@@ -522,10 +506,12 @@ const getToolDescription = (part: ToolPartType, state: ToolStateUnion, currentDi
         return '';
     }
 
-    // Question tool: show "Asked N question(s)"
-    if (part.tool === 'question' && input?.questions && Array.isArray(input.questions)) {
-        const count = input.questions.length;
-        return `Asked ${count} question${count !== 1 ? 's' : ''}`;
+    if (isQuestionToolName(part.tool)) {
+        return questionToolDescription(questionItemsFromToolPart({
+            tool: part.tool,
+            title: 'title' in state ? coerceToText(state.title) : undefined,
+            state: stateWithData,
+        }));
     }
 
     if (part.tool === 'bash' && input?.command && typeof input.command === 'string') {
@@ -1420,23 +1406,43 @@ const ToolExpandedContent: React.FC<ToolExpandedContentProps> = React.memo(({
             );
         };
 
-        // Question tool: show parsed Q&A summary or question content from input
-        if (part.tool === 'question') {
-            if (state.status === 'completed' && hasStringOutput) {
-                const parsedQA = parseQuestionOutput(outputString);
-                if (parsedQA && parsedQA.length > 0) {
-                    return renderScrollableBlock(
-                        <div className="space-y-2">
-                            {parsedQA.map((qa, index) => (
-                                <div key={index} className="space-y-0.5">
-                                    <div className="typography-micro text-muted-foreground">{qa.question}</div>
-                                    <div className="typography-meta text-foreground whitespace-pre-wrap">{qa.answer}</div>
-                                </div>
-                            ))}
-                        </div>,
-                        { maxHeightClass: 'max-h-[40vh]' }
-                    );
-                }
+        // Question / plan_mode_question: keep the Q&A on this tool turn.
+        // Pending cards can sit in the bottom dock; settled answers do not.
+        if (isQuestionToolName(part.tool)) {
+            const questionItems = questionItemsFromToolPart({
+                tool: part.tool,
+                title: 'title' in state ? coerceToText(state.title) : undefined,
+                state: stateWithData,
+            });
+
+            if (questionItems.length > 0) {
+                return renderScrollableBlock(
+                    <div className="space-y-2">
+                        {questionItems.map((item, index) => (
+                            <div key={`${item.question}:${index}`} className="space-y-0.5">
+                                {item.question ? (
+                                    <div className="typography-micro text-muted-foreground">{item.question}</div>
+                                ) : null}
+                                {item.answer ? (
+                                    <div className="typography-meta text-foreground whitespace-pre-wrap">{item.answer}</div>
+                                ) : item.cancelled ? (
+                                    <div className="typography-meta text-muted-foreground">{t('chat.piExtensionUi.cancelled')}</div>
+                                ) : item.options.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 mt-0.5">
+                                        {item.options.map((opt) => (
+                                            <span key={opt.label} className="typography-micro px-1.5 py-0.5 rounded bg-muted/30 border border-border/30 text-muted-foreground">
+                                                {opt.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="typography-meta text-muted-foreground">{t('chat.toolPart.awaitingResponse')}</div>
+                                )}
+                            </div>
+                        ))}
+                    </div>,
+                    { maxHeightClass: 'max-h-[40vh]' }
+                );
             }
 
             if (state.status === 'error' && 'error' in state) {
@@ -1451,35 +1457,6 @@ const ToolExpandedContent: React.FC<ToolExpandedContentProps> = React.memo(({
                             {coerceToText(state.error)}
                         </div>
                     </div>
-                );
-            }
-
-            // Show question content from input whenever available, whether the tool is
-            // pending/running or completed without parseable output. This ensures question
-            // text persists across refreshes even if the QuestionCard store data is lost.
-            const questionInput = input as { questions?: Array<{ question?: string; header?: string; options?: Array<{ label: string; description: string }>; multiple?: boolean }> } | undefined;
-            if (questionInput?.questions && Array.isArray(questionInput.questions) && questionInput.questions.length > 0) {
-                return renderScrollableBlock(
-                    <div className="space-y-2">
-                        {questionInput.questions.map((q, index) => (
-                            <div key={index} className="space-y-0.5">
-                                {q.header ? (
-                                    <div className="typography-micro text-muted-foreground">{coerceToText(q.header)}</div>
-                                ) : null}
-                                <div className="typography-meta text-foreground">{coerceToText(q.question)}</div>
-                                {Array.isArray(q.options) && q.options.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1 mt-0.5">
-                                        {q.options.map((opt) => (
-                                            <span key={coerceToText(opt.label)} className="typography-micro px-1.5 py-0.5 rounded bg-muted/30 border border-border/30 text-muted-foreground">
-                                                {coerceToText(opt.label)}
-                                            </span>
-                                        ))}
-                                    </div>
-                                ) : null}
-                            </div>
-                        ))}
-                    </div>,
-                    { maxHeightClass: 'max-h-[40vh]' }
                 );
             }
 
@@ -1631,7 +1608,7 @@ const ToolExpandedContent: React.FC<ToolExpandedContentProps> = React.memo(({
                 'relative pr-2 pb-2 pt-2 space-y-2 pl-4'
             )}
         >
-            {part.tool === 'question' ? (
+            {isQuestionToolName(part.tool) ? (
                 renderResultContent()
             ) : (
                 <>
