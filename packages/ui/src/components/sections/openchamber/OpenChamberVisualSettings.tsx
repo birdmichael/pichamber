@@ -16,8 +16,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    SELECT_PREFER_BELOW_COLLISION,
 } from '@/components/ui/select';
+import { SELECT_PREFER_BELOW_COLLISION } from '@/lib/select-collision';
 import { Icon } from "@/components/icon/Icon";
 import {
     isDesktopShell,

@@ -616,13 +616,7 @@ const AgentListItem: React.FC<AgentListItemProps> = ({
             {getAgentModeIcon(agent.mode)}
             {(extAgent.scope || isAgentBuiltIn(agent)) && (
               <span className="typography-micro text-muted-foreground bg-muted px-1 rounded flex-shrink-0 leading-none pb-px border border-border/50">
-                {isAgentBuiltIn(agent)
-                  ? t('settings.agents.sidebar.badge.system')
-                  : extAgent.scope === 'project'
-                    ? t('settings.common.scope.project')
-                    : extAgent.scope === 'global'
-                      ? t('settings.common.scope.global')
-                      : extAgent.scope}
+                {isAgentBuiltIn(agent) ? t('settings.agents.sidebar.badge.system') : extAgent.scope}
               </span>
             )}
           </div>

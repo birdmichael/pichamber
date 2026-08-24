@@ -4,6 +4,7 @@ import * as React from "react"
 import { Select as BaseSelect } from "@base-ui/react/select"
 import type { SelectRootChangeEventDetails } from "@base-ui/react/select";
 
+import type { SelectPreferBelowCollision } from "@/lib/select-collision"
 import { cn } from "@/lib/utils"
 import { dropdownTriggerVariants } from "@/components/ui/dropdown-trigger"
 import { ScrollableOverlay } from "@/components/ui/ScrollableOverlay";
@@ -156,19 +157,6 @@ function SelectTrigger({
   )
 }
 
-type SelectCollisionAvoidance = {
-  side?: "flip" | "none" | "shift";
-  align?: "flip" | "none" | "shift";
-  fallbackAxisSide?: "start" | "end" | "none";
-};
-
-/** Keep the menu on the requested side and shrink it; do not flip over the trigger. */
-export const SELECT_PREFER_BELOW_COLLISION = {
-  side: "shift",
-  align: "shift",
-  fallbackAxisSide: "none",
-} as const satisfies SelectCollisionAvoidance;
-
 type SelectContentExtra = {
   position?: "popper" | "item-aligned";
   fitContent?: boolean;
@@ -176,7 +164,7 @@ type SelectContentExtra = {
   sideOffset?: number;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
-  collisionAvoidance?: SelectCollisionAvoidance;
+  collisionAvoidance?: SelectPreferBelowCollision;
 };
 
 function SelectContent({
@@ -300,5 +288,4 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-  SELECT_PREFER_BELOW_COLLISION,
 }
