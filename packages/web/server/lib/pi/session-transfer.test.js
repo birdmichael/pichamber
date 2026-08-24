@@ -364,6 +364,38 @@ describe('session-transfer', () => {
     expect(html).toContain('example-model');
   });
 
+  it('renders a Desktop Pi question answer on the asking turn', () => {
+    const html = buildSessionHtml({
+      info: { title: 'Pi question' },
+      messages: [{
+        info: { role: 'assistant', providerID: 'example-provider', modelID: 'example-model' },
+        parts: [{
+          type: 'text',
+          text: 'need a path',
+        }, {
+          type: 'tool',
+          tool: 'question',
+          state: {
+            status: 'completed',
+            input: { question: 'Which path?', options: ['SKILL.md', 'README.md'] },
+            output: 'User selected: 1. SKILL.md',
+            metadata: {
+              question: 'Which path?',
+              options: ['SKILL.md', 'README.md'],
+              answer: 'SKILL.md',
+              wasCustom: false,
+            },
+          },
+        }],
+      }],
+    }, { locale: 'zh-CN' });
+    expect(html).toContain('need a path');
+    expect(html).toContain('Which path?');
+    expect(html).toContain('SKILL.md');
+    expect(html).toContain('已回答 1 个');
+    expect(html).not.toContain('Input needed');
+  });
+
   it('escapes HTML in exported text and rejects javascript links', () => {
     const html = buildSessionHtml({
       info: { title: '<script>alert(1)</script>' },

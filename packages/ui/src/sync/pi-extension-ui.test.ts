@@ -157,7 +157,35 @@ describe('pi extension UI store', () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.status).toBe('replied');
     expect(prompts[0]?.value).toBe('Yes');
-    expect(selectTranscriptPiExtensionUiPrompts(prompts)).toHaveLength(1);
+    expect(selectTranscriptPiExtensionUiPrompts(prompts)).toEqual([]);
+  });
+
+  test('keeps only pending select/input/editor prompts in the bottom dock', () => {
+    applyPiExtensionUiPrompt({
+      id: 'pui_pending',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Live question',
+      options: ['Yes'],
+      status: 'pending',
+    });
+    applyPiExtensionUiPrompt({
+      id: 'pui_done',
+      sessionID: 'ses_1',
+      kind: 'input',
+      title: 'Already answered',
+      status: 'replied',
+      value: 'typed this',
+    });
+    applyPiExtensionUiPrompt({
+      id: 'pui_cancel',
+      sessionID: 'ses_1',
+      kind: 'editor',
+      title: 'Dismissed',
+      status: 'cancelled',
+    });
+    const prompts = usePiExtensionUiStore.getState().promptsBySession.ses_1 ?? [];
+    expect(selectTranscriptPiExtensionUiPrompts(prompts).map((prompt) => prompt.id)).toEqual(['pui_pending']);
   });
 
   test('keeps confirm prompts out of the transcript list', () => {

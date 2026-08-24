@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Chat: an expanded long CJK user bubble no longer clips a character at the right edge.
 - Chat: message times use the local timezone in the transcript and timeline, including Yesterday, instead of mixing UTC-as-local.
 - Chat: Copy, Save plan, Pin, New session, and Multi-run stay visible on the latest completed assistant turn. Older turns remain hover-only.
+- Chat/Desktop: after you answer or dismiss a question, that result stays on the turn that asked it instead of remaining pinned under later messages.
 - Chat/Desktop: on Pi, a question card now includes the options plus a Type something field you can type and submit. That option used to sit as a radio that never opened a text box, and the question tool itself often reported that no UI was available.
 - Chat: you can type in a Q&A or extension answer card without the composer stealing the keystrokes.
 - Chat: forking from a user message now opens a session you can keep typing in, instead of locking the composer with "Subagent sessions cannot be prompted."

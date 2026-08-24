@@ -153,6 +153,8 @@ After `bindExtensions`, the host replaces that tool's `execute` (`adaptQuestionT
 
 `isFreeformOtherOption` in the shared UI matches those Type something labels as well as existing `Other` labels. This is not OpenCode `/api/question`. Plan select-only cards without Other still have no textarea.
 
+While a prompt is pending, the in-chat card may sit in the bottom dock so the user can answer. After reply or dismiss, do not keep that card under later messages. The answered or cancelled result belongs on the asking `question` / `plan_mode_question` tool part in that turn (`User selected` / `User wrote` / `User cancelled`, plus `details.answer`). Reopening the session reads that tool part, not a sticky dock card.
+
 ## Plan questions
 
 `plan_mode_question` asks sequential `ctx.ui.select` calls (options + Other), then `editor` for a custom answer. Plugin / slot off means the tool is not loaded, so no cards appear. Those cards appear during a planning turn after Plan is on — not from `/plan start`.
@@ -490,7 +492,8 @@ in `extension-ui.js` and speaks `pi.ui.asked` / `pi.ui.settled` / `pi.ui.notify`
 - Installed Pi `question` is remapped onto that same select + editor card
   (Type something is Other). `ctx.ui.custom` is not a TUI and is not a
   silent `undefined`. This is not OpenCode `/api/question` or
-  `sdk.question.reply`.
+  `sdk.question.reply`. Pending cards may sit in the bottom dock; settled
+  answers render on the asking tool turn.
 
 `@narumitw/pi-goal` can call `ctx.ui.confirm` when replacing an existing goal.
 

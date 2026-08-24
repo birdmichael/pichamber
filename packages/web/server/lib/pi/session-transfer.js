@@ -1207,15 +1207,33 @@ const answersFromUnknown = (value) => {
 const parseAnsweredQuestionOutput = (output) => {
   const text = String(output ?? '');
   const match = text.match(/User has answered your questions:\s*(.+?)(?:\.\s*You can now|$)/s);
-  if (!match) return [];
-  const pairs = [];
-  const pairRegex = /"([^"]+)"="([^"]*)"/g;
-  let pairMatch = pairRegex.exec(match[1]);
-  while (pairMatch) {
-    pairs.push({ question: pairMatch[1], answer: pairMatch[2] });
-    pairMatch = pairRegex.exec(match[1]);
+  if (match) {
+    const pairs = [];
+    const pairRegex = /"([^"]+)"="([^"]*)"/g;
+    let pairMatch = pairRegex.exec(match[1]);
+    while (pairMatch) {
+      pairs.push({ question: pairMatch[1], answer: pairMatch[2] });
+      pairMatch = pairRegex.exec(match[1]);
+    }
+    return pairs;
   }
-  return pairs;
+  const trimmed = text.trim();
+  if (/^User cancelled the selection/i.test(trimmed)) return [];
+  const selected = trimmed.match(/^User selected:\s*(?:\d+\.\s*)?([\s\S]+)$/i);
+  if (selected?.[1]?.trim()) return [{ question: '', answer: selected[1].trim() }];
+  const wrote = trimmed.match(/^User wrote:\s*([\s\S]+)$/i);
+  if (wrote?.[1]?.trim()) return [{ question: '', answer: wrote[1].trim() }];
+  return [];
+};
+
+const questionsFromToolInput = (input) => {
+  if (Array.isArray(input.questions)) {
+    return input.questions.map((item) => (
+      asTrimmedString(item?.question || item?.title || item?.header) || asTrimmedString(item)
+    )).filter(Boolean);
+  }
+  const question = asTrimmedString(input.question || input.title);
+  return question ? [question] : [];
 };
 
 const questionItemsFromToolPart = (part) => {
@@ -1225,29 +1243,35 @@ const questionItemsFromToolPart = (part) => {
   const error = typeof part?.state?.error === 'string' ? part.state.error : '';
   const status = asTrimmedString(part?.state?.status);
   const cancelled = status === 'error' || status === 'cancelled'
-    || /dismissed|cancelled|canceled|ignored/i.test(error);
-  const questions = Array.isArray(input.questions) ? input.questions : [];
+    || /dismissed|cancelled|canceled|ignored/i.test(error)
+    || /^User cancelled the selection/i.test(output.trim());
+  const questions = questionsFromToolInput(input);
   const parsed = parseAnsweredQuestionOutput(output);
   const answers = Array.isArray(metadata.answers) ? metadata.answers : [];
+  const metaAnswer = answersFromUnknown(metadata.answers ?? metadata.answer ?? metadata.value).filter(Boolean).join(', ');
   if (questions.length > 0) {
-    return questions.map((item, index) => {
-      const question = asTrimmedString(item?.question || item?.title || item?.header) || asTrimmedString(item);
+    return questions.map((question, index) => {
       const fromMeta = answersFromUnknown(answers[index]).filter(Boolean).join(', ');
       const fromParsed = parsed[index]?.answer || '';
+      const fromSingle = questions.length === 1 ? metaAnswer : '';
+      const answer = fromMeta || fromParsed || fromSingle;
       return {
         question,
-        answer: fromMeta || fromParsed,
-        cancelled: cancelled && !fromMeta && !fromParsed,
+        answer,
+        cancelled: cancelled && !answer,
       };
     }).filter((item) => item.question);
   }
   if (parsed.length > 0) {
-    return parsed.map((item) => ({ ...item, cancelled: false }));
+    return parsed.map((item) => ({
+      question: item.question || asTrimmedString(metadata.question || part?.title),
+      answer: item.answer,
+      cancelled: false,
+    }));
   }
-  const title = asTrimmedString(input.title || part?.title);
+  const title = asTrimmedString(metadata.question || input.title || part?.title);
   if (title) {
-    const answer = answersFromUnknown(metadata.answers ?? metadata.value).filter(Boolean).join(', ');
-    return [{ question: title, answer, cancelled: cancelled && !answer }];
+    return [{ question: title, answer: metaAnswer, cancelled: cancelled && !metaAnswer }];
   }
   return [];
 };
@@ -1255,7 +1279,7 @@ const questionItemsFromToolPart = (part) => {
 const questionItemsFromUiPrompt = (prompt) => {
   if (!isRecord(prompt)) return [];
   const kind = asTrimmedString(prompt.kind).toLowerCase();
-  if (kind && kind !== 'select' && kind !== 'confirm') return [];
+  if (kind && kind !== 'select' && kind !== 'confirm' && kind !== 'input' && kind !== 'editor') return [];
   const status = asTrimmedString(prompt.status).toLowerCase();
   const cancelled = status === 'cancelled' || status === 'canceled';
   const question = asTrimmedString(prompt.title || prompt.message || prompt.question);
