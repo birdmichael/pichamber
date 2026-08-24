@@ -32,6 +32,8 @@ import type { SessionNodeRenderExtras } from './sessionNodeItemUtils';
 import { useSessionFoldersStore } from '@/stores/useSessionFoldersStore';
 import { getGitHubPrStatusKey, usePrVisualSummary } from '@/stores/useGitHubPrStatusStore';
 import { useI18n } from '@/lib/i18n';
+import { parseMultiRunSessionTitle } from '@/lib/multirun/title';
+import { openMultiRunCompareForSessions } from '@/lib/multirun/openCompare';
 import { useChildStoreManager } from '@/sync/sync-context';
 import { canRequestNativeDirectoryAccess, requestDirectoryAccess } from '@/lib/desktop';
 import { CollapsedActivityIndicator } from './collapsedActivityIndicator';
@@ -750,6 +752,10 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
     () => collectGroupSessions(sourceGroupNodes),
     [collectGroupSessions, sourceGroupNodes],
   );
+  const canCompareGroup = React.useMemo(
+    () => allGroupSessions.some((session) => parseMultiRunSessionTitle(session.title) !== null),
+    [allGroupSessions],
+  );
 
   // Precompute the per-folder "delete all sessions in folder" list once
   // per render. The previous design ran a recursive `collectFolderSessions`
@@ -1211,6 +1217,26 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={4}><p>{t('sessions.sidebar.group.actions.deleteArchivedSessions')}</p></TooltipContent>
+            </Tooltip>
+          </div>
+        ) : null}
+        {canCompareGroup ? (
+          <div className={cn('absolute right-7 top-1/2 -translate-y-1/2 z-10 transition-opacity', alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover/gh:opacity-100 group-focus-within/gh:opacity-100', group.directory && !group.isMain && group.worktree && 'right-14')}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openMultiRunCompareForSessions(allGroupSessions, group.label);
+                  }}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-interactive-hover/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  aria-label={t('sessions.sidebar.group.actions.compareRunsAria', { label: group.label })}
+                >
+                  <Icon name="layout-column" className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={4}><p>{t('sessions.sidebar.group.actions.compareRuns')}</p></TooltipContent>
             </Tooltip>
           </div>
         ) : null}

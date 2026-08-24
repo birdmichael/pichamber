@@ -39,6 +39,7 @@ import {
     triggerBrowserImageDownload,
     type VSCodeSaveImageResult,
 } from './persistGeneratedMessageImage';
+import { collectSavableMessageImages, partsHaveImage } from './messageImages';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { toast } from '@/components/ui';
 import { Icon } from "@/components/icon/Icon";
@@ -780,6 +781,7 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
 
 interface AssistantMessageActionButtonsProps {
     hasCopyableText: boolean;
+    hasSavableImage: boolean;
     isTouchContext: boolean;
     onCopyMessage?: () => void | boolean | Promise<void | boolean>;
     reviewTransferAction?: {
@@ -793,6 +795,7 @@ interface AssistantMessageActionButtonsProps {
 
 const AssistantMessageActionButtons = React.memo(({
     hasCopyableText,
+    hasSavableImage,
     isTouchContext,
     onCopyMessage,
     reviewTransferAction,
@@ -890,7 +893,11 @@ const AssistantMessageActionButtons = React.memo(({
             event.stopPropagation();
             event.preventDefault();
 
-            if (isSharing || !hasCopyableText) {
+            if (isSharing) {
+                return;
+            }
+            if (!hasSavableImage) {
+                toast.error(t('chat.messageBody.toast.noImageToSave'));
                 return;
             }
 
@@ -903,7 +910,7 @@ const AssistantMessageActionButtons = React.memo(({
                 setIsSharing(false);
             }
         },
-        [hasCopyableText, isSharing, onShareImage]
+        [hasSavableImage, isSharing, onShareImage, t]
     );
 
     const handleReviewTransferClick = React.useCallback(
@@ -1022,16 +1029,17 @@ const AssistantMessageActionButtons = React.memo(({
                     <TooltipContent sideOffset={6}>{reviewTransferAction.tooltip}</TooltipContent>
                 </Tooltip>
             ) : null}
-            {chatSurfaceMode !== 'mini-chat' && chatSurfaceMode !== 'peek' ? <Tooltip>
+            {chatSurfaceMode !== 'mini-chat' && chatSurfaceMode !== 'peek' && hasSavableImage ? <Tooltip>
                 <TooltipTrigger asChild>
                     <Button
                         type="button"
                         size="icon"
                         variant="ghost"
-                        disabled={isSharing || !hasCopyableText}
+                        disabled={isSharing}
+                        aria-label={isSharing ? t('chat.messageBody.actions.savingImage') : t('chat.messageBody.actions.saveAsImage')}
                         className={cn(
                             'h-8 w-8 text-muted-foreground bg-transparent hover:text-foreground hover:!bg-transparent active:!bg-transparent focus-visible:!bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50',
-                            (!hasCopyableText || isSharing) && 'opacity-50'
+                            isSharing && 'opacity-50'
                         )}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
@@ -1541,10 +1549,56 @@ const AssistantMessageBody = React.memo(({
         [assistantPlanText, currentProjectRef, t]
     );
 
+    const hasImageInTurn = React.useMemo(() => {
+        if (partsHaveImage(visibleParts)) return true;
+        const activityParts = turnGroupingContext?.activityParts;
+        return Boolean(activityParts && partsHaveImage(activityParts.map((activity) => activity.part)));
+    }, [turnGroupingContext?.activityParts, visibleParts]);
+
     const shareMessageAsImage = React.useCallback(
         async (requestedSourceElement?: HTMLElement | null) => {
             const sourceElement = requestedSourceElement ?? messageTextContentRef.current ?? messageContentRef.current;
-            if (!sourceElement) return;
+            const directImages = collectSavableMessageImages([
+                ...visibleParts,
+                ...(turnGroupingContext?.activityParts?.map((activity) => activity.part) ?? []),
+            ]);
+            if (!sourceElement && directImages.length === 0) {
+                toast.error(t('chat.messageBody.toast.noImageToSave'));
+                return;
+            }
+
+            if (!sourceElement && directImages[0]) {
+                try {
+                    const outcome = await persistGeneratedMessageImage(
+                        directImages[0],
+                        {
+                            isVSCode: isVSCodeRuntime(),
+                            saveVSCodeImage: vscodeApi?.saveImage
+                                ? async (payload) => await vscodeApi.saveImage?.(payload) as VSCodeSaveImageResult | undefined
+                                : undefined,
+                            isCapacitor: isCapacitorMobileApp(),
+                            canShareFiles: (files) => navigator.canShare?.({ files }) === true,
+                            shareFiles: (files) => navigator.share({ files }),
+                            canUseDesktopSave: hasDesktopInvoke() && isDesktopLocalOriginActive(),
+                            saveDesktopImageFile,
+                            downloadInBrowser: triggerBrowserImageDownload,
+                        },
+                    );
+                    if (outcome === 'canceled' || outcome === 'download-started') {
+                        return;
+                    }
+                    toast.success(t('chat.messageBody.toast.imageSaved'));
+                } catch (error) {
+                    console.error('Failed to save image:', error);
+                    toast.error(t('chat.messageBody.toast.generateImageFailed'));
+                }
+                return;
+            }
+
+            if (!sourceElement) {
+                toast.error(t('chat.messageBody.toast.generateImageFailed'));
+                return;
+            }
 
             let wrapper: HTMLDivElement | null = null;
             try {
@@ -1647,7 +1701,7 @@ const AssistantMessageBody = React.memo(({
                 }
             }
         },
-        [messageId, t, vscodeApi]
+        [messageId, t, turnGroupingContext?.activityParts, visibleParts, vscodeApi]
     );
 
     const activityPartsForTurn = React.useMemo(() => {
@@ -1716,13 +1770,14 @@ const AssistantMessageBody = React.memo(({
     const messageActionButtons = React.useMemo(() => (
         <AssistantMessageActionButtons
             hasCopyableText={hasCopyableText}
+            hasSavableImage={hasImageInTurn}
             isTouchContext={isTouchContext}
             onCopyMessage={onCopyMessage}
             onShareImage={shareMessageAsImage}
             ttsText={assistantPlanText}
             reviewTransferAction={reviewTransferAction}
         />
-    ), [assistantPlanText, hasCopyableText, isTouchContext, onCopyMessage, reviewTransferAction, shareMessageAsImage]);
+    ), [assistantPlanText, hasCopyableText, hasImageInTurn, isTouchContext, onCopyMessage, reviewTransferAction, shareMessageAsImage]);
 
     const renderJustificationActions = React.useCallback((activity: NonNullable<TurnGroupingContext['activityParts']>[number]) => {
         if (!showSplitAssistantMessageActions || !isSortedRenderMode) {
@@ -1742,13 +1797,14 @@ const AssistantMessageBody = React.memo(({
         return (
             <AssistantMessageActionButtons
                 hasCopyableText={true}
+                hasSavableImage={hasImageInTurn}
                 isTouchContext={isTouchContext}
                 onCopyMessage={copyJustificationText}
                 onShareImage={shareMessageAsImage}
                 ttsText={text}
             />
         );
-    }, [isSortedRenderMode, isTouchContext, shareMessageAsImage, showSplitAssistantMessageActions]);
+    }, [hasImageInTurn, isSortedRenderMode, isTouchContext, shareMessageAsImage, showSplitAssistantMessageActions]);
 
     const lastRenderableTextPartIndex = React.useMemo(() => {
         if (!shouldShowStandaloneMessageActions) {

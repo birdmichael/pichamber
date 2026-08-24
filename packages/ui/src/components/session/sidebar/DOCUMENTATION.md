@@ -31,7 +31,7 @@ Hosted `mobile.html` and Capacitor use `apps/MobileSessionsSheet.tsx`, not this 
 | Desktop control | Mobile host |
 |---|---|
 | Sidebar calendar / Scheduled Tasks | Sessions-sheet calendar chip → `ScheduledTasksDialog` (`MobileOverlayPanel` on phone). `/schedule-task` stays an in-chat starter. |
-| Sidebar merge-arrows / Multi-run | Sessions-sheet merge-arrows chip → `MultiRunLauncher` in `MobileFullscreenSurface`. Models come from the live Pi catalog (`GET /api/pi/models`). |
+| Sidebar merge-arrows / Multi-run | Sessions-sheet merge-arrows chip → `MultiRunLauncher` in `MobileFullscreenSurface`. Models come from the live Pi catalog (`GET /api/pi/models`). Starting two or more runs, or Compare runs from a session, opens `MultiRunCompareView` as the same mutually exclusive surface. |
 | Archive page + restore | Sessions-sheet archive chip → `MobileArchiveSurface`. Restore writes `time.archived = 0` (same client-side split as Desktop; see `sync/DOCUMENTATION.md`). |
 | Footer Refresh | Sessions-sheet footer Refresh. Same `sidebarSessionRecordsReload.ts` contract (`POST /api/pi/sessions/reload`). Hidden on leftover OpenCode. Disabled while composing/streaming/compacting. |
 
@@ -48,8 +48,8 @@ Wording reuses `sessions.sidebar.*` via `apps/mobileSessionChromeKeys.ts`. Impor
 - `SidebarFooter.tsx`: Static footer with icon-only settings, shortcuts, Pi-only Refresh, and about actions. Refresh reloads Pi and re-reads the session list plus the open transcript; it stays hidden on the leftover OpenCode kernel.
 - `sidebarSessionRecordsReload.ts`: Pi-only footer Refresh contract — posts `/api/pi/sessions/reload`, then force-bootstraps the directory list and the open transcript without `server.connected`.
 - `SidebarProjectsList.tsx`: Main scrollable renderer for project zones and their flat/archived groups plus empty/search states; owns project drag-to-reorder.
-- `SessionGroupSection.tsx`: Renders one flat (or archived) group: sessions first, then flat folder entries with path labels, show-more batching, and explicit loading/error/retry state for empty groups. Archived buckets (VS Code) virtualize past 50 rows.
-- `SessionNodeItem.tsx`: Renders one session row/tree node with a single-line layout, inline branch label, indicators, menu actions, and nested children. Pending-question counts stay per-session while expanded and roll up hidden descendants from their owning directory stores while collapsed. Rows do not initiate directory bootstrap on mount.
+- `SessionGroupSection.tsx`: Renders one flat (or archived) group: sessions first, then flat folder entries with path labels, show-more batching, and explicit loading/error/retry state for empty groups. Archived buckets (VS Code) virtualize past 50 rows. A worktree group that contains a multi-run session shows Compare runs next to Delete worktree; that opener finds siblings across isolated worktrees, not only the sessions in the clicked group.
+- `SessionNodeItem.tsx`: Renders one session row/tree node with a single-line layout, inline branch label, indicators, menu actions, and nested children. Pending-question counts stay per-session while expanded and roll up hidden descendants from their owning directory stores while collapsed. Rows do not initiate directory bootstrap on mount. Multi-run rows expose Compare runs and Run fusion; Compare opens the side-by-side group surface.
 - `collapsedActivityIndicator.tsx`: Aggregate busy/unseen dot for collapsed groups and folders.
 - `ConfirmDialogs.tsx`: Shared confirm dialog wrappers for session delete and folder delete flows.
 - `sortableItems.tsx`: DnD sortable wrapper for project ordering plus the sticky zone-band project header and its action affordances.

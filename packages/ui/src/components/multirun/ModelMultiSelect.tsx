@@ -11,6 +11,7 @@ import { useI18n } from '@/lib/i18n';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { loadPiRuntimeModels } from '@/lib/multirun/piModels';
 import { ModelPickerList, type ModelPickerEntry, type ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
+import { markLauncherOverlay } from './launcherEscape';
 
 /** Chip height class - shared between chips and add button */
 const CHIP_HEIGHT_CLASS = 'h-7';
@@ -134,6 +135,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
   const [availableHeight, setAvailableHeight] = React.useState<number | null>(null);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const overlayIdRef = React.useRef(generateInstanceId());
   const isSingleSelect = maxModels === 1;
   const canAddModel = maxModels === undefined || selectedModels.length < maxModels || isSingleSelect;
 
@@ -196,6 +198,28 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
     }
   }, [canAddModel, isOpen]);
 
+  React.useEffect(() => {
+    const overlayId = overlayIdRef.current;
+    markLauncherOverlay(overlayId, isOpen);
+    return () => markLauncherOverlay(overlayId, false);
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      setIsOpen(false);
+      setSearchQuery('');
+    };
+
+    window.addEventListener('keydown', handleEscape, true);
+    return () => window.removeEventListener('keydown', handleEscape, true);
+  }, [isOpen]);
+
   // Close dropdown when clicking outside
   React.useEffect(() => {
     if (!isOpen) return;
@@ -253,7 +277,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
           <button
             ref={triggerRef}
             type="button"
-            data-popup-open={isOpen ? '' : undefined}
+            data-popup-open={isOpen ? 'true' : undefined}
             className={cn(
               dropdownTriggerVariants({ size: 'default' }),
               'w-fit',
@@ -270,6 +294,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
 
           {isOpen ? (
             <div
+              data-launcher-overlay="model-picker"
               className={cn(
                 'absolute left-0 z-50 w-[min(420px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] flex flex-col overflow-hidden rounded-xl border border-border/50 shadow-lg',
                 dropdownSide === 'top' ? 'bottom-full mb-1' : 'top-full mt-1',
