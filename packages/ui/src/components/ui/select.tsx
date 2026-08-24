@@ -156,6 +156,19 @@ function SelectTrigger({
   )
 }
 
+type SelectCollisionAvoidance = {
+  side?: "flip" | "none" | "shift";
+  align?: "flip" | "none" | "shift";
+  fallbackAxisSide?: "start" | "end" | "none";
+};
+
+/** Keep the menu on the requested side and shrink it; do not flip over the trigger. */
+export const SELECT_PREFER_BELOW_COLLISION = {
+  side: "shift",
+  align: "shift",
+  fallbackAxisSide: "none",
+} as const satisfies SelectCollisionAvoidance;
+
 type SelectContentExtra = {
   position?: "popper" | "item-aligned";
   fitContent?: boolean;
@@ -163,6 +176,7 @@ type SelectContentExtra = {
   sideOffset?: number;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
+  collisionAvoidance?: SelectCollisionAvoidance;
 };
 
 function SelectContent({
@@ -174,6 +188,7 @@ function SelectContent({
   sideOffset,
   side,
   align,
+  collisionAvoidance,
   ...props
 }: React.ComponentProps<typeof BaseSelect.Popup> & SelectContentExtra) {
   const portalContext = React.useContext(SelectPortalContext);
@@ -187,6 +202,7 @@ function SelectContent({
         sideOffset={sideOffset}
         side={side ?? "bottom"}
         align={align}
+        collisionAvoidance={collisionAvoidance}
         className="absolute z-[120] pointer-events-auto data-[ending-style]:pointer-events-none"
       >
         <BaseSelect.Popup
@@ -284,4 +300,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  SELECT_PREFER_BELOW_COLLISION,
 }

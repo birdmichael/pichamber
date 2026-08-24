@@ -16,6 +16,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    SELECT_PREFER_BELOW_COLLISION,
 } from '@/components/ui/select';
 import { Icon } from "@/components/icon/Icon";
 import {
@@ -1043,7 +1044,11 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <SelectTrigger aria-label={t('settings.appearance.language.select')} size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_TRIGGER_CLASS}>
                                                 <SelectValue>{label(locale)}</SelectValue>
                                             </SelectTrigger>
-                                            <SelectContent side="bottom">
+                                            <SelectContent
+                                                side="bottom"
+                                                portalToBody
+                                                collisionAvoidance={SELECT_PREFER_BELOW_COLLISION}
+                                            >
                                                 {locales.map((availableLocale) => (
                                                     <SelectItem key={availableLocale} value={availableLocale}>
                                                         {label(availableLocale)}

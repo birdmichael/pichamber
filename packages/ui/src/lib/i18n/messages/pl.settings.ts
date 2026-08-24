@@ -2341,7 +2341,7 @@ export const settingsDict = {
   'settings.voice.page.field.ttsInputMode': 'Tryb wejścia TTS',
   'settings.voice.page.field.ttsInputModeSanitized': 'Oczyszczony tekst',
   'settings.voice.page.field.ttsInputModeRaw': 'Surowy Markdown',
-  'settings.voice.page.field.ttsInputModeSummarized': 'streszczony',
+  'settings.voice.page.field.ttsInputModeSummarized': 'Streszczony',
   'settings.window.description': 'Okno ustawień Pichamber.',
   'settings.openchamber.visual.section.followUpBehavior': 'Follow-up behavior',
   'settings.openchamber.visual.section.followUpBehaviorAria': 'Follow-up behavior',

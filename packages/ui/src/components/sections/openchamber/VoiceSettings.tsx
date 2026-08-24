@@ -816,7 +816,7 @@ export const VoiceSettings: React.FC = () => {
                     ariaLabel={t('settings.voice.page.field.messageReadAloudButtonAria')}
                 />
 
-                <SettingsReveal revealed={showMessageTTSButtons}>
+                <SettingsReveal revealed={showMessageTTSButtons} className="space-y-4">
                     <>
                         <SettingsControlGroup
                             title={t('settings.voice.page.field.provider')}

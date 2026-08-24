@@ -186,7 +186,11 @@ export const SnippetsPage: React.FC = () => {
             />
             <Select value={draftScope} onValueChange={(value) => setDraftScope(value as SnippetScope)}>
               <SelectTrigger size={SETTINGS_SELECT_SIZE} className="w-fit min-w-[100px]">
-                <SelectValue />
+                <SelectValue>
+                  {draftScope === 'project'
+                    ? t('settings.common.scope.project')
+                    : t('settings.common.scope.global')}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
                 <SelectItem value="global">{t('settings.common.scope.global')}</SelectItem>

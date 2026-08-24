@@ -2071,7 +2071,7 @@ export const settingsDict = {
   'settings.voice.page.field.ttsInputMode': 'TTS Input Mode',
   'settings.voice.page.field.ttsInputModeSanitized': 'Sanitized',
   'settings.voice.page.field.ttsInputModeRaw': 'Raw Markdown',
-  'settings.voice.page.field.ttsInputModeSummarized': 'summarized',
+  'settings.voice.page.field.ttsInputModeSummarized': 'Summarized',
   'settings.openchamber.visual.section.colorMode': 'Color Mode',
   'settings.openchamber.visual.section.colorModeAndTheme': 'Color mode & Theme',
   'settings.openchamber.visual.section.mobileLayout': 'Mobile Layout',

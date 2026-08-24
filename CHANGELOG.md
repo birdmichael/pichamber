@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 - Settings: action buttons now keep sentence case (Save changes, Create skill) instead of forcing all-lowercase.
 - Settings: unselected radio labels stay readable. Disabled options, including Sessions retention while Auto-Cleanup is off, still look disabled.
 - Settings: turning on a parent option no longer drops the next click onto the newly revealed row (Activity Default, Collapsible reasoning, and TTS).
+- Settings: leftover Desktop nits — Language stays below the trigger instead of covering Window controls, the first pointer on a newly revealed row is ignored, and dialog/chip labels keep sentence case (Cancel, Create QR code, Add project, Summarized, Global).
 - Settings: switching a Magic Prompt or skill in the middle list resets the right pane to the top.
 - Settings: Shortcuts shows Save and Reset only on a dirty or capturing row, with Cancel while capturing.
 - Settings/Desktop: test-notification and other toasts sit below the titlebar instead of clipping at the top of the window.

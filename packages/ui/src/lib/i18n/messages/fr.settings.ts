@@ -2309,7 +2309,7 @@ export const settingsDict = {
   'settings.voice.page.field.ttsInputMode': 'Mode d’entrée TTS',
   'settings.voice.page.field.ttsInputModeSanitized': 'Nettoyé',
   'settings.voice.page.field.ttsInputModeRaw': 'Markdown brut',
-  'settings.voice.page.field.ttsInputModeSummarized': 'résumé',
+  'settings.voice.page.field.ttsInputModeSummarized': 'Résumé',
   'settings.openchamber.visual.section.mobileLayout': 'Mise en page mobile',
   'settings.openchamber.visual.option.mobileLayout.default': 'Ancienne',
   'settings.openchamber.visual.option.mobileLayout.new': 'Nouvelle',
