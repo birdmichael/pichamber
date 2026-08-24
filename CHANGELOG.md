@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: on unsigned or ad-hoc Mac builds, Restart to Update no longer pretends to succeed. The app opens the GitHub release so you can replace Pichamber.app from the .dmg.
+- Desktop: dismissing the Pi update toast — Dismiss or OK — keeps that version hidden until a newer Pi version is available.
+- Chat: after the multi-run model picker is closed, Esc now closes the New multi-run form, same as Cancel.
 - Desktop: SSH managed install now starts the resolved absolute Pichamber binary, or leftover OpenChamber if that is what is installed. A missing binary lists the paths that were checked instead of failing later with `pichamber: not found`.
 - Desktop/CLI: SSH and `pichamber serve` start messages now say Pichamber instead of OpenChamber.
 - **Chat/Desktop:** after you start a multi-run with two or more models, a compare view shows those runs side by side. You can open it again from a run's menu or the worktree group.

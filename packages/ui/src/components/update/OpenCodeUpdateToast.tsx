@@ -10,6 +10,8 @@ import { getRuntimeKey, subscribeRuntimeEndpointChanged } from '@/lib/runtime-sw
 import { updateDesktopSettings } from '@/lib/persistence';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import {
+  dismissOpenCodeUpdateToast,
+  resolveDismissedOpenCodeUpdateVersion,
   resolveOpenCodeUpdateVersion,
   resolveOpenCodeUpgradeStatusVersion,
   resolvePiUpgradeStatusVersion,
@@ -104,7 +106,9 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
       const decision = shouldShowOpenCodeUpdateToast({
         version,
-        dismissedVersion: getDeferredSafeStorage().getItem(UPDATE_TOAST_DISMISSED_VERSION_KEY),
+        dismissedVersion: resolveDismissedOpenCodeUpdateVersion(
+          getDeferredSafeStorage().getItem(UPDATE_TOAST_DISMISSED_VERSION_KEY),
+        ),
         seenVersions: seenVersionsRef.current,
       });
       if (!decision) {
@@ -112,16 +116,31 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
       seenVersionsRef.current.add(version);
 
+      const persistDismissedVersion = (dismissedVersion: string) => {
+        getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, dismissedVersion);
+        void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: dismissedVersion });
+      };
+
+      let hidingToast = false;
       const dismiss = () => {
-        getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, version);
-        void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: version });
-        toast.dismiss(UPDATE_TOAST_ID);
+        dismissOpenCodeUpdateToast({
+          version,
+          persistDismissedVersion,
+          hideToast: () => {
+            if (hidingToast) return;
+            hidingToast = true;
+            toast.dismiss(UPDATE_TOAST_ID);
+          },
+        });
       };
 
       if (isPiKernel) {
         toast.info(t('piUpdate.toast.available.title', { version }), {
           id: UPDATE_TOAST_ID,
           duration: Infinity,
+          // Shared toast.info adds an OK close control when action is omitted.
+          // Persist on that close, Dismiss, swipe, and the sonner X alike.
+          onDismiss: dismiss,
           cancel: {
             label: t('piUpdate.toast.actions.dismiss'),
             onClick: dismiss,
@@ -134,6 +153,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
         id: UPDATE_TOAST_ID,
         description: t('opencodeUpdate.toast.available.description', { version }),
         duration: Infinity,
+        onDismiss: dismiss,
         action: {
           label: t('opencodeUpdate.toast.actions.update'),
           onClick: runUpgrade,

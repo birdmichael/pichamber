@@ -45,19 +45,110 @@ export interface OpenCodeUpdateToastDecisionInput {
 }
 
 /**
+ * Strips a leading `v` and surrounding whitespace so Pi / npm / stored
+ * versions compare as the same release.
+ */
+export const normalizeOpenCodeUpdateVersion = (version: string | null | undefined): string => {
+  if (typeof version !== 'string') return '';
+  return version.trim().replace(/^v/i, '');
+};
+
+const parseVersionForComparison = (value: string) => {
+  const raw = normalizeOpenCodeUpdateVersion(value);
+  const prereleaseIndex = raw.search(/[-+]/);
+  const core = prereleaseIndex >= 0 ? raw.slice(0, prereleaseIndex) : raw;
+  const parts = core.split('.').map((part) => {
+    const parsed = Number.parseInt(part, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  });
+  return { parts, prerelease: prereleaseIndex >= 0 };
+};
+
+/**
+ * Orders two update versions. Positive means `left` is newer than `right`.
+ * A prerelease of the same core version is treated as older.
+ */
+export const compareOpenCodeUpdateVersions = (left: string, right: string): number => {
+  const a = parseVersionForComparison(left);
+  const b = parseVersionForComparison(right);
+  const length = Math.max(a.parts.length, b.parts.length);
+  for (let index = 0; index < length; index += 1) {
+    const diff = (a.parts[index] || 0) - (b.parts[index] || 0);
+    if (diff !== 0) return diff;
+  }
+  if (a.prerelease !== b.prerelease) return a.prerelease ? -1 : 1;
+  return 0;
+};
+
+let rememberedDismissedVersion: string | null = null;
+
+/** Test-only: clear the in-memory dismiss so cases do not leak across files. */
+export const resetRememberedOpenCodeUpdateDismiss = (): void => {
+  rememberedDismissedVersion = null;
+};
+
+/**
+ * Records that the user dismissed `version` in this JS realm. Survives
+ * component remounts and toast-id recreation until a full reload.
+ */
+export const rememberOpenCodeUpdateToastDismiss = (version: string): string => {
+  const normalized = normalizeOpenCodeUpdateVersion(version);
+  if (!normalized) return '';
+  rememberedDismissedVersion = normalized;
+  return normalized;
+};
+
+/**
+ * Prefers the newer of the persisted dismiss and the in-memory dismiss so a
+ * late settings sync cannot resurrect a version the user already hid.
+ */
+export const resolveDismissedOpenCodeUpdateVersion = (stored: string | null | undefined): string | null => {
+  const storedVersion = normalizeOpenCodeUpdateVersion(stored);
+  const remembered = rememberedDismissedVersion;
+  if (!storedVersion) return remembered;
+  if (!remembered) return storedVersion;
+  return compareOpenCodeUpdateVersions(storedVersion, remembered) >= 0 ? storedVersion : remembered;
+};
+
+export interface OpenCodeUpdateToastDismissInput {
+  readonly version: string;
+  readonly persistDismissedVersion: (version: string) => void;
+  readonly hideToast: () => void;
+}
+
+/**
+ * Persist-and-hide path for Dismiss, the toast OK/close control, and
+ * `onDismiss`. Idempotent for the same version.
+ */
+export const dismissOpenCodeUpdateToast = (input: OpenCodeUpdateToastDismissInput): string => {
+  const version = rememberOpenCodeUpdateToastDismiss(input.version);
+  if (version) {
+    input.persistDismissedVersion(version);
+  }
+  input.hideToast();
+  return version;
+};
+
+/**
  * Returns `true` if the OpenCode update toast should be shown for `version`.
  *
- * Empty/whitespace-only versions short-circuit to `false`. A non-null
- * `dismissedVersion` matching the incoming version also short-circuits; a
- * different `dismissedVersion` means a newer release has appeared since the
- * last dismissal and the toast surfaces again.
+ * Empty/whitespace-only versions short-circuit to `false`. A dismissed
+ * version hides that release and any older one; a newer release surfaces
+ * again. `seenVersions` still dedups the same tab session, including
+ * `v`-prefixed aliases of a version already shown.
  */
 export const shouldShowOpenCodeUpdateToast = (
   input: OpenCodeUpdateToastDecisionInput,
 ): boolean => {
-  if (!input.version) return false;
-  if (input.seenVersions.has(input.version)) return false;
-  if (input.dismissedVersion !== null && input.dismissedVersion === input.version) return false;
+  const version = normalizeOpenCodeUpdateVersion(input.version);
+  if (!version) return false;
+  for (const seen of input.seenVersions) {
+    if (normalizeOpenCodeUpdateVersion(seen) === version) return false;
+  }
+  const dismissedVersion = normalizeOpenCodeUpdateVersion(input.dismissedVersion);
+  if (dismissedVersion && compareOpenCodeUpdateVersions(version, dismissedVersion) <= 0) {
+    return false;
+  }
   return true;
 };
 

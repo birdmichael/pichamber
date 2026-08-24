@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { isLauncherOverlayOpen, markLauncherOverlay, resetLauncherOverlays } from './launcherEscape';
+import { isLauncherOverlayOpen, markLauncherOverlay, resetLauncherOverlays, shouldCloseLauncherFormOnEscape } from './launcherEscape';
 
 const rootWith = (hit: string | null): ParentNode => ({
   querySelector: (selector: string) => (selector === hit ? {} : null),
@@ -52,9 +52,14 @@ describe('isLauncherOverlayOpen', () => {
     expect(isLauncherOverlayOpen(rootWith('[data-model-picker-list]'))).toBe(true);
   });
 
-  test('is true when a select or listbox overlay is mounted', () => {
+  test('is true when a select overlay is mounted', () => {
     resetLauncherOverlays();
-    expect(isLauncherOverlayOpen(rootWith('[role="listbox"]'))).toBe(true);
+    expect(isLauncherOverlayOpen(rootWith('[data-slot="select-content"]'))).toBe(true);
+  });
+
+  test('does not treat a persistent document listbox as an open overlay', () => {
+    resetLauncherOverlays();
+    expect(isLauncherOverlayOpen(rootWith('[role="listbox"]'))).toBe(false);
   });
 
   test('uses the overlay registry even without a document', () => {
@@ -63,5 +68,15 @@ describe('isLauncherOverlayOpen', () => {
     expect(isLauncherOverlayOpen(null)).toBe(true);
     markLauncherOverlay('picker-1', false);
     expect(isLauncherOverlayOpen(null)).toBe(false);
+  });
+});
+
+describe('shouldCloseLauncherFormOnEscape', () => {
+  test('does not close the form while an overlay is open', () => {
+    expect(shouldCloseLauncherFormOnEscape(true)).toBe(false);
+  });
+
+  test('closes the form when no overlay is open', () => {
+    expect(shouldCloseLauncherFormOnEscape(false)).toBe(true);
   });
 });

@@ -1,12 +1,16 @@
 /**
  * Multi-run Esc should dismiss an open picker/popover, not the whole form.
  * The launcher listens on window capture, so it must yield when an overlay
- * is already open and will handle Escape itself.
+ * is already open and will handle Escape itself. Once no overlay is open,
+ * the same Esc closes the form (same as Cancel).
  *
  * Prefer the in-memory overlay registry (authoritative React state) over DOM
  * sniffing. The model picker also mounts `[data-model-picker-list]` and sets
  * `data-popup-open="true"` on the trigger. Empty-string attributes still count
  * as open; explicit `false` / `0` do not.
+ *
+ * Do not treat a bare `[role="listbox"]` as open: the hidden chat
+ * Prompt Navigator rail keeps that role mounted while the launcher is up.
  */
 
 const openOverlayIds = new Set<string>();
@@ -45,7 +49,9 @@ export const isLauncherOverlayOpen = (root: ParentNode | null | undefined = type
     || root.querySelector('[data-launcher-overlay]')
     || root.querySelector('[data-model-picker-list]')
     || root.querySelector('[data-slot="select-content"]')
-    || root.querySelector('[data-slot="dropdown-menu-content"]')
-    || root.querySelector('[role="listbox"]'),
+    || root.querySelector('[data-slot="dropdown-menu-content"]'),
   );
 };
+
+/** First Esc closes an open overlay; otherwise Esc / Cancel close the form. */
+export const shouldCloseLauncherFormOnEscape = (overlayOpen: boolean): boolean => !overlayOpen;
