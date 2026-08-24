@@ -7,7 +7,7 @@ const isPiSubagentChildSession = (session: Session | null | undefined): boolean 
         && metadata.pichamber.subagentRun.runId.trim().length > 0;
 };
 
-export type ChatPromptReadOnlyOptions = {
+type ChatPromptReadOnlyOptions = {
     /**
      * Pi `parentID` is lineage (user-row fork, clone, `/btw`), not an
      * unpromptable leftover-OpenCode subagent. The tab's own `readOnly`

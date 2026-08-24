@@ -17,6 +17,7 @@ import { useProjectsStore } from "@/stores/useProjectsStore";
 import { resolveProjectForSessionDirectory } from "@/lib/projectResolution";
 import { streamDebugEnabled } from "@/stores/utils/streamDebug";
 import { findCatalogMetadata, resolveCatalogThinkingLevels } from "@/lib/model-catalog-capabilities";
+import { findExactCatalogMetadata, resolveDisplayedContextWindow } from "@/lib/modelMetadata";
 import { parsePiThinkingLevel } from "@/components/chat/piThinking";
 import { parseModelIdentifier } from "@/lib/modelIdentifier";
 import { runtimeFetch } from "@/lib/runtime-fetch";
@@ -3316,22 +3317,27 @@ export const useConfigStore = create<ConfigStore>()(
                         return undefined;
                     }
                     const { modelsMetadata, providers } = get();
-                    const cached = findCatalogMetadata(modelsMetadata, providerId, modelId);
-                    if (cached) {
-                        return cached;
-                    }
-
-                    // Fallback: derive metadata from provider model data (covers custom providers not in models.dev)
                     const provider = providers.find((p) => p.id === providerId);
-                    if (!provider) {
-                        return undefined;
-                    }
-                    const model = provider.models.find((m) => m.id === modelId);
-                    if (!model) {
+                    const live = provider?.models.find((m) => m.id === modelId);
+                    const cached = findCatalogMetadata(modelsMetadata, providerId, modelId);
+                    const derived = live ? deriveModelMetadata(providerId, live) : undefined;
+                    const base = cached ?? derived;
+                    if (!base) {
                         return undefined;
                     }
 
-                    return deriveModelMetadata(providerId, model);
+                    const context = resolveDisplayedContextWindow({
+                        live,
+                        exactCatalog: findExactCatalogMetadata(modelsMetadata, providerId, modelId),
+                        modelId,
+                    });
+                    return {
+                        ...base,
+                        limit: {
+                            ...base.limit,
+                            context,
+                        },
+                    };
                 },
                 getVisibleAgents: () => {
                     const { agents } = get();

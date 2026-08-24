@@ -18,7 +18,7 @@ import {
 import type { AttachedFile } from '@/stores/types/sessionTypes';
 import * as sessionActions from '@/sync/session-actions';
 import { buildLinkedIssue } from '@/lib/linkedIssues';
-import { useUserMessageHistory } from "@/sync/sync-context";
+import { useScopedBlockingQuestions, useUserMessageHistory } from "@/sync/sync-context";
 import { getInlineCommentDraftKey, useInlineCommentDraftStore, type InlineCommentDraft, type InlineCommentDraftTarget } from '@/stores/useInlineCommentDraftStore';
 import { useSnippetsStore } from '@/stores/useSnippetsStore';
 import { appendInlineComments } from '@/lib/messages/inlineComments';
@@ -110,6 +110,7 @@ import {
     type ComposerEditorHandle,
 } from './composer/editor/ComposerEditor';
 import { createComposerEditorViewStore } from './composer/editor/viewStore';
+import { isQuestionAnswerTextarea, shouldAutofocusComposer } from './questionAnswerFocus';
 import {
     appendInlineText,
     appendWithLineBreaks,
@@ -867,6 +868,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!prevNewSessionDraftOpenRef.current && newSessionDraftOpen) {
             // New session draft just opened - focus the textarea
             requestAnimationFrame(() => {
+                if (isQuestionAnswerTextarea(document.activeElement)) {
+                    return;
+                }
                 if (isMobile) {
                     // On mobile, use preventScroll to avoid viewport jumping
                     composerRef.current?.focus({ preventScroll: true });
@@ -886,6 +890,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const { phase: btwSessionPhase } = useSessionActivity(btwSessionId, btwDirectory ?? undefined);
     const sessionPhase = isBtwActive ? btwSessionPhase : currentSessionPhase;
     const hasPendingPiExtensionUi = useHasPendingPiExtensionUiPrompt(currentSessionId);
+    const sessionQuestions = useScopedBlockingQuestions(
+        currentSessionId,
+        currentSessionDirectoryForSync ?? currentDirectory ?? undefined,
+    );
+    const hasPendingQuestionCard = sessionQuestions.length > 0;
     const autoReviewRunning = useAutoReviewStore(React.useCallback((state) => {
         if (!currentSessionId) return false;
         const run = state.runsByOriginalSessionID[currentSessionId];
@@ -2178,11 +2187,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     };
 
     React.useEffect(() => {
-
-        if (active && currentSessionId && composerRef.current && !isMobile) {
-            composerRef.current.focus();
+        if (!shouldAutofocusComposer({
+            active,
+            currentSessionId,
+            isMobile,
+            hasPendingQuestionCard,
+            hasPendingPiExtensionUi,
+            activeElement: typeof document === 'undefined' ? null : document.activeElement,
+        })) {
+            return;
         }
-    }, [active, currentSessionId, isMobile]);
+        composerRef.current?.focus();
+    }, [active, currentSessionId, hasPendingPiExtensionUi, hasPendingQuestionCard, isMobile]);
 
     React.useEffect(() => {
         if (!isMobile) {

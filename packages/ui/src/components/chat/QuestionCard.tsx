@@ -18,6 +18,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { shouldShowPiFromSubagentLabel } from '@/lib/subagents/subagentTool';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
+import { stopQuestionAnswerKeyBubble } from './questionAnswerFocus';
 
 interface QuestionCardProps {
   question: QuestionRequest;
@@ -67,9 +68,15 @@ const CustomAnswerTextarea = React.memo(function CustomAnswerTextarea({
     }
   }, [height, isScrollable, localValue]);
 
+  React.useEffect(() => {
+    if (disabled) return;
+    textareaRef.current?.focus({ preventScroll: true });
+  }, [disabled]);
+
   return (
     <textarea
       ref={textareaRef}
+      data-question-answer="true"
       value={localValue}
       onChange={(event) => {
         const nextValue = event.target.value;
@@ -79,7 +86,11 @@ const CustomAnswerTextarea = React.memo(function CustomAnswerTextarea({
       placeholder={placeholder}
       disabled={disabled}
       rows={2}
-      onKeyDown={onKeyDown}
+      onKeyDown={(event) => {
+        stopQuestionAnswerKeyBubble(event);
+        onKeyDown(event);
+      }}
+      onKeyUp={stopQuestionAnswerKeyBubble}
       style={{ height }}
       className={cn(
         'w-full bg-transparent border border-border/30 focus:border-primary rounded px-2 py-1 outline-none typography-meta text-foreground placeholder:text-muted-foreground/50 transition-colors resize-none',
