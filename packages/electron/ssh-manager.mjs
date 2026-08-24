@@ -13,6 +13,11 @@ const DEFAULT_LOCAL_BIND_HOST = '127.0.0.1';
 // prefix inside the user's home instead.
 const REMOTE_USER_PREFIX = '$HOME/.pichamber/npm-global';
 const REMOTE_BUN_CANDIDATE = '"${BUN_INSTALL:-$HOME/.bun}/bin/bun"';
+const REMOTE_NODE_CANDIDATES = [
+  '"$HOME/.local/bin/node"',
+  '"/usr/local/bin/node"',
+  '"/usr/bin/node"',
+];
 // A login shell over SSH does not put home-directory installs on PATH.
 // Look in the places Pichamber, leftover OpenChamber, and bun actually land.
 const REMOTE_PATH_PREFIX = '$HOME/.pichamber/npm-global/bin:${BUN_INSTALL:-$HOME/.bun}/bin:$HOME/.local/bin:$HOME/.openchamber/npm-global/bin';
@@ -24,6 +29,17 @@ const REMOTE_BIN_CANDIDATES = [
   '"$HOME/.openchamber/npm-global/bin/openchamber"',
   '"${BUN_INSTALL:-$HOME/.bun}/bin/openchamber"',
 ];
+const REMOTE_BIN_LOOKUP_PATHS = [
+  '~/.pichamber/npm-global/bin/pichamber',
+  '~/.bun/bin/pichamber',
+  '~/.local/bin/pichamber',
+  '~/.openchamber/npm-global/bin/pichamber',
+  '~/.openchamber/npm-global/bin/openchamber',
+  '~/.bun/bin/openchamber',
+  'command -v pichamber',
+  'command -v openchamber',
+];
+const REMOTE_BIN_NAMES = new Set(['pichamber', 'openchamber']);
 const DEFAULT_CONTROL_PERSIST_SEC = 300;
 const DEFAULT_READY_TIMEOUT_SEC = 30;
 const DEFAULT_RECONNECT_MAX_ATTEMPTS = 5;
@@ -40,6 +56,20 @@ const childProcessDiagnostics = new WeakMap();
 const nowMillis = () => Date.now();
 
 const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
+
+const isAbsoluteRemoteBinPath = (binPath) => {
+  const trimmed = String(binPath || '').trim();
+  if (!trimmed || REMOTE_BIN_NAMES.has(trimmed)) return false;
+  return trimmed.startsWith('/');
+};
+
+const describeRemoteBinLookup = () => REMOTE_BIN_LOOKUP_PATHS.join(', ');
+
+const missingRemoteBinError = (installed) => new Error(
+  installed
+    ? `Pichamber install finished but no executable was found. Looked in: ${describeRemoteBinLookup()}`
+    : 'Pichamber is not installed on the remote machine. Install it there, then connect again',
+);
 
 const hasGlobWildcard = (value) => /[*?]/.test(value);
 
@@ -371,7 +401,7 @@ const waitLocalForwardReady = async (localPort) => {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
     pollMs = Math.min(pollMs * 2, 2000);
   }
-  throw new Error('Timed out waiting for forwarded OpenChamber health');
+  throw new Error('Timed out waiting for forwarded Pichamber health');
 };
 
 const parseVersionToken = (raw) => {
@@ -874,11 +904,11 @@ export class ElectronSshManager {
         password,
         trustDevice: true,
         issueClientToken: true,
-        clientLabel: 'OpenChamber Desktop SSH',
+        clientLabel: 'Pichamber Desktop SSH',
       }),
     });
     if (!loginResponse.ok) {
-      throw new Error(`Configured OpenChamber UI password was rejected by forwarded server (status ${loginResponse.status})`);
+      throw new Error(`Configured Pichamber UI password was rejected by forwarded server (status ${loginResponse.status})`);
     }
 
     const payload = await loginResponse.json().catch(() => null);
@@ -896,7 +926,7 @@ export class ElectronSshManager {
         'Content-Type': 'application/json',
         Cookie: cookie,
       },
-      body: JSON.stringify({ label: 'OpenChamber Desktop SSH' }),
+      body: JSON.stringify({ label: 'Pichamber Desktop SSH' }),
     });
     if (!tokenResponse.ok) return '';
     const tokenPayload = await tokenResponse.json().catch(() => null);
@@ -1028,6 +1058,7 @@ export class ElectronSshManager {
     const script = [
       `for candidate in ${REMOTE_BIN_CANDIDATES.join(' ')} "$(command -v pichamber 2>/dev/null)" "$(command -v openchamber 2>/dev/null)"; do`,
       '  [ -n "$candidate" ] || continue;',
+      '  case "$candidate" in /*) ;; *) continue ;; esac',
       '  [ -x "$candidate" ] || continue;',
       `  printf '%s\t%s\n' "$candidate" "$("$candidate" --version 2>/dev/null | head -n 1)";`,
       'done',
@@ -1045,7 +1076,7 @@ export class ElectronSshManager {
     for (const line of output.split(/\r?\n/)) {
       const [binPath, versionRaw] = line.split('\t');
       const trimmed = (binPath || '').trim();
-      if (!trimmed || seen.has(trimmed)) continue;
+      if (!isAbsoluteRemoteBinPath(trimmed) || seen.has(trimmed)) continue;
       seen.add(trimmed);
       candidates.push({ binPath: trimmed, version: parseVersionToken(versionRaw || '') });
     }
@@ -1102,15 +1133,15 @@ export class ElectronSshManager {
     if (isLivenessHttpStatus(infoStatus)) {
       if (isAuthHttpStatus(infoStatus)) {
         if (openchamberPassword && authStatus !== 200) {
-          throw new Error(`Remote OpenChamber requires UI authentication and configured password was rejected (auth status ${authStatus})`);
+          throw new Error(`Remote Pichamber requires UI authentication and configured password was rejected (auth status ${authStatus})`);
         }
         if (isLivenessHttpStatus(healthStatus)) return {};
-        throw new Error('Remote OpenChamber requires UI authentication on /api/system/info; configure OpenChamber UI password');
+        throw new Error('Remote Pichamber requires UI authentication on /api/system/info; configure Pichamber UI password');
       }
     } else if (isLivenessHttpStatus(healthStatus)) {
       return {};
     } else {
-      throw new Error(`Remote OpenChamber probe failed (info status ${infoStatus}, health status ${healthStatus})`);
+      throw new Error(`Remote Pichamber probe failed (info status ${infoStatus}, health status ${healthStatus})`);
     }
 
     try {
@@ -1129,9 +1160,39 @@ export class ElectronSshManager {
     }
   }
 
+  async buildRemoteRuntimePath(parsed, controlPath) {
+    const extraDirs = [];
+    const seen = new Set();
+    const addDir = (dir) => {
+      if (!dir || seen.has(dir)) return;
+      seen.add(dir);
+      extraDirs.push(dir);
+    };
+
+    const bunPath = await this.resolveRemoteTool(parsed, controlPath, 'bun', [REMOTE_BUN_CANDIDATE]);
+    const nodePath = await this.resolveRemoteTool(parsed, controlPath, 'node', REMOTE_NODE_CANDIDATES);
+    if (isAbsoluteRemoteBinPath(bunPath)) addDir(path.posix.dirname(bunPath));
+    if (isAbsoluteRemoteBinPath(nodePath)) addDir(path.posix.dirname(nodePath));
+
+    return extraDirs.length > 0
+      ? `${REMOTE_PATH_PREFIX}:${extraDirs.join(':')}:$PATH`
+      : `${REMOTE_PATH_PREFIX}:$PATH`;
+  }
+
+  async remoteRuntimeEnvPrefix(parsed, controlPath, extraEnv = '') {
+    const pathValue = await this.buildRemoteRuntimePath(parsed, controlPath);
+    return `PATH="${pathValue}" OPENCHAMBER_RUNTIME=ssh-remote${extraEnv}`;
+  }
+
   async startRemoteServerManaged(parsed, controlPath, instance, desiredPort, binPath) {
-    if (!binPath) {
-      throw new Error('Pichamber is not installed on the remote machine. Install it there, then connect again');
+    const resolvedBin = String(binPath || '').trim();
+    if (!resolvedBin) {
+      throw missingRemoteBinError(false);
+    }
+    if (!isAbsoluteRemoteBinPath(resolvedBin)) {
+      throw new Error(
+        `Remote Pichamber start requires an absolute executable path, not '${resolvedBin}'. Looked in: ${describeRemoteBinLookup()}`,
+      );
     }
 
     const secret = this.configuredOpenChamberPassword(instance);
@@ -1142,11 +1203,12 @@ export class ElectronSshManager {
       throw new Error('Exposing the remote server to its network requires a UI password');
     }
 
-    let envPrefix = `PATH="${REMOTE_PATH_PREFIX}:$PATH" OPENCHAMBER_RUNTIME=ssh-remote`;
+    let extraEnv = '';
     if (secret) {
-      envPrefix += ` OPENCHAMBER_UI_PASSWORD=${shellQuote(secret)}`;
+      extraEnv += ` OPENCHAMBER_UI_PASSWORD=${shellQuote(secret)}`;
     }
-    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} ${shellQuote(binPath)} serve --hostname ${remoteBindHost} --port ${desiredPort}`);
+    const envPrefix = await this.remoteRuntimeEnvPrefix(parsed, controlPath, extraEnv);
+    const output = await this.runRemoteCommand(parsed, controlPath, `${envPrefix} ${shellQuote(resolvedBin)} serve --hostname ${remoteBindHost} --port ${desiredPort}`);
     const port = output.split(/\s+/).map((token) => Number.parseInt(token, 10)).find((value) => Number.isFinite(value));
     return port || desiredPort;
   }
@@ -1154,9 +1216,10 @@ export class ElectronSshManager {
   // `pichamber stop` owns the daemon lifecycle. The HTTP shutdown route sits
   // behind UI authentication, so it cannot stop a password-protected server.
   async stopRemoteServerBestEffort(parsed, controlPath, remotePort, remoteBinPath) {
-    if (!remoteBinPath) return;
+    if (!isAbsoluteRemoteBinPath(remoteBinPath)) return;
     try {
-      await this.runRemoteCommand(parsed, controlPath, `${shellQuote(remoteBinPath)} stop --port ${remotePort}`);
+      const envPrefix = await this.remoteRuntimeEnvPrefix(parsed, controlPath);
+      await this.runRemoteCommand(parsed, controlPath, `${envPrefix} ${shellQuote(remoteBinPath)} stop --port ${remotePort}`);
     } catch {
     }
   }
@@ -1205,16 +1268,17 @@ export class ElectronSshManager {
   async ensureRemoteServer(instance, parsed, controlPath) {
     if (instance.remoteOpenchamber.mode === 'external') {
       if (!instance.remoteOpenchamber.preferredPort) {
-        throw new Error('External mode requires a preferred remote OpenChamber port');
+        throw new Error('External mode requires a preferred remote Pichamber port');
       }
       const port = instance.remoteOpenchamber.preferredPort;
-      this.setStatus(instance.id, 'server_detecting', 'Probing external OpenChamber server', null, null, port, false, 0, false);
+      this.setStatus(instance.id, 'server_detecting', 'Probing external Pichamber server', null, null, port, false, 0, false);
       await this.probeRemoteSystemInfo(parsed, controlPath, port, this.configuredOpenChamberPassword(instance));
       return { remotePort: port, startedByUs: false, remoteBinPath: null };
     }
 
     this.setStatus(instance.id, 'remote_probe', 'Checking remote Pichamber installation');
-    const installed = await this.remoteOpenChamberCandidates(parsed, controlPath);
+    const installed = (await this.remoteOpenChamberCandidates(parsed, controlPath))
+      .filter((candidate) => isAbsoluteRemoteBinPath(candidate.binPath));
     let binary = installed.find((candidate) => candidate.version === this.appVersion) || null;
 
     if (!binary) {
@@ -1226,10 +1290,11 @@ export class ElectronSshManager {
       }
       await this.installOpenChamberManaged(parsed, controlPath, this.appVersion, instance.remoteOpenchamber.installMethod);
 
-      const afterInstall = await this.remoteOpenChamberCandidates(parsed, controlPath);
+      const afterInstall = (await this.remoteOpenChamberCandidates(parsed, controlPath))
+        .filter((candidate) => isAbsoluteRemoteBinPath(candidate.binPath));
       binary = afterInstall.find((candidate) => candidate.version === this.appVersion) || afterInstall[0] || existing;
-      if (!binary) {
-        throw new Error('Pichamber is not installed on the remote machine. Install it there, then connect again');
+      if (!binary || !isAbsoluteRemoteBinPath(binary.binPath)) {
+        throw missingRemoteBinError(true);
       }
     }
 
