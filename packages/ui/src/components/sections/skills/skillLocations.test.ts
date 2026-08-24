@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  defaultNewSkillLocation,
   defaultSkillSource,
   getSkillCatalogInstallLocations,
   getSkillLocationOptions,
@@ -52,6 +53,12 @@ describe('skillLocations', () => {
       'settings.skills.location.option.userAgents.label',
       'settings.skills.location.option.projectAgents.label',
     ]);
+  });
+
+  test('new skill defaults to the current project when Settings is scoped to one', () => {
+    expect(defaultNewSkillLocation(true, true)).toEqual({ scope: 'project', source: 'pi' });
+    expect(defaultNewSkillLocation(true, false)).toEqual({ scope: 'user', source: 'pi' });
+    expect(defaultNewSkillLocation(false, true)).toEqual({ scope: 'project', source: 'opencode' });
   });
 
   test('catalog install Destination is User/Project for the current kernel only', () => {

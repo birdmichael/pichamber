@@ -135,6 +135,7 @@ export const SnippetsPage: React.FC = () => {
   };
 
   if (!selectedSnippetName) {
+    const hasSnippets = snippets.length > 0;
     return (
       <SettingsPageLayout
         title={t('settings.page.snippets.title')}
@@ -145,7 +146,11 @@ export const SnippetsPage: React.FC = () => {
           <div className="text-center text-muted-foreground">
             <Icon name="file-text" className="mx-auto mb-3 h-12 w-12 opacity-50" />
             <p className="typography-body">{t('settings.snippets.page.empty.title')}</p>
-            <p className="typography-meta mt-1 opacity-75">{t('settings.snippets.page.empty.description')}</p>
+            <p className="typography-meta mt-1 opacity-75">
+              {hasSnippets
+                ? t('settings.snippets.page.empty.description')
+                : t('settings.snippets.page.empty.descriptionCreate')}
+            </p>
           </div>
         </div>
       </SettingsPageLayout>
@@ -172,7 +177,7 @@ export const SnippetsPage: React.FC = () => {
       >
       <SettingsSection divider={false} contentClassName="space-y-0">
         {isNew ? (
-          <SettingsFieldRow label="#">
+          <SettingsFieldRow label={t('settings.snippets.page.field.name')}>
             <Input
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
@@ -181,7 +186,11 @@ export const SnippetsPage: React.FC = () => {
             />
             <Select value={draftScope} onValueChange={(value) => setDraftScope(value as SnippetScope)}>
               <SelectTrigger size={SETTINGS_SELECT_SIZE} className="w-fit min-w-[100px]">
-                <SelectValue />
+                <SelectValue>
+                  {draftScope === 'project'
+                    ? t('settings.common.scope.project')
+                    : t('settings.common.scope.global')}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent align="end">
                 <SelectItem value="global">{t('settings.common.scope.global')}</SelectItem>

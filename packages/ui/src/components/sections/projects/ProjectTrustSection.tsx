@@ -113,7 +113,13 @@ export const ProjectTrustSection: React.FC<{ project: ProjectEntry }> = ({ proje
             className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}
             aria-label={t('settings.projects.page.field.defaultProjectTrustAria')}
           >
-            <SelectValue />
+            <SelectValue>
+              {defaultProjectTrust === 'always'
+                ? t('settings.projects.page.option.trustAlways')
+                : defaultProjectTrust === 'never'
+                  ? t('settings.projects.page.option.trustNever')
+                  : t('settings.projects.page.option.trustAsk')}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ask">{t('settings.projects.page.option.trustAsk')}</SelectItem>

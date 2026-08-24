@@ -52,7 +52,7 @@ export const ComingSoonMessengersSection: React.FC = () => {
           aria-disabled="true"
           className={cn(
             'flex min-w-0 items-center gap-3 rounded-xl border border-[var(--interactive-border)] bg-[var(--surface-elevated)] px-4 py-3',
-            'pointer-events-none opacity-60',
+            'pointer-events-none',
           )}
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-[var(--surface-muted)]">

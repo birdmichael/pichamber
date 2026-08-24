@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: action buttons now keep sentence case (Save changes, Create skill) instead of forcing all-lowercase.
+- Settings: unselected radio labels stay readable. Disabled options, including Sessions retention while Auto-Cleanup is off, still look disabled.
+- Settings: turning on a parent option no longer drops the next click onto the newly revealed row (Activity Default, Collapsible reasoning, and TTS).
+- Settings: leftover Desktop nits — Language stays below the trigger instead of covering Window controls, the first pointer on a newly revealed row is ignored, and dialog/chip labels keep sentence case (Cancel, Create QR code, Add project, Summarized, Global).
+- Settings: switching a Magic Prompt or skill in the middle list resets the right pane to the top.
+- Settings: Shortcuts shows Save and Reset only on a dirty or capturing row, with Cancel while capturing.
+- Settings/Desktop: test-notification and other toasts sit below the titlebar instead of clipping at the top of the window.
+- Settings: the thinking-level label uses the composer scale (High / xhigh), not "Xhigh".
+- Settings/Appearance: Terminal Shell shows Auto, and the Language menu opens downward.
+- Settings: Snippets names the name field and, when the list is empty, points at creating one.
+- Settings: Skills Catalog shows a loading state instead of "0 skill(s) found", and New Skill defaults to the current project when one is active.
+- Settings: Home network only stays disabled when this host has no LAN address, with a one-line reason, and the radio lines up with its label.
+- Settings: a disabled Response-style Preset no longer draws a no-entry glyph over the caret.
+- Settings: model capability cards stay readable instead of clipping left-column labels, and Esc on a Settings menu no longer eats the next sidebar click.
+- Settings: the Skills instructions editor chains the scroll wheel to the page at its ends, so bottom controls stay reachable.
+- Settings: Voice provider badges stay on one line, and installed vs not-downloaded uses the real download state.
+- Settings/Desktop: choosing a Pi agent directory asks for that folder instead of "Select Working Directory".
 - Settings/Desktop: folder and file browse buttons keep Settings open and show the native picker instead of closing the window with nothing to pick.
 - Settings/Desktop: the sidebar Settings gear opens on the first click, and Ctrl+, (⌘+, on Mac) opens Settings even when the key arrives as a comma code.
 - Settings/Desktop: after Esc closes Settings, the sidebar gear opens it again on the next click instead of staying dead until reload.

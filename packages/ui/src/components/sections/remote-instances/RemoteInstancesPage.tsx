@@ -1841,15 +1841,15 @@ export const RemoteInstancesPage: React.FC = () => {
                       plain words — "relay" appears only inside the description. */}
                   <div role="radiogroup" aria-label={t('settings.remoteInstances.clientAuth.addDevice.transportLabel')} className="space-y-1.5">
                     {([
-                      { key: 'relay' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.relay'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.relayHint'), available: Boolean(transportOptions?.relayAvailable) },
-                      { key: 'lan' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.lan'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.lanHint'), available: Boolean(transportOptions?.lanUrl) },
-                      { key: 'local' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.local'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.localHint'), available: Boolean(transportOptions?.localUrl) },
+                      { key: 'relay' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.relay'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.relayHint'), unavailable: t('settings.remoteInstances.clientAuth.addDevice.transport.relayUnavailable'), available: Boolean(transportOptions?.relayAvailable) },
+                      { key: 'lan' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.lan'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.lanHint'), unavailable: t('settings.remoteInstances.clientAuth.addDevice.transport.lanUnavailable'), available: Boolean(transportOptions?.lanUrl) },
+                      { key: 'local' as const, label: t('settings.remoteInstances.clientAuth.addDevice.transport.local'), hint: t('settings.remoteInstances.clientAuth.addDevice.transport.localHint'), unavailable: t('settings.remoteInstances.clientAuth.addDevice.transport.localUnavailable'), available: Boolean(transportOptions?.localUrl) },
                     ]).map((option) => {
                       const selected = addDeviceTransport === option.key;
                       return (
                         <div
                           key={option.key}
-                          className={cn('flex items-start gap-2 py-0.5', option.available ? 'cursor-pointer' : 'opacity-45')}
+                          className={cn('flex items-start gap-2 py-0.5', option.available ? 'cursor-pointer' : 'cursor-not-allowed opacity-60')}
                           onClick={() => { if (option.available) setAddDeviceTransport(option.key); }}
                           role="presentation"
                         >
@@ -1858,11 +1858,14 @@ export const RemoteInstancesPage: React.FC = () => {
                             disabled={!option.available}
                             onChange={() => setAddDeviceTransport(option.key)}
                             ariaLabel={option.label}
-                            className="mt-0.5"
+                            className="mt-0.5 self-start"
                           />
-                          <div className="min-w-0">
-                            <p className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/70')}>{option.label}</p>
+                          <div className="min-w-0 pt-px">
+                            <p className={cn('typography-ui-label font-normal', selected || option.available ? 'text-foreground' : 'text-muted-foreground')}>{option.label}</p>
                             <p className="typography-meta text-muted-foreground">{option.hint}</p>
+                            {!option.available ? (
+                              <p className="typography-meta text-muted-foreground">{option.unavailable}</p>
+                            ) : null}
                           </div>
                         </div>
                       );

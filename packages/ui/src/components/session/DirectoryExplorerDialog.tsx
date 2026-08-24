@@ -597,7 +597,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
             variant="outline"
             size="xs"
             tabIndex={-1}
-            className="absolute right-1.5 top-1/2 h-7 -translate-y-1/2 gap-1 px-2 typography-meta"
+            className="absolute right-1.5 top-1/2 h-7 -translate-y-1/2 gap-1 px-2 typography-meta normal-case"
             disabled={isCloneMode ? !canSubmitClone : !canAddProject}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => void finalizeSelection(targetPath)}

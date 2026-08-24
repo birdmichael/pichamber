@@ -46,6 +46,17 @@ export function defaultSkillSource(isPiKernel: boolean): 'pi' | 'opencode' {
   return isPiKernel ? 'pi' : 'opencode';
 }
 
+/** New Skill defaults to the current project when Settings is scoped to one. */
+export function defaultNewSkillLocation(
+  isPiKernel: boolean,
+  hasProject: boolean,
+): { scope: SkillScope; source: SkillSource } {
+  return {
+    scope: hasProject ? 'project' : 'user',
+    source: defaultSkillSource(isPiKernel),
+  };
+}
+
 export function locationValueFrom(scope: SkillScope, source: SkillSource): SkillLocationValue {
   if (scope === 'project' && source === 'claude') return 'project-claude';
   if (scope === 'project' && source === 'agents') return 'project-agents';

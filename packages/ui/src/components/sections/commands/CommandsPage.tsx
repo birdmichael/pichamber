@@ -285,6 +285,7 @@ export const CommandsPage: React.FC = () => {
             agentName={agent}
             onChange={(agentName: string) => setAgent(agentName)}
             className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+            dropdownPortalToBody
           />
         </SettingsFieldRow>
         ) : null}
@@ -304,6 +305,7 @@ export const CommandsPage: React.FC = () => {
               }
             }}
             className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+            dropdownPortalToBody
           />
         </SettingsFieldRow>
       </SettingsSection>

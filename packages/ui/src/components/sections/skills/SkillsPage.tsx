@@ -38,7 +38,7 @@ import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { PreviewToggleButton } from '@/components/views/PreviewToggleButton';
 import { SkillsCatalogPage } from './catalog/SkillsCatalogPage';
 import {
-  defaultSkillSource,
+  defaultNewSkillLocation,
   getSkillLocationOptions,
   locationPartsFrom,
   locationValueFrom,
@@ -225,8 +225,9 @@ const SkillsInstalledPage: React.FC = () => {
         const nextDescription = skillDraft.description || '';
         const nextInstructions = skillDraft.instructions || '';
         setDraftName(skillDraft.name || '');
-        setDraftScope(skillDraft.scope || 'user');
-        setDraftSource(skillDraft.source || defaultSkillSource(isPiKernel));
+        const fallbackLocation = defaultNewSkillLocation(isPiKernel, Boolean(settingsDirectory));
+        setDraftScope(skillDraft.scope || fallbackLocation.scope);
+        setDraftSource(skillDraft.source || fallbackLocation.source);
         setDescription(nextDescription);
         setInstructions(nextInstructions);
         setSkillMarkdown(buildSkillMarkdown(nextDescription, nextInstructions));
@@ -664,6 +665,7 @@ const SkillsInstalledPage: React.FC = () => {
                   extensions={skillEditorExtensions}
                   className="h-full"
                   enableSearch
+                  chainWheelWhenAtScrollEnd
                 />
               )}
             </div>

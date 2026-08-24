@@ -369,7 +369,13 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
               className="w-full"
               aria-label={t('settings.providers.page.custom.field.protocol.label')}
             >
-              <SelectValue />
+              <SelectValue>
+                {form.protocol === 'openai-responses'
+                  ? t('settings.providers.page.custom.field.protocol.openaiResponses')
+                  : form.protocol === 'anthropic-messages'
+                    ? t('settings.providers.page.custom.field.protocol.anthropicMessages')
+                    : t('settings.providers.page.custom.field.protocol.openaiChat')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="openai-chat">{t('settings.providers.page.custom.field.protocol.openaiChat')}</SelectItem>

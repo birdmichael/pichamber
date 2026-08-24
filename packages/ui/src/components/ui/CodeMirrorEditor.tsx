@@ -9,6 +9,7 @@ import { search, searchKeymap, openSearchPanel, closeSearchPanel, searchPanelOpe
 import { createPortal } from 'react-dom';
 
 import { createVimModeExtensions } from '@/lib/codemirror/vimModeExtension';
+import { chainWheelDeltaToAncestor, shouldChainWheelToParent } from '@/lib/editor-wheel';
 import { cn } from '@/lib/utils';
 
 /** Patches `title` attributes onto CodeMirror search-panel controls for icon-only tooltips. */
@@ -143,6 +144,8 @@ type CodeMirrorEditorProps = {
   searchOpen?: boolean;
   onSearchOpenChange?: (open: boolean) => void;
   vimMode?: boolean;
+  /** When the editor is at its scroll end, move the nearest page scroller instead. */
+  chainWheelWhenAtScrollEnd?: boolean;
 };
 
 const lineNumbersCompartment = new Compartment();
@@ -269,6 +272,7 @@ export function CodeMirrorEditor({
   searchOpen,
   onSearchOpenChange,
   vimMode,
+  chainWheelWhenAtScrollEnd = false,
 }: CodeMirrorEditorProps) {
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const viewRef = React.useRef<EditorView | null>(null);
@@ -402,6 +406,17 @@ export function CodeMirrorEditor({
         highlightLinesCompartment.of(createHighlightLinesExtension(highlightLines)),
         blockWidgetsCompartment.of(createBlockWidgetsExtension(blockWidgets, widgetContainersRef.current)),
         searchCompartment.of(enableSearch ? [search({ top: true }), keymap.of(toViewKeyBindings(searchKeymap))] : []),
+        ...(chainWheelWhenAtScrollEnd ? [EditorView.domEventHandlers({
+          wheel(event, view) {
+            if (!shouldChainWheelToParent(view.scrollDOM, event.deltaY)) {
+              return false;
+            }
+            if (chainWheelDeltaToAncestor(view.dom, event.deltaY)) {
+              event.preventDefault();
+            }
+            return true;
+          },
+        })] : []),
       ],
     });
 

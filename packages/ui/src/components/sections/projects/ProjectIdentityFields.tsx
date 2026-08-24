@@ -15,6 +15,7 @@ import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { PROJECT_COLORS, PROJECT_ICONS, PROJECT_COLOR_MAP as COLOR_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
+import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import {
@@ -31,7 +32,7 @@ type ProjectIdentityFieldsProps = {
 
 const NO_VARIANT_VALUE = '__default__';
 
-const formatVariantLabel = (variant: string): string => variant.charAt(0).toUpperCase() + variant.slice(1);
+const formatVariantLabel = (variant: string): string => formatEffortLabel(variant);
 
 export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ form }) => {
   const { t } = useI18n();
@@ -126,6 +127,7 @@ export const ProjectIdentityFields: React.FC<ProjectIdentityFieldsProps> = ({ fo
             modelId={parsedDefaultModel.modelId}
             onChange={handleDefaultModelChange}
             className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+            dropdownPortalToBody
           />
         </SettingsFieldRow>
 

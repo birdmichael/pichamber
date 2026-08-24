@@ -29,7 +29,7 @@ import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { SETTINGS_PANEL_TITLE_CLASS } from '@/components/sections/shared/SettingsSection';
-import { defaultSkillSource, skillSourceBadgeKey } from './skillLocations';
+import { defaultNewSkillLocation, defaultSkillSource, skillSourceBadgeKey } from './skillLocations';
 
 interface SkillsSidebarProps {
   onItemSelect?: () => void;
@@ -91,7 +91,8 @@ export const SkillsSidebar: React.FC<SkillsSidebarProps> = ({ onItemSelect }) =>
     }
 
     // Set draft and open the page for editing
-    setSkillDraft({ name: newName, scope: 'user', source: defaultSkillSource(isPiKernel), description: '' });
+    const location = defaultNewSkillLocation(isPiKernel, Boolean(settingsDirectory));
+    setSkillDraft({ name: newName, scope: location.scope, source: location.source, description: '' });
     setSelectedSkill(newName);
     onItemSelect?.();
 

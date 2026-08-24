@@ -439,7 +439,9 @@ export const SkillsCatalogPage: React.FC<SkillsCatalogPageProps> = ({ mode, onMo
                 {listTitle}
               </span>
               <span className="typography-micro text-muted-foreground/70 shrink-0">
-                {t('settings.skills.catalog.page.foundCount', { count: filtered.length })}
+                {isSelectedSourceLoading || (isLoadingSource && filtered.length === 0)
+                  ? t('settings.skills.catalog.page.foundCountLoading')
+                  : t('settings.skills.catalog.page.foundCount', { count: filtered.length })}
               </span>
             </div>
             <div className="flex items-center gap-1 shrink-0">

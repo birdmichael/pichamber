@@ -391,6 +391,7 @@ export const AgentsPage: React.FC = () => {
               setVariant('');
             }}
             className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+            dropdownPortalToBody
           />
         </SettingsFieldRow>
 

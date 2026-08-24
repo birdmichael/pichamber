@@ -84,14 +84,16 @@ export const PiAgentSettings: React.FC = () => {
       return;
     }
     try {
-      const selected = await requestDirectoryAccess(value.trim() || resolvedPath || '');
+      const selected = await requestDirectoryAccess(value.trim() || resolvedPath || '', {
+        title: t('settings.openchamber.piAgent.dialog.selectDirectory'),
+      });
       if (selected.success && selected.path && selected.path.trim().length > 0) {
         setValue(selected.path.trim());
       }
     } catch {
       // Cancel leaves the field unchanged.
     }
-  }, [resolvedPath, value]);
+  }, [resolvedPath, t, value]);
 
   const isDirty = unwrapPath(value) !== unwrapPath(savedValue);
 
