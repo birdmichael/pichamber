@@ -41,6 +41,8 @@ Examples:
 
 These stores coordinate visible app state, navigation, selected tabs, dialogs, and lightweight feature flags.
 
+`useUIStore` owns mutually exclusive full-page main surfaces: Scheduled Tasks, Archive, Worktrees, New multi-run, and Multi-run compare (`multiRunCompareGroup`). Opening one closes the others. Compare is transient UI state — it is not persisted — and `closeMainSurfaces` clears it with the rest. After a multi-run with two or more sessions starts, the launcher opens compare last so a session-selection close cannot wipe the new surface.
+
 `useCommandsStore` loads Settings → Commands from the command list plus
 `GET /api/config/commands/:name`. The detail payload is authoritative for
 `scope` and `template`. A list item that omits `template` must not clear a

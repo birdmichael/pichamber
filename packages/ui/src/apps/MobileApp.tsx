@@ -6,7 +6,7 @@ import { MobileAppUpdateToast } from '@/components/update/MobileAppUpdateToast';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { Button } from '@/components/ui/button';
 import { OpenChamberLogo } from '@/components/ui/OpenChamberLogo';
-import { MultiRunLauncher } from '@/components/multirun';
+import { MultiRunCompareView, MultiRunLauncher } from '@/components/multirun';
 import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
 import { ScheduledTasksDialog } from '@/components/session/ScheduledTasksDialog';
 import { ChatView } from '@/components/views/ChatView';
@@ -114,6 +114,8 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
   const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
   const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
   const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
+  const multiRunCompareGroup = useUIStore((state) => state.multiRunCompareGroup);
+  const closeMultiRunCompare = useUIStore((state) => state.closeMultiRunCompare);
   const wideChatLayoutEnabled = useUIStore((state) => state.wideChatLayoutEnabled);
   const updateAvailable = useUpdateStore((state) => state.available);
   const updateRuntimeType = useUpdateStore((state) => state.runtimeType);
@@ -302,6 +304,10 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
       setScheduledTasksDialogOpen(false);
       return true;
     }
+    if (multiRunCompareGroup) {
+      closeMultiRunCompare();
+      return true;
+    }
     if (isMultiRunLauncherOpen) {
       setMultiRunLauncherOpen(false);
       return true;
@@ -331,9 +337,11 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
     closeSurface,
     closeWorkspace,
     effectiveDirectory,
+    closeMultiRunCompare,
     isArchivePageOpen,
     isMultiRunLauncherOpen,
     isScheduledTasksDialogOpen,
+    multiRunCompareGroup,
     openPlan,
     sessionsSheetOpen,
     setArchivePageOpen,
@@ -662,6 +670,22 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
                 }}
                 onCancel={() => setMultiRunLauncherOpen(false)}
               />
+            </ErrorBoundary>
+          </MobileFullscreenSurface>
+        ) : null}
+
+        {multiRunCompareGroup ? (
+          <MobileFullscreenSurface
+            open
+            headerless
+            disableEscapeDismiss
+            variant={surfaceVariant}
+            dialogAlign="app"
+            onClose={closeMultiRunCompare}
+            ariaLabel={t('multirun.compare.title')}
+          >
+            <ErrorBoundary>
+              <MultiRunCompareView />
             </ErrorBoundary>
           </MobileFullscreenSurface>
         ) : null}

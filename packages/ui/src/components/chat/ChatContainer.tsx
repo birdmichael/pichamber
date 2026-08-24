@@ -141,6 +141,7 @@ const hasBlockingChatOverlay = (): boolean => {
         isHelpDialogOpen,
         isImagePreviewOpen,
         isMultiRunLauncherOpen,
+        multiRunCompareGroup,
         isSessionSwitcherOpen,
         isSettingsDialogOpen,
     } = useUIStore.getState();
@@ -150,6 +151,7 @@ const hasBlockingChatOverlay = (): boolean => {
         || isHelpDialogOpen
         || isImagePreviewOpen
         || isMultiRunLauncherOpen
+        || Boolean(multiRunCompareGroup)
         || isSessionSwitcherOpen
         || isSettingsDialogOpen;
 };

@@ -17,7 +17,7 @@ import { ScheduledTasksDialog } from '@/components/session/ScheduledTasksDialog'
 import { ArchiveView } from '@/components/views/ArchiveView';
 import { WorktreesView } from '@/components/views/WorktreesView';
 import { DiffWorkerProvider } from '@/contexts/DiffWorkerProvider';
-import { MultiRunLauncher } from '@/components/multirun';
+import { MultiRunCompareView, MultiRunLauncher } from '@/components/multirun';
 import { TerminalView } from '@/components/views/TerminalView';
 import { DrawerProvider } from '@/contexts/DrawerContext';
 
@@ -66,6 +66,7 @@ export const MainLayout: React.FC = () => {
     const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
     const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
     const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
+    const isMultiRunCompareOpen = useUIStore((state) => Boolean(state.multiRunCompareGroup));
     const isScheduledTasksPageOpen = useUIStore((state) => state.isScheduledTasksDialogOpen);
     const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
     const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
@@ -73,7 +74,7 @@ export const MainLayout: React.FC = () => {
     // secondary views are fully hidden (not just covered) so none of their
     // floating chrome bleeds through, and selecting a session / draft / main
     // tab anywhere closes the surface.
-    const isSurfacePageOpen = isScheduledTasksPageOpen || isArchivePageOpen || Boolean(worktreesPageProjectId) || isMultiRunLauncherOpen;
+    const isSurfacePageOpen = isScheduledTasksPageOpen || isArchivePageOpen || Boolean(worktreesPageProjectId) || isMultiRunLauncherOpen || isMultiRunCompareOpen;
 
     React.useEffect(() => {
         const closeSurfacePages = () => useUIStore.getState().closeMainSurfaces();
@@ -372,6 +373,9 @@ export const MainLayout: React.FC = () => {
                                     </ErrorBoundary>
                                 </div>
                             )}
+                            {isMultiRunCompareOpen && (
+                                <ErrorBoundary><MultiRunCompareView /></ErrorBoundary>
+                            )}
                             <ErrorBoundary><ScheduledTasksDialog /></ErrorBoundary>
                             <ErrorBoundary><ArchiveView /></ErrorBoundary>
                             <ErrorBoundary><WorktreesView /></ErrorBoundary>
@@ -470,6 +474,9 @@ export const MainLayout: React.FC = () => {
                                                             />
                                                         </ErrorBoundary>
                                                     </div>
+                                                )}
+                                                {isMultiRunCompareOpen && (
+                                                    <ErrorBoundary><MultiRunCompareView /></ErrorBoundary>
                                                 )}
                                                 <ErrorBoundary><ScheduledTasksDialog /></ErrorBoundary>
                                                 <ErrorBoundary><ArchiveView /></ErrorBoundary>

@@ -164,6 +164,7 @@ export const useKeyboardShortcuts = () => {
         isSessionSwitcherOpen,
         isAboutDialogOpen,
         isMultiRunLauncherOpen,
+        multiRunCompareGroup,
         isImagePreviewOpen,
         activeMainTab,
         isPromptNavigatorPanelOpen,
@@ -193,7 +194,7 @@ export const useKeyboardShortcuts = () => {
         return;
       }
 
-      const hasOverlay = isCommandPaletteOpen || isHelpDialogOpen || isSessionSwitcherOpen || isAboutDialogOpen || isMultiRunLauncherOpen || isImagePreviewOpen;
+      const hasOverlay = isCommandPaletteOpen || isHelpDialogOpen || isSessionSwitcherOpen || isAboutDialogOpen || isMultiRunLauncherOpen || Boolean(multiRunCompareGroup) || isImagePreviewOpen;
       const isChatActive = activeMainTab === 'chat';
 
       if (hasOverlay || !isChatActive) {
@@ -265,6 +266,7 @@ export const useKeyboardShortcuts = () => {
           isAboutDialogOpen,
           isTimelineDialogOpen,
           isMultiRunLauncherOpen,
+          multiRunCompareGroup,
           isImagePreviewOpen,
         } = useUIStore.getState();
 
@@ -279,6 +281,7 @@ export const useKeyboardShortcuts = () => {
           || isAboutDialogOpen
           || isTimelineDialogOpen
           || isMultiRunLauncherOpen
+          || Boolean(multiRunCompareGroup)
           || isImagePreviewOpen;
 
         if (hasOverlay) {

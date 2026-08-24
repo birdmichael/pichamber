@@ -13,6 +13,7 @@ import { useFilesViewTabsStore } from './useFilesViewTabsStore';
 import { isWindowsArm64 } from '@/lib/platform';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
+import type { MultiRunCompareGroup } from '@/types/multirun';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch';
@@ -603,6 +604,7 @@ interface UIStore {
   theme: 'light' | 'dark' | 'system';
   isMultiRunLauncherOpen: boolean;
   multiRunLauncherPrefillPrompt: string;
+  multiRunCompareGroup: MultiRunCompareGroup | null;
   isSidebarOpen: boolean;
   sidebarWidth: number;
   hasManuallyResizedLeftSidebar: boolean;
@@ -844,7 +846,7 @@ interface UIStore {
   setScheduledTasksDialogOpen: (open: boolean) => void;
   setArchivePageOpen: (open: boolean) => void;
   setWorktreesPageProjectId: (projectId: string | null) => void;
-  /** Close every full-page surface (Scheduled, Archive, Worktrees, Multi-run). */
+  /** Close every full-page surface (Scheduled, Archive, Worktrees, Multi-run launcher, Multi-run compare). */
   closeMainSurfaces: () => void;
   setSettingsDialogOpen: (open: boolean) => void;
   setNewWorktreeDialogOpen: (open: boolean) => void;
@@ -912,6 +914,8 @@ interface UIStore {
   setWalkthroughTocWidth: (width: number) => void;
   setGitChangesViewMode: (mode: 'flat' | 'tree') => void;
   setMultiRunLauncherOpen: (open: boolean) => void;
+  openMultiRunCompare: (group: MultiRunCompareGroup) => void;
+  closeMultiRunCompare: () => void;
   setTimelineDialogOpen: (open: boolean) => void;
   setPromptNavigatorPanelOpen: (open: boolean) => void;
   togglePromptNavigatorPanel: () => void;
@@ -976,6 +980,7 @@ export const useUIStore = create<UIStore>()(
         theme: 'system',
         isMultiRunLauncherOpen: false,
         multiRunLauncherPrefillPrompt: '',
+        multiRunCompareGroup: null,
         isSidebarOpen: true,
         sidebarWidth: LEFT_SIDEBAR_MIN_WIDTH,
         hasManuallyResizedLeftSidebar: false,
@@ -1745,25 +1750,25 @@ export const useUIStore = create<UIStore>()(
 
         setScheduledTasksDialogOpen: (open) => {
           set(open
-            ? { isScheduledTasksDialogOpen: true, isArchivePageOpen: false, worktreesPageProjectId: null, isMultiRunLauncherOpen: false }
+            ? { isScheduledTasksDialogOpen: true, isArchivePageOpen: false, worktreesPageProjectId: null, isMultiRunLauncherOpen: false, multiRunCompareGroup: null }
             : { isScheduledTasksDialogOpen: false });
         },
 
         setArchivePageOpen: (open) => {
           set(open
-            ? { isArchivePageOpen: true, isScheduledTasksDialogOpen: false, worktreesPageProjectId: null, isMultiRunLauncherOpen: false }
+            ? { isArchivePageOpen: true, isScheduledTasksDialogOpen: false, worktreesPageProjectId: null, isMultiRunLauncherOpen: false, multiRunCompareGroup: null }
             : { isArchivePageOpen: false });
         },
 
         setWorktreesPageProjectId: (projectId) => {
           set(projectId
-            ? { worktreesPageProjectId: projectId, isScheduledTasksDialogOpen: false, isArchivePageOpen: false, isMultiRunLauncherOpen: false }
+            ? { worktreesPageProjectId: projectId, isScheduledTasksDialogOpen: false, isArchivePageOpen: false, isMultiRunLauncherOpen: false, multiRunCompareGroup: null }
             : { worktreesPageProjectId: null });
         },
 
         closeMainSurfaces: () => {
           const state = get();
-          if (!state.isScheduledTasksDialogOpen && !state.isArchivePageOpen && !state.worktreesPageProjectId && !state.isMultiRunLauncherOpen) {
+          if (!state.isScheduledTasksDialogOpen && !state.isArchivePageOpen && !state.worktreesPageProjectId && !state.isMultiRunLauncherOpen && !state.multiRunCompareGroup) {
             return;
           }
           set({
@@ -1772,6 +1777,7 @@ export const useUIStore = create<UIStore>()(
             worktreesPageProjectId: null,
             isMultiRunLauncherOpen: false,
             multiRunLauncherPrefillPrompt: '',
+            multiRunCompareGroup: null,
           });
         },
 
@@ -2259,7 +2265,12 @@ export const useUIStore = create<UIStore>()(
           set((state) => ({
             isMultiRunLauncherOpen: open,
             multiRunLauncherPrefillPrompt: open ? state.multiRunLauncherPrefillPrompt : '',
-            ...(open ? { isScheduledTasksDialogOpen: false, isArchivePageOpen: false, worktreesPageProjectId: null } : {}),
+            ...(open ? {
+              isScheduledTasksDialogOpen: false,
+              isArchivePageOpen: false,
+              worktreesPageProjectId: null,
+              multiRunCompareGroup: null,
+            } : {}),
           }));
         },
 
@@ -2271,6 +2282,7 @@ export const useUIStore = create<UIStore>()(
             isScheduledTasksDialogOpen: false,
             isArchivePageOpen: false,
             worktreesPageProjectId: null,
+            multiRunCompareGroup: null,
           });
         },
 
@@ -2282,7 +2294,31 @@ export const useUIStore = create<UIStore>()(
             isScheduledTasksDialogOpen: false,
             isArchivePageOpen: false,
             worktreesPageProjectId: null,
+            multiRunCompareGroup: null,
           });
+        },
+
+        openMultiRunCompare: (group) => {
+          const sessionIds = group.sessionIds.filter((sessionId) => sessionId.trim().length > 0);
+          if (sessionIds.length === 0) return;
+          set({
+            multiRunCompareGroup: {
+              groupSlug: group.groupSlug,
+              runGroup: group.runGroup,
+              title: group.title.trim() || group.groupSlug,
+              sessionIds,
+            },
+            isMultiRunLauncherOpen: false,
+            multiRunLauncherPrefillPrompt: '',
+            isSessionSwitcherOpen: false,
+            isScheduledTasksDialogOpen: false,
+            isArchivePageOpen: false,
+            worktreesPageProjectId: null,
+          });
+        },
+
+        closeMultiRunCompare: () => {
+          set({ multiRunCompareGroup: null });
         },
 
         setTimelineDialogOpen: (open) => {

@@ -48,6 +48,7 @@ import { sessionGoalStatusColor, sessionGoalStatusLabelKey } from '@/lib/session
 import { getRuntimeBearerTokenSync } from '@/lib/runtime-auth';
 import { getRuntimeApiBaseUrl } from '@/lib/runtime-switch';
 import { parseMultiRunSessionTitle } from '@/lib/multirun/title';
+import { openMultiRunCompareForSession } from '@/lib/multirun/openCompare';
 import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { MultiRunFusionDialog } from '@/components/multirun/MultiRunFusionDialog';
 import { FusionIcon } from '@/components/icons/FusionIcon';
@@ -1042,10 +1043,16 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         </Tooltip>
       ) : null}
       {isMultiRunLikeSession ? (
-        <Item onClick={() => setFusionDialogOpen(true)} className="[&>svg]:mr-1">
-          <FusionIcon className="mr-1 h-4 w-4" />
-          {t('sessions.sidebar.session.menu.runFusion')}
-        </Item>
+        <>
+          <Item onClick={() => { openMultiRunCompareForSession(resolvedSession); }} className="[&>svg]:mr-1">
+            <Icon name="layout-column" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.compareRuns')}
+          </Item>
+          <Item onClick={() => setFusionDialogOpen(true)} className="[&>svg]:mr-1">
+            <FusionIcon className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.runFusion')}
+          </Item>
+        </>
       ) : null}
 
       {sessionDirectory && !archivedBucket ? (() => {

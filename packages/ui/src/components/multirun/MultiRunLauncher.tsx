@@ -32,6 +32,7 @@ import { startDesktopWindowDrag } from '@/lib/desktopNative';
 import { useI18n } from '@/lib/i18n';
 import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { isLauncherOverlayOpen } from './launcherEscape';
+import { openMultiRunCompareForSessionIds } from '@/lib/multirun/openCompare';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_MODELS_PER_GROUP = 5;
@@ -401,6 +402,9 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
           useSessionUIStore.getState().setCurrentSession(result.firstSessionId);
         }
         onCreated?.();
+        if (result.sessionIds.length >= 2) {
+          openMultiRunCompareForSessionIds(result.sessionIds, name.trim() || result.groupSlug);
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -680,9 +684,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
               <span className="truncate">{t('multirun.launcher.project.gitRequired')}</span>
             </div>
           ) : null}
-          {/* On the full-page surface (isWindowed) there is nothing to
-              "cancel" — you leave via the sidebar like any other page. */}
-          {!isWindowed && onCancel ? (
+          {onCancel ? (
             <Button
               type="button"
               variant="ghost"

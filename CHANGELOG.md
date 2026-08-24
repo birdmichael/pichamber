@@ -4,8 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat/Desktop:** after you start a multi-run with two or more models, a compare view shows those runs side by side. You can open it again from a run's menu or the worktree group.
+- Chat: Save as image is hidden on text-only assistant turns. When the turn has an image, Save as image writes a file or shows an error.
 - Chat: Save project plan, Start new session, and New multi-run action buttons now show Cancel, Save, Send, and Start in sentence case.
 - Chat: Esc on the multi-run model picker now closes only the picker, not the whole New multi-run form.
+- Chat/Desktop: New multi-run keeps a Cancel button on the full-page form, so you can leave without Esc.
 - Chat: the fork-session thinking dropdown now lists the selected model's live Pi thinking levels, and hides when that model has none.
 - Chat: Save as plan writes a Markdown file into the project's `.pichamber/plans` folder and the toast includes that path. Esc or Cancel still does not write.
 - Chat: New multi-run, Start new session, and Save project plan titles now use sentence case, matching the lowercase action buttons.

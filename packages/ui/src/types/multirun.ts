@@ -31,3 +31,10 @@ export interface CreateMultiRunResult {
   sessionIds: string[];
   firstSessionId: string | null;
 }
+
+export interface MultiRunCompareGroup {
+  groupSlug: string;
+  runGroup?: string;
+  title: string;
+  sessionIds: string[];
+}
