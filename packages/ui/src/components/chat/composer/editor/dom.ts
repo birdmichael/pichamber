@@ -8,3 +8,7 @@ export function focusChatInput(): void {
     }
     document.querySelector<HTMLElement>(CHAT_INPUT_EDITOR_SELECTOR)?.focus();
 }
+
+export function blurChatInput(): void {
+    document.querySelector<HTMLElement>(CHAT_INPUT_EDITOR_SELECTOR)?.blur();
+}

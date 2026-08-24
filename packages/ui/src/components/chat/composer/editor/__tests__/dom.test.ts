@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
 
-import { focusChatInput } from '../dom';
+import { blurChatInput, focusChatInput } from '../dom';
 
 const originalDocument = globalThis.document;
 
@@ -38,4 +38,20 @@ test('does not steal focus from a Q&A answer textarea', () => {
     focusChatInput();
 
     expect(focused).toBe(false);
+});
+
+test('blurs the CodeMirror chat input content', () => {
+    let selector = '';
+    let blurred = false;
+    globalThis.document = {
+        querySelector: (value: string) => {
+            selector = value;
+            return { blur: () => { blurred = true; } };
+        },
+    } as unknown as Document;
+
+    blurChatInput();
+
+    expect(selector).toBe('[data-chat-input="true"] .cm-content');
+    expect(blurred).toBe(true);
 });

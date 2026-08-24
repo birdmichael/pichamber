@@ -19,6 +19,7 @@ import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore'
 import { shouldShowPiFromSubagentLabel } from '@/lib/subagents/subagentTool';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
 import { stopQuestionAnswerKeyBubble } from './questionAnswerFocus';
+import { blurChatInput } from './composer/editor/dom';
 
 interface QuestionCardProps {
   question: QuestionRequest;
@@ -91,6 +92,7 @@ const CustomAnswerTextarea = React.memo(function CustomAnswerTextarea({
         onKeyDown(event);
       }}
       onKeyUp={stopQuestionAnswerKeyBubble}
+      onFocus={() => blurChatInput()}
       style={{ height }}
       className={cn(
         'w-full bg-transparent border border-border/30 focus:border-primary rounded px-2 py-1 outline-none typography-meta text-foreground placeholder:text-muted-foreground/50 transition-colors resize-none',
