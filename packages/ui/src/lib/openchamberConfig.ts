@@ -13,8 +13,6 @@ import { createProjectIdFromPath } from './projectId';
 import { runtimeFetch } from './runtime-fetch';
 import { resolveProjectPlansDirectory } from './projectPlansPath';
 
-export { resolveProjectPlansDirectory } from './projectPlansPath';
-
 type ProjectRef = { id: string; path: string };
 
 const CONFIG_FILENAME = 'openchamber.json';
@@ -504,15 +502,6 @@ const createProjectPlanId = (): string => {
     return crypto.randomUUID();
   }
   return `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-};
-
-const getProjectStorageDirectory = async (project: ProjectRef): Promise<string | null> => {
-  const base = await getUserProjectsDirectory();
-  const safeId = resolveConfigProjectId(project);
-  if (!base || !safeId) {
-    return null;
-  }
-  return joinPath(base, safeId);
 };
 
 const getProjectPlansDirectory = async (project: ProjectRef): Promise<string | null> => {

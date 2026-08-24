@@ -45,7 +45,7 @@ describe('toolElapsed', () => {
   test('reads duration from time or metadata', () => {
     expect(readServerDurationMs({ time: { duration: 18400 } })).toBe(18400);
     expect(readServerDurationMs({ metadata: { durationMs: 2100 } })).toBe(2100);
-    expect(readServerDurationMs({})).toBeUndefined();
+    expect(readServerDurationMs({})).toBe(undefined);
   });
 
   test('finalizes from status, end, or duration', () => {

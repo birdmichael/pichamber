@@ -166,9 +166,6 @@ export const createEventTranslator = ({
     const details = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
       ? { ...metadata }
       : undefined;
-    if (details && duration !== undefined && typeof details.duration !== 'number' && typeof details.durationMs !== 'number') {
-      details.duration = duration;
-    }
     return {
       id: partID,
       sessionID,

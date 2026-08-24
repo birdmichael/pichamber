@@ -4,6 +4,7 @@ import {
     USER_BUBBLE_FLEX_ITEM_CLASS,
     USER_MESSAGE_CONTENT_OVERFLOW_CLASS,
     USER_TEXT_COLLAPSED_CLASS,
+    USER_TEXT_EXPANDED_CLASS,
     getUserMessageContentOverflowClass,
     isUserTextOverflowing,
 } from './userBubbleLayout';
@@ -17,6 +18,12 @@ describe('userBubbleLayout', () => {
 
     test('collapsed user text uses a class that inlines markdown blocks for line-clamp', () => {
         expect(USER_TEXT_COLLAPSED_CLASS).toBe('user-text-collapsed');
+    });
+
+    test('expanded user text uses a class that wraps CJK instead of clipping glyphs', () => {
+        expect(USER_TEXT_EXPANDED_CLASS).toBe('user-text-expanded');
+        expect(USER_MESSAGE_CONTENT_OVERFLOW_CLASS.default).toContain('overflow-x-clip');
+        expect(USER_MESSAGE_CONTENT_OVERFLOW_CLASS.default).not.toContain('overflow-x-hidden');
     });
 
     test('non-sticky user content does not hide overflow-y as a line-clamp substitute', () => {

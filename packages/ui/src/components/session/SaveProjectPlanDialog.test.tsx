@@ -38,5 +38,7 @@ describe('SaveProjectPlanDialog', () => {
 
     const [, titleInputId] = labelMatch;
     expect(markup).toContain(`id="${titleInputId}"`);
+    expect(markup).toContain('.pichamber/plans');
+    expect(markup).toContain('Save project plan');
   });
 });
