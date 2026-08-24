@@ -31,6 +31,7 @@ import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
+import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { hasOpenDropdown } from './keyboard-shortcut-dom';
 
@@ -366,6 +367,9 @@ export const useKeyboardShortcuts = () => {
       }
 
       if (eventMatchesShortcut(e, combo('add_selection_to_chat'))) {
+        if (isQuestionAnswerTextarea(e.target)) {
+          return;
+        }
         e.preventDefault();
         addSelectionToChat();
         return;
@@ -383,6 +387,9 @@ export const useKeyboardShortcuts = () => {
       }
 
       if (eventMatchesShortcut(e, combo('focus_input'))) {
+        if (isQuestionAnswerTextarea(e.target)) {
+          return;
+        }
         e.preventDefault();
         focusChatInput();
         return;

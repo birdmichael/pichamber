@@ -790,14 +790,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             result = await copyMarkdownToClipboard(messageTextContent, renderMarkdownSync(messageTextContent));
         }
         if (!result.ok) {
+            toast.error(t('chat.messageBody.toast.copyFailed'));
             return false;
         }
+        toast.success(t('chat.messageBody.toast.copied'));
         if (isUser) {
             setCopiedMessage(true);
             setTimeout(() => setCopiedMessage(false), 2000);
         }
         return true;
-    }, [isUser, messageTextContent]);
+    }, [isUser, messageTextContent, t]);
 
     const handleRevert = React.useCallback(() => {
         if (!sessionId || !message.info.id) return;

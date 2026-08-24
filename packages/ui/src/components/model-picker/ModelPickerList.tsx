@@ -16,7 +16,7 @@ import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getCurrentIntlLocale } from '@/lib/i18n';
-import { lookupModelMetadata, mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
+import { formatModelContextTokens, lookupModelMetadata, mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
 import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
 import { cn } from '@/lib/utils';
 import { useModelPickerSectionsStore } from '@/stores/useModelPickerSectionsStore';
@@ -47,13 +47,6 @@ type IndexSelectionStore = {
   set: (value: number) => void;
 };
 
-const formatCompactNumber = (value: number) => new Intl.NumberFormat(getCurrentIntlLocale(), {
-  notation: 'compact',
-  compactDisplay: 'short',
-  maximumFractionDigits: 1,
-  minimumFractionDigits: 0,
-}).format(value);
-
 const formatUsdCurrency = (value: number) => new Intl.NumberFormat(getCurrentIntlLocale(), {
   style: 'currency',
   currency: 'USD',
@@ -63,13 +56,6 @@ const formatUsdCurrency = (value: number) => new Intl.NumberFormat(getCurrentInt
 
 const getModelDisplayName = (model: Record<string, unknown>) => {
   return getSharedModelDisplayName(model, undefined, { maxLength: 40 });
-};
-
-const formatModelContextTokens = (value?: number | null) => {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '';
-  if (value === 0) return '0';
-  const formatted = formatCompactNumber(value);
-  return formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted;
 };
 
 const formatCost = (value?: number | null) => {

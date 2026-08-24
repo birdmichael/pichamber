@@ -2245,6 +2245,8 @@ export const dict: Record<I18nKey, string> = {
   "chat.messageBody.toast.planSaved": "План збережено",
   "chat.messageBody.toast.imageSaved": "Зображення збережено",
   "chat.messageBody.toast.generateImageFailed": "Не вдалося створити зображення",
+  "chat.messageBody.toast.copied": "Скопійовано",
+  "chat.messageBody.toast.copyFailed": "Не вдалося скопіювати",
   "chat.chatInput.actions.commands": "Команди",
   "chat.chatInput.actions.attachFiles": "Прикріпити файли",
   "chat.chatInput.actions.addAttachment": "Додати вкладення",

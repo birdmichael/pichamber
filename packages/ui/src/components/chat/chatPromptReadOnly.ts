@@ -7,10 +7,20 @@ const isPiSubagentChildSession = (session: Session | null | undefined): boolean 
         && metadata.pichamber.subagentRun.runId.trim().length > 0;
 };
 
+type ChatPromptReadOnlyOptions = {
+    /**
+     * Pi `parentID` is lineage (user-row fork, clone, `/btw`), not an
+     * unpromptable leftover-OpenCode subagent. The tab's own `readOnly`
+     * flag is the authority.
+     */
+    parentIdIsLineage?: boolean;
+};
+
 export const resolveChatPromptReadOnly = (
     session: Session | null | undefined,
     allowPromptingSubagentSessions: boolean,
     readOnly: boolean,
+    options?: ChatPromptReadOnlyOptions,
 ): boolean => {
     // Review sessions are independent conversations even if an older server or
     // cached record still carries parentID. Their explicit metadata is the
@@ -19,10 +29,9 @@ export const resolveChatPromptReadOnly = (
         return readOnly;
     }
 
-    // Pi adapter children are writable follow-up sessions. The tab's own
-    // readOnly flag is the authority; leftover OpenCode parentID locking
-    // must not apply.
-    if (isPiSubagentChildSession(session)) {
+    // Pi adapter children and other Pi lineage children are writable
+    // follow-up sessions. Leftover OpenCode parentID locking must not apply.
+    if (isPiSubagentChildSession(session) || options?.parentIdIsLineage) {
         return readOnly;
     }
 

@@ -26,6 +26,13 @@ On Pi it also no longer mounts the footer context-usage percent chip;
 inspect tokens vs the model window from the desktop header context ring.
 `ModelControls` hides the leftover OpenCode agent chip when the only
 selectable agent is the synthetic Pi default (`shouldShowComposerAgentChip`).
+Composer, Fork-session, and multi-run model pickers show the same context K
+from one helper: live Pi `limit.context` / `contextWindow`, then the exact
+provider/model catalog row, then the published table for that model id.
+They do not use a fuzzy other-provider leftover or max-output tokens.
+While a QuestionCard or pending Desktop `ctx.ui` input card is waiting, the
+composer does not autofocus and does not steal keystrokes from that
+textarea.
 On Desktop (not VS Code), the thinking-level and model chips keep their
 runtime labels when a right-hand panel narrows the composer. Session-width
 rails keep thinking plus the full model name. Walkthrough and similarly

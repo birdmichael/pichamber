@@ -908,6 +908,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         currentSession,
         embeddedAllowPrompting ?? allowPromptingSubagentSessions,
         readOnly,
+        { parentIdIsLineage: isPiKernel },
     );
 
     React.useEffect(() => {

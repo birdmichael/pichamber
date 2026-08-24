@@ -47,4 +47,9 @@ describe('resolveChatPromptReadOnly', () => {
         expect(resolveChatPromptReadOnly(reviewSession, false, false)).toBe(false);
         expect(resolveChatPromptReadOnly(reviewSession, true, true)).toBe(true);
     });
+
+    test('keeps a Pi user-row fork writable when parentID is lineage', () => {
+        expect(resolveChatPromptReadOnly(session('parent'), false, false, { parentIdIsLineage: true })).toBe(false);
+        expect(resolveChatPromptReadOnly(session('parent'), false, true, { parentIdIsLineage: true })).toBe(true);
+    });
 });

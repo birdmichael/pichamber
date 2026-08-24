@@ -2233,6 +2233,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.messageBody.toast.planSaved': '计划已保存',
   'chat.messageBody.toast.imageSaved': '图片已保存',
   'chat.messageBody.toast.generateImageFailed': '生成图片失败',
+  'chat.messageBody.toast.copied': '已复制',
+  'chat.messageBody.toast.copyFailed': '复制失败',
   'chat.chatInput.actions.commands': '命令',
   'chat.chatInput.actions.attachFiles': '附加文件',
   'chat.chatInput.actions.addAttachment': '添加附件',
