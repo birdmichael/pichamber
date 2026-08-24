@@ -382,6 +382,39 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
+  it('returns the prompt-file template for /plan after an extension overlay', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      await fetch(`${url}/api/config/commands/plan`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          description: 'Turn a task into a plan',
+          template: 'Help me write a plan.\n\n$ARGUMENTS',
+        }),
+      });
+      const created = await (await fetch(`${url}/api/session`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Plan overlay' }),
+      })).json();
+      const record = kernel.host.getSession(created.id);
+      record.piSession.registerCommand('plan', async () => {}, { description: 'Enter plan mode' });
+
+      const listed = await (await fetch(`${url}/api/command`)).json();
+      expect(listed.find((command) => command.name === 'plan')).toMatchObject({
+        source: 'extension',
+        template: 'Help me write a plan.\n\n$ARGUMENTS',
+      });
+
+      const detail = await (await fetch(`${url}/api/config/commands/plan`)).json();
+      expect(detail.template).toBe('Help me write a plan.\n\n$ARGUMENTS');
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
   it('serves an OpenCode-shaped user object on /user and /api/user', async () => {
     const { url, close, kernel } = await startFacade();
     try {

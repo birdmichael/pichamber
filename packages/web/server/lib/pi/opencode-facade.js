@@ -335,15 +335,29 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/config/commands/:name', handle(async (req, res) => {
-    const command = host.listCommands(resolveDirectory(req)).find((item) => item.name === req.params.name);
+    const directory = resolveDirectory(req);
+    const command = host.listCommands(directory).find((item) => item.name === req.params.name);
     if (!command) {
       json(res, 404, { error: 'Command not found' });
       return;
     }
+    const prompt = host.listPrompts(directory).find((item) => item.name === req.params.name);
+    const promptTemplate = typeof prompt?.template === 'string' ? prompt.template : '';
+    const listedTemplate = typeof command.template === 'string' ? command.template : '';
+    const template = promptTemplate.length > 0 ? promptTemplate : listedTemplate;
+    const scope = prompt?.scope === 'project' || prompt?.scope === 'user'
+      ? prompt.scope
+      : command.source === 'builtin'
+        ? undefined
+        : (command.scope === 'project' ? 'project' : 'user');
+    const promptPath = prompt?.path || command.path;
     json(res, 200, {
       ...command,
-      scope: command.source === 'builtin' ? undefined : 'user',
-      sources: command.path ? { md: { exists: true, path: command.path, scope: 'user' } } : {},
+      template,
+      scope,
+      sources: promptPath
+        ? { md: { exists: true, path: promptPath, scope: scope === 'project' ? 'project' : 'user' } }
+        : {},
     });
   }));
 

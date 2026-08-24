@@ -14,6 +14,7 @@ import { isWindowsArm64 } from '@/lib/platform';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import type { MultiRunCompareGroup } from '@/types/multirun';
+import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch';
@@ -1786,6 +1787,7 @@ export const useUIStore = create<UIStore>()(
             if (!open) {
               return { isSettingsDialogOpen: false };
             }
+            markSettingsOpenedFromTrigger();
             if (state.settingsHasOpenedOnce) {
               return { isSettingsDialogOpen: true };
             }

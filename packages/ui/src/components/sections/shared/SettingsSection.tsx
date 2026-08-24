@@ -525,6 +525,7 @@ interface SettingsChipGroupProps<T extends string> {
   options: Array<SettingsChipOption<T>>;
   onChange: (value: T) => void;
   className?: string;
+  disabled?: boolean;
   'aria-label'?: string;
 }
 
@@ -534,13 +535,17 @@ export function SettingsChipGroup<T extends string>({
   options,
   onChange,
   className,
+  disabled = false,
   'aria-label': ariaLabel,
 }: SettingsChipGroupProps<T>) {
+  const ignoreClickRef = React.useRef(false);
+
   return (
     <div
       role="group"
       aria-label={ariaLabel}
-      className={cn('flex flex-wrap items-center gap-1', className)}
+      aria-disabled={disabled || undefined}
+      className={cn('flex flex-wrap items-center gap-1', disabled && 'opacity-60', className)}
     >
       {options.map((option) => (
         <Button
@@ -548,10 +553,26 @@ export function SettingsChipGroup<T extends string>({
           type="button"
           variant="chip"
           size="xs"
-          disabled={option.disabled}
+          disabled={disabled || option.disabled}
           aria-pressed={value === option.value}
           className="!font-normal"
-          onClick={() => onChange(option.value)}
+          onPointerDown={(event) => {
+            if (disabled || option.disabled || event.button !== 0) {
+              return;
+            }
+            ignoreClickRef.current = true;
+            onChange(option.value);
+          }}
+          onClick={() => {
+            if (ignoreClickRef.current) {
+              ignoreClickRef.current = false;
+              return;
+            }
+            if (disabled || option.disabled) {
+              return;
+            }
+            onChange(option.value);
+          }}
         >
           {option.label}
         </Button>

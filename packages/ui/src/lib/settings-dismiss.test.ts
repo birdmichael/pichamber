@@ -5,7 +5,9 @@ import {
   hasOpenSettingsOverlay,
   hasSettingsEscapeForm,
   isEventInsideSettingsView,
+  markSettingsOpenedFromTrigger,
   notifySettingsEscapeForm,
+  resetSettingsOpenedFromTriggerForTests,
   SETTINGS_ESCAPE_FORM_EVENT,
   shouldBlockSettingsDismiss,
 } from './settings-dismiss';
@@ -115,6 +117,17 @@ test('notifies a settings-local escape form and skips nested dialogs', () => {
 
 test('allows an explicit close when nothing is blocking', () => {
   resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
   expect(shouldBlockSettingsDismiss(false, { reason: 'close-press' })).toBe(false);
   expect(shouldBlockSettingsDismiss(true)).toBe(false);
+});
+
+test('blocks the leftover outside-press that follows opening Settings', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  markSettingsOpenedFromTrigger();
+  expect(shouldBlockSettingsDismiss(false, {
+    reason: 'outside-press',
+    event: { target: null },
+  })).toBe(true);
 });

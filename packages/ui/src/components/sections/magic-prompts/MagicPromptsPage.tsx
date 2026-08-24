@@ -16,6 +16,7 @@ import { useI18n } from '@/lib/i18n';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import { SettingsSection } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 type PromptBlock = {
   id: MagicPromptId;
@@ -293,6 +294,30 @@ export const MagicPromptsPage: React.FC = () => {
     }
   }, [t]);
 
+  const discardDrafts = React.useCallback(() => {
+    setDrafts({});
+  }, []);
+
+  const pageHasDirtyDraft = React.useMemo(() => {
+    return pageConfig.blocks.some((block) => getDraft(block.id) !== getBaseline(block.id));
+  }, [getBaseline, getDraft, pageConfig.blocks]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!pageHasDirtyDraft || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      discardDrafts();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [discardDrafts, pageHasDirtyDraft]);
+
   const handleResetAll = React.useCallback(async () => {
     setResettingAll(true);
     try {
@@ -337,7 +362,20 @@ export const MagicPromptsPage: React.FC = () => {
         </Button>
       )}
       showSaveStatus={false}
+      scrollKey={selectedPromptId}
     >
+      <div
+        ref={formRef}
+        data-settings-escape-form={pageHasDirtyDraft ? 'true' : undefined}
+        onKeyDown={(event) => {
+          if (!pageHasDirtyDraft || event.key !== 'Escape') {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          discardDrafts();
+        }}
+      >
       {pageConfig.blocks.map((block, index) => {
         const definition = getMagicPromptDefinition(block.id);
         const baseline = getBaseline(block.id);
@@ -380,6 +418,17 @@ export const MagicPromptsPage: React.FC = () => {
                     : t('settings.magicPrompts.page.status.usingBuiltinDefault')}
               </span>
               <div className="flex items-center gap-2">
+                {isDirty ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDraft(block.id, baseline)}
+                    disabled={saving || resetting}
+                  >
+                    {t('settings.common.actions.cancel')}
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"
@@ -404,6 +453,7 @@ export const MagicPromptsPage: React.FC = () => {
           </SettingsSection>
         );
       })}
+      </div>
     </SettingsPageLayout>
   );
 };

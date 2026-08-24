@@ -22,6 +22,7 @@ import { toast } from '@/components/ui';
 export const OpenCodeCliSettings: React.FC = () => {
   const { t } = useI18n();
   const [value, setValue] = React.useState('');
+  const [savedValue, setSavedValue] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
@@ -44,6 +45,7 @@ export const OpenCodeCliSettings: React.FC = () => {
         }
         const next = typeof data.opencodeBinary === 'string' ? data.opencodeBinary.trim() : '';
         setValue(next);
+        setSavedValue(next);
       } catch {
         // ignore
       } finally {
@@ -76,18 +78,25 @@ export const OpenCodeCliSettings: React.FC = () => {
     }
   }, []);
 
+  const unwrapBinary = React.useCallback((raw: string) => {
+    const trimmed = raw.trim();
+    return trimmed.length >= 2
+      && ((trimmed.startsWith('"') && trimmed.endsWith('"'))
+        || (trimmed.startsWith("'") && trimmed.endsWith("'")))
+      ? trimmed.slice(1, -1).trim()
+      : trimmed;
+  }, []);
+  const isDirty = unwrapBinary(value) !== unwrapBinary(savedValue);
+
   const handleSaveAndReload = React.useCallback(async () => {
+    if (!isDirty) return;
     setIsSaving(true);
     try {
       // Strip a wrapping quote pair (Windows "Copy as path" pastes) — literal
       // quotes are never part of a real path.
-      const trimmed = value.trim();
-      const unquoted = trimmed.length >= 2
-        && ((trimmed.startsWith('"') && trimmed.endsWith('"'))
-          || (trimmed.startsWith("'") && trimmed.endsWith("'")))
-        ? trimmed.slice(1, -1).trim()
-        : trimmed;
+      const unquoted = unwrapBinary(value);
       await updateDesktopSettings({ opencodeBinary: unquoted });
+      setSavedValue(unquoted);
       await reloadOpenCodeConfiguration({
         message: t('settings.openchamber.opencodeCli.actions.restartingOpenCode'),
       });
@@ -100,7 +109,7 @@ export const OpenCodeCliSettings: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [t, value]);
+  }, [isDirty, t, unwrapBinary, value]);
 
   const handleShowUpdateNotificationsChange = React.useCallback((enabled: boolean) => {
     setShowOpenCodeUpdateNotifications(enabled);
@@ -164,8 +173,9 @@ export const OpenCodeCliSettings: React.FC = () => {
             <Button
               type="button"
               size="xs"
+              variant={isDirty ? 'default' : 'outline'}
               onClick={handleSaveAndReload}
-              disabled={isLoading || isSaving}
+              disabled={isLoading || isSaving || !isDirty}
               className="shrink-0 !font-normal"
             >
               {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}

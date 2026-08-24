@@ -215,6 +215,7 @@ export const CommandsPage: React.FC = () => {
       title={isNewCommand ? t('settings.commands.page.title.new') : `/${selectedCommandName}`}
       description={isNewCommand ? t('settings.commands.page.subtitle.new') : t('settings.commands.page.subtitle.edit')}
       showSaveStatus={false}
+      scrollKey={selectedCommandName ?? 'empty'}
     >
       <SettingsSection
         title={t('settings.commands.page.section.identity')}
@@ -323,7 +324,32 @@ export const CommandsPage: React.FC = () => {
           <code className="text-foreground">!`cmd`</code> {t('settings.commands.page.templateHint.shellOutput')} &middot;{' '}
           <code className="text-foreground">@file</code> {t('settings.commands.page.templateHint.fileContents')}
         </p>
-        <div className="pt-3">
+        <div className="flex items-center gap-2 pt-3">
+          {isDirty ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="!font-normal"
+              disabled={isSaving}
+              onClick={() => {
+                const initial = initialStateRef.current;
+                if (!initial) {
+                  return;
+                }
+                if (isNewCommand) {
+                  setDraftName(initial.draftName);
+                  setDraftScope(initial.draftScope);
+                }
+                setDescription(initial.description);
+                setAgent(initial.agent);
+                setModel(initial.model);
+                setTemplate(initial.template);
+              }}
+            >
+              {t('settings.common.actions.cancel')}
+            </Button>
+          ) : null}
           <Button
             onClick={handleSave}
             disabled={isSaving || !isDirty}

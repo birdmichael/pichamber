@@ -293,7 +293,21 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           type="button"
           aria-label={t('numberInput.actions.decreaseAria')}
           disabled={decrementDisabled}
-          onClick={() => commitValue(committedValueRef.current - step)}
+          onPointerDown={(event) => {
+            if (decrementDisabled || event.button !== 0) return;
+            ignoreNextClickRef.current = true;
+            commitValue(committedValueRef.current - step);
+          }}
+          onClick={(event) => {
+            if (ignoreNextClickRef.current) {
+              ignoreNextClickRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            if (!decrementDisabled) {
+              commitValue(committedValueRef.current - step);
+            }
+          }}
           className={cn(
             "flex h-full w-7 shrink-0 items-center justify-center overflow-x-hidden overflow-y-hidden border-r border-border p-0 leading-none touch-manipulation",
             "text-muted-foreground hover:bg-interactive-hover hover:text-foreground",
@@ -328,7 +342,21 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           type="button"
           aria-label={t('numberInput.actions.increaseAria')}
           disabled={incrementDisabled}
-          onClick={() => commitValue(committedValueRef.current + step)}
+          onPointerDown={(event) => {
+            if (incrementDisabled || event.button !== 0) return;
+            ignoreNextClickRef.current = true;
+            commitValue(committedValueRef.current + step);
+          }}
+          onClick={(event) => {
+            if (ignoreNextClickRef.current) {
+              ignoreNextClickRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            if (!incrementDisabled) {
+              commitValue(committedValueRef.current + step);
+            }
+          }}
           className={cn(
             "flex h-full w-7 shrink-0 items-center justify-center overflow-x-hidden overflow-y-hidden border-l border-border p-0 leading-none touch-manipulation",
             "text-muted-foreground hover:bg-interactive-hover hover:text-foreground",

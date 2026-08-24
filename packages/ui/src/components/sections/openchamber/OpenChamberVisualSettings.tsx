@@ -1354,8 +1354,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Button size="sm"
                                                 type="button"
                                                 variant="ghost"
-                                                onClick={() => setTerminalFontSize(13)}
-                                                disabled={terminalFontSize === 13}
+                                                onClick={() => setTerminalFontSize(14)}
+                                                disabled={terminalFontSize === 14}
                                                 className={SETTINGS_ICON_BUTTON_CLASS}
                                                 aria-label={t('settings.openchamber.visual.actions.resetTerminalFontSizeAria')}
                                                 title={t('settings.common.actions.reset')}
@@ -1587,20 +1587,16 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                                         const rowStart = index * 3 + 1;
                                                                         const rowProgressPhase = previewPhase - rowStart + 1;
                                                                         const rowProgress = rowProgressPhase <= 0
-                                                                            ? 0
+                                                                            ? 24
                                                                             : rowProgressPhase === 1
                                                                                 ? 42
                                                                                 : rowProgressPhase === 2
                                                                                     ? 68
                                                                                     : 92;
-                                                                        const visible = rowProgress > 0;
                                                                         return (
                                                                             <div
                                                                                 key={index}
-                                                                                className={cn(
-                                                                                    'flex items-center gap-1.5 transition-all duration-300 motion-reduce:transition-none',
-                                                                                    visible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
-                                                                                )}
+                                                                                className="flex items-center gap-1.5"
                                                                             >
                                                                                 <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/55" />
                                                                                 <span
@@ -1614,13 +1610,13 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             ) : (
                                                                 <div className="space-y-1.5">
                                                                     {[0, 1, 2].map((index) => {
-                                                                        const visible = previewPhase >= (index + 1) * 3;
+                                                                        const revealed = previewPhase >= (index + 1) * 3;
                                                                         return (
                                                                             <div
                                                                                 key={index}
                                                                                 className={cn(
-                                                                                    'flex items-center gap-1.5 transition-all duration-300 motion-reduce:transition-none',
-                                                                                    visible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+                                                                                    'flex items-center gap-1.5',
+                                                                                    revealed ? 'opacity-100' : 'opacity-40',
                                                                                 )}
                                                                             >
                                                                                 <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/55" />

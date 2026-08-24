@@ -6,7 +6,6 @@ import { useGitHubAuthStore } from '@/stores/useGitHubAuthStore';
 import type { GitHubAuthStatus } from '@/lib/api/types';
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
-import { openExternalUrl } from '@/lib/url';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { Icon } from "@/components/icon/Icon";
@@ -43,10 +42,6 @@ export const GitHubSettings: React.FC = () => {
   const hasChecked = useGitHubAuthStore((state) => state.hasChecked);
   const refreshStatus = useGitHubAuthStore((state) => state.refreshStatus);
   const setStatus = useGitHubAuthStore((state) => state.setStatus);
-
-  const openExternal = React.useCallback(async (url: string) => {
-    await openExternalUrl(url);
-  }, []);
 
   const [isBusy, setIsBusy] = React.useState(false);
   const [flow, setFlow] = React.useState<DeviceFlowStartResponse | null>(null);
@@ -99,16 +94,13 @@ export const GitHubSettings: React.FC = () => {
 
       setFlow(payload);
       setPollIntervalMs(Math.max(1, payload.interval) * 1000);
-
-      const url = payload.verificationUriComplete || payload.verificationUri;
-      void openExternal(url);
     } catch (error) {
       console.error('Failed to start GitHub connect:', error);
       toast.error(t('settings.github.page.toast.startConnectFailed'));
     } finally {
       setIsBusy(false);
     }
-  }, [openExternal, runtimeGitHub, t]);
+  }, [runtimeGitHub, t]);
 
   const pollOnce = React.useCallback(async (deviceCode: string) => {
     if (runtimeGitHub) {
