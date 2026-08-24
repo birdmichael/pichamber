@@ -1,6 +1,12 @@
-import { describe, test, expect } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 
 import {
+    compareOpenCodeUpdateVersions,
+    dismissOpenCodeUpdateToast,
+    normalizeOpenCodeUpdateVersion,
+    rememberOpenCodeUpdateToastDismiss,
+    resetRememberedOpenCodeUpdateDismiss,
+    resolveDismissedOpenCodeUpdateVersion,
     resolveOpenCodeUpdateVersion,
     resolveOpenCodeUpgradeStatusVersion,
     resolvePiUpgradeStatusVersion,
@@ -137,6 +143,137 @@ describe('shouldShowOpenCodeUpdateToast', () => {
                 version: '1.16.0',
                 dismissedVersion: '1.15.0',
                 seenVersions: new Set(['1.16.0']),
+            }),
+        ).toBe(false);
+    });
+
+    test('treats a v-prefixed dismissed version as the same release', () => {
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: 'v0.84.3',
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: 'v0.84.3',
+                dismissedVersion: '0.84.3',
+                seenVersions: new Set(['0.84.3']),
+            }),
+        ).toBe(false);
+    });
+
+    test('hides an older available version after a newer one was dismissed', () => {
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.2',
+                dismissedVersion: '0.84.3',
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+    });
+
+    test('shows again when a newer version is available after dismiss', () => {
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.85.0',
+                dismissedVersion: '0.84.3',
+                seenVersions: new Set(),
+            }),
+        ).toBe(true);
+    });
+});
+
+describe('openCode update toast dismiss path', () => {
+    beforeEach(() => {
+        resetRememberedOpenCodeUpdateDismiss();
+    });
+
+    test('normalizes and compares Pi versions without a hardcoded provider', () => {
+        expect(normalizeOpenCodeUpdateVersion(' v0.84.3 ')).toBe('0.84.3');
+        expect(compareOpenCodeUpdateVersions('0.85.0', '0.84.3')).toBeGreaterThan(0);
+        expect(compareOpenCodeUpdateVersions('0.84.3', 'v0.84.3')).toBe(0);
+    });
+
+    test('Dismiss and the toast close control persist the version so retries do not re-show it', () => {
+        const persisted: string[] = [];
+        let hidden = 0;
+
+        const persistDismissedVersion = (version: string) => {
+            persisted.push(version);
+        };
+        const hideToast = () => {
+            hidden += 1;
+        };
+
+        expect(
+            dismissOpenCodeUpdateToast({
+                version: '0.84.3',
+                persistDismissedVersion,
+                hideToast,
+            }),
+        ).toBe('0.84.3');
+        // Sonner OK / X / swipe also go through the same helper via onDismiss.
+        expect(
+            dismissOpenCodeUpdateToast({
+                version: '0.84.3',
+                persistDismissedVersion,
+                hideToast,
+            }),
+        ).toBe('0.84.3');
+
+        expect(hidden).toBe(2);
+        expect(persisted).toEqual(['0.84.3', '0.84.3']);
+        expect(resolveDismissedOpenCodeUpdateVersion(null)).toBe('0.84.3');
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: resolveDismissedOpenCodeUpdateVersion(null),
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: resolveDismissedOpenCodeUpdateVersion('0.84.3'),
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+    });
+
+    test('hides the toast even when persist throws', () => {
+        let hidden = 0;
+        expect(
+            dismissOpenCodeUpdateToast({
+                version: '0.84.3',
+                persistDismissedVersion: () => {
+                    throw new Error('settings write failed');
+                },
+                hideToast: () => {
+                    hidden += 1;
+                },
+            }),
+        ).toBe('0.84.3');
+        expect(hidden).toBe(1);
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: resolveDismissedOpenCodeUpdateVersion(null),
+                seenVersions: new Set(),
+            }),
+        ).toBe(false);
+    });
+
+    test('remembers dismiss in-memory so a storage miss cannot resurrect the toast', () => {
+        rememberOpenCodeUpdateToastDismiss('0.84.3');
+        expect(resolveDismissedOpenCodeUpdateVersion(null)).toBe('0.84.3');
+        expect(resolveDismissedOpenCodeUpdateVersion('0.80.0')).toBe('0.84.3');
+        expect(
+            shouldShowOpenCodeUpdateToast({
+                version: '0.84.3',
+                dismissedVersion: resolveDismissedOpenCodeUpdateVersion(''),
+                seenVersions: new Set(),
             }),
         ).toBe(false);
     });

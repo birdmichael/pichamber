@@ -101,6 +101,8 @@ That runs, in order:
 
 **Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`). Without Apple signing env, the Mac build is unsigned and notarization is disabled.
 
+Unsigned and ad-hoc Mac builds can check for updates but cannot install in-place. `quitAndInstall()` fails there, `autoInstallOnAppQuit` stays off, and Desktop must not report Restart to Update as success. The update dialog hides in-app install and opens the GitHub release so the user can replace `Pichamber.app` from the `.dmg`. Developer ID / notarized builds still use Restart to Update.
+
 Unsigned downloads are blocked by Gatekeeper until the user removes quarantine and re-signs locally. After copying `Pichamber.app` to `/Applications`:
 
 ```sh

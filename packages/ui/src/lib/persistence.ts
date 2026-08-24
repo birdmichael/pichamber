@@ -168,6 +168,9 @@ const persistToLocalStorage = (settings: DesktopSettings) => {
     localStorage.removeItem('openchamber.pwaName');
   }
   setStoredMobileKeyboardMode(settings.mobileKeyboardMode);
+  // Missing means "leave the local dismiss alone". Only an explicit empty
+  // string clears it, so a settings sync that omits the field cannot revive
+  // a toast the user already dismissed on this device.
   if (typeof settings.openCodeUpdateToastDismissedVersion === 'string') {
     const version = settings.openCodeUpdateToastDismissedVersion.trim();
     if (version) {
@@ -175,8 +178,6 @@ const persistToLocalStorage = (settings: DesktopSettings) => {
     } else {
       localStorage.removeItem('opencode-update-toast-dismissed-version');
     }
-  } else {
-    localStorage.removeItem('opencode-update-toast-dismissed-version');
   }
   if (typeof settings.dictationEnabled === 'boolean') {
     localStorage.setItem('dictationEnabled', String(settings.dictationEnabled));

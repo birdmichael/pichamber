@@ -9,7 +9,10 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { getRuntimeKey, subscribeRuntimeEndpointChanged } from '@/lib/runtime-switch';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
+import { OpenCodeUpdateBanner } from './OpenCodeUpdateBanner';
 import {
+  dismissOpenCodeUpdateToast,
+  resolveDismissedOpenCodeUpdateVersion,
   resolveOpenCodeUpdateVersion,
   resolveOpenCodeUpgradeStatusVersion,
   resolvePiUpgradeStatusVersion,
@@ -23,18 +26,38 @@ const INITIAL_CHECK_DELAY_MS = 5_000;
 const CHECK_RETRY_DELAYS_MS = [10_000, 60_000];
 const UPDATE_TOAST_DISMISSED_VERSION_KEY = 'opencode-update-toast-dismissed-version';
 
+const persistDismissedVersion = (dismissedVersion: string) => {
+  getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, dismissedVersion);
+  void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: dismissedVersion });
+};
+
 export const OpenCodeUpdateToast: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
   const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
   const seenVersionsRef = React.useRef(new Set<string>());
   const upgradingRef = React.useRef(false);
+  const [availableVersion, setAvailableVersion] = React.useState<string | null>(null);
+
+  const hideAvailableBanner = React.useCallback(() => {
+    setAvailableVersion(null);
+    // Clear any leftover Infinity sonner pill from older builds.
+    toast.dismiss(UPDATE_TOAST_ID);
+  }, []);
 
   React.useEffect(() => {
     if (!showOpenCodeUpdateNotifications) {
-      toast.dismiss(UPDATE_TOAST_ID);
+      hideAvailableBanner();
     }
-  }, [showOpenCodeUpdateNotifications]);
+  }, [hideAvailableBanner, showOpenCodeUpdateNotifications]);
+
+  const dismissAvailableBanner = React.useCallback((version: string) => {
+    dismissOpenCodeUpdateToast({
+      version,
+      persistDismissedVersion,
+      hideToast: hideAvailableBanner,
+    });
+  }, [hideAvailableBanner]);
 
   const reloadOpenCode = React.useCallback(() => {
     toast.dismiss(UPGRADE_TOAST_ID);
@@ -48,7 +71,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
   const runUpgrade = React.useCallback(async () => {
     if (isPiKernel || upgradingRef.current) return;
     upgradingRef.current = true;
-    toast.dismiss(UPDATE_TOAST_ID);
+    hideAvailableBanner();
     toast.message(t('opencodeUpdate.toast.upgrading.title'), {
       id: UPGRADE_TOAST_ID,
       description: t('opencodeUpdate.toast.upgrading.description'),
@@ -91,58 +114,27 @@ export const OpenCodeUpdateToast: React.FC = () => {
     } finally {
       upgradingRef.current = false;
     }
-  }, [isPiKernel, reloadOpenCode, t]);
+  }, [hideAvailableBanner, isPiKernel, reloadOpenCode, t]);
 
   React.useEffect(() => {
-    const showUpdateAvailableToast = (version: string) => {
-      // Upstream setting wins over our dedup logic: if user disabled
-      // OpenCode update notifications, dismiss any active toast and bail
-      // before consulting dedup state.
+    const offerAvailableUpdate = (version: string) => {
       if (!useUIStore.getState().showOpenCodeUpdateNotifications) {
-        toast.dismiss(UPDATE_TOAST_ID);
+        hideAvailableBanner();
         return;
       }
       const decision = shouldShowOpenCodeUpdateToast({
         version,
-        dismissedVersion: getDeferredSafeStorage().getItem(UPDATE_TOAST_DISMISSED_VERSION_KEY),
+        dismissedVersion: resolveDismissedOpenCodeUpdateVersion(
+          getDeferredSafeStorage().getItem(UPDATE_TOAST_DISMISSED_VERSION_KEY),
+        ),
         seenVersions: seenVersionsRef.current,
       });
       if (!decision) {
         return;
       }
       seenVersionsRef.current.add(version);
-
-      const dismiss = () => {
-        getDeferredSafeStorage().setItem(UPDATE_TOAST_DISMISSED_VERSION_KEY, version);
-        void updateDesktopSettings({ openCodeUpdateToastDismissedVersion: version });
-        toast.dismiss(UPDATE_TOAST_ID);
-      };
-
-      if (isPiKernel) {
-        toast.info(t('piUpdate.toast.available.title', { version }), {
-          id: UPDATE_TOAST_ID,
-          duration: Infinity,
-          cancel: {
-            label: t('piUpdate.toast.actions.dismiss'),
-            onClick: dismiss,
-          },
-        });
-        return;
-      }
-
-      toast.info(t('opencodeUpdate.toast.available.title'), {
-        id: UPDATE_TOAST_ID,
-        description: t('opencodeUpdate.toast.available.description', { version }),
-        duration: Infinity,
-        action: {
-          label: t('opencodeUpdate.toast.actions.update'),
-          onClick: runUpgrade,
-        },
-        cancel: {
-          label: t('opencodeUpdate.toast.actions.dismiss'),
-          onClick: dismiss,
-        },
-      });
+      setAvailableVersion(version);
+      toast.dismiss(UPDATE_TOAST_ID);
     };
 
     let cancelled = false;
@@ -158,7 +150,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
           ? resolvePiUpgradeStatusVersion(status)
           : resolveOpenCodeUpgradeStatusVersion(status);
         if (!cancelled && runtimeKey === getRuntimeKey() && version) {
-          showUpdateAvailableToast(version);
+          offerAvailableUpdate(version);
         }
       } catch {
         const delay = CHECK_RETRY_DELAYS_MS[attempt];
@@ -181,7 +173,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
 
     const unsubscribeRuntime = subscribeRuntimeEndpointChanged(({ runtimeKey }) => {
       seenVersionsRef.current.clear();
-      toast.dismiss(UPDATE_TOAST_ID);
+      hideAvailableBanner();
       if (useUIStore.getState().showOpenCodeUpdateNotifications) {
         void checkForUpdate(0, runtimeKey);
       }
@@ -194,7 +186,42 @@ export const OpenCodeUpdateToast: React.FC = () => {
       unsubscribeRuntime();
       window.removeEventListener('openchamber:opencode-update-available', onUpdateAvailable);
     };
-  }, [isPiKernel, runUpgrade, showOpenCodeUpdateNotifications, t]);
+  }, [hideAvailableBanner, isPiKernel, showOpenCodeUpdateNotifications]);
 
-  return null;
+  if (!availableVersion || !showOpenCodeUpdateNotifications) {
+    return null;
+  }
+
+  return (
+    <OpenCodeUpdateBanner
+      title={
+        isPiKernel
+          ? t('piUpdate.toast.available.title', { version: availableVersion })
+          : t('opencodeUpdate.toast.available.title')
+      }
+      description={
+        isPiKernel
+          ? null
+          : t('opencodeUpdate.toast.available.description', { version: availableVersion })
+      }
+      dismissLabel={
+        isPiKernel
+          ? t('piUpdate.toast.actions.dismiss')
+          : t('opencodeUpdate.toast.actions.dismiss')
+      }
+      primaryLabel={
+        isPiKernel
+          ? t('piUpdate.toast.actions.ok')
+          : t('opencodeUpdate.toast.actions.update')
+      }
+      onDismiss={() => dismissAvailableBanner(availableVersion)}
+      onPrimary={() => {
+        if (isPiKernel) {
+          dismissAvailableBanner(availableVersion);
+          return;
+        }
+        void runUpgrade();
+      }}
+    />
+  );
 };
