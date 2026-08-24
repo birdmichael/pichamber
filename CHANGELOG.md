@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-25
+
 - Settings: action buttons now keep sentence case (Save changes, Create skill) instead of forcing all-lowercase.
 - Settings: unselected radio labels stay readable. Disabled options, including Sessions retention while Auto-Cleanup is off, still look disabled.
 - Settings: turning on a parent option no longer drops the next click onto the newly revealed row (Activity Default, Collapsible reasoning, and TTS).
