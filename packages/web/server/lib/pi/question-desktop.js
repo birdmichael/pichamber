@@ -49,7 +49,7 @@ const simpleOptionLabels = (options) => (
   (Array.isArray(options) ? options : []).map((option) => optionLabel(option))
 );
 
-export const questionToolResultFromPrompt = (params, result) => {
+const questionToolResultFromPrompt = (params, result) => {
   const question = typeof params?.question === 'string' ? params.question : '';
   const options = simpleOptionLabels(params?.options);
 
