@@ -53,5 +53,10 @@ export const formatEffortLabel = (variant?: string) => {
     if (/^\d+(\.\d+)?$/.test(trimmed)) {
         return trimmed;
     }
+    // Composer and Settings share this helper. Keep Pi's xhigh token as
+    // "xhigh" — capitalizing it to "Xhigh" is not a product label.
+    if (trimmed.toLowerCase() === 'xhigh') {
+        return 'xhigh';
+    }
     return capitalizeLabel(trimmed);
 };

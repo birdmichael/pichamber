@@ -17,6 +17,9 @@ export const SETTINGS_SELECT_ROW_TRIGGER_CLASS = 'w-full min-w-40 max-w-48';
 export const SETTINGS_ICON_BUTTON_CLASS =
   'h-8 w-8 px-0 text-muted-foreground hover:text-foreground';
 
+/** Settings action buttons keep locale sentence case (dialogs already do). */
+export const SETTINGS_ACTION_BUTTON_CLASS = 'normal-case';
+
 /** Custom dropdown triggers (ModelSelector / AgentSelector) in settings field rows. */
 // eslint-disable-next-line react-refresh/only-export-components
 export const SETTINGS_CUSTOM_TRIGGER_CLASS = cn(
@@ -482,7 +485,8 @@ export const SettingsRadioOption: React.FC<SettingsRadioOptionProps> = ({
         <span
           className={cn(
             'typography-settings-field-label font-normal',
-            selected ? 'text-foreground' : 'text-foreground/50',
+            'text-foreground',
+            disabled && 'text-muted-foreground',
           )}
         >
           {label}

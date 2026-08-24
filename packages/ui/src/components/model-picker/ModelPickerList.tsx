@@ -105,30 +105,30 @@ const ModelPickerRowTooltip: React.FC<{
     <Tooltip delayDuration={0} open={active && delayedActive} onOpenChange={() => {}}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       {active && delayedActive ? (
-        <TooltipContent side="right" sideOffset={8} className="max-w-[min(18rem,calc(100vw-1.5rem))] text-left transition-none data-[starting-style]:opacity-100 data-[starting-style]:scale-100 data-[ending-style]:opacity-100 data-[ending-style]:scale-100">
+        <TooltipContent side="right" sideOffset={8} className="z-[220] max-w-[min(22rem,calc(100vw-1.5rem))] overflow-visible text-left transition-none data-[starting-style]:opacity-100 data-[starting-style]:scale-100 data-[ending-style]:opacity-100 data-[ending-style]:scale-100">
           <div className="flex flex-col gap-2 text-left text-xs">
             {capabilities.length > 0 ? (
-              <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span className="typography-meta font-medium">{labels.capabilities}</span>
-                <span className="typography-meta text-foreground">{capabilities.join(', ')}</span>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-muted-foreground">
+                <span className="typography-meta shrink-0 font-medium">{labels.capabilities}</span>
+                <span className="typography-meta min-w-0 whitespace-normal break-words text-foreground">{capabilities.join(', ')}</span>
               </div>
             ) : null}
             {inputModalities.length > 0 ? (
-              <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span className="typography-meta font-medium">{labels.input}</span>
-                <span className="typography-meta text-foreground">{inputModalities.join(', ')}</span>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-muted-foreground">
+                <span className="typography-meta shrink-0 font-medium">{labels.input}</span>
+                <span className="typography-meta min-w-0 whitespace-normal break-words text-foreground">{inputModalities.join(', ')}</span>
               </div>
             ) : null}
             {outputModalities.length > 0 ? (
-              <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span className="typography-meta font-medium">{labels.output}</span>
-                <span className="typography-meta text-foreground">{outputModalities.join(', ')}</span>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-muted-foreground">
+                <span className="typography-meta shrink-0 font-medium">{labels.output}</span>
+                <span className="typography-meta min-w-0 whitespace-normal break-words text-foreground">{outputModalities.join(', ')}</span>
               </div>
             ) : null}
             {(metadata?.cost?.input !== undefined || metadata?.cost?.output !== undefined) ? (
-              <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span className="typography-meta font-medium">{labels.costPerMillion}</span>
-                <span className="typography-meta text-foreground">In {formatCost(metadata?.cost?.input)} · Out {formatCost(metadata?.cost?.output)}</span>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-muted-foreground">
+                <span className="typography-meta shrink-0 font-medium">{labels.costPerMillion}</span>
+                <span className="typography-meta min-w-0 whitespace-normal break-words text-foreground">In {formatCost(metadata?.cost?.input)} · Out {formatCost(metadata?.cost?.output)}</span>
               </div>
             ) : null}
           </div>

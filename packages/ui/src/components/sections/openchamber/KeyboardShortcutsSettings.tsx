@@ -248,6 +248,8 @@ export const KeyboardShortcutsSettings: React.FC = () => {
           const draft = draftByAction[action.id];
           const displayCombo = draft ?? effective;
           const hasDraft = typeof draft === 'string' && normalizeCombo(draft) !== normalizeCombo(effective);
+          const hasOverride = Object.prototype.hasOwnProperty.call(shortcutOverrides, action.id);
+          const isCapturing = capturingActionId === action.id;
           const isUnassignedDisplay = displayCombo === '' || normalizeCombo(displayCombo) === UNASSIGNED_SHORTCUT;
           const displayValue = capturingActionId === action.id
             ? t('settings.openchamber.keyboardShortcuts.field.pressKeys')
@@ -297,26 +299,44 @@ export const KeyboardShortcutsSettings: React.FC = () => {
                   }}
                   className="h-7 w-40 min-w-0 typography-ui-label text-center"
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="xs"
-                  className="!font-normal"
-                  onClick={() => {
-                    const next = draftByAction[action.id];
-                    if (!next) {
-                      setErrorText(t('settings.openchamber.keyboardShortcuts.error.captureFirst'));
-                      return;
-                    }
-                    saveCombo(action.id, next);
-                  }}
-                  disabled={!hasDraft}
-                >
-                  {t('settings.common.actions.saveChanges')}
-                </Button>
-                <Button type="button" size="xs" className="!font-normal" variant="ghost" onClick={() => resetOne(action.id)}>
-                  {t('settings.common.actions.reset')}
-                </Button>
+                {isCapturing ? (
+                  <Button
+                    type="button"
+                    size="xs"
+                    className="!font-normal"
+                    variant="ghost"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setCapturingActionId(null);
+                      setErrorText('');
+                    }}
+                  >
+                    {t('settings.common.actions.cancel')}
+                  </Button>
+                ) : null}
+                {hasDraft ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="xs"
+                    className="!font-normal"
+                    onClick={() => {
+                      const next = draftByAction[action.id];
+                      if (!next) {
+                        setErrorText(t('settings.openchamber.keyboardShortcuts.error.captureFirst'));
+                        return;
+                      }
+                      saveCombo(action.id, next);
+                    }}
+                  >
+                    {t('settings.common.actions.saveChanges')}
+                  </Button>
+                ) : null}
+                {hasOverride || hasDraft ? (
+                  <Button type="button" size="xs" className="!font-normal" variant="ghost" onClick={() => resetOne(action.id)}>
+                    {t('settings.common.actions.reset')}
+                  </Button>
+                ) : null}
               </SettingsFieldRow>
             </div>
           );

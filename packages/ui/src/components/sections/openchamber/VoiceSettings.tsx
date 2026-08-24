@@ -26,6 +26,7 @@ import {
     SETTINGS_FIELD_LABEL_CLASS,
     SETTINGS_HELPER_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { SettingsReveal } from '@/components/sections/shared/SettingsReveal';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { browserVoiceService } from '@/lib/voice/browserVoiceService';
 import { cn } from '@/lib/utils';
@@ -202,12 +203,12 @@ const LocalModelPicker = ({
                                     />
                                 </div>
                                 <div className="min-w-0 flex-1 space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <span className="min-w-0 truncate typography-ui-label font-normal text-foreground">
                                             {tUnsafe(entry.labelKey)}
                                         </span>
                                         {entry.badgeKey ? (
-                                            <span className="rounded border border-[var(--status-success-border)] bg-[var(--status-success-background)] px-1 text-[9px] font-medium uppercase leading-[14px] tracking-wide text-[var(--status-success)]">
+                                            <span className="shrink-0 rounded border border-[var(--status-success-border)] bg-[var(--status-success-background)] px-1 text-[9px] font-medium uppercase leading-[14px] tracking-wide text-[var(--status-success)]">
                                                 {tUnsafe(entry.badgeKey)}
                                             </span>
                                         ) : null}
@@ -815,7 +816,7 @@ export const VoiceSettings: React.FC = () => {
                     ariaLabel={t('settings.voice.page.field.messageReadAloudButtonAria')}
                 />
 
-                {showMessageTTSButtons && (
+                <SettingsReveal revealed={showMessageTTSButtons}>
                     <>
                         <SettingsControlGroup
                             title={t('settings.voice.page.field.provider')}
@@ -1153,7 +1154,7 @@ export const VoiceSettings: React.FC = () => {
                                 />
                             </SettingsControlGroup>
                     </>
-                )}
+                </SettingsReveal>
             </SettingsSection>
 
             <SettingsSection

@@ -45,6 +45,11 @@ describe('resolvePiThinkingChipPresentation', () => {
       level: 'max',
       label: 'Max',
     });
+    expect(resolvePiThinkingChipPresentation('xhigh')).toEqual({
+      status: 'ready',
+      level: 'xhigh',
+      label: 'xhigh',
+    });
     expect(resolvePiThinkingChipPresentation('low')).toEqual({
       status: 'ready',
       level: 'low',

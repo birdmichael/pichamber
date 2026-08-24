@@ -62,6 +62,7 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
 
   return (
     <ScrollableOverlay
+      key={scrollKey ?? 'settings-page'}
       outerClassName={cn('h-full min-h-0', outerClassName)}
       className="w-full @container"
     >
@@ -69,6 +70,8 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
         ref={contentRef}
         className={cn(
           'mx-auto max-w-[840px] space-y-0 px-6 py-6 @3xl:px-12 @3xl:py-8',
+          // Button defaults to lowercase; Settings actions keep locale sentence case.
+          '[&_[data-slot=button]]:normal-case',
           // The first visible section never needs the top divider, no matter
           // which platform-conditional sections above it rendered null.
           '[&>section:first-of-type]:border-t-0 [&>section:first-of-type]:pt-0',

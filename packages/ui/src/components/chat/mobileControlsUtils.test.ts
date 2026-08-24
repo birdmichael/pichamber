@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { shouldShowComposerAgentChip } from './composerAgentChip';
-import { isPrimaryMode } from './mobileControlsUtils';
+import { formatEffortLabel, isPrimaryMode } from './mobileControlsUtils';
 
 /** Same composition as MobileAgentButton after getVisibleAgents(). */
 const shouldShowMobileAgentButton = (
@@ -35,5 +35,13 @@ describe('MobileAgentButton Pi hide', () => {
 
   test('does not hide an empty list so OpenCode can still paint while agents hydrate', () => {
     expect(shouldShowMobileAgentButton([])).toBe(true);
+  });
+});
+
+describe('formatEffortLabel', () => {
+  test('keeps the composer xhigh token instead of Xhigh', () => {
+    expect(formatEffortLabel('xhigh')).toBe('xhigh');
+    expect(formatEffortLabel('high')).toBe('High');
+    expect(formatEffortLabel('max')).toBe('Max');
   });
 });

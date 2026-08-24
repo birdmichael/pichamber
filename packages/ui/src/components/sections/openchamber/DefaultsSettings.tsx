@@ -36,6 +36,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import { clampPiThinkingLevel, type PiThinkingLevel } from '@/components/chat/piThinking';
+import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
 
 const getDisplayModel = (
   storedModel: string | undefined
@@ -318,7 +319,7 @@ export const DefaultsSettings: React.FC = () => {
     if (variant === DEFAULT_VARIANT_VALUE) {
       return t('settings.openchamber.defaults.option.default');
     }
-    return variant.charAt(0).toUpperCase() + variant.slice(1);
+    return formatEffortLabel(variant);
   }, [t]);
 
   const handleAgentChange = React.useCallback(
@@ -501,6 +502,7 @@ export const DefaultsSettings: React.FC = () => {
                 modelId={parsedModel.modelId}
                 onChange={handleModelChange}
                 className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+                dropdownPortalToBody
               />
             </SettingsFieldRow>
 
@@ -787,6 +789,7 @@ export const DefaultsSettings: React.FC = () => {
                   onChange={handleSmallModelOverrideChange}
                   allowedProviderIds={smallModelProviders}
                   className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+                  dropdownPortalToBody
                 />
               </SettingsFieldRow>
             ) : null}
@@ -813,6 +816,7 @@ export const DefaultsSettings: React.FC = () => {
                   isModelAllowed={isStructuredOutputCapable}
                   placeholder={t('settings.openchamber.defaults.walkthroughModel.usesSmallModel')}
                   className={SETTINGS_CUSTOM_TRIGGER_CLASS}
+                  dropdownPortalToBody
                 />
               </SettingsFieldRow>
             </SettingsInset>

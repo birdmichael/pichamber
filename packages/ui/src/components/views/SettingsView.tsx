@@ -972,7 +972,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                         key={page.slug}
                         type="button"
                         data-settings-nav={page.slug}
-                        onClick={() => openPage(page.slug)}
+                        onPointerDown={(event) => {
+                          if (event.button !== 0) {
+                            return;
+                          }
+                          event.currentTarget.dataset.settingsNavArmed = '1';
+                          openPage(page.slug);
+                        }}
+                        onClick={(event) => {
+                          if (event.currentTarget.dataset.settingsNavArmed === '1') {
+                            delete event.currentTarget.dataset.settingsNavArmed;
+                            return;
+                          }
+                          openPage(page.slug);
+                        }}
                         aria-current={selected ? 'page' : undefined}
                         className={cn(
                           'flex h-11 min-h-11 w-full shrink-0 items-center gap-2.5 rounded-md px-3 sm:h-8 sm:min-h-8 sm:gap-2 sm:px-2',
@@ -1083,7 +1096,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   };
 
   return (
-    <div ref={containerRef} data-settings-view="true" className={cn('relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-background)] text-[var(--surface-foreground)]')}>
+    <div ref={containerRef} data-settings-view="true" className={cn('relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--surface-background)] text-[var(--surface-foreground)] [&_[data-slot=button]]:normal-case')}>
       {isMobile ? (
         <div
           className={cn(

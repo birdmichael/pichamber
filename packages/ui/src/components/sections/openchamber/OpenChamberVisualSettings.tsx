@@ -59,6 +59,7 @@ import {
     SETTINGS_FIELDS_STACK_CLASS,
     SETTINGS_OPTION_STACK_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { SettingsReveal } from '@/components/sections/shared/SettingsReveal';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import type { TerminalShellOption } from '@/lib/api/types';
@@ -1042,7 +1043,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <SelectTrigger aria-label={t('settings.appearance.language.select')} size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_TRIGGER_CLASS}>
                                                 <SelectValue>{label(locale)}</SelectValue>
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent side="bottom">
                                                 {locales.map((availableLocale) => (
                                                     <SelectItem key={availableLocale} value={availableLocale}>
                                                         {label(availableLocale)}
@@ -1523,7 +1524,11 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 >
                                     <Select value={terminalShell} onValueChange={(value) => { if (isTerminalShell(value)) setTerminalShell(value); }}>
                                         <SelectTrigger aria-label={t('settings.openchamber.visual.field.terminalShellAria')} size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_TRIGGER_CLASS}>
-                                            <SelectValue />
+                                            <SelectValue>
+                                              {terminalShell === 'auto'
+                                                ? t('settings.openchamber.visual.option.terminalShell.auto')
+                                                : (terminalShellOptions.find((shell) => shell.id === terminalShell)?.name ?? terminalShell)}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="auto">{t('settings.openchamber.visual.option.terminalShell.auto')}</SelectItem>
@@ -1637,7 +1642,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                     </SettingsControlGroup>
                                 )}
 
-                                {shouldShow('activityRenderMode') && chatRenderMode === 'sorted' && (
+                                <SettingsReveal revealed={shouldShow('activityRenderMode') && chatRenderMode === 'sorted'}>
                                     <SettingsControlGroup title={t('settings.openchamber.visual.section.activityDefault')}>
                                         <SettingsRadioGroup aria-label={t('settings.openchamber.visual.section.activityDefaultAria')}>
                                             {ACTIVITY_RENDER_MODE_OPTIONS.map((option) => (
@@ -1651,7 +1656,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             ))}
                                         </SettingsRadioGroup>
                                     </SettingsControlGroup>
-                                )}
+                                </SettingsReveal>
                             </SettingsSection>
                         )}
 
@@ -1873,14 +1878,14 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             ariaLabel={t('settings.openchamber.visual.field.showReasoningTracesAria')}
                                             settingsItem="chat.reasoning-traces"
                                         />
-                                        {showReasoningTraces && (
+                                        <SettingsReveal revealed={showReasoningTraces}>
                                             <SettingsCheckboxRow
                                                 checked={collapsibleThinkingBlocks}
                                                 onChange={setCollapsibleThinkingBlocks}
                                                 label={t('settings.openchamber.visual.field.collapsibleThinkingBlocks')}
                                                 ariaLabel={t('settings.openchamber.visual.field.collapsibleThinkingBlocksAria')}
                                             />
-                                        )}
+                                        </SettingsReveal>
                                     </SettingsSection>
                                 )}
 

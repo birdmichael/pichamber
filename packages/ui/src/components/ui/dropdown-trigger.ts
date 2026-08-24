@@ -19,7 +19,7 @@ export const dropdownTriggerVariants = cva(
     'typography-ui-label whitespace-nowrap shadow-none outline-none text-left',
     'hover:bg-interactive-hover data-[popup-open]:bg-interactive-active',
     'focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-    'disabled:cursor-not-allowed disabled:opacity-50',
+    'disabled:cursor-default disabled:opacity-50',
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='text-'])]:text-muted-foreground",
   ].join(' '),
   {

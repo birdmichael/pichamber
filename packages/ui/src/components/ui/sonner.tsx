@@ -82,7 +82,7 @@ function usePinnedToastStyles(shadow: string) {
   }, [shadow])
 }
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({ offset, ...props }: ToasterProps) => {
   const isDark = useIsDarkTheme()
   const shadow = isDark ? SHADOW_DARK : SHADOW_LIGHT
   usePinnedToastStyles(shadow)
@@ -92,6 +92,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={isDark ? "dark" : "light"}
       className="toaster group app-region-no-drag"
       closeButton={false}
+      offset={offset ?? "calc(var(--oc-header-height, 3rem) + 12px)"}
       toastOptions={{
         classNames: {
           toast:

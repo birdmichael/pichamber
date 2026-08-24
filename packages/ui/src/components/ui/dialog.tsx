@@ -63,7 +63,7 @@ const DialogOverlay = React.forwardRef<
       className={cn(
         "oc-glass-backdrop fixed inset-0 z-50 bg-black/25 dark:bg-black/40",
         "transition-opacity duration-150 ease-out",
-        "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+        "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:pointer-events-none",
         className
       )}
       {...props}
