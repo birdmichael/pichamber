@@ -1,9 +1,9 @@
-export type QuestionToolOption = {
+type QuestionToolOption = {
   label: string;
   description?: string;
 };
 
-export type QuestionToolItem = {
+type QuestionToolItem = {
   question: string;
   answer: string;
   cancelled: boolean;
