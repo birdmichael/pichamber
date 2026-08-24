@@ -52,6 +52,32 @@ describe('toPiRuntimeModelProviders', () => {
     ]);
   });
 
+  test('keeps the Pi contextWindow so pickers do not fall back to models.dev', () => {
+    expect(toPiRuntimeModelProviders({
+      providers: [{
+        id: 'acme',
+        name: 'Acme',
+        models: {
+          'grok-4.6': {
+            id: 'grok-4.6',
+            name: 'Grok 4.6',
+            contextWindow: 256000,
+            limit: { context: 256000, output: 8192 },
+          },
+        },
+      }],
+    })).toEqual([{
+      id: 'acme',
+      name: 'Acme',
+      models: [{
+        id: 'grok-4.6',
+        name: 'Grok 4.6',
+        contextWindow: 256000,
+        limit: { context: 256000, output: 8192 },
+      }],
+    }]);
+  });
+
   test('does not invent providers from missing or malformed catalogs', () => {
     expect(toPiRuntimeModelProviders(null)).toEqual([]);
     expect(toPiRuntimeModelProviders({})).toEqual([]);

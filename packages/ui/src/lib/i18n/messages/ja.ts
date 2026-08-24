@@ -2263,6 +2263,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.messageBody.toast.planSaved': '計画を保存しました',
   'chat.messageBody.toast.imageSaved': '画像を保存しました',
   'chat.messageBody.toast.generateImageFailed': '画像の生成に失敗しました',
+  'chat.messageBody.toast.copied': 'コピーしました',
+  'chat.messageBody.toast.copyFailed': 'コピーに失敗しました',
   'chat.chatInput.actions.commands': 'コマンド',
   'chat.chatInput.actions.attachFiles': 'ファイルを添付',
   'chat.chatInput.actions.addAttachment': '添付ファイルを追加',

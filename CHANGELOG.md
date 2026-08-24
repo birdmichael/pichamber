@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: forking from a user message now opens a session you can keep typing in, instead of locking the composer with "Subagent sessions cannot be prompted."
+- Chat: copying a user or assistant message now shows a Copied toast, and the copy icon briefly becomes a check.
+- Chat: the same model now shows one context size in Recent, the fork-session picker, and the multi-run picker — the live Pi catalog window, not a leftover models.dev number.
 - Chat: long user messages wrap inside the bubble instead of clipping to a single line.
 - Settings: Session Defaults thinking levels now follow the selected model, the same as the composer chip and project defaults.
 

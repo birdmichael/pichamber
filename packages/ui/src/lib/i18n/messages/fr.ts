@@ -1931,6 +1931,8 @@ export const dict = {
   'chat.messageBody.toast.planSaved': 'Forfait enregistré',
   'chat.messageBody.toast.imageSaved': 'Image enregistrée',
   'chat.messageBody.toast.generateImageFailed': 'Échec de la génération de l\'image',
+  'chat.messageBody.toast.copied': 'Copié',
+  'chat.messageBody.toast.copyFailed': 'Échec de la copie',
   'chat.chatInput.actions.commands': 'Commandes',
   'chat.chatInput.actions.attachFiles': 'Joindre des fichiers',
   'chat.chatInput.actions.addAttachment': 'Ajouter une pièce jointe',

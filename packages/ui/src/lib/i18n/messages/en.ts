@@ -2267,6 +2267,8 @@ export const dict = {
   'chat.messageBody.toast.planSaved': 'Plan saved',
   'chat.messageBody.toast.imageSaved': 'Image saved',
   'chat.messageBody.toast.generateImageFailed': 'Failed to generate image',
+  'chat.messageBody.toast.copied': 'Copied',
+  'chat.messageBody.toast.copyFailed': 'Failed to copy',
   'chat.chatInput.actions.commands': 'Commands',
   'chat.chatInput.actions.attachFiles': 'Attach files',
   'chat.chatInput.actions.addAttachment': 'Add attachment',

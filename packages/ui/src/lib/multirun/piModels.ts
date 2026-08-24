@@ -9,6 +9,8 @@ type PiCatalogModel = {
   id?: unknown;
   name?: unknown;
   displayName?: unknown;
+  contextWindow?: unknown;
+  limit?: unknown;
 };
 
 type PiCatalogProvider = {
@@ -21,6 +23,8 @@ type CatalogModel = {
   id: string;
   name?: string;
   sourceKeys: string[];
+  contextWindow?: number;
+  limit?: { context?: number; output?: number };
 };
 
 export type PiEnabledModelRow = {
@@ -56,6 +60,41 @@ const catalogModelName = (record: PiCatalogModel | undefined): string | undefine
   return asNonEmptyString(record?.name) ?? asNonEmptyString(record?.displayName) ?? undefined;
 };
 
+const readPositiveNumber = (value: unknown): number | undefined => {
+  const numeric = typeof value === 'number' || typeof value === 'string'
+    ? Number(value)
+    : NaN;
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return numeric;
+};
+
+const catalogModelContext = (record: PiCatalogModel | undefined): Pick<CatalogModel, 'contextWindow' | 'limit'> => {
+  const limit = record?.limit && typeof record.limit === 'object' && !Array.isArray(record.limit)
+    ? record.limit as { context?: unknown; output?: unknown }
+    : undefined;
+  const contextWindow = readPositiveNumber(record?.contextWindow) ?? readPositiveNumber(limit?.context);
+  const output = readPositiveNumber(limit?.output);
+  return {
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(contextWindow !== undefined || output !== undefined
+      ? {
+          limit: {
+            ...(contextWindow !== undefined ? { context: contextWindow } : {}),
+            ...(output !== undefined ? { output } : {}),
+          },
+        }
+      : {}),
+  };
+};
+
+const withCatalogIdentity = (
+  model: Pick<CatalogModel, 'id' | 'name' | 'sourceKeys'>,
+  record: PiCatalogModel | undefined,
+): CatalogModel => ({
+  ...model,
+  ...catalogModelContext(record),
+});
+
 const isModelEnabled = (providerId: string, modelId: string, enabledModels: string[]): boolean => {
   if (enabledModels.length === 0) return true;
   return enabledModels.includes(modelId) || enabledModels.includes(`${providerId}/${modelId}`);
@@ -69,7 +108,7 @@ const toCatalogModels = (models: unknown): CatalogModel[] => {
       const id = asNonEmptyString(record.id);
       if (!id) return [];
       const name = catalogModelName(record);
-      return [{ id, sourceKeys: [id], ...(name ? { name } : {}) }];
+      return [withCatalogIdentity({ id, sourceKeys: [id], ...(name ? { name } : {}) }, record)];
     });
   }
 
@@ -81,7 +120,7 @@ const toCatalogModels = (models: unknown): CatalogModel[] => {
     if (!id) return [];
     const name = catalogModelName(model) ?? (sourceKey && sourceKey !== id ? sourceKey : undefined);
     const sourceKeys = [id, sourceKey].filter((item): item is string => Boolean(item));
-    return [{ id, sourceKeys, ...(name ? { name } : {}) }];
+    return [withCatalogIdentity({ id, sourceKeys, ...(name ? { name } : {}) }, model)];
   });
 };
 
@@ -127,6 +166,8 @@ const uniqueCatalogModels = (models: CatalogModel[]): CatalogModel[] => {
         id: model.id,
         sourceKeys: [...new Set(model.sourceKeys)],
         ...(model.name ? { name: model.name } : {}),
+        ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+        ...(model.limit ? { limit: model.limit } : {}),
       });
       continue;
     }
@@ -144,6 +185,8 @@ const uniqueCatalogModels = (models: CatalogModel[]): CatalogModel[] => {
       id: winner.id,
       sourceKeys: [...new Set([...existing.sourceKeys, ...model.sourceKeys, existing.id, model.id])],
       ...(name ? { name } : {}),
+      ...(winner.contextWindow !== undefined ? { contextWindow: winner.contextWindow } : existing.contextWindow !== undefined ? { contextWindow: existing.contextWindow } : model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+      ...(winner.limit ? { limit: winner.limit } : existing.limit ? { limit: existing.limit } : model.limit ? { limit: model.limit } : {}),
     };
   }
   return unique;
@@ -251,6 +294,8 @@ export const toPiRuntimeModelProviders = (
       .map((model) => ({
         id: model.id,
         name: model.name ?? model.id,
+        ...(model.contextWindow !== undefined ? { contextWindow: model.contextWindow } : {}),
+        ...(model.limit ? { limit: model.limit } : {}),
       }));
     if (models.length === 0) return [];
     const name = asNonEmptyString(provider.name) ?? id;
