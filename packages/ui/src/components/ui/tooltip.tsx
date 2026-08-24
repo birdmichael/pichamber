@@ -274,6 +274,7 @@ function TooltipContent({
           sideOffset={sideOffset}
           side={side}
           align={align}
+          collisionPadding={8}
           className="pointer-events-none z-50"
         >
           <BaseTooltip.Popup

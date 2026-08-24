@@ -1081,6 +1081,15 @@ html:not(.dark) .chat-scroll {
   margin: 0;
 }
 
+/* Expanded prompts wrap CJK at glyph boundaries so overflow-x-clip cannot
+   cut a character at the bubble edge. */
+.user-text-expanded,
+.user-text-expanded .markdown-content,
+.user-text-expanded .markdown-content p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* Tool cards (code size) and reasoning (meta size, dimmed) are intentionally
    compact — keep their paragraphs tight, matching prior behavior. */
 .markdown-content.markdown-tool p,

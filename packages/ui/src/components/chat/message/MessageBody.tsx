@@ -1316,6 +1316,9 @@ const AssistantMessageBody = React.memo(({
     const collapsedPreviewCount = 7;
     const isLastAssistantInTurn = turnGroupingContext?.isLastAssistantInTurn ?? false;
     const hasStopFinish = messageFinish === 'stop';
+    const keepLatestTurnActionsVisible = Boolean(
+        turnGroupingContext?.isLatestTurn && isLastAssistantInTurn && hasStopFinish,
+    );
     const effectiveStreamPhase: StreamPhase = hasStopFinish ? 'completed' : streamPhase;
 
     const availableWorktreesByProject = useSessionUIStore((state) => state.availableWorktreesByProject);
@@ -1530,7 +1533,7 @@ const AssistantMessageBody = React.memo(({
                     detail: { projectId: currentProjectRef.id },
                 }));
                 setIsPlanDialogOpen(false);
-                toast.success(t('chat.messageBody.toast.planSaved'));
+                toast.success(t('chat.messageBody.toast.planSavedWithPath', { path: created.path }));
             } finally {
                 setIsSavingPlan(false);
             }
@@ -2334,7 +2337,7 @@ const AssistantMessageBody = React.memo(({
                         <div
                             className={cn(
                                 'flex items-center gap-1.5',
-                                alwaysShowMessageActions || isTouchContext
+                                alwaysShowMessageActions || isTouchContext || keepLatestTurnActionsVisible
                                     ? undefined
                                     : 'pointer-events-none opacity-0 transition-opacity duration-150 has-[[data-visible=true]]:pointer-events-auto has-[[data-visible=true]]:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100'
                             )}

@@ -31,6 +31,7 @@ import type { ProjectEntry } from '@/lib/api/types';
 import { startDesktopWindowDrag } from '@/lib/desktopNative';
 import { useI18n } from '@/lib/i18n';
 import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
+import { isLauncherOverlayOpen } from './launcherEscape';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_MODELS_PER_GROUP = 5;
@@ -233,11 +234,11 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
   React.useEffect(() => {
     if (!onCancel) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        onCancel();
-      }
+      if (e.key !== 'Escape') return;
+      if (isLauncherOverlayOpen()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
@@ -695,7 +696,9 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
             {isSubmitting ? (
               t('multirun.launcher.actions.creating')
             ) : (
-              <>{t('multirun.launcher.actions.startWithRunCount', { count: totalRunCount })}</>
+              <>{totalRunCount === 1
+                ? t('multirun.launcher.actions.startWithRunCountSingle', { count: totalRunCount })
+                : t('multirun.launcher.actions.startWithRunCountPlural', { count: totalRunCount })}</>
             )}
           </Button>
         </div>

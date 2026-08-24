@@ -18,6 +18,7 @@ import { EXECUTION_FORK_DEFAULT_INSTRUCTIONS, EXECUTION_FORK_GOAL_INSTRUCTIONS }
 import { useI18n } from '@/lib/i18n';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
+import { resolveForkThinkingLevels } from '@/components/session/forkThinkingLevels';
 
 export type ForkSessionExecution = {
   providerID: string;
@@ -51,6 +52,8 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
   const currentModelID = useConfigStore((state) => state.currentModelId);
   const currentVariant = useConfigStore((state) => state.currentVariant || '');
   const currentAgentName = useConfigStore((state) => state.currentAgentName || '');
+  const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
+  const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
 
   const [providerID, setProviderID] = React.useState(currentProviderID);
   const [modelID, setModelID] = React.useState(currentModelID);
@@ -120,12 +123,29 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
     return model?.variants ? Object.keys(model.variants) : [];
   }, [providers, providerID, modelID]);
 
-  const hasVariantOptions = variantOptions.length > 0;
+  const thinkingLevels = React.useMemo(
+    () => resolveForkThinkingLevels({
+      isPiKernel,
+      providerId: providerID,
+      modelId: modelID,
+      getModelMetadata,
+      variantKeys: variantOptions,
+    }),
+    // modelsMetadata is required: getModelMetadata is a stable store method
+    // and would otherwise keep the empty-catalog fallback after fetch lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
+    [getModelMetadata, isPiKernel, modelID, modelsMetadata, providerID, variantOptions],
+  );
 
   React.useEffect(() => {
-    if (hasVariantOptions || !variant) return;
-    setVariant('');
-  }, [hasVariantOptions, variant]);
+    if (thinkingLevels.length === 0) {
+      if (variant) setVariant('');
+      return;
+    }
+    if (variant && !thinkingLevels.includes(variant)) {
+      setVariant(thinkingLevels.includes('medium') ? 'medium' : thinkingLevels[0]);
+    }
+  }, [thinkingLevels, variant]);
 
   const canConfirm =
     providerID.trim().length > 0 && modelID.trim().length > 0 && instructions.trim().length > 0;
@@ -159,7 +179,7 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!submitting) onOpenChange(nextOpen); }}>
       <DialogContent className="max-w-md overflow-visible">
         <DialogHeader>
-          <DialogTitle>{t('chat.messageBody.actions.startNewSession')}</DialogTitle>
+          <DialogTitle>{t('chat.messageBody.forkDialog.title')}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -177,15 +197,16 @@ export function ForkSessionDialog(props: ForkSessionDialogProps) {
               }}
             />
           </div>
+          {thinkingLevels.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('sessions.scheduledTasks.editor.thinkingLevel.label')}</span>
             <ThinkingPill
               value={variant}
-              options={variantOptions}
-              disabled={!hasVariantOptions}
+              options={thinkingLevels}
               onChange={setVariant}
             />
           </div>
+          ) : null}
           {showAgentPicker ? (
           <div className="flex flex-col gap-1.5">
             <span className="typography-meta font-medium text-muted-foreground">{t('sessions.scheduledTasks.editor.agent.label')}</span>

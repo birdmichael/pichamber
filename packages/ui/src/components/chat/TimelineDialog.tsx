@@ -15,6 +15,9 @@ import { Icon } from "@/components/icon/Icon";
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { getFullText, getMessagePreview } from './lib/messagePreview';
+import { formatTimestampForDisplay } from './message/timeFormat';
+import { resolveDisplayTimeZone, toDisplayEpochMs } from '@/lib/timeFormat';
+import { useUIStore } from '@/stores/useUIStore';
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +50,7 @@ export const TimelineDialog: React.FC<TimelineDialogProps> = ({
     const forkFromMessage = useSessionUIStore((state) => state.forkFromMessage);
     const { isMobile, isTablet } = useDeviceInfo();
     const alwaysShowActions = isMobile || isTablet;
+    const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
 
     const [forkingMessageId, setForkingMessageId] = React.useState<string | null>(null);
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -58,19 +62,17 @@ export const TimelineDialog: React.FC<TimelineDialogProps> = ({
     const wasOpenRef = React.useRef(open);
 
     const formatDateGroup = React.useCallback((timestamp: number): string => {
-        return new Date(timestamp).toLocaleDateString(getCurrentIntlLocale(), {
+        return new Date(toDisplayEpochMs(timestamp)).toLocaleDateString(getCurrentIntlLocale(), {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
+            timeZone: resolveDisplayTimeZone(),
         });
     }, []);
 
     const formatMessageTime = React.useCallback((timestamp: number): string => {
-        return new Date(timestamp).toLocaleTimeString(getCurrentIntlLocale(), {
-            hour: 'numeric',
-            minute: '2-digit',
-        });
-    }, []);
+        return formatTimestampForDisplay(timestamp, timeFormatPreference);
+    }, [timeFormatPreference]);
 
     // Timeline actions are only valid for user messages.
     const userMessages = React.useMemo(() => {

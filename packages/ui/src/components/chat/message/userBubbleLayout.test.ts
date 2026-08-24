@@ -21,6 +21,7 @@ describe('userBubbleLayout', () => {
 
     test('non-sticky user content does not hide overflow-y as a line-clamp substitute', () => {
         expect(USER_MESSAGE_CONTENT_OVERFLOW_CLASS.default).not.toContain('overflow-y-hidden');
+        expect(USER_MESSAGE_CONTENT_OVERFLOW_CLASS.default).toContain('overflow-x-clip');
         expect(getUserMessageContentOverflowClass(false)).toBe(USER_MESSAGE_CONTENT_OVERFLOW_CLASS.default);
         expect(getUserMessageContentOverflowClass(true)).toContain('overflow-y-auto');
     });
