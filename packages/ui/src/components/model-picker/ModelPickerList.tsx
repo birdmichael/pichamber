@@ -105,7 +105,7 @@ const ModelPickerRowTooltip: React.FC<{
     <Tooltip delayDuration={0} open={active && delayedActive} onOpenChange={() => {}}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       {active && delayedActive ? (
-        <TooltipContent side="right" sideOffset={8} className="max-w-xs text-left transition-none data-[starting-style]:opacity-100 data-[starting-style]:scale-100 data-[ending-style]:opacity-100 data-[ending-style]:scale-100">
+        <TooltipContent side="right" sideOffset={8} className="max-w-[min(18rem,calc(100vw-1.5rem))] text-left transition-none data-[starting-style]:opacity-100 data-[starting-style]:scale-100 data-[ending-style]:opacity-100 data-[ending-style]:scale-100">
           <div className="flex flex-col gap-2 text-left text-xs">
             {capabilities.length > 0 ? (
               <div className="flex items-center justify-between gap-3 text-muted-foreground">
@@ -621,6 +621,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       onEscape?.();
     }
   }, [disabled, flatModelList, moveSelection, onActiveKeyDown, onEscape, onSelect, onVariantKey, selectionStore]);
@@ -664,11 +665,12 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
               tabIndex={-1}
               onClick={() => { if (!disabled) onSelect(entry); }}
               onKeyDown={(event) => {
-                if (disabled) return;
-                if (event.key === 'Enter' || event.key === ' ') {
+                if (event.key === ' ' && !disabled) {
                   event.preventDefault();
                   onSelect(entry);
+                  return;
                 }
+                handleKeyDown(event);
               }}
               onMouseEnter={handleMouseActivity}
               onMouseMove={handleMouseActivity}
@@ -843,7 +845,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
   };
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col" data-model-picker-list="" onKeyDown={handleKeyDown}>
       <div className="px-2 py-1 border-b border-border/40">
         <div className="relative">
           <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -964,6 +966,6 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
       <div className="px-3 pt-1 pb-1.5 border-t border-border/40 typography-micro text-muted-foreground">
         <ModelPickerFooter store={selectionStore} flatModelList={flatModelList} footerContent={footerContent} fallback={labels.keyboardHint} />
       </div>
-    </>
+    </div>
   );
 };

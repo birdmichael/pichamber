@@ -81,6 +81,14 @@ capability that pretends to be user-set. Family inference and the UI
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).
 
+## Tool part timing
+
+Live `tool_execution_*` events keep the first `state.time.start` for that
+`toolCallId`. Later running updates must not reset start to `now()`.
+Completion writes `end` and `duration` (milliseconds). The chat timer
+freezes on that duration or `end - start`. Hydrated tool results that
+omit times still mark `completed`/`error` so the UI cannot keep counting.
+
 ## Session thinking levels
 
 `GET /api/session/:id/thinking` returns `{ thinking, available }` from the

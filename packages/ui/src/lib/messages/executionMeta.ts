@@ -1,5 +1,5 @@
 export const MULTIRUN_EXECUTION_FORK_PROMPT_META_TEXT =
-    "This message bellow comes from an AI agent in another session. I want you to act according to its content: " +
+    "This message below comes from an AI agent in another session. I want you to act according to its content: " +
     "if it is an implementation plan, your task is to implement that plan; " +
     "if it is a conclusion or summary, your task is to verify it, explain whether you agree or disagree, and correct it if needed; " +
     "if it is a bug description, find the root cause and fix it. " +

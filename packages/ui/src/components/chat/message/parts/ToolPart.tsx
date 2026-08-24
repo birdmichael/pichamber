@@ -42,6 +42,13 @@ import { ToolRevealOnMount } from './ToolRevealOnMount';
 import { getToolIcon } from './toolPresentation';
 import { useDurationTickerNow } from '@/hooks/useDurationTicker';
 import {
+    formatToolElapsed,
+    isToolPartFinalized,
+    readServerDurationMs,
+    resolveToolElapsedMs,
+    toEpochMillis,
+} from './toolElapsed';
+import {
     buildTaskSummaryEntriesFromSession,
     normalizeTaskSummaryEntries,
     parseTaskMetadataBlock,
@@ -123,18 +130,22 @@ const GIT_REFRESH_MUTATING_TOOLS = new Set([
     'patch',
 ]);
 
-const formatDuration = (start: number, end?: number, now: number = Date.now()) => {
-    const duration = Math.max(0, (end ?? now) - start);
-    const seconds = duration / 1000;
-
-    const displaySeconds = seconds < 0.05 && end !== undefined ? 0.1 : seconds;
-    return `${displaySeconds.toFixed(1)}s`;
-};
-
-const LiveDuration: React.FC<{ start: number; end?: number; active: boolean }> = ({ start, end, active }) => {
+const LiveDuration: React.FC<{
+    start: number;
+    end?: number;
+    durationMs?: number;
+    active: boolean;
+}> = ({ start, end, durationMs, active }) => {
     const now = useDurationTickerNow(active, 250);
+    const elapsedMs = resolveToolElapsedMs({
+        start,
+        end,
+        durationMs,
+        now,
+        finalized: !active,
+    });
 
-    return <>{formatDuration(start, end, now)}</>;
+    return <>{formatToolElapsed(elapsedMs, !active)}</>;
 };
 
 const deferredToolBodyMounts: Array<{ active: boolean; fn: () => void }> = [];
@@ -1715,7 +1726,16 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     });
 
     const status = state?.status as string | undefined;
-    const isFinalized = status === 'completed' || status === 'error' || status === 'aborted' || status === 'failed' || status === 'timeout' || status === 'cancelled';
+    const time = stateWithData.time;
+    const serverDurationMs = readServerDurationMs({
+        time: time as { duration?: unknown; durationMs?: unknown } | undefined,
+        metadata: metadata as { duration?: unknown; durationMs?: unknown } | undefined,
+    });
+    const isFinalized = isToolPartFinalized({
+        status,
+        timeEnd: typeof time?.end === 'number' ? time.end : undefined,
+        durationMs: serverDurationMs,
+    });
     const isSuccessfullyFinalized = status === 'completed';
     const isError = status === 'error' || status === 'failed';
 
@@ -1794,7 +1814,6 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     }, [isExpanded, isTaskTool, shouldNotifyStructuralChange]);
 
     const partMetadata = (part as unknown as { metadata?: unknown }).metadata;
-    const time = stateWithData.time;
 
     const [pinnedTime, setPinnedTime] = React.useState<{ start?: number; end?: number }>(() => ({
         start: typeof time?.start === 'number' ? time.start : undefined,
@@ -1839,17 +1858,14 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     }, [time?.end, time?.start]);
 
     const effectiveTimeStart = React.useMemo(() => {
-        // Once we captured a local start (during pending, before server sends time.start),
-        // always prefer it so the timer never jumps when server start arrives later.
-        if (typeof localStartAt === 'number') {
-            return localStartAt;
-        }
-        const candidates = [pinnedTime.start, time?.start].filter(
-            (value): value is number => typeof value === 'number'
-        );
+        const candidates = [localStartAt, pinnedTime.start, time?.start]
+            .filter((value): value is number => typeof value === 'number')
+            .map(toEpochMillis);
         if (candidates.length === 0) {
             return undefined;
         }
+        // Earliest start wins. A later local Date.now() must not replace an
+        // earlier server start — that is the 20.3s → 18.4s jump.
         return Math.min(...candidates);
     }, [localStartAt, pinnedTime.start, time?.start]);
 
@@ -2194,7 +2210,8 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
                                     <LiveDuration
                                         start={effectiveTimeStart}
                                         end={typeof effectiveTimeEnd === 'number' ? effectiveTimeEnd : undefined}
-                                        active={Boolean(isActive && typeof effectiveTimeEnd !== 'number')}
+                                        durationMs={serverDurationMs}
+                                        active={Boolean(isActive && typeof effectiveTimeEnd !== 'number' && serverDurationMs === undefined)}
                                     />
                                 </span>
                             ) : null}

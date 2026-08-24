@@ -201,7 +201,7 @@ const isFinishedPiAssistantMessage = (message) => {
 
 const completedMillisFromPiAssistant = (message, created) => {
   if (typeof message?.timestamp === 'number' && Number.isFinite(message.timestamp) && message.timestamp > 0) {
-    return message.timestamp;
+    return message.timestamp >= 1e9 && message.timestamp < 1e12 ? message.timestamp * 1000 : message.timestamp;
   }
   if (typeof message?.timestamp === 'string' && message.timestamp.trim()) {
     const parsed = Date.parse(message.timestamp);
@@ -273,7 +273,9 @@ const isoFromUnknown = (value) => {
 };
 
 const millisFromUnknown = (value) => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value >= 1e9 && value < 1e12 ? value * 1000 : value;
+  }
   if (typeof value === 'string' && value.trim()) {
     const parsed = Date.parse(value);
     if (!Number.isNaN(parsed)) return parsed;
@@ -445,12 +447,17 @@ const applyToolResultToPart = (part, message) => {
   if (toolName && (!part.tool || part.tool === 'tool')) {
     part.tool = toolName;
   }
+  const created = typeof part.state?.time?.start === 'number' ? part.state.time.start : undefined;
+  const endedAt = Date.now();
+  const startedAt = created ?? endedAt;
+  const duration = Math.max(0, endedAt - startedAt);
   part.state = {
     status: isError ? 'error' : 'completed',
     input,
     output,
     ...(isError ? { error: output || 'tool error' } : {}),
-    ...(details ? { metadata: details } : {}),
+    ...(details ? { metadata: { ...details, ...(typeof details.duration === 'number' || typeof details.durationMs === 'number' ? {} : { duration }) } } : {}),
+    time: { start: startedAt, end: endedAt, duration },
   };
 };
 

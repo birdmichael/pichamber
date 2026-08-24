@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: Save project plan, Start new session, and New multi-run action buttons now show Cancel, Save, Send, and Start in sentence case.
+- Chat: Esc on the multi-run model picker now closes only the picker, not the whole New multi-run form.
+- Chat: the fork-session thinking dropdown now lists the selected model's live Pi thinking levels, and hides when that model has none.
+- Chat: Save as plan writes a Markdown file into the project's `.pichamber/plans` folder and the toast includes that path. Esc or Cancel still does not write.
+- Chat: New multi-run, Start new session, and Save project plan titles now use sentence case, matching the lowercase action buttons.
+- Chat: the multi-run start button says "1 run" or "N runs", and the forked prompt no longer says "bellow".
+- Chat: assistant footer action tooltips and model-capability popovers stay inside the window instead of clipping into the Session panel or past a dialog.
+- Chat: tool-card elapsed time freezes when the tool finishes and prefers the server duration, so it no longer keeps counting or jumps backwards.
+- Chat: an expanded long CJK user bubble no longer clips a character at the right edge.
+- Chat: message times use the local timezone in the transcript and timeline, including Yesterday, instead of mixing UTC-as-local.
+- Chat: Copy, Save plan, Pin, New session, and Multi-run stay visible on the latest completed assistant turn. Older turns remain hover-only.
 - Chat/Desktop: on Pi, a question card now includes the options plus a Type something field you can type and submit. That option used to sit as a radio that never opened a text box, and the question tool itself often reported that no UI was available.
 - Chat: you can type in a Q&A or extension answer card without the composer stealing the keystrokes.
 - Chat: forking from a user message now opens a session you can keep typing in, instead of locking the composer with "Subagent sessions cannot be prompted."

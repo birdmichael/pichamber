@@ -11,6 +11,7 @@ import { isVSCodeRuntime } from './desktop';
 import { sanitizeStarterRefs, type DraftStarterRef } from './draftStarters';
 import { createProjectIdFromPath } from './projectId';
 import { runtimeFetch } from './runtime-fetch';
+import { resolveProjectPlansDirectory } from './projectPlansPath';
 
 type ProjectRef = { id: string; path: string };
 
@@ -503,21 +504,8 @@ const createProjectPlanId = (): string => {
   return `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 };
 
-const getProjectStorageDirectory = async (project: ProjectRef): Promise<string | null> => {
-  const base = await getUserProjectsDirectory();
-  const safeId = resolveConfigProjectId(project);
-  if (!base || !safeId) {
-    return null;
-  }
-  return joinPath(base, safeId);
-};
-
 const getProjectPlansDirectory = async (project: ProjectRef): Promise<string | null> => {
-  const projectDirectory = await getProjectStorageDirectory(project);
-  if (!projectDirectory) {
-    return null;
-  }
-  return joinPath(projectDirectory, 'plans');
+  return resolveProjectPlansDirectory(project);
 };
 
 const formatProjectPlanMarkdown = (title: string, body: string): string => {
@@ -860,14 +848,8 @@ export async function createProjectPlanFile(
   const id = createProjectPlanId();
   const filePath = joinPath(plansDirectory, `${createdAt}-${slugifyPlanTitle(title)}.md`);
 
-  const projectDirectory = await getProjectStorageDirectory(project);
-  if (!projectDirectory) {
-    return null;
-  }
-
-  const createdProjectDir = await mkdirp(projectDirectory);
-  const createdPlansDir = createdProjectDir ? await mkdirp(plansDirectory) : false;
-  if (!createdProjectDir || !createdPlansDir) {
+  const createdPlansDir = await mkdirp(plansDirectory);
+  if (!createdPlansDir) {
     return null;
   }
 

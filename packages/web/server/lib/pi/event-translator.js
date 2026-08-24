@@ -47,6 +47,7 @@ export const createEventTranslator = ({
   const textParts = new Map();
   const reasoningParts = new Map();
   const toolParts = new Map();
+  const toolStartTimes = new Map();
   let assistantMessageID = null;
   let assistantCreatedAt = null;
   let assistantParentID = null;
@@ -92,6 +93,7 @@ export const createEventTranslator = ({
     textParts.clear();
     reasoningParts.clear();
     toolParts.clear();
+    toolStartTimes.clear();
     lastUsage = undefined;
     return assistantMessageID;
   };
@@ -155,22 +157,32 @@ export const createEventTranslator = ({
     text,
   });
 
-  const toolPart = (partID, { callID, tool, status, input, output, error, metadata }) => ({
-    id: partID,
-    sessionID,
-    messageID: assistantMessageID,
-    type: 'tool',
-    callID,
-    tool,
-    state: {
-      status,
-      input: input ?? {},
-      ...(output !== undefined ? { output } : {}),
-      ...(error ? { error } : {}),
-      ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? { metadata } : {}),
-      time: { start: now(), ...(status === 'completed' || status === 'error' ? { end: now() } : {}) },
-    },
-  });
+  const toolPart = (partID, { callID, tool, status, input, output, error, metadata }) => {
+    const startedAt = toolStartTimes.get(callID) ?? now();
+    if (!toolStartTimes.has(callID)) toolStartTimes.set(callID, startedAt);
+    const isDone = status === 'completed' || status === 'error';
+    const endedAt = isDone ? now() : undefined;
+    const duration = isDone ? Math.max(0, endedAt - startedAt) : undefined;
+    const details = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? { ...metadata }
+      : undefined;
+    return {
+      id: partID,
+      sessionID,
+      messageID: assistantMessageID,
+      type: 'tool',
+      callID,
+      tool,
+      state: {
+        status,
+        input: input ?? {},
+        ...(output !== undefined ? { output } : {}),
+        ...(error ? { error } : {}),
+        ...(details ? { metadata: details } : {}),
+        time: { start: startedAt, ...(endedAt !== undefined ? { end: endedAt, duration } : {}) },
+      },
+    };
+  };
 
   const isToolCallBlock = (block) => (
     Boolean(block && typeof block === 'object' && (

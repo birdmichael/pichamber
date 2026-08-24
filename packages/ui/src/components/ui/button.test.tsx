@@ -20,4 +20,11 @@ describe("Button", () => {
 
     expect(element.props.type).toBe(undefined)
   })
+
+  test("keeps locale sentence case when callers pass normal-case", () => {
+    const element = Button({ children: "Cancel", className: "normal-case" })
+
+    expect(element.props.className).toContain("normal-case")
+    expect(element.props.className.split(/\s+/)).not.toContain("lowercase")
+  })
 })

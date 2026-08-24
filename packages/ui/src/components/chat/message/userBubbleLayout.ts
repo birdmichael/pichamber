@@ -21,9 +21,12 @@ export const USER_BUBBLE_FLEX_ITEM_CLASS = 'min-w-0 w-fit max-w-[85%]';
  */
 export const USER_TEXT_COLLAPSED_CLASS = 'user-text-collapsed';
 
+/** Expanded long CJK must wrap whole glyphs instead of clipping at the edge. */
+export const USER_TEXT_EXPANDED_CLASS = 'user-text-expanded';
+
 export const USER_MESSAGE_CONTENT_OVERFLOW_CLASS = {
-    sticky: 'min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-none',
-    default: 'min-w-0 overflow-x-hidden',
+    sticky: 'min-w-0 overflow-x-clip overflow-y-auto overscroll-contain scrollbar-none',
+    default: 'min-w-0 overflow-x-clip',
 } as const;
 
 export function getUserMessageContentOverflowClass(useStickyScrollableUserContent: boolean): string {

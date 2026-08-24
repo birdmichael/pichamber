@@ -97,6 +97,32 @@ describe('createEventTranslator', () => {
     });
     expect(end[0].properties.part.state.status).toBe('completed');
     expect(end[0].properties.part.state.output).toBe('ok');
+    expect(end[0].properties.part.state.time.start).toBe(toolStart.properties.part.state.time.start);
+    expect(end[0].properties.part.state.time.end).toBeGreaterThanOrEqual(end[0].properties.part.state.time.start);
+    expect(end[0].properties.part.state.time.duration).toBe(
+      end[0].properties.part.state.time.end - end[0].properties.part.state.time.start,
+    );
+  });
+
+  it('keeps a tool start time across running updates', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    const start = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_timer',
+      toolName: 'bash',
+      args: { command: 'sleep 1' },
+    });
+    const firstStart = start.find((event) => event.type === 'message.part.updated').properties.part.state.time.start;
+    const mid = t.translate({
+      type: 'tool_execution_update',
+      toolCallId: 'call_timer',
+      toolName: 'bash',
+      args: { command: 'sleep 1' },
+      partialResult: { content: [{ type: 'text', text: '...' }] },
+    });
+    expect(mid[0].properties.part.state.time.start).toBe(firstStart);
+    expect(mid[0].properties.part.state.time.end).toBeUndefined();
   });
 
   const latestToolParts = (events) => {

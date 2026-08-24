@@ -64,8 +64,8 @@ export function SaveProjectPlanDialog(props: SaveProjectPlanDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>{t('saveProjectPlanDialog.actions.cancel')}</Button>
-          <Button onClick={() => void onSave(trimmedTitle)} disabled={!trimmedTitle || saving}>
+          <Button variant="outline" className="normal-case" onClick={() => onOpenChange(false)} disabled={saving}>{t('saveProjectPlanDialog.actions.cancel')}</Button>
+          <Button className="normal-case" onClick={() => void onSave(trimmedTitle)} disabled={!trimmedTitle || saving}>
             {saving ? t('saveProjectPlanDialog.actions.saving') : t('saveProjectPlanDialog.actions.save')}
           </Button>
         </DialogFooter>

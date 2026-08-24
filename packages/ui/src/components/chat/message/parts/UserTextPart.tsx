@@ -15,7 +15,7 @@ import {
 } from '@/lib/messages/inlineMessageLinks';
 import { prepareUserMarkdownContent, SKILL_TOKEN_PATTERN } from './userTextPartContent';
 import { extractTerminalContexts } from '@/lib/messages/terminalContext';
-import { USER_TEXT_COLLAPSED_CLASS, isUserTextOverflowing } from '../userBubbleLayout';
+import { USER_TEXT_COLLAPSED_CLASS, USER_TEXT_EXPANDED_CLASS, isUserTextOverflowing } from '../userBubbleLayout';
 
 type PartWithText = Part & { text?: string; content?: string; value?: string };
 
@@ -244,7 +244,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
             <div
                 className={cn(
                     "min-w-0 break-words font-sans typography-markdown-body",
-                    isExpanded && "pb-3",
+                    isExpanded && ["pb-3 pr-7", USER_TEXT_EXPANDED_CLASS],
                     normalizedRenderingMode === 'plain' && 'whitespace-pre-wrap',
                     isCollapsed && ["line-clamp-2", USER_TEXT_COLLAPSED_CLASS],
                     collapsibleUserMessages && isTruncated && !isExpanded && "cursor-pointer"
