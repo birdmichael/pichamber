@@ -2,7 +2,7 @@ import React from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
-import { shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
+import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { SettingsView } from './SettingsView';
 
 interface SettingsWindowProps {
@@ -23,6 +23,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
       open={open}
       onOpenChange={(next, eventDetails) => {
         if (shouldBlockSettingsDismiss(next, eventDetails)) {
+          if (!next && eventDetails?.reason === 'escape-key') {
+            notifySettingsEscapeForm();
+          }
           return;
         }
         onOpenChange(next);

@@ -5,6 +5,8 @@ import {
   hasOpenSettingsOverlay,
   hasSettingsEscapeForm,
   isEventInsideSettingsView,
+  notifySettingsEscapeForm,
+  SETTINGS_ESCAPE_FORM_EVENT,
   shouldBlockSettingsDismiss,
 } from './settings-dismiss';
 
@@ -82,6 +84,33 @@ test('blocks Escape when a settings-local form is open', () => {
       value: originalDocument,
     });
   }
+});
+
+test('notifies a settings-local escape form and skips nested dialogs', () => {
+  const dispatched: string[] = [];
+  const form = {
+    dispatchEvent: (event: Event) => {
+      dispatched.push(event.type);
+      return true;
+    },
+  };
+  const root = {
+    querySelector: (selector: string) => (
+      selector.includes('[data-settings-escape-form]') ? form : null
+    ),
+    querySelectorAll: () => ({ length: 1 }),
+  } as unknown as ParentNode;
+
+  expect(notifySettingsEscapeForm(root)).toBe(true);
+  expect(dispatched).toEqual([SETTINGS_ESCAPE_FORM_EVENT]);
+
+  const nestedRoot = {
+    querySelector: (selector: string) => (
+      selector.includes('[data-settings-escape-form]') ? form : null
+    ),
+    querySelectorAll: () => ({ length: 2 }),
+  } as unknown as ParentNode;
+  expect(notifySettingsEscapeForm(nestedRoot)).toBe(false);
 });
 
 test('allows an explicit close when nothing is blocking', () => {

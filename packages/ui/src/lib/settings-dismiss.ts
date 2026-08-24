@@ -24,6 +24,20 @@ function hasNestedSettingsDialog(root?: ParentNode | null): boolean {
   return (resolveRoot(root)?.querySelectorAll('[role="dialog"]').length ?? 0) > 1;
 }
 
+export const SETTINGS_ESCAPE_FORM_EVENT = 'settings-escape-form';
+
+export function notifySettingsEscapeForm(root?: ParentNode | null): boolean {
+  if (hasOpenSettingsOverlay(root) || hasNestedSettingsDialog(root)) {
+    return false;
+  }
+  const form = resolveRoot(root)?.querySelector('[data-settings-escape-form]');
+  if (!form) {
+    return false;
+  }
+  form.dispatchEvent(new Event(SETTINGS_ESCAPE_FORM_EVENT));
+  return true;
+}
+
 export function hasSettingsEscapeForm(root?: ParentNode | null): boolean {
   return Boolean(resolveRoot(root)?.querySelector('[data-settings-escape-form]'));
 }

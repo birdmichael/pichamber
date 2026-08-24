@@ -26,7 +26,7 @@ import { useProjectsStore } from '@/stores/useProjectsStore';
 import { InstallConflictsDialog, type ConflictDecision, type SkillConflict } from './InstallConflictsDialog';
 import {
   defaultSkillSource,
-  getSkillLocationOptions,
+  getSkillCatalogInstallLocations,
   locationPartsFrom,
   locationValueFrom,
   skillLocationDescriptionKey,
@@ -46,7 +46,7 @@ interface InstallSkillDialogProps {
 export const InstallSkillDialog: React.FC<InstallSkillDialogProps> = ({ open, onOpenChange, item }) => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
-  const locationOptions = getSkillLocationOptions(isPiKernel);
+  const locationOptions = getSkillCatalogInstallLocations(isPiKernel);
   const installSkills = useSkillsCatalogStore((s) => s.installSkills);
   const isInstalling = useSkillsCatalogStore((s) => s.isInstalling);
   const [scope, setScope] = React.useState<'user' | 'project'>('user');

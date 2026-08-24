@@ -16,6 +16,7 @@ import {
   SETTINGS_SELECT_SIZE,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 export const SnippetsPage: React.FC = () => {
   const { t } = useI18n();
@@ -87,6 +88,22 @@ export const SnippetsPage: React.FC = () => {
     setSelectedSnippet(null);
   }, [setSelectedSnippet, setSnippetDraft]);
 
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isNew || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isNew]);
+
   const handleSave = async () => {
     const snippetName = isNew ? draftName.trim().replace(/\s+/g, '-') : selectedSnippetName?.trim();
     if (!snippetName) {
@@ -142,6 +159,7 @@ export const SnippetsPage: React.FC = () => {
       showSaveStatus={false}
     >
       <div
+        ref={formRef}
         data-settings-escape-form={isNew ? 'true' : undefined}
         onKeyDown={(event) => {
           if (!isNew || event.key !== 'Escape') {
