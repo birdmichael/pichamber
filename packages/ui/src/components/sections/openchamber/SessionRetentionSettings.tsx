@@ -75,7 +75,7 @@ export const SessionRetentionSettings: React.FC = () => {
         ariaLabel={t('settings.openchamber.sessionRetention.field.enableAutoCleanupAria')}
       />
 
-      <SettingsInset className="space-y-0">
+      <SettingsInset className={autoDeleteEnabled ? 'space-y-0' : 'space-y-0 opacity-60'}>
         <SettingsFieldRow
           settingsItem="sessions.retention-period"
           label={t('settings.openchamber.sessionRetention.field.retentionPeriod')}
@@ -86,6 +86,7 @@ export const SessionRetentionSettings: React.FC = () => {
             min={MIN_DAYS}
             max={MAX_DAYS}
             step={1}
+            disabled={!autoDeleteEnabled}
             aria-label={t('settings.openchamber.sessionRetention.field.retentionPeriodAria')}
             className="w-20 tabular-nums"
           />
@@ -95,7 +96,7 @@ export const SessionRetentionSettings: React.FC = () => {
             type="button"
             variant="ghost"
             onClick={() => setAutoDeleteAfterDays(DEFAULT_RETENTION_DAYS)}
-            disabled={autoDeleteAfterDays === DEFAULT_RETENTION_DAYS}
+            disabled={!autoDeleteEnabled || autoDeleteAfterDays === DEFAULT_RETENTION_DAYS}
             className={SETTINGS_ICON_BUTTON_CLASS}
             aria-label={t('settings.openchamber.sessionRetention.actions.resetRetentionAria')}
             title={t('settings.common.actions.reset')}
@@ -111,6 +112,7 @@ export const SessionRetentionSettings: React.FC = () => {
           <SettingsChipGroup
             value={sessionRetentionAction}
             onChange={setSessionRetentionAction}
+            disabled={!autoDeleteEnabled}
             options={RETENTION_ACTION_OPTIONS.map((option) => ({
               value: option.value,
               label: t(option.labelKey),
@@ -134,6 +136,9 @@ export const SessionRetentionSettings: React.FC = () => {
             {isRunning ? t('settings.openchamber.sessionRetention.actions.cleaningUp') : t('settings.openchamber.sessionRetention.actions.runCleanupNow')}
           </Button>
         </SettingsFieldRow>
+        <p className="typography-meta text-muted-foreground">
+          {t('settings.openchamber.sessionRetention.manualCleanup.info')}
+        </p>
         <p className="typography-meta text-muted-foreground">
           {action === 'archive'
             ? t('settings.openchamber.sessionRetention.manualCleanup.eligibleArchiveNow', { count: pendingCount })

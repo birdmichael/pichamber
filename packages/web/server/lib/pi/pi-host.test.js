@@ -1430,6 +1430,7 @@ describe('live session command helpers', () => {
       source: 'extension',
       description: 'Enter plan mode',
       agent: 'pi',
+      template: 'old',
     });
     expect(merged.some((command) => command.name === 'goal' && command.source === 'extension')).toBe(true);
     expect(merged.some((command) => command.name === 'reload')).toBe(false);

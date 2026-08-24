@@ -261,7 +261,11 @@ that project. Settings → Extensions packages lists those configured package na
 - builtins + markdown prompts from `listPiCommands` (`compact`, `login`,
   custom prompts from `{agentDir}/prompts` — not `reload`).
 - live extension commands from sessions in the request directory
-  (`source: "extension"`)
+  (`source: "extension"`). When an extension overlays a markdown prompt
+  of the same name (`/plan`, `/goal`), keep that prompt's `template`,
+  `path`, and `scope`. An empty extension template must not wipe the
+  file body. `GET /api/config/commands/:name` reads the prompt file when
+  one exists so Settings can load the real template.
 - Feature Plugins slash names that must appear before a session exists
   (Plan slot installed+enabled → `/plan`; Subagents slot
   installed+enabled → `/run`; Btw slot installed+enabled → `/btw`).

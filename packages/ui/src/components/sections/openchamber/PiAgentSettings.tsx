@@ -35,6 +35,7 @@ const unwrapPath = (value: string): string => {
 export const PiAgentSettings: React.FC = () => {
   const { t } = useI18n();
   const [value, setValue] = React.useState('');
+  const [savedValue, setSavedValue] = React.useState('');
   const [resolvedPath, setResolvedPath] = React.useState('');
   const [loadState, setLoadState] = React.useState<LoadState>('loading');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -64,7 +65,9 @@ export const PiAgentSettings: React.FC = () => {
           setLoadState('error');
           return;
         }
-        setValue(typeof data.piAgentDir === 'string' ? data.piAgentDir.trim() : '');
+        const nextValue = typeof data.piAgentDir === 'string' ? data.piAgentDir.trim() : '';
+        setValue(nextValue);
+        setSavedValue(nextValue);
         setResolvedPath(typeof data.piAgentDirResolved === 'string' ? data.piAgentDirResolved.trim() : '');
         setLoadState('ready');
       } catch {
@@ -90,8 +93,10 @@ export const PiAgentSettings: React.FC = () => {
     }
   }, [resolvedPath, value]);
 
+  const isDirty = unwrapPath(value) !== unwrapPath(savedValue);
+
   const handleSaveAndReload = React.useCallback(async () => {
-    if (loadState !== 'ready') return;
+    if (loadState !== 'ready' || !isDirty) return;
     setIsSaving(true);
     try {
       const unquoted = unwrapPath(value);
@@ -116,9 +121,11 @@ export const PiAgentSettings: React.FC = () => {
         return;
       }
       // Empty stays empty: do not write the resolved default into the field.
-      setValue(unquoted.length === 0
+      const nextValue = unquoted.length === 0
         ? ''
-        : (typeof payload?.piAgentDir === 'string' ? payload.piAgentDir.trim() : unquoted));
+        : (typeof payload?.piAgentDir === 'string' ? payload.piAgentDir.trim() : unquoted);
+      setValue(nextValue);
+      setSavedValue(nextValue);
       if (typeof payload?.piAgentDirResolved === 'string') {
         setResolvedPath(payload.piAgentDirResolved.trim());
       }
@@ -145,7 +152,7 @@ export const PiAgentSettings: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [loadState, t, value]);
+  }, [isDirty, loadState, t, value]);
 
   const handleShowUpdateNotificationsChange = React.useCallback((enabled: boolean) => {
     setShowOpenCodeUpdateNotifications(enabled);
@@ -214,8 +221,9 @@ export const PiAgentSettings: React.FC = () => {
             <Button
               type="button"
               size="xs"
+              variant={isDirty ? 'default' : 'outline'}
               onClick={handleSaveAndReload}
-              disabled={fieldDisabled}
+              disabled={fieldDisabled || !isDirty}
               className="shrink-0 !font-normal"
             >
               {isSaving ? t('settings.common.actions.saving') : t('settings.common.actions.saveChanges')}

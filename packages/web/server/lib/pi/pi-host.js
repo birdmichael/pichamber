@@ -979,8 +979,17 @@ export const mergeLiveExtensionCommands = (listed, live) => {
       merged.push(entry);
       continue;
     }
-    if (merged[existingIndex].source === 'builtin') continue;
-    merged[existingIndex] = entry;
+    const existing = merged[existingIndex];
+    if (existing.source === 'builtin') continue;
+    // Extension handlers overlay the slash name, but Settings still edits the
+    // markdown prompt body. An empty extension template must not wipe it.
+    const existingTemplate = typeof existing.template === 'string' ? existing.template : '';
+    merged[existingIndex] = {
+      ...entry,
+      template: existingTemplate.length > 0 ? existingTemplate : entry.template,
+      path: existing.path || entry.path,
+      scope: existing.scope || entry.scope,
+    };
   }
   return merged;
 };

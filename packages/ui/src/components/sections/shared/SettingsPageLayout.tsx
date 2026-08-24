@@ -28,6 +28,8 @@ interface SettingsPageLayoutProps {
   className?: string;
   /** Additional className for the outer ScrollableOverlay */
   outerClassName?: string;
+  /** When this key changes, reset the page scrollport to the top. */
+  scrollKey?: string;
 }
 
 /**
@@ -44,10 +46,19 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
   description,
   headerEnd,
   showSaveStatus = false,
+  scrollKey,
 }) => {
   const hasHeader = title != null || description != null || headerEnd != null || showSaveStatus;
   const isPlainTitle = typeof title === 'string' || typeof title === 'number';
   const hasTitleChrome = titleLeading != null || titleAccessory != null;
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const scrollport = contentRef.current?.closest<HTMLElement>('.overlay-scrollbar-container');
+    if (scrollport) {
+      scrollport.scrollTop = 0;
+    }
+  }, [scrollKey]);
 
   return (
     <ScrollableOverlay
@@ -55,6 +66,7 @@ export const SettingsPageLayout: React.FC<SettingsPageLayoutProps> = ({
       className="w-full @container"
     >
       <div
+        ref={contentRef}
         className={cn(
           'mx-auto max-w-[840px] space-y-0 px-6 py-6 @3xl:px-12 @3xl:py-8',
           // The first visible section never needs the top divider, no matter

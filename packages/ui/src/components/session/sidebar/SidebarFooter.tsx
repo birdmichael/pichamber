@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
 import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
+import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
 
 type Props = {
   onOpenSettings: () => void;
@@ -44,7 +45,10 @@ export function SidebarFooter({
     ignoreSettingsClickRef.current = activateTitlebarIconOnPointerDown({
       button: event.button,
       closeHoverUi: () => setSettingsTooltipOpen(false),
-      activate: onOpenSettings,
+      activate: () => {
+        markSettingsOpenedFromTrigger();
+        onOpenSettings();
+      },
     });
   }, [onOpenSettings]);
 

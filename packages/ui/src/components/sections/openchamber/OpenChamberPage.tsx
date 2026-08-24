@@ -129,6 +129,7 @@ export const OpenChamberPage: React.FC<OpenChamberPageProps> = ({ section }) => 
             description={pageDescription}
             showSaveStatus
             className="openchamber-page-body"
+            scrollKey={section}
         >
             {renderSectionContent()}
         </SettingsPageLayout>

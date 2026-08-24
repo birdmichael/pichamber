@@ -56,6 +56,7 @@ import { getLanguageFromExtension } from '@/lib/toolHelpers';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 import { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 
@@ -189,6 +190,27 @@ const SkillsInstalledPage: React.FC = () => {
     ? newFileContent !== originalFileContent
     : newFileName.trim() !== '';
 
+  const abandonNewDraft = React.useCallback(() => {
+    setSkillDraft(null);
+    setSelectedSkill(null);
+  }, [setSelectedSkill, setSkillDraft]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isNewSkill || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isNewSkill]);
+
   const locationLabelText = React.useCallback((value: SkillLocationValue) => (
     t(skillLocationLabelKey(value))
   ), [t]);
@@ -212,6 +234,7 @@ const SkillsInstalledPage: React.FC = () => {
         setOriginalInstructions('');
         setSupportingFiles([]);
         setPendingFiles(skillDraft.pendingFiles || []);
+        setIsLoading(false);
       } else if (selectedSkillName && selectedSkill) {
         setIsLoading(true);
         try {
@@ -515,7 +538,20 @@ const SkillsInstalledPage: React.FC = () => {
             })
           : t('settings.skills.page.subtitle.newSkill')}
         showSaveStatus={false}
+        scrollKey={isNewSkill ? 'new-skill' : selectedSkillName ?? 'empty'}
       >
+        <div
+          ref={formRef}
+          data-settings-escape-form={isNewSkill ? 'true' : undefined}
+          onKeyDown={(event) => {
+            if (!isNewSkill || event.key !== 'Escape') {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            abandonNewDraft();
+          }}
+        >
 
 
 
@@ -688,15 +724,23 @@ const SkillsInstalledPage: React.FC = () => {
         </SettingsSection>
 
         <SettingsSection>
-          <Button
-            onClick={handleSave}
-            disabled={isReadOnlySkill || isSaving || !hasSkillChanges}
-            size="xs"
-            className="!font-normal"
-          >
-            {isSaving ? t('settings.common.actions.saving') : isNewSkill ? t('settings.skills.page.actions.createSkill') : t('settings.common.actions.saveChanges')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleSave}
+              disabled={isReadOnlySkill || isSaving || !hasSkillChanges}
+              size="xs"
+              className="!font-normal"
+            >
+              {isSaving ? t('settings.common.actions.saving') : isNewSkill ? t('settings.skills.page.actions.createSkill') : t('settings.common.actions.saveChanges')}
+            </Button>
+            {isNewSkill ? (
+              <Button type="button" variant="ghost" size="xs" className="!font-normal" onClick={abandonNewDraft}>
+                {t('settings.common.actions.cancel')}
+              </Button>
+            ) : null}
+          </div>
         </SettingsSection>
+        </div>
       </SettingsPageLayout>
 
 

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Radio } from '@/components/ui/radio';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui';
 import { NumberInput } from '@/components/ui/number-input';
 import { Icon } from "@/components/icon/Icon";
 import {
@@ -545,7 +546,16 @@ export const VoiceSettings: React.FC = () => {
         }
 
         utterance.onend = () => setIsBrowserPreviewPlaying(false);
-        utterance.onerror = () => setIsBrowserPreviewPlaying(false);
+        utterance.onerror = () => {
+            setIsBrowserPreviewPlaying(false);
+            toast.error(t('settings.voice.page.toast.previewFailed'));
+        };
+
+        if (!('speechSynthesis' in window)) {
+            setIsBrowserPreviewPlaying(false);
+            toast.error(t('settings.voice.page.toast.previewUnavailable'));
+            return;
+        }
 
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
@@ -626,7 +636,7 @@ export const VoiceSettings: React.FC = () => {
                 }),
             });
 
-            if (!response.ok) throw new Error('Preview failed');
+            if (!response.ok) throw new Error('preview-failed');
 
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
@@ -642,6 +652,7 @@ export const VoiceSettings: React.FC = () => {
                 disposePreviewAudio(audio);
                 setPreviewAudio(null);
                 setIsPreviewPlaying(false);
+                toast.error(t('settings.voice.page.toast.previewFailed'));
             };
 
             setPreviewAudio(audio);
@@ -650,6 +661,7 @@ export const VoiceSettings: React.FC = () => {
             disposePreviewAudio(audio);
             setPreviewAudio(null);
             setIsPreviewPlaying(false);
+            toast.error(t('settings.voice.page.toast.previewFailed'));
         }
     }, [sayVoice, speechRate, previewAudio, t]);
 
@@ -700,6 +712,7 @@ export const VoiceSettings: React.FC = () => {
                 disposePreviewAudio(audio);
                 setOpenaiPreviewAudio(null);
                 setIsOpenAIPreviewPlaying(false);
+                toast.error(t('settings.voice.page.toast.previewFailed'));
             };
 
             setOpenaiPreviewAudio(audio);
@@ -708,6 +721,7 @@ export const VoiceSettings: React.FC = () => {
             disposePreviewAudio(audio);
             setOpenaiPreviewAudio(null);
             setIsOpenAIPreviewPlaying(false);
+            toast.error(t('settings.voice.page.toast.previewFailed'));
         }
     }, [openaiVoice, speechRate, openaiPreviewAudio, openaiApiKey, t]);
 
@@ -725,7 +739,10 @@ export const VoiceSettings: React.FC = () => {
             return;
         }
 
-        if (!openaiCompatibleUrl.trim()) return;
+        if (!openaiCompatibleUrl.trim()) {
+            toast.error(t('settings.voice.page.toast.previewUnavailable'));
+            return;
+        }
 
         setIsCompatiblePreviewPlaying(true);
         let audio: HTMLAudioElement | null = null;
@@ -762,6 +779,7 @@ export const VoiceSettings: React.FC = () => {
                 disposePreviewAudio(audio);
                 setCompatiblePreviewAudio(null);
                 setIsCompatiblePreviewPlaying(false);
+                toast.error(t('settings.voice.page.toast.previewFailed'));
             };
 
             setCompatiblePreviewAudio(audio);
@@ -770,6 +788,7 @@ export const VoiceSettings: React.FC = () => {
             disposePreviewAudio(audio);
             setCompatiblePreviewAudio(null);
             setIsCompatiblePreviewPlaying(false);
+            toast.error(t('settings.voice.page.toast.previewFailed'));
         }
     }, [openaiCompatibleUrl, openaiCompatibleVoice, openaiCompatibleTtsModel, openaiCompatibleApiKey, speechRate, compatiblePreviewAudio, t]);
 
@@ -1002,7 +1021,18 @@ export const VoiceSettings: React.FC = () => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewOpenAIVoice} title={t('settings.voice.page.actions.preview')} disabled={!isOpenAIAvailable}>
+                                            <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    if (!isOpenAIAvailable) {
+                                                        toast.error(t('settings.voice.page.toast.previewUnavailable'));
+                                                        return;
+                                                    }
+                                                    void previewOpenAIVoice();
+                                                }}
+                                                title={t('settings.voice.page.actions.preview')}
+                                            >
                                                 {isOpenAIPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
@@ -1014,17 +1044,35 @@ export const VoiceSettings: React.FC = () => {
 
                                     {voiceProvider === 'say' && (
                                         <>
-                                            <Select value={sayVoice} onValueChange={setSayVoice} disabled={!isSayAvailable || sayVoices.length === 0}>
+                                            <Select
+                                                value={sayVoice && sayVoice !== '$auto' ? sayVoice : '$auto'}
+                                                onValueChange={(value) => setSayVoice(value === '$auto' ? '' : value)}
+                                                disabled={!isSayAvailable || sayVoices.length === 0}
+                                            >
                                                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
-                                                    <SelectValue placeholder={sayVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.selectVoicePlaceholder')} />
+                                                    <SelectValue placeholder={sayVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.auto')}>
+                                                        {sayVoice && sayVoice !== '$auto' ? sayVoice : t('settings.voice.page.field.auto')}
+                                                    </SelectValue>
                                                 </SelectTrigger>
                                                 <SelectContent>
+                                                    <SelectItem value="$auto">{t('settings.voice.page.field.auto')}</SelectItem>
                                                     {sayVoices.map((v) => (
                                                         <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewVoice} title={t('settings.voice.page.actions.preview')} disabled={!isSayAvailable || sayVoices.length === 0}>
+                                            <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    if (!isSayAvailable || sayVoices.length === 0) {
+                                                        toast.error(t('settings.voice.page.toast.previewUnavailable'));
+                                                        return;
+                                                    }
+                                                    void previewVoice();
+                                                }}
+                                                title={t('settings.voice.page.actions.preview')}
+                                            >
                                                 {isPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
@@ -1033,12 +1081,14 @@ export const VoiceSettings: React.FC = () => {
                                     {voiceProvider === 'browser' && (
                                         <>
                                             <Select
-                                                value={browserVoice || '$auto'}
+                                                value={browserVoice && browserVoice !== '$auto' ? browserVoice : '$auto'}
                                                 onValueChange={(value) => setBrowserVoice(value === '$auto' ? '' : value)}
                                                 disabled={filteredBrowserVoices.length === 0}
                                             >
                                                 <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
-                                                    <SelectValue placeholder={filteredBrowserVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.auto')} />
+                                                    <SelectValue placeholder={filteredBrowserVoices.length === 0 ? t('settings.voice.page.field.voicesUnavailable') : t('settings.voice.page.field.auto')}>
+                                                        {browserVoice && browserVoice !== '$auto' ? browserVoice : t('settings.voice.page.field.auto')}
+                                                    </SelectValue>
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="$auto">{t('settings.voice.page.field.auto')}</SelectItem>
@@ -1047,7 +1097,18 @@ export const VoiceSettings: React.FC = () => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button size="xs" variant="ghost" onClick={previewBrowserVoice} title={t('settings.voice.page.actions.preview')} disabled={filteredBrowserVoices.length === 0}>
+                                            <Button
+                                                size="xs"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    if (filteredBrowserVoices.length === 0 || !('speechSynthesis' in window)) {
+                                                        toast.error(t('settings.voice.page.toast.previewUnavailable'));
+                                                        return;
+                                                    }
+                                                    previewBrowserVoice();
+                                                }}
+                                                title={t('settings.voice.page.actions.preview')}
+                                            >
                                                 {isBrowserPreviewPlaying ? <Icon name="stop" className="w-3.5 h-3.5" /> : <Icon name="play" className="w-3.5 h-3.5" />}
                                             </Button>
                                         </>
