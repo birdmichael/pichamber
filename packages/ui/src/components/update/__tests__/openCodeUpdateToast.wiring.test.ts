@@ -7,23 +7,23 @@ const toastSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../OpenCodeUpdateToast.tsx'),
   'utf-8',
 );
-const toasterSource = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '../../ui/sonner.tsx'),
+const headerSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../layout/Header.tsx'),
   'utf-8',
 );
 
-describe('Pi update toast click wiring', () => {
-  test('Dismiss and OK both call dismiss, and toast.info is not left with a no-op action', () => {
-    expect(toastSource).toContain("label: tRef.current('piUpdate.toast.actions.ok')");
-    expect(toastSource).toContain("label: tRef.current('piUpdate.toast.actions.dismiss')");
-    expect(toastSource).toMatch(/action:\s*\{[\s\S]*onClick: dismiss/);
-    expect(toastSource).toMatch(/cancel:\s*\{[\s\S]*onClick: dismiss/);
+describe('Pi update available banner', () => {
+  test('available update is React state, not a sonner Infinity toast', () => {
+    expect(toastSource).toContain('const [availableVersion, setAvailableVersion]');
+    expect(toastSource).toContain('setAvailableVersion(version)');
+    expect(toastSource).toContain('<OpenCodeUpdateBanner');
+    expect(toastSource).toContain("t('piUpdate.toast.actions.dismiss')");
+    expect(toastSource).toContain("t('piUpdate.toast.actions.ok')");
+    expect(toastSource).not.toMatch(/toast\.info\(/);
   });
 
-  test('pins Electron no-drag on the toaster so header drag cannot swallow Dismiss', () => {
-    expect(toasterSource).toContain('app-region-no-drag');
-    expect(toasterSource).toContain('-webkit-app-region');
-    expect(toasterSource).toContain('no-drag');
-    expect(toasterSource).toContain('[data-sonner-toaster]');
+  test('header chrome hosts the banner so Dismiss is a titlebar no-drag child', () => {
+    expect(headerSource).toContain('OpenCodeUpdateBannerHost');
+    expect(headerSource).toContain('<OpenCodeUpdateBannerHost />');
   });
 });

@@ -90,6 +90,7 @@ import {
   resolveCurrentDesktopHost,
 } from '@/lib/desktopCurrentHost';
 import { Icon } from "@/components/icon/Icon";
+import { OpenCodeUpdateBannerHost } from '@/components/update/OpenCodeUpdateBanner';
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
@@ -2068,6 +2069,7 @@ export const Header: React.FC<HeaderProps> = ({
       role="tablist"
       aria-label={t('header.navigation.mainAria')}
     >
+      <OpenCodeUpdateBannerHost />
       {/* Drag region for the window-controls inset (traffic lights) to the left
           of the overlay buttons — stays a window drag area. */}
       <div
@@ -2337,6 +2339,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const renderMobile = () => (
     <div className="app-region-drag relative flex items-center gap-2 px-3 py-2 select-none">
+      <OpenCodeUpdateBannerHost />
       <div className="flex items-center gap-2 shrink-0">
         {/* Use drawer toggle when onToggleLeftDrawer is provided, otherwise use legacy session switcher */}
         {onToggleLeftDrawer ? (
