@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 
 import { ChatView } from '@/components/views/ChatView';
+import { GitViewFallback } from '@/components/views/GitViewFallback';
 import { PlanViewFallback } from '@/components/views/PlanViewFallback';
 
 // Keep TerminalView eager: the bottom dock reserves its height immediately, so
@@ -289,7 +290,7 @@ export const MainLayout: React.FC = () => {
             case 'plan':
                 return <React.Suspense fallback={<PlanViewFallback />}><PlanView /></React.Suspense>;
             case 'git':
-                return <React.Suspense fallback={null}><GitView isActive={!mobileRightSidebarOpen} /></React.Suspense>;
+                return <React.Suspense fallback={<GitViewFallback />}><GitView isActive={!mobileRightSidebarOpen} /></React.Suspense>;
             case 'diff':
                 return <React.Suspense fallback={null}><DiffView /></React.Suspense>;
             case 'terminal':
@@ -434,7 +435,7 @@ export const MainLayout: React.FC = () => {
                             {mobileRightDrawerVisible && (
                                 <motion.div className="absolute inset-0 z-20 bg-sidebar" data-page-scroll-lock="true" style={{ x: rightDrawerX }} aria-hidden={!mobileRightSidebarOpen}>
                                     <ErrorBoundary>
-                                        <React.Suspense fallback={null}><GitView isActive={mobileRightSidebarOpen} /></React.Suspense>
+                                        <React.Suspense fallback={<GitViewFallback />}><GitView isActive={mobileRightSidebarOpen} /></React.Suspense>
                                     </ErrorBoundary>
                                 </motion.div>
                             )}
