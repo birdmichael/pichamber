@@ -15,6 +15,12 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import type { MultiRunCompareGroup } from '@/types/multirun';
 import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
+import {
+  isBrowserTabIdentity,
+  mergeContextPanelForBrowserScope,
+  openedProjectPathSet,
+  resolveBrowserScopeKey,
+} from '@/lib/browser/scope';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch';
@@ -138,6 +144,100 @@ const runtimeMemoryKey = (value?: string | null): string => {
 
 // Shared with rail/panel consumers so contextPanelByDirectory lookups agree on keys.
 export const normalizeContextPanelDirectoryKey = (value: string): string => normalizeDirectoryPath(value);
+
+type BrowserScopeDirectoryStore = {
+  getState: () => { homeDirectory?: string | null };
+};
+
+type BrowserScopeProjectsStore = {
+  getState: () => { projects: Array<{ path: string }> };
+};
+
+let directoryStoreForBrowserScope: BrowserScopeDirectoryStore | undefined;
+let projectsStoreForBrowserScope: BrowserScopeProjectsStore | undefined;
+
+export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectoryStore): void => {
+  directoryStoreForBrowserScope = store;
+};
+
+export const bindProjectsStoreForBrowserScope = (store: BrowserScopeProjectsStore): void => {
+  projectsStoreForBrowserScope = store;
+};
+
+const requireStoreExport = <T>(specifier: string, exportName: string): T | undefined => {
+  const req =
+    (import.meta as ImportMeta & { require?: (id: string) => Record<string, T> }).require
+    ?? (globalThis as typeof globalThis & { require?: (id: string) => Record<string, T> }).require;
+  if (typeof req !== 'function') {
+    return undefined;
+  }
+  try {
+    return req(specifier)?.[exportName];
+  } catch {
+    return undefined;
+  }
+};
+
+const getDirectoryStoreForBrowserScope = (): BrowserScopeDirectoryStore | undefined => {
+  if (!directoryStoreForBrowserScope) {
+    const exportName = 'useDirectoryStore';
+    directoryStoreForBrowserScope = requireStoreExport<BrowserScopeDirectoryStore>(
+      `./${exportName}`,
+      exportName,
+    );
+  }
+  return directoryStoreForBrowserScope;
+};
+
+const getProjectsStoreForBrowserScope = (): BrowserScopeProjectsStore | undefined => {
+  if (!projectsStoreForBrowserScope) {
+    const exportName = 'useProjectsStore';
+    projectsStoreForBrowserScope = requireStoreExport<BrowserScopeProjectsStore>(
+      `./${exportName}`,
+      exportName,
+    );
+  }
+  return projectsStoreForBrowserScope;
+};
+
+// Home / opened projects are needed only when a browser action runs. A static
+// import here closes useDirectoryStore → persistence → useUIStore →
+// useDirectoryStore and TDZ-crashes the Desktop renderer before React mounts.
+const readContextBrowserScopeKey = (directory: string): string => {
+  const home = getDirectoryStoreForBrowserScope()?.getState().homeDirectory;
+  const opened = openedProjectPathSet(
+    getProjectsStoreForBrowserScope()?.getState().projects.map((project) => project.path) ?? [],
+  );
+  return resolveBrowserScopeKey(directory, home, opened) || directory;
+};
+
+const readMergedContextPanel = (
+  byDirectory: Record<string, ContextPanelDirectoryState>,
+  directory: string,
+): ContextPanelDirectoryState | undefined => {
+  const scopeKey = readContextBrowserScopeKey(directory);
+  return mergeContextPanelForBrowserScope(
+    directory,
+    byDirectory[directory],
+    scopeKey,
+    byDirectory[scopeKey],
+  );
+};
+
+const findContextPanelTabOwner = (
+  byDirectory: Record<string, ContextPanelDirectoryState>,
+  directory: string,
+  tabID: string,
+): string | null => {
+  if (byDirectory[directory]?.tabs.some((tab) => tab.id === tabID)) {
+    return directory;
+  }
+  const scopeKey = readContextBrowserScopeKey(directory);
+  if (scopeKey !== directory && byDirectory[scopeKey]?.tabs.some((tab) => tab.id === tabID)) {
+    return scopeKey;
+  }
+  return null;
+};
 
 const normalizeDirectoryPath = (value: string): string => {
   if (!value) return '';
@@ -358,6 +458,12 @@ const sanitizeContextPanelTabs = (tabs: unknown): ContextPanelTab[] => {
 
 const resolveActiveContextPanelTabID = (tabs: ContextPanelTab[], activeTabId: string | null): string | null => {
   if (activeTabId && tabs.some((tab) => tab.id === activeTabId)) {
+    return activeTabId;
+  }
+
+  // Browser tabs may live on the project/chats scope bucket while this
+  // session directory only stores the active pointer.
+  if (activeTabId && isBrowserTabIdentity(activeTabId)) {
     return activeTabId;
   }
 
@@ -1201,7 +1307,7 @@ export const useUIStore = create<UIStore>()(
           }
 
           const state = get();
-          const panelState = state.contextPanelByDirectory[normalizedDirectory];
+          const panelState = readMergedContextPanel(state.contextPanelByDirectory, normalizedDirectory);
           const tabs = panelState?.tabs ?? [];
           const activeTab = tabs.find((tab) => tab.id === panelState?.activeTabId) ?? null;
 
@@ -1236,13 +1342,41 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
+          const writeKey = tab.mode === 'browser'
+            ? readContextBrowserScopeKey(normalizedDirectory)
+            : normalizedDirectory;
+
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const prev = state.contextPanelByDirectory[writeKey];
             const current = touchContextPanelState(prev);
-            const byDirectory = {
+            const nextWrite = upsertContextPanelTab(current, tab);
+            const byDirectory: Record<string, ContextPanelDirectoryState> = {
               ...state.contextPanelByDirectory,
-              [normalizedDirectory]: upsertContextPanelTab(current, tab),
+              [writeKey]: nextWrite,
             };
+
+            if (tab.mode === 'browser' && writeKey !== normalizedDirectory) {
+              const sessionPrev = byDirectory[normalizedDirectory];
+              const sessionCurrent = touchContextPanelState(sessionPrev);
+              const leftoverBrowserTabs = sessionCurrent.tabs.filter((entry) => entry.mode === 'browser');
+              if (leftoverBrowserTabs.length > 0) {
+                const existingIds = new Set(nextWrite.tabs.map((entry) => entry.id));
+                const toMove = leftoverBrowserTabs.filter((entry) => !existingIds.has(entry.id));
+                if (toMove.length > 0) {
+                  byDirectory[writeKey] = {
+                    ...nextWrite,
+                    tabs: [...nextWrite.tabs, ...toMove],
+                  };
+                }
+              }
+              byDirectory[normalizedDirectory] = {
+                ...sessionCurrent,
+                isOpen: true,
+                tabs: sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser'),
+                activeTabId: nextWrite.activeTabId,
+                touchedAt: Date.now(),
+              };
+            }
 
             return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
           });
@@ -1359,12 +1493,18 @@ export const useUIStore = create<UIStore>()(
           const normalizedTabID = (tabID || '').trim();
           if (!normalizedDirectory || !normalizedTabID) return;
           set((state) => {
-            const current = state.contextPanelByDirectory[normalizedDirectory];
+            const ownerKey = findContextPanelTabOwner(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+              normalizedTabID,
+            );
+            if (!ownerKey) return state;
+            const current = state.contextPanelByDirectory[ownerKey];
             if (!current) return state;
             return {
               contextPanelByDirectory: {
                 ...state.contextPanelByDirectory,
-                [normalizedDirectory]: setContextPanelTabTargetPath(current, normalizedTabID, targetPath),
+                [ownerKey]: setContextPanelTabTargetPath(current, normalizedTabID, targetPath),
               },
             };
           });
@@ -1378,43 +1518,81 @@ export const useUIStore = create<UIStore>()(
           }
 
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const ownerKey = findContextPanelTabOwner(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+              normalizedTabID,
+            );
+            if (!ownerKey) {
+              return state;
+            }
+
+            const prev = state.contextPanelByDirectory[ownerKey];
             const current = touchContextPanelState(prev);
             if (!current.tabs.some((tab) => tab.id === normalizedTabID)) {
               return state;
             }
 
             const nextTab = current.tabs.find((tab) => tab.id === normalizedTabID);
-            if (current.activeTabId === normalizedTabID && current.isOpen) {
-              if (nextTab?.mode === 'plan' && current.expanded) {
-                const byDirectory = {
-                  ...state.contextPanelByDirectory,
-                  [normalizedDirectory]: {
-                    ...current,
-                    expanded: false,
-                    touchedAt: Date.now(),
-                  },
-                };
-                return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
-              }
-              return state;
-            }
-
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: {
-                ...current,
-                isOpen: true,
-                expanded: nextTab?.mode === 'plan' ? false : current.expanded,
-                activeTabId: normalizedTabID,
-                touchedAt: Date.now(),
-                tabs: current.tabs.map((tab) => (tab.id === normalizedTabID
-                  ? { ...tab, touchedAt: Date.now() }
-                  : tab)),
-              },
+            const touchedOwner: ContextPanelDirectoryState = {
+              ...current,
+              isOpen: ownerKey === normalizedDirectory ? true : current.isOpen,
+              expanded: nextTab?.mode === 'plan' ? false : current.expanded,
+              activeTabId: ownerKey === normalizedDirectory ? normalizedTabID : current.activeTabId,
+              touchedAt: Date.now(),
+              tabs: current.tabs.map((tab) => (tab.id === normalizedTabID
+                ? { ...tab, touchedAt: Date.now() }
+                : tab)),
             };
 
-            return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+            if (ownerKey === normalizedDirectory) {
+              if (current.activeTabId === normalizedTabID && current.isOpen) {
+                if (nextTab?.mode === 'plan' && current.expanded) {
+                  const byDirectory = {
+                    ...state.contextPanelByDirectory,
+                    [normalizedDirectory]: {
+                      ...current,
+                      expanded: false,
+                      touchedAt: Date.now(),
+                    },
+                  };
+                  return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
+                }
+                return state;
+              }
+
+              return {
+                contextPanelByDirectory: clampContextPanelRoots({
+                  ...state.contextPanelByDirectory,
+                  [normalizedDirectory]: touchedOwner,
+                }, 20),
+              };
+            }
+
+            const sessionPrev = state.contextPanelByDirectory[normalizedDirectory];
+            const sessionCurrent = touchContextPanelState(sessionPrev);
+            if (sessionCurrent.activeTabId === normalizedTabID && sessionCurrent.isOpen) {
+              return {
+                contextPanelByDirectory: clampContextPanelRoots({
+                  ...state.contextPanelByDirectory,
+                  [ownerKey]: touchedOwner,
+                }, 20),
+              };
+            }
+
+            return {
+              contextPanelByDirectory: clampContextPanelRoots({
+                ...state.contextPanelByDirectory,
+                [ownerKey]: touchedOwner,
+                [normalizedDirectory]: {
+                  ...sessionCurrent,
+                  isOpen: true,
+                  expanded: nextTab?.mode === 'plan' ? false : sessionCurrent.expanded,
+                  activeTabId: normalizedTabID,
+                  touchedAt: Date.now(),
+                },
+              }, 20),
+            };
           });
         },
 
@@ -1427,7 +1605,21 @@ export const useUIStore = create<UIStore>()(
           }
 
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const activeOwner = findContextPanelTabOwner(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+              normalizedActiveTabID,
+            );
+            const overOwner = findContextPanelTabOwner(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+              normalizedOverTabID,
+            );
+            if (!activeOwner || activeOwner !== overOwner) {
+              return state;
+            }
+
+            const prev = state.contextPanelByDirectory[activeOwner];
             const current = touchContextPanelState(prev);
             if (!current.tabs.some((tab) => tab.id === normalizedActiveTabID) || !current.tabs.some((tab) => tab.id === normalizedOverTabID)) {
               return state;
@@ -1440,7 +1632,7 @@ export const useUIStore = create<UIStore>()(
 
             const byDirectory = {
               ...state.contextPanelByDirectory,
-              [normalizedDirectory]: next,
+              [activeOwner]: next,
             };
 
             return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
@@ -1454,20 +1646,53 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          const closingTab = get().contextPanelByDirectory[normalizedDirectory]?.tabs
-            .find((tab) => tab.id === normalizedTabID);
+          const ownerKey = findContextPanelTabOwner(
+            get().contextPanelByDirectory,
+            normalizedDirectory,
+            normalizedTabID,
+          );
+          const closingTab = (ownerKey
+            ? get().contextPanelByDirectory[ownerKey]
+            : get().contextPanelByDirectory[normalizedDirectory]
+          )?.tabs.find((tab) => tab.id === normalizedTabID);
 
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const resolvedOwner = ownerKey ?? findContextPanelTabOwner(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+              normalizedTabID,
+            );
+            if (!resolvedOwner) {
+              return state;
+            }
+
+            const prev = state.contextPanelByDirectory[resolvedOwner];
             const current = touchContextPanelState(prev);
             if (!current.tabs.some((tab) => tab.id === normalizedTabID)) {
               return state;
             }
 
-            const byDirectory = {
+            const nextOwner = closeContextPanelTab(current, normalizedTabID);
+            const byDirectory: Record<string, ContextPanelDirectoryState> = {
               ...state.contextPanelByDirectory,
-              [normalizedDirectory]: closeContextPanelTab(current, normalizedTabID),
+              [resolvedOwner]: nextOwner,
             };
+
+            if (resolvedOwner !== normalizedDirectory) {
+              const sessionPrev = byDirectory[normalizedDirectory];
+              if (sessionPrev && sessionPrev.activeTabId === normalizedTabID) {
+                const remainingBrowser = nextOwner.tabs.filter((tab) => tab.mode === 'browser');
+                const nextSameModeTab = remainingBrowser.length > 0
+                  ? remainingBrowser.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best))
+                  : null;
+                byDirectory[normalizedDirectory] = {
+                  ...sessionPrev,
+                  activeTabId: nextSameModeTab?.id ?? sessionPrev.activeTabId,
+                  isOpen: nextSameModeTab ? sessionPrev.isOpen : false,
+                  touchedAt: Date.now(),
+                };
+              }
+            }
 
             return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
           });
@@ -1536,12 +1761,16 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
+          const writeKey = mode === 'browser'
+            ? readContextBrowserScopeKey(normalizedDirectory)
+            : normalizedDirectory;
+
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
+            const prev = state.contextPanelByDirectory[writeKey];
             const current = touchContextPanelState(prev);
             const byDirectory = {
               ...state.contextPanelByDirectory,
-              [normalizedDirectory]: {
+              [writeKey]: {
                 ...current,
                 widthByMode: {
                   ...current.widthByMode,

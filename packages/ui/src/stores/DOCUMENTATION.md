@@ -68,6 +68,20 @@ mounted session-chat iframe stay enabled independently of that visibility flag
 so a delayed or lost handshake cannot hide an already-materialized transcript
 (busy subagents would otherwise show only the working-status row).
 
+Browser tabs and `useBrowserHistoryStore` are scoped by Settings project, not by
+raw session directory. Isolated chat dirs and home-as-chat share
+`openchamber:chats`; home that is itself an opened project stays a project key.
+Files / Git / notes stay keyed by the real session directory. `BrowserPane`
+also keeps that session directory so annotation drafts and announced servers
+match the composer. Cookies stay on the global Electron partition
+`persist:openchamber-browser`. Resolve the store key with
+`resolveBrowserScopeKey` in `lib/browser/scope.ts`. A projectless Chats draft
+(sidebar Chats-row +, no session until send) uses `openchamber:chats`
+immediately — it must not inherit the last project's directory from
+`DirectoryStore`. `useUIStore` reads home and opened projects through a late
+getter inside `readContextBrowserScopeKey` and must not statically import
+`useDirectoryStore` or `useProjectsStore`.
+
 ### Session / project coordination stores
 
 Examples:

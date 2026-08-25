@@ -7,6 +7,7 @@ import { updateDesktopSettings } from '@/lib/persistence';
 import { useFileSearchStore } from '@/stores/useFileSearchStore';
 import { streamDebugEnabled } from '@/stores/utils/streamDebug';
 import { getDeferredSafeStorage } from './utils/safeStorage';
+import { bindDirectoryStoreForBrowserScope } from './useUIStore';
 
 interface DirectoryStore {
 
@@ -434,6 +435,7 @@ export const useDirectoryStore = create<DirectoryStore>()(
     }
   )
 );
+bindDirectoryStoreForBrowserScope(useDirectoryStore);
 
 if (typeof window !== 'undefined') {
   initializeHomeDirectory().then((home) => {

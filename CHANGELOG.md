@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: browser tabs and address history follow the current project. All Chats share one browser, separate from every Settings project. A new Chats draft uses that shared browser immediately, before you send. Sign-in cookies stay shared.
 - Desktop: the Pi update banner sits below the title bar so it no longer covers window controls or header icons.
 - Desktop: new session from the sidebar top control, File menu, and command palette follows the current project; the Chats-row + still opens a projectless chat; Cmd+N is no longer eaten by the File menu.
 - Desktop: the sidebar Settings gear and session rows now open on the first click. A leftover overlay after Esc, and the hover tooltip, no longer eat that press.
