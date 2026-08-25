@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractHunkPatch, splitPatchIntoHunks } from "./patchFileDiff";
+import { extractHunkPatch, fileDiffFromPatch, splitPatchIntoHunks } from "./patchFileDiff";
 
 const SAMPLE_PATCH = `diff --git a/foo.txt b/foo.txt
 index 1111111..2222222 100644
@@ -79,5 +79,67 @@ describe("extractHunkPatch", () => {
     expect(extractHunkPatch(SAMPLE_PATCH, 2)).toBeNull();
     expect(extractHunkPatch(SAMPLE_PATCH, 1.5)).toBeNull();
     expect(extractHunkPatch("", 0)).toBeNull();
+  });
+});
+
+const changeLineNumbers = (patch: string) => {
+  const fileDiff = fileDiffFromPatch("example.ts", patch);
+  const rows: Array<{ type: "deletion" | "addition"; lineNumber: number }> = [];
+
+  for (const hunk of fileDiff.hunks) {
+    let oldLine = hunk.deletionStart;
+    let newLine = hunk.additionStart;
+    for (const content of hunk.hunkContent) {
+      if (content.type === "context") {
+        oldLine += content.lines;
+        newLine += content.lines;
+        continue;
+      }
+
+      for (let index = 0; index < content.deletions; index += 1) {
+        rows.push({ type: "deletion", lineNumber: oldLine });
+        oldLine += 1;
+      }
+      for (let index = 0; index < content.additions; index += 1) {
+        rows.push({ type: "addition", lineNumber: newLine });
+        newLine += 1;
+      }
+    }
+  }
+
+  return rows;
+};
+
+describe("fileDiffFromPatch line numbers", () => {
+  test("keeps old and new numbers on a same-offset replace pair", () => {
+    const rows = changeLineNumbers(`diff --git a/example.ts b/example.ts
+--- a/example.ts
++++ b/example.ts
+@@ -10,3 +10,3 @@
+ context
+-removed
++added
+ after
+`);
+    expect(rows).toEqual([
+      { type: "deletion", lineNumber: 11 },
+      { type: "addition", lineNumber: 11 },
+    ]);
+  });
+
+  test("does not reuse one number when old and new hunk starts differ", () => {
+    const rows = changeLineNumbers(`diff --git a/example.ts b/example.ts
+--- a/example.ts
++++ b/example.ts
+@@ -10,3 +20,3 @@
+ context
+-removed
++added
+ after
+`);
+    expect(rows).toEqual([
+      { type: "deletion", lineNumber: 11 },
+      { type: "addition", lineNumber: 21 },
+    ]);
   });
 });

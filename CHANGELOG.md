@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Diff: long changed lines wrap by default, and turning wrap off shows a usable horizontal scrollbar instead of clipping at the panel edge.
 - Settings: Feature Plugins can install Todo. After install, Work Status shows Tasks first and updates when the model changes the list.
 - Git: opening the panel shows a loading skeleton instead of a blank pane, and change-file paths keep the filename readable when the folder is truncated.
 - Desktop: the sidebar Settings gear opens on the first click even when the window was unfocused, and Context sources expands on the first click after the right sidebar closes. A leftover tooltip no longer eats that press.

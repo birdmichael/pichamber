@@ -1174,7 +1174,7 @@ export const useUIStore = create<UIStore>()(
         recentEfforts: {},
         diffLayoutPreference: 'inline',
         diffFileLayout: {},
-        diffWrapLines: false,
+        diffWrapLines: true,
         walkthroughTocWidth: 224,
         gitChangesViewMode: 'flat',
         isTimelineDialogOpen: false,
