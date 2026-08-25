@@ -26,9 +26,10 @@ describe('Pi update available banner', () => {
     expect(toastSource).not.toMatch(/toast\.info\(/);
   });
 
-  test('header hosts the banner below the titlebar as a no-drag child', () => {
-    expect(headerSource).toContain('OpenCodeUpdateBannerHost');
-    expect(headerSource).toContain('<OpenCodeUpdateBannerHost />');
+  test('portals to document.body below the titlebar as a no-drag overlay', () => {
+    expect(headerSource).not.toContain('OpenCodeUpdateBannerHost');
+    expect(bannerSource).toContain('createPortal');
+    expect(bannerSource).toContain('resolveUpdateAvailableBannerPortalTarget(document)');
     expect(bannerSource).toContain('--oc-header-height');
     expect(bannerSource).toContain('app-region-no-drag');
     expect(bannerSource).not.toMatch(/absolute inset-x-0 top-0/);
