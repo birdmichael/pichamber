@@ -5,6 +5,7 @@ import { DiffViewIcon } from '@/components/icons/DiffIcon';
 import { Button } from '@/components/ui/button';
 import { SortableTabsStrip } from '@/components/ui/sortable-tabs-strip';
 import { PullRequestView } from '@/components/views/PullRequestView';
+import { GitViewFallback } from '@/components/views/GitViewFallback';
 import { PlanViewFallback } from '@/components/views/PlanViewFallback';
 import { TerminalView } from '@/components/views/TerminalView';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
@@ -915,7 +916,7 @@ export const ContextPanel: React.FC = () => {
   const activeNonChatContent = activeTab?.mode === 'context'
         ? <ContextPanelContent />
         : activeTab?.mode === 'git'
-            ? <React.Suspense fallback={null}><GitView isActive={isOpen} /></React.Suspense>
+            ? <React.Suspense fallback={<GitViewFallback />}><GitView isActive={isOpen} /></React.Suspense>
             : activeTab?.mode === 'pr'
                 ? <PullRequestView />
             : activeTab?.mode === 'notes'

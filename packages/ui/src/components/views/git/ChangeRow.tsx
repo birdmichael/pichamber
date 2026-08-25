@@ -4,6 +4,7 @@ import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import { Icon } from "@/components/icon/Icon";
 import type { GitStatus } from '@/lib/api/types';
 import { useI18n } from '@/lib/i18n';
+import { GitChangePath } from './GitChangePath';
 
 type ChangeDescriptor = {
   code: string;
@@ -135,33 +136,7 @@ export const ChangeRow = React.memo<ChangeRowProps>(function ChangeRow({
           {descriptor.code}
         </span>
         <FileTypeIcon filePath={file.path} className="h-3.5 w-3.5 shrink-0" />
-        {(() => {
-          const lastSlash = file.path.lastIndexOf('/');
-          if (lastSlash === -1) {
-            return (
-              <span
-                className="flex-1 min-w-0 truncate typography-ui-label text-foreground"
-                style={{ direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' }}
-                title={file.path}
-              >
-                {file.path}
-              </span>
-            );
-          }
-          const dir = file.path.slice(0, lastSlash);
-          const name = file.path.slice(lastSlash);
-          return (
-            <span className="flex-1 min-w-0 flex items-baseline overflow-hidden" title={file.path}>
-              <span
-                className="min-w-0 truncate typography-ui-label text-muted-foreground"
-                  style={{ direction: 'rtl', textAlign: 'left', unicodeBidi: 'plaintext' }}
-              >
-                {dir}
-              </span>
-              <span className="flex-shrink-0 typography-ui-label"><span className="text-muted-foreground">/</span><span className="text-foreground">{name.slice(1)}</span></span>
-            </span>
-          );
-        })()}
+        <GitChangePath path={file.path} />
         <span className="shrink-0 typography-micro">
           <span style={{ color: 'var(--status-success)' }}>+{insertions}</span>
           <span className="text-muted-foreground mx-0.5">/</span>

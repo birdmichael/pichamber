@@ -52,6 +52,7 @@ import { StashesDialog } from './git/StashesDialog';
 import { ChangesPanel, type ChangesGroupConfig } from './git/ChangesPanel';
 import { CommitSection } from './git/CommitSection';
 import { GitEmptyState } from './git/GitEmptyState';
+import { GitViewFallback } from './GitViewFallback';
 import { HistorySection } from './git/HistorySection';
 import { ConflictDialog } from './git/ConflictDialog';
 import { StashDialog } from './git/StashDialog';
@@ -2287,14 +2288,7 @@ export const GitView: React.FC<GitViewProps> = ({ isActive }) => {
   }
 
   if (isGitRepo === null || (isGitRepo === true && !status)) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Icon name="loader-4" className="size-4 animate-spin" />
-          <span className="typography-ui-label">{t('gitView.loading.checkingRepository')}</span>
-        </div>
-      </div>
-    );
+    return <GitViewFallback />;
   }
 
   if (isGitRepo === false) {
