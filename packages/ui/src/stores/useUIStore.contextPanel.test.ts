@@ -300,6 +300,19 @@ describe('useUIStore browser project/chats scope', () => {
   const projectA = `${home}/project-a`;
   const projectB = `${home}/project-b`;
 
+  test('projectless chats draft key does not read the last project tabs', () => {
+    useUIStore.getState().openContextPreview(projectA, 'https://example.com/');
+    useUIStore.getState().openContextPreview(projectA, 'https://example.org/');
+
+    useUIStore.getState().openContextSurface(CHAT_DRAFT_PROJECT_ID, 'browser');
+
+    const projectTabs = useUIStore.getState().contextPanelByDirectory[projectA]?.tabs ?? [];
+    const draftTabs = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]?.tabs ?? [];
+    expect(projectTabs.map((tab) => tab.targetPath)).toEqual(['https://example.com/', 'https://example.org/']);
+    expect(draftTabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+    expect(draftTabs.some((tab) => tab.targetPath === 'https://example.com/' || tab.targetPath === 'https://example.org/')).toBe(false);
+  });
+
   test('two chat sessions share one browser tab set on the chats sentinel', () => {
     useUIStore.getState().openContextPreview(chatA, 'https://example.com/');
     useUIStore.getState().openContextFile(chatA, `${chatA}/notes.md`);

@@ -1,8 +1,70 @@
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
+import { normalizePath } from '@/lib/pathNormalization';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionWorktreeStore } from '@/sync/session-worktree-store';
 import { getAttachedSessionDirectory } from '@/sync/session-worktree-contract';
 import { useSessionDirectory } from '@/sync/sync-context';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
+
+export type EffectiveDirectoryDraft = {
+    open?: boolean;
+    target?: 'chat' | 'project';
+    bootstrapPendingDirectory?: string | null;
+    directoryOverride?: string | null;
+    preparedChatDirectory?: string | null;
+};
+
+export type EffectiveDirectoryInput = {
+    currentSessionId?: string | null;
+    sessionDirectory?: string | null;
+    worktreeDirectory?: string | null;
+    draft?: EffectiveDirectoryDraft | null;
+    fallbackDirectory?: string | null;
+};
+
+const readDraftFilesystemDirectory = (draft?: EffectiveDirectoryDraft | null): string | undefined => {
+    if (!draft?.open) return undefined;
+    return (
+        draft.bootstrapPendingDirectory
+        || draft.directoryOverride
+        || draft.preparedChatDirectory
+        || undefined
+    ) ?? undefined;
+};
+
+/**
+ * Working directory for Files / Git / annotations. A projectless Chats draft
+ * has no session directory yet and must not inherit the last project's path.
+ */
+export function resolveEffectiveDirectory(input: EffectiveDirectoryInput): string | undefined {
+    if (input.currentSessionId) {
+        if (input.worktreeDirectory) return input.worktreeDirectory;
+        if (input.sessionDirectory) return input.sessionDirectory;
+    }
+
+    const draftDirectory = readDraftFilesystemDirectory(input.draft);
+    if (draftDirectory) return draftDirectory;
+    if (input.draft?.open && input.draft.target === 'chat') {
+        return undefined;
+    }
+
+    return input.fallbackDirectory ?? undefined;
+};
+
+/**
+ * Context-panel / browser identity. A projectless Chats draft uses the shared
+ * chats bucket immediately so tabs and address history do not stay on the
+ * last Settings project.
+ */
+export function resolveContextPanelDirectoryKey(
+    effectiveDirectory: string | null | undefined,
+    draft?: EffectiveDirectoryDraft | null,
+): string {
+    const normalized = normalizePath(effectiveDirectory ?? null);
+    if (normalized) return normalized;
+    if (draft?.open && draft.target === 'chat') return CHAT_DRAFT_PROJECT_ID;
+    return '';
+}
 
 /**
  * Hook that resolves the effective working directory for tabs (Git, Diff, Files, Terminal).
@@ -10,11 +72,8 @@ import { useDirectoryStore } from '@/stores/useDirectoryStore';
  * Priority order:
  * 1. Worktree metadata path (for worktree sessions)
  * 2. Session directory (for active sessions)
- * 3. Draft session directoryOverride (when creating a new session)
- * 4. Fallback directory from DirectoryStore
- *
- * This ensures that tabs show content from the correct project directory
- * even when a draft session is being created.
+ * 3. Draft session directory (override / pending bootstrap / prepared chat dir)
+ * 4. Fallback directory from DirectoryStore — never for a projectless Chats draft
  */
 export const useEffectiveDirectory = (): string | undefined => {
     const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
@@ -24,26 +83,22 @@ export const useEffectiveDirectory = (): string | undefined => {
     const worktreeMap = useSessionUIStore((s) => s.worktreeMetadata);
     const fallbackDirectory = useDirectoryStore((s) => s.currentDirectory);
 
-    // If we have an active session, use its directory
-    if (currentSessionId) {
-        const attachmentDirectory = getAttachedSessionDirectory(worktreeAttachment);
-        if (attachmentDirectory) {
-            return attachmentDirectory;
-        }
-        const worktreeMetadata = worktreeMap.get(currentSessionId);
-        if (worktreeMetadata?.path) {
-            return worktreeMetadata.path;
-        }
-        if (currentSessionDirectory) {
-            return currentSessionDirectory;
-        }
-    }
+    return resolveEffectiveDirectory({
+        currentSessionId,
+        sessionDirectory: currentSessionDirectory,
+        worktreeDirectory: getAttachedSessionDirectory(worktreeAttachment) ?? worktreeMap.get(currentSessionId ?? '')?.path,
+        draft: newSessionDraft,
+        fallbackDirectory,
+    });
+};
 
-    // If a draft session is open, use its directoryOverride
-    if (newSessionDraft?.open && (newSessionDraft.bootstrapPendingDirectory || newSessionDraft.directoryOverride)) {
-        return (newSessionDraft.bootstrapPendingDirectory || newSessionDraft.directoryOverride) ?? undefined;
-    }
-
-    // Fall back to the global directory
-    return fallbackDirectory ?? undefined;
+/** Panel / browser key, including `openchamber:chats` for a projectless Chats draft. */
+export const useContextPanelDirectoryKey = (): string => {
+    const effectiveDirectory = useEffectiveDirectory();
+    const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
+    const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
+    return resolveContextPanelDirectoryKey(
+        effectiveDirectory,
+        currentSessionId ? null : newSessionDraft,
+    );
 };

@@ -20,7 +20,7 @@ const PlanView = lazyWithChunkRecovery(() => import('@/components/views/PlanView
 import { ProjectContextPanel } from './RightSidebarTabs';
 import { SidebarFilesTree } from './SidebarFilesTree';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
-import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useContextPanelDirectoryKey, useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
@@ -58,27 +58,6 @@ const RESIZE_FOLLOW_INTERVAL_MS = 100;
 const CONTEXT_TAB_LABEL_MAX_CHARS = 24;
 type TranslateFn = ReturnType<typeof useI18n>['t'];
 const EMPTY_SESSION_TITLE_MAP = new Map<string, string>();
-
-
-
-const normalizeDirectoryKey = (value: string): string => {
-  if (!value) return '';
-
-  const raw = value.replace(/\\/g, '/');
-  const hadUncPrefix = raw.startsWith('//');
-  let normalized = raw.replace(/\/+$/g, '');
-  normalized = normalized.replace(/\/+/g, '/');
-
-  if (hadUncPrefix && !normalized.startsWith('//')) {
-    normalized = `/${normalized}`;
-  }
-
-  if (normalized === '') {
-    return raw.startsWith('/') ? '/' : '';
-  }
-
-  return normalized;
-};
 
 const clampWidth = (width: number): number => {
   if (!Number.isFinite(width)) {
@@ -442,7 +421,7 @@ const truncateTabLabel = (value: string, maxChars: number): string => {
 export const ContextPanel: React.FC = () => {
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory() ?? '';
-  const directoryKey = React.useMemo(() => normalizeDirectoryKey(effectiveDirectory), [effectiveDirectory]);
+  const directoryKey = useContextPanelDirectoryKey();
   const { panelState } = useMergedContextPanel(directoryKey);
   const closeContextPanel = useUIStore((state) => state.closeContextPanel);
   const closeContextPanelTab = useUIStore((state) => state.closeContextPanelTab);
@@ -456,9 +435,9 @@ export const ContextPanel: React.FC = () => {
   // Registered from the panel because opening a tab is panel state, not
   // something the browser view itself can do before it exists.
   React.useEffect(() => {
-    if (!effectiveDirectory) return;
-    return registerBrowserOpener((url) => openContextBrowser(effectiveDirectory, url));
-  }, [effectiveDirectory, openContextBrowser]);
+    if (!directoryKey) return;
+    return registerBrowserOpener((url) => openContextBrowser(directoryKey, url));
+  }, [directoryKey, openContextBrowser]);
   const reorderContextPanelTabs = useUIStore((state) => state.reorderContextPanelTabs);
   const setSelectedFilePath = useFilesViewTabsStore((state) => state.setSelectedPath);
   const contextEditorTreeVisible = useUIStore((state) => state.contextEditorTreeVisible);

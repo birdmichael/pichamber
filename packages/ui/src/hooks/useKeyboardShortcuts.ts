@@ -28,7 +28,7 @@ import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useGitStore } from '@/stores/useGitStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
-import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
@@ -45,7 +45,7 @@ export const useKeyboardShortcuts = () => {
   const toggleHelpDialog = useUIStore((s) => s.toggleHelpDialog);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const currentShortcutDirectory = useDirectoryStore((s) => s.currentDirectory);
-  const effectiveDirectory = useEffectiveDirectory();
+  const panelDirectoryKey = useContextPanelDirectoryKey();
 
   // The terminal lives in the context panel; these mirror the rail behavior.
   const toggleTerminalSurface = React.useCallback(() => {
@@ -517,10 +517,10 @@ export const useKeyboardShortcuts = () => {
         && !e.repeat
         && eventMatchesShortcutPrefix(e, switchSurfacePrefix, heldKeysRef.current)) {
         const state = useUIStore.getState();
-        if (state.isMobile || !effectiveDirectory) {
+        if (state.isMobile || !panelDirectoryKey) {
           return;
         }
-        const directory = normalizeContextPanelDirectoryKey(effectiveDirectory);
+        const directory = normalizeContextPanelDirectoryKey(panelDirectoryKey);
         const panelState = state.contextPanelByDirectory[directory];
         const sessionId = useSessionUIStore.getState().currentSessionId;
         const visibleSurfaces = getVisibleContextRailSurfaces({
@@ -739,7 +739,7 @@ export const useKeyboardShortcuts = () => {
     currentSessionId,
     isPiKernel,
     currentDirectory,
-    effectiveDirectory,
+    panelDirectoryKey,
     activeProject?.id,
     activeProject?.path,
     shortcutOverrides,

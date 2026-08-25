@@ -75,9 +75,12 @@ Files / Git / notes stay keyed by the real session directory. `BrowserPane`
 also keeps that session directory so annotation drafts and announced servers
 match the composer. Cookies stay on the global Electron partition
 `persist:openchamber-browser`. Resolve the store key with
-`resolveBrowserScopeKey` in `lib/browser/scope.ts`. `useUIStore` reads home and
-opened projects through a late getter inside `readContextBrowserScopeKey` and
-must not statically import `useDirectoryStore` or `useProjectsStore`.
+`resolveBrowserScopeKey` in `lib/browser/scope.ts`. A projectless Chats draft
+(sidebar Chats-row +, no session until send) uses `openchamber:chats`
+immediately — it must not inherit the last project's directory from
+`DirectoryStore`. `useUIStore` reads home and opened projects through a late
+getter inside `readContextBrowserScopeKey` and must not statically import
+`useDirectoryStore` or `useProjectsStore`.
 
 ### Session / project coordination stores
 

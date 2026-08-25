@@ -37,6 +37,7 @@ import { useAssistantStatus } from '@/hooks/useAssistantStatus';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useDesktopWindowControlsLayout } from '@/hooks/useDesktopWindowControlsLayout';
+import { useContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
@@ -1116,7 +1117,8 @@ export const Header: React.FC<HeaderProps> = ({
   const openDirectory = React.useMemo(() => {
     return worktreeDirectory || sessionDirectory || draftDirectory;
   }, [draftDirectory, sessionDirectory, worktreeDirectory]);
-  const { panelState: mergedContextPanel } = useMergedContextPanel(normalize(openDirectory || ''));
+  const panelDirectoryKey = useContextPanelDirectoryKey();
+  const { panelState: mergedContextPanel } = useMergedContextPanel(panelDirectoryKey);
   const activeContextMode = getActiveContextMode(mergedContextPanel);
 
   const catalogWorktreeBranch = useSessionUIStore((state) => {

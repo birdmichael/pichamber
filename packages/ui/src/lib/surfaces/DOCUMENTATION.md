@@ -85,8 +85,9 @@ the `openContext*` actions in `useUIStore`.
   mounted while the panel is open. A selected chat restores its state from
   the session stores. A closed panel mounts no chat iframe.
   Browser tabs (and address history) use `resolveBrowserScopeKey`: one set
-  per Settings project, plus one shared Chats bucket. Files/Git stay on the
-  session directory. Electron cookies stay global.
+  per Settings project, plus one shared Chats bucket. A projectless Chats
+  draft uses that bucket as soon as the composer opens, before send.
+  Files/Git stay on the session directory. Electron cookies stay global.
   Singleton surfaces (git, pr, notes, plan, context) remount on switch. These
   surfaces must restore their state from stores or snapshots.
 - Runtime scope: the registry itself is consumed by desktop/web `MainLayout`.

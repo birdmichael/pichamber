@@ -19,7 +19,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Icon } from '@/components/icon/Icon';
 import { DiffViewIcon } from '@/components/icons/DiffIcon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
 import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { useDeviceInfo } from '@/lib/device';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -40,7 +41,7 @@ import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useGitStatus, useIsGitRepo } from '@/stores/useGitStore';
-import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
+import { useUIStore } from '@/stores/useUIStore';
 
 const RAIL_TOOLTIP_DELAY_MS = 150;
 // Hold the surface-switch modifier for this long before revealing the order
@@ -160,9 +161,9 @@ const ContextPanelRailItem: React.FC<RailItemProps> = ({
 
 export const ContextPanelRail: React.FC = () => {
   const { t } = useI18n();
-  const effectiveDirectory = useEffectiveDirectory();
-  const directoryKey = effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : '';
+  const directoryKey = useContextPanelDirectoryKey();
   const { panelState } = useMergedContextPanel(directoryKey);
+  const gitDirectory = directoryKey && directoryKey !== CHAT_DRAFT_PROJECT_ID ? directoryKey : null;
   const workStatusPanelVisible = useUIStore((state) => state.workStatusPanelVisible);
   const contextRailOrder = useUIStore((state) => state.contextRailOrder);
   const setContextRailOrder = useUIStore((state) => state.setContextRailOrder);
@@ -179,8 +180,8 @@ export const ContextPanelRail: React.FC = () => {
     planModeExperimentalEnabled: planModeEnabled,
   });
   const { screenWidth } = useDeviceInfo();
-  const gitStatus = useGitStatus(directoryKey || null);
-  const isGitRepo = useIsGitRepo(directoryKey || null);
+  const gitStatus = useGitStatus(gitDirectory);
+  const isGitRepo = useIsGitRepo(gitDirectory);
 
   const surfaceSwitchPrefix = React.useMemo(
     () => getEffectiveShortcutPrefix('switch_context_surface', shortcutOverrides),
