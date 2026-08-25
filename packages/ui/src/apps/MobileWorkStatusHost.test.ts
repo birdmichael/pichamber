@@ -75,7 +75,8 @@ describe('MobileWorkStatusHost', () => {
     expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: false })).toBe(true);
     expect(hostSource).toContain("useFeaturePluginSlotActive('todo'");
     expect(hostSource).toContain("sectionVisible('tasks')");
-    expect(hostSource.indexOf('WorkStatusTasksSection')).toBeLessThan(hostSource.indexOf('WorkStatusPrimaryGroup'));
+    expect(hostSource.indexOf("{sectionVisible('tasks') ? <WorkStatusTasksSection"))
+      .toBeLessThan(hostSource.indexOf('<WorkStatusPrimaryGroup'));
   });
 
   test('clicking a live child uses the existing in-place setCurrentSession helper', () => {
