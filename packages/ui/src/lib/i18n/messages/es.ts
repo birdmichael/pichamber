@@ -2094,6 +2094,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.contextUsage.label": "Context used",
   "chat.commandAutocomplete.badge.system": "sistema",
   "chat.commandAutocomplete.empty": "No se encontraron comandos",
+  "chat.commandAutocomplete.keyboardHintEmpty": "Esc cerrar",
   "chat.agentMentionAutocomplete.badge.system": "sistema",
   "chat.agentMentionAutocomplete.empty": "No se encontraron agentes",
   "chat.fileMentionAutocomplete.searchMoreAgents": "Escribe para buscar más agentes",

@@ -147,7 +147,9 @@ copy.
   generous; **membership in the command, skill or snippet registry is the
   authority**, not the pattern. An unknown `/token` stays plain prose. Enter
   on an empty slash popup closes it and sends that prose; Escape dismisses
-  the popup. The key decision lives in `resolveCommandAutocompleteKey`. On the
+  the popup. The key decision lives in `resolveCommandAutocompleteKey`. The
+  empty-list footer uses `resolveCommandAutocompleteKeyboardHintKey` and must
+  not advertise Enter select. On the
   Pi kernel, installed skills are slash targets as `/skill:name`; the scanner
   accepts `:` in the identifier so that form is one token.
 - `triggers.ts` — which picker a caret position asks for. Exactly one can be

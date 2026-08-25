@@ -2118,6 +2118,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.contextUsage.label': 'Context used',
   'chat.commandAutocomplete.badge.system': 'system',
   'chat.commandAutocomplete.empty': '명령 없음',
+  'chat.commandAutocomplete.keyboardHintEmpty': 'Esc 닫기',
   'chat.agentMentionAutocomplete.badge.system': 'system',
   'chat.agentMentionAutocomplete.empty': '에이전트 없음',
   'chat.fileMentionAutocomplete.searchMoreAgents': '입력해 에이전트를 더 검색하세요',

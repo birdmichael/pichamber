@@ -12,7 +12,7 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { refreshFeaturePlugins, usePiBtwPluginAvailable, usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
-import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey, resolveSlashMenuDescription } from './commandAutocompleteItems';
+import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey, resolveCommandAutocompleteKeyboardHintKey, resolveSlashMenuDescription } from './commandAutocompleteItems';
 import {
   DESKTOP_SLASH_DESCRIPTION_CLASS,
   DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
@@ -598,7 +598,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
       </ScrollableOverlay>
       {!isMobile && (
         <div ref={footerRef} className="px-3 pt-1 pb-1.5 border-t typography-meta text-muted-foreground">
-          {t('chat.autocomplete.keyboardHint')}
+          {t(resolveCommandAutocompleteKeyboardHintKey(loading ? 0 : commands.length))}
         </div>
       )}
     </div>

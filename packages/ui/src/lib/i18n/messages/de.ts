@@ -1943,6 +1943,7 @@ export const dict = {
   'chat.contextUsage.label': 'Context used',
   'chat.commandAutocomplete.badge.system': 'System',
   'chat.commandAutocomplete.empty': 'Keine Befehle gefunden',
+  'chat.commandAutocomplete.keyboardHintEmpty': 'Esc schließen',
   'chat.agentMentionAutocomplete.badge.system': 'System',
   'chat.agentMentionAutocomplete.empty': 'Keine Agenten gefunden',
   'chat.fileMentionAutocomplete.searchMoreAgents': 'Tippe, um mehr Agenten zu suchen',

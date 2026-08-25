@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { PICHAMBER_STARTER_SLASH_COMMANDS } from '@/lib/draftStarters';
+import { dict as enDict } from '@/lib/i18n/messages/en';
 import {
   commandHasPiSlashPrefix,
   commandMatchesPiSlashQuery,
@@ -10,6 +11,7 @@ import {
   filterPiSlashCommands,
   mergeCommandAutocompleteItems,
   resolveCommandAutocompleteKey,
+  resolveCommandAutocompleteKeyboardHintKey,
   resolveSlashMenuDescription,
   toPiSkillSlashName,
 } from '../commandAutocompleteItems';
@@ -386,6 +388,18 @@ describe('resolveSlashMenuDescription', () => {
       runDescription: 'Run a subagent as a one-shot workflow',
     })).toBe(catchUp.description);
     expect(commandMatchesPiSlashQuery(catchUp, 're-establish')).toBe(false);
+  });
+});
+
+describe('resolveCommandAutocompleteKeyboardHintKey', () => {
+  test('empty list does not advertise Enter select', () => {
+    const emptyHintKey = resolveCommandAutocompleteKeyboardHintKey(0);
+    expect(emptyHintKey).toBe('chat.commandAutocomplete.keyboardHintEmpty');
+    expect(enDict[emptyHintKey]).toBe('Esc close');
+    expect(enDict[emptyHintKey]).not.toMatch(/Enter/i);
+    expect(resolveCommandAutocompleteKeyboardHintKey(1)).toBe(
+      'chat.autocomplete.keyboardHint',
+    );
   });
 });
 
