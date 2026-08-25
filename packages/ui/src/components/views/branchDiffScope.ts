@@ -63,6 +63,30 @@ export const coerceDiffScope = <T extends string>(
 ): T | 'working' => (scope === 'branch' && !branchScopeAvailable ? 'working' : scope);
 
 /**
+ * Branch lists committed `base...head` only. An empty list must not read as a
+ * clean working tree when Changed or Staged still have files.
+ */
+export const branchEmptyExcludesWorkingTree = (
+  workingFileCount: number,
+  stagedFileCount: number
+): boolean => workingFileCount > 0 || stagedFileCount > 0;
+
+/**
+ * Header view-mode when the stacked list is empty (Branch with no committed
+ * files). Falls back to the persisted preference so switching scope does not
+ * unmount the toggle. `dynamic` reads as unified until files exist.
+ */
+export const resolveDiffToolbarLayout = (
+  fileLayouts: ReadonlyArray<'inline' | 'side-by-side'>,
+  preference: 'dynamic' | 'inline' | 'side-by-side'
+): 'inline' | 'side-by-side' => {
+  if (fileLayouts.length === 0) {
+    return preference === 'side-by-side' ? 'side-by-side' : 'inline';
+  }
+  return fileLayouts.every((layout) => layout === 'side-by-side') ? 'side-by-side' : 'inline';
+};
+
+/**
  * True when a reflog creation source names this branch itself — locally or as
  * a remote-tracking copy (`origin/<branch>`). A worktree started from
  * `origin/<same-branch>` records that as the creation source, but comparing
