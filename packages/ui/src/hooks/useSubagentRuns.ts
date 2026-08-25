@@ -56,11 +56,18 @@ export const useSubagentRuns = (
     ));
     void load();
     const timer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       void load();
     }, 2000);
+    const onVisibility = () => {
+      if (typeof document === 'undefined' || document.hidden) return;
+      void load();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [enabled, sessionId]);
 

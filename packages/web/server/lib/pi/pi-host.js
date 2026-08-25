@@ -44,7 +44,7 @@ import {
   writeFeaturePlugins,
 } from './feature-plugins.js';
 import { enrichPiPackageVersions } from './pi-package-versions.js';
-import { getPiUpgradeStatus } from './pi-upgrade-status.js';
+import { getPiUpgradeStatus, invalidatePiUpgradeStatusCache } from './pi-upgrade-status.js';
 import { runPiSelfUpdate } from './pi-upgrade.js';
 import {
   createAdapterMcpConfig,
@@ -1651,6 +1651,40 @@ export const createPiHost = ({
     });
   };
 
+  const statSessionFile = (file) => {
+    try {
+      const stat = fs.statSync(file);
+      return { mtimeMs: stat.mtimeMs, size: stat.size };
+    } catch {
+      return null;
+    }
+  };
+
+  const sessionFileStampEquals = (left, right) => (
+    Boolean(left)
+    && Boolean(right)
+    && left.mtimeMs === right.mtimeMs
+    && left.size === right.size
+  );
+
+  const findRecordBySessionFile = (file) => {
+    for (const record of sessions.values()) {
+      if (record.sessionFile === file) return record;
+    }
+    return null;
+  };
+
+  const readSessionFileEntries = (file) => {
+    try {
+      return fs.readFileSync(file, 'utf8')
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    } catch {
+      return [];
+    }
+  };
+
   const attachSessionFromFile = async (file, {
     sessionID,
     directory,
@@ -1661,6 +1695,17 @@ export const createPiHost = ({
     const resolvedFile = typeof file === 'string' ? file.trim() : '';
     if (!resolvedFile || !fs.existsSync(resolvedFile)) {
       throw missingSession(sessionID || resolvedFile);
+    }
+    const hintedId = (typeof sessionID === 'string' && sessionID.trim())
+      ? sessionID.trim()
+      : readSessionIdFromSessionFile(resolvedFile);
+    const existing = (hintedId && sessions.get(hintedId)) || findRecordBySessionFile(resolvedFile);
+    if (existing) {
+      if (parentID) existing.info.parentID = parentID;
+      if (metadata && typeof metadata === 'object') {
+        existing.info.metadata = { ...(existing.info.metadata || {}), ...metadata };
+      }
+      return existing;
     }
     let manager = null;
     if (!mock) {
@@ -1673,16 +1718,7 @@ export const createPiHost = ({
         manager = null;
       }
     }
-    const fileEntries = (() => {
-      try {
-        return fs.readFileSync(resolvedFile, 'utf8')
-          .split(/\r?\n/)
-          .filter(Boolean)
-          .map((line) => JSON.parse(line));
-      } catch {
-        return [];
-      }
-    })();
+    const fileEntries = readSessionFileEntries(resolvedFile);
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
       || directory
       || defaultDirectory;
@@ -1692,13 +1728,13 @@ export const createPiHost = ({
     if (!resolvedId) {
       throw missingSession(sessionID || resolvedFile);
     }
-    const existing = sessions.get(resolvedId);
-    if (existing) {
-      if (parentID) existing.info.parentID = parentID;
+    const alreadyAttached = sessions.get(resolvedId);
+    if (alreadyAttached) {
+      if (parentID) alreadyAttached.info.parentID = parentID;
       if (metadata && typeof metadata === 'object') {
-        existing.info.metadata = { ...(existing.info.metadata || {}), ...metadata };
+        alreadyAttached.info.metadata = { ...(alreadyAttached.info.metadata || {}), ...metadata };
       }
-      return existing;
+      return alreadyAttached;
     }
     const factory = await resolveCreateSession();
     const model = await resolvePreferredModel();
@@ -1736,6 +1772,7 @@ export const createPiHost = ({
       }),
       messages: hydrateFacadeMessages(entries, resolvedId, { piSession }),
       status: { type: 'idle' },
+      sessionFileStamp: statSessionFile(resolvedFile),
       piSession,
       translator: createRecordTranslator(resolvedId, cwd, { piSession }),
       unsubscribe: null,
@@ -1753,16 +1790,18 @@ export const createPiHost = ({
   const refreshChildMessagesFromFile = (record) => {
     const file = record?.sessionFile;
     if (!file || !fs.existsSync(file)) return;
+    const stamp = statSessionFile(file);
+    if (stamp && sessionFileStampEquals(record.sessionFileStamp, stamp)) {
+      return;
+    }
     try {
       const piSessionManager = record.sessionManager;
       const entries = typeof piSessionManager?.getEntries === 'function'
         ? piSessionManager.getEntries()
-        : fs.readFileSync(file, 'utf8')
-          .split(/\r?\n/)
-          .filter(Boolean)
-          .map((line) => JSON.parse(line));
+        : readSessionFileEntries(file);
       if (!Array.isArray(entries)) return;
       record.messages = hydrateFacadeMessages(entries, record.id, record);
+      record.sessionFileStamp = stamp;
     } catch {
     }
   };
@@ -2942,6 +2981,7 @@ export const createPiHost = ({
         spawnImpl: options.spawnImpl,
         resolveInvocation: options.resolveInvocation,
       });
+      invalidatePiUpgradeStatusCache();
       let reload = null;
       try {
         reload = await this.reload();

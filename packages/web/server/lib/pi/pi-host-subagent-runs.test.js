@@ -421,4 +421,82 @@ describe('Pi host subagent runs', () => {
     expect(host.getStatus()[parent.id]).toBeUndefined();
     host.dispose();
   });
+
+  it('skips re-reading an unchanged child jsonl and refreshes when the file changes', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const tmpdir = path.join(home, 'tmp');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_scout');
+    fs.mkdirSync(runDir, { recursive: true });
+    const childFile = path.join(runDir, 'child.jsonl');
+    const writeChild = (extraLines = []) => {
+      fs.writeFileSync(childFile, [
+        JSON.stringify({ type: 'session', id: 'scout-child', cwd: '/tmp/project' }),
+        JSON.stringify({
+          type: 'message',
+          id: 'msg_user',
+          message: { role: 'user', content: [{ type: 'text', text: 'Inspect the repo' }] },
+        }),
+        ...extraLines,
+      ].map((line) => `${line}\n`).join(''));
+    };
+    writeChild();
+
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    const originalReadFileSync = fs.readFileSync;
+    const childReads = [];
+    fs.readFileSync = function patchedReadFileSync(file, options) {
+      if (path.resolve(String(file)) === path.resolve(childFile)) {
+        childReads.push(String(file));
+      }
+      return originalReadFileSync.call(this, file, options);
+    };
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async ({ sessionManager } = {}) => createInMemoryPiSession({
+        sessionId: sessionManager?.getSessionId?.() || 'mock',
+      }),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_scout',
+      sessionId: parent.id,
+      state: 'running',
+      mode: 'async',
+      sessionFile: childFile,
+      steps: [{ agent: 'scout', status: 'running', sessionFile: childFile }],
+    }));
+
+    try {
+      const listed = await host.listSubagentRuns(parent.id);
+      expect(listed.runs[0]).toMatchObject({ sessionID: 'scout-child', openable: true });
+      const afterAttach = childReads.length;
+      expect(afterAttach).toBeGreaterThan(0);
+      expect(host.getMessages('scout-child').some((entry) => (
+        entry.parts?.some((part) => part.text === 'Inspect the repo')
+      ))).toBe(true);
+      await host.listSubagentRuns(parent.id);
+      host.getMessages('scout-child');
+      expect(childReads.length).toBe(afterAttach);
+
+      writeChild([JSON.stringify({
+        type: 'message',
+        id: 'msg_more',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Found the test entry points' }] },
+      })]);
+      const afterChange = host.getMessages('scout-child');
+      expect(childReads.length).toBeGreaterThan(afterAttach);
+      expect(afterChange.some((entry) => (
+        entry.parts?.some((part) => part.text === 'Found the test entry points')
+      ))).toBe(true);
+    } finally {
+      fs.readFileSync = originalReadFileSync;
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
 });

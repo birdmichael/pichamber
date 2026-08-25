@@ -14,10 +14,7 @@ import { OpenCodeStatusDialog } from '../ui/OpenCodeStatusDialog';
 import { SessionSidebar } from '@/components/session/SessionSidebar';
 import { SessionDialogs } from '@/components/session/SessionDialogs';
 import { ScheduledTasksDialog } from '@/components/session/ScheduledTasksDialog';
-import { ArchiveView } from '@/components/views/ArchiveView';
-import { WorktreesView } from '@/components/views/WorktreesView';
 import { DiffWorkerProvider } from '@/contexts/DiffWorkerProvider';
-import { MultiRunCompareView, MultiRunLauncher } from '@/components/multirun';
 import { TerminalView } from '@/components/views/TerminalView';
 import { DrawerProvider } from '@/contexts/DrawerContext';
 
@@ -44,6 +41,10 @@ const FilesView = lazyWithChunkRecovery(() => import('@/components/views/FilesVi
 const DiagramView = lazyWithChunkRecovery(() => import('@/components/views/DiagramView').then(m => ({ default: m.DiagramView })));
 const SettingsView = lazyWithChunkRecovery(() => import('@/components/views/SettingsView').then(m => ({ default: m.SettingsView })));
 const SettingsWindow = lazyWithChunkRecovery(() => import('@/components/views/SettingsWindow').then(m => ({ default: m.SettingsWindow })));
+const ArchiveView = lazyWithChunkRecovery(() => import('@/components/views/ArchiveView').then(m => ({ default: m.ArchiveView })));
+const WorktreesView = lazyWithChunkRecovery(() => import('@/components/views/WorktreesView').then(m => ({ default: m.WorktreesView })));
+const MultiRunCompareView = lazyWithChunkRecovery(() => import('@/components/multirun').then(m => ({ default: m.MultiRunCompareView })));
+const MultiRunLauncher = lazyWithChunkRecovery(() => import('@/components/multirun').then(m => ({ default: m.MultiRunLauncher })));
 
 export const MainLayout: React.FC = () => {
     const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
@@ -63,13 +64,28 @@ export const MainLayout: React.FC = () => {
             setSettingsWindowMounted(true);
         }
     }, [isSettingsDialogOpen]);
+    const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
+    const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
+    // Same first-open mount as Settings: rendering the lazy component fetches
+    // Archive / Worktrees / multi-run chunks. Keep them mounted after first
+    // open so local search/filter state survives close.
+    const [archiveViewMounted, setArchiveViewMounted] = React.useState(false);
+    const [worktreesViewMounted, setWorktreesViewMounted] = React.useState(false);
+    React.useEffect(() => {
+        if (isArchivePageOpen) {
+            setArchiveViewMounted(true);
+        }
+    }, [isArchivePageOpen]);
+    React.useEffect(() => {
+        if (worktreesPageProjectId) {
+            setWorktreesViewMounted(true);
+        }
+    }, [worktreesPageProjectId]);
     const isMultiRunLauncherOpen = useUIStore((state) => state.isMultiRunLauncherOpen);
     const setMultiRunLauncherOpen = useUIStore((state) => state.setMultiRunLauncherOpen);
     const multiRunLauncherPrefillPrompt = useUIStore((state) => state.multiRunLauncherPrefillPrompt);
     const isMultiRunCompareOpen = useUIStore((state) => Boolean(state.multiRunCompareGroup));
     const isScheduledTasksPageOpen = useUIStore((state) => state.isScheduledTasksDialogOpen);
-    const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
-    const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
     // Any full-page surface replacing the chat area. While open, the chat and
     // secondary views are fully hidden (not just covered) so none of their
     // floating chrome bleeds through, and selecting a session / draft / main
@@ -365,20 +381,32 @@ export const MainLayout: React.FC = () => {
                             {isMultiRunLauncherOpen && (
                                 <div className="absolute inset-0 z-10 bg-background">
                                     <ErrorBoundary>
-                                        <MultiRunLauncher
-                                            initialPrompt={multiRunLauncherPrefillPrompt}
-                                            onCreated={() => setMultiRunLauncherOpen(false)}
-                                            onCancel={() => setMultiRunLauncherOpen(false)}
-                                        />
+                                        <React.Suspense fallback={null}>
+                                            <MultiRunLauncher
+                                                initialPrompt={multiRunLauncherPrefillPrompt}
+                                                onCreated={() => setMultiRunLauncherOpen(false)}
+                                                onCancel={() => setMultiRunLauncherOpen(false)}
+                                            />
+                                        </React.Suspense>
                                     </ErrorBoundary>
                                 </div>
                             )}
                             {isMultiRunCompareOpen && (
-                                <ErrorBoundary><MultiRunCompareView /></ErrorBoundary>
+                                <ErrorBoundary>
+                                    <React.Suspense fallback={null}><MultiRunCompareView /></React.Suspense>
+                                </ErrorBoundary>
                             )}
                             <ErrorBoundary><ScheduledTasksDialog /></ErrorBoundary>
-                            <ErrorBoundary><ArchiveView /></ErrorBoundary>
-                            <ErrorBoundary><WorktreesView /></ErrorBoundary>
+                            {archiveViewMounted && (
+                                <ErrorBoundary>
+                                    <React.Suspense fallback={null}><ArchiveView /></React.Suspense>
+                                </ErrorBoundary>
+                            )}
+                            {worktreesViewMounted && (
+                                <ErrorBoundary>
+                                    <React.Suspense fallback={null}><WorktreesView /></React.Suspense>
+                                </ErrorBoundary>
+                            )}
                             {/* Always mount SessionSidebar on mobile to match desktop behavior.
                                 Conditional mount (mobileLeftDrawerVisible && ...) caused a
                                 data-loading cascade on every drawer open: paginated sessions
@@ -466,21 +494,33 @@ export const MainLayout: React.FC = () => {
                                                         <ErrorBoundary>
                                                             {/* isWindowed: the app Header already shows the surface
                                                                 title, so skip the launcher's own title bar. */}
-                                                            <MultiRunLauncher
-                                                                isWindowed
-                                                                initialPrompt={multiRunLauncherPrefillPrompt}
-                                                                onCreated={() => setMultiRunLauncherOpen(false)}
-                                                                onCancel={() => setMultiRunLauncherOpen(false)}
-                                                            />
+                                                            <React.Suspense fallback={null}>
+                                                                <MultiRunLauncher
+                                                                    isWindowed
+                                                                    initialPrompt={multiRunLauncherPrefillPrompt}
+                                                                    onCreated={() => setMultiRunLauncherOpen(false)}
+                                                                    onCancel={() => setMultiRunLauncherOpen(false)}
+                                                                />
+                                                            </React.Suspense>
                                                         </ErrorBoundary>
                                                     </div>
                                                 )}
                                                 {isMultiRunCompareOpen && (
-                                                    <ErrorBoundary><MultiRunCompareView /></ErrorBoundary>
+                                                    <ErrorBoundary>
+                                                        <React.Suspense fallback={null}><MultiRunCompareView /></React.Suspense>
+                                                    </ErrorBoundary>
                                                 )}
                                                 <ErrorBoundary><ScheduledTasksDialog /></ErrorBoundary>
-                                                <ErrorBoundary><ArchiveView /></ErrorBoundary>
-                                                <ErrorBoundary><WorktreesView /></ErrorBoundary>
+                                                {archiveViewMounted && (
+                                                    <ErrorBoundary>
+                                                        <React.Suspense fallback={null}><ArchiveView /></React.Suspense>
+                                                    </ErrorBoundary>
+                                                )}
+                                                {worktreesViewMounted && (
+                                                    <ErrorBoundary>
+                                                        <React.Suspense fallback={null}><WorktreesView /></React.Suspense>
+                                                    </ErrorBoundary>
+                                                )}
                                             </main>
                                             <ContextPanel />
                                         </div>

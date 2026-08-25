@@ -9,6 +9,32 @@ import {
   shouldSkipPiVersionCheck,
 } from './pi-upgrade-status.js';
 
+const PI_PACKAGE_VERSION_TTL_MS = 5 * 60 * 1000;
+// Match DefaultPackageManager.update's in-process concurrency.
+const PI_PACKAGE_VERSION_CONCURRENCY = 4;
+
+const latestVersionCache = new Map();
+const latestVersionInflight = new Map();
+
+export const invalidatePiPackageVersionCache = () => {
+  latestVersionCache.clear();
+  latestVersionInflight.clear();
+};
+
+const mapWithConcurrency = async (items, limit, mapper) => {
+  const results = new Array(items.length);
+  let next = 0;
+  const workerCount = Math.min(Math.max(1, limit), items.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }));
+  return results;
+};
+
 const NPM_SPEC_PATTERN = /^(?:npm:)?(@[^/]+\/[^@\s]+|[^@/\s:]+)(?:@(.+))?$/;
 
 const isFile = (value) => {
@@ -104,27 +130,40 @@ export const enrichPiPackageVersions = async (
     directory,
     env = process.env,
     fetchImpl = fetch,
+    now = Date.now,
+    ttlMs = PI_PACKAGE_VERSION_TTL_MS,
+    concurrency = PI_PACKAGE_VERSION_CONCURRENCY,
   } = {},
 ) => {
   const rows = Array.isArray(packages) ? packages : [];
   const skipLatest = shouldSkipPiVersionCheck(env);
-  const latestByName = new Map();
 
   const resolveLatest = async (name) => {
     if (skipLatest) return null;
-    if (latestByName.has(name)) return latestByName.get(name);
-    try {
-      const latest = await fetchLatestNpmPackageVersion(name, { fetchImpl, env });
-      latestByName.set(name, latest);
-      return latest;
-    } catch {
-      latestByName.set(name, null);
-      return null;
-    }
+    const at = typeof now === 'function' ? now() : now;
+    const cached = latestVersionCache.get(name);
+    if (cached && at < cached.expiresAt) return cached.version;
+    const pending = latestVersionInflight.get(name);
+    if (pending) return pending;
+    const request = (async () => {
+      try {
+        const latest = await fetchLatestNpmPackageVersion(name, { fetchImpl, env });
+        latestVersionCache.set(name, {
+          version: latest,
+          expiresAt: (typeof now === 'function' ? now() : now) + ttlMs,
+        });
+        return latest;
+      } catch {
+        return null;
+      } finally {
+        latestVersionInflight.delete(name);
+      }
+    })();
+    latestVersionInflight.set(name, request);
+    return request;
   };
 
-  const enriched = [];
-  for (const item of rows) {
+  return mapWithConcurrency(rows, concurrency, async (item) => {
     const parsed = parsePiPackageSpec(item?.path || item?.source || '');
     const kind = parsed?.kind || item?.source || 'unknown';
     const packageName = parsed?.kind === 'npm' ? parsed.name : (typeof item?.name === 'string' ? item.name : '');
@@ -141,7 +180,7 @@ export const enrichPiPackageVersions = async (
       ? await resolveLatest(packageName)
       : null;
     const pinned = Boolean(parsed?.pinned);
-    enriched.push({
+    return {
       ...item,
       currentVersion,
       latestVersion,
@@ -153,7 +192,6 @@ export const enrichPiPackageVersions = async (
         kind: parsed?.kind,
       }),
       kind,
-    });
-  }
-  return enriched;
+    };
+  });
 };

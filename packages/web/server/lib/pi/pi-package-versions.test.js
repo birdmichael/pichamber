@@ -5,12 +5,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   enrichPiPackageVersions,
+  invalidatePiPackageVersionCache,
   packageHasUpdate,
   parsePiPackageSpec,
 } from './pi-package-versions.js';
 
 const tempHomes = [];
 afterEach(() => {
+  invalidatePiPackageVersionCache();
   for (const dir of tempHomes.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -121,5 +123,49 @@ describe('pi-package-versions', () => {
     expect(rows[0].currentVersion).toBeNull();
     expect(rows[0].latestVersion).toBeNull();
     expect(rows[0].updateAvailable).toBe(false);
+  });
+
+  it('caches latest versions by package name across list calls', async () => {
+    const home = makeHome();
+    let called = 0;
+    const fetchImpl = async () => {
+      called += 1;
+      return { ok: true, json: async () => ({ version: '1.2.3' }) };
+    };
+    const packages = [
+      { name: 'pi-question-tool', path: 'npm:pi-question-tool', source: 'npm', scope: 'user' },
+    ];
+    await enrichPiPackageVersions(packages, { home, env: {}, fetchImpl, now: () => 1_000 });
+    const again = await enrichPiPackageVersions(packages, { home, env: {}, fetchImpl, now: () => 2_000 });
+    expect(called).toBe(1);
+    expect(again[0].latestVersion).toBe('1.2.3');
+  });
+
+  it('fetches unique package latest versions with a concurrency cap of 4', async () => {
+    const home = makeHome();
+    let active = 0;
+    let maxActive = 0;
+    const packages = Array.from({ length: 8 }, (_, index) => ({
+      name: `pi-pkg-${index}`,
+      path: `npm:pi-pkg-${index}`,
+      source: 'npm',
+      scope: 'user',
+    }));
+    const rows = await enrichPiPackageVersions(packages, {
+      home,
+      env: {},
+      concurrency: 4,
+      fetchImpl: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => { setTimeout(resolve, 20); });
+        active -= 1;
+        return { ok: true, json: async () => ({ version: '3.0.0' }) };
+      },
+    });
+    expect(rows).toHaveLength(8);
+    expect(rows.every((row) => row.latestVersion === '3.0.0')).toBe(true);
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(4);
   });
 });

@@ -4,9 +4,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PI_SDK_PACKAGE = '@earendil-works/pi-coding-agent';
+const PI_UPGRADE_STATUS_TTL_MS = 5 * 60 * 1000;
 
 const require = createRequire(import.meta.url);
 const FETCH_TIMEOUT_MS = 10_000;
+
+let cachedUpgradeStatus = null;
+let inflightUpgradeStatus = null;
+
+export const invalidatePiUpgradeStatusCache = () => {
+  cachedUpgradeStatus = null;
+  inflightUpgradeStatus = null;
+};
 
 const isEnvFlagPresent = (value) => {
   if (typeof value !== 'string') return false;
@@ -92,46 +101,54 @@ const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process.env } 
   fetchLatestNpmPackageVersion(PI_SDK_PACKAGE, { fetchImpl, env })
 );
 
+const buildUpgradeStatus = ({ currentVersion, latestVersion }) => ({
+  available: Boolean(currentVersion && latestVersion && comparePiSdkVersions(latestVersion, currentVersion) > 0),
+  currentVersion,
+  latestVersion: latestVersion || null,
+  package: PI_SDK_PACKAGE,
+  upgrade: { supported: false, reason: 'bundled' },
+});
+
 export const getPiUpgradeStatus = async ({
   fetchImpl = fetch,
   env = process.env,
   currentVersion = readInstalledPiSdkVersion(),
+  now = Date.now,
+  ttlMs = PI_UPGRADE_STATUS_TTL_MS,
 } = {}) => {
-  const upgrade = { supported: false, reason: 'bundled' };
   if (shouldSkipPiVersionCheck(env)) {
-    return {
-      available: false,
-      currentVersion,
-      latestVersion: null,
-      package: PI_SDK_PACKAGE,
-      upgrade,
-    };
+    return buildUpgradeStatus({ currentVersion, latestVersion: null });
   }
-  try {
-    const latestVersion = await fetchLatestPiSdkVersion({ fetchImpl, env });
-    if (!currentVersion || !latestVersion) {
-      return {
-        available: false,
-        currentVersion,
-        latestVersion,
-        package: PI_SDK_PACKAGE,
-        upgrade,
+  const cacheKey = currentVersion || '';
+  const at = typeof now === 'function' ? now() : now;
+  if (
+    cachedUpgradeStatus
+    && cachedUpgradeStatus.key === cacheKey
+    && at < cachedUpgradeStatus.expiresAt
+  ) {
+    return cachedUpgradeStatus.status;
+  }
+  if (inflightUpgradeStatus && inflightUpgradeStatus.key === cacheKey) {
+    return inflightUpgradeStatus.promise;
+  }
+  const promise = (async () => {
+    try {
+      const latestVersion = await fetchLatestPiSdkVersion({ fetchImpl, env });
+      const status = buildUpgradeStatus({ currentVersion, latestVersion });
+      cachedUpgradeStatus = {
+        key: cacheKey,
+        status,
+        expiresAt: (typeof now === 'function' ? now() : now) + ttlMs,
       };
+      return status;
+    } catch {
+      return buildUpgradeStatus({ currentVersion, latestVersion: null });
+    } finally {
+      if (inflightUpgradeStatus?.promise === promise) {
+        inflightUpgradeStatus = null;
+      }
     }
-    return {
-      available: comparePiSdkVersions(latestVersion, currentVersion) > 0,
-      currentVersion,
-      latestVersion,
-      package: PI_SDK_PACKAGE,
-      upgrade,
-    };
-  } catch {
-    return {
-      available: false,
-      currentVersion,
-      latestVersion: null,
-      package: PI_SDK_PACKAGE,
-      upgrade,
-    };
-  }
+  })();
+  inflightUpgradeStatus = { key: cacheKey, promise };
+  return promise;
 };
