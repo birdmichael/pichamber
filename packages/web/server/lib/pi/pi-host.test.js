@@ -399,18 +399,25 @@ describe('createPiHost', () => {
     const record = await host.createSession({ directory: '/tmp/project', title: 'Pin compact' });
     events.length = 0;
     await expect(host.compactSession(record.id)).resolves.toEqual({ compacted: true });
-    expect(events.map((item) => item.event.type)).toEqual([
+    const types = events.map((item) => item.event.type);
+    // Compact also replays the session todo snapshot (todo.updated). That is
+    // not the pin-inject contract this test owns.
+    expect(types.filter((type) => type !== 'todo.updated')).toEqual([
       'session.status',
       'session.compact',
       'session.compact',
       'session.compacted',
     ]);
-    expect(events[1].event.properties).toMatchObject({ sessionID: record.id, status: 'start' });
-    expect(events[2].event.properties).toMatchObject({ sessionID: record.id, status: 'end' });
-    expect(events[3].event).toMatchObject({
+    const compactEvents = events.filter((item) => item.event.type !== 'todo.updated');
+    expect(compactEvents[1].event.properties).toMatchObject({ sessionID: record.id, status: 'start' });
+    expect(compactEvents[2].event.properties).toMatchObject({ sessionID: record.id, status: 'end' });
+    expect(compactEvents[3].event).toMatchObject({
       type: 'session.compacted',
       properties: { sessionID: record.id, directory: '/tmp/project' },
     });
+    expect(events.some((item) => (
+      item.event.type === 'todo.updated' && item.event.properties?.sessionID === record.id
+    ))).toBe(true);
     host.dispose();
   });
 
