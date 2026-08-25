@@ -44,6 +44,27 @@ keyed by package name; honor `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`). `POST
 `DefaultPackageManager.removeAndPersist(source)` path as Feature Plugins
 uninstall (after the Settings confirm dialog), then reloads idle sessions.
 
+## User extension natives on Desktop
+
+Pi loads configured packages through `DefaultResourceLoader` →
+`jiti.import` of paths resolved by `DefaultPackageManager` from
+`{resolvePiAgentDir()}/npm` and `<cwd>/.pi/npm`. That require happens in
+the same Electron process as the kernel.
+
+On Desktop (`process.versions.electron` non-empty), a native `dlopen`
+failure whose error is the `NODE_MODULE_VERSION` mismatch sentence skips
+**that user extension only**. The kernel stays ready. Other extensions
+still load. Sessions can still be created and prompted. Diagnostics keep
+the extension source, `.node` path, `process.versions.modules`,
+`process.versions.electron`, and the compiler ABI parsed from the error.
+Do not hardcode ABI numbers or package names.
+
+The skip layer is off when `process.versions.electron` is empty (CLI /
+plain Node) so system-Node-built natives still load. App-owned natives
+under `app.asar.unpacked` are not reported as skipped user extensions.
+This is a soft-land only: it does not rebuild `{agentDir}/npm` for
+Electron and does not add a second `npm-electron` prefix.
+
 ## First-install project seed
 
 When `~/.config/openchamber/settings.json` is missing, or the file exists
