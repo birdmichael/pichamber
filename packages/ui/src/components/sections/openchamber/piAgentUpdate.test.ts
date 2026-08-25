@@ -63,6 +63,13 @@ describe('PiAgentSettings version display', () => {
       'utf8',
     );
     expect(source).toContain('SETTINGS_VERSION_META_CLASS');
+    const classSource = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../shared/SettingsSection.tsx'),
+      'utf8',
+    );
+    expect(classSource).toContain(
+      "SETTINGS_VERSION_META_CLASS =\n  'typography-meta tabular-nums text-[var(--surface-muted-foreground)]'",
+    );
     expect(source).not.toContain('SettingsVersionChips');
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.currentVersion')}");
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.latestVersion')}");

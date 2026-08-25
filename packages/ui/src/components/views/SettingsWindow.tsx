@@ -33,10 +33,15 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
     >
       <Dialog.Portal>
         <Dialog.Backdrop
+          data-slot="dialog-overlay"
           className={cn(
             'oc-glass-backdrop fixed inset-0 z-50 bg-black/25 dark:bg-black/40',
             'transition-opacity duration-150 ease-out',
             'data-[starting-style]:opacity-0 data-[ending-style]:opacity-0',
+            // Esc / close must not leave a leftover backdrop that eats the
+            // next sidebar gear or session-row press.
+            !open && 'pointer-events-none',
+            'data-[ending-style]:pointer-events-none',
           )}
         />
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -50,6 +55,8 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
               'transition-all duration-150 ease-out',
               'data-[starting-style]:opacity-0 data-[starting-style]:scale-[0.98]',
               'data-[ending-style]:opacity-0 data-[ending-style]:scale-[0.98]',
+              !open && 'pointer-events-none',
+              'data-[ending-style]:pointer-events-none',
               // Dim this window when a nested dialog (e.g. "Add a device") opens
               // on top of it, mirroring how the page behind a dialog is dimmed.
               'data-[nested-dialog-open]:brightness-[0.55] dark:data-[nested-dialog-open]:brightness-[0.4]',

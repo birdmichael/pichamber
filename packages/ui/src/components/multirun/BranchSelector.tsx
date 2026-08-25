@@ -18,6 +18,7 @@ import {
   resolveWorktreeSourceBranchPreference,
 } from '@/lib/worktrees/worktreeSourceBranchPreference';
 import { useI18n } from '@/lib/i18n';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export interface BranchSelectorProps {
   /** Current directory to check for git repository */
@@ -172,14 +173,19 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
         <SelectTrigger
           id={id}
           size="lg"
+          aria-busy={isLoading}
           className={cn('min-w-0 max-w-full *:data-[slot=select-value]:truncate', className ?? 'w-fit')}
         >
-          <SelectValue placeholder={isLoading ? t('multiRun.branchSelector.status.loadingBranches') : t('multiRun.branchSelector.placeholder.selectSourceBranch')} />
+          {isLoading ? (
+            <Skeleton className="h-4 w-24 rounded-md" aria-hidden />
+          ) : (
+            <SelectValue placeholder={t('multiRun.branchSelector.placeholder.selectSourceBranch')} />
+          )}
         </SelectTrigger>
         <SelectContent className="max-h-[280px] max-w-[320px]">
           {isLoading ? (
-            <div className="px-2 py-4 text-center typography-meta text-muted-foreground">
-              {t('multiRun.branchSelector.status.loadingBranches')}
+            <div className="px-2 py-4" aria-hidden>
+              <Skeleton className="mx-auto h-4 w-24 rounded-md" />
             </div>
           ) : localBranches.length === 0 && remoteBranches.length === 0 ? (
             <div className="px-2 py-4 text-center typography-meta text-muted-foreground">

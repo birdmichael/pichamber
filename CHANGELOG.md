@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: the sidebar Settings gear and session rows now open on the first click. A leftover overlay after Esc, and the hover tooltip, no longer eat that press.
+- Settings: the Pi version next to Update is muted secondary text.
+- Chat: New multi-run Base branch shows a quiet loading control instead of the words "Loading branches...".
 - Desktop: hidden windows pause Work Status, tray, and session watchdog polling, then refresh once when you come back.
 - Desktop: Archive, Worktrees, and multi-run views load when you open them instead of at first paint.
 - Settings: Pi and Extensions show only the installed version as quiet text. Update sits next to the Pi version, keeps sentence case, and hides the latest version on the tooltip.

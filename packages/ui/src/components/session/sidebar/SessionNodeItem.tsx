@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { dropdownMenuItemClass, dropdownMenuPopupClass, dropdownMenuSeparatorClass, dropdownMenuSubTriggerClass } from '@/components/ui/dropdown-menu.styles';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
 import { isManagedChatDirectory } from '@/lib/chatDirectories';
@@ -336,6 +337,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         : 'group-hover:pr-3 group-focus-within:pr-3');
   const alwaysActionPaddingClass = showQuickArchiveAction ? 'pr-13' : 'pr-7';
   const suppressNextSelectRef = React.useRef(false);
+  const ignoreRowClickRef = React.useRef(false);
   const [isTouchPressed, setIsTouchPressed] = React.useState(false);
   const editingIdRef = React.useRef(editingId);
   editingIdRef.current = editingId;
@@ -933,6 +935,19 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     if (mobileVariant && event.pointerType === 'touch') {
       setIsTouchPressed(true);
     }
+    if (event.pointerType !== 'mouse') {
+      return;
+    }
+    if (event.button === 2 || (event.button === 0 && event.ctrlKey && !selectionModeEnabled)) {
+      return;
+    }
+    ignoreRowClickRef.current = activateTitlebarIconOnPointerDown({
+      button: event.button,
+      closeHoverUi: () => undefined,
+      activate: () => {
+        handleRowSelect(event as unknown as React.MouseEvent<HTMLButtonElement>);
+      },
+    });
   };
   const handleRowPointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (mobileVariant && event.pointerType === 'touch') {
@@ -1281,7 +1296,14 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
  	                    onPointerUp={handleRowPointerEnd}
  	                    onPointerCancel={handleRowPointerEnd}
  	                    onMouseDown={handleRowMouseDown}
- 	                    onClick={(event) => handleRowSelect(event)}
+ 	                    onClick={(event) => {
+                      if (ignoreRowClickRef.current) {
+                        ignoreRowClickRef.current = false;
+                        event.preventDefault();
+                        return;
+                      }
+                      handleRowSelect(event);
+                    }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       handleSessionDoubleClick(session.id, sessionTitle);

@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Sessions: the first click on a session row now opens that session. The hover preview no longer eats that press.
 - Chat: Save as image is hidden on text-only assistant turns. When the turn has an image, Save as image writes a file or shows an error.
 - Chat: long user messages wrap inside the bubble instead of clipping to a single line.
 - Settings: Session Defaults thinking levels now follow the selected model, the same as the composer chip and project defaults.
