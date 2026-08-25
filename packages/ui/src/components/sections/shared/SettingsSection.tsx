@@ -74,7 +74,7 @@ export const SETTINGS_DESCRIPTION_CLASS =
 export const SETTINGS_HELPER_CLASS = 'typography-meta text-muted-foreground';
 /** Read-only installed version — muted metadata, not a chip or field label. */
 export const SETTINGS_VERSION_META_CLASS =
-  'typography-meta text-muted-foreground tabular-nums';
+  'typography-meta tabular-nums text-[var(--surface-muted-foreground)]';
 /** Callout / alert headline inside a section (not a control-group title). */
 export const SETTINGS_CALLOUT_TITLE_CLASS = 'typography-meta font-medium text-foreground';
 /** Brand / product name under a logo — quieter than L1 page title. */

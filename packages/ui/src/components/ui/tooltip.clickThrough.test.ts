@@ -13,4 +13,10 @@ describe('tooltip click-through', () => {
     expect(tooltipSource).toContain('className="pointer-events-none z-[200]"');
     expect(tooltipSource).toMatch(/oc-glass-tooltip pointer-events-none/);
   });
+
+  test('an activating mouse press cannot open the tooltip', () => {
+    expect(tooltipSource).toContain('shouldSuppressTooltipOpen');
+    expect(tooltipSource).toContain('pointerPressActiveRef');
+  });
 });
+

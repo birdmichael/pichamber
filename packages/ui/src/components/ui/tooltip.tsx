@@ -2,6 +2,10 @@ import * as React from "react"
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip"
 
 import { cn } from "@/lib/utils"
+import {
+  isPrimaryMouseTooltipPointer,
+  shouldSuppressTooltipOpen,
+} from "@/components/ui/tooltip-press"
 
 const MOBILE_LONG_PRESS_DELAY = 600
 const MOBILE_LONG_PRESS_CLOSE_DELAY = 1600
@@ -79,6 +83,7 @@ function Tooltip({
   const closeTimeoutRef = React.useRef<number | null>(null)
   const startPointRef = React.useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = React.useRef(false)
+  const pointerPressActiveRef = React.useRef(false)
   const controlled = open !== undefined
   const tooltipOpen = controlled ? open : longPressOpen
 
@@ -104,6 +109,13 @@ function Tooltip({
 
   const contextValue = React.useMemo<LongPressTooltipContextValue>(() => ({
     handlePointerDown: (event) => {
+      if (isPrimaryMouseTooltipPointer(event.pointerType, event.button)) {
+        pointerPressActiveRef.current = true
+        if (!controlled) {
+          setLongPressOpen(false)
+        }
+      }
+
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
         return
       }
@@ -137,6 +149,7 @@ function Tooltip({
       }
     },
     handlePointerEnd: () => {
+      pointerPressActiveRef.current = false
       clearLongPressTimeout()
       startPointRef.current = null
 
@@ -174,6 +187,13 @@ function Tooltip({
   }, [clearCloseTimeout, clearLongPressTimeout])
 
   const handleOpenChange = React.useCallback((nextOpen: boolean, event: TooltipChangeEventDetails) => {
+    if (shouldSuppressTooltipOpen({
+      nextOpen,
+      pointerPressActive: pointerPressActiveRef.current,
+    })) {
+      return
+    }
+
     if (!controlled) {
       setLongPressOpen(nextOpen)
     }
