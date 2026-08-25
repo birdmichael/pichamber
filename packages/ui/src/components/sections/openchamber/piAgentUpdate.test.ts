@@ -57,14 +57,17 @@ describe('piAgentUpdate', () => {
 });
 
 describe('PiAgentSettings version display', () => {
-  test('uses one chip row instead of stacked Current / Latest field rows', () => {
+  test('shows muted current version text and Update, not chips or Current / Latest labels', () => {
     const source = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), 'PiAgentSettings.tsx'),
       'utf8',
     );
-    expect(source).toContain('SettingsVersionChips');
+    expect(source).toContain('SETTINGS_VERSION_META_CLASS');
+    expect(source).not.toContain('SettingsVersionChips');
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.currentVersion')}");
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.latestVersion')}");
+    expect(source).not.toContain('actions.upToDate');
+    expect(source).toContain('updateToVersion');
     expect(source).toContain('data-settings-item="sessions.pi-update"');
   });
 });

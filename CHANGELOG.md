@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Pi and Extensions show only the installed version as quiet text. Update appears when a newer version exists; the latest version stays on the Update tooltip.
 - Settings: Pi and Extensions versions use compact chips instead of stacked number rows or "Current x · Latest y" sentences.
 - Settings/Desktop: the Pi section now shows the current in-process Pi version, the latest version when the existing update check finds one, and Update. Update runs `pi update` on that install and reloads Pi.
 - Settings: Extensions package rows show current and latest versions, with Update when a newer npm version exists, and Update all when any row can update.

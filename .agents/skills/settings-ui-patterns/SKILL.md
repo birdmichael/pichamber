@@ -49,7 +49,7 @@ Load each reference whose task branch applies; reference loading is complete whe
 | Boolean | `SettingsCheckboxRow` |
 | Mutually exclusive list | `SettingsRadioGroup` + `SettingsRadioOption` |
 | Short segmented options | `SettingsChipGroup` |
-| Read-only version pills | `SettingsVersionChips` |
+| Installed version metadata | `SETTINGS_VERSION_META_CLASS` |
 | Sub-cluster with a quiet L3 title inside a section | `SettingsControlGroup` |
 | Two-column area on wide panes | `SettingsTwoColumn` |
 | Helper text on demand (hover + tap) | `info` prop or `SettingsInfoHint` |

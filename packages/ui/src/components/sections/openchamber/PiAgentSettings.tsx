@@ -7,10 +7,10 @@ import {
   SettingsFieldRow,
   SettingsCheckboxRow,
   SettingsInset,
-  SettingsVersionChips,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_DESCRIPTION_CLASS,
+  SETTINGS_VERSION_META_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { canRequestNativeDirectoryAccess, requestDirectoryAccess } from '@/lib/desktop';
@@ -23,9 +23,7 @@ import { toast } from '@/components/ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   canUpdatePiFromStatus,
-  isPiUpToDate,
   parsePiUpgradeStatus,
-  shouldShowPiLatestVersion,
   type PiUpgradeStatus,
 } from './piAgentUpdate';
 
@@ -312,41 +310,47 @@ export const PiAgentSettings: React.FC = () => {
 
         {upgradeStatus?.currentVersion ? (
           <div
-            className="flex min-w-0 flex-wrap items-center gap-2 py-1.5"
+            className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-1.5"
             data-settings-item="sessions.pi-version"
           >
-            <SettingsVersionChips
-              currentVersion={upgradeStatus.currentVersion}
-              currentAriaLabel={t('settings.openchamber.piAgent.field.currentVersionAria', {
-                version: upgradeStatus.currentVersion,
-              })}
-              latestVersion={shouldShowPiLatestVersion(upgradeStatus) ? upgradeStatus.latestVersion : null}
-              latestAriaLabel={upgradeStatus.latestVersion
-                ? t('settings.openchamber.piAgent.field.latestVersionAria', {
-                    version: upgradeStatus.latestVersion,
-                  })
-                : undefined}
-              status={isPiUpToDate(upgradeStatus)
-                ? t('settings.openchamber.piAgent.actions.upToDate')
-                : null}
-            />
-            {canUpdatePiFromStatus(upgradeStatus) ? (
-              <Button
-                type="button"
-                size="xs"
-                variant="default"
-                onClick={handleUpdatePi}
-                disabled={isUpdating}
-                className="shrink-0 !font-normal"
-                aria-label={t('settings.openchamber.piAgent.actions.updateAria')}
-                data-settings-item="sessions.pi-update"
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span
+                className={SETTINGS_VERSION_META_CLASS}
+                aria-label={t('settings.openchamber.piAgent.field.currentVersionAria', {
+                  version: upgradeStatus.currentVersion,
+                })}
               >
-                {isUpdating
-                  ? t('settings.openchamber.piAgent.actions.updating')
-                  : t('settings.openchamber.piAgent.actions.update')}
-              </Button>
+                {upgradeStatus.currentVersion}
+              </span>
+              <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
+            </div>
+            {canUpdatePiFromStatus(upgradeStatus) && upgradeStatus.latestVersion ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={handleUpdatePi}
+                    disabled={isUpdating}
+                    className="shrink-0 !font-normal"
+                    aria-label={t('settings.openchamber.piAgent.actions.updateToVersion', {
+                      version: upgradeStatus.latestVersion,
+                    })}
+                    data-settings-item="sessions.pi-update"
+                  >
+                    {isUpdating
+                      ? t('settings.openchamber.piAgent.actions.updating')
+                      : t('settings.openchamber.piAgent.actions.update')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>
+                  {t('settings.openchamber.piAgent.actions.updateToVersion', {
+                    version: upgradeStatus.latestVersion,
+                  })}
+                </TooltipContent>
+              </Tooltip>
             ) : null}
-            <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
           </div>
         ) : null}
 
