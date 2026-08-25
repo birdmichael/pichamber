@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Git: opening the panel shows a loading skeleton instead of a blank pane, and change-file paths keep the filename readable when the folder is truncated.
+- Files: Markdown files open as a rendered preview. The preview and menu buttons sit above the document instead of covering the first lines.
 - Desktop: the sidebar Settings gear opens on the first click even when the window was unfocused, and Context sources expands on the first click after the right sidebar closes. A leftover tooltip no longer eats that press.
 - UI: Walkthrough stays off the right rail until there is a walkthrough or you start one from Changes or a pull request.
 - Desktop: Archive, Scheduled tasks, and Worktrees now have a close control, and Esc returns to the previous session after any open picker or dialog.
