@@ -137,7 +137,8 @@ Why: only navigation tools use the compact static path; all other tools need obs
   be inlined the same way collapsed code already is. The user-bubble flex
   item needs `min-w-0` so the `max-w-[85%]` cap can shrink and wrap.
   Expanded long CJK uses `overflow-wrap: anywhere` plus right padding so
-  glyphs are not clipped at the bubble edge.
+  glyphs are not clipped at the bubble edge. Hover actions stay inside the
+  right-aligned column — do not translate them past the bubble's right edge.
 - Tools: `ToolPart.tsx`, `ToolPartDiffPreview.tsx`, `PlainDiffFallback.tsx`, `ProgressiveGroup.tsx`, `toolPresentation.tsx`, `toolRenderUtils.ts`, `ToolRevealOnMount.tsx`
 - Reasoning/justification: `ReasoningPart.tsx`, `JustificationBlock.tsx`
 - Status/placeholders: `WorkingPlaceholder.tsx`, `SessionActiveSpinner.tsx`, `MigratingPart.tsx`, `BusyDots.tsx`

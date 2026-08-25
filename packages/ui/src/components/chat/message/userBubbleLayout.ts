@@ -10,10 +10,39 @@
  * The bubble is a shrink-to-fit flex item. Without `min-w-0` it will not
  * shrink below the unwrapped content width, so a long paragraph stays one
  * line and gets clipped.
+ *
+ * Hover actions sit inside that same right-aligned box. Do not shift them
+ * past the bubble edge — the chat scroller clips overflow-x.
  */
 
 /** Flex item wrapping the user bubble: shrink-to-fit, cap at 85%, allow wrap. */
 export const USER_BUBBLE_FLEX_ITEM_CLASS = 'min-w-0 w-fit max-w-[85%]';
+
+/**
+ * User bubbles are right-aligned against the message column. A positive
+ * translate-x paints the hover strip past that edge, where overflow-x on the
+ * chat scroller clips it. Keep the strip inside the bubble/column.
+ */
+export const USER_BUBBLE_HOVER_ACTIONS_SHIFT_CLASS = 'translate-x-0';
+
+export function getUserBubbleHoverActionsFrameClass(options: {
+    isMobile: boolean;
+    inline: boolean;
+    stickyUserHeaderEnabled: boolean;
+}): string {
+    if (options.isMobile) {
+        if (options.inline) {
+            return 'flex items-center justify-end pt-2 pb-3';
+        }
+        return options.stickyUserHeaderEnabled
+            ? 'flex h-9 items-start justify-end pt-0'
+            : 'flex h-11 items-start justify-end pt-0';
+    }
+    if (options.inline) {
+        return 'absolute top-full left-0 right-0 z-10 max-w-full pt-5';
+    }
+    return 'flex h-8 max-w-full items-start justify-end pt-2';
+}
 
 /**
  * Applied to the collapsed user-text wrapper so line-clamp sees inline boxes.

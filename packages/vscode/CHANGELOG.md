@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.
 - Chat: copying a message shows Copied at the bottom-right instead of covering the user bubble.
 - Sessions: the first click on a session row now opens that session. The hover preview no longer eats that press.
