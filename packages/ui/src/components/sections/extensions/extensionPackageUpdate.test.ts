@@ -122,12 +122,17 @@ describe('extensionPackageUpdate', () => {
 });
 
 describe('ExtensionsPage version display', () => {
-  test('uses version chips instead of a Current · Latest sentence', () => {
+  test('shows muted current version text and Update, not chips or Up to date', () => {
     const source = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), 'ExtensionsPage.tsx'),
       'utf8',
     );
-    expect(source).toContain('SettingsVersionChips');
+    expect(source).toContain('SETTINGS_VERSION_META_CLASS');
+    expect(source).not.toContain('SettingsVersionChips');
     expect(source).not.toContain('versionBits.join');
+    expect(source).not.toContain('actions.upToDate');
+    expect(source).not.toContain('latestUnknown');
+    expect(source).toContain('updateToVersion');
+    expect(source).toContain('SETTINGS_ACTION_BUTTON_CLASS');
   });
 });

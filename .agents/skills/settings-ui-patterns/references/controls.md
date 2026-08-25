@@ -63,18 +63,20 @@ for text that must stay visible (warnings, dynamic status).
 Skip per-option descriptions when labels are self-explanatory. For short
 segmented choices use `SettingsChipGroup` (chips with `aria-pressed`).
 
-## Version chips
+## Version metadata
 
-Use `SettingsVersionChips` for read-only current / latest version pills — not
-two `SettingsFieldRow`s and not a gray "Current x · Latest y" sentence.
+Use `SETTINGS_VERSION_META_CLASS` for a read-only installed version — not a
+`SettingsFieldRow`, not chips, and not a "Current x · Latest y" sentence.
 
-- Current is the quiet pill (`tone="quiet"`). Latest is the accent pill only
-  when a newer version exists (`tone="accent"`, `status.info` tokens).
-- Up to date: current pill + muted status text; no latest pill; hide Update.
-- Keep chips on one baseline (`flex-nowrap`). Truncate the neighboring name
-  instead of wrapping badges onto a second line.
-- Name current / latest in `aria-label`; do not repeat those words as visible
-  field labels next to the pills.
+- Show only the current version as muted tabular text under or beside the name.
+- When a newer latest exists, show a quiet sentence-case Update
+  (`SETTINGS_ACTION_BUTTON_CLASS`). Put the latest version on the button
+  aria/tooltip (`Update to {version}`), not on the visible label and not as a
+  second number.
+- Pi: keep the version and Update adjacent on the left. Do not
+  `justify-between` / right-align Update across the pane.
+- Extensions: name and version stay left; Update and Uninstall stay right.
+- When already current: version only. No "Up to date", no latest number, no Update.
 
 ## Numeric Value / Override
 

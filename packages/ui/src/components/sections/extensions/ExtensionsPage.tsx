@@ -12,8 +12,10 @@ import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
   SettingsSection,
-  SettingsVersionChips,
+  SETTINGS_ACTION_BUTTON_CLASS,
+  SETTINGS_VERSION_META_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { shouldShowExtensionsSection } from './extensionsPageVisibility';
 import {
@@ -210,7 +212,7 @@ export const ExtensionsPage: React.FC = () => {
               variant="default"
               disabled={isBusy}
               onClick={() => { void runUpdate(); }}
-              className="shrink-0 !font-normal"
+              className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
               aria-label={t('settings.extensions.page.packages.actions.updateAllAria')}
             >
               {busy?.kind === 'all'
@@ -228,47 +230,57 @@ export const ExtensionsPage: React.FC = () => {
             {packages.map((item) => {
               const source = packageUninstallSource(item);
               const rowBusy = (busy?.kind === 'one' || busy?.kind === 'uninstall') && busy.source === source;
-              const versionState = packageVersionState(item);
-              const showUpdate = versionState === 'update';
-              const versionStatus = versionState === 'upToDate'
-                ? t('settings.extensions.page.packages.actions.upToDate')
-                : versionState === 'unknown'
-                  ? t('settings.extensions.page.packages.latestUnknown')
-                  : !item.currentVersion && item.scope
-                    ? item.scope
-                    : null;
+              const showUpdate = packageVersionState(item) === 'update';
+              const updateLabel = item.latestVersion
+                ? t('settings.extensions.page.packages.actions.updateToVersion', {
+                    version: item.latestVersion,
+                  })
+                : t('settings.extensions.page.packages.actions.updateAria', { name: item.name });
+              const updateButton = (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={isBusy}
+                  onClick={() => { void runUpdate(source); }}
+                  className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
+                  aria-label={updateLabel}
+                >
+                  {rowBusy && busy?.kind === 'one'
+                    ? t('settings.extensions.page.packages.actions.updating')
+                    : t('settings.extensions.page.packages.actions.update')}
+                </Button>
+              );
               return (
                 <li key={`${item.scope}:${item.path}:${item.source}`} className="rounded-lg border border-border/50 px-3 py-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div className="min-w-0 flex-1">
                       <div className="min-w-0 truncate typography-ui-label font-medium">{item.name}</div>
-                      <SettingsVersionChips
-                        currentVersion={item.currentVersion}
-                        currentAriaLabel={item.currentVersion
-                          ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
-                          : undefined}
-                        latestVersion={versionState === 'update' ? item.latestVersion : null}
-                        latestAriaLabel={versionState === 'update' && item.latestVersion
-                          ? t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion })
-                          : undefined}
-                        status={versionStatus}
-                      />
+                      {item.currentVersion ? (
+                        <div
+                          className={SETTINGS_VERSION_META_CLASS}
+                          aria-label={t('settings.extensions.page.packages.currentVersion', {
+                            version: item.currentVersion,
+                          })}
+                        >
+                          {item.currentVersion}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {showUpdate ? (
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          disabled={isBusy}
-                          onClick={() => { void runUpdate(source); }}
-                          className="shrink-0 !font-normal"
-                          aria-label={t('settings.extensions.page.packages.actions.updateAria', { name: item.name })}
-                        >
-                          {rowBusy && busy?.kind === 'one'
-                            ? t('settings.extensions.page.packages.actions.updating')
-                            : t('settings.extensions.page.packages.actions.update')}
-                        </Button>
+                        item.latestVersion ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              {updateButton}
+                            </TooltipTrigger>
+                            <TooltipContent sideOffset={8}>
+                              {t('settings.extensions.page.packages.actions.updateToVersion', {
+                                version: item.latestVersion,
+                              })}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : updateButton
                       ) : null}
                       <Button
                         type="button"
