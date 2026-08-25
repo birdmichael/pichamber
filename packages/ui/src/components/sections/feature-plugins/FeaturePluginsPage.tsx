@@ -298,7 +298,7 @@ function FeaturePluginImpactTags({ slot }: { slot: FeaturePluginSlot }) {
 
   return (
     <ul
-      className="mt-2 flex flex-wrap gap-1.5"
+      className="mt-1 flex flex-wrap gap-1"
       aria-label={t('settings.featurePlugins.impact.aria')}
     >
       {surfaces.map((surface) => {
@@ -310,7 +310,7 @@ function FeaturePluginImpactTags({ slot }: { slot: FeaturePluginSlot }) {
                 <span
                   tabIndex={0}
                   aria-label={tooltip}
-                  className="inline-flex cursor-help items-center rounded-full border border-[var(--interactive-border)] bg-[var(--surface-muted)] px-2 py-0.5 typography-micro font-medium text-muted-foreground"
+                  className="inline-flex cursor-help items-center rounded-md border border-[var(--interactive-border)] px-1.5 py-px typography-micro font-normal leading-none text-muted-foreground"
                 >
                   {t(FEATURE_PLUGIN_SURFACE_LABEL_KEY[surface])}
                 </span>

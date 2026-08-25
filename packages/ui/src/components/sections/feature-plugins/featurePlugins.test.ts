@@ -161,7 +161,9 @@ describe('feature plugin payload parsing', () => {
     expect(pageSource.includes("pending?.action === 'install'")).toBe(true);
     expect(pageSource.includes('<FeaturePluginImpactTags slot={pending.slot} />')).toBe(true);
     expect(pageSource.includes('status-success')).toBe(true);
-    expect(pageSource).toContain('border-[var(--interactive-border)] bg-[var(--surface-muted)]');
+    expect(pageSource).toContain('mt-1 flex flex-wrap gap-1');
+    expect(pageSource).toContain('rounded-md border border-[var(--interactive-border)] px-1.5 py-px typography-micro font-normal leading-none text-muted-foreground');
+    expect(pageSource).not.toContain('rounded-full border border-[var(--interactive-border)] bg-[var(--surface-muted)]');
   });
 });
 
