@@ -28,12 +28,13 @@ describe('getVisibleContextRailSurfaces', () => {
   });
 
   test('hides the walkthrough on VS Code and below the min width', () => {
-    expect(getVisibleContextRailSurfaces({ ...baseOptions, isVSCode: true }).some((s) => s.id === 'walkthrough')).toBe(false);
+    const withWalkthrough = { ...baseOptions, tabs: [{ mode: 'walkthrough' as const }] };
+    expect(getVisibleContextRailSurfaces({ ...withWalkthrough, isVSCode: true }).some((s) => s.id === 'walkthrough')).toBe(false);
     expect(
-      getVisibleContextRailSurfaces({ ...baseOptions, screenWidth: WALKTHROUGH_MIN_WIDTH - 1 }).some((s) => s.id === 'walkthrough'),
+      getVisibleContextRailSurfaces({ ...withWalkthrough, screenWidth: WALKTHROUGH_MIN_WIDTH - 1 }).some((s) => s.id === 'walkthrough'),
     ).toBe(false);
     expect(
-      getVisibleContextRailSurfaces({ ...baseOptions, screenWidth: WALKTHROUGH_MIN_WIDTH }).some((s) => s.id === 'walkthrough'),
+      getVisibleContextRailSurfaces({ ...withWalkthrough, screenWidth: WALKTHROUGH_MIN_WIDTH }).some((s) => s.id === 'walkthrough'),
     ).toBe(true);
   });
 
@@ -59,11 +60,14 @@ describe('getVisibleContextRailSurfaces', () => {
     expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'pr' }] }).some((s) => s.id === 'pr')).toBe(true);
   });
 
-  test('shows the walkthrough on wide Desktop with no tabs', () => {
+  test('hides empty walkthrough chrome until a walkthrough tab exists', () => {
     const walkthrough = CONTEXT_SURFACES.find((surface) => surface.id === 'walkthrough');
-    expect(walkthrough?.availability).toBe('always');
-    expect(getVisibleContextRailSurfaces(baseOptions).some((s) => s.id === 'walkthrough')).toBe(true);
-    expect(getVisibleContextRailSurfaces({ ...baseOptions, isGitRepo: true }).some((s) => s.id === 'walkthrough')).toBe(true);
+    expect(walkthrough?.availability).toBe('has-content');
+    expect(getVisibleContextRailSurfaces(baseOptions).some((s) => s.id === 'walkthrough')).toBe(false);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, isGitRepo: true }).some((s) => s.id === 'walkthrough')).toBe(false);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'diff' }] }).some((s) => s.id === 'walkthrough')).toBe(false);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'pr' }] }).some((s) => s.id === 'walkthrough')).toBe(false);
+    expect(getVisibleContextRailSurfaces({ ...baseOptions, tabs: [{ mode: 'walkthrough' }] }).some((s) => s.id === 'walkthrough')).toBe(true);
   });
 
   test('offers no browser surface inside VS Code', () => {

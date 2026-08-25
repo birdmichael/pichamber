@@ -88,7 +88,7 @@ export const CONTEXT_SURFACES: readonly ContextSurfaceDescriptor[] = [
     mode: 'walkthrough',
     icon: 'route',
     labelKey: 'contextPanel.mode.walkthrough',
-    availability: 'always',
+    availability: 'has-content',
   },
   {
     id: 'editor',
