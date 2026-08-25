@@ -73,8 +73,23 @@ test('treats unsigned and ad-hoc Mac builds as unable to install in-place', () =
   }), true);
   assert.equal(canInstallDesktopUpdateInPlace({
     platform: 'darwin',
-    packaged: false,
+    packaged: true,
+    macCodeSign: { signed: true, adhoc: false, identity: 'Apple Development: Example (TEAM)' },
+  }), false);
+  assert.equal(canInstallDesktopUpdateInPlace({
+    platform: 'darwin',
+    packaged: true,
+    macCodeSign: { signed: true, adhoc: false, identity: 'Apple Distribution: Example (TEAM)' },
+  }), false);
+  assert.equal(canInstallDesktopUpdateInPlace({
+    platform: 'darwin',
+    packaged: true,
     macCodeSign: { signed: true, adhoc: false },
+  }), false);
+  assert.equal(canInstallDesktopUpdateInPlace({
+    platform: 'darwin',
+    packaged: false,
+    macCodeSign: { signed: true, adhoc: false, identity: 'Developer ID Application: Example (TEAM)' },
   }), false);
   assert.equal(canInstallDesktopUpdateInPlace({ platform: 'linux', packaged: true }), true);
 });

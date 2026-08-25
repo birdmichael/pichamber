@@ -29,7 +29,9 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 | `scripts/prepare-opencode-cli.mjs` | Optional leftover: downloads OpenCode CLI only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode` |
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/main.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
-| `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows builds when signing env is missing |
+| `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows/Mac builds when signing env is missing |
+| `scripts/install-apple-desktop-cert.sh` | CI: import `APPLE_CERTIFICATE` and pin `CSC_NAME` to Developer ID Application |
+| `scripts/verify-macos-app-signature.sh` | CI: require Developer ID, hardened runtime, stapled notarization, and Electron JIT entitlements |
 | `scripts/generate-product-icons.mjs` | Rasterizes `app-icon.svg` / `tray-glyph.svg` into icns, ico, PNG, tray frames, and web/docs badges |
 | `scripts/generate-macos-icon-assets.cjs` | Compiles `AppIcon.icon` to `Assets.car` with Xcode `actool` (macOS only) |
 | `resources/` | Packaged web assets, icons, and macOS entitlements |
@@ -99,18 +101,20 @@ That runs, in order:
 5. `rebuild:native` to rebuild native modules for Electron.
 6. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
 
-**Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`). Without Apple signing env, the Mac build is unsigned and notarization is disabled.
+**Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`).
 
-Unsigned and ad-hoc Mac builds can check for updates but cannot install in-place. `quitAndInstall()` fails there, `autoInstallOnAppQuit` stays off, and Desktop must not report Restart to Update as success. The update dialog hides in-app install and opens the GitHub release so the user can replace `Pichamber.app` from the `.dmg`. Developer ID / notarized builds still use Restart to Update.
+GitHub Release / desktop smoke builds import `APPLE_CERTIFICATE` (Developer ID Application) and notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The signed job fails if the imported identity is not Developer ID Application, or if the `.app` is missing a stapled notary ticket. The first Developer ID notarization for a team can stay `In Progress` for hours or days — `notarytool --wait` will hold CI until Apple finishes or the job hits its 75-minute timeout. After that first ticket lands, later builds are usually a few minutes.
 
-Unsigned downloads are blocked by Gatekeeper until the user removes quarantine and re-signs locally. After copying `Pichamber.app` to `/Applications`:
+Local `electron:build` stays unsigned when `CSC_LINK` / `CSC_NAME` / `APPLE_ID` are unset. Unsigned and ad-hoc Mac builds can check for updates but cannot install in-place. `quitAndInstall()` fails there, `autoInstallOnAppQuit` stays off, and Desktop must not report Restart to Update as success. The update dialog hides in-app install and opens the GitHub release so the user can replace `Pichamber.app` from the `.dmg`. Developer ID / notarized builds still use Restart to Update.
+
+Unsigned local builds are blocked by Gatekeeper until you remove quarantine and ad-hoc sign:
 
 ```sh
 xattr -cr /Applications/Pichamber.app
 codesign --force --deep --sign - /Applications/Pichamber.app
 ```
 
-Ad-hoc signing (`-`) is enough to launch on that Mac. To redistribute with your own Developer ID, replace `-` with that identity and notarize separately. Set `APPLE_SIGNING=false` when `APPLE_ID` is present for iOS TestFlight but the Mac build must stay unsigned.
+Set `APPLE_SIGNING=false` when `APPLE_ID` is present for iOS TestFlight but the Mac build must stay unsigned.
 
 Windows/Linux desktop packaging is leftover and not the product target.
 

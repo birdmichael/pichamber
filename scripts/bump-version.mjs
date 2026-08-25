@@ -11,6 +11,7 @@ const PACKAGES = [
   'packages/ui/package.json',
   'packages/web/package.json',
   'packages/electron/package.json',
+  'packages/mobile/package.json',
   'packages/vscode/package.json',
 ];
 

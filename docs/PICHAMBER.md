@@ -39,8 +39,8 @@ bun run --cwd packages/electron package
 
 That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds native modules, and runs electron-builder. Output lands in `packages/electron/dist` as `Pichamber-<version>-mac-<arch>.dmg` and `.zip`.
 
-- Unsigned local builds are the default when Apple signing env (`CSC_LINK` / `APPLE_ID`) is unset.
-- Notarized release builds still need Xcode + Apple signing/notarization credentials.
+- Unsigned local builds are the default when Apple signing env (`CSC_LINK` / `CSC_NAME` / `APPLE_ID`) is unset.
+- GitHub Release Mac builds use the Developer ID Application certificate in `APPLE_CERTIFICATE` and notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The job fails closed if that identity is missing or the notary ticket is not stapled. The first Developer ID notarization can stay In Progress for hours; later submits are usually fast.
 - OpenCode CLI is **not** downloaded for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` only if you also want the leftover OpenCode CLI extraResource.
 
 `OPENCHAMBER_KERNEL` defaults to `pi` in both Desktop and the in-process server. Set `OPENCHAMBER_KERNEL=opencode` to restore the upstream OpenCode process + proxy.

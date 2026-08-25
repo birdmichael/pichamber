@@ -225,8 +225,15 @@ jobs:
           security create-keychain -p "$RUNNER_TEMP" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security unlock-keychain -p "$RUNNER_TEMP" "$keychain_path"
-          security import "$cert_path" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security import "$cert_path" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -A -f pkcs12 -k "$keychain_path"
           security list-keychain -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$RUNNER_TEMP" "$keychain_path"
+          if ! security find-identity -v -p codesigning "$keychain_path" | grep -q 'Apple Distribution'; then
+            echo "Apple Distribution identity not found after importing the iOS certificate."
+            security find-identity -v -p codesigning "$keychain_path" || true
+            exit 1
+          fi
 
           app_profile="$RUNNER_TEMP/openchamber-app.mobileprovision"
           widget_profile="$RUNNER_TEMP/openchamber-widget.mobileprovision"
