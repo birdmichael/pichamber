@@ -1,8 +1,9 @@
 # Pi host and facade
 
-Owning module for the in-process Pi kernel: session host, OpenCode-shaped
-HTTP/SSE facade, Desktop `ctx.ui`, command dispatch, and reload. Product
-behavior is documented in `docs/PICHAMBER.md`.
+Owning module for the Pi kernel: session host, OpenCode-shaped HTTP/SSE
+facade, Desktop `ctx.ui`, command dispatch, reload, and the Desktop Node
+child that loads `{agentDir}/npm`. Product behavior is documented in
+`docs/PICHAMBER.md`.
 
 ## Pi agent directory
 
@@ -46,16 +47,55 @@ uninstall (after the Settings confirm dialog), then reloads idle sessions.
 
 ## User extension natives on Desktop
 
-Pi loads configured packages through `DefaultResourceLoader` →
-`jiti.import` of paths resolved by `DefaultPackageManager` from
-`{resolvePiAgentDir()}/npm` and `<cwd>/.pi/npm`. That require happens in
-the same Electron process as the kernel.
+Desktop product path: the HTTP facade and `createPiHost` orchestration
+stay in Electron. The process that loads `{resolvePiAgentDir()}/npm` and
+`<cwd>/.pi/npm` is a **Node child** (`node-kernel-child.js`) that runs
+the app-bundled `@earendil-works/pi-coding-agent` plus a resolved Node
+binary. User `.node` files are not `dlopen`'d in Electron.
 
-On Desktop (`process.versions.electron` non-empty), a native `dlopen`
-failure whose error is the `NODE_MODULE_VERSION` mismatch sentence skips
-**that user extension only**. The kernel stays ready. Other extensions
-still load. Sessions can still be created and prompted. Diagnostics keep
-the extension source, `.node` path, `process.versions.modules`,
+Node resolution: `PICHAMBER_NODE_BINARY` / `OPENCHAMBER_NODE_BINARY`,
+then the packaged `resources/node` binary (`PICHAMBER_BUNDLED_NODE`),
+then PATH `node` (never `pi` / Electron / Bun), then the current
+`process.execPath` only when it is actually Node. Desktop therefore
+prefers the app-bundled Node over an incompatible PATH Node. Feature
+Plugin install prepends that same Node onto the child's `PATH`.
+`packages/electron/scripts/prepare-node.mjs` stages a Node that can
+`import` the app-bundled `@earendil-works/pi-coding-agent` (official
+current/LTS if the local binary cannot). Do not spawn PATH `pi`.
+
+SDK location uses `import()` / `import.meta.resolve`, then walks up to
+the `package.json` whose `name` is `@earendil-works/pi-coding-agent`.
+Do not `require.resolve` the package or its `package.json` subpath —
+ESM-only `exports` have no CJS main. `hello.sdk` reports that version
+and packagePath when `import()` succeeds. A real `import()` failure
+(including `markAsUncloneable`) stays `PI_SDK_UNAVAILABLE` and must
+not be described as missing Node.js.
+
+Missing Node or an unusable Node (SDK import throws, including
+`markAsUncloneable`): `host.ready()` returns false, `isReady()` is
+false, `createSession` throws `PI_NODE_UNAVAILABLE` /
+`PI_SDK_UNAVAILABLE` (503) with recovery text. The Node-child host
+does not fall back to `createInMemoryPiSession`. Empty
+`hello.sdk.packagePath` plus ready is a fail. That is not a half-up
+kernel. Child crash: the Desktop shell stays up;
+`host.reload()` respawns the child; interrupted turns keep
+`session.error` plus `opencode-restart-interrupted`. `ctx.ui`, session
+create/prompt/fork, scheduled-task session create, and `pichamber`
+create-send-fork stay on the parent host and reach the child over IPC
+(not HTTP). `host.reload()` / 409-while-streaming stay the same.
+`OPENCHAMBER_PI_NODE_KERNEL=0` restores the in-process fallback below.
+`OPENCHAMBER_KERNEL=opencode` is unchanged.
+
+P0 skip and the P1a electron tree remain as that in-process fallback.
+They are not the Desktop product path. Do not revert P0. Do not rebuild
+`{agentDir}/npm` in place for Electron.
+
+On the in-process fallback (`process.versions.electron` non-empty and
+the Node child off), a native `dlopen` failure whose error is the
+`NODE_MODULE_VERSION` mismatch sentence skips **that user extension
+only**. The kernel stays ready. Other extensions still load. Sessions
+can still be created and prompted. Diagnostics keep the extension
+source, `.node` path, `process.versions.modules`,
 `process.versions.electron`, and the compiler ABI parsed from the error.
 Do not hardcode ABI numbers or package names.
 
@@ -63,8 +103,8 @@ The skip layer is off when `process.versions.electron` is empty (CLI /
 plain Node) so system-Node-built natives still load. App-owned natives
 under `app.asar.unpacked` are not reported as skipped user extensions.
 
-Desktop also keeps a second prefix so the in-process kernel can load
-natives without rewriting the CLI tree. `{agentDir}/npm` stays the
+The fallback also keeps a second prefix so the in-process kernel can
+load natives without rewriting the CLI tree. `{agentDir}/npm` stays the
 system-Node install. Isolated native packages live at
 `{agentDir}/npm-electron/electron-{modules}-{platform}-{arch}/{name}@{version}/`
 (and the same formula under `<cwd>/.pi/npm-electron`). `modules`,
@@ -72,13 +112,14 @@ system-Node install. Isolated native packages live at
 Electron upgrade therefore misses the old cache directory.
 
 PackageManager `install` / `update` (and session create/reload) is the
-sync point. Candidates match `@electron/rebuild` discovery (`binding.gyp`,
-`prebuilds/`, native `package.json` metadata) plus lazy capture when
-load-time ABI fails. A hit native package is loaded as a whole package
-from the electron tree. N-API tries the original file first and isolates
-only after that fails. Rebuild runs in a child process; failure falls
-back to the skip above, does not throw into the host, and does not
-mutate `{agentDir}/npm`. The `pi` CLI never reads the electron tree.
+sync point for that fallback tree. Candidates match `@electron/rebuild`
+discovery (`binding.gyp`, `prebuilds/`, native `package.json` metadata)
+plus lazy capture when load-time ABI fails. A hit native package is
+loaded as a whole package from the electron tree. N-API tries the
+original file first and isolates only after that fails. Rebuild runs in
+a child process; failure falls back to the skip above, does not throw
+into the host, and does not mutate `{agentDir}/npm`. The `pi` CLI never
+reads the electron tree.
 
 ## First-install project seed
 

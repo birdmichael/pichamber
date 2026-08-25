@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Desktop:** GitHub Release macOS builds are Developer ID signed and notarized. Gatekeeper should open the downloaded app without the previous quarantine / ad-hoc re-sign steps. After that signed app is installed, Desktop can Restart to Update instead of opening GitHub.
+- **Desktop:** user Pi extensions that ship a native module now run on the app's Node, so a normal npm install works in Desktop without an Electron rebuild.
 - **Desktop:** user Pi extensions that need a native module now load from a Desktop-only copy rebuilt for Electron. The system `pi` CLI keeps its own Node build.
 - **Desktop:** a user-installed Pi extension built for a different Node than Electron is skipped, so the app and other extensions keep running.
 - Git: switching Diff to Branch keeps collapse, review, wrap, and view-mode. When that view has no committed changes versus the base, it says so — and if you still have uncommitted files, that this scope excludes the working tree.

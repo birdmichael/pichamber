@@ -28,9 +28,10 @@ other.
 
 - On leftover `OPENCHAMBER_KERNEL=opencode`, session status and messages
   come from official directory-scoped OpenCode APIs. On the Pi kernel,
-  those same actions use the in-process host (`getStatus`, `getMessages`,
+  those same actions use the Pi host (`getStatus`, `getMessages`,
   `listSessionInfos`, `createSession`, `promptAsync`, `forkSession`) and
-  must not HTTP-loopback to the local facade. Message output includes only
+  must not HTTP-loopback to the local facade. On Desktop the host methods
+  IPC to the Node child that loads user extensions. Message output includes only
   ordered `text` parts.
 - Wait never treats an initial idle response as completion after dispatch. It
   requires observed activity or a newly completed assistant message.
