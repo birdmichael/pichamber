@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const APP_OWNED_NATIVE_SEGMENT = `${path.sep}app.asar.unpacked${path.sep}`;
 const USER_NPM_DIR = 'npm';
+const USER_ELECTRON_NPM_DIR = 'npm-electron';
 const PROJECT_PI_DIR = '.pi';
 
 const MODULE_PATH_PATTERN = /The module ['"]([^'"]+\.node)['"]/i;
@@ -10,6 +11,7 @@ const COMPILER_ABI_PATTERN = /was compiled against a different Node\.js version 
 const LOADER_ABI_PATTERN = /This version of Node\.js requires\s+NODE_MODULE_VERSION\s+(\d+)/i;
 
 let originalModuleLoad = null;
+let originalResolveFilename = null;
 const guardStack = [];
 
 const asText = (value) => {
@@ -50,6 +52,12 @@ export const listUserNpmTrees = ({ agentDir, projectDir } = {}) => {
     trees.push({
       root: path.join(agent, USER_NPM_DIR),
       scope: 'user',
+      kind: 'cli',
+    });
+    trees.push({
+      root: path.join(agent, USER_ELECTRON_NPM_DIR),
+      scope: 'user',
+      kind: 'electron',
     });
   }
   const project = resolveExisting(projectDir);
@@ -57,6 +65,12 @@ export const listUserNpmTrees = ({ agentDir, projectDir } = {}) => {
     trees.push({
       root: path.join(project, PROJECT_PI_DIR, USER_NPM_DIR),
       scope: 'project',
+      kind: 'cli',
+    });
+    trees.push({
+      root: path.join(project, PROJECT_PI_DIR, USER_ELECTRON_NPM_DIR),
+      scope: 'project',
+      kind: 'electron',
     });
   }
   return trees;
@@ -101,10 +115,26 @@ const packageNameFromNodeModulesRest = (rest) => {
   return parts[0];
 };
 
+const packageNameFromElectronRest = (rest) => {
+  const parts = rest.split(/[\\/]/).filter(Boolean);
+  if (parts.length < 2) return '';
+  const runtime = parts[0];
+  if (!runtime.startsWith('electron-')) return '';
+  if (parts[1].startsWith('@') && parts[2]) {
+    const scopedName = parts[2].replace(/@[^@]+$/, '');
+    return scopedName ? `${parts[1]}/${scopedName}` : '';
+  }
+  return parts[1].replace(/@[^@]+$/, '');
+};
+
 export const userExtensionSourceFromPath = (filePath, trees) => {
   const tree = findUserNpmTreeForPath(filePath, trees);
   if (!tree) return '';
   const resolved = path.resolve(filePath);
+  if (tree.kind === 'electron') {
+    const name = packageNameFromElectronRest(path.relative(tree.root, resolved));
+    return name ? `npm:${name}` : tree.root;
+  }
   const nodeModulesRoot = path.join(tree.root, 'node_modules');
   if (isPathInside(nodeModulesRoot, resolved)) {
     const rest = path.relative(nodeModulesRoot, resolved);
@@ -225,21 +255,71 @@ const defaultLoadModule = function defaultLoadModule(request, parent, isMain, or
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const patchedModuleLoad = function patchedModuleLoad(request, parent, isMain) {
-  const guard = currentGuard();
+const loadThrough = function loadThrough(guard, request, parent, isMain) {
   const loadModule = guard?.loadModule || defaultLoadModule;
   const originalLoad = originalModuleLoad || Module._load;
+  return loadModule.call(this, request, parent, isMain, originalLoad);
+};
+
+const rememberFailure = (guard, error, request) => {
+  if (!guard?.store) return;
+  const classified = classifyUserExtensionNativeFailure(error, {
+    ...guard.context,
+    extensionPath: typeof request === 'string' ? request : guard.context.extensionPath,
+  });
+  if (classified) {
+    guard.store.remember(classified);
+  }
+};
+
+const patchedModuleLoad = function patchedModuleLoad(request, parent, isMain) {
+  const guard = currentGuard();
+  const originalResolve = originalResolveFilename || Module._resolveFilename;
+  const remap = typeof guard?.remapLoad === 'function'
+    ? guard.remapLoad(request, parent, (nextRequest, nextParent) => (
+      originalResolve.call(Module, nextRequest, nextParent, false)
+    ))
+    : null;
+  const primary = remap?.preferIsolated ? remap.isolatedRequest : request;
   try {
-    return loadModule.call(this, request, parent, isMain, originalLoad);
+    return loadThrough.call(this, guard, primary, parent, isMain);
   } catch (error) {
-    if (guard?.store) {
-      const classified = classifyUserExtensionNativeFailure(error, {
-        ...guard.context,
-        extensionPath: typeof request === 'string' ? request : guard.context.extensionPath,
-      });
-      if (classified) {
-        guard.store.remember(classified);
+    if (
+      remap?.fallbackRequest
+      && primary !== remap.fallbackRequest
+      && parseNativeAbiMismatch(error)
+    ) {
+      try {
+        return loadThrough.call(this, guard, remap.fallbackRequest, parent, isMain);
+      } catch (isolatedError) {
+        if (typeof guard?.captureLazyNative === 'function') {
+          guard.captureLazyNative(isolatedError, request, parent);
+        }
+        rememberFailure(guard, isolatedError, remap.fallbackRequest);
+        throw isolatedError;
       }
+    }
+    if (typeof guard?.captureLazyNative === 'function') {
+      guard.captureLazyNative(error, request, parent);
+    }
+    rememberFailure(guard, error, request);
+    throw error;
+  }
+};
+
+const patchedResolveFilename = function patchedResolveFilename(request, parent, isMain, options) {
+  const guard = currentGuard();
+  const originalResolve = originalResolveFilename || Module._resolveFilename;
+  try {
+    return originalResolve.call(this, request, parent, isMain, options);
+  } catch (error) {
+    if (typeof guard?.resolveFilenameFallback === 'function') {
+      const fallback = guard.resolveFilenameFallback(
+        request,
+        parent,
+        (nextRequest, nextParent) => originalResolve.call(this, nextRequest, nextParent, false),
+      );
+      if (fallback) return fallback;
     }
     throw error;
   }
@@ -248,7 +328,9 @@ const patchedModuleLoad = function patchedModuleLoad(request, parent, isMain) {
 const installModuleLoadPatch = () => {
   if (originalModuleLoad) return;
   originalModuleLoad = Module._load;
+  originalResolveFilename = Module._resolveFilename;
   Module._load = patchedModuleLoad;
+  Module._resolveFilename = patchedResolveFilename;
 };
 
 const uninstallModuleLoadPatch = () => {
@@ -256,7 +338,11 @@ const uninstallModuleLoadPatch = () => {
   if (Module._load === patchedModuleLoad) {
     Module._load = originalModuleLoad;
   }
+  if (originalResolveFilename && Module._resolveFilename === patchedResolveFilename) {
+    Module._resolveFilename = originalResolveFilename;
+  }
   originalModuleLoad = null;
+  originalResolveFilename = null;
 };
 
 export const withUserExtensionNativeGuard = async (options, operation) => {
@@ -276,6 +362,11 @@ export const withUserExtensionNativeGuard = async (options, operation) => {
     context,
     store,
     loadModule: typeof options?.loadModule === 'function' ? options.loadModule : defaultLoadModule,
+    remapLoad: typeof options?.remapLoad === 'function' ? options.remapLoad : null,
+    captureLazyNative: typeof options?.captureLazyNative === 'function' ? options.captureLazyNative : null,
+    resolveFilenameFallback: typeof options?.resolveFilenameFallback === 'function'
+      ? options.resolveFilenameFallback
+      : null,
   };
   installModuleLoadPatch();
   guardStack.push(entry);

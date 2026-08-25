@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** user Pi extensions that need a native module now load from a Desktop-only copy rebuilt for Electron. The system `pi` CLI keeps its own Node build.
 - **Desktop:** a user-installed Pi extension built for a different Node than Electron is skipped, so the app and other extensions keep running.
 - Git: switching Diff to Branch keeps collapse, review, wrap, and view-mode. When that view has no committed changes versus the base, it says so — and if you still have uncommitted files, that this scope excludes the working tree.
 - Diff: long changed lines wrap by default, and turning wrap off shows a usable horizontal scrollbar instead of clipping at the panel edge.
