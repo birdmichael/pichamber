@@ -43,6 +43,9 @@ import {
   toFeaturePluginsPayload,
   writeFeaturePlugins,
 } from './feature-plugins.js';
+import { enrichPiPackageVersions } from './pi-package-versions.js';
+import { getPiUpgradeStatus } from './pi-upgrade-status.js';
+import { runPiSelfUpdate } from './pi-upgrade.js';
 import {
   createAdapterMcpConfig,
   deleteAdapterMcpConfig,
@@ -1079,6 +1082,7 @@ export const createPiHost = ({
   readListSessionMetadata,
   listPersistedSessionsInDir,
   getCustomTools,
+  runSelfUpdate,
 } = {}) => {
   const sessions = new Map();
   const hydrating = new Map();
@@ -1087,6 +1091,11 @@ export const createPiHost = ({
   let modelRuntimeError = null;
   let readyPromise = null;
   const resolveAgentDir = () => resolvePiAgentDir(home);
+  const selfUpdate = typeof runSelfUpdate === 'function'
+    ? runSelfUpdate
+    : (mock
+      ? async () => ({ ok: true, command: 'pi update' })
+      : runPiSelfUpdate);
 
   const emit = (directory, ocEvent) => {
     if (typeof onEvent === 'function') {
@@ -2914,6 +2923,60 @@ export const createPiHost = ({
     },
     listPackages(directory) {
       return listPiPackages({ home, directory: directory || defaultDirectory });
+    },
+    async listPackagesWithVersions(directory, options = {}) {
+      const env = options.env || (mock
+        ? { ...process.env, PI_SKIP_VERSION_CHECK: '1' }
+        : process.env);
+      return enrichPiPackageVersions(this.listPackages(directory), {
+        home,
+        directory: directory || defaultDirectory,
+        env,
+        fetchImpl: options.fetchImpl,
+      });
+    },
+    async upgradePi(options = {}) {
+      const updated = await selfUpdate({
+        agentDir: resolveAgentDir(),
+        env: options.env,
+        spawnImpl: options.spawnImpl,
+        resolveInvocation: options.resolveInvocation,
+      });
+      let reload = null;
+      try {
+        reload = await this.reload();
+      } catch (error) {
+        reload = {
+          error: error?.message || 'reload failed',
+          status: Number(error?.status) || 500,
+        };
+      }
+      return {
+        success: true,
+        command: updated.command,
+        ...await getPiUpgradeStatus({
+          env: options.env,
+          fetchImpl: options.fetchImpl,
+        }),
+        reload,
+      };
+    },
+    async updatePiPackages({ source, directory, env, fetchImpl } = {}) {
+      const manager = await this.resolveFeaturePackageManager();
+      if (typeof manager.update !== 'function') {
+        const error = new Error('Pi package update is unavailable');
+        error.status = 503;
+        throw error;
+      }
+      const spec = typeof source === 'string' ? source.trim() : '';
+      await manager.update(spec || undefined);
+      const cwd = directory || defaultDirectory;
+      const reload = await this.reloadIdleSessions(cwd);
+      return {
+        extensions: this.listExtensions(cwd),
+        packages: await this.listPackagesWithVersions(cwd, { env, fetchImpl }),
+        reload,
+      };
     },
     async resolveFeaturePackageManager() {
       if (typeof createPackageManager === 'function') {

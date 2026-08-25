@@ -518,6 +518,21 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
   },
   {
+    id: 'sessions.pi-version',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.field.currentVersion',
+    descriptionKey: 'settings.openchamber.piAgent.field.versionInfo',
+    keywords: ['pi', 'version', 'sdk', 'current version', 'update'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
+    id: 'sessions.pi-update',
+    page: 'general',
+    titleKey: 'settings.openchamber.piAgent.actions.update',
+    keywords: ['pi', 'update', 'pi update', 'sdk'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+  },
+  {
     id: 'sessions.agent-control-tool',
     page: 'general',
     titleKey: 'settings.openchamber.tools.field.agentControlTool',
@@ -860,7 +875,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'extensions',
     titleKey: 'settings.extensions.page.packages.title',
     descriptionKey: 'settings.extensions.page.packages.info',
-    keywords: ['packages', 'pi'],
+    keywords: ['packages', 'pi', 'update', 'version'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'extensions.update-all',
+    page: 'extensions',
+    titleKey: 'settings.extensions.page.packages.actions.updateAll',
+    keywords: ['update all', 'packages', 'pi', 'extensions'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

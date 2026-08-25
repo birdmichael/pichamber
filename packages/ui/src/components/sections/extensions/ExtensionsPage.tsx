@@ -1,42 +1,122 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
-import { SettingsSection } from '@/components/sections/shared/SettingsSection';
+import {
+  SETTINGS_HELPER_CLASS,
+  SettingsSection,
+} from '@/components/sections/shared/SettingsSection';
+import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { shouldShowExtensionsSection } from './extensionsPageVisibility';
+import {
+  packageHasUpdate,
+  packagesWithUpdates,
+  parseExtensionPackages,
+  type ExtensionPackageItem,
+} from './extensionPackageUpdate';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 
 type ExtensionItem = { name: string; path: string; scope: string };
-type PackageItem = { name: string; path: string; scope: string; source: string };
+
+type BusyState = { kind: 'one'; source: string } | { kind: 'all' } | null;
 
 export const ExtensionsPage: React.FC = () => {
   const { t } = useI18n();
   const [extensions, setExtensions] = React.useState<ExtensionItem[]>([]);
-  const [packages, setPackages] = React.useState<PackageItem[]>([]);
+  const [packages, setPackages] = React.useState<ExtensionPackageItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [busy, setBusy] = React.useState<BusyState>(null);
+
+  const applyPayload = React.useCallback((data: unknown) => {
+    const payload = data && typeof data === 'object' ? data as {
+      extensions?: ExtensionItem[];
+      packages?: unknown;
+    } : null;
+    setExtensions(Array.isArray(payload?.extensions) ? payload.extensions : []);
+    setPackages(parseExtensionPackages(payload));
+  }, []);
+
+  const load = React.useCallback(async () => {
+    const response = await runtimeFetch('/api/pi/extensions', { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      const error = new Error('Could not load extensions');
+      throw error;
+    }
+    applyPayload(await response.json().catch(() => null));
+  }, [applyPayload]);
 
   React.useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+    void (async () => {
       try {
-        const response = await runtimeFetch('/api/pi/extensions', { headers: { Accept: 'application/json' } });
-        if (!response.ok) return;
-        const data = await response.json() as { extensions?: ExtensionItem[]; packages?: PackageItem[] };
-        if (cancelled) return;
-        setExtensions(Array.isArray(data.extensions) ? data.extensions : []);
-        setPackages(Array.isArray(data.packages) ? data.packages : []);
-      } catch { /* ignored */ } finally {
+        await load();
+      } catch {
+        if (!cancelled) {
+          setExtensions([]);
+          setPackages([]);
+        }
+      } finally {
         if (!cancelled) setLoading(false);
       }
-    };
-    void load();
+    })();
     return () => { cancelled = true; };
-  }, []);
+  }, [load]);
+
+  const runUpdate = React.useCallback(async (source?: string) => {
+    if (busy) return;
+    const nextBusy: BusyState = source ? { kind: 'one', source } : { kind: 'all' };
+    setBusy(nextBusy);
+    try {
+      const response = await runtimeFetch('/api/pi/extensions/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(source ? { source } : {}),
+      });
+      const raw = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(t('settings.extensions.page.packages.toast.updateBusy'));
+          return;
+        }
+        const message = raw && typeof raw === 'object' && typeof (raw as { error?: unknown }).error === 'string'
+          ? (raw as { error: string }).error
+          : (source
+            ? t('settings.extensions.page.packages.toast.updateFailed', { name: source })
+            : t('settings.extensions.page.packages.toast.updateAllFailed'));
+        toast.error(message);
+        return;
+      }
+      applyPayload(raw);
+      await refreshSessionTitleReloadLists();
+      if (source) {
+        const name = packages.find((item) => item.path === source || item.name === source)?.name || source;
+        toast.success(t('settings.extensions.page.packages.toast.updateSuccess', { name }));
+      } else {
+        const count = packagesWithUpdates(packages).length;
+        toast.success(count === 1
+          ? t('settings.extensions.page.packages.toast.updateAllSuccessOne')
+          : t('settings.extensions.page.packages.toast.updateAllSuccess', { count }));
+      }
+    } catch {
+      toast.error(source
+        ? t('settings.extensions.page.packages.toast.updateFailed', { name: source })
+        : t('settings.extensions.page.packages.toast.updateAllFailed'));
+    } finally {
+      setBusy(null);
+    }
+  }, [applyPayload, busy, packages, t]);
 
   const showExtensionsSection = shouldShowExtensionsSection({
     loading,
     extensionCount: extensions.length,
     packageCount: packages.length,
   });
+  const updates = packagesWithUpdates(packages);
+  const isBusy = busy !== null;
 
   return (
     <SettingsPageLayout
@@ -71,18 +151,65 @@ export const ExtensionsPage: React.FC = () => {
         info={t('settings.extensions.page.packages.info')}
         settingsItem="extensions.packages"
       >
+        {updates.length > 0 ? (
+          <div className="mb-3 flex justify-start" data-settings-item="extensions.update-all">
+            <Button
+              type="button"
+              size="xs"
+              variant="default"
+              disabled={isBusy}
+              onClick={() => { void runUpdate(); }}
+              className="shrink-0 !font-normal"
+              aria-label={t('settings.extensions.page.packages.actions.updateAllAria')}
+            >
+              {busy?.kind === 'all'
+                ? t('settings.extensions.page.packages.actions.updating')
+                : t('settings.extensions.page.packages.actions.updateAll')}
+            </Button>
+          </div>
+        ) : null}
         {loading ? (
           <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.loading')}</p>
         ) : packages.length === 0 ? (
           <p className="typography-ui text-muted-foreground">{t('settings.extensions.page.packages.empty')}</p>
         ) : (
           <ul className="space-y-2">
-            {packages.map((item) => (
-              <li key={`${item.scope}:${item.source}:${item.path}`} className="rounded-lg border border-border/50 px-3 py-2">
-                <div className="typography-ui-label font-medium">{item.name}</div>
-                <div className="typography-meta text-muted-foreground">{item.scope} · {item.source} · {item.path}</div>
-              </li>
-            ))}
+            {packages.map((item) => {
+              const rowBusy = busy?.kind === 'one' && busy.source === item.path;
+              const showUpdate = packageHasUpdate(item);
+              return (
+                <li key={`${item.scope}:${item.path}:${item.source}`} className="rounded-lg border border-border/50 px-3 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="typography-ui-label font-medium">{item.name}</div>
+                      <div className={`${SETTINGS_HELPER_CLASS} mt-0.5`}>
+                        {item.currentVersion
+                          ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
+                          : item.scope}
+                        {item.latestVersion && showUpdate
+                          ? ` · ${t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion })}`
+                          : ''}
+                      </div>
+                    </div>
+                    {showUpdate ? (
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="outline"
+                        disabled={isBusy}
+                        onClick={() => { void runUpdate(item.path); }}
+                        className="shrink-0 !font-normal"
+                        aria-label={t('settings.extensions.page.packages.actions.updateAria', { name: item.name })}
+                      >
+                        {rowBusy
+                          ? t('settings.extensions.page.packages.actions.updating')
+                          : t('settings.extensions.page.packages.actions.update')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </SettingsSection>

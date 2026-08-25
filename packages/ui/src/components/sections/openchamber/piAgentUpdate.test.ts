@@ -1,0 +1,54 @@
+import { describe, expect, test } from 'bun:test';
+
+import {
+  canUpdatePiFromStatus,
+  isPiUpToDate,
+  parsePiUpgradeStatus,
+  shouldShowPiLatestVersion,
+} from './piAgentUpdate';
+
+describe('piAgentUpdate', () => {
+  test('parses the existing upgrade-status payload and ignores a missing latest', () => {
+    expect(parsePiUpgradeStatus({
+      available: false,
+      currentVersion: '0.84.2',
+      latestVersion: null,
+    })).toEqual({
+      available: false,
+      currentVersion: '0.84.2',
+      latestVersion: null,
+    });
+    expect(parsePiUpgradeStatus(null)).toBeNull();
+  });
+
+  test('shows latest and Update only when the banner source reports an update', () => {
+    const available = parsePiUpgradeStatus({
+      available: true,
+      currentVersion: '0.84.2',
+      latestVersion: '0.90.0',
+    });
+    expect(shouldShowPiLatestVersion(available)).toBe(true);
+    expect(canUpdatePiFromStatus(available)).toBe(true);
+    expect(isPiUpToDate(available)).toBe(false);
+  });
+
+  test('hides latest and Update when already current or latest is unknown', () => {
+    const current = parsePiUpgradeStatus({
+      available: false,
+      currentVersion: '0.90.0',
+      latestVersion: '0.90.0',
+    });
+    expect(shouldShowPiLatestVersion(current)).toBe(false);
+    expect(canUpdatePiFromStatus(current)).toBe(false);
+    expect(isPiUpToDate(current)).toBe(true);
+
+    const unknownLatest = parsePiUpgradeStatus({
+      available: false,
+      currentVersion: '0.84.2',
+      latestVersion: null,
+    });
+    expect(shouldShowPiLatestVersion(unknownLatest)).toBe(false);
+    expect(canUpdatePiFromStatus(unknownLatest)).toBe(false);
+    expect(isPiUpToDate(unknownLatest)).toBe(false);
+  });
+});

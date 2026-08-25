@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   comparePiSdkVersions,
   getPiUpgradeStatus,
+  npmLatestUrlForPackage,
   PI_SDK_PACKAGE,
   shouldSkipPiVersionCheck,
 } from './pi-upgrade-status.js';
@@ -57,6 +58,12 @@ describe('pi-upgrade-status', () => {
       package: PI_SDK_PACKAGE,
       upgrade: { supported: false, reason: 'bundled' },
     });
+  });
+
+  it('builds the same npm latest URL shape used by the header banner', () => {
+    expect(npmLatestUrlForPackage(PI_SDK_PACKAGE)).toBe(
+      'https://registry.npmjs.org/@earendil-works%2Fpi-coding-agent/latest',
+    );
   });
 
   it('does not claim an update is available when the npm check fails', async () => {

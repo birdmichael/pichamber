@@ -189,6 +189,13 @@ describe('settings.json package manager', () => {
     expect(isFeaturePluginSourceInstalled('npm:@narumitw/pi-goal', listConfiguredPiPackageSources(home))).toBe(true);
     await manager.removeAndPersist('@narumitw/pi-goal');
     expect(listConfiguredPiPackageSources(home)).toEqual(['npm:pi-mcp-adapter']);
+    await expect(manager.update('npm:pi-mcp-adapter')).resolves.toEqual({
+      updated: ['npm:pi-mcp-adapter'],
+    });
+    await expect(manager.update()).resolves.toEqual({
+      updated: ['npm:pi-mcp-adapter'],
+    });
+    await expect(manager.update('npm:missing-package')).rejects.toMatchObject({ status: 404 });
   });
 
   it('does not treat listing as an install', () => {

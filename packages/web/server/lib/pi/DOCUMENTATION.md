@@ -21,8 +21,21 @@ Empty string clears the override. Changing the directory does not copy
 
 `GET /api/path` and `getKernelInfo().paths` report the resolved dir.
 `GET /api/pi/upgrade-status` compares the installed
-`@earendil-works/pi-coding-agent` with npm and returns
-`upgrade.supported: false` (`reason: "bundled"`).
+`@earendil-works/pi-coding-agent` with npm (`available`, `currentVersion`,
+`latestVersion`). Settings → General uses that same payload. `POST
+/api/pi/upgrade` runs `pi update` on the in-process SDK `bin.pi`
+(`dist/cli.js`) with `PI_CODING_AGENT_DIR` set to the resolved agent dir,
+then `host.reload()`. It does not spawn a PATH `pi`. After success,
+Desktop reloads the in-process kernel (not an app Restart).
+`upgrade.supported` stays `false` (`reason: "bundled"`) so the header
+banner remains informational.
+
+`GET /api/pi/extensions` lists configured `settings.json` `packages` plus
+`currentVersion` / `latestVersion` / `updateAvailable` (npm registry;
+honor `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`). `POST
+/api/pi/extensions/update` `{ source? }` calls Pi
+`DefaultPackageManager.update(source)` (all configured packages when
+`source` is omitted), then reloads idle sessions. It does not uninstall.
 
 ## First-install project seed
 

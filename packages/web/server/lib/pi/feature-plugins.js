@@ -420,6 +420,17 @@ export const createSettingsJsonPackageManager = ({ home = os.homedir() } = {}) =
         filtered: typeof entry === 'object',
       })).filter((item) => item.source);
     },
+    async update(source) {
+      const spec = typeof source === 'string' ? source.trim() : '';
+      const packages = readPackages();
+      const configured = packages.map(configuredPackageSource).filter(Boolean);
+      if (spec && !configured.some((entry) => featurePluginSourcesMatch(entry, spec))) {
+        const error = new Error(`No matching package: ${spec}`);
+        error.status = 404;
+        throw error;
+      }
+      return { updated: spec ? [spec] : configured };
+    },
   };
 };
 
