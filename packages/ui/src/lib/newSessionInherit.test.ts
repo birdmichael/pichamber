@@ -56,7 +56,7 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       openedProjectPaths: [],
       activeProjectId: null,
       activeProjectPath: null,
-    })).toBeUndefined();
+    })).toBe(undefined);
   });
 
   test('managed-chat current session + active project → project', () => {
@@ -81,7 +81,7 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       openedProjectPaths,
       activeProjectId: null,
       activeProjectPath: null,
-    })).toBeUndefined();
+    })).toBe(undefined);
   });
 
   test('home is a project session when that folder is an opened project', () => {
