@@ -5,12 +5,30 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
   FEATURE_PLUGIN_SLOT_COPY,
+  FEATURE_PLUGIN_SLOT_UI_IMPACT,
   FEATURE_PLUGIN_SLOTS,
+  FEATURE_PLUGIN_SURFACE_LABEL_KEY,
+  FEATURE_PLUGIN_UI_SURFACES,
+  assertFeaturePluginUiImpact,
   emptyFeaturePluginsPayload,
   featurePluginPackageLabel,
+  featurePluginSlotSearchKeywords,
+  featurePluginSlotUiSurfaces,
+  featurePluginSurfaceTooltipKey,
   parseFeaturePluginsPayload,
   presetSourceLabel,
 } from './featurePlugins';
+import { dict as enDict } from '@/lib/i18n/messages/en';
+import { dict as deDict } from '@/lib/i18n/messages/de';
+import { dict as esDict } from '@/lib/i18n/messages/es';
+import { dict as frDict } from '@/lib/i18n/messages/fr';
+import { dict as jaDict } from '@/lib/i18n/messages/ja';
+import { dict as koDict } from '@/lib/i18n/messages/ko';
+import { dict as plDict } from '@/lib/i18n/messages/pl';
+import { dict as ptBrDict } from '@/lib/i18n/messages/pt-BR';
+import { dict as ukDict } from '@/lib/i18n/messages/uk';
+import { dict as zhCnDict } from '@/lib/i18n/messages/zh-CN';
+import { dict as zhTwDict } from '@/lib/i18n/messages/zh-TW';
 
 const pageSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), 'FeaturePluginsPage.tsx'),
@@ -136,6 +154,98 @@ describe('feature plugin payload parsing', () => {
     expect(pageSource.includes('if (payload.slots[slot].installed) return;')).toBe(true);
     for (const slot of FEATURE_PLUGIN_SLOTS) {
       expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
+    }
+    expect(pageSource.includes('<FeaturePluginImpactTags slot={slot} />')).toBe(true);
+    expect(pageSource.indexOf('t(copy.infoKey)')).toBeLessThan(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />'));
+    expect(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />')).toBeLessThan(pageSource.indexOf('featurePluginPackageLabel(slot)'));
+    expect(pageSource.includes("pending?.action === 'install'")).toBe(true);
+    expect(pageSource.includes('<FeaturePluginImpactTags slot={pending.slot} />')).toBe(true);
+    expect(pageSource.includes('status-success')).toBe(true);
+    expect(pageSource).toContain('mt-1 flex flex-wrap gap-1');
+    expect(pageSource).toContain('rounded-md border border-[var(--interactive-border)] px-1.5 py-px typography-micro font-normal leading-none text-muted-foreground');
+    expect(pageSource).not.toContain('rounded-full border border-[var(--interactive-border)] bg-[var(--surface-muted)]');
+  });
+});
+
+describe('feature plugin UI impact tags', () => {
+  test('registers a non-empty closed-vocabulary tag list for every slot', () => {
+    expect(FEATURE_PLUGIN_SLOTS.map((slot) => slot in FEATURE_PLUGIN_SLOT_UI_IMPACT)).toEqual(
+      FEATURE_PLUGIN_SLOTS.map(() => true),
+    );
+    for (const slot of FEATURE_PLUGIN_SLOTS) {
+      const surfaces = featurePluginSlotUiSurfaces(slot);
+      assertFeaturePluginUiImpact(slot, surfaces);
+      expect(surfaces.length).toBeGreaterThan(0);
+      for (const surface of surfaces) {
+        expect(FEATURE_PLUGIN_UI_SURFACES).toContain(surface);
+        expect(enDict[featurePluginSurfaceTooltipKey(slot, surface)]).toBeTruthy();
+        expect(enDict[FEATURE_PLUGIN_SURFACE_LABEL_KEY[surface]]).toBeTruthy();
+      }
+    }
+  });
+
+  test('fails when a slot is missing tags or uses an unknown surface id', () => {
+    expect(() => assertFeaturePluginUiImpact('ghost', [])).toThrow(/must declare UI impact tags/);
+    expect(() => assertFeaturePluginUiImpact('goal', ['tui'])).toThrow(/unknown UI impact surface "tui"/);
+    expect(() => featurePluginSurfaceTooltipKey('todo', 'commands')).toThrow(/no tooltip/);
+  });
+
+  test('keeps the closed slot-to-chrome map', () => {
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.goal]).toEqual(['composer', 'commands']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.plan]).toEqual(['composer', 'commands', 'sidebar', 'session']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.mcp]).toEqual(['workStatus', 'settings']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.subagents]).toEqual(['workStatus', 'commands', 'session']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.btw]).toEqual(['commands', 'session']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.todo]).toEqual(['workStatus']);
+
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.goal).not.toContain('workStatus');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.goal).not.toContain('sidebar');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.goal).not.toContain('settings');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.goal).not.toContain('session');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.mcp).not.toContain('commands');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.mcp).not.toContain('composer');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.btw).not.toContain('composer');
+    expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.todo).toEqual(['workStatus']);
+    expect(featurePluginSlotSearchKeywords('todo')).toEqual(['work status', 'workStatus']);
+  });
+
+  test('every locale has real surface labels and concrete chrome tooltips', () => {
+    const locales = {
+      de: deDict,
+      es: esDict,
+      fr: frDict,
+      ja: jaDict,
+      ko: koDict,
+      pl: plDict,
+      'pt-BR': ptBrDict,
+      uk: ukDict,
+      'zh-CN': zhCnDict,
+      'zh-TW': zhTwDict,
+    } as const;
+    const labelKeys = FEATURE_PLUGIN_UI_SURFACES.map((surface) => FEATURE_PLUGIN_SURFACE_LABEL_KEY[surface]);
+
+    expect(enDict['settings.featurePlugins.surface.composer']).toBe('Composer');
+    expect(enDict['settings.featurePlugins.slot.goal.surface.composer.tooltip']).toBe('Composer Goal button');
+    expect(zhCnDict['settings.featurePlugins.surface.composer']).toBe('输入框');
+    expect(zhCnDict['settings.featurePlugins.slot.goal.surface.composer.tooltip']).toBe('输入框上的 Goal 按钮');
+
+    for (const [locale, dictionary] of Object.entries(locales)) {
+      for (const key of labelKeys) {
+        expect(dictionary[key], `${locale} ${key}`).toBeTruthy();
+        if (key !== 'settings.featurePlugins.surface.session' || locale !== 'fr') {
+          expect(dictionary[key], `${locale} ${key}`).not.toBe(enDict[key]);
+        }
+      }
+      for (const slot of FEATURE_PLUGIN_SLOTS) {
+        for (const surface of FEATURE_PLUGIN_SLOT_UI_IMPACT[slot]) {
+          const tooltipKey = featurePluginSurfaceTooltipKey(slot, surface);
+          const tooltip = dictionary[tooltipKey];
+          expect(tooltip, `${locale} ${tooltipKey}`).toBeTruthy();
+          if (!tooltip.startsWith('/')) {
+            expect(tooltip, `${locale} ${tooltipKey}`).not.toBe(enDict[tooltipKey]);
+          }
+        }
+      }
     }
   });
 });

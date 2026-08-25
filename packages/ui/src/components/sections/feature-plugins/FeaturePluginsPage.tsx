@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
   SETTINGS_HELPER_CLASS,
@@ -25,12 +26,15 @@ import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
   FEATURE_PLUGIN_SLOT_COPY,
   FEATURE_PLUGIN_SLOTS,
+  FEATURE_PLUGIN_SURFACE_LABEL_KEY,
   type FeaturePluginSlot,
   type FeaturePluginSlotState,
   type FeaturePluginsPayload,
   type FeaturePluginsReloadResult,
   emptyFeaturePluginsPayload,
   featurePluginPackageLabel,
+  featurePluginSlotUiSurfaces,
+  featurePluginSurfaceTooltipKey,
   parseFeaturePluginsPayload,
 } from './featurePlugins';
 
@@ -174,6 +178,9 @@ export const FeaturePluginsPage: React.FC = () => {
                 : t('settings.featurePlugins.dialog.install.description')}
             </DialogDescription>
           </DialogHeader>
+          {pending?.action === 'install' ? (
+            <FeaturePluginImpactTags slot={pending.slot} />
+          ) : null}
           <DialogFooter>
             <Button
               size="sm"
@@ -233,6 +240,7 @@ function FeaturePluginCard({
           <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
             {t(copy.infoKey)}
           </p>
+          <FeaturePluginImpactTags slot={slot} />
           <p className="typography-meta mt-2 font-mono text-muted-foreground">
             {featurePluginPackageLabel(slot)}
           </p>
@@ -281,5 +289,37 @@ function FeaturePluginCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function FeaturePluginImpactTags({ slot }: { slot: FeaturePluginSlot }) {
+  const { t } = useI18n();
+  const surfaces = featurePluginSlotUiSurfaces(slot);
+
+  return (
+    <ul
+      className="mt-1 flex flex-wrap gap-1"
+      aria-label={t('settings.featurePlugins.impact.aria')}
+    >
+      {surfaces.map((surface) => {
+        const tooltip = t(featurePluginSurfaceTooltipKey(slot, surface));
+        return (
+          <li key={surface}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  tabIndex={0}
+                  aria-label={tooltip}
+                  className="inline-flex cursor-help items-center rounded-md border border-[var(--interactive-border)] px-1.5 py-px typography-micro font-normal leading-none text-muted-foreground"
+                >
+                  {t(FEATURE_PLUGIN_SURFACE_LABEL_KEY[surface])}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent sideOffset={6}>{tooltip}</TooltipContent>
+            </Tooltip>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
