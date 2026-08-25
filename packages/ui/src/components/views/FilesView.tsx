@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CodeMirrorEditor } from '@/components/ui/CodeMirrorEditor';
 import { GoToLineDialog } from './GoToLineDialog';
+import { isMarkdownFile, resolveMarkdownViewMode, type PreviewViewMode } from './fileViewerMode';
 import { PreviewToggleButton } from './PreviewToggleButton';
 import { JsonTreeView } from '@/components/ui/JsonTreeView';
 import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -337,12 +338,6 @@ const serializeEditorContent = (content: string, lineEnding: FileLineEnding): st
 
 const getFileIcon = (filePath: string, extension?: string): React.ReactNode => {
   return <FileTypeIcon filePath={filePath} extension={extension} />;
-};
-
-const isMarkdownFile = (path: string): boolean => {
-  if (!path) return false;
-  const ext = path.toLowerCase().split('.').pop();
-  return ext === 'md' || ext === 'markdown';
 };
 
 const isJsonFile = (path: string): boolean => {
@@ -778,10 +773,9 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, [isClickInsidePortalledMenu, isFloatingToolbarOpen]);
   type TextViewMode = 'view' | 'edit';
-  type PreviewViewMode = 'preview' | 'edit';
 
   const [textViewMode, setTextViewMode] = React.useState<TextViewMode>('edit');
-  const [mdViewMode, setMdViewMode] = React.useState<PreviewViewMode>('edit');
+  const [mdViewMode, setMdViewMode] = React.useState<PreviewViewMode>('preview');
   const [jsonViewMode, setJsonViewMode] = React.useState<'tree' | 'text'>('tree');
   const [htmlViewMode, setHtmlViewMode] = React.useState<PreviewViewMode>('edit');
   const [drawioViewMode, setDrawioViewMode] = React.useState<PreviewViewMode>('preview');
@@ -2446,18 +2440,19 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
     setTextViewMode(textViewModeByPathRef.current[selectedPath] ?? 'edit');
 
-    // Respect per-type localStorage preference when available,
-    // falling back to the setting-derived default when nothing is stored.
-    let mdDefault: PreviewViewMode = settingsDefaultFileViewerPreview ? 'preview' : 'edit';
+    // Markdown defaults to rendered preview. A stored last-used mode or a
+    // per-path choice still wins; the generic preview setting does not force
+    // source on first open.
+    let storedMdMode: string | null = null;
     try {
-      const stored = localStorage.getItem(MD_VIEWER_MODE_KEY);
-      if (stored === 'preview' || stored === 'edit') {
-        mdDefault = stored;
-      }
+      storedMdMode = localStorage.getItem(MD_VIEWER_MODE_KEY);
     } catch {
       // Ignore localStorage errors
     }
-    setMdViewMode(mdViewModeByPathRef.current[selectedPath] ?? mdDefault);
+    setMdViewMode(resolveMarkdownViewMode({
+      pathMode: mdViewModeByPathRef.current[selectedPath],
+      storedMode: storedMdMode,
+    }));
 
     let htmlDefault: PreviewViewMode = settingsDefaultFileViewerPreview ? 'preview' : 'edit';
     try {
@@ -3780,11 +3775,13 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
       </div>
 
-      <div className="flex-1 min-h-0 min-w-0 relative">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* In-flow, not absolute: Desktop Files is editor-only and has no tab
+            row, so a floating overlay covered the first markdown lines. */}
         {selectedFile && !isSearchOpen && !(settingsExpandedEditorToolbar || isMobile) && (
           <div
             ref={floatingToolbarRef}
-            className="absolute right-3 top-3 z-30"
+            className="flex shrink-0 justify-end overflow-x-auto px-3 py-1.5"
             onMouseLeave={() => {
               if (toolbarDropdownOpenCountRef.current > 0) return;
               setIsFloatingToolbarOpen(false);
@@ -3844,7 +3841,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
             )}
           </div>
         )}
-        <ScrollableOverlay outerClassName="h-full min-w-0" className="h-full min-w-0">
+        <ScrollableOverlay outerClassName="h-full min-h-0 min-w-0 flex-1" className="h-full min-w-0">
           {!selectedFile ? (
             <div className="p-3 typography-ui text-muted-foreground">{t('filesView.editor.pickFileFromTree')}</div>
           ) : (fileLoading || isPdfAssetAuthLoading) ? (
