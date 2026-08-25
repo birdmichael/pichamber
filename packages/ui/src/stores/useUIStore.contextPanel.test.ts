@@ -330,11 +330,48 @@ describe('useUIStore browser project/chats scope', () => {
     expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
   });
 
-  test('same project, two sessions still share one tab set', () => {
+  test('reopening the browser on the same project directory does not create a chats bucket', () => {
     useUIStore.getState().openContextPreview(projectA, 'https://shared.example/');
     useUIStore.getState().openContextSurface(projectA, 'browser');
 
     expect(useUIStore.getState().contextPanelByDirectory[projectA]?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
+  });
+
+  test('moves leftover chat-session browser tabs onto the chats sentinel', () => {
+    useUIStore.setState({
+      contextPanelByDirectory: {
+        [chatA]: {
+          isOpen: true,
+          expanded: false,
+          tabs: [{
+            id: 'browser:https://old.example/',
+            mode: 'browser',
+            targetPath: 'https://old.example/',
+            dedupeKey: 'https://old.example/',
+            label: null,
+            sessionTitleFallback: null,
+            readOnly: false,
+            stagedDiff: false,
+            diffScope: 'working',
+            touchedAt: 1,
+          }],
+          activeTabId: 'browser:https://old.example/',
+          widthByMode: {},
+          touchedAt: 1,
+        },
+      },
+    });
+
+    useUIStore.getState().openContextPreview(chatA, 'https://new.example/');
+
+    const chats = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
+    const sessionA = useUIStore.getState().contextPanelByDirectory[chatA];
+    expect(chats?.tabs.map((tab) => tab.targetPath)).toEqual([
+      'https://new.example/',
+      'https://old.example/',
+    ]);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
   });
 
   test('home that is an opened Settings project stays a project scope', () => {
