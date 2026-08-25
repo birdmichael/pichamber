@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   packageDisplayName,
@@ -119,8 +122,11 @@ describe('extensionPackageUpdate', () => {
 });
 
 describe('ExtensionsPage version display', () => {
-  test('uses version chips instead of a Current · Latest sentence', async () => {
-    const source = await Bun.file(new URL('./ExtensionsPage.tsx', import.meta.url)).text();
+  test('uses version chips instead of a Current · Latest sentence', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'ExtensionsPage.tsx'),
+      'utf8',
+    );
     expect(source).toContain('SettingsVersionChips');
     expect(source).not.toContain('versionBits.join');
   });

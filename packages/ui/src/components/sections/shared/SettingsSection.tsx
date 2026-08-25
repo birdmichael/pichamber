@@ -544,7 +544,7 @@ interface SettingsVersionChipProps {
 }
 
 /** Read-only version pill. Not a SettingsChipGroup option (those are selectable). */
-export function SettingsVersionChip({
+function SettingsVersionChip({
   version,
   tone = 'quiet',
   'aria-label': ariaLabel,
