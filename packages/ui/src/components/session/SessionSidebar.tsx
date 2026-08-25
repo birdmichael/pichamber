@@ -6,6 +6,7 @@ import { useDeviceInfo } from '@/lib/device';
 import { isDesktopShell } from '@/lib/desktop';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { getChatsRootForHome, getChatsRootFromDirectory, isChatDirectoryPath, isManagedChatDirectory } from '@/lib/chatDirectories';
+import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { formatDirectoryName, cn } from '@/lib/utils';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useChildStoreManager, useGlobalSessionStatus } from '@/sync/sync-context';
@@ -1932,6 +1933,15 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     if (mobileVariant) {
       setSessionSwitcherOpen(false);
     }
+    openNewSessionDraft(readInheritedNewSessionDraftOptions());
+  }, [mobileVariant, openNewSessionDraft, setActiveMainTab, setSessionSwitcherOpen]);
+
+  const handleOpenNewChatFromChatsRow = React.useCallback(() => {
+    useUIStore.getState().closeMainSurfaces();
+    setActiveMainTab('chat');
+    if (mobileVariant) {
+      setSessionSwitcherOpen(false);
+    }
     openNewSessionDraft();
   }, [mobileVariant, openNewSessionDraft, setActiveMainTab, setSessionSwitcherOpen]);
 
@@ -1976,12 +1986,12 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         expansionState={recentExpandedParents}
         variant="section"
         isDesktopShellRuntime={isDesktopShellRuntime}
-        onNewChat={handleOpenNewSessionDraftFromHeader}
+        onNewChat={handleOpenNewChatFromChatsRow}
         alwaysShowActions={alwaysShowSidebarActions}
         renderChatsSection={renderChatsSection}
       />
     ) : null,
-    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewSessionDraftFromHeader, hasActivitySectionItems, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode],
+    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewChatFromChatsRow, hasActivitySectionItems, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode],
   );
 
   return (

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Desktop: Cmd+N / Ctrl+N while a project session is open creates that project session again; the File menu no longer eats the shortcut.
+- Desktop: new session from the sidebar top control, File menu, and command palette follows the current project; the Chats-row + still opens a projectless chat; Cmd+N is no longer eaten by the File menu.
 - Desktop: the sidebar Settings gear and session rows now open on the first click. A leftover overlay after Esc, and the hover tooltip, no longer eat that press.
 - Settings: the Pi version next to Update is muted secondary text.
 - Chat: New multi-run Base branch shows a quiet loading control instead of the words "Loading branches...".

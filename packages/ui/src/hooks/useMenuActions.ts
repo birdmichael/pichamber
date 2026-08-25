@@ -8,6 +8,7 @@ import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUISto
 import { useUpdateStore } from '@/stores/useUpdateStore';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { sessionEvents } from '@/lib/sessionEvents';
+import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
 import { showOpenCodeStatus } from '@/lib/openCodeStatus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
@@ -193,7 +194,7 @@ export const useMenuActions = (
         case 'new-session':
           setActiveMainTab('chat');
           setSessionSwitcherOpen(false);
-          openNewSessionDraft();
+          openNewSessionDraft(readInheritedNewSessionDraftOptions());
           break;
 
         case 'new-worktree-session':

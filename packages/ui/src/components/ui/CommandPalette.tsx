@@ -36,6 +36,7 @@ import { toast } from '@/components/ui';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import type { Session } from '@opencode-ai/sdk/v2';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
+import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
 import { isCapacitorApp } from '@/lib/platform';
@@ -175,7 +176,7 @@ export const CommandPalette: React.FC = () => {
         onSelect: run(() => {
           setActiveMainTab('chat');
           setSessionSwitcherOpen(false);
-          openNewSessionDraft();
+          openNewSessionDraft(readInheritedNewSessionDraftOptions());
         }),
       },
       {
