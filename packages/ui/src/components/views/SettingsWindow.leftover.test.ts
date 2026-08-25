@@ -19,8 +19,18 @@ describe('dialog leftover overlay', () => {
     expect(settingsWindowSource).toContain('data-[ending-style]:pointer-events-none');
   });
 
+  test('open Settings counts as a dialog layer so nested closes cannot uncover the sidebar', () => {
+    expect(settingsWindowSource).toContain('markDialogLayerMounted');
+    expect(settingsWindowSource).toContain('if (!open)');
+  });
+
   test('shared dialog popups drop pointer events while they are exiting', () => {
     expect(dialogSource).toContain('data-[ending-style]:pointer-events-none');
     expect(dialogSource).toContain('data-slot="dialog-content"');
+  });
+
+  test('shared dialog overlays keep pointer events on nested exit', () => {
+    expect(dialogSource).toContain('useDialogLayerRegistration');
+    expect(dialogSource).toContain('dropPointerEventsOnExit && "data-[ending-style]:pointer-events-none"');
   });
 });

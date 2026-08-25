@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Chat: copying a message shows Copied at the bottom-right instead of covering the user bubble.
 - Desktop: new session from the sidebar top control, File menu, and command palette follows the current project; the Chats-row + still opens a projectless chat; Cmd+N is no longer eaten by the File menu.
 - Desktop: the sidebar Settings gear and session rows now open on the first click. A leftover overlay after Esc, and the hover tooltip, no longer eat that press.
+- Desktop: while Settings or another dialog is open, sidebar session hover-cards no longer paint over the modal. Esc still closes a nested dialog first.
 - Settings: the Pi version next to Update is muted secondary text.
 - Chat: New multi-run Base branch shows a quiet loading control instead of the words "Loading branches...".
 - Desktop: hidden windows pause Work Status, tray, and session watchdog polling, then refresh once when you come back.

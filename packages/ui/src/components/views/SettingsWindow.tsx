@@ -2,6 +2,7 @@ import React from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { SettingsView } from './SettingsView';
 
@@ -17,6 +18,13 @@ interface SettingsWindowProps {
 export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChange }) => {
   const { t } = useI18n();
   const descriptionId = React.useId();
+
+  React.useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+    return markDialogLayerMounted();
+  }, [open]);
 
   return (
     <Dialog.Root
