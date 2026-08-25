@@ -54,3 +54,21 @@ export const packagesWithUpdates = (packages: ExtensionPackageItem[]): Extension
 export const packageUninstallSource = (item: ExtensionPackageItem): string => (
   (item.path || item.source || '').trim()
 );
+
+export const packageDisplayName = (item: Pick<ExtensionPackageItem, 'name' | 'path'>): string => (
+  item.name.trim() || item.path.trim()
+);
+
+export const isNpmExtensionPackage = (item: ExtensionPackageItem): boolean => (
+  item.source === 'npm' || item.path.trim().startsWith('npm:')
+);
+
+export type PackageVersionState = 'update' | 'upToDate' | 'unknown' | 'none';
+
+/** Distinguishes a known current latest from a failed/skipped latest lookup. */
+export const packageVersionState = (item: ExtensionPackageItem): PackageVersionState => {
+  if (packageHasUpdate(item)) return 'update';
+  if (item.currentVersion && item.latestVersion) return 'upToDate';
+  if (item.currentVersion && !item.latestVersion && isNpmExtensionPackage(item)) return 'unknown';
+  return 'none';
+};

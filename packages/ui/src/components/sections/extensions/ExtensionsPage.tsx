@@ -17,8 +17,9 @@ import {
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { shouldShowExtensionsSection } from './extensionsPageVisibility';
 import {
-  packageHasUpdate,
+  packageDisplayName,
   packageUninstallSource,
+  packageVersionState,
   packagesWithUpdates,
   parseExtensionPackages,
   type ExtensionPackageItem,
@@ -227,19 +228,27 @@ export const ExtensionsPage: React.FC = () => {
             {packages.map((item) => {
               const source = packageUninstallSource(item);
               const rowBusy = (busy?.kind === 'one' || busy?.kind === 'uninstall') && busy.source === source;
-              const showUpdate = packageHasUpdate(item);
+              const versionState = packageVersionState(item);
+              const showUpdate = versionState === 'update';
+              const versionBits = [
+                item.currentVersion
+                  ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
+                  : item.scope,
+              ];
+              if (versionState === 'update' && item.latestVersion) {
+                versionBits.push(t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion }));
+              } else if (versionState === 'upToDate') {
+                versionBits.push(t('settings.extensions.page.packages.actions.upToDate'));
+              } else if (versionState === 'unknown') {
+                versionBits.push(t('settings.extensions.page.packages.latestUnknown'));
+              }
               return (
                 <li key={`${item.scope}:${item.path}:${item.source}`} className="rounded-lg border border-border/50 px-3 py-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="typography-ui-label font-medium">{item.name}</div>
                       <div className={`${SETTINGS_HELPER_CLASS} mt-0.5`}>
-                        {item.currentVersion
-                          ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
-                          : item.scope}
-                        {item.latestVersion && showUpdate
-                          ? ` · ${t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion })}`
-                          : ''}
+                        {versionBits.join(' · ')}
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -287,10 +296,21 @@ export const ExtensionsPage: React.FC = () => {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t('settings.extensions.page.packages.dialog.uninstall.title')}</DialogTitle>
+            <DialogTitle>
+              {t('settings.extensions.page.packages.dialog.uninstall.title', {
+                name: pendingUninstall ? packageDisplayName(pendingUninstall) : '',
+              })}
+            </DialogTitle>
             <DialogDescription>
-              {t('settings.extensions.page.packages.dialog.uninstall.description')}
+              {t('settings.extensions.page.packages.dialog.uninstall.description', {
+                name: pendingUninstall ? packageDisplayName(pendingUninstall) : '',
+              })}
             </DialogDescription>
+            {pendingUninstall && packageUninstallSource(pendingUninstall) ? (
+              <p className="typography-meta font-mono text-muted-foreground">
+                {packageUninstallSource(pendingUninstall)}
+              </p>
+            ) : null}
           </DialogHeader>
           <DialogFooter>
             <Button

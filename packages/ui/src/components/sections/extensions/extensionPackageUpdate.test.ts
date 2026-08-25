@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  packageDisplayName,
   packageHasUpdate,
   packageUninstallSource,
+  packageVersionState,
   packagesWithUpdates,
   parseExtensionPackages,
 } from './extensionPackageUpdate';
@@ -71,5 +73,47 @@ describe('extensionPackageUpdate', () => {
       source: './tools/local',
       scope: 'project',
     })).toBe('./tools/local');
+    expect(packageDisplayName({
+      name: 'pi-question-tool',
+      path: 'npm:pi-question-tool',
+    })).toBe('pi-question-tool');
+  });
+
+  test('treats a known current latest as up to date and a missing npm latest as unknown', () => {
+    expect(packageVersionState({
+      name: 'pi-question-tool',
+      path: 'npm:pi-question-tool',
+      source: 'npm',
+      scope: 'user',
+      currentVersion: '0.1.1',
+      latestVersion: '0.1.1',
+      updateAvailable: false,
+    })).toBe('upToDate');
+    expect(packageVersionState({
+      name: 'pi-question-tool',
+      path: 'npm:pi-question-tool',
+      source: 'npm',
+      scope: 'user',
+      currentVersion: '0.1.1',
+      latestVersion: null,
+      updateAvailable: false,
+    })).toBe('unknown');
+    expect(packageVersionState({
+      name: 'pi-question-tool',
+      path: 'npm:pi-question-tool',
+      source: 'npm',
+      scope: 'user',
+      currentVersion: '0.1.1',
+      latestVersion: '0.2.0',
+      updateAvailable: true,
+    })).toBe('update');
+    expect(packageVersionState({
+      name: 'local-tool',
+      path: './tools/local',
+      source: 'local',
+      scope: 'project',
+      currentVersion: '1.0.0',
+      latestVersion: null,
+    })).toBe('none');
   });
 });
