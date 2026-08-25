@@ -6,12 +6,20 @@ import { cn } from '@/lib/utils';
 
 const UPDATE_AVAILABLE_HOST_ID = 'pichamber-update-available-host';
 
-/** Header slot: banner portals here so it is a no-drag child of the titlebar. */
+/**
+ * Same offset as sonner toasts. The header column is overflow-hidden, so the
+ * host must be `fixed` below `--oc-header-height` rather than `absolute top-0`
+ * inside the titlebar (that covers traffic lights and header icons).
+ */
+const UPDATE_AVAILABLE_BANNER_TOP = 'calc(var(--oc-header-height, 3rem) + 12px)';
+
+/** Header slot: banner portals here so Dismiss stays a titlebar no-drag child. */
 export const OpenCodeUpdateBannerHost: React.FC = () => (
   <div
     id={UPDATE_AVAILABLE_HOST_ID}
     data-update-available-host=""
-    className="pointer-events-none absolute inset-x-0 top-0 z-[80] flex justify-center pt-1.5"
+    className="pointer-events-none fixed inset-x-0 z-[80] flex justify-center"
+    style={{ top: UPDATE_AVAILABLE_BANNER_TOP }}
   />
 );
 
@@ -81,7 +89,10 @@ export const OpenCodeUpdateBanner: React.FC<OpenCodeUpdateBannerProps> = ({
   );
 
   const fallback = (
-    <div className="pointer-events-none fixed inset-x-0 top-3 z-[80] flex justify-center">
+    <div
+      className="pointer-events-none fixed inset-x-0 z-[80] flex justify-center"
+      style={{ top: UPDATE_AVAILABLE_BANNER_TOP }}
+    >
       {node}
     </div>
   );
