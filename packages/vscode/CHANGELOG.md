@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.
+- Chat: copying a message shows Copied at the bottom-right instead of covering the user bubble.
 - Sessions: the first click on a session row now opens that session. The hover preview no longer eats that press.
 - Chat: Save as image is hidden on text-only assistant turns. When the turn has an image, Save as image writes a file or shows an error.
 - Chat: long user messages wrap inside the bubble instead of clipping to a single line.

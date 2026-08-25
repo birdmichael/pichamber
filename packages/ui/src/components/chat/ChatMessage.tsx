@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { AnimationHandlers, ContentChangeReason } from '@/hooks/useChatAutoFollow';
 import MessageBody from './message/MessageBody';
 import { USER_BUBBLE_FLEX_ITEM_CLASS } from './message/userBubbleLayout';
+import { presentMessageCopyToast } from './message/messageCopyToast';
 import type { AgentMentionInfo } from './message/types';
 import type { StreamPhase, ToolPopupContent } from './message/types';
 import { deriveMessageRole } from './message/messageRole';
@@ -790,10 +791,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             result = await copyMarkdownToClipboard(messageTextContent, renderMarkdownSync(messageTextContent));
         }
         if (!result.ok) {
-            toast.error(t('chat.messageBody.toast.copyFailed'));
+            presentMessageCopyToast(false, t('chat.messageBody.toast.copyFailed'));
             return false;
         }
-        toast.success(t('chat.messageBody.toast.copied'));
+        presentMessageCopyToast(true, t('chat.messageBody.toast.copied'));
         if (isUser) {
             setCopiedMessage(true);
             setTimeout(() => setCopiedMessage(false), 2000);
