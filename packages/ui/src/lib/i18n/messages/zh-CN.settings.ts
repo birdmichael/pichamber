@@ -121,6 +121,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': '安装 Subagents 软件包。安装后即可使用工作状态和可写子会话。此页面不会启动 /subagents-fleet。',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': '安装 Btw 软件包。安装后，可用 /btw 在临时会话中提出旁支问题。此页面不会启动 /btw。',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': '安装 Todo 软件包。安装后，Work Status 会显示 Tasks 分区，并在模型更改待办时更新。此页面不会启动 /todos。',
   'settings.featurePlugins.status.installed': '已安装',
   'settings.featurePlugins.status.notInstalled': '未安装',
   'settings.featurePlugins.actions.install': '安装',

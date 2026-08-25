@@ -55,11 +55,10 @@ const PANEL_TRANSITION_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
  * Work-status panel: a card inside the chat column reporting the state of the
  * session, its branch and its subagents.
  *
- * Ordering is by durability, not by category. The first sections hold readouts
- * that stay true for the whole session, then the state of the work in flight,
- * then episodic material an agent may never produce. Each section renders
- * nothing when it has nothing, so the panel collapses toward the top instead of
- * reserving empty space.
+ * Tasks is first when that section is available. Remaining sections still
+ * group durable session/project readouts, then work in flight, then episodic
+ * material. Each section renders nothing when it has nothing, so the panel
+ * collapses toward the top instead of reserving empty space.
  *
  * The card clips; the scroller lives inside it, so the same top/bottom scroll
  * shadows the transcript uses stay within the rounded border instead of
@@ -75,9 +74,10 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const isPiKernel = usePiKernel();
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive],
   );
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering
@@ -255,6 +255,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         size={24}
         className="oc-hide-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
       >
+        {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
         <WorkStatusPrimaryGroup
           sessionId={sessionId}
           directory={directory}
@@ -264,7 +265,6 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         />
         {sectionVisible('usage') ? <WorkStatusUsageSection /> : null}
         {sectionVisible('subagents') ? <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} /> : null}
-        {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
         {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} /> : null}
         {sectionVisible('pinned') ? <WorkStatusPinnedSection sessionId={sessionId} directory={directory} /> : null}
         {sectionVisible('contextSources') ? <WorkStatusContextSection sessionId={sessionId} directory={directory} /> : null}

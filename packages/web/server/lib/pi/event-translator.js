@@ -5,6 +5,11 @@ import {
   toPiImageContent,
   usageHasRecordedNumbers,
 } from './session-transfer.js';
+import {
+  TODO_TOOL_NAME,
+  isTaskDetails,
+  mapTasksToOpenCodeTodos,
+} from './session-todo.js';
 
 export { mapPiUsageToOpenCodeTokens, resolveUsableFacadeModel } from './session-transfer.js';
 
@@ -471,7 +476,7 @@ export const createEventTranslator = ({
         const metadata = piEvent.result?.details && typeof piEvent.result.details === 'object'
           ? piEvent.result.details
           : undefined;
-        return [partUpdated(toolPart(partID, {
+        const events = [partUpdated(toolPart(partID, {
             callID,
             tool: piEvent.toolName || 'tool',
             status: piEvent.isError ? 'error' : 'completed',
@@ -480,6 +485,17 @@ export const createEventTranslator = ({
             error: piEvent.isError ? output || 'tool error' : undefined,
             metadata,
           }))];
+        if (
+          !piEvent.isError
+          && (piEvent.toolName || 'tool') === TODO_TOOL_NAME
+          && isTaskDetails(piEvent.result?.details)
+        ) {
+          events.push(event('todo.updated', {
+            sessionID,
+            todos: mapTasksToOpenCodeTodos(piEvent.result.details.tasks),
+          }));
+        }
+        return events;
       }
 
       case 'compaction_start':

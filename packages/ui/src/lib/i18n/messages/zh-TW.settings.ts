@@ -2295,6 +2295,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': '安裝 Subagents 套件。安裝後即可使用工作狀態與可寫入的子工作階段。此頁面不會啟動 /subagents-fleet。',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': '安裝 Btw 套件。安裝後，可用 /btw 在暫時工作階段提出旁支問題。此頁面不會啟動 /btw。',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': '安裝 Todo 套件。安裝後，Work Status 會顯示 Tasks 區塊，並在模型變更待辦時更新。此頁面不會啟動 /todos。',
   'settings.featurePlugins.status.installed': '已安裝',
   'settings.featurePlugins.status.notInstalled': '未安裝',
   'settings.featurePlugins.actions.install': '安裝',

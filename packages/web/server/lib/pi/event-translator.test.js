@@ -380,6 +380,74 @@ describe('createEventTranslator', () => {
     expect(end[0].properties.part.state.metadata).toEqual({ sessionId: 'child-from-details' });
   });
 
+  it('emits todo.updated on todo tool_execution_end with TaskDetails', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_todo',
+      toolName: 'todo',
+      args: { action: 'create', subject: 'Write tests' },
+    });
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_todo',
+      toolName: 'todo',
+      args: { action: 'create', subject: 'Write tests' },
+      result: {
+        content: [{ type: 'text', text: 'Created task #1' }],
+        details: {
+          action: 'create',
+          params: { subject: 'Write tests' },
+          nextId: 2,
+          tasks: [{ id: 1, subject: 'Write tests', status: 'pending' }],
+        },
+      },
+      isError: false,
+    });
+    expect(end.map((event) => event.type)).toEqual(['message.part.updated', 'todo.updated']);
+    expect(end[1].properties).toMatchObject({
+      sessionID: 'ses_1',
+      todos: [{ id: '1', content: 'Write tests', status: 'pending', priority: 'medium' }],
+    });
+  });
+
+  it('does not wait for message_end and skips thrown todo errors', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_todo_err',
+      toolName: 'todo',
+      args: { action: 'update' },
+    });
+    const failed = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_todo_err',
+      toolName: 'todo',
+      result: { content: [{ type: 'text', text: 'boom' }] },
+      isError: true,
+    });
+    expect(failed.map((event) => event.type)).toEqual(['message.part.updated']);
+
+    const invalid = translator();
+    invalid.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    invalid.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_todo_bad',
+      toolName: 'todo',
+      args: { action: 'list' },
+    });
+    const skipped = invalid.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_todo_bad',
+      toolName: 'todo',
+      result: { details: { tasks: [] } },
+      isError: false,
+    });
+    expect(skipped.map((event) => event.type)).toEqual(['message.part.updated']);
+  });
+
 
   it('attaches parentID, agent, model, and stable time to assistant info', () => {
     const t = translator();

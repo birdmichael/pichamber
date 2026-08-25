@@ -1343,12 +1343,16 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.mcp.source).toBe('npm:pi-mcp-adapter');
       expect(body.slots.subagents.source).toBe('npm:pi-subagents');
       expect(body.slots.btw.source).toBe('npm:@narumitw/pi-btw');
+      expect(body.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
+      expect(body.slots.todo.source).not.toBe('npm:rpiv-todo');
       expect(body.slots.goal.command).toBe('goal');
       expect(body.slots.btw.command).toBe('btw');
       expect(body.slots.plan.command).toBeUndefined();
+      expect(body.slots.todo.command).toBeUndefined();
       expect(body.slots.goal.installed).toBe(false);
       expect(body.slots.plan.installed).toBe(false);
       expect(body.slots.btw.installed).toBe(false);
+      expect(body.slots.todo.installed).toBe(false);
       expect(body.slots.goal.enabled).toBe(false);
       const home = kernel.host.getPath().home;
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
@@ -1408,6 +1412,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(chamber.featurePlugins.mcp.enabled).toBeUndefined();
       expect(chamber.featurePlugins.subagents.enabled).toBeUndefined();
       expect(chamber.featurePlugins.btw.enabled).toBeUndefined();
+      expect(chamber.featurePlugins.todo.enabled).toBeUndefined();
 
       const removed = await fetch(`${url}/api/pi/feature-plugins/goal/uninstall`, {
         method: 'POST',
@@ -1490,6 +1495,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(plugins.slots.subagents).toMatchObject({ installed: true, enabled: true });
       expect(plugins.slots.plan).toMatchObject({ installed: false, enabled: false });
       expect(plugins.slots.btw).toMatchObject({ installed: false, enabled: false });
+      expect(plugins.slots.todo).toMatchObject({ installed: false, enabled: false });
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
@@ -1606,6 +1612,124 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect((await removed.json()).slots.btw.installed).toBe(false);
       const after = await (await fetch(`${url}/api/command`)).json();
       expect(after.some((command) => command.name === 'btw')).toBe(false);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('returns Pi todo snapshots only when the Todo slot is on and isolates child sessions', async () => {
+    const pool = [];
+    const { url, close, kernel } = await startFacade({
+      createSession: async () => {
+        const session = createInMemoryPiSession();
+        pool.push(session);
+        return session;
+      },
+    });
+    try {
+      const parent = await kernel.host.createSession({ directory: '/tmp/project', title: 'Parent' });
+      const child = await kernel.host.createSession({
+        directory: '/tmp/project',
+        title: 'Child',
+        parentID: parent.id,
+      });
+      const parentSession = pool[0];
+      const childSession = pool[1];
+
+      const off = await fetch(`${url}/api/session/${parent.id}/todo`);
+      expect(off.status).toBe(200);
+      expect(await off.json()).toEqual([]);
+
+      const installed = await fetch(`${url}/api/pi/feature-plugins/todo/install`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(installed.status).toBe(200);
+      expect((await installed.json()).slots.todo).toMatchObject({
+        installed: true,
+        enabled: true,
+        source: 'npm:@juicesharp/rpiv-todo',
+      });
+
+      parentSession.emitEvent({ type: 'message_start', message: { role: 'assistant', content: [] } });
+      parentSession.emitEvent({
+        type: 'tool_execution_start',
+        toolCallId: 'todo_parent',
+        toolName: 'todo',
+        args: { action: 'create', subject: 'Parent task' },
+      });
+      parentSession.emitEvent({
+        type: 'tool_execution_end',
+        toolCallId: 'todo_parent',
+        toolName: 'todo',
+        isError: false,
+        result: {
+          details: {
+            action: 'create',
+            params: {},
+            nextId: 2,
+            tasks: [{ id: 1, subject: 'Parent task', status: 'pending' }],
+          },
+        },
+      });
+      childSession.emitEvent({ type: 'message_start', message: { role: 'assistant', content: [] } });
+      childSession.emitEvent({
+        type: 'tool_execution_start',
+        toolCallId: 'todo_child',
+        toolName: 'todo',
+        args: { action: 'create', subject: 'Child task' },
+      });
+      childSession.emitEvent({
+        type: 'tool_execution_end',
+        toolCallId: 'todo_child',
+        toolName: 'todo',
+        isError: false,
+        result: {
+          details: {
+            action: 'create',
+            params: {},
+            nextId: 2,
+            tasks: [{ id: 1, subject: 'Child task', status: 'in_progress' }],
+          },
+        },
+      });
+
+      const parentTodos = await (await fetch(`${url}/api/session/${parent.id}/todo`)).json();
+      const childTodos = await (await fetch(`${url}/api/session/${child.id}/todo`)).json();
+      expect(parentTodos).toEqual([
+        { id: '1', content: 'Parent task', status: 'pending', priority: 'medium' },
+      ]);
+      expect(childTodos).toEqual([
+        { id: '1', content: 'Child task', status: 'in_progress', priority: 'medium' },
+      ]);
+
+      parentSession.sessionManager.appendEntry({
+        type: 'message',
+        message: {
+          role: 'toolResult',
+          toolName: 'todo',
+          details: {
+            action: 'update',
+            params: {},
+            nextId: 2,
+            tasks: [{ id: 1, subject: 'Parent after reload', status: 'completed' }],
+          },
+        },
+      });
+      await kernel.host.reload({ sessionID: parent.id });
+      expect(await (await fetch(`${url}/api/session/${parent.id}/todo`)).json()).toEqual([
+        { id: '1', content: 'Parent after reload', status: 'completed', priority: 'medium' },
+      ]);
+
+      const removed = await fetch(`${url}/api/pi/feature-plugins/todo/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(removed.status).toBe(200);
+      expect(await (await fetch(`${url}/api/session/${parent.id}/todo`)).json()).toEqual([]);
     } finally {
       kernel.dispose();
       await close();

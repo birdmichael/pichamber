@@ -85,6 +85,10 @@ describe('feature plugin defaults and persist', () => {
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.btw,
       command: 'btw',
     });
+    expect(plugins.todo.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.todo);
+    expect(plugins.todo.source).toBe('npm:@juicesharp/rpiv-todo');
+    expect(plugins.todo.source).not.toBe('npm:rpiv-todo');
+    expect(plugins.todo.command).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -209,7 +213,9 @@ describe('settings.json package manager', () => {
     expect(payload.slots.mcp.installed).toBe(false);
     expect(payload.slots.subagents.installed).toBe(false);
     expect(payload.slots.btw.installed).toBe(false);
+    expect(payload.slots.todo.installed).toBe(false);
     expect(payload.slots.goal.enabled).toBe(false);
+    expect(payload.slots.todo.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
   });
 
@@ -241,8 +247,30 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.subagents).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
+  });
+
+  it('enables Todo when packages lists @juicesharp/rpiv-todo, not unscoped rpiv-todo', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: normalizeFeaturePlugins({}),
+      configuredSources: ['npm:@juicesharp/rpiv-todo'],
+    });
+    const unscoped = toFeaturePluginsPayload({
+      plugins: normalizeFeaturePlugins({}),
+      configuredSources: ['npm:rpiv-todo'],
+    });
+    expect(scoped.slots.todo).toMatchObject({
+      source: 'npm:@juicesharp/rpiv-todo',
+      installed: true,
+      enabled: true,
+    });
+    expect(unscoped.slots.todo).toMatchObject({
+      source: 'npm:@juicesharp/rpiv-todo',
+      installed: false,
+      enabled: false,
+    });
   });
 
   it('lets installed packages win over a leftover chamber enabled false', () => {
@@ -262,6 +290,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.goal).toMatchObject({ installed: true, enabled: true });
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(readFeaturePlugins(home).subagents.enabled).toBeUndefined();
     expect(resolveFeaturePluginEnabled(true)).toBe(true);
@@ -292,6 +321,9 @@ describe('existing Pi agent recognition', () => {
     expect(chamber.featurePlugins.btw).toEqual({
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.btw,
       command: 'btw',
+    });
+    expect(chamber.featurePlugins.todo).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.todo,
     });
     expect(JSON.stringify(chamber)).not.toContain('"enabled"');
   });

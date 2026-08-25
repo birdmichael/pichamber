@@ -17,6 +17,10 @@ describe('section registry', () => {
     expect(Object.keys(WORK_STATUS_SECTION_LABEL_KEYS).sort())
       .toEqual([...WORK_STATUS_SECTION_IDS].sort());
   });
+
+  test('lists Tasks first so the live todo list is the top readout', () => {
+    expect(WORK_STATUS_SECTION_IDS[0]).toBe('tasks');
+  });
 });
 
 describe('isWorkStatusSectionAvailable', () => {
@@ -38,9 +42,19 @@ describe('isWorkStatusSectionAvailable', () => {
   test('keeps session context on the available list for Pi', () => {
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('usage');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('subagents');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('tasks');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, subagentsSlotActive: true })).toContain('subagents');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: false })).toEqual(WORK_STATUS_SECTION_IDS);
+  });
+
+  test('hides Tasks on Pi unless the Todo feature-plugin slot is installed and enabled', () => {
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true, todoSlotActive: false })).toBe(false);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true, todoSlotActive: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: false })).toBe(true);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: false, todoSlotActive: false })).toBe(true);
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, todoSlotActive: true })[0]).toBe('tasks');
   });
 
   test('hides MCP on Pi until the adapter slot is installed and enabled', () => {
@@ -109,7 +123,7 @@ describe('areAllWorkStatusSectionsHidden', () => {
   });
 
   test('on Pi, ignores the unavailable provider-usage section', () => {
-    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp' && id !== 'subagents');
+    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp' && id !== 'subagents' && id !== 'tasks');
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: true })).toBe(true);
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: false })).toBe(false);
     expect(areAllWorkStatusSectionsHidden([], { isPiKernel: true })).toBe(false);
