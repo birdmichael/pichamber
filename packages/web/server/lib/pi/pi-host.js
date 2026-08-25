@@ -47,6 +47,12 @@ import { enrichPiPackageVersions } from './pi-package-versions.js';
 import { getPiUpgradeStatus, invalidatePiUpgradeStatusCache } from './pi-upgrade-status.js';
 import { runPiSelfUpdate } from './pi-upgrade.js';
 import {
+  collectSkippedUserExtensionsFromErrors,
+  createUserExtensionNativeSkipStore,
+  rememberSkippedUserExtensions,
+  withUserExtensionNativeGuard,
+} from './user-extension-native.js';
+import {
   createAdapterMcpConfig,
   deleteAdapterMcpConfig,
   getAdapterMcpConfig,
@@ -1081,6 +1087,17 @@ const createLocalReply = (emit) => (record, body, userText, assistantText) => {
   return { info: assistantInfo, parts: [assistantPart] };
 };
 
+const logSkippedUserExtension = (skip) => {
+  const details = [
+    skip?.source && `source=${skip.source}`,
+    skip?.nodePath && `node=${skip.nodePath}`,
+    skip?.loaderAbi && `loaderAbi=${skip.loaderAbi}`,
+    skip?.compilerAbi && `compilerAbi=${skip.compilerAbi}`,
+    skip?.electronVersion && `electron=${skip.electronVersion}`,
+  ].filter(Boolean);
+  console.warn(`[pi-host] skipped user extension native (${details.join(' ')})`);
+};
+
 export const createPiHost = ({
   createSession,
   createModelRuntime,
@@ -1094,6 +1111,8 @@ export const createPiHost = ({
   listPersistedSessionsInDir,
   getCustomTools,
   runSelfUpdate,
+  getProcessVersions,
+  userExtensionNativeLoadModule,
 } = {}) => {
   const sessions = new Map();
   const sessionTodos = new Map();
@@ -1102,6 +1121,10 @@ export const createPiHost = ({
   let modelRuntime = null;
   let modelRuntimeError = null;
   let readyPromise = null;
+  const skippedUserExtensions = createUserExtensionNativeSkipStore();
+  const resolveProcessVersions = () => (
+    typeof getProcessVersions === 'function' ? getProcessVersions() : process.versions
+  );
   const resolveAgentDir = () => resolvePiAgentDir(home);
   const selfUpdate = typeof runSelfUpdate === 'function'
     ? runSelfUpdate
@@ -1121,9 +1144,48 @@ export const createPiHost = ({
     return asCustomToolList(await getCustomTools());
   };
 
+  const harvestUserExtensionNativeSkips = (errors, directory) => {
+    const skipped = collectSkippedUserExtensionsFromErrors(errors, {
+      agentDir: resolveAgentDir(),
+      projectDir: directory || defaultDirectory,
+      versions: resolveProcessVersions(),
+    });
+    rememberSkippedUserExtensions(skippedUserExtensions, skipped, logSkippedUserExtension);
+    return skipped;
+  };
+
+  const harvestExtensionsResult = (result, directory) => {
+    if (!result) return;
+    harvestUserExtensionNativeSkips(result.errors, directory);
+    if (typeof result.getExtensions === 'function') {
+      harvestUserExtensionNativeSkips(result.getExtensions()?.errors, directory);
+    }
+    if (typeof result.resourceLoader?.getExtensions === 'function') {
+      harvestUserExtensionNativeSkips(result.resourceLoader.getExtensions()?.errors, directory);
+    }
+  };
+
+  const runWithUserExtensionNativeGuard = async (directory, operation) => (
+    withUserExtensionNativeGuard({
+      agentDir: resolveAgentDir(),
+      projectDir: directory || defaultDirectory,
+      versions: resolveProcessVersions(),
+      store: skippedUserExtensions,
+      ...(typeof userExtensionNativeLoadModule === 'function'
+        ? { loadModule: userExtensionNativeLoadModule }
+        : {}),
+    }, async (guard) => {
+      const result = await operation(guard);
+      harvestExtensionsResult(result, directory);
+      return result;
+    })
+  );
+
   const invokeSessionFactory = async (factory, args) => {
     const customTools = await resolveCustomTools();
-    const session = await factory({ ...args, customTools });
+    const session = await runWithUserExtensionNativeGuard(args?.cwd, async () => (
+      factory({ ...args, customTools })
+    ));
     if (typeof session?.setCustomTools === 'function') {
       session.setCustomTools(customTools);
     }
@@ -1191,7 +1253,7 @@ export const createPiHost = ({
     try {
       const pi = await loadPiSdk();
       return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
-        const { session } = await pi.createAgentSession({
+        const created = await pi.createAgentSession({
           cwd,
           agentDir: resolveAgentDir(),
           modelRuntime: runtime,
@@ -1199,7 +1261,8 @@ export const createPiHost = ({
           sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
           ...(customTools ? { customTools } : {}),
         });
-        return session;
+        harvestExtensionsResult(created?.extensionsResult || created, cwd);
+        return created?.session || created;
       };
     } catch (error) {
       console.warn('[pi-host] @earendil-works/pi-coding-agent unavailable, using in-memory mock session:', error?.message || error);
@@ -1256,7 +1319,10 @@ export const createPiHost = ({
       }
       const factory = async ({ cwd, sessionManager, sessionStartEvent }) => {
         const customTools = await resolveCustomTools();
-        const services = await pi.createAgentSessionServices({ cwd });
+        const services = await runWithUserExtensionNativeGuard(cwd, async () => (
+          pi.createAgentSessionServices({ cwd, agentDir: resolveAgentDir() })
+        ));
+        harvestExtensionsResult(services, cwd);
         return {
           ...(await pi.createAgentSessionFromServices({
             services,
@@ -1268,11 +1334,13 @@ export const createPiHost = ({
           diagnostics: services.diagnostics,
         };
       };
-      const runtime = await pi.createAgentSessionRuntime(factory, {
-        cwd: directory,
-        agentDir: resolveAgentDir(),
-        sessionManager: pi.SessionManager.inMemory(directory),
-      });
+      const runtime = await runWithUserExtensionNativeGuard(directory, async () => (
+        pi.createAgentSessionRuntime(factory, {
+          cwd: directory,
+          agentDir: resolveAgentDir(),
+          sessionManager: pi.SessionManager.inMemory(directory),
+        })
+      ));
       directoryRuntimes.set(directory, runtime);
       return runtime;
     } catch (error) {
@@ -2005,7 +2073,10 @@ export const createPiHost = ({
     }
     record.unsubscribe?.();
     if (typeof record.piSession?.reload === 'function') {
-      await record.piSession.reload();
+      await runWithUserExtensionNativeGuard(record.directory, async () => {
+        await record.piSession.reload();
+        harvestExtensionsResult(record.piSession, record.directory);
+      });
       if (typeof record.piSession.setCustomTools === 'function') {
         record.piSession.setCustomTools(await resolveCustomTools());
       } else if (typeof getCustomTools === 'function') {
@@ -2143,6 +2214,9 @@ export const createPiHost = ({
     ready,
     isMock() {
       return mock;
+    },
+    listSkippedUserExtensions() {
+      return skippedUserExtensions.list();
     },
     async createSession(input) {
       await ready();
@@ -2623,6 +2697,7 @@ export const createPiHost = ({
       for (const record of interruptedRecords) {
         await interruptRecordForKernelReload(record);
       }
+      skippedUserExtensions.clear();
       if (interruptedRecords.length > 0) {
         emit(interruptedRecords[0].directory || 'global', {
           id: createEventId(),
@@ -3578,6 +3653,7 @@ export const createPiHost = ({
       }
       sessions.clear();
       sessionTodos.clear();
+      skippedUserExtensions.clear();
     },
   };
 };
