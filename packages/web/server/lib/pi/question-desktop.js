@@ -84,7 +84,7 @@ const questionToolResultFromPrompt = (params, result) => {
   };
 };
 
-export const runQuestionDesktopPrompt = async (params, ui) => {
+const runQuestionDesktopPrompt = async (params, ui) => {
   const options = Array.isArray(params?.options) ? params.options : [];
   if (!ui || typeof ui.select !== 'function' || typeof ui.editor !== 'function') {
     return null;
