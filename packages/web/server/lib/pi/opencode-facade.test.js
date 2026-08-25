@@ -1507,6 +1507,55 @@ describe('OpenCode facade HTTP/SSE', () => {
         'pi-subagents',
       ]);
       expect(extensions.packages.some((item) => item.name === 'pi-extensions')).toBe(false);
+      expect(extensions.packages.every((item) => item.name !== undefined)).toBe(true);
+
+      const updated = await fetch(`${url}/api/pi/extensions/update`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source: 'npm:pi-mcp-adapter' }),
+      });
+      expect(updated.status).toBe(200);
+      const updatedBody = await updated.json();
+      expect(updatedBody.packages.map((item) => item.name)).toEqual([
+        '@narumitw/pi-goal',
+        'pi-mcp-adapter',
+        'pi-subagents',
+      ]);
+      expect(updatedBody.packages.some((item) => item.name === 'pi-question-tool')).toBe(false);
+
+      const missing = await fetch(`${url}/api/pi/extensions/update`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source: 'npm:does-not-exist' }),
+      });
+      expect(missing.status).toBe(404);
+
+      const uninstalled = await fetch(`${url}/api/pi/extensions/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source: 'npm:pi-mcp-adapter' }),
+      });
+      expect(uninstalled.status).toBe(200);
+      const uninstalledBody = await uninstalled.json();
+      expect(uninstalledBody.packages.map((item) => item.name)).toEqual([
+        '@narumitw/pi-goal',
+        'pi-subagents',
+      ]);
+      expect(uninstalledBody.packages.some((item) => item.name === 'pi-mcp-adapter')).toBe(false);
+
+      const missingUninstall = await fetch(`${url}/api/pi/extensions/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ source: 'npm:does-not-exist' }),
+      });
+      expect(missingUninstall.status).toBe(404);
+
+      const emptyUninstall = await fetch(`${url}/api/pi/extensions/uninstall`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(emptyUninstall.status).toBe(400);
 
       const agents = await (await fetch(`${url}/api/agent`)).json();
       expect(agents).toEqual([expect.objectContaining({ name: 'pi' })]);

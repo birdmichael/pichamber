@@ -5,6 +5,7 @@ import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
 import { resolveListedSessionTitle } from './pi-host.js';
 import { getPiUpgradeStatus } from './pi-upgrade-status.js';
+import { PI_UPDATE_IN_PROGRESS_CODE } from './pi-upgrade.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -102,6 +103,33 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.get('/api/pi/upgrade-status', handle(async (_req, res) => {
     json(res, 200, await getPiUpgradeStatus());
+  }));
+
+  let piUpgradePromise = null;
+  app.post('/api/pi/upgrade', parseJson, handle(async (_req, res) => {
+    if (piUpgradePromise) {
+      const error = new Error('A Pi update is already in progress.');
+      error.status = 409;
+      error.code = PI_UPDATE_IN_PROGRESS_CODE;
+      throw error;
+    }
+    const upgrade = typeof host.upgradePi === 'function'
+      ? host.upgradePi.bind(host)
+      : null;
+    if (!upgrade) {
+      const error = new Error('Pi update is unavailable.');
+      error.status = 503;
+      throw error;
+    }
+    const operation = upgrade();
+    piUpgradePromise = operation;
+    try {
+      json(res, 200, await operation);
+    } finally {
+      if (piUpgradePromise === operation) {
+        piUpgradePromise = null;
+      }
+    }
   }));
 
   // OpenCode SDK calls GET /user (and /api/user). A missing handler used to
@@ -439,10 +467,64 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.get('/api/pi/extensions', handle(async (req, res) => {
     const directory = resolveDirectory(req);
+    const packages = typeof host.listPackagesWithVersions === 'function'
+      ? await host.listPackagesWithVersions(directory)
+      : (typeof host.listPackages === 'function' ? host.listPackages(directory) : []);
     json(res, 200, {
       extensions: typeof host.listExtensions === 'function' ? host.listExtensions(directory) : [],
-      packages: typeof host.listPackages === 'function' ? host.listPackages(directory) : [],
+      packages,
     });
+  }));
+
+  let piPackageMutationPromise = null;
+  const runExclusivePackageMutation = async (start) => {
+    if (piPackageMutationPromise) {
+      const error = new Error('A package change is already in progress.');
+      error.status = 409;
+      error.code = PI_UPDATE_IN_PROGRESS_CODE;
+      throw error;
+    }
+    const operation = start();
+    piPackageMutationPromise = operation;
+    try {
+      return await operation;
+    } finally {
+      if (piPackageMutationPromise === operation) {
+        piPackageMutationPromise = null;
+      }
+    }
+  };
+
+  app.post('/api/pi/extensions/update', parseJson, handle(async (req, res) => {
+    const update = typeof host.updatePiPackages === 'function'
+      ? host.updatePiPackages.bind(host)
+      : null;
+    if (!update) {
+      const error = new Error('Pi package update is unavailable.');
+      error.status = 503;
+      throw error;
+    }
+    const source = typeof req.body?.source === 'string' ? req.body.source.trim() : '';
+    json(res, 200, await runExclusivePackageMutation(() => update({
+      source: source || undefined,
+      directory: resolveDirectory(req),
+    })));
+  }));
+
+  app.post('/api/pi/extensions/uninstall', parseJson, handle(async (req, res) => {
+    const remove = typeof host.removePiPackage === 'function'
+      ? host.removePiPackage.bind(host)
+      : null;
+    if (!remove) {
+      const error = new Error('Pi package uninstall is unavailable.');
+      error.status = 503;
+      throw error;
+    }
+    const source = typeof req.body?.source === 'string' ? req.body.source.trim() : '';
+    json(res, 200, await runExclusivePackageMutation(() => remove({
+      source,
+      directory: resolveDirectory(req),
+    })));
   }));
 
   app.get('/api/pi/feature-plugins', handle(async (_req, res) => {

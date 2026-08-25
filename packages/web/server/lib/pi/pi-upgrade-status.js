@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 export const PI_SDK_PACKAGE = '@earendil-works/pi-coding-agent';
 
 const require = createRequire(import.meta.url);
-const NPM_LATEST_URL = `https://registry.npmjs.org/${encodeURIComponent(PI_SDK_PACKAGE).replace('%40', '@')}/latest`;
 const FETCH_TIMEOUT_MS = 10_000;
 
 const isEnvFlagPresent = (value) => {
@@ -66,9 +65,20 @@ export const readInstalledPiSdkVersion = () => {
   return null;
 };
 
-export const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process.env } = {}) => {
+export const npmLatestUrlForPackage = (packageName) => {
+  const name = typeof packageName === 'string' ? packageName.trim() : '';
+  if (!name) return null;
+  return `https://registry.npmjs.org/${encodeURIComponent(name).replace('%40', '@')}/latest`;
+};
+
+export const fetchLatestNpmPackageVersion = async (
+  packageName,
+  { fetchImpl = fetch, env = process.env } = {},
+) => {
   if (shouldSkipPiVersionCheck(env)) return null;
-  const response = await fetchImpl(NPM_LATEST_URL, {
+  const url = npmLatestUrlForPackage(packageName);
+  if (!url) return null;
+  const response = await fetchImpl(url, {
     headers: { Accept: 'application/json' },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
@@ -77,6 +87,10 @@ export const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process
   const version = typeof payload?.version === 'string' ? payload.version.trim().replace(/^v/i, '') : '';
   return version || null;
 };
+
+const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process.env } = {}) => (
+  fetchLatestNpmPackageVersion(PI_SDK_PACKAGE, { fetchImpl, env })
+);
 
 export const getPiUpgradeStatus = async ({
   fetchImpl = fetch,

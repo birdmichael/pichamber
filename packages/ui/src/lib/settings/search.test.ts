@@ -339,6 +339,34 @@ describe('settings search', () => {
     expect(directory.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
     expect(env.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
     expect(updates.some((result) => result.id === 'sessions.pi-update-notifications')).toBe(true);
+    const version = buildSettingsSearchResults({
+      query: 'current version',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(version.some((result) => result.id === 'sessions.pi-version')).toBe(true);
+    const update = buildSettingsSearchResults({
+      query: 'pi update',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(true);
+    const updateAll = buildSettingsSearchResults({
+      query: 'update all',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(updateAll.some((result) => result.id === 'extensions.update-all')).toBe(true);
+    const uninstall = buildSettingsSearchResults({
+      query: 'uninstall',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(uninstall.some((result) => result.id === 'extensions.packages')).toBe(true);
     expect(leftover.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });
