@@ -212,6 +212,7 @@ export function ensureLiveFeatureSlashCommands<T extends PiSlashCommandItem>(
  * Slash-popup key contract. The composer routes Enter into the open popup;
  * an empty list must close and let that Enter send the typed text as chat.
  * Escape still dismisses. A non-empty list still selects or navigates.
+ * The empty-list footer must not advertise Enter select.
  */
 export type CommandAutocompleteKeyAction =
   | { type: 'close'; consume: true }
@@ -219,6 +220,18 @@ export type CommandAutocompleteKeyAction =
   | { type: 'navigate'; direction: 'next' | 'previous'; consume: true }
   | { type: 'select'; consume: true }
   | { type: 'noop'; consume: true };
+
+export type CommandAutocompleteKeyboardHintKey =
+  | 'chat.commandAutocomplete.keyboardHintEmpty'
+  | 'chat.autocomplete.keyboardHint';
+
+export function resolveCommandAutocompleteKeyboardHintKey(
+  itemCount: number,
+): CommandAutocompleteKeyboardHintKey {
+  return itemCount === 0
+    ? 'chat.commandAutocomplete.keyboardHintEmpty'
+    : 'chat.autocomplete.keyboardHint';
+}
 
 export function resolveCommandAutocompleteKey(
   key: string,

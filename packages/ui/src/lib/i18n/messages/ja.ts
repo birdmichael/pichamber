@@ -2112,6 +2112,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.contextUsage.label': 'Context used',
   'chat.commandAutocomplete.badge.system': 'システム',
   'chat.commandAutocomplete.empty': 'コマンドが見つかりません',
+  'chat.commandAutocomplete.keyboardHintEmpty': 'Esc 閉じる',
   'chat.agentMentionAutocomplete.badge.system': 'システム',
   'chat.agentMentionAutocomplete.empty': 'エージェントが見つかりません',
   'chat.fileMentionAutocomplete.searchMoreAgents': 'さらにエージェントを検索するには入力',

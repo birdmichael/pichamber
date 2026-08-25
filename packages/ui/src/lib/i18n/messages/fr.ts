@@ -1847,6 +1847,7 @@ export const dict = {
   'chat.contextUsage.label': 'Context used',
   'chat.commandAutocomplete.badge.system': 'système',
   'chat.commandAutocomplete.empty': 'Aucune commande trouvée',
+  'chat.commandAutocomplete.keyboardHintEmpty': 'Esc fermer',
   'chat.agentMentionAutocomplete.badge.system': 'système',
   'chat.agentMentionAutocomplete.empty': 'Aucun agent trouvé',
   'chat.fileMentionAutocomplete.searchMoreAgents': 'Tapez pour rechercher plus d\'agents',

@@ -2086,6 +2086,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.contextUsage.label': '上下文占用',
   'chat.commandAutocomplete.badge.system': '系統',
   'chat.commandAutocomplete.empty': '找不到命令',
+  'chat.commandAutocomplete.keyboardHintEmpty': 'Esc 關閉',
   'chat.agentMentionAutocomplete.badge.system': '系統',
   'chat.agentMentionAutocomplete.empty': '找不到 Agent',
   'chat.fileMentionAutocomplete.searchMoreAgents': '輸入以搜尋更多 Agent',
