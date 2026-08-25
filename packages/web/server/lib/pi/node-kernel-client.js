@@ -11,6 +11,7 @@ import {
   childPathEnvForNode,
   createMissingNodeError,
   createSdkUnavailableError,
+  describeNodeKernelFailure,
   isSdkHelloReady,
   resolvePiNodeRuntime,
   toNodeReadablePath,
@@ -208,12 +209,22 @@ export const createNodeKernelClient = ({
   let exitError = null;
   const liveSessionIds = new Set();
 
-  const describe = () => ({
-    ...runtime,
-    childScript: script,
-    hello,
-    pid: child?.pid || null,
-  });
+  const describe = () => {
+    const snapshot = {
+      ...runtime,
+      childScript: script,
+      hello,
+      pid: child?.pid || null,
+    };
+    const failure = describeNodeKernelFailure(snapshot);
+    if (!failure) return snapshot;
+    return {
+      ...snapshot,
+      code: failure.code,
+      message: failure.message,
+      recovery: failure.recovery,
+    };
+  };
 
   const rejectAll = (error) => {
     for (const item of pending.values()) {

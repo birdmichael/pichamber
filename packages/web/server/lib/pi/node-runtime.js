@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const PI_NODE_UNAVAILABLE_CODE = 'PI_NODE_UNAVAILABLE';
 export const PI_SDK_UNAVAILABLE_CODE = 'PI_SDK_UNAVAILABLE';
@@ -146,31 +147,126 @@ export const isSdkHelloReady = (hello) => {
   return Boolean(asText(sdk.package) && asText(sdk.version) && asText(sdk.packagePath));
 };
 
-export const resolveInstalledPiSdkInfo = ({
-  requireImpl,
-  packageName = PI_SDK_PACKAGE,
-} = {}) => {
-  if (!requireImpl || typeof requireImpl.resolve !== 'function') {
-    throw new Error('A require implementation is required to resolve the Pi SDK');
+export const describeNodeKernelFailure = (runtime) => {
+  if (!runtime?.ok) {
+    return {
+      code: runtime?.code || PI_NODE_UNAVAILABLE_CODE,
+      message: asText(runtime?.message) || 'Desktop could not find a Node.js binary for the Pi kernel.',
+      recovery: asText(runtime?.recovery) || missingNodeRecovery(),
+    };
   }
-  const entry = requireImpl.resolve(packageName);
-  let dir = path.dirname(entry);
-  while (dir !== path.dirname(dir)) {
-    const candidate = path.join(dir, 'package.json');
+  if (runtime.hello && !isSdkHelloReady(runtime.hello)) {
+    const sdkError = asText(runtime.hello?.sdk?.error);
+    return {
+      code: PI_SDK_UNAVAILABLE_CODE,
+      message: sdkError || 'The resolved Node.js binary could not load the app-bundled Pi SDK.',
+      recovery: sdkUnavailableRecovery(),
+    };
+  }
+  return null;
+};
+
+const toFilesystemPath = (value) => {
+  const text = asText(value);
+  if (!text) return '';
+  if (text.startsWith('file:')) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
-      if (pkg?.name === packageName) {
-        return {
-          package: packageName,
-          version: typeof pkg.version === 'string' ? pkg.version.trim() : '',
-          packagePath: candidate,
-        };
-      }
+      return fileURLToPath(text);
     } catch {
+      return '';
     }
-    dir = path.dirname(dir);
   }
-  throw new Error(`Could not resolve ${packageName} package.json from ${entry}`);
+  return path.isAbsolute(text) ? text : '';
+};
+
+const readNamedPackage = (dir, packageName, { readFileImpl, existsImpl }) => {
+  const candidate = path.join(dir, 'package.json');
+  if (!existsImpl(candidate)) return null;
+  try {
+    const pkg = JSON.parse(readFileImpl(candidate, 'utf8'));
+    if (pkg?.name !== packageName) return null;
+    return {
+      package: packageName,
+      version: typeof pkg.version === 'string' ? pkg.version.trim() : '',
+      packagePath: candidate,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const findNamedPackageFromModulePath = (modulePath, packageName, io = {}) => {
+  const readFileImpl = io.readFileImpl || fs.readFileSync;
+  const existsImpl = io.existsImpl || fs.existsSync;
+  let current = toFilesystemPath(modulePath);
+  if (!current) return null;
+  if (path.basename(current) === 'package.json') {
+    current = path.dirname(current);
+  } else if (existsImpl(current) && isFile(current)) {
+    current = path.dirname(current);
+  }
+  while (current && current !== path.dirname(current)) {
+    const found = readNamedPackage(current, packageName, { readFileImpl, existsImpl });
+    if (found) return found;
+    current = path.dirname(current);
+  }
+  return null;
+};
+
+const resolveSdkModuleUrl = (packageName, resolveImpl) => {
+  if (typeof resolveImpl === 'function') {
+    return String(resolveImpl(packageName) || '');
+  }
+  if (typeof import.meta.resolve === 'function') {
+    return String(import.meta.resolve(packageName));
+  }
+  throw new Error(`import.meta.resolve is not available for ${packageName}`);
+};
+
+export const resolveInstalledPiSdkInfo = async ({
+  packageName = PI_SDK_PACKAGE,
+  importImpl,
+  resolveImpl,
+  readFileImpl = fs.readFileSync,
+  existsImpl = fs.existsSync,
+} = {}) => {
+  try {
+    if (typeof importImpl === 'function') {
+      await importImpl(packageName);
+    } else {
+      await import(packageName);
+    }
+  } catch (error) {
+    return {
+      package: packageName,
+      version: '',
+      packagePath: '',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  let modulePath = '';
+  try {
+    modulePath = resolveSdkModuleUrl(packageName, resolveImpl);
+  } catch (error) {
+    return {
+      package: packageName,
+      version: '',
+      packagePath: '',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const found = findNamedPackageFromModulePath(modulePath, packageName, { readFileImpl, existsImpl });
+  if (!found || !asText(found.version) || !asText(found.packagePath)) {
+    return {
+      package: packageName,
+      version: found?.version || '',
+      packagePath: found?.packagePath || '',
+      error: `Resolved ${packageName} but could not locate its package.json`,
+    };
+  }
+  return found;
 };
 
 const acceptNodeBinary = (candidate, { allowCurrentElectron = false, versions = process.versions } = {}) => {

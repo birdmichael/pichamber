@@ -197,20 +197,7 @@ const resolveSdkInfo = async () => {
       error: message,
     };
   }
-  try {
-    const info = resolveInstalledPiSdkInfo({ requireImpl: require, packageName: PI_SDK_PACKAGE });
-    if (!boot?.mock) {
-      await import(PI_SDK_PACKAGE);
-    }
-    return info;
-  } catch (error) {
-    return {
-      package: PI_SDK_PACKAGE,
-      version: '',
-      packagePath: '',
-      error: error?.message || String(error),
-    };
-  }
+  return resolveInstalledPiSdkInfo({ packageName: PI_SDK_PACKAGE });
 };
 
 const createChildSession = async (input = {}) => {

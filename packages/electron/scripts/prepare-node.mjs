@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { resolveInstalledPiSdkInfo } from '../../web/server/lib/pi/node-runtime.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const electronRoot = path.resolve(__dirname, '..');
@@ -73,20 +74,12 @@ export const probeNodeLoadsPiSdk = ({
   return { ok: false, error };
 };
 
-const resolveSdkPackageRoot = () => {
-  const require = createRequire(path.join(webRoot, 'package.json'));
-  const entry = require.resolve(PI_SDK_PACKAGE);
-  let dir = path.dirname(entry);
-  while (dir !== path.dirname(dir)) {
-    const candidate = path.join(dir, 'package.json');
-    try {
-      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
-      if (pkg?.name === PI_SDK_PACKAGE) return dir;
-    } catch {
-    }
-    dir = path.dirname(dir);
+const resolveSdkPackageRoot = async () => {
+  const info = await resolveInstalledPiSdkInfo();
+  if (info.error || !info.packagePath) {
+    throw new Error(info.error || `Could not resolve ${PI_SDK_PACKAGE}`);
   }
-  return path.dirname(entry);
+  return path.dirname(info.packagePath);
 };
 
 const localNodeCandidates = () => {
@@ -165,7 +158,7 @@ export const preparePiNodeBinary = async ({
   platform = process.platform,
   arch = process.arch,
 } = {}) => {
-  resolveSdkPackageRoot();
+  await resolveSdkPackageRoot();
   for (const candidate of localNodeCandidates()) {
     const probed = probe({ command: candidate, cwd: webRoot });
     if (probed.ok) {

@@ -49,6 +49,7 @@ import {
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
 import { buildHealthSnapshot, createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
+import { describeNodeKernelFailure } from './lib/pi/node-runtime.js';
 import { createPichamberControlTool } from './lib/pi/pichamber-control-tool.js';
 import { createPichamberWebTool } from './lib/pi/pichamber-web-tool.js';
 import { createOpenCodeEnvRuntime } from './lib/opencode/env-runtime.js';
@@ -1329,10 +1330,11 @@ const bootstrapOpenCodeAtStartup = async (...args) => {
       const nodeRuntime = typeof piKernel.host?.getNodeRuntime === 'function'
         ? piKernel.host.getNodeRuntime()
         : null;
+      const failure = describeNodeKernelFailure(nodeRuntime);
       console.error(
         '[pichamber] Pi node kernel is not ready. '
-        + `${nodeRuntime?.message || 'Node.js was not found.'} `
-        + `${nodeRuntime?.recovery || ''}`.trim(),
+        + `${failure?.message || 'The Pi node kernel is not ready.'} `
+        + `${failure?.recovery || ''}`.trim(),
       );
     }
     return;

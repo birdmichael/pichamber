@@ -202,11 +202,14 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
     try {
       await expect(kernel.ready()).resolves.toBe(false);
       expect(kernel.host.isReady()).toBe(false);
-      const hello = kernel.host.getNodeRuntime().hello;
-      expect(hello?.sdk?.packagePath || '').toBe('');
+      const runtime = kernel.host.getNodeRuntime();
+      expect(runtime.hello?.sdk?.packagePath || '').toBe('');
+      expect(runtime.message).toMatch(/markAsUncloneable/);
+      expect(runtime.message).not.toMatch(/Node\.js was not found/);
       await expect(kernel.host.createSession({ directory: cwd })).rejects.toMatchObject({
         code: PI_SDK_UNAVAILABLE_CODE,
         status: 503,
+        message: expect.not.stringMatching(/Node\.js was not found/),
         recovery: expect.stringMatching(/PICHAMBER_NODE_BINARY/),
       });
     } finally {

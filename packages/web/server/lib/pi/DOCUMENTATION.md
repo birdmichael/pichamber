@@ -63,6 +63,14 @@ Plugin install prepends that same Node onto the child's `PATH`.
 `import` the app-bundled `@earendil-works/pi-coding-agent` (official
 current/LTS if the local binary cannot). Do not spawn PATH `pi`.
 
+SDK location uses `import()` / `import.meta.resolve`, then walks up to
+the `package.json` whose `name` is `@earendil-works/pi-coding-agent`.
+Do not `require.resolve` the package or its `package.json` subpath —
+ESM-only `exports` have no CJS main. `hello.sdk` reports that version
+and packagePath when `import()` succeeds. A real `import()` failure
+(including `markAsUncloneable`) stays `PI_SDK_UNAVAILABLE` and must
+not be described as missing Node.js.
+
 Missing Node or an unusable Node (SDK import throws, including
 `markAsUncloneable`): `host.ready()` returns false, `isReady()` is
 false, `createSession` throws `PI_NODE_UNAVAILABLE` /

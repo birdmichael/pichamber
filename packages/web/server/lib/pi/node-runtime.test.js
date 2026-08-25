@@ -1,12 +1,18 @@
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
   PI_NODE_UNAVAILABLE_CODE,
+  PI_SDK_PACKAGE,
+  PI_SDK_UNAVAILABLE_CODE,
   childPathEnvForNode,
+  describeNodeKernelFailure,
   isSdkHelloReady,
+  resolveInstalledPiSdkInfo,
   resolvePiNodeRuntime,
   shouldUseNodeKernel,
   toNodeReadablePath,
@@ -107,6 +113,74 @@ describe('resolvePiNodeRuntime', () => {
         packagePath: '/app/node_modules/@earendil-works/pi-coding-agent/package.json',
       },
     })).toBe(true);
+  });
+
+  it('resolves an ESM-only package that has exports but no CJS main', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-esm-sdk-'));
+    const packageName = PI_SDK_PACKAGE;
+    const pkgRoot = path.join(root, 'node_modules', packageName);
+    const entry = path.join(pkgRoot, 'index.js');
+    fs.mkdirSync(pkgRoot, { recursive: true });
+    fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ type: 'module' })}\n`);
+    fs.writeFileSync(path.join(pkgRoot, 'package.json'), `${JSON.stringify({
+      name: packageName,
+      version: '9.9.9-esm-test',
+      type: 'module',
+      exports: { '.': './index.js' },
+    }, null, 2)}\n`);
+    fs.writeFileSync(entry, 'export const AgentSession = class {};\n');
+
+    const req = createRequire(path.join(root, 'package.json'));
+    expect(() => req.resolve(packageName)).toThrow(/exports/i);
+
+    const info = await resolveInstalledPiSdkInfo({
+      packageName,
+      importImpl: async () => import(pathToFileURL(entry).href),
+      resolveImpl: () => pathToFileURL(entry).href,
+    });
+    expect(info.error).toBeUndefined();
+    expect(info.version).toBe('9.9.9-esm-test');
+    expect(info.packagePath).toBe(path.join(pkgRoot, 'package.json'));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('fail-closes when import() cannot load the SDK', async () => {
+    const info = await resolveInstalledPiSdkInfo({
+      importImpl: async () => {
+        throw new Error('webidl.util.markAsUncloneable is not a function');
+      },
+      resolveImpl: () => {
+        throw new Error('require.resolve must not run after import() failure');
+      },
+    });
+    expect(info.version).toBe('');
+    expect(info.packagePath).toBe('');
+    expect(info.error).toMatch(/markAsUncloneable/);
+  });
+
+  it('does not describe an SDK failure as missing Node.js', () => {
+    const failure = describeNodeKernelFailure({
+      ok: true,
+      command: '/tmp/pichamber-node22/bin/node',
+      source: 'override',
+      hello: {
+        sdk: {
+          package: PI_SDK_PACKAGE,
+          version: '',
+          packagePath: '',
+          error: 'No "exports" main defined',
+        },
+      },
+    });
+    expect(failure.code).toBe(PI_SDK_UNAVAILABLE_CODE);
+    expect(failure.message).toMatch(/exports/);
+    expect(failure.message).not.toMatch(/Node\.js was not found/);
+    expect(failure.recovery).not.toMatch(/Node\.js was not found/);
+    expect(describeNodeKernelFailure({
+      ok: false,
+      message: 'Desktop could not find a Node.js binary to load user Pi extensions.',
+      recovery: 'Install a Node.js that can load the app Pi SDK',
+    }).message).not.toBe('Node.js was not found.');
   });
 
   it('rewrites app.asar paths so a real Node can read unpacked sources', () => {
