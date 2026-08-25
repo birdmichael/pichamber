@@ -3,8 +3,9 @@
  *
  * The panel is used to return to the same handful of addresses — a dev server,
  * a staging URL, one page of the app being worked on — so typing them out every
- * time is the wrong default. History is per project, because the addresses that
- * matter belong to whatever is being worked on, not to the app as a whole.
+ * time is the wrong default. History is per project (plus one shared Chats
+ * bucket), because the addresses that matter belong to whatever is being
+ * worked on, not to the app as a whole.
  *
  * The ranking and matching live here as pure functions so the behaviour can be
  * reasoned about without a store, a list, or a keyboard in the way.

@@ -1,17 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { normalizePath } from '@/lib/pathNormalization';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import {
   recordVisit,
   forgetVisit,
   type BrowserHistoryEntry,
 } from '@/lib/browser/history';
+import { openedProjectPathSet, resolveBrowserScopeKey } from '@/lib/browser/scope';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
+import { useDirectoryStore } from './useDirectoryStore';
+import { useProjectsStore } from './useProjectsStore';
 
 /**
- * Addresses visited in the browser panel, kept per project.
+ * Addresses visited in the browser panel, kept per project or the shared
+ * Chats bucket. Isolated chat session directories collapse onto one key.
  *
  * Scoped by runtime as well as directory: the same path on a remote instance is
  * a different machine with different servers on it, and offering one's
@@ -27,8 +30,12 @@ type BrowserHistoryState = {
 };
 
 const projectKey = (directory: string): string => {
-  const normalized = normalizePath((directory || '').trim());
-  return normalized ? JSON.stringify([getRuntimeKey(), normalized]) : '';
+  const home = useDirectoryStore.getState().homeDirectory;
+  const opened = openedProjectPathSet(
+    useProjectsStore.getState().projects.map((project) => project.path),
+  );
+  const scoped = resolveBrowserScopeKey(directory, home, opened);
+  return scoped ? JSON.stringify([getRuntimeKey(), scoped]) : '';
 };
 
 /** Keeps the projects visited most recently; the rest are not worth carrying. */

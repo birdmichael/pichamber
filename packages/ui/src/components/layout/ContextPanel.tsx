@@ -21,6 +21,7 @@ import { ProjectContextPanel } from './RightSidebarTabs';
 import { SidebarFilesTree } from './SidebarFilesTree';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { useBrowserFaviconStore } from '@/stores/useBrowserFaviconStore';
@@ -442,8 +443,7 @@ export const ContextPanel: React.FC = () => {
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory() ?? '';
   const directoryKey = React.useMemo(() => normalizeDirectoryKey(effectiveDirectory), [effectiveDirectory]);
-
-  const panelState = useUIStore((state) => (directoryKey ? state.contextPanelByDirectory[directoryKey] : undefined));
+  const { scopeKey, panelState } = useMergedContextPanel(directoryKey);
   const closeContextPanel = useUIStore((state) => state.closeContextPanel);
   const closeContextPanelTab = useUIStore((state) => state.closeContextPanelTab);
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
@@ -1199,7 +1199,7 @@ export const ContextPanel: React.FC = () => {
               activeTab?.id !== tab.id && 'hidden'
             )}
           >
-            <BrowserPane initialUrl={tab.targetPath ?? ''} directory={directoryKey} tabID={tab.id} />
+            <BrowserPane initialUrl={tab.targetPath ?? ''} directory={scopeKey || directoryKey} tabID={tab.id} />
           </div>
         ))}
         {diffTabs.map((tab) => (

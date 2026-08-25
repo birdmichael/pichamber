@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { CHAT_DRAFT_PROJECT_ID } from '../lib/chatDirectories';
 import { CONTEXT_SURFACES, sortContextSurfaces } from '../lib/surfaces/registry';
+import { useDirectoryStore } from './useDirectoryStore';
+import { useProjectsStore } from './useProjectsStore';
 import { useUIStore } from './useUIStore';
 
 beforeEach(() => {
   useUIStore.setState({ contextPanelByDirectory: {}, contextRailOrder: [] });
+  useDirectoryStore.setState({ homeDirectory: '/Users/tester' });
+  useProjectsStore.setState({ projects: [] });
 });
 
 describe('useUIStore context panel tabs', () => {
@@ -285,5 +290,71 @@ describe('context panel tab limits', () => {
     const tabs = state?.tabs ?? [];
     expect(tabs.some((tab) => tab.id === state?.activeTabId)).toBe(true);
     expect(tabs.some((tab) => tab.targetPath === 'http://localhost:3019/')).toBe(true);
+  });
+});
+
+describe('useUIStore browser project/chats scope', () => {
+  const home = '/Users/tester';
+  const chatA = `${home}/.config/openchamber/chats/2026-08-25/session-a`;
+  const chatB = `${home}/.config/openchamber/chats/2026-08-25/session-b`;
+  const projectA = `${home}/project-a`;
+  const projectB = `${home}/project-b`;
+
+  test('two chat sessions share one browser tab set on the chats sentinel', () => {
+    useUIStore.getState().openContextPreview(chatA, 'https://example.com/');
+    useUIStore.getState().openContextFile(chatA, `${chatA}/notes.md`);
+
+    const chats = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
+    const sessionA = useUIStore.getState().contextPanelByDirectory[chatA];
+    expect(chats?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'file')).toBe(true);
+
+    useUIStore.getState().openContextSurface(chatB, 'browser');
+    const sessionB = useUIStore.getState().contextPanelByDirectory[chatB];
+    const sharedBrowser = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
+    expect(sharedBrowser?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+    expect(sharedBrowser?.tabs[0]?.id).toBe(chats?.tabs[0]?.id);
+    expect(sessionB?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    expect(sessionB?.isOpen).toBe(true);
+    expect(sessionB?.activeTabId).toBe(sharedBrowser?.tabs[0]?.id);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'file')).toBe(true);
+  });
+
+  test('project A and project B keep separate browser tabs', () => {
+    useUIStore.getState().openContextPreview(projectA, 'https://a.example/');
+    useUIStore.getState().openContextPreview(projectB, 'https://b.example/');
+
+    expect(useUIStore.getState().contextPanelByDirectory[projectA]?.tabs.map((tab) => tab.targetPath)).toEqual(['https://a.example/']);
+    expect(useUIStore.getState().contextPanelByDirectory[projectB]?.tabs.map((tab) => tab.targetPath)).toEqual(['https://b.example/']);
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
+  });
+
+  test('same project, two sessions still share one tab set', () => {
+    useUIStore.getState().openContextPreview(projectA, 'https://shared.example/');
+    useUIStore.getState().openContextSurface(projectA, 'browser');
+
+    expect(useUIStore.getState().contextPanelByDirectory[projectA]?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+  });
+
+  test('home that is an opened Settings project stays a project scope', () => {
+    useProjectsStore.setState({
+      projects: [{ id: 'home', path: home, label: 'Home' }],
+    });
+
+    useUIStore.getState().openContextPreview(home, 'https://home.example/');
+
+    expect(useUIStore.getState().contextPanelByDirectory[home]?.tabs[0]?.targetPath).toBe('https://home.example/');
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
+  });
+
+  test('persisting a chat browser URL writes the chats bucket, not the session dir', () => {
+    useUIStore.getState().openContextPreview(chatA, 'https://start.example/');
+    const tabID = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]?.tabs[0]?.id as string;
+
+    useUIStore.getState().setContextPanelTabTargetPath(chatA, tabID, 'https://later.example/');
+
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]?.tabs[0]?.targetPath).toBe('https://later.example/');
+    expect(useUIStore.getState().contextPanelByDirectory[chatA]?.tabs).toEqual([]);
   });
 });

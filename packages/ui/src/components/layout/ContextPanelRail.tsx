@@ -20,6 +20,7 @@ import { Icon } from '@/components/icon/Icon';
 import { DiffViewIcon } from '@/components/icons/DiffIcon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { useDeviceInfo } from '@/lib/device';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { useI18n } from '@/lib/i18n';
@@ -161,8 +162,7 @@ export const ContextPanelRail: React.FC = () => {
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory();
   const directoryKey = effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : '';
-
-  const panelState = useUIStore((state) => (directoryKey ? state.contextPanelByDirectory[directoryKey] : undefined));
+  const { panelState } = useMergedContextPanel(directoryKey);
   const workStatusPanelVisible = useUIStore((state) => state.workStatusPanelVisible);
   const contextRailOrder = useUIStore((state) => state.contextRailOrder);
   const setContextRailOrder = useUIStore((state) => state.setContextRailOrder);
