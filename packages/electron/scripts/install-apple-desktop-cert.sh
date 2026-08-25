@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Import APPLE_CERTIFICATE (base64 PKCS#12) into a temporary keychain and pin
-# electron-builder to the Developer ID Application identity.
+# electron-builder to that Developer ID Application identity via CSC_NAME.
+#
+# Do not export CSC_LINK / CSC_KEY_PASSWORD. electron-builder 26 re-imports the
+# p12 into a second keychain, and writing the password through GITHUB_ENV can
+# corrupt it (`MAC verification failed during PKCS12 import`).
+# Do not export `Developer ID Application: ...` as CSC_NAME; electron-builder 26
+# rejects that prefix. Use the stripped certificate name.
+# Do not set CSC_KEYCHAIN or replace the user keychain search list — that hides
+# identities electron-builder still needs to see.
 set -euo pipefail
 
 if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
@@ -30,13 +38,11 @@ security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_PATH"
 # Import the full PKCS#12 (leaf + intermediates + private key). Do not pass
 # `-t cert`; that can drop the private key on some runners.
-# Trust codesign without a GUI prompt. Do not pass `-t cert`; that can drop
-# the private key on some runners. Do not set CSC_KEYCHAIN — electron-builder
-# creates its own keychain from CSC_LINK, and an exclusive search list hides it.
 security import "$CERT_PATH" \
   -P "$APPLE_CERTIFICATE_PASSWORD" \
   -A -T /usr/bin/codesign -f pkcs12 \
   -k "$KEYCHAIN_PATH" >/dev/null
+rm -f "$CERT_PATH"
 
 security list-keychain -d user -s "$KEYCHAIN_PATH" \
   "$HOME/Library/Keychains/login.keychain-db"
@@ -52,13 +58,11 @@ CSC_NAME="$(
     | node "$SCRIPT_DIR/macos-signing.mjs" csc-name
 )"
 echo "Using codesigning identity: $IDENTITY"
+echo "Using electron-builder CSC_NAME: $CSC_NAME"
 
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "csc_name=$CSC_NAME" >> "$GITHUB_OUTPUT"
+fi
 if [[ -n "${GITHUB_ENV:-}" ]]; then
-  {
-    echo "CSC_LINK=$CERT_PATH"
-    echo "CSC_KEY_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
-    echo "CSC_NAME=$IDENTITY"
-    echo "APPLE_SIGNING_KEYCHAIN=$KEYCHAIN_PATH"
-    echo "APPLE_SIGNING_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD"
-  } >> "$GITHUB_ENV"
+  echo "CSC_NAME=$CSC_NAME" >> "$GITHUB_ENV"
 fi

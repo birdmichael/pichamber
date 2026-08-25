@@ -30,7 +30,7 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/main.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
 | `scripts/package.mjs` | Runs `electron-builder`, with unsigned Windows/Mac builds when signing env is missing |
-| `scripts/install-apple-desktop-cert.sh` | CI: import `APPLE_CERTIFICATE` and pin `CSC_NAME` to Developer ID Application |
+| `scripts/install-apple-desktop-cert.sh` | CI: import `APPLE_CERTIFICATE` into a keychain and pin `CSC_NAME` (no `CSC_LINK` re-import) |
 | `scripts/verify-macos-app-signature.sh` | CI: require Developer ID, hardened runtime, stapled notarization, and Electron JIT entitlements |
 | `scripts/generate-product-icons.mjs` | Rasterizes `app-icon.svg` / `tray-glyph.svg` into icns, ico, PNG, tray frames, and web/docs badges |
 | `scripts/generate-macos-icon-assets.cjs` | Compiles `AppIcon.icon` to `Assets.car` with Xcode `actool` (macOS only) |
@@ -103,7 +103,7 @@ That runs, in order:
 
 **Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`).
 
-GitHub Release / desktop smoke builds import `APPLE_CERTIFICATE` (Developer ID Application) and notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The signed job fails if the imported identity is not Developer ID Application, or if the `.app` is missing a stapled notary ticket. The first Developer ID notarization for a team can stay `In Progress` for hours or days — `notarytool --wait` will hold CI until Apple finishes or the job hits its 75-minute timeout. After that first ticket lands, later builds are usually a few minutes.
+GitHub Release / desktop smoke builds import `APPLE_CERTIFICATE` (Developer ID Application) into a temporary keychain and pin electron-builder with `CSC_NAME` only — they do not pass `CSC_LINK` / `CSC_KEY_PASSWORD`, because electron-builder would re-import the p12 and `GITHUB_ENV` can corrupt that password. They notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The signed job fails if the imported identity is not Developer ID Application, or if the `.app` is missing a stapled notary ticket. The first Developer ID notarization for a team can stay `In Progress` for hours or days — `notarytool --wait` will hold CI until Apple finishes or the job hits its 75-minute timeout. After that first ticket lands, later builds are usually a few minutes.
 
 Local `electron:build` stays unsigned when `CSC_LINK` / `CSC_NAME` / `APPLE_ID` are unset. Unsigned and ad-hoc Mac builds can check for updates but cannot install in-place. `quitAndInstall()` fails there, `autoInstallOnAppQuit` stays off, and Desktop must not report Restart to Update as success. The update dialog hides in-app install and opens the GitHub release so the user can replace `Pichamber.app` from the `.dmg`. Developer ID / notarized builds still use Restart to Update.
 

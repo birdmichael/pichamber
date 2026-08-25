@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -102,4 +103,14 @@ test('requires Electron JIT entitlements and forbids sandbox', () => {
     () => assertMacReleaseEntitlements(RELEASE_ENTITLEMENTS.replace('com.apple.security.cs.allow-jit', 'com.apple.security.cs.allow-unsigned-executable-memory')),
     /allow-jit/,
   );
+});
+
+test('CI cert install pins stripped CSC_NAME and does not re-export the p12', () => {
+  const script = readFileSync(new URL('./install-apple-desktop-cert.sh', import.meta.url), 'utf8');
+  assert.match(script, /macos-signing\.mjs" csc-name/);
+  assert.match(script, /echo "CSC_NAME=\$CSC_NAME"/);
+  assert.match(script, /echo "csc_name=\$CSC_NAME"/);
+  assert.equal(script.includes('CSC_LINK='), false);
+  assert.equal(script.includes('CSC_KEY_PASSWORD='), false);
+  assert.equal(script.includes('CSC_NAME=$IDENTITY'), false);
 });

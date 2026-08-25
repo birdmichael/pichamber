@@ -186,6 +186,7 @@ jobs:
           fi
 
       - name: Install Apple Certificate
+        id: apple_cert
         if: steps.apple_signing.outputs.signing == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -195,6 +196,7 @@ jobs:
       - name: Build Electron app
         working-directory: packages/electron
         env:
+          CSC_NAME: ${{ steps.apple_cert.outputs.csc_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -216,7 +218,7 @@ jobs:
           # crash on require inside the packaged app.
           bun run rebuild:native
           if [[ "${{ steps.apple_signing.outputs.signing }}" == "true" ]]; then
-            # CSC_LINK / CSC_NAME / CSC_KEY_PASSWORD come from the install step.
+            # CSC_NAME comes from the install step (keychain identity only).
             node ./scripts/package.mjs --mac --${{ matrix.arch }} --publish=never
           else
             # APPLE_ID is also used for iOS TestFlight. Force unsigned Mac
