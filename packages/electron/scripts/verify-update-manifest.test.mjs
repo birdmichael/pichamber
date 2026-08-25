@@ -58,6 +58,24 @@ test('accepts electron-builder field ordering and optional blockMapSize', () => 
   }
 });
 
+test('accepts a Mac latest-mac.yml that lists both zip and dmg', () => {
+  const artifactName = 'Pichamber-1.15.0-mac-arm64.zip';
+  const bytes = Buffer.from(`artifact:${artifactName}`);
+  const value = fixture('latest-mac.yml', artifactName, [
+    `  - url: ${artifactName}`,
+    `    sha512: ${crypto.createHash('sha512').update(bytes).digest('base64')}`,
+    `    size: ${bytes.length}`,
+    '  - url: Pichamber-1.15.0-mac-arm64.dmg',
+    '    sha512: dmg-checksum',
+    '    size: 99',
+  ]);
+  try {
+    assert.equal(verifyUpdateManifest({ ...value, expectedVersion: '1.15.0' }).name, artifactName);
+  } finally {
+    fs.rmSync(value.root, { recursive: true, force: true });
+  }
+});
+
 test('rejects a manifest that points at the other architecture artifact', () => {
   const value = fixture('latest-linux-arm64.yml', 'OpenChamber-1.15.0-linux-arm64.AppImage');
   try {

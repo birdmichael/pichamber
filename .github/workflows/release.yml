@@ -47,6 +47,11 @@ jobs:
             echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Confirm package versions match release
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: node scripts/assert-release-package-versions.mjs "$VERSION"
+
       - name: Extract changelog for release
         env:
           VERSION: ${{ steps.get_version.outputs.version }}
@@ -125,6 +130,7 @@ jobs:
   build-desktop-electron-macos:
     needs: create-release
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
     continue-on-error: ${{ matrix.arch == 'x64' }}
     strategy:
       fail-fast: false
@@ -180,31 +186,17 @@ jobs:
           fi
 
       - name: Install Apple Certificate
+        id: apple_cert
         if: steps.apple_signing.outputs.signing == 'true'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/electron-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A -t cert -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        run: bash packages/electron/scripts/install-apple-desktop-cert.sh
 
       - name: Build Electron app
         working-directory: packages/electron
         env:
+          CSC_NAME: ${{ steps.apple_cert.outputs.csc_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -212,8 +204,13 @@ jobs:
           # cross-building (runner is arm64; x64 matrix needs the hint).
           ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
           APPLE_SIGNING: ${{ steps.apple_signing.outputs.signing }}
+          # First Developer ID notarization can sit In Progress for hours.
+          # Job timeout-minutes fails closed instead of holding the runner
+          # after zip/dmg/staple. 120m leaves room after a long --wait.
+          DEBUG: electron-notarize,electron-osx-sign
         run: |
           bun run build:web-assets
+          bun run prepare:pi-kernel
           bun run prepare:opencode-cli
           bun run bundle:main
           # npmRebuild=false in package.json, so electron-builder won't
@@ -222,7 +219,8 @@ jobs:
           # crash on require inside the packaged app.
           bun run rebuild:native
           if [[ "${{ steps.apple_signing.outputs.signing }}" == "true" ]]; then
-            bunx electron-builder --mac --${{ matrix.arch }} --publish=never
+            # CSC_NAME comes from the install step (keychain identity only).
+            node ./scripts/package.mjs --mac --${{ matrix.arch }} --publish=never
           else
             # APPLE_ID is also used for iOS TestFlight. Force unsigned Mac
             # so that secret cannot trigger notarization.
@@ -231,48 +229,20 @@ jobs:
 
       - name: Verify signature + entitlements + notarization
         if: steps.apple_signing.outputs.signing == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash packages/electron/scripts/verify-macos-app-signature.sh
+
+      - name: Verify Mac update manifest
+        if: steps.apple_signing.outputs.signing == 'true'
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
+          ARCH: ${{ matrix.arch }}
         run: |
-          set -euo pipefail
-
-          APP_DIR="packages/electron/dist/mac"
-          [ -d "packages/electron/dist/mac-arm64" ] && APP_DIR="packages/electron/dist/mac-arm64"
-
-          APP_PATH=$(find "$APP_DIR" -maxdepth 2 -name "*.app" -print -quit)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: .app not found under packages/electron/dist/mac*"
-            ls -la packages/electron/dist/
-            exit 1
-          fi
-
-          echo "Verifying $APP_PATH"
-          codesign -vv --deep --strict "$APP_PATH"
-
-          # Require hardened runtime
-          CS_INFO=$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)
-          echo "$CS_INFO"
-          if ! echo "$CS_INFO" | grep -q "flags=.*runtime"; then
-            echo "Error: hardened runtime flag missing"
-            exit 1
-          fi
-
-          # Require notary ticket stapled
-          xcrun stapler validate "$APP_PATH"
-
-          ENTITLEMENTS=$(codesign -d --entitlements :- "$APP_PATH" 2>&1 || true)
-          if echo "$ENTITLEMENTS" | grep -q "com.apple.security.app-sandbox"; then
-            echo "Error: app sandbox entitlement is present"
-            exit 1
-          fi
-          for key in \
-            com.apple.security.cs.allow-jit \
-            com.apple.security.cs.allow-unsigned-executable-memory \
-            com.apple.security.cs.disable-library-validation
-          do
-            if ! echo "$ENTITLEMENTS" | grep -q "<key>$key</key>"; then
-              echo "Error: required entitlement missing: $key"
-              exit 1
-            fi
-          done
+          node packages/electron/scripts/verify-update-manifest.mjs \
+            packages/electron/dist/latest-mac.yml \
+            "packages/electron/dist/Pichamber-${VERSION}-mac-${ARCH}.zip" \
+            "$VERSION"
 
       - name: Confirm unsigned Mac package
         if: steps.apple_signing.outputs.signing != 'true'
@@ -604,6 +574,9 @@ jobs:
             'latest-linux.yml',
             `Pichamber-${version}-linux-arm64.AppImage`,
             'latest-linux-arm64.yml',
+            `Pichamber-${version}-mac-arm64.dmg`,
+            `Pichamber-${version}-mac-arm64.zip`,
+            'latest-mac.yml',
           ];
           const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/v${version}`, {
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },

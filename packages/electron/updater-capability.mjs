@@ -42,10 +42,15 @@ export const inspectMacAppCodeSign = ({
   return parsed;
 };
 
+const isDeveloperIdApplicationIdentity = (identity) => (
+  typeof identity === 'string' && identity.startsWith('Developer ID Application:')
+);
+
 /**
- * In-place electron-updater install needs a Developer ID / notarized Mac
- * build. Unsigned and ad-hoc (`codesign -s -`) apps can download a payload
- * but quitAndInstall() fails and must not be reported as success.
+ * In-place electron-updater install needs a Developer ID Mac build.
+ * Unsigned, ad-hoc (`codesign -s -`), Apple Development, and Apple
+ * Distribution apps can download a payload but quitAndInstall() fails and
+ * must not be reported as success.
  */
 export const canInstallDesktopUpdateInPlace = ({
   platform = process.platform,
@@ -55,7 +60,7 @@ export const canInstallDesktopUpdateInPlace = ({
   if (!packaged) return false;
   if (platform !== 'darwin') return true;
   if (!macCodeSign?.signed || macCodeSign.adhoc) return false;
-  return true;
+  return isDeveloperIdApplicationIdentity(macCodeSign.identity);
 };
 
 export const describeInPlaceInstallFailure = ({

@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       repository:
-        description: Repository to checkout, for example openchamber/openchamber or daveotero/openchamber
+        description: Repository to checkout. Leave empty to use this repository.
         required: false
-        default: openchamber/openchamber
+        default: ''
         type: string
       ref:
         description: Git ref to build (branch, tag, or sha)
-        required: true
-        default: feat/windows-desktop-app
+        required: false
+        default: main
         type: string
       build_macos:
         description: Build signed/notarized macOS Electron artifacts
@@ -47,6 +47,7 @@ jobs:
     if: ${{ inputs.build_macos }}
     name: Build macOS Electron (${{ matrix.arch }})
     runs-on: macos-26
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -90,36 +91,24 @@ jobs:
             opencode-cli-${{ runner.os }}-${{ matrix.arch }}-
 
       - name: Install Apple Certificate
+        id: apple_cert
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/electron-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A -t cert -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        run: bash packages/electron/scripts/install-apple-desktop-cert.sh
 
       - name: Build Electron app
         working-directory: packages/electron
         env:
+          CSC_NAME: ${{ steps.apple_cert.outputs.csc_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
+          DEBUG: electron-notarize,electron-osx-sign
         run: |
           bun run build:web-assets
+          bun run prepare:pi-kernel
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
           bun run bundle:main
@@ -127,50 +116,13 @@ jobs:
           # recompile native deps on its own. Rebuild against the target
           # Electron ABI before packaging, matching the release workflow.
           bun run rebuild:native
-          bunx electron-builder --mac --${{ matrix.arch }} --publish=never
+          node ./scripts/package.mjs --mac --${{ matrix.arch }} --publish=never
           bun run verify:opencode-cli:packaged
 
       - name: Verify signature + entitlements + notarization
-        run: |
-          set -euo pipefail
-
-          APP_DIR="packages/electron/dist/mac"
-          [ -d "packages/electron/dist/mac-arm64" ] && APP_DIR="packages/electron/dist/mac-arm64"
-
-          APP_PATH=$(find "$APP_DIR" -maxdepth 2 -name "*.app" -print -quit)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: .app not found under packages/electron/dist/mac*"
-            ls -la packages/electron/dist/
-            exit 1
-          fi
-
-          echo "Verifying $APP_PATH"
-          codesign -vv --deep --strict "$APP_PATH"
-
-          CS_INFO=$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)
-          echo "$CS_INFO"
-          if ! echo "$CS_INFO" | grep -q "flags=.*runtime"; then
-            echo "Error: hardened runtime flag missing"
-            exit 1
-          fi
-
-          xcrun stapler validate "$APP_PATH"
-
-          ENTITLEMENTS=$(codesign -d --entitlements :- "$APP_PATH" 2>&1 || true)
-          if echo "$ENTITLEMENTS" | grep -q "com.apple.security.app-sandbox"; then
-            echo "Error: app sandbox entitlement is present"
-            exit 1
-          fi
-          for key in \
-            com.apple.security.cs.allow-jit \
-            com.apple.security.cs.allow-unsigned-executable-memory \
-            com.apple.security.cs.disable-library-validation
-          do
-            if ! echo "$ENTITLEMENTS" | grep -q "<key>$key</key>"; then
-              echo "Error: required entitlement missing: $key"
-              exit 1
-            fi
-          done
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash packages/electron/scripts/verify-macos-app-signature.sh
 
       - name: Upload macOS installable artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

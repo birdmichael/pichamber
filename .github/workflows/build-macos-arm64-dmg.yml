@@ -20,6 +20,7 @@ jobs:
   build-macos-dmg-arm64-electron:
     name: Build Electron DMG (arm64, ${{ inputs.macos_version }})
     runs-on: ${{ inputs.macos_version }}
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -52,42 +53,35 @@ jobs:
             opencode-cli-${{ runner.os }}-arm64-
 
       - name: Install Apple Certificate
+        id: apple_cert
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          KEYCHAIN_PATH=$RUNNER_TEMP/electron-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          security import $RUNNER_TEMP/certificate.p12 \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A -t cert -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+        run: bash packages/electron/scripts/install-apple-desktop-cert.sh
 
       - name: Build Electron app (arm64)
         working-directory: packages/electron
         env:
+          CSC_NAME: ${{ steps.apple_cert.outputs.csc_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ELECTRON_BUILDER_ARCH: arm64
+          DEBUG: electron-notarize,electron-osx-sign
         run: |
           bun run build:web-assets
+          bun run prepare:pi-kernel
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
           bun run bundle:main
           bun run rebuild:native
-          ./node_modules/.bin/electron-builder --mac --arm64 --publish=never
+          node ./scripts/package.mjs --mac --arm64 --publish=never
           bun run verify:opencode-cli:packaged
+
+      - name: Verify signature + entitlements + notarization
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash packages/electron/scripts/verify-macos-app-signature.sh
 
       - name: Prepare DMG artifact
         run: |
@@ -96,7 +90,7 @@ jobs:
           DMG_PATH="packages/electron/dist/*.dmg"
           if ls $DMG_PATH 1> /dev/null 2>&1; then
             DMG_FILE=$(ls $DMG_PATH | head -n 1)
-            DMG_NAME="OpenChamber_Electron_${{ inputs.macos_version }}_arm64.dmg"
+            DMG_NAME="Pichamber_Electron_${{ inputs.macos_version }}_arm64.dmg"
             cp "$DMG_FILE" "artifacts/$DMG_NAME"
           else
             echo "Error: DMG file not found at $DMG_PATH"
