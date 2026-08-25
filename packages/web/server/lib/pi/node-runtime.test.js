@@ -126,12 +126,15 @@ describe('resolvePiNodeRuntime', () => {
       name: packageName,
       version: '9.9.9-esm-test',
       type: 'module',
-      exports: { '.': './index.js' },
+      exports: {
+        '.': { import: './index.js' },
+      },
     }, null, 2)}\n`);
     fs.writeFileSync(entry, 'export const AgentSession = class {};\n');
 
     const req = createRequire(path.join(root, 'package.json'));
     expect(() => req.resolve(packageName)).toThrow(/exports/i);
+    expect(() => req.resolve(`${packageName}/package.json`)).toThrow(/exports/i);
 
     const info = await resolveInstalledPiSdkInfo({
       packageName,
