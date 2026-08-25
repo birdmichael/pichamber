@@ -1,3 +1,4 @@
+import { featurePluginSlotSearchKeywords } from '@/components/sections/feature-plugins/featurePlugins';
 import type { I18nKey } from '@/lib/i18n/store';
 import { isSessionGoalVisibleOnPiKernel, shouldShowOpenCodeAgentPicker } from '@/lib/usePiKernel';
 import {
@@ -890,7 +891,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.goal.title',
     descriptionKey: 'settings.featurePlugins.slot.goal.info',
-    keywords: ['goal', 'pi-goal', '@narumitw/pi-goal', 'npm', 'install'],
+    keywords: ['goal', 'pi-goal', '@narumitw/pi-goal', 'npm', 'install', ...featurePluginSlotSearchKeywords('goal')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -898,7 +899,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.plan.title',
     descriptionKey: 'settings.featurePlugins.slot.plan.info',
-    keywords: ['plan', 'pi-plan-mode', '@narumitw/pi-plan-mode', 'npm', 'install', 'agents'],
+    keywords: ['plan', 'pi-plan-mode', '@narumitw/pi-plan-mode', 'npm', 'install', 'agents', ...featurePluginSlotSearchKeywords('plan')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -906,7 +907,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.mcp.title',
     descriptionKey: 'settings.featurePlugins.slot.mcp.info',
-    keywords: ['mcp', 'pi-mcp-adapter', 'npm', 'install'],
+    keywords: ['mcp', 'pi-mcp-adapter', 'npm', 'install', ...featurePluginSlotSearchKeywords('mcp')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -914,7 +915,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.subagents.title',
     descriptionKey: 'settings.featurePlugins.slot.subagents.info',
-    keywords: ['subagents', 'pi-subagents', 'npm', 'install', 'agents'],
+    keywords: ['subagents', 'pi-subagents', 'npm', 'install', 'agents', ...featurePluginSlotSearchKeywords('subagents')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -922,7 +923,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.btw.title',
     descriptionKey: 'settings.featurePlugins.slot.btw.info',
-    keywords: ['btw', 'pi-btw', '@narumitw/pi-btw', 'npm', 'install'],
+    keywords: ['btw', 'pi-btw', '@narumitw/pi-btw', 'npm', 'install', ...featurePluginSlotSearchKeywords('btw')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -930,7 +931,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.todo.title',
     descriptionKey: 'settings.featurePlugins.slot.todo.info',
-    keywords: ['todo', 'rpiv-todo', '@juicesharp/rpiv-todo', 'npm', 'install', 'tasks'],
+    keywords: ['todo', 'rpiv-todo', '@juicesharp/rpiv-todo', 'npm', 'install', 'tasks', ...featurePluginSlotSearchKeywords('todo')],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

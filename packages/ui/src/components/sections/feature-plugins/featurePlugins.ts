@@ -35,6 +35,111 @@ export interface FeaturePluginsReloadResult {
   skipped?: Array<{ sessionID: string; reason?: string }>;
 }
 
+/** Closed vocabulary of Pichamber chrome that can appear after a slot is installed. */
+export const FEATURE_PLUGIN_UI_SURFACES = [
+  'composer',
+  'commands',
+  'workStatus',
+  'sidebar',
+  'settings',
+  'session',
+] as const;
+
+export type FeaturePluginUiSurface = (typeof FEATURE_PLUGIN_UI_SURFACES)[number];
+
+const FEATURE_PLUGIN_UI_SURFACE_SET = new Set<string>(FEATURE_PLUGIN_UI_SURFACES);
+
+export const FEATURE_PLUGIN_SURFACE_LABEL_KEY: Record<FeaturePluginUiSurface, I18nKey> = {
+  composer: 'settings.featurePlugins.surface.composer',
+  commands: 'settings.featurePlugins.surface.commands',
+  workStatus: 'settings.featurePlugins.surface.workStatus',
+  sidebar: 'settings.featurePlugins.surface.sidebar',
+  settings: 'settings.featurePlugins.surface.settings',
+  session: 'settings.featurePlugins.surface.session',
+};
+
+/** Hardcoded chrome tags per slot. New slots must register here; empty or unknown ids fail tests. */
+export const FEATURE_PLUGIN_SLOT_UI_IMPACT: Record<FeaturePluginSlot, readonly FeaturePluginUiSurface[]> = {
+  goal: ['composer', 'commands'],
+  plan: ['composer', 'commands', 'sidebar', 'session'],
+  mcp: ['workStatus', 'settings'],
+  subagents: ['workStatus', 'commands', 'session'],
+  btw: ['commands', 'session'],
+  todo: ['workStatus'],
+};
+
+const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
+  FeaturePluginSlot,
+  Partial<Record<FeaturePluginUiSurface, I18nKey>>
+> = {
+  goal: {
+    composer: 'settings.featurePlugins.slot.goal.surface.composer.tooltip',
+    commands: 'settings.featurePlugins.slot.goal.surface.commands.tooltip',
+  },
+  plan: {
+    composer: 'settings.featurePlugins.slot.plan.surface.composer.tooltip',
+    commands: 'settings.featurePlugins.slot.plan.surface.commands.tooltip',
+    sidebar: 'settings.featurePlugins.slot.plan.surface.sidebar.tooltip',
+    session: 'settings.featurePlugins.slot.plan.surface.session.tooltip',
+  },
+  mcp: {
+    workStatus: 'settings.featurePlugins.slot.mcp.surface.workStatus.tooltip',
+    settings: 'settings.featurePlugins.slot.mcp.surface.settings.tooltip',
+  },
+  subagents: {
+    workStatus: 'settings.featurePlugins.slot.subagents.surface.workStatus.tooltip',
+    commands: 'settings.featurePlugins.slot.subagents.surface.commands.tooltip',
+    session: 'settings.featurePlugins.slot.subagents.surface.session.tooltip',
+  },
+  btw: {
+    commands: 'settings.featurePlugins.slot.btw.surface.commands.tooltip',
+    session: 'settings.featurePlugins.slot.btw.surface.session.tooltip',
+  },
+  todo: {
+    workStatus: 'settings.featurePlugins.slot.todo.surface.workStatus.tooltip',
+  },
+};
+
+function featurePluginSurfaceSearchKeywords(surface: FeaturePluginUiSurface): readonly string[] {
+  if (surface === 'workStatus') return ['work status', 'workStatus'];
+  return [surface];
+}
+
+export function featurePluginSlotSearchKeywords(slot: FeaturePluginSlot): string[] {
+  return FEATURE_PLUGIN_SLOT_UI_IMPACT[slot].flatMap((surface) => [...featurePluginSurfaceSearchKeywords(surface)]);
+}
+
+export function featurePluginSurfaceTooltipKey(
+  slot: FeaturePluginSlot,
+  surface: FeaturePluginUiSurface,
+): I18nKey {
+  const key = FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY[slot][surface];
+  if (!key) {
+    throw new Error(`Feature plugin slot "${slot}" has no tooltip for surface "${surface}"`);
+  }
+  return key;
+}
+
+/** Fails when a slot has no tags or an unknown surface id. Used by tests and render. */
+export function assertFeaturePluginUiImpact(
+  slot: string,
+  surfaces: readonly string[],
+): asserts surfaces is readonly FeaturePluginUiSurface[] {
+  if (!Array.isArray(surfaces) || surfaces.length === 0) {
+    throw new Error(`Feature plugin slot "${slot}" must declare UI impact tags`);
+  }
+  const unknown = surfaces.filter((surface) => !FEATURE_PLUGIN_UI_SURFACE_SET.has(surface));
+  if (unknown.length > 0) {
+    throw new Error(`Feature plugin slot "${slot}" has unknown UI impact surface "${unknown[0]}"`);
+  }
+}
+
+export function featurePluginSlotUiSurfaces(slot: FeaturePluginSlot): readonly FeaturePluginUiSurface[] {
+  const surfaces = FEATURE_PLUGIN_SLOT_UI_IMPACT[slot];
+  assertFeaturePluginUiImpact(slot, surfaces);
+  return surfaces;
+}
+
 export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
   titleKey: I18nKey;
   infoKey: I18nKey;

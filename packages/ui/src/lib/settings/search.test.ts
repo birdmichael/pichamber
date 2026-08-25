@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { I18nKey } from '@/lib/i18n/store';
+import { dict as enDict } from '@/lib/i18n/messages/en';
 import { buildSettingsSearchResults } from './search';
 
 const t = (key: I18nKey): string => key;
@@ -457,5 +458,41 @@ describe('settings search', () => {
       });
       expect(results.some((result) => result.id === id)).toBe(true);
     }
+  });
+
+  test('lands Feature Plugins search on cards by UI impact surface words', () => {
+    const getPageTitle = (page: string) => page;
+    const translate = (key: I18nKey) => enDict[key];
+    const idsFor = (query: string) => buildSettingsSearchResults({
+      query,
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t: translate,
+      getPageTitle,
+    }).filter((result) => result.page === 'feature-plugins').map((result) => result.id);
+
+    expect(idsFor('composer')).toEqual(['feature-plugins.goal', 'feature-plugins.plan']);
+    expect(idsFor('commands')).toEqual([
+      'feature-plugins.goal',
+      'feature-plugins.plan',
+      'feature-plugins.subagents',
+      'feature-plugins.btw',
+    ]);
+    expect(idsFor('work status')).toEqual([
+      'feature-plugins.mcp',
+      'feature-plugins.subagents',
+      'feature-plugins.todo',
+    ]);
+    expect(idsFor('sidebar')).toEqual(['feature-plugins.plan']);
+    expect(idsFor('session').filter((id) => id.startsWith('feature-plugins.'))).toEqual([
+      'feature-plugins.plan',
+      'feature-plugins.subagents',
+      'feature-plugins.btw',
+    ]);
+    expect(idsFor('settings')).toContain('feature-plugins.mcp');
+    expect(idsFor('settings')).not.toContain('feature-plugins.goal');
+    expect(idsFor('composer')).not.toContain('feature-plugins.mcp');
+    expect(idsFor('composer')).not.toContain('feature-plugins.btw');
+    expect(idsFor('commands')).not.toContain('feature-plugins.mcp');
+    expect(idsFor('commands')).not.toContain('feature-plugins.todo');
   });
 });
