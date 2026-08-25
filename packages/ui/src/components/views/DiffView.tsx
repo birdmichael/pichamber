@@ -900,7 +900,7 @@ const MultiFileDiffEntry = React.memo<MultiFileDiffEntryProps>(({
                 </div>
             </div>
             {isExpanded && (
-                <div className="relative bg-background overflow-hidden">
+                <div className="relative min-w-0 bg-background">
                     {!isMounted && !diffLoadError ? (
                         <div className="h-40 border border-border/40 bg-background/40" />
                     ) : null}

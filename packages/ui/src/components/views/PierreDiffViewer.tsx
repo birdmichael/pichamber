@@ -29,6 +29,7 @@ import { getDefaultTheme } from '@/lib/theme/themes';
 
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
+import { PIERRE_DIFF_OVERFLOW_CSS, resolvePierreOverflow } from './pierreDiffOverflow';
 
 
 // Threshold (bytes) above which syntax highlighting is degraded for performance
@@ -190,6 +191,8 @@ const WEBKIT_SCROLL_FIX_CSS = `
       text-decoration: underline;
     }
   }
+
+  ${PIERRE_DIFF_OVERFLOW_CSS}
   `;
 
 // Fast cache key - use length + samples instead of full hash
@@ -755,7 +758,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     tokenizeMaxLineLength: isLargeContent ? 1 : 1000,
     collapsedContextThreshold: 0,
     expansionLineCount: 20,
-    overflow: wrapLines ? ('wrap' as const) : ('scroll' as const),
+    overflow: resolvePierreOverflow(wrapLines),
     disableFileHeader: true,
     enableLineSelection: enableComments,
     enableHoverUtility: false,
