@@ -35,7 +35,10 @@ banner remains informational.
 honor `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`). `POST
 /api/pi/extensions/update` `{ source? }` calls Pi
 `DefaultPackageManager.update(source)` (all configured packages when
-`source` is omitted), then reloads idle sessions. It does not uninstall.
+`source` is omitted), then reloads idle sessions. `POST
+/api/pi/extensions/uninstall` `{ source }` uses the same
+`DefaultPackageManager.removeAndPersist(source)` path as Feature Plugins
+uninstall (after the Settings confirm dialog), then reloads idle sessions.
 
 ## First-install project seed
 

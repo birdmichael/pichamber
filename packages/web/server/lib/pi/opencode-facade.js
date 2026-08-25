@@ -476,14 +476,26 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     });
   }));
 
-  let piPackageUpdatePromise = null;
-  app.post('/api/pi/extensions/update', parseJson, handle(async (req, res) => {
-    if (piPackageUpdatePromise) {
-      const error = new Error('A package update is already in progress.');
+  let piPackageMutationPromise = null;
+  const runExclusivePackageMutation = async (start) => {
+    if (piPackageMutationPromise) {
+      const error = new Error('A package change is already in progress.');
       error.status = 409;
       error.code = PI_UPDATE_IN_PROGRESS_CODE;
       throw error;
     }
+    const operation = start();
+    piPackageMutationPromise = operation;
+    try {
+      return await operation;
+    } finally {
+      if (piPackageMutationPromise === operation) {
+        piPackageMutationPromise = null;
+      }
+    }
+  };
+
+  app.post('/api/pi/extensions/update', parseJson, handle(async (req, res) => {
     const update = typeof host.updatePiPackages === 'function'
       ? host.updatePiPackages.bind(host)
       : null;
@@ -493,18 +505,26 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       throw error;
     }
     const source = typeof req.body?.source === 'string' ? req.body.source.trim() : '';
-    const operation = update({
+    json(res, 200, await runExclusivePackageMutation(() => update({
       source: source || undefined,
       directory: resolveDirectory(req),
-    });
-    piPackageUpdatePromise = operation;
-    try {
-      json(res, 200, await operation);
-    } finally {
-      if (piPackageUpdatePromise === operation) {
-        piPackageUpdatePromise = null;
-      }
+    })));
+  }));
+
+  app.post('/api/pi/extensions/uninstall', parseJson, handle(async (req, res) => {
+    const remove = typeof host.removePiPackage === 'function'
+      ? host.removePiPackage.bind(host)
+      : null;
+    if (!remove) {
+      const error = new Error('Pi package uninstall is unavailable.');
+      error.status = 503;
+      throw error;
     }
+    const source = typeof req.body?.source === 'string' ? req.body.source.trim() : '';
+    json(res, 200, await runExclusivePackageMutation(() => remove({
+      source,
+      directory: resolveDirectory(req),
+    })));
   }));
 
   app.get('/api/pi/feature-plugins', handle(async (_req, res) => {

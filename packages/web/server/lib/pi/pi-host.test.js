@@ -332,6 +332,26 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('uninstalls one configured settings.json package and leaves siblings', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-pkg-uninstall-'));
+    await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-question-tool');
+    await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-mcp-adapter');
+    const host = createPiHost({
+      mock: true,
+      home,
+      defaultDirectory: '/tmp/project',
+    });
+    const result = await host.removePiPackage({ source: 'npm:pi-mcp-adapter' });
+    expect(result.packages.map((item) => item.name)).toEqual(['pi-question-tool']);
+    await expect(host.removePiPackage({ source: 'npm:missing' })).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(host.removePiPackage({ source: '' })).rejects.toMatchObject({
+      status: 400,
+    });
+    host.dispose();
+  });
+
   it('re-resolves the agent directory on reload after a settings change', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-agent-dir-'));
     const first = path.join(home, 'first-agent');

@@ -360,6 +360,13 @@ describe('settings search', () => {
       getPageTitle,
     });
     expect(updateAll.some((result) => result.id === 'extensions.update-all')).toBe(true);
+    const uninstall = buildSettingsSearchResults({
+      query: 'uninstall',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(uninstall.some((result) => result.id === 'extensions.packages')).toBe(true);
     expect(leftover.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });

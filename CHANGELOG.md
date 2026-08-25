@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Settings/Desktop: the Pi section now shows the current in-process Pi version, the latest version when the existing update check finds one, and Update. Update runs `pi update` on that install and reloads Pi.
 - Settings: Extensions package rows show current and latest versions, with Update when a newer npm version exists, and Update all when any row can update.
+- Settings: Extensions package rows include Uninstall, which asks first and then removes that package from Pi packages.
 
 ## [1.1.1] - 2026-08-25
 

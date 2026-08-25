@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   packageHasUpdate,
+  packageUninstallSource,
   packagesWithUpdates,
   parseExtensionPackages,
 } from './extensionPackageUpdate';
@@ -52,5 +53,23 @@ describe('extensionPackageUpdate', () => {
       }],
     });
     expect(packageHasUpdate(packages[0])).toBe(false);
+  });
+
+  test('uninstall uses the configured settings.json source, not a display name', () => {
+    const packages = parseExtensionPackages({
+      packages: [{
+        name: 'pi-question-tool',
+        path: 'npm:pi-question-tool',
+        source: 'npm',
+        scope: 'user',
+      }],
+    });
+    expect(packageUninstallSource(packages[0])).toBe('npm:pi-question-tool');
+    expect(packageUninstallSource({
+      name: 'local-tool',
+      path: '',
+      source: './tools/local',
+      scope: 'project',
+    })).toBe('./tools/local');
   });
 });

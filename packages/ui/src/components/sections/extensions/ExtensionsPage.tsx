@@ -1,5 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
@@ -10,6 +18,7 @@ import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessio
 import { shouldShowExtensionsSection } from './extensionsPageVisibility';
 import {
   packageHasUpdate,
+  packageUninstallSource,
   packagesWithUpdates,
   parseExtensionPackages,
   type ExtensionPackageItem,
@@ -19,7 +28,11 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 
 type ExtensionItem = { name: string; path: string; scope: string };
 
-type BusyState = { kind: 'one'; source: string } | { kind: 'all' } | null;
+type BusyState =
+  | { kind: 'one'; source: string }
+  | { kind: 'all' }
+  | { kind: 'uninstall'; source: string }
+  | null;
 
 export const ExtensionsPage: React.FC = () => {
   const { t } = useI18n();
@@ -27,6 +40,7 @@ export const ExtensionsPage: React.FC = () => {
   const [packages, setPackages] = React.useState<ExtensionPackageItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<BusyState>(null);
+  const [pendingUninstall, setPendingUninstall] = React.useState<ExtensionPackageItem | null>(null);
 
   const applyPayload = React.useCallback((data: unknown) => {
     const payload = data && typeof data === 'object' ? data as {
@@ -110,6 +124,42 @@ export const ExtensionsPage: React.FC = () => {
     }
   }, [applyPayload, busy, packages, t]);
 
+  const runUninstall = React.useCallback(async (item: ExtensionPackageItem) => {
+    const source = packageUninstallSource(item);
+    if (busy || !source) return;
+    setBusy({ kind: 'uninstall', source });
+    try {
+      const response = await runtimeFetch('/api/pi/extensions/uninstall', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ source }),
+      });
+      const raw = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(t('settings.extensions.page.packages.toast.uninstallBusy'));
+          return;
+        }
+        const message = raw && typeof raw === 'object' && typeof (raw as { error?: unknown }).error === 'string'
+          ? (raw as { error: string }).error
+          : t('settings.extensions.page.packages.toast.uninstallFailed', { name: item.name });
+        toast.error(message);
+        return;
+      }
+      applyPayload(raw);
+      await refreshSessionTitleReloadLists();
+      toast.success(t('settings.extensions.page.packages.toast.uninstallSuccess', { name: item.name }));
+    } catch {
+      toast.error(t('settings.extensions.page.packages.toast.uninstallFailed', { name: item.name }));
+    } finally {
+      setBusy(null);
+      setPendingUninstall(null);
+    }
+  }, [applyPayload, busy, t]);
+
   const showExtensionsSection = shouldShowExtensionsSection({
     loading,
     extensionCount: extensions.length,
@@ -175,7 +225,8 @@ export const ExtensionsPage: React.FC = () => {
         ) : (
           <ul className="space-y-2">
             {packages.map((item) => {
-              const rowBusy = busy?.kind === 'one' && busy.source === item.path;
+              const source = packageUninstallSource(item);
+              const rowBusy = (busy?.kind === 'one' || busy?.kind === 'uninstall') && busy.source === source;
               const showUpdate = packageHasUpdate(item);
               return (
                 <li key={`${item.scope}:${item.path}:${item.source}`} className="rounded-lg border border-border/50 px-3 py-2">
@@ -191,21 +242,36 @@ export const ExtensionsPage: React.FC = () => {
                           : ''}
                       </div>
                     </div>
-                    {showUpdate ? (
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                      {showUpdate ? (
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          disabled={isBusy}
+                          onClick={() => { void runUpdate(source); }}
+                          className="shrink-0 !font-normal"
+                          aria-label={t('settings.extensions.page.packages.actions.updateAria', { name: item.name })}
+                        >
+                          {rowBusy && busy?.kind === 'one'
+                            ? t('settings.extensions.page.packages.actions.updating')
+                            : t('settings.extensions.page.packages.actions.update')}
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         size="xs"
                         variant="outline"
-                        disabled={isBusy}
-                        onClick={() => { void runUpdate(item.path); }}
+                        disabled={isBusy || !source}
+                        onClick={() => setPendingUninstall(item)}
                         className="shrink-0 !font-normal"
-                        aria-label={t('settings.extensions.page.packages.actions.updateAria', { name: item.name })}
+                        aria-label={t('settings.extensions.page.packages.actions.uninstallAria', { name: item.name })}
                       >
-                        {rowBusy
-                          ? t('settings.extensions.page.packages.actions.updating')
-                          : t('settings.extensions.page.packages.actions.update')}
+                        {rowBusy && busy?.kind === 'uninstall'
+                          ? t('settings.extensions.page.packages.actions.uninstalling')
+                          : t('settings.extensions.page.packages.actions.uninstall')}
                       </Button>
-                    ) : null}
+                    </div>
                   </div>
                 </li>
               );
@@ -213,6 +279,41 @@ export const ExtensionsPage: React.FC = () => {
           </ul>
         )}
       </SettingsSection>
+      <Dialog
+        open={pendingUninstall !== null}
+        onOpenChange={(open) => {
+          if (!open && busy?.kind !== 'uninstall') setPendingUninstall(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('settings.extensions.page.packages.dialog.uninstall.title')}</DialogTitle>
+            <DialogDescription>
+              {t('settings.extensions.page.packages.dialog.uninstall.description')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPendingUninstall(null)}
+              disabled={busy?.kind === 'uninstall'}
+            >
+              {t('settings.common.actions.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (pendingUninstall) void runUninstall(pendingUninstall);
+              }}
+              disabled={busy?.kind === 'uninstall' || pendingUninstall == null}
+            >
+              {t('settings.extensions.page.packages.actions.uninstall')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SettingsPageLayout>
   );
 };

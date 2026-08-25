@@ -2978,6 +2978,33 @@ export const createPiHost = ({
         reload,
       };
     },
+    async removePiPackage({ source, directory, env, fetchImpl } = {}) {
+      const spec = typeof source === 'string' ? source.trim() : '';
+      if (!spec) {
+        const error = new Error('Package source is required');
+        error.status = 400;
+        throw error;
+      }
+      const manager = await this.resolveFeaturePackageManager();
+      if (typeof manager.removeAndPersist !== 'function') {
+        const error = new Error('Pi package uninstall is unavailable');
+        error.status = 503;
+        throw error;
+      }
+      const removed = await manager.removeAndPersist(spec);
+      if (removed === false) {
+        const error = new Error(`No matching package: ${spec}`);
+        error.status = 404;
+        throw error;
+      }
+      const cwd = directory || defaultDirectory;
+      const reload = await this.reloadIdleSessions(cwd);
+      return {
+        extensions: this.listExtensions(cwd),
+        packages: await this.listPackagesWithVersions(cwd, { env, fetchImpl }),
+        reload,
+      };
+    },
     async resolveFeaturePackageManager() {
       if (typeof createPackageManager === 'function') {
         return createPackageManager({

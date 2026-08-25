@@ -50,3 +50,7 @@ export const packageHasUpdate = (item: ExtensionPackageItem): boolean => (
 export const packagesWithUpdates = (packages: ExtensionPackageItem[]): ExtensionPackageItem[] => (
   packages.filter(packageHasUpdate)
 );
+
+export const packageUninstallSource = (item: ExtensionPackageItem): string => (
+  (item.path || item.source || '').trim()
+);

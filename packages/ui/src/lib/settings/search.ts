@@ -875,7 +875,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'extensions',
     titleKey: 'settings.extensions.page.packages.title',
     descriptionKey: 'settings.extensions.page.packages.info',
-    keywords: ['packages', 'pi', 'update', 'version'],
+    keywords: ['packages', 'pi', 'update', 'version', 'uninstall'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
