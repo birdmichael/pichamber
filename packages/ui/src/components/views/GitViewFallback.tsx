@@ -2,6 +2,7 @@ import React from 'react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 const FILE_ROW_WIDTHS = ['w-[88%]', 'w-[72%]', 'w-[80%]', 'w-[64%]', 'w-[76%]', 'w-[58%]'] as const;
 
@@ -26,7 +27,7 @@ export function GitViewFallback() {
         {FILE_ROW_WIDTHS.map((width) => (
           <div key={width} className="flex items-center gap-2">
             <Skeleton className="size-4 rounded" aria-hidden />
-            <Skeleton className={`h-4 rounded-md ${width}`} aria-hidden />
+            <Skeleton className={cn('h-4 rounded-md', width)} aria-hidden />
           </div>
         ))}
       </div>

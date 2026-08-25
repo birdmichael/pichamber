@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { splitGitChangePath } from './GitChangePath';
+import { splitGitChangePath } from './splitGitChangePath';
 
 const source = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), 'GitChangePath.tsx'),
