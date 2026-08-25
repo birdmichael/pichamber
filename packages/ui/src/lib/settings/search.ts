@@ -522,7 +522,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'general',
     titleKey: 'settings.openchamber.piAgent.field.currentVersion',
     descriptionKey: 'settings.openchamber.piAgent.field.versionInfo',
-    keywords: ['pi', 'version', 'sdk', 'current version', 'update'],
+    keywords: ['pi', 'version', 'sdk', 'current version', 'latest version', 'update'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
   },
   {

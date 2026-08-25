@@ -7,11 +7,12 @@ import {
   SettingsFieldRow,
   SettingsCheckboxRow,
   SettingsInset,
+  SettingsVersionChips,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_DESCRIPTION_CLASS,
-  SETTINGS_HELPER_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { canRequestNativeDirectoryAccess, requestDirectoryAccess } from '@/lib/desktop';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
@@ -310,31 +311,43 @@ export const PiAgentSettings: React.FC = () => {
         ) : null}
 
         {upgradeStatus?.currentVersion ? (
-          <SettingsFieldRow
-            settingsItem="sessions.pi-version"
-            label={t('settings.openchamber.piAgent.field.currentVersion')}
-            info={t('settings.openchamber.piAgent.field.versionInfo')}
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-2 py-1.5"
+            data-settings-item="sessions.pi-version"
           >
-            <span
-              className={`${SETTINGS_HELPER_CLASS} font-mono`}
-              aria-label={t('settings.openchamber.piAgent.field.currentVersionAria')}
-            >
-              {upgradeStatus.currentVersion}
-            </span>
-          </SettingsFieldRow>
-        ) : null}
-        {shouldShowPiLatestVersion(upgradeStatus) ? (
-          <SettingsFieldRow
-            settingsItem="sessions.pi-latest-version"
-            label={t('settings.openchamber.piAgent.field.latestVersion')}
-          >
-            <span
-              className={`${SETTINGS_HELPER_CLASS} font-mono`}
-              aria-label={t('settings.openchamber.piAgent.field.latestVersionAria')}
-            >
-              {upgradeStatus?.latestVersion}
-            </span>
-          </SettingsFieldRow>
+            <SettingsVersionChips
+              currentVersion={upgradeStatus.currentVersion}
+              currentAriaLabel={t('settings.openchamber.piAgent.field.currentVersionAria', {
+                version: upgradeStatus.currentVersion,
+              })}
+              latestVersion={shouldShowPiLatestVersion(upgradeStatus) ? upgradeStatus.latestVersion : null}
+              latestAriaLabel={upgradeStatus.latestVersion
+                ? t('settings.openchamber.piAgent.field.latestVersionAria', {
+                    version: upgradeStatus.latestVersion,
+                  })
+                : undefined}
+              status={isPiUpToDate(upgradeStatus)
+                ? t('settings.openchamber.piAgent.actions.upToDate')
+                : null}
+            />
+            {canUpdatePiFromStatus(upgradeStatus) ? (
+              <Button
+                type="button"
+                size="xs"
+                variant="default"
+                onClick={handleUpdatePi}
+                disabled={isUpdating}
+                className="shrink-0 !font-normal"
+                aria-label={t('settings.openchamber.piAgent.actions.updateAria')}
+                data-settings-item="sessions.pi-update"
+              >
+                {isUpdating
+                  ? t('settings.openchamber.piAgent.actions.updating')
+                  : t('settings.openchamber.piAgent.actions.update')}
+              </Button>
+            ) : null}
+            <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
+          </div>
         ) : null}
 
         <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
@@ -347,32 +360,7 @@ export const PiAgentSettings: React.FC = () => {
             info={t('settings.openchamber.piAgent.field.showUpdateNotificationsInfo')}
           />
 
-          <div className="flex justify-start gap-2 py-1.5" data-settings-item="sessions.pi-update">
-            {canUpdatePiFromStatus(upgradeStatus) ? (
-              <Button
-                type="button"
-                size="xs"
-                variant="default"
-                onClick={handleUpdatePi}
-                disabled={isUpdating}
-                className="shrink-0 !font-normal"
-                aria-label={t('settings.openchamber.piAgent.actions.updateAria')}
-              >
-                {isUpdating
-                  ? t('settings.openchamber.piAgent.actions.updating')
-                  : t('settings.openchamber.piAgent.actions.update')}
-              </Button>
-            ) : isPiUpToDate(upgradeStatus) ? (
-              <Button
-                type="button"
-                size="xs"
-                variant="outline"
-                disabled
-                className="shrink-0 !font-normal"
-              >
-                {t('settings.openchamber.piAgent.actions.upToDate')}
-              </Button>
-            ) : null}
+          <div className="flex justify-start gap-2 py-1.5">
             <Button
               type="button"
               size="xs"

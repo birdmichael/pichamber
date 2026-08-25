@@ -63,6 +63,19 @@ for text that must stay visible (warnings, dynamic status).
 Skip per-option descriptions when labels are self-explanatory. For short
 segmented choices use `SettingsChipGroup` (chips with `aria-pressed`).
 
+## Version chips
+
+Use `SettingsVersionChips` for read-only current / latest version pills — not
+two `SettingsFieldRow`s and not a gray "Current x · Latest y" sentence.
+
+- Current is the quiet pill (`tone="quiet"`). Latest is the accent pill only
+  when a newer version exists (`tone="accent"`, `status.info` tokens).
+- Up to date: current pill + muted status text; no latest pill; hide Update.
+- Keep chips on one baseline (`flex-nowrap`). Truncate the neighboring name
+  instead of wrapping badges onto a second line.
+- Name current / latest in `aria-label`; do not repeat those words as visible
+  field labels next to the pills.
+
 ## Numeric Value / Override
 
 `NumberInput` inside `SETTINGS_NUMBER_STEPPER_ROW_CLASS`, with

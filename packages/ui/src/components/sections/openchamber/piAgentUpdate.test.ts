@@ -52,3 +52,13 @@ describe('piAgentUpdate', () => {
     expect(isPiUpToDate(unknownLatest)).toBe(false);
   });
 });
+
+describe('PiAgentSettings version display', () => {
+  test('uses one chip row instead of stacked Current / Latest field rows', async () => {
+    const source = await Bun.file(new URL('./PiAgentSettings.tsx', import.meta.url)).text();
+    expect(source).toContain('SettingsVersionChips');
+    expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.currentVersion')}");
+    expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.latestVersion')}");
+    expect(source).toContain('data-settings-item="sessions.pi-update"');
+  });
+});

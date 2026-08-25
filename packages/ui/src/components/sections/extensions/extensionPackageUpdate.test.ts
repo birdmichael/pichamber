@@ -117,3 +117,11 @@ describe('extensionPackageUpdate', () => {
     })).toBe('none');
   });
 });
+
+describe('ExtensionsPage version display', () => {
+  test('uses version chips instead of a Current · Latest sentence', async () => {
+    const source = await Bun.file(new URL('./ExtensionsPage.tsx', import.meta.url)).text();
+    expect(source).toContain('SettingsVersionChips');
+    expect(source).not.toContain('versionBits.join');
+  });
+});
