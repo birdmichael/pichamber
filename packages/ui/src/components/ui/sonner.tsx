@@ -4,6 +4,8 @@ import * as React from "react"
 import { Toaster as Sonner } from "sonner"
 import type { ToasterProps } from "sonner"
 
+import { cn } from "@/lib/utils"
+
 const SHADOW_DARK =
   "inset 0 1px 0 0 rgba(255,255,255,0.12), inset 0 0 0 1px rgba(255,255,255,0.08), 0 0 0 1px rgba(0,0,0,0.36), 0 1px 1px -0.5px rgba(0,0,0,0.22), 0 3px 3px -1.5px rgba(0,0,0,0.20), 0 6px 6px -3px rgba(0,0,0,0.16)"
 
@@ -82,7 +84,7 @@ function usePinnedToastStyles(shadow: string) {
   }, [shadow])
 }
 
-const Toaster = ({ offset, ...props }: ToasterProps) => {
+const Toaster = ({ offset, className, ...props }: ToasterProps) => {
   const isDark = useIsDarkTheme()
   const shadow = isDark ? SHADOW_DARK : SHADOW_LIGHT
   usePinnedToastStyles(shadow)
@@ -90,7 +92,7 @@ const Toaster = ({ offset, ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={isDark ? "dark" : "light"}
-      className="toaster group app-region-no-drag"
+      className={cn("toaster group app-region-no-drag", className)}
       closeButton={false}
       offset={offset ?? "calc(var(--oc-header-height, 3rem) + 12px)"}
       toastOptions={{

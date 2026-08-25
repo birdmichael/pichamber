@@ -195,6 +195,19 @@
   }
 }
 
+/* Hosted mobile.html / MobileApp toasts. Sonner applies --mobile-offset-*
+   (default 16px) below 600px and ignores `offset`, so iPhone Safari sat under
+   the notch. Capacitor / standalone toaster rules stay in place for those
+   shells. max(token, env()) keeps Android Capacitor (env()=0) and iOS Safari
+   (token may still be the 0px default) both inside the safe area. */
+[data-sonner-toaster].oc-mobile-toaster[data-y-position='top'] {
+  top: calc(max(var(--oc-safe-area-top, 0px), env(safe-area-inset-top, 0px)) + 16px) !important;
+}
+
+[data-sonner-toaster].oc-mobile-toaster[data-y-position='bottom'] {
+  bottom: calc(max(var(--oc-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px)) + 16px) !important;
+}
+
 /* Phase 1: iOS PWA safe area handling - Enhanced positioning approach */
 @media (display-mode: standalone) {
   /* iOS-specific safe area handling. The --oc-safe-area-* tokens and the
