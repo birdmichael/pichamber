@@ -33,6 +33,7 @@ import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
+import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
 import { hasOpenDropdown } from './keyboard-shortcut-dom';
 
 export const useKeyboardShortcuts = () => {
@@ -165,6 +166,9 @@ export const useKeyboardShortcuts = () => {
         isImagePreviewOpen,
         activeMainTab,
         isPromptNavigatorPanelOpen,
+        isArchivePageOpen,
+        isScheduledTasksDialogOpen,
+        worktreesPageProjectId,
       } = useUIStore.getState();
 
       if (isInsideDialog || isInsideTerminal || hasDropdownInteraction) {
@@ -187,6 +191,19 @@ export const useKeyboardShortcuts = () => {
       }
 
       if (isSettingsMounted) {
+        resetAbortPriming();
+        return;
+      }
+
+      if (shouldCloseMainSurfaceOnEscape({
+        isArchivePageOpen,
+        isScheduledTasksDialogOpen,
+        worktreesPageProjectId,
+        isMultiRunLauncherOpen,
+        multiRunCompareGroup,
+      })) {
+        e.preventDefault();
+        useUIStore.getState().closeMainSurfaces();
         resetAbortPriming();
         return;
       }

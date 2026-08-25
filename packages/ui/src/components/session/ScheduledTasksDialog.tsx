@@ -686,11 +686,18 @@ export function ScheduledTasksDialog() {
               </div>
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-              {/* Pages have no close button: you leave by picking a session,
-                  a draft, or another surface in the sidebar. */}
-              <div className="flex items-center px-6 pt-3">
+              <div className="flex items-center justify-between gap-3 px-6 pt-3">
                 <Button size="sm" onClick={openNewTaskEditor} disabled={!selectedProjectID}>
                   <Icon name="add" className="mr-1 h-4 w-4" /> {t('sessions.scheduledTasks.dialog.actions.newTask')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => useUIStore.getState().closeMainSurfaces()}
+                  aria-label={t('sessions.scheduledTasks.page.closeAria')}
+                >
+                  <Icon name="close" className="h-4 w-4" />
                 </Button>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">

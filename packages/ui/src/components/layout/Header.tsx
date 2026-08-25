@@ -1427,6 +1427,13 @@ export const Header: React.FC<HeaderProps> = ({
     }
     return null;
   }, [isArchiveSurfaceOpen, isMultiRunSurfaceOpen, isScheduledSurfaceOpen, multiRunCompareGroup, t, worktreesSurfaceProjectId, worktreesSurfaceProjectLabel]);
+  const surfaceCloseAria = isScheduledSurfaceOpen
+    ? t('sessions.scheduledTasks.page.closeAria')
+    : isArchiveSurfaceOpen
+      ? t('sessions.archivePage.closeAria')
+      : worktreesSurfaceProjectId
+        ? t('sessions.worktreesPage.closeAria')
+        : null;
 
 
   const actionDirectory = React.useMemo(() => {
@@ -2089,14 +2096,24 @@ export const Header: React.FC<HeaderProps> = ({
           while the sidebar is closed. */}
       <div className="flex min-w-0 flex-1 items-center">
         {activeSurfaceHeader ? (
-          <div className="mr-3 flex min-w-0 flex-col items-start px-1 py-0.5 -my-0.5 text-left">
-            <span className="truncate typography-ui-label text-[14px] font-normal leading-tight text-foreground max-w-full">
-              {activeSurfaceHeader.title}
-            </span>
-            {activeSurfaceHeader.subtitle ? (
-              <span className="truncate typography-micro text-[10.5px] font-normal leading-tight text-muted-foreground/75 max-w-full">
-                {activeSurfaceHeader.subtitle}
+          <div className="app-region-no-drag mr-3 flex min-w-0 items-center gap-0.5">
+            <div className="flex min-w-0 flex-col items-start px-1 py-0.5 -my-0.5 text-left">
+              <span className="truncate typography-ui-label text-[14px] font-normal leading-tight text-foreground max-w-full">
+                {activeSurfaceHeader.title}
               </span>
+              {activeSurfaceHeader.subtitle ? (
+                <span className="truncate typography-micro text-[10.5px] font-normal leading-tight text-muted-foreground/75 max-w-full">
+                  {activeSurfaceHeader.subtitle}
+                </span>
+              ) : null}
+            </div>
+            {surfaceCloseAria ? (
+              <HeaderIconActionButton
+                title={surfaceCloseAria}
+                ariaLabel={surfaceCloseAria}
+                onClick={() => useUIStore.getState().closeMainSurfaces()}
+                Icon="close"
+              />
             ) : null}
           </div>
         ) : (
