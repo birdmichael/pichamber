@@ -195,6 +195,9 @@ reuses the choice instead of asking again.
   uses the reflog source. A source that names this branch or `origin/<branch>`
   is treated as missing detection so the one-time picker can run.
 - Do not guess `main`/`master` when both detection and override are empty.
+- DiffView Branch lists committed `base...head` files only. An empty list is
+  "no committed changes versus the base", not a clean working tree. Collapse,
+  review, wrap, and view-mode stay mounted when that list is empty.
 
 ### `useGitHubPrStatusStore.ts`
 

@@ -4,7 +4,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useGitStore, useGitStatus, useIsGitRepo, useGitLoadingStatus } from '@/stores/useGitStore';
 import { useGitBaseBranchStore, gitBaseBranchEntryKey } from '@/stores/useGitBaseBranchStore';
-import { coerceDiffScope, branchRangeKey, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, isOwnBranchCreationSource, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
+import { coerceDiffScope, branchRangeKey, branchEmptyExcludesWorkingTree, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, isOwnBranchCreationSource, resolveDiffToolbarLayout, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
 import { getBranchBase, getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { cn } from '@/lib/utils';
@@ -1032,6 +1032,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
     const pendingDiffScope = useUIStore((state) => state.pendingDiffScope);
     const setPendingDiffFile = useUIStore((state) => state.setPendingDiffFile);
     const diffLayoutPreference = useUIStore((state) => state.diffLayoutPreference);
+    const setDiffLayoutPreference = useUIStore((state) => state.setDiffLayoutPreference);
     const diffFileLayout = useUIStore((state) => state.diffFileLayout);
     const setDiffFileLayout = useUIStore((state) => state.setDiffFileLayout);
     const diffWrapLinesStore = useUIStore((state) => state.diffWrapLines);
@@ -1474,12 +1475,13 @@ export const DiffView: React.FC<DiffViewProps> = ({
         return 'side-by-side';
     }, [diffFileLayout, diffLayoutPreference, screenWidth]);
 
-    const currentLayoutForAllFiles = React.useMemo<'inline' | 'side-by-side' | null>(() => {
-        if (changedFiles.length === 0) return null;
-        return changedFiles.every((file) => getLayoutForFile(file) === 'side-by-side')
-            ? 'side-by-side'
-            : 'inline';
-    }, [changedFiles, getLayoutForFile]);
+    const currentLayoutForAllFiles = React.useMemo<'inline' | 'side-by-side'>(
+        () => resolveDiffToolbarLayout(
+            changedFiles.map((file) => getLayoutForFile(file)),
+            diffLayoutPreference
+        ),
+        [changedFiles, diffLayoutPreference, getLayoutForFile]
+    );
 
     // Ensure git status on mount
     React.useEffect(() => {
@@ -1761,10 +1763,15 @@ export const DiffView: React.FC<DiffViewProps> = ({
         const nextLayout: 'inline' | 'side-by-side' =
             mode === 'side-by-side' ? 'side-by-side' : 'inline';
 
+        if (changedFiles.length === 0) {
+            setDiffLayoutPreference(nextLayout);
+            return;
+        }
+
         changedFiles.forEach((file) => {
             setDiffFileLayout(file.path, nextLayout);
         });
-    }, [changedFiles, setDiffFileLayout]);
+    }, [changedFiles, setDiffFileLayout, setDiffLayoutPreference]);
 
     const [openingEditorFilePath, setOpeningEditorFilePath] = React.useState<string | null>(null);
 
@@ -2014,10 +2021,25 @@ export const DiffView: React.FC<DiffViewProps> = ({
         }
 
         if (changedFiles.length === 0) {
+            if (activeDiffScope === 'branch' && branchBase) {
+                const excludesWorkingTree = branchEmptyExcludesWorkingTree(workingFileCount, stagedFileCount);
+                return (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+                        <div className="text-sm text-muted-foreground">
+                            {t('diffView.branch.empty', { base: branchBase })}
+                        </div>
+                        {excludesWorkingTree ? (
+                            <div className="max-w-sm typography-micro text-muted-foreground">
+                                {t('diffView.branch.emptyExcludesWorkingTree')}
+                            </div>
+                        ) : null}
+                    </div>
+                );
+            }
+
             return (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                     {activeDiffScope === 'turn' ? t('diffView.state.noLastTurnChanges')
-                        : activeDiffScope === 'branch' && branchBase ? t('diffView.branch.empty', { base: branchBase })
                         : t('diffView.state.cleanWorkingTree')}
                 </div>
             );
@@ -2055,32 +2077,31 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         </div>
                     )
                 )}
-                {changedFiles.length > 0 && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleExpandOrCollapseAll}
-                        className={cn(
-                            'diff-toolbar__expand-button h-7 flex-shrink-0 gap-1 px-1.5 text-muted-foreground hover:text-foreground',
-                            'ml-auto',
-                        )}
-                        title={expandedFiles.size > 0 ? t('diffView.actions.collapseAll') : t('diffView.actions.expandAll')}
-                    >
-                        <Icon
-                            name="expand-up-down"
-                            className="size-4"
-                        />
-                        <span className="diff-toolbar__expand-label typography-ui-label">
-                            {expandedFiles.size > 0 ? t('diffView.actions.collapseAll') : t('diffView.actions.expandAll')}
-                        </span>
-                    </Button>
-                )}
-                {changedFiles.length > 0 && showReviewAction && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExpandOrCollapseAll}
+                    disabled={changedFiles.length === 0}
+                    className={cn(
+                        'diff-toolbar__expand-button h-7 flex-shrink-0 gap-1 px-1.5 text-muted-foreground hover:text-foreground',
+                        'ml-auto',
+                    )}
+                    title={expandedFiles.size > 0 ? t('diffView.actions.collapseAll') : t('diffView.actions.expandAll')}
+                >
+                    <Icon
+                        name="expand-up-down"
+                        className="size-4"
+                    />
+                    <span className="diff-toolbar__expand-label typography-ui-label">
+                        {expandedFiles.size > 0 ? t('diffView.actions.collapseAll') : t('diffView.actions.expandAll')}
+                    </span>
+                </Button>
+                {showReviewAction && (
                     <Button
                         variant="default"
                         size="sm"
                         onClick={() => setReviewDialogOpen(true)}
-                        disabled={reviewFlowSubmitting}
+                        disabled={changedFiles.length === 0 || reviewFlowSubmitting}
                         className="diff-toolbar__review-button h-7 flex-shrink-0 gap-1.5 px-2"
                         aria-label={t('diffView.actions.reviewAria')}
                     >
@@ -2094,7 +2115,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         </span>
                     </Button>
                 )}
-                {changedFiles.length > 0 && showWalkthroughAction && (
+                {showWalkthroughAction && (
                     <Button
                         variant="outline"
                         size="sm"
@@ -2122,6 +2143,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                             }
                             openContextSurface(directory, 'walkthrough');
                         }}
+                        disabled={changedFiles.length === 0}
                         className={cn('diff-toolbar__walkthrough-button h-7 flex-shrink-0 gap-1.5 px-2', WALKTHROUGH_ACTION_CLASS)}
                         aria-label={t('walkthrough.action.open')}
                     >
@@ -2153,26 +2175,22 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         </TooltipContent>
                     </Tooltip>
                 )}
-                {changedFiles.length > 0 && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDiffWrapLines(!diffWrapLinesStore)}
-                        className={cn(
-                            'h-5 w-5 p-0 transition-opacity',
-                            diffWrapLines ? 'text-foreground opacity-100' : 'text-muted-foreground opacity-60 hover:opacity-100'
-                        )}
-                        title={diffWrapLines ? t('diffView.actions.disableLineWrap') : t('diffView.actions.enableLineWrap')}
-                    >
-                        <Icon name="text-wrap" className="size-4" />
-                    </Button>
-                )}
-                {currentLayoutForAllFiles && (
-                    <DiffViewToggle
-                        mode={currentLayoutForAllFiles === 'side-by-side' ? 'side-by-side' : 'unified'}
-                        onModeChange={handleHeaderLayoutChange}
-                    />
-                )}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDiffWrapLines(!diffWrapLinesStore)}
+                    className={cn(
+                        'h-5 w-5 p-0 transition-opacity',
+                        diffWrapLines ? 'text-foreground opacity-100' : 'text-muted-foreground opacity-60 hover:opacity-100'
+                    )}
+                    title={diffWrapLines ? t('diffView.actions.disableLineWrap') : t('diffView.actions.enableLineWrap')}
+                >
+                    <Icon name="text-wrap" className="size-4" />
+                </Button>
+                <DiffViewToggle
+                    mode={currentLayoutForAllFiles === 'side-by-side' ? 'side-by-side' : 'unified'}
+                    onModeChange={handleHeaderLayoutChange}
+                />
             </div>
 
             <ReviewFlowDialog

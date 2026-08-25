@@ -4,8 +4,10 @@ import { describe, expect, test } from 'bun:test';
 
 import {
     branchRangeKey,
+    branchEmptyExcludesWorkingTree,
     coerceDiffScope,
     isBranchScopeAvailable,
+    resolveDiffToolbarLayout,
     isBranchScopeDefinitelyUnavailable,
     isOwnBranchCreationSource,
     useRangeKeyedCache,
@@ -39,6 +41,33 @@ describe('isOwnBranchCreationSource', () => {
         expect(isOwnBranchCreationSource(null, 'feature')).toBe(false);
         expect(isOwnBranchCreationSource('origin/feature', null)).toBe(false);
         expect(isOwnBranchCreationSource('', 'feature')).toBe(false);
+    });
+});
+
+describe('branchEmptyExcludesWorkingTree', () => {
+    test('is false only when both Changed and Staged are empty', () => {
+        expect(branchEmptyExcludesWorkingTree(0, 0)).toBe(false);
+    });
+
+    test('is true when the working tree still has files', () => {
+        // A new branch from origin/main with only uncommitted work must not
+        // present "no branch changes" as a clean repo.
+        expect(branchEmptyExcludesWorkingTree(2, 0)).toBe(true);
+        expect(branchEmptyExcludesWorkingTree(0, 1)).toBe(true);
+        expect(branchEmptyExcludesWorkingTree(3, 2)).toBe(true);
+    });
+});
+
+describe('resolveDiffToolbarLayout', () => {
+    test('keeps a view-mode when there are no files', () => {
+        expect(resolveDiffToolbarLayout([], 'inline')).toBe('inline');
+        expect(resolveDiffToolbarLayout([], 'side-by-side')).toBe('side-by-side');
+        expect(resolveDiffToolbarLayout([], 'dynamic')).toBe('inline');
+    });
+
+    test('follows the stacked files when any exist', () => {
+        expect(resolveDiffToolbarLayout(['side-by-side', 'side-by-side'], 'inline')).toBe('side-by-side');
+        expect(resolveDiffToolbarLayout(['inline', 'side-by-side'], 'side-by-side')).toBe('inline');
     });
 });
 
