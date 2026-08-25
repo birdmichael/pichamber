@@ -18,5 +18,11 @@ describe('tooltip click-through', () => {
     expect(tooltipSource).toContain('shouldSuppressTooltipOpen');
     expect(tooltipSource).toContain('pointerPressActiveRef');
   });
+
+  test('tooltips behind an open dialog do not open or stay open', () => {
+    expect(tooltipSource).toContain('subscribeDialogOpenLayer');
+    expect(tooltipSource).toContain('trigger: triggerElementRef.current');
+    expect(tooltipSource).toContain('rememberTrigger');
+  });
 });
 

@@ -2,6 +2,7 @@ import * as React from "react"
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip"
 
 import { cn } from "@/lib/utils"
+import { subscribeDialogOpenLayer } from "@/components/ui/dialog-open-layer"
 import {
   isPrimaryMouseTooltipPointer,
   shouldSuppressTooltipOpen,
@@ -17,6 +18,7 @@ type LongPressTooltipContextValue = {
   handlePointerEnd: () => void;
   handleClickCapture: (event: React.MouseEvent<HTMLElement>) => void;
   handleContextMenu: (event: React.MouseEvent<HTMLElement>) => void;
+  rememberTrigger: (target: EventTarget | null) => void;
 };
 
 const LongPressTooltipContext = React.createContext<LongPressTooltipContextValue | null>(null)
@@ -84,6 +86,7 @@ function Tooltip({
   const startPointRef = React.useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = React.useRef(false)
   const pointerPressActiveRef = React.useRef(false)
+  const triggerElementRef = React.useRef<EventTarget | null>(null)
   const controlled = open !== undefined
   const tooltipOpen = controlled ? open : longPressOpen
 
@@ -107,8 +110,14 @@ function Tooltip({
     }
   }, [controlled])
 
+  const rememberTrigger = React.useCallback((target: EventTarget | null) => {
+    triggerElementRef.current = target
+  }, [])
+
   const contextValue = React.useMemo<LongPressTooltipContextValue>(() => ({
+    rememberTrigger,
     handlePointerDown: (event) => {
+      rememberTrigger(event.currentTarget)
       if (isPrimaryMouseTooltipPointer(event.pointerType, event.button)) {
         pointerPressActiveRef.current = true
         if (!controlled) {
@@ -134,6 +143,7 @@ function Tooltip({
       }, MOBILE_LONG_PRESS_DELAY)
     },
     handlePointerMove: (event) => {
+      rememberTrigger(event.currentTarget)
       const startPoint = startPointRef.current
 
       if (!startPoint) {
@@ -177,7 +187,7 @@ function Tooltip({
 
       event.preventDefault()
     },
-  }), [clearCloseTimeout, clearLongPressTimeout, controlled, setTooltipOpen])
+  }), [clearCloseTimeout, clearLongPressTimeout, controlled, rememberTrigger, setTooltipOpen])
 
   React.useEffect(() => {
     return () => {
@@ -187,9 +197,14 @@ function Tooltip({
   }, [clearCloseTimeout, clearLongPressTimeout])
 
   const handleOpenChange = React.useCallback((nextOpen: boolean, event: TooltipChangeEventDetails) => {
+    const eventTarget = event && typeof event === 'object' && 'event' in event
+      ? (event.event as { target?: EventTarget | null } | null)?.target ?? null
+      : null
+
     if (shouldSuppressTooltipOpen({
       nextOpen,
       pointerPressActive: pointerPressActiveRef.current,
+      trigger: triggerElementRef.current ?? eventTarget,
     })) {
       return
     }
@@ -200,6 +215,25 @@ function Tooltip({
 
     onOpenChange?.(nextOpen, event)
   }, [controlled, onOpenChange])
+
+  React.useEffect(() => {
+    if (!tooltipOpen) {
+      return
+    }
+
+    const closeIfBehindModal = () => {
+      if (shouldSuppressTooltipOpen({
+        nextOpen: true,
+        pointerPressActive: false,
+        trigger: triggerElementRef.current,
+      })) {
+        setTooltipOpen(false)
+      }
+    }
+
+    closeIfBehindModal()
+    return subscribeDialogOpenLayer(closeIfBehindModal)
+  }, [setTooltipOpen, tooltipOpen])
 
   const tooltip = (
     <LongPressTooltipContext.Provider value={contextValue}>
@@ -219,6 +253,8 @@ function TooltipTrigger({
   children,
   onPointerDown,
   onPointerMove,
+  onPointerEnter,
+  onFocus,
   onPointerUp,
   onPointerCancel,
   onClickCapture,
@@ -233,6 +269,14 @@ function TooltipTrigger({
     <TooltipPartBoundary fallback={children}>
       <BaseTooltip.Trigger
         data-slot="tooltip-trigger"
+        onPointerEnter={(event) => {
+          longPressTooltip?.rememberTrigger(event.currentTarget)
+          onPointerEnter?.(event)
+        }}
+        onFocus={(event) => {
+          longPressTooltip?.rememberTrigger(event.currentTarget)
+          onFocus?.(event)
+        }}
         onPointerDown={(event) => {
           onPointerDown?.(event)
           longPressTooltip?.handlePointerDown(event)

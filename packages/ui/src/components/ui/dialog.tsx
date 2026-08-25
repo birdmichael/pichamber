@@ -4,8 +4,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
 import { useI18n } from '@/lib/i18n'
 import { Icon } from "@/components/icon/Icon";
-
-let openDialogCount = 0;
+import { useDialogLayerRegistration } from "@/components/ui/dialog-open-layer";
 
 type AsChildProps = { asChild?: boolean };
 type AsChildRenderProps = {
@@ -45,16 +44,7 @@ const DialogOverlay = React.forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BaseDialog.Backdrop>
 >(({ className, ...props }, ref) => {
-  React.useEffect(() => {
-    openDialogCount += 1;
-    document.documentElement.classList.add('oc-dialog-open');
-    return () => {
-      openDialogCount = Math.max(0, openDialogCount - 1);
-      if (openDialogCount === 0) {
-        document.documentElement.classList.remove('oc-dialog-open');
-      }
-    };
-  }, []);
+  const { dropPointerEventsOnExit } = useDialogLayerRegistration();
 
   return (
     <BaseDialog.Backdrop
@@ -63,7 +53,11 @@ const DialogOverlay = React.forwardRef<
       className={cn(
         "oc-glass-backdrop fixed inset-0 z-50 bg-black/25 dark:bg-black/40",
         "transition-opacity duration-150 ease-out",
-        "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:pointer-events-none",
+        "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+        // Last dialog: leftover overlay must not eat the next page click.
+        // Nested close: keep blocking so pointer-over cannot reach the sidebar
+        // while Settings (or another parent modal) is still open.
+        dropPointerEventsOnExit && "data-[ending-style]:pointer-events-none",
         className
       )}
       {...props}
