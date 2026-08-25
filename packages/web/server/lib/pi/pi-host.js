@@ -53,6 +53,11 @@ import {
   withUserExtensionNativeGuard,
 } from './user-extension-native.js';
 import {
+  createElectronTreeLoadHelpers,
+  syncUserExtensionElectronTree,
+  wrapPackageManagerWithElectronNativeTree,
+} from './user-extension-electron-tree.js';
+import {
   createAdapterMcpConfig,
   deleteAdapterMcpConfig,
   getAdapterMcpConfig,
@@ -1113,6 +1118,8 @@ export const createPiHost = ({
   runSelfUpdate,
   getProcessVersions,
   userExtensionNativeLoadModule,
+  rebuildUserExtensionNative,
+  spawnUserExtensionRebuild,
 } = {}) => {
   const sessions = new Map();
   const sessionTodos = new Map();
@@ -1165,12 +1172,38 @@ export const createPiHost = ({
     }
   };
 
-  const runWithUserExtensionNativeGuard = async (directory, operation) => (
-    withUserExtensionNativeGuard({
+  const electronTreeContext = (directory) => ({
+    agentDir: resolveAgentDir(),
+    projectDir: directory || defaultDirectory,
+    versions: resolveProcessVersions(),
+    ...(typeof rebuildUserExtensionNative === 'function'
+      ? { rebuildPackage: rebuildUserExtensionNative }
+      : {}),
+    ...(typeof spawnUserExtensionRebuild === 'function'
+      ? { spawnImpl: spawnUserExtensionRebuild }
+      : {}),
+  });
+
+  const syncElectronNativeTree = async (directory) => {
+    try {
+      return await syncUserExtensionElectronTree(electronTreeContext(directory));
+    } catch (error) {
+      console.warn(`[pi-host] electron native tree sync failed: ${error?.message || error}`);
+      return { enabled: false, isolated: [], skipped: [], failed: [] };
+    }
+  };
+
+  const runWithUserExtensionNativeGuard = async (directory, operation) => {
+    await syncElectronNativeTree(directory);
+    const helpers = createElectronTreeLoadHelpers(electronTreeContext(directory));
+    return withUserExtensionNativeGuard({
       agentDir: resolveAgentDir(),
       projectDir: directory || defaultDirectory,
       versions: resolveProcessVersions(),
       store: skippedUserExtensions,
+      remapLoad: helpers.remapLoad,
+      captureLazyNative: helpers.captureLazyNative,
+      resolveFilenameFallback: helpers.resolveFilenameFallback,
       ...(typeof userExtensionNativeLoadModule === 'function'
         ? { loadModule: userExtensionNativeLoadModule }
         : {}),
@@ -1178,8 +1211,8 @@ export const createPiHost = ({
       const result = await operation(guard);
       harvestExtensionsResult(result, directory);
       return result;
-    })
-  );
+    });
+  };
 
   const invokeSessionFactory = async (factory, args) => {
     const customTools = await resolveCustomTools();
@@ -3213,21 +3246,23 @@ export const createPiHost = ({
       };
     },
     async resolveFeaturePackageManager() {
+      let manager;
       if (typeof createPackageManager === 'function') {
-        return createPackageManager({
+        manager = await createPackageManager({
           cwd: defaultDirectory,
           home,
           agentDir: resolveAgentDir(),
         });
+      } else if (mock) {
+        manager = createSettingsJsonPackageManager({ home });
+      } else {
+        manager = await createSdkPackageManager({
+          cwd: defaultDirectory,
+          home,
+          loadSdk: loadPiSdk,
+        });
       }
-      if (mock) {
-        return createSettingsJsonPackageManager({ home });
-      }
-      return createSdkPackageManager({
-        cwd: defaultDirectory,
-        home,
-        loadSdk: loadPiSdk,
-      });
+      return wrapPackageManagerWithElectronNativeTree(manager, electronTreeContext(defaultDirectory));
     },
     getFeaturePlugins() {
       return toFeaturePluginsPayload({

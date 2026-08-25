@@ -132,6 +132,12 @@ bunx vitest run server/lib/pi
 bun test --cwd packages/electron ./kernel-env.test.mjs
 ```
 
+Desktop (`process.versions.electron` set) isolates user native packages under
+`{agentDir}/npm-electron/electron-{modules}-{platform}-{arch}/{name}@{version}/`
+so `{agentDir}/npm` stays the system-Node tree for the `pi` CLI. Rebuild
+failure skips that extension and keeps the kernel ready. This is not P1b
+(no bundled Node kernel).
+
 ## Product mark
 
 Pichamber is the desktop client for Pi. The mark is OpenChamber's isometric open-top cube (the chamber) with the official Pi pixel-art "pi" wordmark in the **same top-face slot** as the old OpenCode O (`scale(0.068)`, isometric center). Not a copy of `pi.dev/favicon.svg`, not a Greek π, not a window/traffic-light, and not the rejected inside-the-volume `scale(0.115)` / `ty=6` placement.

@@ -7,6 +7,7 @@ import {
   resolvePiDefaultsPath,
   resolvePiSettingsPath,
 } from './pi-resources.js';
+import { wrapPackageManagerWithElectronNativeTree } from './user-extension-electron-tree.js';
 
 const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'];
 
@@ -448,9 +449,13 @@ export const createSdkPackageManager = async ({
   }
   const agentDir = resolvePiAgentDir(home);
   const settingsManager = pi.SettingsManager.create(cwd, agentDir);
-  return new pi.DefaultPackageManager({
+  return wrapPackageManagerWithElectronNativeTree(new pi.DefaultPackageManager({
     cwd,
     agentDir,
     settingsManager,
+  }), {
+    agentDir,
+    projectDir: cwd,
+    versions: process.versions,
   });
 };

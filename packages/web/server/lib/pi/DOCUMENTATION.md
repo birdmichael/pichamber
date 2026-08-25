@@ -62,8 +62,23 @@ Do not hardcode ABI numbers or package names.
 The skip layer is off when `process.versions.electron` is empty (CLI /
 plain Node) so system-Node-built natives still load. App-owned natives
 under `app.asar.unpacked` are not reported as skipped user extensions.
-This is a soft-land only: it does not rebuild `{agentDir}/npm` for
-Electron and does not add a second `npm-electron` prefix.
+
+Desktop also keeps a second prefix so the in-process kernel can load
+natives without rewriting the CLI tree. `{agentDir}/npm` stays the
+system-Node install. Isolated native packages live at
+`{agentDir}/npm-electron/electron-{modules}-{platform}-{arch}/{name}@{version}/`
+(and the same formula under `<cwd>/.pi/npm-electron`). `modules`,
+`platform`, and `arch` come from the current Desktop process. An
+Electron upgrade therefore misses the old cache directory.
+
+PackageManager `install` / `update` (and session create/reload) is the
+sync point. Candidates match `@electron/rebuild` discovery (`binding.gyp`,
+`prebuilds/`, native `package.json` metadata) plus lazy capture when
+load-time ABI fails. A hit native package is loaded as a whole package
+from the electron tree. N-API tries the original file first and isolates
+only after that fails. Rebuild runs in a child process; failure falls
+back to the skip above, does not throw into the host, and does not
+mutate `{agentDir}/npm`. The `pi` CLI never reads the electron tree.
 
 ## First-install project seed
 
