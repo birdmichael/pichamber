@@ -17,7 +17,7 @@ const UPDATE_AVAILABLE_BANNER_TOP = 'calc(var(--oc-header-height, 3rem) + 12px)'
  * that ancestor's overflow / transform / isolation even with position:fixed.
  */
 export const resolveUpdateAvailableBannerPortalTarget = (
-  doc: Pick<Document, 'body'> | null | undefined,
+  doc: { body?: HTMLElement | null } | null | undefined,
 ): HTMLElement | null => doc?.body ?? null;
 
 interface OpenCodeUpdateBannerProps {
