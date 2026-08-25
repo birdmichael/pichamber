@@ -16,6 +16,7 @@ import { PermissionCard } from './PermissionCard';
 import { QuestionCard } from './QuestionCard';
 import { PiExtensionPromptCard } from './PiExtensionPromptCard';
 import { PiExtensionConfirmDialog } from './PiExtensionConfirmDialog';
+import { boundQuestionPromptIds } from '@/components/chat/message/parts/questionToolItems';
 import { hasActiveQuestionToolInCurrentTurn, recoverPendingQuestionWithRetry } from '@/sync/question-recovery';
 import { listPiExtensionUiPrompts } from '@/sync/pi-extension-ui';
 import {
@@ -236,10 +237,11 @@ const ChatViewport = React.memo(({
 }: ChatViewportProps) => {
     const { t } = useI18n();
     const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
-    const transcriptPiPrompts = React.useMemo(
-        () => selectTranscriptPiExtensionUiPrompts(piExtensionPrompts),
-        [piExtensionPrompts],
-    );
+    const transcriptPiPrompts = React.useMemo(() => {
+        const boundIds = boundQuestionPromptIds(piExtensionPrompts, renderedMessages);
+        return selectTranscriptPiExtensionUiPrompts(piExtensionPrompts)
+            .filter((prompt) => !boundIds.has(prompt.id));
+    }, [piExtensionPrompts, renderedMessages]);
     const pendingPiConfirm = React.useMemo(
         () => selectPendingConfirmPrompt(piExtensionPrompts),
         [piExtensionPrompts],

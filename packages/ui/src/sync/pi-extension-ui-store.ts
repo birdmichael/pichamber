@@ -218,7 +218,7 @@ export const useHasPendingPiExtensionUiPrompt = (sessionID: string | null | unde
   })
 );
 
-/** Bottom-dock cards: pending select/input/editor only. Settled replies live on the asking tool turn. */
+/** Bottom-dock cards: pending select/input/editor that are not bound to a question-tool turn. */
 export const selectTranscriptPiExtensionUiPrompts = (
   prompts: PiExtensionUiPrompt[],
 ): PiExtensionUiPrompt[] => prompts.filter((prompt) => (

@@ -51,6 +51,8 @@ import { formatTimestampForDisplay } from './timeFormat';
 import { ToolRevealOnMount } from './parts/ToolRevealOnMount';
 import { StaticToolRow } from './parts/ProgressiveGroup';
 import { isExpandableTool, isStandaloneTool } from './parts/toolRenderUtils';
+import { isQuestionToolName } from './parts/questionToolItems';
+import { QuestionToolTurn } from './parts/QuestionToolTurn';
 import TurnActivity from '../components/TurnActivity';
 import { createProjectPlanFile } from '@/lib/openchamberConfig';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
@@ -1987,6 +1989,17 @@ const AssistantMessageBody = React.memo(({
                 const toolPart = part as ToolPartType;
                 const toolName = toolPart.tool?.toLowerCase() ?? '';
                 const toolPartId = toolPart.id ?? `${messageId}-part-${i}-${part.type}`;
+
+                if (isQuestionToolName(toolPart.tool)) {
+                    rendered.push(
+                        <FadeInOnReveal key={`question-${toolPart.id ?? toolPartId}`}>
+                            <QuestionToolTurn part={toolPart} sessionID={sessionId} />
+                        </FadeInOnReveal>
+                    );
+                    flushSegmentsAfterTool(toolPartId);
+                    i += 1;
+                    continue;
+                }
 
                 if (isSortedRenderMode && !isActivityOwnerMessage) {
                     flushSegmentsAfterTool(toolPartId);

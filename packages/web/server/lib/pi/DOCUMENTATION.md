@@ -167,13 +167,14 @@ The installed Pi `question` extension (official example / `@earendil-works` ques
 
 After `bindExtensions`, the host replaces that tool's `execute` (`adaptQuestionToolForDesktop` in `question-desktop.js`) so Desktop can answer it:
 
-1. `ctx.ui.select` with the model options plus a numbered `Type something.` option.
-2. A chosen option returns the official `{ answer, wasCustom: false, index }` result.
-3. `Type something.` / `Type something` (and numbered variants) is Other: the in-chat card opens `CustomAnswerTextarea`, then `editor` consumes the stashed text the same way Plan Other does.
+1. Options present: `ctx.ui.select` with the model options plus a numbered `Type something.` option.
+2. No options: `ctx.ui.editor` so an open-ended question still gets an input card.
+3. A chosen option returns the official `{ answer, wasCustom: false, index }` result.
+4. `Type something.` / `Type something` (and numbered variants) is Other: the in-chat card opens `CustomAnswerTextarea`, then `editor` consumes the stashed text the same way Plan Other does. The host re-adapts the tool after bind and again before each prompt so a late-registered `pi-question-tool` still maps.
 
 `isFreeformOtherOption` in the shared UI matches those Type something labels as well as existing `Other` labels. This is not OpenCode `/api/question`. Plan select-only cards without Other still have no textarea.
 
-While a prompt is pending, the in-chat card may sit in the bottom dock so the user can answer. After reply or dismiss, do not keep that card under later messages. The answered or cancelled result belongs on the asking `question` / `plan_mode_question` tool part in that turn (`User selected` / `User wrote` / `User cancelled`, plus `details.answer`). Reopening the session reads that tool part, not a sticky dock card.
+While a prompt is pending, the usable card belongs on the asking `question` / `plan_mode_question` tool turn. The bottom dock is only for prompts that are not bound to a visible question-tool part (for example a bare `/plan` launch). After reply or dismiss, do not keep that card under later messages. The answered or cancelled result stays on that turn (`User selected` / `User wrote` / `User cancelled`, plus `details.answer`). Reopening the session hydrates `GET /api/pi/ui` onto the same turn; fetch failure must not clear a local card.
 
 ## Plan questions
 
