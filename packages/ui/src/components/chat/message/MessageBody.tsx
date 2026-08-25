@@ -13,7 +13,11 @@ import type { TurnActivityGroup, TurnChangedFile, TurnGroupingContext } from '..
 import { cn } from '@/lib/utils';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
 import { isEmptyTextPart, extractTextContent } from './partUtils';
-import { getUserMessageContentOverflowClass } from './userBubbleLayout';
+import {
+    getUserBubbleHoverActionsFrameClass,
+    getUserMessageContentOverflowClass,
+    USER_BUBBLE_HOVER_ACTIONS_SHIFT_CLASS,
+} from './userBubbleLayout';
 import { FadeInOnReveal } from './FadeInOnReveal';
 import { Button } from '@/components/ui/button';
 import { SaveProjectPlanDialog } from '@/components/session/SaveProjectPlanDialog';
@@ -582,26 +586,16 @@ const UserMessageBody = React.memo(({ messageId, parts, messageCreatedAt, isMobi
     const actionsBlock = ((canCopyMessage && hasCopyableText) || onRevert || effectiveOnFork || onToggleContextPin) && showUserActions ? (
         <div className={cn(
             'group/user-actions',
-            isMobile
-                ? userActionsMode === 'inline'
-                    ? 'flex items-center justify-end pt-2 pb-3'
-                    : stickyUserHeaderEnabled
-                        ? 'flex h-9 items-start justify-end pt-0'
-                        : 'flex h-11 items-start justify-end pt-0'
-                : userActionsMode === 'inline'
-                    ? 'absolute top-full left-0 right-0 z-10 pt-5'
-                    : 'flex h-8 items-start justify-end pt-2'
+            getUserBubbleHoverActionsFrameClass({
+                isMobile,
+                inline: userActionsMode === 'inline',
+                stickyUserHeaderEnabled,
+            }),
         )}>
             <div
                 className={cn(
-                    'flex items-center justify-end gap-1',
-                    isMobile
-                        ? userActionsMode === 'inline'
-                            ? 'translate-x-5'
-                            : 'translate-x-0'
-                        : userActionsMode === 'inline'
-                            ? 'translate-x-5'
-                            : 'translate-x-0',
+                    'flex max-w-full items-center justify-end gap-1',
+                    USER_BUBBLE_HOVER_ACTIONS_SHIFT_CLASS,
                     alwaysShowActions || isMessageCopied
                         ? 'pointer-events-auto opacity-100'
                         : 'pointer-events-none opacity-0 transition-opacity duration-150 has-[[data-visible=true]]:pointer-events-auto has-[[data-visible=true]]:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 group-hover/user-actions:pointer-events-auto group-hover/user-actions:opacity-100 group-hover/user-shell:pointer-events-auto group-hover/user-shell:opacity-100'
