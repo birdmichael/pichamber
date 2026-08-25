@@ -133,5 +133,6 @@ describe('ExtensionsPage version display', () => {
     expect(source).not.toContain('actions.upToDate');
     expect(source).not.toContain('latestUnknown');
     expect(source).toContain('updateToVersion');
+    expect(source).toContain('SETTINGS_ACTION_BUTTON_CLASS');
   });
 });

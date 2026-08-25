@@ -12,6 +12,7 @@ import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
   SettingsSection,
+  SETTINGS_ACTION_BUTTON_CLASS,
   SETTINGS_VERSION_META_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -211,7 +212,7 @@ export const ExtensionsPage: React.FC = () => {
               variant="default"
               disabled={isBusy}
               onClick={() => { void runUpdate(); }}
-              className="shrink-0 !font-normal"
+              className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
               aria-label={t('settings.extensions.page.packages.actions.updateAllAria')}
             >
               {busy?.kind === 'all'
@@ -242,7 +243,7 @@ export const ExtensionsPage: React.FC = () => {
                   variant="outline"
                   disabled={isBusy}
                   onClick={() => { void runUpdate(source); }}
-                  className="shrink-0 !font-normal"
+                  className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
                   aria-label={updateLabel}
                 >
                   {rowBusy && busy?.kind === 'one'

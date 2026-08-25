@@ -69,5 +69,9 @@ describe('PiAgentSettings version display', () => {
     expect(source).not.toContain('actions.upToDate');
     expect(source).toContain('updateToVersion');
     expect(source).toContain('data-settings-item="sessions.pi-update"');
+    expect(source).toContain('SETTINGS_ACTION_BUTTON_CLASS');
+    expect(source).toContain('justify-start');
+    expect(source).not.toContain('justify-between');
+    expect(source).not.toContain('justify-end');
   });
 });

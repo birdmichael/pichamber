@@ -7,6 +7,7 @@ import {
   SettingsFieldRow,
   SettingsCheckboxRow,
   SettingsInset,
+  SETTINGS_ACTION_BUTTON_CLASS,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_DESCRIPTION_CLASS,
@@ -310,20 +311,17 @@ export const PiAgentSettings: React.FC = () => {
 
         {upgradeStatus?.currentVersion ? (
           <div
-            className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-1.5"
+            className="flex min-w-0 flex-wrap items-center justify-start gap-2 py-1.5"
             data-settings-item="sessions.pi-version"
           >
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span
-                className={SETTINGS_VERSION_META_CLASS}
-                aria-label={t('settings.openchamber.piAgent.field.currentVersionAria', {
-                  version: upgradeStatus.currentVersion,
-                })}
-              >
-                {upgradeStatus.currentVersion}
-              </span>
-              <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
-            </div>
+            <span
+              className={SETTINGS_VERSION_META_CLASS}
+              aria-label={t('settings.openchamber.piAgent.field.currentVersionAria', {
+                version: upgradeStatus.currentVersion,
+              })}
+            >
+              {upgradeStatus.currentVersion}
+            </span>
             {canUpdatePiFromStatus(upgradeStatus) && upgradeStatus.latestVersion ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -333,7 +331,7 @@ export const PiAgentSettings: React.FC = () => {
                     variant="outline"
                     onClick={handleUpdatePi}
                     disabled={isUpdating}
-                    className="shrink-0 !font-normal"
+                    className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
                     aria-label={t('settings.openchamber.piAgent.actions.updateToVersion', {
                       version: upgradeStatus.latestVersion,
                     })}
@@ -351,6 +349,7 @@ export const PiAgentSettings: React.FC = () => {
                 </TooltipContent>
               </Tooltip>
             ) : null}
+            <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
           </div>
         ) : null}
 

@@ -69,9 +69,13 @@ Use `SETTINGS_VERSION_META_CLASS` for a read-only installed version — not a
 `SettingsFieldRow`, not chips, and not a "Current x · Latest y" sentence.
 
 - Show only the current version as muted tabular text under or beside the name.
-- When a newer latest exists, show a quiet sentence-case Update. Put the latest
-  version on the button aria/tooltip (`Update to {version}`), not on the visible
-  label and not as a second number.
+- When a newer latest exists, show a quiet sentence-case Update
+  (`SETTINGS_ACTION_BUTTON_CLASS`). Put the latest version on the button
+  aria/tooltip (`Update to {version}`), not on the visible label and not as a
+  second number.
+- Pi: keep the version and Update adjacent on the left. Do not
+  `justify-between` / right-align Update across the pane.
+- Extensions: name and version stay left; Update and Uninstall stay right.
 - When already current: version only. No "Up to date", no latest number, no Update.
 
 ## Numeric Value / Override
