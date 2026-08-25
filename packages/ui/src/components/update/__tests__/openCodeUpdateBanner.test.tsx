@@ -2,10 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import {
-  OpenCodeUpdateBanner,
-  resolveUpdateAvailableBannerPortalTarget,
-} from '../OpenCodeUpdateBanner';
+import { OpenCodeUpdateBanner } from '../OpenCodeUpdateBanner';
+import { resolveUpdateAvailableBannerPortalTarget } from '../openCodeUpdateBannerPortal';
 
 describe('OpenCodeUpdateBanner', () => {
   test('portals to document.body, not a header-column host', () => {

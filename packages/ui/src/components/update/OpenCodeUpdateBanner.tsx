@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/icon/Icon';
 import { cn } from '@/lib/utils';
+import { resolveUpdateAvailableBannerPortalTarget } from './openCodeUpdateBannerPortal';
 
 const UPDATE_AVAILABLE_HOST_ID = 'pichamber-update-available-host';
 
@@ -11,14 +12,6 @@ const UPDATE_AVAILABLE_HOST_ID = 'pichamber-update-available-host';
  * cover traffic lights or header icons (#296).
  */
 const UPDATE_AVAILABLE_BANNER_TOP = 'calc(var(--oc-header-height, 3rem) + 12px)';
-
-/**
- * Body-level stacking context only. A host inside the header column loses to
- * that ancestor's overflow / transform / isolation even with position:fixed.
- */
-export const resolveUpdateAvailableBannerPortalTarget = (
-  doc: { body?: HTMLElement | null } | null | undefined,
-): HTMLElement | null => doc?.body ?? null;
 
 interface OpenCodeUpdateBannerProps {
   title: string;

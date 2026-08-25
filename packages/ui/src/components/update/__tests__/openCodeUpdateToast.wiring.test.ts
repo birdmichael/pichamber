@@ -11,6 +11,10 @@ const bannerSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../OpenCodeUpdateBanner.tsx'),
   'utf-8',
 );
+const portalSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../openCodeUpdateBannerPortal.ts'),
+  'utf-8',
+);
 const headerSource = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '../../layout/Header.tsx'),
   'utf-8',
@@ -30,6 +34,7 @@ describe('Pi update available banner', () => {
     expect(headerSource).not.toContain('OpenCodeUpdateBannerHost');
     expect(bannerSource).toContain('createPortal');
     expect(bannerSource).toContain('resolveUpdateAvailableBannerPortalTarget(document)');
+    expect(portalSource).toContain('doc?.body ?? null');
     expect(bannerSource).toContain('--oc-header-height');
     expect(bannerSource).toContain('app-region-no-drag');
     expect(bannerSource).not.toMatch(/absolute inset-x-0 top-0/);
