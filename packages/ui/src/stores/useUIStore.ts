@@ -10,8 +10,6 @@ import { getStoredMobileKeyboardMode, type MobileKeyboardMode } from '@/lib/mobi
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import type { TerminalShell } from '@/lib/api/types';
 import { useFilesViewTabsStore } from './useFilesViewTabsStore';
-import { useDirectoryStore } from './useDirectoryStore';
-import { useProjectsStore } from './useProjectsStore';
 import { isWindowsArm64 } from '@/lib/platform';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
@@ -147,10 +145,68 @@ const runtimeMemoryKey = (value?: string | null): string => {
 // Shared with rail/panel consumers so contextPanelByDirectory lookups agree on keys.
 export const normalizeContextPanelDirectoryKey = (value: string): string => normalizeDirectoryPath(value);
 
+type BrowserScopeDirectoryStore = {
+  getState: () => { homeDirectory?: string | null };
+};
+
+type BrowserScopeProjectsStore = {
+  getState: () => { projects: Array<{ path: string }> };
+};
+
+let directoryStoreForBrowserScope: BrowserScopeDirectoryStore | undefined;
+let projectsStoreForBrowserScope: BrowserScopeProjectsStore | undefined;
+
+export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectoryStore): void => {
+  directoryStoreForBrowserScope = store;
+};
+
+export const bindProjectsStoreForBrowserScope = (store: BrowserScopeProjectsStore): void => {
+  projectsStoreForBrowserScope = store;
+};
+
+const requireStoreExport = <T>(specifier: string, exportName: string): T | undefined => {
+  const req =
+    (import.meta as ImportMeta & { require?: (id: string) => Record<string, T> }).require
+    ?? (globalThis as typeof globalThis & { require?: (id: string) => Record<string, T> }).require;
+  if (typeof req !== 'function') {
+    return undefined;
+  }
+  try {
+    return req(specifier)?.[exportName];
+  } catch {
+    return undefined;
+  }
+};
+
+const getDirectoryStoreForBrowserScope = (): BrowserScopeDirectoryStore | undefined => {
+  if (!directoryStoreForBrowserScope) {
+    const exportName = 'useDirectoryStore';
+    directoryStoreForBrowserScope = requireStoreExport<BrowserScopeDirectoryStore>(
+      `./${exportName}`,
+      exportName,
+    );
+  }
+  return directoryStoreForBrowserScope;
+};
+
+const getProjectsStoreForBrowserScope = (): BrowserScopeProjectsStore | undefined => {
+  if (!projectsStoreForBrowserScope) {
+    const exportName = 'useProjectsStore';
+    projectsStoreForBrowserScope = requireStoreExport<BrowserScopeProjectsStore>(
+      `./${exportName}`,
+      exportName,
+    );
+  }
+  return projectsStoreForBrowserScope;
+};
+
+// Home / opened projects are needed only when a browser action runs. A static
+// import here closes useDirectoryStore → persistence → useUIStore →
+// useDirectoryStore and TDZ-crashes the Desktop renderer before React mounts.
 const readContextBrowserScopeKey = (directory: string): string => {
-  const home = useDirectoryStore.getState().homeDirectory;
+  const home = getDirectoryStoreForBrowserScope()?.getState().homeDirectory;
   const opened = openedProjectPathSet(
-    useProjectsStore.getState().projects.map((project) => project.path),
+    getProjectsStoreForBrowserScope()?.getState().projects.map((project) => project.path) ?? [],
   );
   return resolveBrowserScopeKey(directory, home, opened) || directory;
 };

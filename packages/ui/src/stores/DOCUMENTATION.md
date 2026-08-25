@@ -75,7 +75,9 @@ Files / Git / notes stay keyed by the real session directory. `BrowserPane`
 also keeps that session directory so annotation drafts and announced servers
 match the composer. Cookies stay on the global Electron partition
 `persist:openchamber-browser`. Resolve the store key with
-`resolveBrowserScopeKey` in `lib/browser/scope.ts`.
+`resolveBrowserScopeKey` in `lib/browser/scope.ts`. `useUIStore` reads home and
+opened projects through a late getter inside `readContextBrowserScopeKey` and
+must not statically import `useDirectoryStore` or `useProjectsStore`.
 
 ### Session / project coordination stores
 
