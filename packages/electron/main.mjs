@@ -4883,7 +4883,11 @@ const buildMacMenu = () => {
       submenu: [
         { label: 'New Window', accelerator: 'Cmd+Shift+Alt+N', click: () => void handleInvoke(null, 'desktop_new_window') },
         { type: 'separator' },
-        { label: 'New Session', accelerator: 'Cmd+N', click: () => dispatchAction('new-session') },
+        // registerAccelerator:false → show the shortcut hint but let the
+        // renderer own the (customizable) key binding. Otherwise Cmd+N never
+        // reaches useKeyboardShortcuts, which passes directoryOverride for a
+        // project session.
+        { label: 'New Session', accelerator: 'Cmd+N', registerAccelerator: false, click: () => dispatchAction('new-session') },
         { label: 'New Worktree', accelerator: 'Cmd+Shift+N', click: () => dispatchAction('new-worktree-session') },
         // registerAccelerator:false → show the shortcut hint but let the
         // renderer own the (customizable) key binding, avoiding a double open.
@@ -4984,7 +4988,11 @@ const buildAutoHiddenMenu = () => {
       submenu: [
         { label: 'New Window', accelerator: 'Ctrl+Shift+Alt+N', click: () => void handleInvoke(null, 'desktop_new_window') },
         { type: 'separator' },
-        { label: 'New Session', accelerator: 'Ctrl+N', click: () => dispatchAction('new-session') },
+        // registerAccelerator:false → show the shortcut hint but let the
+        // renderer own the (customizable) key binding. Otherwise Ctrl+N never
+        // reaches useKeyboardShortcuts, which passes directoryOverride for a
+        // project session.
+        { label: 'New Session', accelerator: 'Ctrl+N', registerAccelerator: false, click: () => dispatchAction('new-session') },
         { label: 'New Worktree', accelerator: 'Ctrl+Shift+N', click: () => dispatchAction('new-worktree-session') },
         { type: 'separator' },
         { label: 'Add Workspace', click: () => dispatchAction('change-workspace') },

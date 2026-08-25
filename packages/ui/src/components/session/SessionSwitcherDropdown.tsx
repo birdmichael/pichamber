@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Icon } from '@/components/icon/Icon';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { useGlobalSessionStatus } from '@/sync/sync-context';
 import { useSessionUnseenCount } from '@/sync/notification-store';
 import { useSwitcherItems, type SwitcherItem } from '@/components/session/sidebar/hooks/useSwitcherItems';
@@ -78,7 +79,7 @@ function SwitcherContent({ onSelect, variant, scopeProjectId }: SwitcherContentP
   const handleNewSession = React.useCallback(() => {
     setActiveMainTab('chat');
     onSelect();
-    openNewSessionDraft();
+    openNewSessionDraft(readInheritedNewSessionDraftOptions());
   }, [onSelect, openNewSessionDraft, setActiveMainTab]);
 
   const [expandedParents, setExpandedParents] = React.useState<Set<string>>(new Set());
