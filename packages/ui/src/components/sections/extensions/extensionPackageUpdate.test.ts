@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   packageDisplayName,
@@ -115,5 +118,16 @@ describe('extensionPackageUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: null,
     })).toBe('none');
+  });
+});
+
+describe('ExtensionsPage version display', () => {
+  test('uses version chips instead of a Current · Latest sentence', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'ExtensionsPage.tsx'),
+      'utf8',
+    );
+    expect(source).toContain('SettingsVersionChips');
+    expect(source).not.toContain('versionBits.join');
   });
 });

@@ -533,6 +533,77 @@ interface SettingsChipGroupProps<T extends string> {
   'aria-label'?: string;
 }
 
+const SETTINGS_VERSION_CHIP_CLASS =
+  'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 typography-micro font-medium tabular-nums';
+
+interface SettingsVersionChipProps {
+  version: string;
+  /** Quiet = installed/current. Accent = a newer latest, not a CTA. */
+  tone?: 'quiet' | 'accent';
+  'aria-label'?: string;
+}
+
+/** Read-only version pill. Not a SettingsChipGroup option (those are selectable). */
+function SettingsVersionChip({
+  version,
+  tone = 'quiet',
+  'aria-label': ariaLabel,
+}: SettingsVersionChipProps) {
+  return (
+    <span
+      aria-label={ariaLabel}
+      className={cn(
+        SETTINGS_VERSION_CHIP_CLASS,
+        tone === 'accent'
+          ? 'border-[var(--status-info-border)] bg-[var(--status-info-background)] text-[var(--status-info)]'
+          : 'border-[var(--interactive-border)] bg-[var(--surface-elevated)] text-muted-foreground',
+      )}
+    >
+      {version}
+    </span>
+  );
+}
+
+interface SettingsVersionChipsProps {
+  currentVersion?: string | null;
+  currentAriaLabel?: string;
+  /** Pass only when a newer latest should be shown. */
+  latestVersion?: string | null;
+  latestAriaLabel?: string;
+  /** Muted status next to the chips, e.g. "Up to date". */
+  status?: React.ReactNode;
+  className?: string;
+}
+
+/** One-line current / latest chips. Keep nowrap so badges share a baseline. */
+export function SettingsVersionChips({
+  currentVersion,
+  currentAriaLabel,
+  latestVersion,
+  latestAriaLabel,
+  status,
+  className,
+}: SettingsVersionChipsProps) {
+  if (!currentVersion && !latestVersion && status == null) return null;
+  return (
+    <div className={cn('flex shrink-0 flex-nowrap items-center gap-1.5', className)}>
+      {currentVersion ? (
+        <SettingsVersionChip version={currentVersion} aria-label={currentAriaLabel} />
+      ) : null}
+      {latestVersion ? (
+        <SettingsVersionChip
+          version={latestVersion}
+          tone="accent"
+          aria-label={latestAriaLabel}
+        />
+      ) : null}
+      {status != null ? (
+        <span className={cn(SETTINGS_HELPER_CLASS, 'shrink-0 whitespace-nowrap')}>{status}</span>
+      ) : null}
+    </div>
+  );
+}
+
 /** Compact chip / segmented enum picker. */
 export function SettingsChipGroup<T extends string>({
   value,

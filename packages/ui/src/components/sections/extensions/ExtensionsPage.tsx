@@ -11,8 +11,8 @@ import {
 import { toast } from '@/components/ui';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
 import {
-  SETTINGS_HELPER_CLASS,
   SettingsSection,
+  SettingsVersionChips,
 } from '@/components/sections/shared/SettingsSection';
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { shouldShowExtensionsSection } from './extensionsPageVisibility';
@@ -230,28 +230,31 @@ export const ExtensionsPage: React.FC = () => {
               const rowBusy = (busy?.kind === 'one' || busy?.kind === 'uninstall') && busy.source === source;
               const versionState = packageVersionState(item);
               const showUpdate = versionState === 'update';
-              const versionBits = [
-                item.currentVersion
-                  ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
-                  : item.scope,
-              ];
-              if (versionState === 'update' && item.latestVersion) {
-                versionBits.push(t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion }));
-              } else if (versionState === 'upToDate') {
-                versionBits.push(t('settings.extensions.page.packages.actions.upToDate'));
-              } else if (versionState === 'unknown') {
-                versionBits.push(t('settings.extensions.page.packages.latestUnknown'));
-              }
+              const versionStatus = versionState === 'upToDate'
+                ? t('settings.extensions.page.packages.actions.upToDate')
+                : versionState === 'unknown'
+                  ? t('settings.extensions.page.packages.latestUnknown')
+                  : !item.currentVersion && item.scope
+                    ? item.scope
+                    : null;
               return (
                 <li key={`${item.scope}:${item.path}:${item.source}`} className="rounded-lg border border-border/50 px-3 py-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="typography-ui-label font-medium">{item.name}</div>
-                      <div className={`${SETTINGS_HELPER_CLASS} mt-0.5`}>
-                        {versionBits.join(' · ')}
-                      </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <div className="min-w-0 truncate typography-ui-label font-medium">{item.name}</div>
+                      <SettingsVersionChips
+                        currentVersion={item.currentVersion}
+                        currentAriaLabel={item.currentVersion
+                          ? t('settings.extensions.page.packages.currentVersion', { version: item.currentVersion })
+                          : undefined}
+                        latestVersion={versionState === 'update' ? item.latestVersion : null}
+                        latestAriaLabel={versionState === 'update' && item.latestVersion
+                          ? t('settings.extensions.page.packages.latestVersion', { version: item.latestVersion })
+                          : undefined}
+                        status={versionStatus}
+                      />
                     </div>
-                    <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       {showUpdate ? (
                         <Button
                           type="button"

@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   canUpdatePiFromStatus,
@@ -50,5 +53,18 @@ describe('piAgentUpdate', () => {
     expect(shouldShowPiLatestVersion(unknownLatest)).toBe(false);
     expect(canUpdatePiFromStatus(unknownLatest)).toBe(false);
     expect(isPiUpToDate(unknownLatest)).toBe(false);
+  });
+});
+
+describe('PiAgentSettings version display', () => {
+  test('uses one chip row instead of stacked Current / Latest field rows', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'PiAgentSettings.tsx'),
+      'utf8',
+    );
+    expect(source).toContain('SettingsVersionChips');
+    expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.currentVersion')}");
+    expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.latestVersion')}");
+    expect(source).toContain('data-settings-item="sessions.pi-update"');
   });
 });
