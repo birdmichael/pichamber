@@ -136,10 +136,11 @@ Desktop (`process.versions.electron` set) loads user Pi extensions in a
 Node child that runs the app-bundled `@earendil-works/pi-coding-agent`
 plus a resolved or packaged Node. User `.node` files are not `dlopen`'d
 in Electron, so a normal system `npm install` works without an Electron
-rebuild. Desktop does not spawn PATH `pi`. Missing Node is a clear error
-plus recovery, not a half-up kernel. `OPENCHAMBER_PI_NODE_KERNEL=0`
-restores the leftover in-process path (P0 skip + optional
-`{agentDir}/npm-electron/…` tree).
+rebuild. Desktop prefers the app-bundled Node over PATH Node and does
+not spawn PATH `pi`. Missing Node, or a Node that cannot load the SDK,
+is a clear error plus recovery — not a mock or half-up kernel.
+`OPENCHAMBER_PI_NODE_KERNEL=0` restores the leftover in-process path
+(P0 skip + optional `{agentDir}/npm-electron/…` tree).
 
 ## Product mark
 

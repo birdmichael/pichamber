@@ -7,7 +7,12 @@ import { createInMemoryPiSession, createPiHost } from './pi-host.js';
 import { createPichamberControlTool, PICHAMBER_CONTROL_TOOL_NAME } from './pichamber-control-tool.js';
 import { createPichamberWebTool, PICHAMBER_WEB_TOOL_NAME } from './pichamber-web-tool.js';
 import { NODE_KERNEL_PROTOCOL, serializeKernelError, serializeSessionSnapshot } from './node-kernel-protocol.js';
-import { PI_SDK_PACKAGE } from './pi-upgrade-status.js';
+import {
+  PI_SDK_PACKAGE,
+  createSdkUnavailableError,
+  isSdkHelloReady,
+  resolveInstalledPiSdkInfo,
+} from './node-runtime.js';
 
 const require = createRequire(import.meta.url);
 const send = (message) => {
@@ -180,20 +185,30 @@ const requireSession = (sessionId) => {
   return session;
 };
 
-const resolveSdkInfo = () => {
-  try {
-    const pkgPath = require.resolve(`${PI_SDK_PACKAGE}/package.json`);
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    return {
-      package: PI_SDK_PACKAGE,
-      version: pkg.version || '',
-      packagePath: pkgPath,
-    };
-  } catch {
+const resolveSdkInfo = async () => {
+  if (boot?.failSdkLoad) {
+    const message = boot.failSdkLoad === true
+      ? 'webidl.util.markAsUncloneable is not a function'
+      : String(boot.failSdkLoad);
     return {
       package: PI_SDK_PACKAGE,
       version: '',
       packagePath: '',
+      error: message,
+    };
+  }
+  try {
+    const info = resolveInstalledPiSdkInfo({ requireImpl: require, packageName: PI_SDK_PACKAGE });
+    if (!boot?.mock) {
+      await import(PI_SDK_PACKAGE);
+    }
+    return info;
+  } catch (error) {
+    return {
+      package: PI_SDK_PACKAGE,
+      version: '',
+      packagePath: '',
+      error: error?.message || String(error),
     };
   }
 };
@@ -223,6 +238,7 @@ const createChildSession = async (input = {}) => {
   if (!host) {
     host = createPiHost({
       mock: false,
+      allowInMemoryFallback: false,
       home: boot?.home,
       defaultDirectory: boot?.defaultDirectory || process.cwd(),
       getProcessVersions: () => process.versions,
@@ -258,20 +274,31 @@ const createChildSession = async (input = {}) => {
 
 const handleCall = async (method, params = {}) => {
   if (method === 'hello') {
+    const sdk = await resolveSdkInfo();
     return {
       protocol: NODE_KERNEL_PROTOCOL,
       pid: process.pid,
       execPath: process.execPath,
       argv: process.argv,
       versions: process.versions,
-      sdk: resolveSdkInfo(),
+      sdk,
       cwd: process.cwd(),
     };
   }
   if (method === 'ready') {
-    return { ok: true };
+    const hello = await handleCall('hello');
+    if (!boot?.mock && !isSdkHelloReady(hello)) {
+      throw createSdkUnavailableError(hello);
+    }
+    return { ok: true, hello };
   }
   if (method === 'createSession') {
+    if (!boot?.mock) {
+      const hello = await handleCall('hello');
+      if (!isSdkHelloReady(hello)) {
+        throw createSdkUnavailableError(hello);
+      }
+    }
     return createChildSession(params);
   }
   if (method === 'session.method') {
@@ -296,6 +323,7 @@ const handleCall = async (method, params = {}) => {
     if (!host) {
       host = createPiHost({
         mock: boot?.mock === true,
+        allowInMemoryFallback: false,
         home: boot?.home,
         defaultDirectory: boot?.defaultDirectory || process.cwd(),
         getProcessVersions: () => process.versions,
@@ -327,9 +355,13 @@ const onMessage = async (message) => {
   if (!message || typeof message !== 'object') return;
   if (message.type === 'boot') {
     boot = message.boot || {};
+    const hello = await handleCall('hello');
     send({
       type: 'ready',
-      hello: await handleCall('hello'),
+      hello,
+      error: !boot.mock && !isSdkHelloReady(hello)
+        ? serializeKernelError(createSdkUnavailableError(hello))
+        : undefined,
     });
     return;
   }

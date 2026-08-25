@@ -175,8 +175,8 @@ Use an explicit override when testing a different OpenCode CLI build or when a u
 | `OPENCHAMBER_RUNTIME=desktop` | Set by Electron before starting the web server |
 | `OPENCHAMBER_KERNEL` | Desktop/server kernel. Defaults to `pi`. Set `opencode` to restore the leftover OpenCode process |
 | `OPENCHAMBER_PI_NODE_KERNEL` | Desktop Pi session loader. Defaults on for Electron. Set `0` to keep sessions in-process (P0 skip + P1a electron tree). Set `1` to force the Node child |
-| `PICHAMBER_NODE_BINARY` | Explicit Node executable for the Pi kernel child. Must be `node`, not PATH `pi` |
-| `PICHAMBER_BUNDLED_NODE` | Staged packaged Node path; Desktop sets this when `resources/node/bin/node` exists |
+| `PICHAMBER_NODE_BINARY` | Explicit Node executable for the Pi kernel child. Must be `node`, not PATH `pi`. If that binary cannot load the app Pi SDK, Desktop fails closed instead of mocking |
+| `PICHAMBER_BUNDLED_NODE` | Staged packaged Node path; Desktop prefers this over PATH Node when `resources/node/bin/node` exists |
 | `OPENCHAMBER_BUNDLE_OPENCODE_CLI` | Set `1` during `electron:build` to stage the leftover OpenCode CLI extraResource |
 | `OPENCHAMBER_OPENCODE_CLI_VERSION` | Optional packaging override for the leftover OpenCode CLI version; defaults to the pinned root `@opencode-ai/sdk` version |
 | `OPENCHAMBER_TARGET_ARCH` | Explicit desktop package architecture (`x64` or `arm64`); Linux requires it to match the native host |

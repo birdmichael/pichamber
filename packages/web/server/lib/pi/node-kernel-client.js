@@ -8,9 +8,10 @@ import {
   restoreKernelError,
 } from './node-kernel-protocol.js';
 import {
-  PI_NODE_UNAVAILABLE_CODE,
   childPathEnvForNode,
   createMissingNodeError,
+  createSdkUnavailableError,
+  isSdkHelloReady,
   resolvePiNodeRuntime,
   toNodeReadablePath,
 } from './node-runtime.js';
@@ -182,6 +183,7 @@ export const createNodeKernelClient = ({
   defaultDirectory = process.cwd(),
   mock = false,
   loadUserNpmExtensions = false,
+  failSdkLoad,
   getCustomTools,
   onHostEvent,
   onChildExit,
@@ -372,6 +374,7 @@ export const createNodeKernelClient = ({
         defaultDirectory,
         mock,
         loadUserNpmExtensions,
+        failSdkLoad,
         agentDir: home ? path.join(home, '.pi', 'agent') : undefined,
       },
     });
@@ -493,7 +496,9 @@ export const createNodeKernelHost = (options = {}) => {
     : process.versions);
   const env = options.env || process.env;
   let kernelReady = false;
+  let lastReadyError = null;
   let client = null;
+  const mock = options.mock === true;
   const runtime = resolvePiNodeRuntime({
     env,
     versions,
@@ -555,6 +560,7 @@ export const createNodeKernelHost = (options = {}) => {
     ...options,
     getProcessVersions: options.getProcessVersions || (() => versions),
     electronNativeIsolation: false,
+    allowInMemoryFallback: false,
     createDirectoryRuntime: options.createDirectoryRuntime || (async ({ cwd }) => ({
       session: null,
       directory: cwd,
@@ -575,6 +581,7 @@ export const createNodeKernelHost = (options = {}) => {
   host.ready = async () => {
     if (!runtime.ok || !client) {
       kernelReady = false;
+      lastReadyError = createMissingNodeError(runtime);
       console.error(`[pi-host] ${runtime.message} ${runtime.recovery}`);
       return false;
     }
@@ -584,17 +591,30 @@ export const createNodeKernelHost = (options = {}) => {
       if (hello && /(?:^|[\\/])pi(?:\.exe)?$/i.test(String(hello.execPath || ''))) {
         throw new Error('Node kernel refused to start PATH pi');
       }
+      if (!mock && !isSdkHelloReady(hello)) {
+        throw createSdkUnavailableError(hello);
+      }
       await originalReady();
+      lastReadyError = null;
       kernelReady = true;
       return true;
     } catch (error) {
       kernelReady = false;
+      lastReadyError = error?.recovery ? error : createSdkUnavailableError(error);
       console.error(`[pi-host] node kernel failed: ${error?.message || error}`);
-      if (error?.code === PI_NODE_UNAVAILABLE_CODE || error?.recovery) {
-        return false;
-      }
-      throw error;
+      return false;
     }
+  };
+  const originalCreateSession = host.createSession.bind(host);
+  host.createSession = async (input) => {
+    if (!kernelReady) {
+      const ok = await host.ready();
+      if (!ok) {
+        throw lastReadyError
+          || (!runtime.ok ? createMissingNodeError(runtime) : createSdkUnavailableError(client?.describe()?.hello));
+      }
+    }
+    return originalCreateSession(input);
   };
   host.reload = async (reloadOptions) => {
     if (!runtime.ok || !client) {
@@ -602,6 +622,14 @@ export const createNodeKernelHost = (options = {}) => {
     }
     if (!client.isConnected()) {
       await client.ensureStarted();
+    }
+    if (!mock) {
+      const hello = await client.call('hello');
+      if (!isSdkHelloReady(hello)) {
+        kernelReady = false;
+        lastReadyError = createSdkUnavailableError(hello);
+        throw lastReadyError;
+      }
     }
     const result = await originalReload(reloadOptions);
     kernelReady = true;

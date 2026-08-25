@@ -54,16 +54,22 @@ the app-bundled `@earendil-works/pi-coding-agent` plus a resolved Node
 binary. User `.node` files are not `dlopen`'d in Electron.
 
 Node resolution: `PICHAMBER_NODE_BINARY` / `OPENCHAMBER_NODE_BINARY`,
-PATH `node` (never `pi` / Electron / Bun), then the packaged
-`resources/node` binary (`PICHAMBER_BUNDLED_NODE`), then the current
-`process.execPath` only when it is actually Node. Feature Plugin install
-prepends that same Node onto the child's `PATH`. Packaged Desktop stages
-Node with `packages/electron/scripts/prepare-node.mjs`. Do not spawn PATH
-`pi`.
+then the packaged `resources/node` binary (`PICHAMBER_BUNDLED_NODE`),
+then PATH `node` (never `pi` / Electron / Bun), then the current
+`process.execPath` only when it is actually Node. Desktop therefore
+prefers the app-bundled Node over an incompatible PATH Node. Feature
+Plugin install prepends that same Node onto the child's `PATH`.
+`packages/electron/scripts/prepare-node.mjs` stages a Node that can
+`import` the app-bundled `@earendil-works/pi-coding-agent` (official
+current/LTS if the local binary cannot). Do not spawn PATH `pi`.
 
-Missing Node: `host.ready()` returns false, `isReady()` is false,
-`createSession` throws `PI_NODE_UNAVAILABLE` (503) with recovery text.
-That is not a half-up kernel. Child crash: the Desktop shell stays up;
+Missing Node or an unusable Node (SDK import throws, including
+`markAsUncloneable`): `host.ready()` returns false, `isReady()` is
+false, `createSession` throws `PI_NODE_UNAVAILABLE` /
+`PI_SDK_UNAVAILABLE` (503) with recovery text. The Node-child host
+does not fall back to `createInMemoryPiSession`. Empty
+`hello.sdk.packagePath` plus ready is a fail. That is not a half-up
+kernel. Child crash: the Desktop shell stays up;
 `host.reload()` respawns the child; interrupted turns keep
 `session.error` plus `opencode-restart-interrupted`. `ctx.ui`, session
 create/prompt/fork, scheduled-task session create, and `pichamber`

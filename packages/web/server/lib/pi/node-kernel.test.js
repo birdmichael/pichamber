@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
-import { PI_NODE_UNAVAILABLE_CODE } from './node-runtime.js';
+import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE } from './node-runtime.js';
 import { createNodeKernelClient } from './node-kernel-client.js';
 
 const require = createRequire(import.meta.url);
@@ -181,6 +181,34 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
       expect(hello.argv.some((arg) => arg === decoy || /(^|[\\/])pi$/.test(String(arg)))).toBe(false);
       expect(String(hello.argv[1] || '')).toMatch(/node-kernel-child\.js$/);
       expect(hello.sdk.package).toBe('@earendil-works/pi-coding-agent');
+    } finally {
+      kernel.dispose();
+    }
+  });
+
+  it('22b: SDK load failure in the Node child is not a mock-ready kernel', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const kernel = createPiKernel({
+      mock: false,
+      useNodeKernel: true,
+      failSdkLoad: 'webidl.util.markAsUncloneable is not a function',
+      nodeBinary: process.execPath,
+      home,
+      defaultDirectory: cwd,
+      versions: { electron: '43.0.0', modules: '88' },
+      env: { ...process.env },
+    });
+    try {
+      await expect(kernel.ready()).resolves.toBe(false);
+      expect(kernel.host.isReady()).toBe(false);
+      const hello = kernel.host.getNodeRuntime().hello;
+      expect(hello?.sdk?.packagePath || '').toBe('');
+      await expect(kernel.host.createSession({ directory: cwd })).rejects.toMatchObject({
+        code: PI_SDK_UNAVAILABLE_CODE,
+        status: 503,
+        recovery: expect.stringMatching(/PICHAMBER_NODE_BINARY/),
+      });
     } finally {
       kernel.dispose();
     }

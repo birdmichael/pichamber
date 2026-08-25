@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PI_NODE_UNAVAILABLE_CODE,
   childPathEnvForNode,
+  isSdkHelloReady,
   resolvePiNodeRuntime,
   shouldUseNodeKernel,
   toNodeReadablePath,
@@ -75,6 +76,37 @@ describe('resolvePiNodeRuntime', () => {
   it('prepends the loader Node onto PATH so install uses the same binary', () => {
     const next = childPathEnvForNode('/opt/node/bin/node', { PATH: '/usr/bin' });
     expect(next.startsWith(`/opt/node/bin${path.delimiter}`)).toBe(true);
+  });
+
+  it('prefers bundled Node over PATH Node on Desktop', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-bundled-node-'));
+    const bundled = path.join(root, 'node', 'bin', 'node');
+    fs.mkdirSync(path.dirname(bundled), { recursive: true });
+    fs.writeFileSync(bundled, '#!/bin/sh\nexit 0\n');
+    fs.chmodSync(bundled, 0o755);
+    const resolved = resolvePiNodeRuntime({
+      versions: { electron: '43.0.0' },
+      env: {
+        PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH || ''}`,
+        PICHAMBER_BUNDLED_NODE: bundled,
+      },
+      resourcesPath: path.join(root),
+    });
+    expect(resolved).toMatchObject({ ok: true, source: 'bundled', command: path.resolve(bundled) });
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('treats an empty SDK hello as not ready', () => {
+    expect(isSdkHelloReady({
+      sdk: { package: '@earendil-works/pi-coding-agent', version: '', packagePath: '' },
+    })).toBe(false);
+    expect(isSdkHelloReady({
+      sdk: {
+        package: '@earendil-works/pi-coding-agent',
+        version: '0.84.2',
+        packagePath: '/app/node_modules/@earendil-works/pi-coding-agent/package.json',
+      },
+    })).toBe(true);
   });
 
   it('rewrites app.asar paths so a real Node can read unpacked sources', () => {

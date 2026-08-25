@@ -1122,6 +1122,7 @@ export const createPiHost = ({
   rebuildUserExtensionNative,
   spawnUserExtensionRebuild,
   electronNativeIsolation,
+  allowInMemoryFallback = true,
 } = {}) => {
   const sessions = new Map();
   const sessionTodos = new Map();
@@ -1305,6 +1306,9 @@ export const createPiHost = ({
         return created?.session || created;
       };
     } catch (error) {
+      if (allowInMemoryFallback === false) {
+        throw error;
+      }
       console.warn('[pi-host] @earendil-works/pi-coding-agent unavailable, using in-memory mock session:', error?.message || error);
       return async () => createInMemoryPiSession();
     }

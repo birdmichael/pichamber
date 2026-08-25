@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const PI_NODE_UNAVAILABLE_CODE = 'PI_NODE_UNAVAILABLE';
+export const PI_SDK_UNAVAILABLE_CODE = 'PI_SDK_UNAVAILABLE';
+export const PI_SDK_PACKAGE = '@earendil-works/pi-coding-agent';
 
 const NODE_NAMES = new Set(['node', 'node.exe']);
 const REJECTED_NAMES = new Set(['pi', 'pi.exe', 'electron', 'electron.exe', 'pichamber', 'pichamber.exe', 'bun', 'bun.exe']);
@@ -116,9 +118,60 @@ export const createMissingNodeError = (runtime) => {
 };
 
 const missingNodeRecovery = () => (
-  'Install Node.js, or set PICHAMBER_NODE_BINARY to a Node executable, then reload Pi. '
+  'Install a Node.js that can load the app Pi SDK, or set PICHAMBER_NODE_BINARY to that executable, then reload Pi. '
   + 'Desktop will not start a half-ready kernel, and it will not load user extensions inside Electron.'
 );
+
+const sdkUnavailableRecovery = () => (
+  'Install a Node.js that can load the app Pi SDK, or set PICHAMBER_NODE_BINARY to that executable, then reload Pi. '
+  + 'Desktop will not start a mock or half-ready kernel.'
+);
+
+export const createSdkUnavailableError = (detail) => {
+  const sdkError = typeof detail?.sdk?.error === 'string' ? detail.sdk.error : '';
+  const message = sdkError
+    || detail?.message
+    || 'The resolved Node.js binary could not load the app-bundled Pi SDK.';
+  const error = new Error(message);
+  error.status = 503;
+  error.code = PI_SDK_UNAVAILABLE_CODE;
+  error.recovery = sdkUnavailableRecovery();
+  return error;
+};
+
+export const isSdkHelloReady = (hello) => {
+  const sdk = hello?.sdk;
+  if (!sdk || typeof sdk !== 'object') return false;
+  if (asText(sdk.error)) return false;
+  return Boolean(asText(sdk.package) && asText(sdk.version) && asText(sdk.packagePath));
+};
+
+export const resolveInstalledPiSdkInfo = ({
+  requireImpl,
+  packageName = PI_SDK_PACKAGE,
+} = {}) => {
+  if (!requireImpl || typeof requireImpl.resolve !== 'function') {
+    throw new Error('A require implementation is required to resolve the Pi SDK');
+  }
+  const entry = requireImpl.resolve(packageName);
+  let dir = path.dirname(entry);
+  while (dir !== path.dirname(dir)) {
+    const candidate = path.join(dir, 'package.json');
+    try {
+      const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      if (pkg?.name === packageName) {
+        return {
+          package: packageName,
+          version: typeof pkg.version === 'string' ? pkg.version.trim() : '',
+          packagePath: candidate,
+        };
+      }
+    } catch {
+    }
+    dir = path.dirname(dir);
+  }
+  throw new Error(`Could not resolve ${packageName} package.json from ${entry}`);
+};
 
 const acceptNodeBinary = (candidate, { allowCurrentElectron = false, versions = process.versions } = {}) => {
   const filePath = asText(candidate);
@@ -171,6 +224,18 @@ export const resolvePiNodeRuntime = ({
     }
   }
 
+  for (const candidate of bundledNodeCandidates({ env, resourcesPath, platform })) {
+    const resolved = acceptNodeBinary(candidate, { versions });
+    if (resolved) {
+      return {
+        ok: true,
+        command: resolved,
+        source: 'bundled',
+        recovery: '',
+      };
+    }
+  }
+
   const systemNode = searchPathForNode({ env, platform });
   if (systemNode) {
     return {
@@ -187,18 +252,6 @@ export const resolvePiNodeRuntime = ({
         ok: true,
         command: resolved,
         source: 'system',
-        recovery: '',
-      };
-    }
-  }
-
-  for (const candidate of bundledNodeCandidates({ env, resourcesPath, platform })) {
-    const resolved = acceptNodeBinary(candidate, { versions });
-    if (resolved) {
-      return {
-        ok: true,
-        command: resolved,
-        source: 'bundled',
         recovery: '',
       };
     }
