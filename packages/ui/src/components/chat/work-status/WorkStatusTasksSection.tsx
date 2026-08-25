@@ -40,7 +40,7 @@ export const WorkStatusTasksSection: React.FC<Props> = ({ sessionId, directory }
 
   const liveTodos = useDirectorySync(
     React.useCallback(
-      (state: State) => (sessionId ? state.todo[sessionId] ?? EMPTY_TODOS : EMPTY_TODOS),
+      (state: State) => (sessionId ? state.todo[sessionId] : undefined),
       [sessionId],
     ),
   );
@@ -50,9 +50,10 @@ export const WorkStatusTasksSection: React.FC<Props> = ({ sessionId, directory }
       [directory, sessionId],
     ),
   );
-  // Live channel wins; persistence only restores context for a session whose
-  // todo events predate this client's connection.
-  const todos = liveTodos.length > 0 ? liveTodos : persistedTodos ?? EMPTY_TODOS;
+  // Live `todo.updated` is the source of truth, including an empty snapshot
+  // after clear. Persistence only restores context before this client has a
+  // live key for the session.
+  const todos = liveTodos !== undefined ? liveTodos : persistedTodos ?? EMPTY_TODOS;
 
   const visibleTodos = React.useMemo(() => {
     const kept = todos

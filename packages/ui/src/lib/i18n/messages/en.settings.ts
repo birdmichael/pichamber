@@ -120,6 +120,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Installs the Subagents package. After install, Work Status and writable child sessions become available. This page does not start /subagents-fleet.',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Installs the Btw package. After install, /btw asks a side question in a temporary session. This page does not start /btw.',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Installs the Todo package. After install, Work Status shows a Tasks section that updates when the model changes todos. This page does not start /todos.',
   'settings.featurePlugins.status.installed': 'Installed',
   'settings.featurePlugins.status.notInstalled': 'Not installed',
   'settings.featurePlugins.actions.install': 'Install',

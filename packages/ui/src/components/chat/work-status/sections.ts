@@ -8,15 +8,19 @@ import type { I18nKey } from '@/lib/i18n/messages/en';
  * existing. Kernel availability (`isWorkStatusSectionAvailable`) filters that
  * list before either surface sees it.
  *
+ * Tasks is first: when the Todo feature-plugin slot is on, the live list is
+ * the most immediate readout. That product order overrides the older
+ * durability ranking that put Session first.
+ *
  * The ids are persisted in user settings — renaming one silently resets that
  * user's choice for it.
  */
 export const WORK_STATUS_SECTION_IDS = [
+  'tasks',
   'session',
   'repository',
   'usage',
   'subagents',
-  'tasks',
   'mcp',
   'pinned',
   'contextSources',
@@ -34,6 +38,11 @@ type WorkStatusSectionContext = {
    * (installed + enabled), not on `!isPiKernel`. OpenCode is unchanged.
    */
   subagentsSlotActive?: boolean;
+  /**
+   * Pi Tasks Work Status is gated on the Todo feature-plugin slot
+   * (installed + enabled). OpenCode is unchanged.
+   */
+  todoSlotActive?: boolean;
 };
 
 /**
@@ -44,6 +53,9 @@ type WorkStatusSectionContext = {
  * Subagents on Pi exist only when the Subagents feature-plugin slot is
  * installed and enabled. Leftover OpenCode parentID children are not a Pi
  * fleet.
+ *
+ * Tasks on Pi exist only when the Todo feature-plugin slot is installed
+ * and enabled. Presence of `todo` tool calls is not the gate.
  */
 export const isWorkStatusSectionAvailable = (
   id: WorkStatusSectionId,
@@ -52,6 +64,7 @@ export const isWorkStatusSectionAvailable = (
   if (context?.isPiKernel && id === 'usage') return false;
   if (id === 'mcp' && context?.isPiKernel && !context.isMcpFeaturePluginActive) return false;
   if (context?.isPiKernel && id === 'subagents') return context.subagentsSlotActive === true;
+  if (context?.isPiKernel && id === 'tasks') return context.todoSlotActive === true;
   return true;
 };
 

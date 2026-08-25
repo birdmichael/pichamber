@@ -189,15 +189,23 @@ from aggregating message summaries, not from `Session.summary`.
 
 ## Section order
 
-Ordering is by durability, not category:
+`WORK_STATUS_SECTION_IDS` is display order. Tasks is first so a live
+todo list is the top readout when that section is offered.
 
-1. **Session** (goal, context, cost), **Project** (attention, branch,
+1. **Tasks** — first. On Pi the section exists only when Feature Plugins
+   `todo` is installed and enabled. OpenCode keeps the current Tasks
+   behavior (no slot gate). An empty list still renders nothing (the
+   panel collapses); there is no empty “Tasks” header. The gate is the
+   slot, not leftover OpenCode `todo.updated` stubs or the presence of
+   `todo` tool calls.
+2. **Session** (goal, context, cost), **Project** (attention, branch,
    changes, PR, checks) and **Usage** — true for as long as the session is
    open. Usage sits here rather than lower down because a spent quota stops the
    work outright. On Pi the provider-quota Usage section is not available
    (there is no quota API); the Session context meter is unchanged;
-2. **Subagents**, **Tasks** — what is happening right now;
-3. **MCP**, **Pinned messages**, **Context sources** — supporting material.
+3. **Subagents** — what is happening right now. On Pi this section exists
+   only when the Subagents slot is installed and enabled;
+4. **MCP**, **Pinned messages**, **Context sources** — supporting material.
 
 ## Switching it off
 
@@ -242,6 +250,16 @@ session with many subagents does not crowd every section below it out of the
 panel.
 
 ## Tasks
+
+On Pi, `WorkStatusPanel`, the section-settings dialog, and
+`MobileWorkStatusHost` all hide this section unless the Todo
+feature-plugin slot is installed and enabled. Uninstall removes the
+section immediately (no empty shell). Live SSE `todo.updated` writes
+`state.todo[sessionId]` and is the source of truth, including an empty
+snapshot after clear. Persistence is reconnect fallback only: it is
+used only while this client has no live key for the session. Fetch
+failure must not be treated as an empty success. Child sessions keep
+their own list; the parent panel does not show child todos.
 
 Icons and strike-through match the composer's todo dropdown, so one list does
 not read as two. Two deliberate differences:

@@ -113,6 +113,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Installe le paquet Subagents. Après l’installation, Work Status et les sessions enfants inscriptibles deviennent disponibles. Cette page ne lance pas /subagents-fleet.',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Installe le paquet Btw. Après l’installation, /btw pose une question à part dans une session temporaire. Cette page ne lance pas /btw.',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Installe le paquet Todo. Après l’installation, Work Status affiche une section Tâches qui se met à jour lorsque le modèle change les todos. Cette page ne lance pas /todos.',
   'settings.featurePlugins.status.installed': 'Installé',
   'settings.featurePlugins.status.notInstalled': 'Non installé',
   'settings.featurePlugins.actions.install': 'Installer',

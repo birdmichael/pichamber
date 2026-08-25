@@ -4,6 +4,7 @@ import { WorkStatusGoalRow } from '@/components/chat/work-status/WorkStatusGoalR
 import { WorkStatusMcpSection } from '@/components/chat/work-status/WorkStatusMcpSection';
 import { WorkStatusPrimaryGroup } from '@/components/chat/work-status/WorkStatusPrimaryGroup';
 import { WorkStatusSubagentsSection } from '@/components/chat/work-status/WorkStatusSubagentsSection';
+import { WorkStatusTasksSection } from '@/components/chat/work-status/WorkStatusTasksSection';
 import { WorkStatusUsageSection } from '@/components/chat/work-status/WorkStatusUsageSection';
 import { isWorkStatusSectionVisible } from '@/components/chat/work-status/sections';
 import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
@@ -28,9 +29,10 @@ export const MobileWorkStatusHost: React.FC<{
   const isPiKernel = usePiKernel();
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive],
   );
   const sectionVisible = React.useCallback(
     (sectionId: Parameters<typeof isWorkStatusSectionVisible>[1]) =>
@@ -40,6 +42,7 @@ export const MobileWorkStatusHost: React.FC<{
 
   return (
     <div data-work-status-host="session-metadata">
+      {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
       <WorkStatusPrimaryGroup
         sessionId={sessionId}
         directory={directory}

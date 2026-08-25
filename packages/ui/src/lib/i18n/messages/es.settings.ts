@@ -121,6 +121,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Instala el paquete Subagents. Tras instalarlo, Work Status y las sesiones hijas escribibles quedan disponibles. Esta página no inicia /subagents-fleet.',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Instala el paquete Btw. Tras instalarlo, /btw hace una pregunta secundaria en una sesión temporal. Esta página no inicia /btw.',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Instala el paquete Todo. Tras instalarlo, Work Status muestra una sección Tareas que se actualiza cuando el modelo cambia los todos. Esta página no inicia /todos.',
   'settings.featurePlugins.status.installed': 'Instalado',
   'settings.featurePlugins.status.notInstalled': 'No instalado',
   'settings.featurePlugins.actions.install': 'Instalar',

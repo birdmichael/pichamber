@@ -121,6 +121,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Subagents 패키지를 설치합니다. 설치하면 Work Status와 쓰기 가능한 자식 세션을 사용할 수 있습니다. 이 페이지는 /subagents-fleet을 시작하지 않습니다.',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Btw 패키지를 설치합니다. 설치하면 /btw로 임시 세션에서 옆질문을 할 수 있습니다. 이 페이지는 /btw를 시작하지 않습니다.',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Todo 패키지를 설치합니다. 설치하면 Work Status에 Tasks 섹션이 나타나며, 모델이 할 일을 바꿀 때 업데이트됩니다. 이 페이지는 /todos를 시작하지 않습니다.',
   'settings.featurePlugins.status.installed': '설치됨',
   'settings.featurePlugins.status.notInstalled': '설치되지 않음',
   'settings.featurePlugins.actions.install': '설치',

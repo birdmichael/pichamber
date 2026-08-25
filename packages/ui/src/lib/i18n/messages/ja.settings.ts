@@ -121,6 +121,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Subagents パッケージをインストールします。インストール後、Work Status と書き込み可能な子セッションが使えます。このページは /subagents-fleet を起動しません。',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Btw パッケージをインストールします。インストール後、/btw で一時セッションに脇の質問を送れます。このページは /btw を起動しません。',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Todo パッケージをインストールします。インストール後、Work Status に Tasks セクションが表示され、モデルが todos を変更すると更新されます。このページは /todos を起動しません。',
   'settings.featurePlugins.status.installed': 'インストール済み',
   'settings.featurePlugins.status.notInstalled': '未インストール',
   'settings.featurePlugins.actions.install': 'インストール',

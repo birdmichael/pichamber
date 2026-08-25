@@ -846,8 +846,12 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, children);
   }));
 
-  app.get('/api/session/:sessionID/todo', handle(async (_req, res) => {
-    json(res, 200, []);
+  app.get('/api/session/:sessionID/todo', handle(async (req, res) => {
+    if (typeof host.getSessionTodos !== 'function') {
+      json(res, 200, []);
+      return;
+    }
+    json(res, 200, await host.getSessionTodos(req.params.sessionID, resolveDirectory(req)));
   }));
 
   app.post('/api/session/:sessionID/prompt_async', parseJson, handle(async (req, res) => {

@@ -926,6 +926,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
+    id: 'feature-plugins.todo',
+    page: 'feature-plugins',
+    titleKey: 'settings.featurePlugins.slot.todo.title',
+    descriptionKey: 'settings.featurePlugins.slot.todo.info',
+    keywords: ['todo', 'rpiv-todo', '@juicesharp/rpiv-todo', 'npm', 'install', 'tasks'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'snippets.create',
     page: 'snippets',
     titleKey: 'settings.snippets.sidebar.actions.create',

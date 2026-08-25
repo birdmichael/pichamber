@@ -26,7 +26,9 @@ describe('MobileWorkStatusHost', () => {
     expect(hostSource).toContain('WorkStatusGoalRow');
     expect(hostSource).toContain('WorkStatusMcpSection');
     expect(hostSource).toContain('WorkStatusSubagentsSection');
+    expect(hostSource).toContain('WorkStatusTasksSection');
     expect(hostSource).toContain("isWorkStatusSectionVisible");
+    expect(hostSource).toContain("sectionVisible('tasks')");
     expect(hostSource).not.toContain("from '@/components/chat/work-status/WorkStatusPanel'");
     expect(metadataSource).toContain('MobileWorkStatusHost');
     expect(metadataSource).not.toContain('UsageProviderCards');
@@ -64,6 +66,16 @@ describe('MobileWorkStatusHost', () => {
     expect(isWorkStatusSectionAvailable('subagents', { isPiKernel: true, subagentsSlotActive: true })).toBe(true);
     expect(hostSource).toContain('useFeaturePluginSlotActive');
     expect(hostSource).toContain("sectionVisible('subagents')");
+  });
+
+  test('gates the Tasks row on the Feature Plugin Todo slot', () => {
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true, todoSlotActive: false })).toBe(false);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true, todoSlotActive: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: false })).toBe(true);
+    expect(hostSource).toContain("useFeaturePluginSlotActive('todo'");
+    expect(hostSource).toContain("sectionVisible('tasks')");
+    expect(hostSource.indexOf('WorkStatusTasksSection')).toBeLessThan(hostSource.indexOf('WorkStatusPrimaryGroup'));
   });
 
   test('clicking a live child uses the existing in-place setCurrentSession helper', () => {

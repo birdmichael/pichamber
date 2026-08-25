@@ -121,6 +121,8 @@ export const settingsDict = {
   'settings.featurePlugins.slot.subagents.info': 'Встановлює пакет Subagents. Після встановлення доступні Work Status і дочірні сеанси із записом. Ця сторінка не запускає /subagents-fleet.',
   'settings.featurePlugins.slot.btw.title': 'Btw',
   'settings.featurePlugins.slot.btw.info': 'Встановлює пакет Btw. Після встановлення /btw ставить побічне запитання в тимчасовій сесії. Ця сторінка не запускає /btw.',
+  'settings.featurePlugins.slot.todo.title': 'Todo',
+  'settings.featurePlugins.slot.todo.info': 'Встановлює пакет Todo. Після встановлення Work Status показує розділ Tasks, який оновлюється, коли модель змінює todos. Ця сторінка не запускає /todos.',
   'settings.featurePlugins.status.installed': 'Встановлено',
   'settings.featurePlugins.status.notInstalled': 'Не встановлено',
   'settings.featurePlugins.actions.install': 'Встановити',

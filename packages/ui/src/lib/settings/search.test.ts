@@ -445,6 +445,7 @@ describe('settings search', () => {
       { query: 'pi-mcp-adapter', id: 'feature-plugins.mcp' },
       { query: 'pi-subagents', id: 'feature-plugins.subagents' },
       { query: '@narumitw/pi-btw', id: 'feature-plugins.btw' },
+      { query: '@juicesharp/rpiv-todo', id: 'feature-plugins.todo' },
     ] as const;
 
     for (const { query, id } of queries) {

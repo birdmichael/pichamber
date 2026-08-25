@@ -8,7 +8,7 @@ import {
   resolvePiSettingsPath,
 } from './pi-resources.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -16,6 +16,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   mcp: 'npm:pi-mcp-adapter',
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
+  todo: 'npm:@juicesharp/rpiv-todo',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {

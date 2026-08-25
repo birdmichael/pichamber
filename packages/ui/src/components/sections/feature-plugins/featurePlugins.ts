@@ -1,6 +1,6 @@
 import type { I18nKey } from '@/lib/i18n';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw'] as const;
+export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'] as const;
 
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
@@ -10,6 +10,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   mcp: 'npm:pi-mcp-adapter',
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
+  todo: 'npm:@juicesharp/rpiv-todo',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS: Partial<Record<FeaturePluginSlot, string>> = {
@@ -63,6 +64,11 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
     titleKey: 'settings.featurePlugins.slot.btw.title',
     infoKey: 'settings.featurePlugins.slot.btw.info',
     settingsItem: 'feature-plugins.btw',
+  },
+  todo: {
+    titleKey: 'settings.featurePlugins.slot.todo.title',
+    infoKey: 'settings.featurePlugins.slot.todo.info',
+    settingsItem: 'feature-plugins.todo',
   },
 };
 

@@ -25,9 +25,12 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.mcp.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.mcp);
     expect(payload.slots.subagents.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.subagents);
     expect(payload.slots.btw.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.btw);
+    expect(payload.slots.todo.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.todo);
+    expect(payload.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
     expect(payload.slots.btw.command).toBe('btw');
+    expect(payload.slots.todo.command).toEqual(undefined);
     expect(payload.slots.plan.command).toEqual(undefined);
   });
 
@@ -37,7 +40,7 @@ describe('feature plugin payload parsing', () => {
     expect(parseFeaturePluginsPayload({ slots: { goal: { source: 'npm:@narumitw/pi-goal' } } })).toBeNull();
   });
 
-  test('accepts a complete five-slot payload', () => {
+  test('accepts a complete six-slot payload', () => {
     const parsed = parseFeaturePluginsPayload({
       slots: {
         goal: {
@@ -57,12 +60,32 @@ describe('feature plugin payload parsing', () => {
           installed: true,
           presets: [{ id: 'default', source: 'npm:@narumitw/pi-btw' }],
         },
+        todo: {
+          source: 'npm:@juicesharp/rpiv-todo',
+          enabled: true,
+          installed: true,
+          presets: [{ id: 'default', source: 'npm:@juicesharp/rpiv-todo' }],
+        },
       },
     });
     expect(parsed?.slots.goal.installed).toBe(true);
     expect(parsed?.slots.btw.installed).toBe(true);
     expect(parsed?.slots.btw.command).toBe('btw');
+    expect(parsed?.slots.todo.installed).toBe(true);
+    expect(parsed?.slots.todo.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.todo);
     expect(parsed?.slots.plan.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.plan);
+  });
+
+  test('rejects a five-slot payload that omits todo', () => {
+    expect(parseFeaturePluginsPayload({
+      slots: {
+        goal: { source: 'npm:@narumitw/pi-goal', enabled: false, installed: false, presets: [] },
+        plan: { source: 'npm:@narumitw/pi-plan-mode', enabled: false, installed: false, presets: [] },
+        mcp: { source: 'npm:pi-mcp-adapter', enabled: false, installed: false, presets: [] },
+        subagents: { source: 'npm:pi-subagents', enabled: false, installed: false, presets: [] },
+        btw: { source: 'npm:@narumitw/pi-btw', enabled: false, installed: false, presets: [] },
+      },
+    })).toBeNull();
   });
 
   test('rejects a four-slot payload that omits btw', () => {
@@ -83,15 +106,17 @@ describe('feature plugin payload parsing', () => {
     expect(featurePluginPackageLabel('mcp')).toBe('pi-mcp-adapter');
     expect(featurePluginPackageLabel('subagents')).toBe('pi-subagents');
     expect(featurePluginPackageLabel('btw')).toBe('@narumitw/pi-btw');
+    expect(featurePluginPackageLabel('todo')).toBe('@juicesharp/rpiv-todo');
   });
 
-  test('keeps Settings search IDs on the five slot cards', () => {
+  test('keeps Settings search IDs on the six slot cards', () => {
     expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
       'feature-plugins.goal',
       'feature-plugins.plan',
       'feature-plugins.mcp',
       'feature-plugins.subagents',
       'feature-plugins.btw',
+      'feature-plugins.todo',
     ]);
   });
 

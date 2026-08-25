@@ -87,6 +87,11 @@ import {
   sessionPlanFromState,
 } from './session-plan.js';
 import {
+  isTodoSlotActive,
+  mapTasksToOpenCodeTodos,
+  replayTodosFromEntries,
+} from './session-todo.js';
+import {
   extractRunsFromFacadeMessages,
   extractRunsFromPiEntries,
   findAdapterRunByChildSessionId,
@@ -320,6 +325,12 @@ export const createInMemoryPiSession = ({
           planState = { ...data };
         }
       },
+      appendEntry(entry) {
+        if (entry) sessionEntries.push(entry);
+      },
+    },
+    emitEvent(event) {
+      emit(event);
     },
     async prompt(text, options = {}) {
       if (streaming) {
@@ -1085,6 +1096,7 @@ export const createPiHost = ({
   runSelfUpdate,
 } = {}) => {
   const sessions = new Map();
+  const sessionTodos = new Map();
   const hydrating = new Map();
   const directoryRuntimes = new Map();
   let modelRuntime = null;
@@ -1288,12 +1300,74 @@ export const createPiHost = ({
     return readyPromise;
   };
 
+  const readRecordEntriesOrThrow = (record) => {
+    const manager = record?.sessionManager || record?.piSession?.sessionManager;
+    try {
+      if (typeof manager?.getEntries === 'function') {
+        const entries = manager.getEntries();
+        if (!Array.isArray(entries)) {
+          const error = new Error(`Failed to read session entries for ${record.id}`);
+          error.status = 500;
+          throw error;
+        }
+        return entries;
+      }
+      if (typeof manager?.getBranch === 'function') {
+        const entries = manager.getBranch();
+        if (!Array.isArray(entries)) {
+          const error = new Error(`Failed to read session entries for ${record.id}`);
+          error.status = 500;
+          throw error;
+        }
+        return entries;
+      }
+    } catch (error) {
+      if (error?.status) throw error;
+      const wrapped = new Error(error?.message || `Failed to read session entries for ${record.id}`);
+      wrapped.status = 500;
+      throw wrapped;
+    }
+    return [];
+  };
+
+  const publishRecordTodos = (record, entries) => {
+    if (!Array.isArray(entries)) {
+      const error = new Error(`Failed to read todo snapshot for session ${record.id}`);
+      error.status = 500;
+      throw error;
+    }
+    const todos = mapTasksToOpenCodeTodos(replayTodosFromEntries(entries).tasks);
+    sessionTodos.set(record.id, todos);
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'todo.updated',
+      properties: { sessionID: record.id, todos },
+    });
+    return todos;
+  };
+
+  const syncRecordTodos = (record) => publishRecordTodos(record, readRecordEntriesOrThrow(record));
+
   const emitTranslated = (record, piEvent) => {
     const ocEvents = record.translator.translate(piEvent);
     for (const ocEvent of ocEvents) {
       applyEventToStore(record, ocEvent);
       record.info.time.updated = Date.now();
       emit(record.directory, ocEvent);
+      if (ocEvent.type === 'todo.updated' && Array.isArray(ocEvent.properties?.todos)) {
+        sessionTodos.set(record.id, ocEvent.properties.todos);
+      }
+    }
+    if (
+      piEvent?.type === 'compaction_end'
+      && piEvent.aborted !== true
+      && !(typeof piEvent.errorMessage === 'string' && piEvent.errorMessage.trim())
+    ) {
+      try {
+        syncRecordTodos(record);
+      } catch {
+        // Keep the last good snapshot. Do not replace a failed replay with [].
+      }
     }
     return ocEvents;
   };
@@ -1503,6 +1577,7 @@ export const createPiHost = ({
     attachSession(record);
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
+    sessionTodos.set(sessionID, []);
     emit(cwd, {
       id: createSessionId().replace('ses_', 'evt_'),
       type: 'session.created',
@@ -1618,6 +1693,7 @@ export const createPiHost = ({
     attachSession(record);
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
+    publishRecordTodos(record, entries);
     return record;
   };
 
@@ -1779,6 +1855,7 @@ export const createPiHost = ({
     };
     attachSession(record);
     sessions.set(resolvedId, record);
+    publishRecordTodos(record, entries);
     emit(cwd, {
       id: createEventId(),
       type: 'session.created',
@@ -1954,6 +2031,11 @@ export const createPiHost = ({
     }
     attachSession(record);
     await bindDesktopExtensionUI(record);
+    try {
+      syncRecordTodos(record);
+    } catch {
+      // Reload still succeeded. Keep the last good snapshot instead of [].
+    }
     emit(record.directory, {
       id: createEventId(),
       type: 'session.updated',
@@ -2090,6 +2172,7 @@ export const createPiHost = ({
       } catch {
       }
       sessions.delete(sessionID);
+      sessionTodos.delete(sessionID);
       if (record.sessionFile) {
         try {
           fs.unlinkSync(record.sessionFile);
@@ -3376,7 +3459,22 @@ export const createPiHost = ({
         throw error;
       }
       await record.piSession.compact(typeof instructions === "string" && instructions.trim() ? instructions : undefined);
+      try {
+        syncRecordTodos(record);
+      } catch {
+        // Compact still succeeded. Keep the last good snapshot instead of [].
+      }
       return { compacted: true };
+    },
+    async getSessionTodos(sessionID, directory) {
+      if (!isTodoSlotActive(this.getFeaturePlugins())) {
+        return [];
+      }
+      const record = await ensureRecord(sessionID, directory);
+      if (sessionTodos.has(record.id)) {
+        return sessionTodos.get(record.id);
+      }
+      return syncRecordTodos(record);
     },
     exportSession(sessionID, format = 'jsonl', options = {}) {
       const record = getRecord(sessionID);
@@ -3470,6 +3568,7 @@ export const createPiHost = ({
         }
       }
       sessions.clear();
+      sessionTodos.clear();
     },
   };
 };

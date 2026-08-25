@@ -222,6 +222,42 @@ requires ready/saved markdown. Desktop localizes known plan-ready
 A ready plan with markdown auto-opens the docked Plan rail
 (`openContextPlan`); `/plan start` does not.
 
+## Session todos
+
+`session-todo.js` hosts the live rpiv-todo list for one session. The
+gate is Feature Plugins `todo` (`npm:@juicesharp/rpiv-todo`)
+installed+enabled. Chrome follows `{agentDir}/settings.json` `packages`
+only. Chamber `featurePlugins.todo.enabled` is ignored. Presence of
+`todo` tool calls is not the gate.
+
+When the slot is on:
+
+- `GET /api/session/:id/todo` returns the last mapped OpenCode `Todo[]`
+  for that session. Slot off returns `[]`. A missing session is 404.
+  A hydrate / `getEntries` failure is an HTTP error, not an empty
+  success.
+- Live updates fire on `tool_execution_end` for tool `todo` with valid
+  TaskDetails (`tasks` array + numeric `nextId`). The translator maps
+  those tasks and emits SSE `todo.updated` immediately. Do not wait
+  for `message_end`.
+- Hydrate, reload, compact, and reopen replay the last matching
+  `todo` toolResult `details` on that session's branch (same last-write
+  wins as `session-plan.js` / `latestCompletionPlan`). Replay failure
+  keeps the last good snapshot; it does not write `[]`.
+- Child sessions have their own list keyed by session id. Parent Work
+  Status does not show child todos.
+
+Mapping: `id` → `String(id)`, `subject` → `content`, `deleted` →
+`cancelled`, other statuses pass through, `priority` defaults to
+`medium`. Do not draw `blockedBy` / `owner` / `description` on
+Work Status rows. Do not hide completed items next turn.
+
+Do not scrape TUI overlay / `ctrl+shift+t` / widget `rpiv-todos`,
+read `~/.config/rpiv-todo/config.json`, import the extension process
+`Map`, poll, or use leftover OpenCode `todowrite` / `todoread`.
+`TOOL_NAME` stays `"todo"`. `/todos` is optional listing, not an
+acceptance gate. There is no second install path.
+
 ## Slash command dispatch
 
 `POST /api/session/:id/command` (`host.runCommand`) is the command channel on
