@@ -747,6 +747,7 @@ const piKernel = piKernelEnabled
   ? createPiKernel({
       defaultDirectory: process.cwd(),
       mock: isPiMockEnabled(),
+      resourcesPath: process.resourcesPath,
       getCustomTools: async () => {
         const settings = await readSettingsFromDiskMigrated().catch(() => null);
         const tools = [];
@@ -1320,9 +1321,20 @@ const ensureGlobalWatcherStarted = async () => {
 };
 const bootstrapOpenCodeAtStartup = async (...args) => {
   if (piKernel) {
-    await piKernel.ready();
+    const ready = await piKernel.ready();
     await openCodeLifecycleRuntime.bootstrapOpenCodeAtStartup(...args);
-    console.log('[pichamber] Pi kernel ready — chat/session/event routes are served by the facade');
+    if (ready) {
+      console.log('[pichamber] Pi kernel ready — chat/session/event routes are served by the facade');
+    } else {
+      const nodeRuntime = typeof piKernel.host?.getNodeRuntime === 'function'
+        ? piKernel.host.getNodeRuntime()
+        : null;
+      console.error(
+        '[pichamber] Pi node kernel is not ready. '
+        + `${nodeRuntime?.message || 'Node.js was not found.'} `
+        + `${nodeRuntime?.recovery || ''}`.trim(),
+      );
+    }
     return;
   }
   await openCodeLifecycleRuntime.bootstrapOpenCodeAtStartup(...args);
@@ -1620,7 +1632,9 @@ async function main(options = {}) {
       return buildHealthSnapshot({
         kernel: piKernelEnabled ? 'pi' : 'opencode',
         piMock: Boolean(piKernel?.mock),
-        piReady: Boolean(piKernel),
+        piReady: typeof piKernel?.host?.isReady === 'function'
+          ? piKernel.host.isReady()
+          : Boolean(piKernel),
         openCodePort,
         isOpenCodeReady,
         isRestartingOpenCode,
@@ -1645,6 +1659,9 @@ async function main(options = {}) {
           desktopNotifyEnabled: ENV_DESKTOP_NOTIFY,
           planModeExperimentalEnabled: PLAN_MODE_EXPERIMENT_ENABLED,
           apiOnly,
+          piNodeRuntime: typeof piKernel?.host?.getNodeRuntime === 'function'
+            ? piKernel.host.getNodeRuntime()
+            : undefined,
         },
       });
     },

@@ -15,7 +15,7 @@ The product is the **macOS Electron app**. The web server is only the in-process
 bun install
 ```
 
-3. Configure Pi auth/models the usual way (`~/.pi/agent/auth.json` and `~/.pi/agent/models.json`, or provider keys in the environment). Settings → General can override the Pi agent directory (stored in `~/.config/openchamber/settings.json`). Resolution is: that setting, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`. Changing it does not copy the old tree; Save + Reload applies it. First install with no OpenChamber settings file seeds every existing `{agentDir}/sessions/` cwd as an open project and selects the most recently updated one; skip tmp / missing / `node_modules` / leftover Cursor worktree paths, isolated `~/.config/openchamber/chats` directories, and the exact home folder. Those project-less sessions still appear in the sidebar Chats section. `projects: []` after Close Project is not first-install. The `pi` CLI on your PATH is optional; Desktop uses the in-process `@earendil-works/pi-coding-agent` SDK.
+3. Configure Pi auth/models the usual way (`~/.pi/agent/auth.json` and `~/.pi/agent/models.json`, or provider keys in the environment). Settings → General can override the Pi agent directory (stored in `~/.config/openchamber/settings.json`). Resolution is: that setting, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`. Changing it does not copy the old tree; Save + Reload applies it. First install with no OpenChamber settings file seeds every existing `{agentDir}/sessions/` cwd as an open project and selects the most recently updated one; skip tmp / missing / `node_modules` / leftover Cursor worktree paths, isolated `~/.config/openchamber/chats` directories, and the exact home folder. Those project-less sessions still appear in the sidebar Chats section. `projects: []` after Close Project is not first-install. The `pi` CLI on your PATH is optional; Desktop uses the app-bundled `@earendil-works/pi-coding-agent` SDK plus a resolved or packaged Node to load `{agentDir}/npm`. It does not spawn PATH `pi`.
 4. Run Desktop in development (HMR). This boots Pi by default — no OpenCode install is required:
 
 ```bash
@@ -37,7 +37,7 @@ bun run electron:build
 bun run --cwd packages/electron package
 ```
 
-That verifies the Pi SDK, builds web assets, bundles Electron main, rebuilds native modules, and runs electron-builder. Output lands in `packages/electron/dist` as `Pichamber-<version>-mac-<arch>.dmg` and `.zip`.
+That verifies the Pi SDK, stages a Node binary for the Desktop kernel child, builds web assets, bundles Electron main, rebuilds native modules, and runs electron-builder. Output lands in `packages/electron/dist` as `Pichamber-<version>-mac-<arch>.dmg` and `.zip`.
 
 - Unsigned local builds are the default when Apple signing env (`CSC_LINK` / `CSC_NAME` / `APPLE_ID`) is unset.
 - GitHub Release Mac builds import the Developer ID Application certificate in `APPLE_CERTIFICATE` and pin `CSC_NAME` (no `CSC_LINK` re-import), then notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The job fails closed if that identity is missing or the notary ticket is not stapled. The first Developer ID notarization can stay In Progress for hours; later submits are usually fast.
@@ -109,7 +109,7 @@ Onboarding and bootstrap wait on those Pi signals. They must not treat the OpenC
 - MCP status and config when the feature-plugin slot is installed and enabled: `GET /api/mcp` reports adapter status (or `cached`/`disabled` from adapter files when no live snapshot exists); `GET|POST|PATCH|DELETE /api/config/mcp` reads/writes adapter files. The slot-off case returns no servers and does not invent OpenCode MCP config. LSP, permission, and question remain empty-success stubs so bootstrap does not crash.
 - Composer Goal button when Feature Plugins `goal` is installed and enabled. Click opens a modal; a required objective runs `session.command` → `session.prompt("/goal <objective>")`. Bare `/goal` is rejected. A missing live command errors and is not sent as chat. OpenChamber Session Goal stays hidden on Pi.
 - Desktop Electron agents drive the right-rail Browser via host tool `pichamber_web` (Settings → Pichamber Tools). The leftover OpenCode plugin name `openchamber_web` is not attached on Pi.
-- Desktop Electron agents can create sessions and scheduled tasks via host tool `pichamber` when Settings → Pichamber Tools → Agent control is on. Session create/send/fork stay in-process on the Pi host (no HTTP to the local facade). The leftover OpenCode plugin name `openchamber` is not attached on Pi.
+- Desktop Electron agents can create sessions and scheduled tasks via host tool `pichamber` when Settings → Pichamber Tools → Agent control is on. Session create/send/fork stay on the Pi host (no HTTP to the local facade; on Desktop those host methods IPC to the Node child that loads `{agentDir}/npm`). The leftover OpenCode plugin name `openchamber` is not attached on Pi.
 - Hidden OpenCode-only stubs (501 unsupported, not offered in the UI): share, revert, session.shell
 - `GET /api/find/files` (and `/find/files`) for composer @ file search
 - Session export/import: `GET|POST /api/session/:id/export?format=jsonl|html` and `POST /api/session/import`. JSONL export writes Pi-native `text` / `thinking` / `toolCall` / `toolResult` / `image` so import reconstructs the same facade parts, and keeps assistant `provider` / `model` / `usage` when they already exist. HTML export (`buildSessionHtml`) writes a self-contained offline file that matches the accepted share-chrome preview: Pichamber mark, GitHub + light/dark toggle (`pichamber-export-theme`), Pi coding-agent version, last usable model, user bubbles, thinking as muted unboxed paragraphs, settled `ctx.ui` questions, collapsed tools, Markdown answers, horizontal 1px left-gutter ticks, and a `pichamber` footer. Images are embedded `data:` URLs. Remote http(s) image URLs are omitted or labeled. It does not create a public share URL. JSONL stays the round-trip / re-import format.
@@ -132,11 +132,14 @@ bunx vitest run server/lib/pi
 bun test --cwd packages/electron ./kernel-env.test.mjs
 ```
 
-Desktop (`process.versions.electron` set) isolates user native packages under
-`{agentDir}/npm-electron/electron-{modules}-{platform}-{arch}/{name}@{version}/`
-so `{agentDir}/npm` stays the system-Node tree for the `pi` CLI. Rebuild
-failure skips that extension and keeps the kernel ready. This is not P1b
-(no bundled Node kernel).
+Desktop (`process.versions.electron` set) loads user Pi extensions in a
+Node child that runs the app-bundled `@earendil-works/pi-coding-agent`
+plus a resolved or packaged Node. User `.node` files are not `dlopen`'d
+in Electron, so a normal system `npm install` works without an Electron
+rebuild. Desktop does not spawn PATH `pi`. Missing Node is a clear error
+plus recovery, not a half-up kernel. `OPENCHAMBER_PI_NODE_KERNEL=0`
+restores the leftover in-process path (P0 skip + optional
+`{agentDir}/npm-electron/…` tree).
 
 ## Product mark
 

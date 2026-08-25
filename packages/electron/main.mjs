@@ -1611,6 +1611,15 @@ const spawnLocalServer = async () => {
   process.env.OPENCHAMBER_SKIP_API_COMPRESSION = process.env.OPENCHAMBER_SKIP_API_COMPRESSION || 'true';
   process.env.NO_PROXY = process.env.NO_PROXY || 'localhost,127.0.0.1';
   process.env.no_proxy = process.env.no_proxy || 'localhost,127.0.0.1';
+  const bundledNode = path.join(
+    resourceRoot(),
+    'node',
+    'bin',
+    process.platform === 'win32' ? 'node.exe' : 'node',
+  );
+  if (fs.existsSync(bundledNode)) {
+    process.env.PICHAMBER_BUNDLED_NODE = bundledNode;
+  }
 
   const { startWebUiServer } = await import('@pichamber/web/server/index.js');
 

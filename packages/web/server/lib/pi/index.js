@@ -4,21 +4,41 @@ import { createSseBus } from './sse-bus.js';
 import { createEventTranslator } from './event-translator.js';
 import { isPiKernelEnabled, isPiMockEnabled, resolveKernelName, PI_KERNEL, OPENCODE_KERNEL } from './kernel.js';
 import { buildHealthSnapshot } from './health-snapshot.js';
+import { createNodeKernelHost } from './node-kernel-client.js';
+import { shouldUseNodeKernel } from './node-runtime.js';
+
+const publishHostEvent = (bus, options) => (directory, event) => {
+  bus.publish(directory, event, { eventId: event?.id });
+  if (typeof options.onEvent === 'function') {
+    options.onEvent(directory, event);
+  }
+};
 
 export const createPiKernel = (options = {}) => {
   const env = options.env || process.env;
   const mock = options.mock ?? isPiMockEnabled(env);
+  const versions = options.versions
+    || (typeof options.getProcessVersions === 'function' ? options.getProcessVersions() : process.versions);
   const bus = options.bus || createSseBus();
-  const host = options.host || createPiHost({
-    ...options,
+  const useNodeKernel = shouldUseNodeKernel({
+    env,
+    versions,
     mock,
-    onEvent: (directory, event) => {
-      bus.publish(directory, event, { eventId: event?.id });
-      if (typeof options.onEvent === 'function') {
-        options.onEvent(directory, event);
-      }
-    },
+    useNodeKernel: options.useNodeKernel,
   });
+  const host = options.host || (useNodeKernel
+    ? createNodeKernelHost({
+      ...options,
+      mock,
+      env,
+      versions,
+      onEvent: publishHostEvent(bus, options),
+    })
+    : createPiHost({
+      ...options,
+      mock,
+      onEvent: publishHostEvent(bus, options),
+    }));
 
   bus.start();
 
@@ -27,6 +47,7 @@ export const createPiKernel = (options = {}) => {
     mock,
     host,
     bus,
+    sessionLoader: useNodeKernel ? 'node' : 'in-process',
     register(app) {
       registerPiFacade(app, {
         host,
@@ -35,8 +56,8 @@ export const createPiKernel = (options = {}) => {
       });
     },
     async ready() {
-      await host.ready();
-      return true;
+      const ok = await host.ready();
+      return ok !== false;
     },
     dispose() {
       host.dispose();
@@ -59,3 +80,6 @@ export {
   OPENCODE_KERNEL,
   buildHealthSnapshot,
 };
+
+export { shouldUseNodeKernel, resolvePiNodeRuntime, PI_NODE_UNAVAILABLE_CODE } from './node-runtime.js';
+export { createNodeKernelHost, createNodeKernelClient } from './node-kernel-client.js';

@@ -49,6 +49,7 @@ import { runPiSelfUpdate } from './pi-upgrade.js';
 import {
   collectSkippedUserExtensionsFromErrors,
   createUserExtensionNativeSkipStore,
+  isElectronProcess,
   rememberSkippedUserExtensions,
   withUserExtensionNativeGuard,
 } from './user-extension-native.js';
@@ -1120,6 +1121,7 @@ export const createPiHost = ({
   userExtensionNativeLoadModule,
   rebuildUserExtensionNative,
   spawnUserExtensionRebuild,
+  electronNativeIsolation,
 } = {}) => {
   const sessions = new Map();
   const sessionTodos = new Map();
@@ -1132,6 +1134,8 @@ export const createPiHost = ({
   const resolveProcessVersions = () => (
     typeof getProcessVersions === 'function' ? getProcessVersions() : process.versions
   );
+  const isolateUserNativesInElectron = electronNativeIsolation !== false
+    && (electronNativeIsolation === true || isElectronProcess(resolveProcessVersions()));
   const resolveAgentDir = () => resolvePiAgentDir(home);
   const selfUpdate = typeof runSelfUpdate === 'function'
     ? runSelfUpdate
@@ -1185,6 +1189,9 @@ export const createPiHost = ({
   });
 
   const syncElectronNativeTree = async (directory) => {
+    if (!isolateUserNativesInElectron) {
+      return { enabled: false, isolated: [], skipped: [], failed: [] };
+    }
     try {
       return await syncUserExtensionElectronTree(electronTreeContext(directory));
     } catch (error) {
@@ -3262,7 +3269,9 @@ export const createPiHost = ({
           loadSdk: loadPiSdk,
         });
       }
-      return wrapPackageManagerWithElectronNativeTree(manager, electronTreeContext(defaultDirectory));
+      return isolateUserNativesInElectron
+        ? wrapPackageManagerWithElectronNativeTree(manager, electronTreeContext(defaultDirectory))
+        : manager;
     },
     getFeaturePlugins() {
       return toFeaturePluginsPayload({

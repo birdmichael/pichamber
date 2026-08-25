@@ -6,7 +6,7 @@ This package owns the native shell: windows, menus, deep links, native notificat
 
 ## How It Runs
 
-Desktop starts the Pichamber web server in the same Electron main process and boots the **in-process Pi kernel** by default (`OPENCHAMBER_KERNEL=pi`). There is no separate sidecar subprocess for the server, and no managed OpenCode child process on the default path.
+Desktop starts the Pichamber web server in the same Electron main process and boots the **Pi kernel** by default (`OPENCHAMBER_KERNEL=pi`). There is no separate sidecar subprocess for the server, and no managed OpenCode child process on the default path. The HTTP facade stays in Electron. User `{agentDir}/npm` extensions load in a Node child that runs the app-bundled `@earendil-works/pi-coding-agent` plus a resolved or packaged Node — not PATH `pi`, and not `dlopen` of user natives inside Electron.
 
 `main.mjs` imports `@pichamber/web/server/index.js` and calls `startWebUiServer()`. The Electron window then loads the UI from the local server in development, or from packaged `resources/web-dist` assets in packaged builds.
 
@@ -25,7 +25,8 @@ The preload bridge exposes desktop-only APIs to the web UI through `window.__OPE
 | `scripts/electron-dev.mjs` | Desktop dev launcher with Vite HMR support |
 | `scripts/ensure-electron.mjs` | Verifies the installed Electron binary is complete and repairs it via the postinstall under Bun |
 | `scripts/build-web-assets.mjs` | Builds `packages/web` and stages UI assets into `resources/web-dist` |
-| `scripts/prepare-pi-kernel.mjs` | Verifies the in-process Pi SDK (`@earendil-works/pi-coding-agent`) is installed |
+| `scripts/prepare-pi-kernel.mjs` | Verifies the app-bundled Pi SDK (`@earendil-works/pi-coding-agent`) is installed |
+| `scripts/prepare-node.mjs` | Stages a Node binary into `resources/node` so packaged Desktop can load user extensions without assuming a system Node |
 | `scripts/prepare-opencode-cli.mjs` | Optional leftover: downloads OpenCode CLI only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode` |
 | `scripts/bundle-main.mjs` | Bundles Electron main code into `dist-bundle/main.mjs` for packaging |
 | `scripts/rebuild-native.mjs` | Rebuilds native modules against the Electron runtime |
@@ -95,11 +96,12 @@ bun run electron:build
 That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
-2. `prepare:pi-kernel` to verify the in-process Pi SDK is installed.
-3. `prepare:opencode-cli` — skipped for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` to stage the leftover OpenCode CLI.
-4. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
-5. `rebuild:native` to rebuild native modules for Electron.
-6. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
+2. `prepare:pi-kernel` to verify the app-bundled Pi SDK is installed.
+3. `prepare:node` to stage a Node binary for the Desktop kernel child.
+4. `prepare:opencode-cli` — skipped for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` to stage the leftover OpenCode CLI.
+5. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
+6. `rebuild:native` to rebuild native modules for Electron.
+7. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
 
 **Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`).
 
@@ -146,7 +148,7 @@ The macOS menu bar item is enabled by default and can be disabled in General set
 
 ## Bundled kernel (Pi)
 
-Packaged Mac Desktop boots the in-process Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`). There is no bundled Pi CLI binary and no managed OpenCode child on the default path.
+Packaged Mac Desktop boots the app-bundled Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`) in a Node child. There is no bundled Pi CLI binary and no managed OpenCode child on the default path. User extensions load with that Node, not inside Electron. If Node cannot be resolved, Desktop reports a clear error and recovery instead of starting a half-ready kernel.
 
 The leftover OpenCode CLI extraResource is optional. `prepare:opencode-cli` downloads it only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode`. The OpenCode CLI settings page stays visible for that leftover path.
 
@@ -172,6 +174,9 @@ Use an explicit override when testing a different OpenCode CLI build or when a u
 | `OPENCHAMBER_HMR_API_PORT` | Preferred API port for desktop dev, default `3901` |
 | `OPENCHAMBER_RUNTIME=desktop` | Set by Electron before starting the web server |
 | `OPENCHAMBER_KERNEL` | Desktop/server kernel. Defaults to `pi`. Set `opencode` to restore the leftover OpenCode process |
+| `OPENCHAMBER_PI_NODE_KERNEL` | Desktop Pi session loader. Defaults on for Electron. Set `0` to keep sessions in-process (P0 skip + P1a electron tree). Set `1` to force the Node child |
+| `PICHAMBER_NODE_BINARY` | Explicit Node executable for the Pi kernel child. Must be `node`, not PATH `pi` |
+| `PICHAMBER_BUNDLED_NODE` | Staged packaged Node path; Desktop sets this when `resources/node/bin/node` exists |
 | `OPENCHAMBER_BUNDLE_OPENCODE_CLI` | Set `1` during `electron:build` to stage the leftover OpenCode CLI extraResource |
 | `OPENCHAMBER_OPENCODE_CLI_VERSION` | Optional packaging override for the leftover OpenCode CLI version; defaults to the pinned root `@opencode-ai/sdk` version |
 | `OPENCHAMBER_TARGET_ARCH` | Explicit desktop package architecture (`x64` or `arm64`); Linux requires it to match the native host |

@@ -1,0 +1,230 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+export const PI_NODE_UNAVAILABLE_CODE = 'PI_NODE_UNAVAILABLE';
+
+const NODE_NAMES = new Set(['node', 'node.exe']);
+const REJECTED_NAMES = new Set(['pi', 'pi.exe', 'electron', 'electron.exe', 'pichamber', 'pichamber.exe', 'bun', 'bun.exe']);
+
+const asText = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const basenameOf = (filePath) => path.basename(filePath || '').toLowerCase();
+
+const isFile = (filePath) => {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+};
+
+const isExecutableFile = (filePath) => {
+  if (!filePath || !isFile(filePath)) return false;
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return process.platform === 'win32' && isFile(filePath);
+  }
+};
+
+export const isNodeExecutableName = (filePath) => NODE_NAMES.has(basenameOf(filePath));
+
+export const isRejectedKernelBinaryName = (filePath) => REJECTED_NAMES.has(basenameOf(filePath));
+
+export const isElectronProcess = (versions = process.versions) => {
+  const electron = versions && typeof versions === 'object' ? versions.electron : '';
+  return typeof electron === 'string' && electron.trim() !== '';
+};
+
+export const shouldUseNodeKernel = ({
+  env = process.env,
+  versions = process.versions,
+  mock = false,
+  useNodeKernel,
+} = {}) => {
+  if (useNodeKernel === true) return true;
+  if (useNodeKernel === false) return false;
+  const flag = asText(env?.OPENCHAMBER_PI_NODE_KERNEL).toLowerCase();
+  if (flag === '0' || flag === 'false' || flag === 'off') return false;
+  if (flag === '1' || flag === 'true' || flag === 'on') return true;
+  if (mock) return false;
+  return isElectronProcess(versions);
+};
+
+export const toNodeReadablePath = (filePath) => {
+  const value = asText(filePath);
+  if (!value) return '';
+  const needle = `${path.sep}app.asar${path.sep}`;
+  if (!value.includes(needle)) return value;
+  return value.replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
+};
+
+const bundledNodeCandidates = ({ env = process.env, resourcesPath, platform = process.platform } = {}) => {
+  const names = platform === 'win32' ? ['node.exe'] : ['node'];
+  const roots = [
+    asText(env?.PICHAMBER_BUNDLED_NODE),
+    asText(env?.OPENCHAMBER_BUNDLED_NODE),
+    resourcesPath ? path.join(resourcesPath, 'node', 'bin') : '',
+    resourcesPath ? path.join(resourcesPath, 'node') : '',
+  ].filter(Boolean);
+  const out = [];
+  for (const root of roots) {
+    if (isNodeExecutableName(root) || root.toLowerCase().endsWith('.exe')) {
+      out.push(root);
+      continue;
+    }
+    for (const name of names) {
+      out.push(path.join(root, name));
+    }
+  }
+  return out;
+};
+
+const searchPathForNode = ({ env = process.env, platform = process.platform } = {}) => {
+  const pathValue = asText(env?.PATH || env?.Path);
+  if (!pathValue) return '';
+  const names = platform === 'win32' ? ['node.exe', 'node'] : ['node'];
+  for (const dir of pathValue.split(path.delimiter)) {
+    if (!dir) continue;
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      if (isExecutableFile(candidate) && isNodeExecutableName(candidate)) {
+        return path.resolve(candidate);
+      }
+    }
+  }
+  return '';
+};
+
+const wellKnownNodePaths = ({ platform = process.platform } = {}) => {
+  if (platform === 'win32') return [];
+  return [
+    '/opt/homebrew/bin/node',
+    '/usr/local/bin/node',
+    '/usr/bin/node',
+    '/bin/node',
+  ];
+};
+
+export const createMissingNodeError = (runtime) => {
+  const error = new Error(runtime?.message || 'Desktop could not find a Node.js binary for the Pi kernel.');
+  error.status = 503;
+  error.code = PI_NODE_UNAVAILABLE_CODE;
+  error.recovery = runtime?.recovery || missingNodeRecovery();
+  return error;
+};
+
+export const missingNodeRecovery = () => (
+  'Install Node.js, or set PICHAMBER_NODE_BINARY to a Node executable, then reload Pi. '
+  + 'Desktop will not start a half-ready kernel, and it will not load user extensions inside Electron.'
+);
+
+const acceptNodeBinary = (candidate, { allowCurrentElectron = false, versions = process.versions } = {}) => {
+  const filePath = asText(candidate);
+  if (!filePath || !isExecutableFile(filePath)) return '';
+  if (isRejectedKernelBinaryName(filePath) && !isNodeExecutableName(filePath)) {
+    return '';
+  }
+  if (!allowCurrentElectron && isElectronProcess(versions) && filePath === process.execPath) {
+    return '';
+  }
+  if (isNodeExecutableName(filePath)) return path.resolve(filePath);
+  return '';
+};
+
+export const resolvePiNodeRuntime = ({
+  env = process.env,
+  versions = process.versions,
+  execPath = process.execPath,
+  platform = process.platform,
+  resourcesPath,
+  nodeBinary,
+} = {}) => {
+  const explicit = [
+    nodeBinary,
+    env?.PICHAMBER_NODE_BINARY,
+    env?.OPENCHAMBER_NODE_BINARY,
+  ];
+  for (const candidate of explicit) {
+    const resolved = acceptNodeBinary(candidate, { versions });
+    if (resolved) {
+      return {
+        ok: true,
+        command: resolved,
+        source: 'override',
+        recovery: '',
+      };
+    }
+    if (asText(candidate) && isRejectedKernelBinaryName(candidate)) {
+      return {
+        ok: false,
+        code: PI_NODE_UNAVAILABLE_CODE,
+        message: `PICHAMBER_NODE_BINARY must be a Node.js binary, not ${path.basename(candidate)}.`,
+        recovery: missingNodeRecovery(),
+      };
+    }
+  }
+
+  const systemNode = searchPathForNode({ env, platform });
+  if (systemNode) {
+    return {
+      ok: true,
+      command: systemNode,
+      source: 'system',
+      recovery: '',
+    };
+  }
+  for (const candidate of wellKnownNodePaths({ platform })) {
+    const resolved = acceptNodeBinary(candidate, { versions });
+    if (resolved) {
+      return {
+        ok: true,
+        command: resolved,
+        source: 'system',
+        recovery: '',
+      };
+    }
+  }
+
+  for (const candidate of bundledNodeCandidates({ env, resourcesPath, platform })) {
+    const resolved = acceptNodeBinary(candidate, { versions });
+    if (resolved) {
+      return {
+        ok: true,
+        command: resolved,
+        source: 'bundled',
+        recovery: '',
+      };
+    }
+  }
+
+  if (!isElectronProcess(versions) && isNodeExecutableName(execPath)) {
+    const resolved = acceptNodeBinary(execPath, { versions, allowCurrentElectron: true });
+    if (resolved) {
+      return {
+        ok: true,
+        command: resolved,
+        source: 'current',
+        recovery: '',
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    code: PI_NODE_UNAVAILABLE_CODE,
+    message: 'Desktop could not find a Node.js binary to load user Pi extensions.',
+    recovery: missingNodeRecovery(),
+  };
+};
+
+export const childPathEnvForNode = (nodeBinary, env = process.env) => {
+  const command = asText(nodeBinary);
+  const current = asText(env?.PATH || env?.Path);
+  if (!command) return current;
+  const dir = path.dirname(command);
+  if (!current) return dir;
+  const parts = current.split(path.delimiter).filter(Boolean);
+  return [dir, ...parts.filter((entry) => path.resolve(entry) !== path.resolve(dir))].join(path.delimiter);
+};
