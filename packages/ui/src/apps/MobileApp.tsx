@@ -63,6 +63,7 @@ import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { MobileWorkspaceDrawer, type MobileWorkspaceTab } from './MobileWorkspaceDrawer';
 import { closeMobileReviewOverlay } from './mobileWorkspaceReview';
 import { DedicatedMobileAppProvider, type MobileAppActions } from './mobileAppContext';
+import { MOBILE_TOASTER_CLASS, MOBILE_TOASTER_SAFE_AREA_OFFSET } from './mobileToasterSafeArea';
 import { autoConnectLastInstance, getAutoConnectTargetLabel, logMobileConnectEvent, reprobeActiveConnection, type AutoConnectOutcome } from './mobileConnections';
 import { isCapacitorMobileApp, useNativeAndroidBackButton, useNativeMobileChrome, useNativeMobileLifecycle } from './mobileNativeChrome';
 import { reconnectAppForTransportSwitch, resetAppForRuntimeEndpointChange } from './runtimeEndpointReset';
@@ -1360,7 +1361,12 @@ export function MobileApp({ apis }: MobileAppProps) {
                 setConnectionEpoch((value) => value + 1);
               }} />
               <AppLinkConfirmDialog />
-              <Toaster position="top-center" offset="calc(var(--oc-safe-area-top, 0px) + 16px)" />
+              <Toaster
+                position="top-center"
+                className={MOBILE_TOASTER_CLASS}
+                offset={MOBILE_TOASTER_SAFE_AREA_OFFSET}
+                mobileOffset={MOBILE_TOASTER_SAFE_AREA_OFFSET}
+              />
               {isInitialized ? <ConfigUpdateOverlay /> : null}
             </div>
           </TooltipProvider>
