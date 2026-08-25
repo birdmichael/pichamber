@@ -88,7 +88,7 @@ export const fetchLatestNpmPackageVersion = async (
   return version || null;
 };
 
-export const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process.env } = {}) => (
+const fetchLatestPiSdkVersion = async ({ fetchImpl = fetch, env = process.env } = {}) => (
   fetchLatestNpmPackageVersion(PI_SDK_PACKAGE, { fetchImpl, env })
 );
 

@@ -6,14 +6,14 @@ import path from 'node:path';
 import { PI_SDK_PACKAGE, readInstalledPiSdkVersion } from './pi-upgrade-status.js';
 
 export const PI_UPDATE_IN_PROGRESS_CODE = 'PI_UPGRADE_IN_PROGRESS';
-export const PI_UPDATE_CLI_UNAVAILABLE_CODE = 'PI_UPGRADE_CLI_UNAVAILABLE';
+const PI_UPDATE_CLI_UNAVAILABLE_CODE = 'PI_UPGRADE_CLI_UNAVAILABLE';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 const defaultRequire = createRequire(import.meta.url);
 
 const basenameOf = (filePath) => path.basename(filePath || '').toLowerCase();
 
-export const resolveInProcessPiCli = ({
+const resolveInProcessPiCli = ({
   requireImpl = defaultRequire,
   readFileSync = fs.readFileSync,
   existsSync = fs.existsSync,
@@ -36,6 +36,7 @@ export const resolveInProcessPiCli = ({
 export const resolveNodeRuntimeForPiCli = ({
   execPath = process.execPath,
   platform = process.platform,
+  versions = process.versions,
 } = {}) => {
   const base = basenameOf(execPath);
   if (
@@ -46,7 +47,14 @@ export const resolveNodeRuntimeForPiCli = ({
   ) {
     return { command: execPath, extraEnv: {} };
   }
-  if (base.includes('electron')) {
+  // Packaged Desktop is `Pichamber`, not `electron`. Prefer the running
+  // binary with ELECTRON_RUN_AS_NODE over a PATH `node`.
+  if (
+    versions?.electron
+    || base.includes('electron')
+    || base.includes('pichamber')
+    || execPath.toLowerCase().includes('.app/contents/macos/')
+  ) {
     return { command: execPath, extraEnv: { ELECTRON_RUN_AS_NODE: '1' } };
   }
   return {

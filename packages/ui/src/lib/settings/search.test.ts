@@ -346,7 +346,13 @@ describe('settings search', () => {
       getPageTitle,
     });
     expect(version.some((result) => result.id === 'sessions.pi-version')).toBe(true);
-    expect(version.some((result) => result.id === 'sessions.pi-update')).toBe(true);
+    const update = buildSettingsSearchResults({
+      query: 'pi update',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(true);
     const updateAll = buildSettingsSearchResults({
       query: 'update all',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },

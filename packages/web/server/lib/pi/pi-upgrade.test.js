@@ -31,11 +31,18 @@ describe('pi-upgrade', () => {
   });
 
   it('uses ELECTRON_RUN_AS_NODE when the process is Electron', () => {
-    const runtime = resolveNodeRuntimeForPiCli({
+    const packaged = resolveNodeRuntimeForPiCli({
       execPath: '/Applications/Pichamber.app/Contents/MacOS/Pichamber',
     });
-    expect(runtime.command).toContain('Pichamber');
-    expect(runtime.extraEnv.ELECTRON_RUN_AS_NODE).toBe('1');
+    expect(packaged.command).toContain('Pichamber');
+    expect(packaged.extraEnv.ELECTRON_RUN_AS_NODE).toBe('1');
+
+    const electronBin = resolveNodeRuntimeForPiCli({
+      execPath: '/usr/lib/electron/electron',
+      versions: { electron: '43.3.0' },
+    });
+    expect(electronBin.command).toBe('/usr/lib/electron/electron');
+    expect(electronBin.extraEnv.ELECTRON_RUN_AS_NODE).toBe('1');
   });
 
   it('rejects when the in-process CLI cannot be resolved', async () => {

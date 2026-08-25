@@ -67,7 +67,7 @@ export const parsePiPackageSpec = (source) => {
   };
 };
 
-export const resolveManagedNpmPackageJsonPath = ({
+const resolveManagedNpmPackageJsonPath = ({
   home = os.homedir(),
   directory,
   scope,
@@ -83,7 +83,7 @@ export const resolveManagedNpmPackageJsonPath = ({
   return path.join(resolvePiAgentDir(home), 'npm', 'node_modules', name, 'package.json');
 };
 
-export const readInstalledNpmPackageVersion = (packageJsonPath) => {
+const readInstalledNpmPackageVersion = (packageJsonPath) => {
   if (!packageJsonPath || !isFile(packageJsonPath)) return null;
   const pkg = readJsonObject(packageJsonPath);
   const version = typeof pkg.version === 'string' ? pkg.version.trim().replace(/^v/i, '') : '';
