@@ -42,25 +42,23 @@ describe('tooltip press', () => {
 
 describe('tooltip behind modal', () => {
   test('does not hide hover-cards when no dialog is open', () => {
-    const sidebarTrigger = document.createElement('button');
-    document.body.append(sidebarTrigger);
+    const sidebarTrigger = {
+      closest: () => null,
+    } as unknown as Element;
 
-    try {
-      expect(isTooltipTriggerBehindModal(sidebarTrigger)).toBe(false);
-      expect(shouldSuppressTooltipOpen({
-        nextOpen: true,
-        pointerPressActive: false,
-        trigger: sidebarTrigger,
-      })).toBe(false);
-    } finally {
-      sidebarTrigger.remove();
-    }
+    expect(isTooltipTriggerBehindModal(sidebarTrigger)).toBe(false);
+    expect(shouldSuppressTooltipOpen({
+      nextOpen: true,
+      pointerPressActive: false,
+      trigger: sidebarTrigger,
+    })).toBe(false);
   });
 
   test('blocks sidebar triggers while a dialog layer is open', () => {
     const unmark = markDialogLayerMounted();
-    const sidebarTrigger = document.createElement('button');
-    document.body.append(sidebarTrigger);
+    const sidebarTrigger = {
+      closest: () => null,
+    } as unknown as Element;
 
     try {
       expect(isTooltipTriggerBehindModal(sidebarTrigger)).toBe(true);
@@ -75,18 +73,17 @@ describe('tooltip behind modal', () => {
         trigger: sidebarTrigger,
       })).toBe(false);
     } finally {
-      sidebarTrigger.remove();
       unmark();
     }
   });
 
   test('still allows tooltips whose trigger is inside the dialog', () => {
     const unmark = markDialogLayerMounted();
-    const dialog = document.createElement('div');
-    dialog.setAttribute('role', 'dialog');
-    const insideTrigger = document.createElement('button');
-    dialog.append(insideTrigger);
-    document.body.append(dialog);
+    const insideTrigger = {
+      closest: (selector: string) => (
+        selector.includes('[role="dialog"]') ? {} : null
+      ),
+    } as unknown as Element;
 
     try {
       expect(isTooltipTriggerBehindModal(insideTrigger)).toBe(false);
@@ -96,7 +93,6 @@ describe('tooltip behind modal', () => {
         trigger: insideTrigger,
       })).toBe(false);
     } finally {
-      dialog.remove();
       unmark();
     }
   });

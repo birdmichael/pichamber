@@ -8,7 +8,7 @@ import * as React from 'react';
 
 export const DIALOG_OPEN_CLASS = 'oc-dialog-open';
 
-export const DIALOG_TRIGGER_SCOPE_SELECTOR = [
+const DIALOG_TRIGGER_SCOPE_SELECTOR = [
   '[data-slot="dialog-content"]',
   '[role="dialog"]',
 ].join(', ');
@@ -73,7 +73,10 @@ export function resetDialogOpenLayerForTests(): void {
 }
 
 export function isElementInsideDialog(target: EventTarget | null | undefined): boolean {
-  return target instanceof Element && Boolean(target.closest(DIALOG_TRIGGER_SCOPE_SELECTOR));
+  if (!target || typeof (target as { closest?: unknown }).closest !== 'function') {
+    return false;
+  }
+  return Boolean((target as Element).closest(DIALOG_TRIGGER_SCOPE_SELECTOR));
 }
 
 /** Register this overlay and re-render when another dialog layer mounts or unmounts. */
