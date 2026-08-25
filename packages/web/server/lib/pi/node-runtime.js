@@ -28,11 +28,11 @@ const isExecutableFile = (filePath) => {
   }
 };
 
-export const isNodeExecutableName = (filePath) => NODE_NAMES.has(basenameOf(filePath));
+const isNodeExecutableName = (filePath) => NODE_NAMES.has(basenameOf(filePath));
 
-export const isRejectedKernelBinaryName = (filePath) => REJECTED_NAMES.has(basenameOf(filePath));
+const isRejectedKernelBinaryName = (filePath) => REJECTED_NAMES.has(basenameOf(filePath));
 
-export const isElectronProcess = (versions = process.versions) => {
+const isElectronProcess = (versions = process.versions) => {
   const electron = versions && typeof versions === 'object' ? versions.electron : '';
   return typeof electron === 'string' && electron.trim() !== '';
 };
@@ -115,7 +115,7 @@ export const createMissingNodeError = (runtime) => {
   return error;
 };
 
-export const missingNodeRecovery = () => (
+const missingNodeRecovery = () => (
   'Install Node.js, or set PICHAMBER_NODE_BINARY to a Node executable, then reload Pi. '
   + 'Desktop will not start a half-ready kernel, and it will not load user extensions inside Electron.'
 );
@@ -126,7 +126,12 @@ const acceptNodeBinary = (candidate, { allowCurrentElectron = false, versions = 
   if (isRejectedKernelBinaryName(filePath) && !isNodeExecutableName(filePath)) {
     return '';
   }
-  if (!allowCurrentElectron && isElectronProcess(versions) && filePath === process.execPath) {
+  if (
+    !allowCurrentElectron
+    && isElectronProcess(versions)
+    && filePath === process.execPath
+    && !isNodeExecutableName(filePath)
+  ) {
     return '';
   }
   if (isNodeExecutableName(filePath)) return path.resolve(filePath);

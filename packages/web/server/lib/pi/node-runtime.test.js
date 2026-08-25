@@ -49,6 +49,7 @@ describe('resolvePiNodeRuntime', () => {
       env: { PATH: `/tmp/decoy-pi${path.delimiter}${process.env.PATH || ''}` },
     });
     expect(resolved).toMatchObject({ ok: true, source: 'override', command: process.execPath });
+    expect(path.basename(resolved.command)).toMatch(/^node(?:\.exe)?$/);
 
     const rejected = resolvePiNodeRuntime({
       nodeBinary: '/usr/local/bin/pi',

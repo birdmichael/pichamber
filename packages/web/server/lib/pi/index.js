@@ -81,5 +81,5 @@ export {
   buildHealthSnapshot,
 };
 
-export { shouldUseNodeKernel, resolvePiNodeRuntime, PI_NODE_UNAVAILABLE_CODE } from './node-runtime.js';
-export { createNodeKernelHost, createNodeKernelClient } from './node-kernel-client.js';
+export { shouldUseNodeKernel, PI_NODE_UNAVAILABLE_CODE } from './node-runtime.js';
+export { createNodeKernelHost } from './node-kernel-client.js';

@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,12 +15,11 @@ import {
   toNodeReadablePath,
 } from './node-runtime.js';
 
-const require = createRequire(import.meta.url);
 const CHILD_SCRIPT = fileURLToPath(new URL('./node-kernel-child.js', import.meta.url));
 
 const KERNEL_RELOAD_INTERRUPTED_KIND = 'opencode-restart-interrupted';
 
-export const resolveNodeKernelChildScript = ({
+const resolveNodeKernelChildScript = ({
   childScript,
   resourcesPath,
 } = {}) => {
@@ -159,7 +157,8 @@ const createRemotePiSession = (client, snapshot) => {
     },
     dispose() {
       client.forgetSession(state.sessionId);
-      return call('dispose');
+      if (!client.isConnected()) return undefined;
+      return call('dispose').catch(() => undefined);
     },
     bindExtensions(bindings = {}) {
       session.extensionBindings = bindings;
@@ -469,7 +468,8 @@ export const createNodeKernelClient = ({
       return Array.from(liveSessionIds);
     },
     dispose() {
-      rejectAll(new Error('Pi node kernel disposed'));
+      exitError = new Error('Pi node kernel disposed');
+      rejectAll(exitError);
       if (child) {
         try {
           child.removeAllListeners('exit');
@@ -621,20 +621,4 @@ export const createNodeKernelHost = (options = {}) => {
     nodeRuntime: host.getNodeRuntime(),
   });
   return host;
-};
-
-export const createInterruptedKernelNotification = (sessionIds) => ({
-  title: sessionIds.length > 1 ? 'Chats interrupted' : 'Chat interrupted',
-  body: 'Pi restarted during a running response. Send a message to continue.',
-  tag: KERNEL_RELOAD_INTERRUPTED_KIND,
-  kind: KERNEL_RELOAD_INTERRUPTED_KIND,
-  sessionId: sessionIds[0],
-});
-
-export const resolveBundledPiSdkPath = () => {
-  try {
-    return require.resolve('@earendil-works/pi-coding-agent/package.json');
-  } catch {
-    return '';
-  }
 };
