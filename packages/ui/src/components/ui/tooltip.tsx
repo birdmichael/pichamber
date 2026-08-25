@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils"
 import { subscribeDialogOpenLayer } from "@/components/ui/dialog-open-layer"
 import {
   isPrimaryMouseTooltipPointer,
+  shouldAllowTooltipDismissPropagation,
   shouldSuppressTooltipOpen,
+  subscribeTooltipWindowBlur,
 } from "@/components/ui/tooltip-press"
 
 const MOBILE_LONG_PRESS_DELAY = 600
@@ -209,6 +211,13 @@ function Tooltip({
       return
     }
 
+    if (shouldAllowTooltipDismissPropagation({
+      nextOpen,
+      reason: event?.reason,
+    })) {
+      event?.allowPropagation?.()
+    }
+
     if (!controlled) {
       setLongPressOpen(nextOpen)
     }
@@ -235,9 +244,28 @@ function Tooltip({
     return subscribeDialogOpenLayer(closeIfBehindModal)
   }, [setTooltipOpen, tooltipOpen])
 
+  const tooltipOpenRef = React.useRef(tooltipOpen)
+  tooltipOpenRef.current = tooltipOpen
+
+  React.useEffect(() => {
+    return subscribeTooltipWindowBlur(() => {
+      pointerPressActiveRef.current = false
+      if (!tooltipOpenRef.current) {
+        return
+      }
+      setTooltipOpen(false)
+      onOpenChange?.(false, { reason: 'none' } as TooltipChangeEventDetails)
+    })
+  }, [onOpenChange, setTooltipOpen])
+
   const tooltip = (
     <LongPressTooltipContext.Provider value={contextValue}>
-      <BaseTooltip.Root open={tooltipOpen} onOpenChange={handleOpenChange} {...props} />
+      <BaseTooltip.Root
+        open={tooltipOpen}
+        onOpenChange={handleOpenChange}
+        disableHoverablePopup
+        {...props}
+      />
     </LongPressTooltipContext.Provider>
   )
 
@@ -269,6 +297,7 @@ function TooltipTrigger({
     <TooltipPartBoundary fallback={children}>
       <BaseTooltip.Trigger
         data-slot="tooltip-trigger"
+        closeOnClick={false}
         onPointerEnter={(event) => {
           longPressTooltip?.rememberTrigger(event.currentTarget)
           onPointerEnter?.(event)

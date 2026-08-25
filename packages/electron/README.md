@@ -219,6 +219,7 @@ Development builds use a separate user data directory named `Pichamber Dev`, so 
 ## Things To Be Careful With
 
 - Keep desktop-specific code in this package. Do not move OpenCode feature backend logic into Electron.
+- Desktop windows set `acceptFirstMouse` so the first click on an unfocused window reaches the UI instead of only focusing the window.
 - Use hidden Windows process launches for background helpers. Avoid visible console flashes.
 - Keep `@pichamber/web`, `bun-pty`, `node-pty`, and native modules external in `bundle-main.mjs`; bundling them can break Electron startup.
 - Rebuild native modules after dependency or Electron version changes.

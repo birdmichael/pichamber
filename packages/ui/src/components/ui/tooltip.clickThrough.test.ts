@@ -24,5 +24,13 @@ describe('tooltip click-through', () => {
     expect(tooltipSource).toContain('trigger: triggerElementRef.current');
     expect(tooltipSource).toContain('rememberTrigger');
   });
+
+  test('a leftover tooltip dismiss does not stop the press that closed it', () => {
+    expect(tooltipSource).toContain('shouldAllowTooltipDismissPropagation');
+    expect(tooltipSource).toContain('allowPropagation');
+    expect(tooltipSource).toContain('closeOnClick={false}');
+    expect(tooltipSource).toContain('disableHoverablePopup');
+    expect(tooltipSource).toContain('subscribeTooltipWindowBlur');
+  });
 });
 
