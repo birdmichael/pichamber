@@ -22,7 +22,7 @@ export function WorktreesView(): React.ReactNode {
     <div className="absolute inset-0 z-10 flex flex-col bg-background">
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="mx-auto w-full max-w-4xl space-y-4">
-          <div className="flex items-center">
+          <div className="flex items-center justify-between gap-3">
             <Button
               size="sm"
               onClick={() => {
@@ -32,6 +32,15 @@ export function WorktreesView(): React.ReactNode {
             >
               <Icon name="node-tree" className="mr-1 h-3.5 w-3.5" />
               {t('sessions.sidebar.project.actions.newWorktree')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => useUIStore.getState().closeMainSurfaces()}
+              aria-label={t('sessions.worktreesPage.closeAria')}
+            >
+              <Icon name="close" className="h-4 w-4" />
             </Button>
           </div>
           <WorktreeSectionContent projectRef={{ id: project.id, path: project.path }} sections="list-only" />

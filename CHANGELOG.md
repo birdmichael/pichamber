@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: Archive, Scheduled tasks, and Worktrees now have a close control, and Esc returns to the previous session after any open picker or dialog.
 - Chat: hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.
 - Desktop: browser tabs and address history follow the current project. All Chats share one browser, separate from every Settings project. A new Chats draft uses that shared browser immediately, before you send. Sign-in cookies stay shared.
