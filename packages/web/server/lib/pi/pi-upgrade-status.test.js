@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   comparePiSdkVersions,
   getPiUpgradeStatus,
+  invalidatePiUpgradeStatusCache,
   npmLatestUrlForPackage,
   PI_SDK_PACKAGE,
   shouldSkipPiVersionCheck,
 } from './pi-upgrade-status.js';
+
+afterEach(() => {
+  invalidatePiUpgradeStatusCache();
+});
 
 describe('pi-upgrade-status', () => {
   it('compares SDK versions and treats a newer latest as available', () => {
@@ -77,5 +82,107 @@ describe('pi-upgrade-status', () => {
     expect(status.available).toBe(false);
     expect(status.latestVersion).toBeNull();
     expect(status.upgrade).toEqual({ supported: false, reason: 'bundled' });
+  });
+
+  it('reuses a short-TTL cache so banner and Settings share one npm check', async () => {
+    let called = 0;
+    const fetchImpl = async () => {
+      called += 1;
+      return { ok: true, json: async () => ({ version: '0.90.0' }) };
+    };
+    const first = await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 1_000,
+    });
+    const second = await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 2_000,
+    });
+    expect(called).toBe(1);
+    expect(second).toEqual(first);
+    expect(first.available).toBe(true);
+  });
+
+  it('coalesces concurrent upgrade-status fetches into one npm request', async () => {
+    let called = 0;
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = async () => {
+      called += 1;
+      await gate;
+      return { ok: true, json: async () => ({ version: '0.91.0' }) };
+    };
+    const pending = [
+      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
+      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
+      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
+    ];
+    release();
+    const results = await Promise.all(pending);
+    expect(called).toBe(1);
+    expect(results.every((status) => status.latestVersion === '0.91.0')).toBe(true);
+  });
+
+  it('invalidates the cache after a successful pi update and when the TTL expires', async () => {
+    let called = 0;
+    const fetchImpl = async () => {
+      called += 1;
+      return { ok: true, json: async () => ({ version: `0.9${called}.0` }) };
+    };
+    await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 1_000,
+      ttlMs: 5_000,
+    });
+    await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 4_000,
+      ttlMs: 5_000,
+    });
+    expect(called).toBe(1);
+    invalidatePiUpgradeStatusCache();
+    await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 4_000,
+      ttlMs: 5_000,
+    });
+    expect(called).toBe(2);
+    await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl,
+      now: () => 10_000,
+      ttlMs: 5_000,
+    });
+    expect(called).toBe(3);
+  });
+
+  it('still honors PI_OFFLINE even when a cached latest exists', async () => {
+    await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: {},
+      fetchImpl: async () => ({ ok: true, json: async () => ({ version: '0.90.0' }) }),
+    });
+    const skipped = await getPiUpgradeStatus({
+      currentVersion: '0.84.2',
+      env: { PI_SKIP_VERSION_CHECK: '1' },
+      fetchImpl: async () => {
+        throw new Error('should not fetch');
+      },
+    });
+    expect(skipped.available).toBe(false);
+    expect(skipped.latestVersion).toBeNull();
   });
 });

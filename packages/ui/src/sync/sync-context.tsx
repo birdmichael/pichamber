@@ -263,7 +263,9 @@ const CHILD_SESSION_DISCOVERY_INTERVAL_MS = 15_000
 // startup with many cache-hydrated directories that is dozens of simultaneous
 // requests, which would otherwise queue interactive traffic (opening a
 // session) behind them on the browser's ~6 sockets per origin. Later ticks
-// still cover every directory via the per-directory timestamps.
+// still cover every directory via the per-directory timestamps. Hidden
+// documents skip the interval work (same gate as FilesView); becoming
+// visible again runs one immediate refresh so status does not look stale.
 
 const requestSignature = (items: Array<{ id: string }> | undefined): string => {
   if (!items || items.length === 0) return ""
@@ -2364,6 +2366,7 @@ export function SyncProvider(props: {
 
     const tick = () => {
       if (running || stopped) return
+      if (typeof document !== "undefined" && document.hidden) return
       running = true
       void Promise.resolve()
         .then(() => {
@@ -2408,11 +2411,23 @@ export function SyncProvider(props: {
     }
 
     const interval = setInterval(tick, ACTIVE_SESSION_WATCHDOG_INTERVAL_MS)
+    const onVisibility = () => {
+      if (typeof document === "undefined" || document.hidden) return
+      lastStatusPollAtByDirectoryRef.current.clear()
+      lastChildDiscoveryAtByDirectoryRef.current.clear()
+      tick()
+    }
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility)
+    }
     tick()
 
     return () => {
       stopped = true
       clearInterval(interval)
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility)
+      }
     }
   }, [childStores, triggerDirectoryResync])
 

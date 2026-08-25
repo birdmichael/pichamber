@@ -22,7 +22,10 @@ Empty string clears the override. Changing the directory does not copy
 `GET /api/path` and `getKernelInfo().paths` report the resolved dir.
 `GET /api/pi/upgrade-status` compares the installed
 `@earendil-works/pi-coding-agent` with npm (`available`, `currentVersion`,
-`latestVersion`). Settings → General uses that same payload. `POST
+`latestVersion`). Settings → General and About use that same payload.
+The npm latest is cached in-process for 5 minutes so those surfaces share
+one check. A successful `POST /api/pi/upgrade` invalidates the cache.
+Every call still honors `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`. `POST
 /api/pi/upgrade` runs `pi update` on the in-process SDK `bin.pi`
 (`dist/cli.js`) with `PI_CODING_AGENT_DIR` set to the resolved agent dir,
 then `host.reload()`. It does not spawn a PATH `pi`. After success,
@@ -31,8 +34,9 @@ Desktop reloads the in-process kernel (not an app Restart).
 banner remains informational.
 
 `GET /api/pi/extensions` lists configured `settings.json` `packages` plus
-`currentVersion` / `latestVersion` / `updateAvailable` (npm registry;
-honor `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`). `POST
+`currentVersion` / `latestVersion` / `updateAvailable` (npm registry
+`/latest`, 10s timeout, at most 4 in flight, short in-process TTL cache
+keyed by package name; honor `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`). `POST
 /api/pi/extensions/update` `{ source? }` calls Pi
 `DefaultPackageManager.update(source)` (all configured packages when
 `source` is omitted), then reloads idle sessions. `POST
@@ -569,8 +573,11 @@ When the slot is on:
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet. A finished tool-call without a child is
   not minted into an empty chat just to make the row clickable.
-- A run with a child session file is attached as a facade session: stable Pi
+-   A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
+  Attach and child-message refresh skip a full jsonl parse when that file's
+  mtime and size are unchanged; a busy child still updates when the file
+  changes.
   Follow-ups stay on the child; the parent transcript is unchanged.
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.

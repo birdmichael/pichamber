@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: hidden windows pause Work Status, tray, and session watchdog polling, then refresh once when you come back.
+- Desktop: Archive, Worktrees, and multi-run views load when you open them instead of at first paint.
 - Settings: Pi and Extensions show only the installed version as quiet text. Update sits next to the Pi version, keeps sentence case, and hides the latest version on the tooltip.
 - Settings: Pi and Extensions versions use compact chips instead of stacked number rows or "Current x · Latest y" sentences.
 - Settings/Desktop: the Pi section now shows the current in-process Pi version, the latest version when the existing update check finds one, and Update. Update runs `pi update` on that install and reloads Pi.

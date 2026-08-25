@@ -549,12 +549,18 @@ export const useTraySync = (): void => {
     // (independent of the sidebar) and refresh it periodically so sessions from
     // directories this client never opened still show up and stay current.
     void ensureGlobalSessionsLoaded(getAllSyncSessions());
-    const refreshInterval = window.setInterval(() => { void refreshGlobalSessions(); }, GLOBAL_REFRESH_MS);
+    const refreshInterval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void refreshGlobalSessions();
+    }, GLOBAL_REFRESH_MS);
 
     // Global busy/retry status: fetch now and poll, so unsynced sessions don't
     // sit looking idle. Synced directories stay instant via their SSE stores.
     void refreshGlobalStatus();
-    const globalStatusInterval = window.setInterval(() => { void refreshGlobalStatus(); }, POLL_INTERVAL_MS);
+    const globalStatusInterval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void refreshGlobalStatus();
+    }, POLL_INTERVAL_MS);
 
     // Leftover OpenCode only: Pi has no `/api/quota/*` source. Empty groups
     // omit the tray Usage submenu.
@@ -572,7 +578,20 @@ export const useTraySync = (): void => {
 
     // Safety net: catches anything the event subscriptions miss (e.g. a store
     // that existed before the registry subscription was attached).
-    const interval = window.setInterval(() => { rebindStores(); flushNow(); }, POLL_INTERVAL_MS);
+    const interval = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      rebindStores();
+      flushNow();
+    }, POLL_INTERVAL_MS);
+
+    const onVisibility = () => {
+      if (typeof document === 'undefined' || document.hidden) return;
+      void refreshGlobalSessions();
+      void refreshGlobalStatus();
+      rebindStores();
+      flushNow();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     flushNow();
 
@@ -582,6 +601,7 @@ export const useTraySync = (): void => {
       window.clearInterval(interval);
       window.clearInterval(refreshInterval);
       window.clearInterval(globalStatusInterval);
+      document.removeEventListener('visibilitychange', onVisibility);
       unsubscribeNotif();
       unsubscribeGlobal();
       unsubscribeProjects();
