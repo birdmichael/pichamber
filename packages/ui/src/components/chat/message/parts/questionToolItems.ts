@@ -11,6 +11,7 @@ type QuestionToolItem = {
 };
 
 type QuestionToolPartLike = {
+  type?: string;
   tool?: string;
   title?: string;
   state?: {
@@ -178,6 +179,52 @@ export const questionItemsFromToolPart = (part: QuestionToolPartLike): QuestionT
   }
 
   return [];
+};
+
+export const isActiveQuestionToolStatus = (status: unknown): boolean => {
+  const value = asTrimmedString(status).toLowerCase();
+  return value === 'pending' || value === 'running';
+};
+
+type PendingQuestionPromptLike = {
+  id: string;
+  title?: string;
+  status?: string;
+  kind?: string;
+};
+
+export const matchPendingQuestionPrompt = <T extends PendingQuestionPromptLike>(
+  prompts: readonly T[],
+  part: QuestionToolPartLike,
+): T | null => {
+  if (!isQuestionToolName(part.tool)) return null;
+  const pending = prompts.filter((prompt) => (
+    prompt.status === 'pending'
+    && (prompt.kind === 'select' || prompt.kind === 'input' || prompt.kind === 'editor')
+  ));
+  if (pending.length === 0) return null;
+  const items = questionItemsFromToolPart(part);
+  const question = items[0]?.question || asTrimmedString(part.title);
+  if (question) {
+    const titled = pending.find((prompt) => asTrimmedString(prompt.title) === question);
+    if (titled) return titled;
+  }
+  return pending.length === 1 ? pending[0] ?? null : null;
+};
+
+export const boundQuestionPromptIds = (
+  prompts: readonly PendingQuestionPromptLike[],
+  messages: readonly { parts?: readonly QuestionToolPartLike[] }[],
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const part of message.parts ?? []) {
+      if (part.type !== 'tool' || !isQuestionToolName(part.tool)) continue;
+      const match = matchPendingQuestionPrompt(prompts, part);
+      if (match) ids.add(match.id);
+    }
+  }
+  return ids;
 };
 
 export const questionToolDescription = (items: QuestionToolItem[]): string => {

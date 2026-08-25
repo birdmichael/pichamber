@@ -1349,6 +1349,10 @@ export const createPiHost = ({
     };
   };
 
+  const ensureQuestionToolAdapted = (record) => {
+    adaptQuestionToolForDesktop(record?.piSession, record?.extensionUI?.context);
+  };
+
   const bindDesktopExtensionUI = async (record) => {
     if (!record?.piSession || typeof record.piSession.bindExtensions !== 'function') {
       return record;
@@ -1367,7 +1371,7 @@ export const createPiHost = ({
         uiContext: record.extensionUI.context,
         mode: 'rpc',
       });
-      adaptQuestionToolForDesktop(record.piSession, record.extensionUI.context);
+      ensureQuestionToolAdapted(record);
     } catch (error) {
       console.warn(`[pi-host] bindExtensions failed for ${record.id}:`, error?.message || error);
     }
@@ -2430,6 +2434,7 @@ export const createPiHost = ({
       const delivery = body.delivery;
       const run = async () => {
         try {
+          ensureQuestionToolAdapted(record);
           if (isStreaming && delivery === 'steer' && typeof record.piSession.steer === 'function') {
             await record.piSession.steer(text, images);
             return;
@@ -2704,6 +2709,7 @@ export const createPiHost = ({
           error.status = 500;
           throw error;
         }
+        ensureQuestionToolAdapted(record);
         await record.piSession.prompt(userText);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
@@ -2832,7 +2838,10 @@ export const createPiHost = ({
         const waitMs = mock ? 400 : 12_000;
         const finishRun = async () => {
           const promptTask = Promise.resolve()
-            .then(() => record.piSession.prompt(userText))
+            .then(() => {
+              ensureQuestionToolAdapted(record);
+              return record.piSession.prompt(userText);
+            })
             .then(() => 'done');
           const started = Date.now();
           try {

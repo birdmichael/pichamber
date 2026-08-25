@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  boundQuestionPromptIds,
+  isActiveQuestionToolStatus,
   isQuestionToolName,
+  matchPendingQuestionPrompt,
   parseQuestionToolOutput,
   questionItemsFromToolPart,
   questionToolDescription,
@@ -93,6 +96,21 @@ describe('questionItemsFromToolPart', () => {
     }]);
   });
 
+  test('materializes an open-ended pending Pi question without options', () => {
+    expect(questionItemsFromToolPart({
+      tool: 'question',
+      state: {
+        status: 'running',
+        input: { question: 'What should we work on next?' },
+      },
+    })).toEqual([{
+      question: 'What should we work on next?',
+      answer: '',
+      cancelled: false,
+      options: [],
+    }]);
+  });
+
   test('shows the pending Pi question text before an answer arrives', () => {
     expect(questionItemsFromToolPart({
       tool: 'plan_mode_question',
@@ -106,6 +124,65 @@ describe('questionItemsFromToolPart', () => {
       cancelled: false,
       options: [{ label: 'One file', description: 'keep it local' }],
     }]);
+  });
+});
+
+describe('matchPendingQuestionPrompt', () => {
+  test('binds a pending select/editor prompt onto the asking question turn', () => {
+    const part = {
+      type: 'tool',
+      tool: 'question',
+      state: {
+        status: 'running',
+        input: { question: 'What should we work on next?', options: [] },
+      },
+    };
+    expect(matchPendingQuestionPrompt([
+      { id: 'pui_plan', title: 'Plan mode', kind: 'select', status: 'pending' },
+      { id: 'pui_q', title: 'What should we work on next?', kind: 'editor', status: 'pending' },
+    ], part)?.id).toBe('pui_q');
+  });
+
+  test('pairs the only pending prompt when titles are missing', () => {
+    expect(matchPendingQuestionPrompt([
+      { id: 'pui_only', title: '', kind: 'select', status: 'pending' },
+    ], {
+      tool: 'question',
+      state: { status: 'running', input: { question: 'Pick one', options: ['A'] } },
+    })?.id).toBe('pui_only');
+  });
+
+  test('does not guess when several pending prompts do not match the turn', () => {
+    expect(matchPendingQuestionPrompt([
+      { id: 'pui_a', title: 'A', kind: 'select', status: 'pending' },
+      { id: 'pui_b', title: 'B', kind: 'select', status: 'pending' },
+    ], {
+      tool: 'question',
+      state: { status: 'running', input: { question: 'C', options: ['Yes'] } },
+    })).toBeNull();
+  });
+
+  test('keeps bound prompt ids on the asking turn for session revisit', () => {
+    const prompts = [
+      { id: 'pui_q', title: 'What should we work on next?', kind: 'editor', status: 'pending' },
+      { id: 'pui_plan', title: 'Start Plan mode', kind: 'select', status: 'pending' },
+    ];
+    expect([...boundQuestionPromptIds(prompts, [{
+      parts: [{
+        type: 'tool',
+        tool: 'question',
+        state: {
+          status: 'pending',
+          input: { question: 'What should we work on next?' },
+        },
+      }],
+    }])]).toEqual(['pui_q']);
+  });
+
+  test('treats pending and running as active question-tool statuses', () => {
+    expect(isActiveQuestionToolStatus('pending')).toBe(true);
+    expect(isActiveQuestionToolStatus('running')).toBe(true);
+    expect(isActiveQuestionToolStatus('completed')).toBe(false);
   });
 });
 

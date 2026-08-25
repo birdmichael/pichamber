@@ -6,7 +6,6 @@ import {
   formatQuestionSelectOptions,
   isFreeformOtherOption,
   QUESTION_TYPE_SOMETHING_LABEL,
-  runQuestionDesktopPrompt,
 } from './question-desktop.js';
 import { createExtensionUIController } from './extension-ui.js';
 
@@ -128,18 +127,39 @@ describe('question desktop mapping', () => {
     });
   });
 
-  it('rejects empty options without asking ctx.ui', async () => {
+  it('opens an editor card when the question has no options', async () => {
     const { controller } = createUi();
-    await expect(executeQuestionViaDesktopUi({
-      question: 'Empty?',
+    const pending = executeQuestionViaDesktopUi({
+      question: 'What should we work on next?',
       options: [],
-    }, controller.context)).resolves.toEqual({
-      content: [{ type: 'text', text: 'Error: No options provided' }],
-      details: { question: 'Empty?', options: [], answer: null },
+    }, controller.context);
+
+    const prompt = await waitForPrompt(controller, 'editor');
+    expect(prompt.title).toBe('What should we work on next?');
+    expect(controller.reply(prompt.id, '  the login flow  ')).toBe(true);
+
+    await expect(pending).resolves.toEqual({
+      content: [{ type: 'text', text: 'User wrote: the login flow' }],
+      details: {
+        question: 'What should we work on next?',
+        options: [],
+        answer: 'the login flow',
+        wasCustom: true,
+      },
     });
-    expect(controller.list()).toEqual([]);
-    await expect(runQuestionDesktopPrompt({ question: 'Empty?', options: [] }, controller.context))
-      .resolves.toEqual({ error: 'empty-options' });
+  });
+
+  it('cancels an open-ended question when the editor is dismissed', async () => {
+    const { controller } = createUi();
+    const pending = executeQuestionViaDesktopUi({
+      question: 'What should we work on next?',
+    }, controller.context);
+    const prompt = await waitForPrompt(controller, 'editor');
+    expect(controller.cancel(prompt.id)).toBe(true);
+    await expect(pending).resolves.toEqual({
+      content: [{ type: 'text', text: 'User cancelled the selection' }],
+      details: { question: 'What should we work on next?', options: [], answer: null },
+    });
   });
 
   it('replaces the installed question execute with the Desktop mapping', async () => {

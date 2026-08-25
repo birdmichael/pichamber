@@ -396,6 +396,40 @@ describe('session-transfer', () => {
     expect(html).not.toContain('Input needed');
   });
 
+  it('hydrates a pending question toolCall onto the asking turn with question text', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'Use the question tool now.' }] },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'toolCall',
+            id: 'c_q',
+            name: 'question',
+            arguments: { question: 'What should we work on next?' },
+          }],
+        },
+      },
+    ], 'ses_question');
+
+    expect(messages).toHaveLength(2);
+    expect(messages[1].parts).toEqual([expect.objectContaining({
+      type: 'tool',
+      callID: 'c_q',
+      tool: 'question',
+      state: {
+        status: 'pending',
+        input: { question: 'What should we work on next?' },
+      },
+    })]);
+  });
+
   it('escapes HTML in exported text and rejects javascript links', () => {
     const html = buildSessionHtml({
       info: { title: '<script>alert(1)</script>' },

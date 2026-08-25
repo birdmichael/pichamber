@@ -5,7 +5,8 @@
  * `ctx.mode === "tui"` and then calls `ctx.ui.custom` with a TUI Editor.
  * Desktop binds `mode: "rpc"` and cannot run that factory. Mutating the live
  * tool definition's `execute` (the wrapper reads it at call time) maps the
- * same params onto `ctx.ui.select` + `editor` — the existing in-chat card.
+ * same params onto `ctx.ui.select` + `editor`. An options list becomes a
+ * select card; an open-ended question (no options) becomes an editor card.
  * `GET /api/question` stays a stub.
  */
 
@@ -85,16 +86,21 @@ const questionToolResultFromPrompt = (params, result) => {
 
 export const runQuestionDesktopPrompt = async (params, ui) => {
   const options = Array.isArray(params?.options) ? params.options : [];
-  if (options.length === 0) {
-    return { error: 'empty-options' };
-  }
   if (!ui || typeof ui.select !== 'function' || typeof ui.editor !== 'function') {
     return null;
   }
 
+  const title = typeof params?.question === 'string' ? params.question : '';
+  if (options.length === 0) {
+    const text = await ui.editor(title, '');
+    if (text === undefined) return null;
+    const trimmed = String(text).trim();
+    if (!trimmed) return null;
+    return { answer: trimmed, wasCustom: true };
+  }
+
   const labels = simpleOptionLabels(options);
   const selectOptions = formatQuestionSelectOptions(options);
-  const title = typeof params?.question === 'string' ? params.question : '';
   const selected = await ui.select(title, selectOptions);
   if (selected === undefined) return null;
 
@@ -128,30 +134,20 @@ export const runQuestionDesktopPrompt = async (params, ui) => {
   };
 };
 
-export const executeQuestionViaDesktopUi = async (params, ui) => {
-  const options = Array.isArray(params?.options) ? params.options : [];
-  const question = typeof params?.question === 'string' ? params.question : '';
-  if (options.length === 0) {
-    return {
-      content: [{ type: 'text', text: 'Error: No options provided' }],
-      details: { question, options: [], answer: null },
-    };
-  }
+export const executeQuestionViaDesktopUi = async (params, ui) => (
+  questionToolResultFromPrompt(params, await runQuestionDesktopPrompt(params, ui))
+);
 
-  const result = await runQuestionDesktopPrompt(params, ui);
-  if (result?.error === 'empty-options') {
-    return {
-      content: [{ type: 'text', text: 'Error: No options provided' }],
-      details: { question, options: [], answer: null },
-    };
-  }
-  return questionToolResultFromPrompt(params, result);
+const questionToolDefinition = (piSession) => {
+  if (!piSession || typeof piSession.getToolDefinition !== 'function') return null;
+  const definition = piSession.getToolDefinition('question');
+  if (definition && typeof definition.execute === 'function') return definition;
+  return null;
 };
 
 export const adaptQuestionToolForDesktop = (piSession, ui) => {
-  if (!piSession || typeof piSession.getToolDefinition !== 'function') return false;
-  const definition = piSession.getToolDefinition('question');
-  if (!definition || typeof definition.execute !== 'function') return false;
+  const definition = questionToolDefinition(piSession);
+  if (!definition) return false;
   if (definition.execute[DESKTOP_ADAPTED]) return true;
 
   const execute = async (_toolCallId, params, _signal, _onUpdate, ctx) => (

@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: the sidebar Settings gear opens on the first click even when the window was unfocused, and Context sources expands on the first click after the right sidebar closes. A leftover tooltip no longer eats that press.
 - UI: Walkthrough stays off the right rail until there is a walkthrough or you start one from Changes or a pull request.
 - Desktop: Archive, Scheduled tasks, and Worktrees now have a close control, and Esc returns to the previous session after any open picker or dialog.
+- Chat: a question-tool turn now shows a usable card with options or an input, and that card stays on the turn when you switch sessions.
 - Chat: hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.
 - Desktop: browser tabs and address history follow the current project. All Chats share one browser, separate from every Settings project. A new Chats draft uses that shared browser immediately, before you send. Sign-in cookies stay shared.
