@@ -2506,6 +2506,9 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     titleBarStyle: usesCustomTitleBar ? 'hidden' : 'default',
     titleBarOverlay: titleBarOverlayEnabled,
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
+    // macOS otherwise uses the first click only to focus the window, so the
+    // sidebar gear / session panel never see that press.
+    acceptFirstMouse: true,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,
@@ -2908,6 +2911,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     autoHideMenuBar: process.platform !== 'darwin',
     titleBarStyle: process.platform === 'darwin' || usesFramelessChrome ? 'hidden' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
+    acceptFirstMouse: true,
     webPreferences: {
       additionalArguments: [
         `--openchamber-local-origin=${desktopLocalOrigin}`,

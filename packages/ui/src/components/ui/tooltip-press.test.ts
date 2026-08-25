@@ -4,7 +4,10 @@ import { markDialogLayerMounted, resetDialogOpenLayerForTests } from './dialog-o
 import {
   isPrimaryMouseTooltipPointer,
   isTooltipTriggerBehindModal,
+  resetTooltipWindowBlurForTests,
+  shouldAllowTooltipDismissPropagation,
   shouldSuppressTooltipOpen,
+  subscribeTooltipWindowBlur,
 } from './tooltip-press';
 
 afterEach(() => {
@@ -37,6 +40,82 @@ describe('tooltip press', () => {
     expect(isPrimaryMouseTooltipPointer('mouse', 0)).toBe(true);
     expect(isPrimaryMouseTooltipPointer('mouse', 2)).toBe(false);
     expect(isPrimaryMouseTooltipPointer('touch', 0)).toBe(false);
+  });
+
+  test('lets the dismiss press reach the control under a leftover tooltip', () => {
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: false,
+      reason: 'outside-press',
+    })).toBe(true);
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: false,
+      reason: 'trigger-press',
+    })).toBe(true);
+  });
+
+  test('does not rewrite hover, focus, or open transitions', () => {
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: true,
+      reason: 'outside-press',
+    })).toBe(false);
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: false,
+      reason: 'trigger-hover',
+    })).toBe(false);
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: false,
+      reason: 'trigger-focus',
+    })).toBe(false);
+    expect(shouldAllowTooltipDismissPropagation({
+      nextOpen: false,
+      reason: 'escape-key',
+    })).toBe(false);
+  });
+
+  test('notifies mounted tooltips once when the window blurs', () => {
+    resetTooltipWindowBlurForTests();
+    const blurHandlers: Array<() => void> = [];
+    const previousWindow = (globalThis as { window?: unknown }).window;
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        addEventListener: (type: string, handler: () => void) => {
+          if (type === 'blur') blurHandlers.push(handler);
+        },
+        removeEventListener: () => undefined,
+      },
+    });
+
+    try {
+      const first = { calls: 0 };
+      const second = { calls: 0 };
+      const unsubscribeFirst = subscribeTooltipWindowBlur(() => {
+        first.calls += 1;
+      });
+      const unsubscribeSecond = subscribeTooltipWindowBlur(() => {
+        second.calls += 1;
+      });
+
+      for (const handler of blurHandlers) handler();
+      expect(first.calls).toBe(1);
+      expect(second.calls).toBe(1);
+
+      unsubscribeFirst();
+      for (const handler of blurHandlers) handler();
+      expect(first.calls).toBe(1);
+      expect(second.calls).toBe(2);
+      unsubscribeSecond();
+    } finally {
+      resetTooltipWindowBlurForTests();
+      if (previousWindow === undefined) {
+        Reflect.deleteProperty(globalThis, 'window');
+      } else {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: previousWindow,
+        });
+      }
+    }
   });
 });
 
