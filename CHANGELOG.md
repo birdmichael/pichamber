@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- UI: Walkthrough stays off the right rail until there is a walkthrough or you start one from Changes or a pull request.
 - Desktop: Archive, Scheduled tasks, and Worktrees now have a close control, and Esc returns to the previous session after any open picker or dialog.
 - Chat: hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.

@@ -1326,9 +1326,9 @@ export const useUIStore = create<UIStore>()(
           }
 
           // Chat needs a session payload; the rail hides it until a tab exists.
-          // Pull request and walkthrough are also rail-hidden until content or
-          // a related diff tab exists, but Git / diff / generate still open
-          // an empty singleton through this action.
+          // Walkthrough is also rail-hidden until a walkthrough tab exists, but
+          // Changes / pull-request generate still open an empty singleton
+          // through this action.
           if (mode === 'chat') {
             return;
           }
