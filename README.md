@@ -5,17 +5,17 @@
 
 **Pichamber is a macOS desktop workspace for [Pi](https://github.com/earendil-works/pi).** Direct the agent, review the diff, and keep sessions, skills, and git in one window.
 
-This is a new product line on a fork of OpenChamber. Versioning started at **1.0.0** and is independent of OpenChamber. The current release is **1.2.0**. The kernel is in-process Pi (`@earendil-works/pi-coding-agent`), not an OpenCode child process.
+This is a new product line on a fork of OpenChamber. Versioning started at **1.0.0** and is independent of OpenChamber. The current release is **1.2.1**. The kernel is in-process Pi (`@earendil-works/pi-coding-agent`), not an OpenCode child process.
 
 ![Pichamber](docs/references/chat_example.png)
 
 ## What you get
 
 - **Pi models and thinking** — providers and models come from `~/.pi/agent` at runtime. Thinking levels (`off` … `max`) sit next to the composer model chip. A project can pin a thinking level next to its model.
-- **Feature Plugins** — Goal, Plan, MCP, Subagents, and Btw. On/off follows Pi `settings.json` packages only; there is no Desktop Enabled checkbox. `/btw` exists only after installing `npm:@narumitw/pi-btw`; without it, `/btw` is a normal chat message.
+- **Feature Plugins** — Goal, Plan, MCP, Subagents, and Btw. On/off follows Pi `settings.json` packages only; there is no Desktop Enabled checkbox. After `pi-subagents` is installed, child runs nest under the parent in the sidebar; expand the parent and click the child to open that chat. `/btw` exists only after installing `npm:@narumitw/pi-btw`; without it, `/btw` is a normal chat message.
 - **Chats without a project** — start a chat without choosing a folder. Those sessions live in their own sidebar section and do not inherit a repository or worktree.
 - **Skills, prompts, and commands** — user and project skills under `~/.pi/agent` and `.pi`. Slash commands are Pi builtins plus your prompts. Skills Catalog is a card grid with counts, search, and repo links.
-- **Sessions** — compact, retry, scoped models, export/import JSONL or HTML, and a session tree for fork-from-here.
+- **Sessions** — compact, scoped models, export/import JSONL or HTML, and a session tree for fork-from-here.
 - **Scheduled Tasks** — a Pichamber scheduler that creates a real Pi session and sends the task prompt. The sidebar calendar, `/schedule-task`, and Multi-run stay available on Pi.
 - **Dictation** — speech is transcribed after you stop. The composer shows a waveform and timer while you record.
 - **Custom providers** — OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages.
@@ -48,7 +48,7 @@ The `pi` CLI on your PATH is optional. Desktop embeds the Pi SDK.
 
 | Ref | Role |
 | --- | --- |
-| [`main`](https://github.com/birdmichael/pichamber) | Pi kernel mainline, Pichamber **1.2.0** |
+| [`main`](https://github.com/birdmichael/pichamber) | Pi kernel mainline, Pichamber **1.2.1** |
 | [`legacy/openchamber`](https://github.com/birdmichael/pichamber/tree/legacy/openchamber) | Pre-Pi OpenChamber history |
 
 Land **one verified feature per pull request** into `main`. Do not open PRs against upstream [`openchamber/openchamber`](https://github.com/openchamber/openchamber).

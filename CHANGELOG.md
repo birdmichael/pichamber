@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-26
+
 - Desktop: after Subagents creates a child run, the sidebar can expand that parent and open the child chat from the nested row.
 - Desktop: Node-kernel ctx.ui now noops TUI helpers that Subagents calls (setToolsExpanded and related), so a Subagent launch is not aborted.
 
