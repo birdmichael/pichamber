@@ -24,7 +24,7 @@ files:
 releaseDate: '2026-07-30T00:00:00.000Z'
 `;
 
-const createFixture = ({ includeArm64 = true, includeMacArm64 = true, includeMacX64 = true } = {}) => {
+const createFixture = ({ includeArm64 = true, includeMacArm64 = true, includeMacX64 = false } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-latest-yml-'));
   const artifacts = path.join(root, 'artifacts');
   const output = path.join(root, 'output');
@@ -69,7 +69,7 @@ test('writes separate x64 and ARM64 Windows update channels', (context) => {
 
   const mac = fs.readFileSync(path.join(fixture.output, 'latest-mac.yml'), 'utf8');
   assert.match(mac, /Pichamber-1\.2\.3-mac-arm64\.zip/);
-  assert.match(mac, /Pichamber-1\.2\.3-mac-x64\.zip/);
+  assert.doesNotMatch(mac, /Pichamber-1\.2\.3-mac-x64\.zip/);
 });
 
 test('fails instead of publishing Mac updates without the arm64 zip', (context) => {

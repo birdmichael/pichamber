@@ -131,7 +131,6 @@ jobs:
     needs: create-release
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 330
-    continue-on-error: ${{ matrix.arch == 'x64' }}
     strategy:
       fail-fast: false
       matrix:
@@ -140,10 +139,6 @@ jobs:
             arch: arm64
             platform: darwin-aarch64
             runner: macos-26
-          - target: x86_64-apple-darwin
-            arch: x64
-            platform: darwin-x86_64
-            runner: macos-15-intel
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -200,8 +195,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # rebuild-native.mjs reads this to target the right arch when
-          # cross-building (runner is arm64; x64 matrix needs the hint).
+          # rebuild-native.mjs reads this to target the right arch.
           ELECTRON_BUILDER_ARCH: ${{ matrix.arch }}
           APPLE_SIGNING: ${{ steps.apple_signing.outputs.signing }}
           # First Developer ID notarization can sit In Progress for hours.
