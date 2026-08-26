@@ -130,7 +130,7 @@ jobs:
   build-desktop-electron-macos:
     needs: create-release
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 330
     continue-on-error: ${{ matrix.arch == 'x64' }}
     strategy:
       fail-fast: false
@@ -206,7 +206,7 @@ jobs:
           APPLE_SIGNING: ${{ steps.apple_signing.outputs.signing }}
           # First Developer ID notarization can sit In Progress for hours.
           # Job timeout-minutes fails closed instead of holding the runner
-          # after zip/dmg/staple. 120m leaves room after a long --wait.
+          # after zip/dmg/staple. 330m leaves room after a long --wait.
           DEBUG: electron-notarize,electron-osx-sign
         run: |
           bun run build:web-assets
