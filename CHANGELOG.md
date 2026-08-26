@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-08-27
+
 - Settings: Desktop shows the bundled Pi version only. It does not check npm for a newer kernel, and app updates stay on About.
 
 ## [1.2.2] - 2026-08-26
