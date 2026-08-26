@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createExtensionUIController, EXTENSION_UI_EVENTS } from './extension-ui.js';
+import { createExtensionUIController, createNoopUiExtras, EXTENSION_UI_EVENTS } from './extension-ui.js';
 
 const createController = () => {
   const events = [];
@@ -126,6 +126,17 @@ describe('Desktop ExtensionUIContext', () => {
     await expect(select).resolves.toBeUndefined();
     await expect(confirm).resolves.toBe(false);
     expect(controller.list()).toEqual([]);
+  });
+
+  it('keeps TUI helpers as local noops on Desktop ctx.ui', () => {
+    const extras = createNoopUiExtras();
+    const { controller } = createController();
+    expect(() => extras.setToolsExpanded(false)).not.toThrow();
+    expect(() => controller.context.setToolsExpanded(false)).not.toThrow();
+    expect(() => controller.context.setWidget(null)).not.toThrow();
+    expect(() => controller.context.setStatus('working')).not.toThrow();
+    expect(controller.context.getToolsExpanded()).toBe(false);
+    expect(extras.getToolsExpanded()).toBe(false);
   });
 
   it('returns false for unknown reply or cancel ids', () => {

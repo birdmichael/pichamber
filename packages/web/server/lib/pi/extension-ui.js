@@ -23,7 +23,7 @@ const publicPrompt = (prompt) => ({
   value: prompt.value,
 });
 
-const createNoopUiExtras = () => ({
+export const createNoopUiExtras = () => ({
   onTerminalInput: () => noop,
   setStatus: noop,
   setWorkingMessage: noop,

@@ -7,6 +7,7 @@ import { createInMemoryPiSession, createPiHost } from './pi-host.js';
 import { createPichamberControlTool, PICHAMBER_CONTROL_TOOL_NAME } from './pichamber-control-tool.js';
 import { createPichamberWebTool, PICHAMBER_WEB_TOOL_NAME } from './pichamber-web-tool.js';
 import { NODE_KERNEL_PROTOCOL, serializeKernelError, serializeSessionSnapshot } from './node-kernel-protocol.js';
+import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
 import {
   PI_SDK_PACKAGE,
   createSdkUnavailableError,
@@ -115,49 +116,7 @@ const wrapSession = (session, extras = {}) => {
     ? session.bindExtensions.bind(session)
     : null;
   session.bindExtensions = async (bindings = {}) => {
-    const ui = {
-      async select(title, options, opts) {
-        return parentRequest('ui.select', {
-          sessionId: session.sessionId,
-          title,
-          options,
-          opts,
-        });
-      },
-      async confirm(title, message) {
-        return parentRequest('ui.confirm', {
-          sessionId: session.sessionId,
-          title,
-          message,
-        });
-      },
-      async input(title, opts) {
-        return parentRequest('ui.input', {
-          sessionId: session.sessionId,
-          title,
-          opts,
-        });
-      },
-      async editor(title, opts) {
-        return parentRequest('ui.editor', {
-          sessionId: session.sessionId,
-          title,
-          opts,
-        });
-      },
-      notify(message, level) {
-        return parentRequest('ui.notify', {
-          sessionId: session.sessionId,
-          message,
-          level,
-        });
-      },
-    };
-    const next = {
-      ...bindings,
-      uiContext: bindings.uiContext || ui,
-      mode: bindings.mode || 'rpc',
-    };
+    const next = bindNodeKernelChildUiContext(session, bindings, parentRequest);
     if (originalBind) return originalBind(next);
     session.extensionBindings = next;
     return undefined;
