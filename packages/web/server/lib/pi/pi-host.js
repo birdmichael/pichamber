@@ -45,7 +45,7 @@ import {
 } from './feature-plugins.js';
 import { enrichPiPackageVersions } from './pi-package-versions.js';
 import { getPiUpgradeStatus, invalidatePiUpgradeStatusCache } from './pi-upgrade-status.js';
-import { runPiSelfUpdate } from './pi-upgrade.js';
+import { createPiUpgradeUnsupportedError, runPiSelfUpdate } from './pi-upgrade.js';
 import {
   collectSkippedUserExtensionsFromErrors,
   createUserExtensionNativeSkipStore,
@@ -3322,6 +3322,13 @@ export const createPiHost = ({
       });
     },
     async upgradePi(options = {}) {
+      const status = await getPiUpgradeStatus({
+        env: options.env,
+        fetchImpl: options.fetchImpl,
+      });
+      if (status?.upgrade?.supported !== true) {
+        throw createPiUpgradeUnsupportedError();
+      }
       const updated = await selfUpdate({
         agentDir: resolveAgentDir(),
         env: options.env,

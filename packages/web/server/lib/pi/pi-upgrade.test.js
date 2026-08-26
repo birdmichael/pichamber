@@ -2,6 +2,8 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 
 import {
+  createPiUpgradeUnsupportedError,
+  PI_UPGRADE_UNSUPPORTED_CODE,
   resolveNodeRuntimeForPiCli,
   resolvePiUpdateInvocation,
   runPiSelfUpdate,
@@ -13,6 +15,14 @@ const fakeCli = (script = '/opt/pichamber/node_modules/@earendil-works/pi-coding
 });
 
 describe('pi-upgrade', () => {
+  it('creates a 403 unsupported-upgrade error for leftover callers', () => {
+    expect(createPiUpgradeUnsupportedError()).toMatchObject({
+      status: 403,
+      code: PI_UPGRADE_UNSUPPORTED_CODE,
+      message: expect.stringMatching(/bundled Pi SDK cannot be upgraded/i),
+    });
+  });
+
   it('runs the in-process SDK cli.js, not a PATH pi', () => {
     const invocation = resolvePiUpdateInvocation({
       agentDir: '/Users/me/custom-pi',
