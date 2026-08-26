@@ -1770,6 +1770,9 @@ export const createPiHost = ({
         sessionManager: manager,
       });
     } catch (error) {
+      if (allowInMemoryFallback === false) {
+        throw error;
+      }
       console.warn(`[pi-host] failed to attach live Pi session ${sessionID}:`, error?.message || error);
       piSession = createInMemoryPiSession({ sessionId: sessionID });
     }
@@ -2007,6 +2010,9 @@ export const createPiHost = ({
         ...(manager ? { sessionManager: manager } : {}),
       });
     } catch (error) {
+      if (allowInMemoryFallback === false) {
+        throw error;
+      }
       console.warn(`[pi-host] failed to attach subagent session ${resolvedId}:`, error?.message || error);
       piSession = createInMemoryPiSession({ sessionId: resolvedId });
     }

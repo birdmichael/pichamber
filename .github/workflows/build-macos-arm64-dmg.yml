@@ -71,12 +71,14 @@ jobs:
         run: |
           bun run build:web-assets
           bun run prepare:pi-kernel
+          bun run prepare:node
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
           bun run bundle:main
           bun run rebuild:native
           node ./scripts/package.mjs --mac --arm64 --publish=never
           bun run verify:opencode-cli:packaged
+          bun run verify:pi-node-kernel:packaged
 
       - name: Verify signature + entitlements + notarization
         env:

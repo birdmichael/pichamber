@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** the packaged app now starts the real Pi kernel. Opening an existing chat no longer answers with “Hello from the Pi mock kernel,” and a kernel that cannot start shows an error instead of a fake reply.
 - **Desktop:** GitHub Release publishes the Mac update feed as soon as the Apple Silicon build is on the Release. Intel is still notarized when that build succeeds, and is added to the same feed later instead of blocking Apple Silicon.
 
 ## [1.2.1] - 2026-08-26

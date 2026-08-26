@@ -106,6 +106,7 @@ jobs:
         run: |
           bun run build:web-assets
           bun run prepare:pi-kernel
+          bun run prepare:node
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
           bun run bundle:main
@@ -115,6 +116,7 @@ jobs:
           bun run rebuild:native
           node ./scripts/package.mjs --mac --${{ matrix.arch }} --publish=never
           bun run verify:opencode-cli:packaged
+          bun run verify:pi-node-kernel:packaged
 
       - name: Verify signature + entitlements + notarization
         env:
@@ -194,6 +196,11 @@ jobs:
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
 
+      - name: Prepare bundled Node for the Pi kernel child
+        working-directory: packages/electron
+        shell: bash
+        run: bun run prepare:node
+
       - name: Bundle main process
         working-directory: packages/electron
         run: bun run bundle:main
@@ -215,6 +222,7 @@ jobs:
         run: |
           node ./scripts/package.mjs --win --${{ matrix.arch }} --publish=never
           bun run verify:opencode-cli:packaged
+          bun run verify:pi-node-kernel:packaged
 
       - name: Upload Windows installable artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -300,12 +308,15 @@ jobs:
         run: |
           set -euo pipefail
           bun run build:web-assets
+          bun run prepare:pi-kernel
+          bun run prepare:node
           bun run prepare:opencode-cli
           bun run verify:opencode-cli
           bun run bundle:main
           bun run rebuild:native
           node ./scripts/package.mjs --linux --${{ matrix.arch }} --publish=never
           bun run verify:opencode-cli:packaged
+          bun run verify:pi-node-kernel:packaged
           bun run verify:linux-appimage
 
       - name: Validate Linux update manifest

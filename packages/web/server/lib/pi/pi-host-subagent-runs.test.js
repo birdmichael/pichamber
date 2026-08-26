@@ -690,4 +690,48 @@ describe('Pi host subagent runs', () => {
     expect(await host.listSessionChildren(parent.id)).toEqual([]);
     host.dispose();
   });
+
+  it('does not attach a subagent file onto the in-memory mock when fallback is closed', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    let calls = 0;
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      allowInMemoryFallback: false,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async ({ sessionManager } = {}) => {
+        calls += 1;
+        if (calls > 1) {
+          throw Object.assign(new Error('Pi node kernel did not become ready'), {
+            code: 'PI_NODE_UNAVAILABLE',
+            status: 503,
+          });
+        }
+        return createInMemoryPiSession({
+          sessionId: typeof sessionManager?.getSessionId === 'function'
+            ? sessionManager.getSessionId()
+            : undefined,
+        });
+      },
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const { tmpdir, childId } = writeAdapterChildRun({ home, parentID: parent.id });
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    try {
+      await host.listSessionInfos('/tmp/project');
+      expect(() => host.getSession(childId)).toThrow(/Session not found/);
+      await expect(host.ensureSession(childId, '/tmp/project')).rejects.toMatchObject({
+        code: 'PI_NODE_UNAVAILABLE',
+        status: 503,
+      });
+      expect(() => host.getSession(childId)).toThrow(/Session not found/);
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
 });

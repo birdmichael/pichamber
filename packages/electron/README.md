@@ -103,6 +103,8 @@ That runs, in order:
 6. `rebuild:native` to rebuild native modules for Electron.
 7. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
 
+GitHub Release, desktop smoke, and the standalone Mac DMG job must call `prepare:node` (the local `package` script already does). After `package.mjs`, run `verify:pi-node-kernel:packaged`. That check requires `Contents/Resources/node/bin/node` (or the Windows `node.exe`) and `app.asar.unpacked/node_modules/@pichamber/web/server/lib/pi/node-kernel-child.js`. It does not require `resources/pi-node-kernel/`. The child script is the asar-unpacked module next to the Pi host, not a copied extraResource.
+
 **Package on a Mac.** A Linux VM cannot produce a usable `Pichamber-*.dmg`. Build output goes to `packages/electron/dist` (`Pichamber-<version>-mac-<arch>.dmg` and `.zip`).
 
 GitHub Release / desktop smoke builds import `APPLE_CERTIFICATE` (Developer ID Application) into a temporary keychain and pin electron-builder with `CSC_NAME` only — they do not pass `CSC_LINK` / `CSC_KEY_PASSWORD`, because electron-builder would re-import the p12 and `GITHUB_ENV` can corrupt that password. They notarize with `APPLE_ID` + `APPLE_PASSWORD` + `APPLE_TEAM_ID`. The signed job fails if the imported identity is not Developer ID Application, or if the `.app` is missing a stapled notary ticket. The first Developer ID notarization for a team can stay `In Progress` for hours or days — `notarytool --wait` will hold CI until Apple finishes or the job hits its timeout. GitHub Release and standalone Mac DMG jobs allow 330 minutes so a first ticket is not cancelled at 120 minutes. After that first ticket lands, later builds are usually faster, but Apple can still take most of an hour.
@@ -150,7 +152,7 @@ The macOS menu bar item is enabled by default and can be disabled in General set
 
 ## Bundled kernel (Pi)
 
-Packaged Mac Desktop boots the app-bundled Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`) in a Node child. There is no bundled Pi CLI binary and no managed OpenCode child on the default path. User extensions load with that Node, not inside Electron. If Node cannot be resolved, Desktop reports a clear error and recovery instead of starting a half-ready kernel.
+Packaged Mac Desktop boots the app-bundled Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`) in a Node child. There is no bundled Pi CLI binary and no managed OpenCode child on the default path. User extensions load with that Node, not inside Electron. The child script is the unpacked `node-kernel-child.js` under `app.asar.unpacked`; packaged Desktop also ships `resources/node`. If Node cannot be resolved or the child cannot start, Desktop reports a clear error and recovery instead of starting a half-ready kernel or answering with the in-memory mock.
 
 The leftover OpenCode CLI extraResource is optional. `prepare:opencode-cli` downloads it only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode`. The OpenCode CLI settings page stays visible for that leftover path.
 
