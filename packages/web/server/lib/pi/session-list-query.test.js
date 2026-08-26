@@ -40,6 +40,8 @@ describe('Pi session list query', () => {
       .toEqual(['root']);
     expect(applySessionListQuery(infos, { roots: false }).sessions.map((item) => item.id))
       .toEqual(['root', 'child']);
+    expect(applySessionListQuery(infos, {}).sessions.map((item) => item.id))
+      .toEqual(['root', 'child']);
   });
 
   it('pages by time.updated strictly earlier and reports x-next-cursor', () => {

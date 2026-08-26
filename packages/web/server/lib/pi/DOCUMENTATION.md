@@ -222,7 +222,9 @@ unbound sessions stay `ui_unavailable`.
 | `input` / `editor` | In-chat text field. Plan **Other** is a `select` option, then `editor` |
 | `notify` | Toast via `pi.ui.notify` |
 | `custom` | No TUI factory. Installed Pi `question` is remapped onto `select` + `editor` (see Question tool). Other `custom()` callers get an in-chat editor, not silent `undefined` |
-| TUI-only (widgets, terminal input) | No-op |
+| TUI-only (widgets, terminal input) | No-op (`createNoopUiExtras`) |
+
+The Node-kernel child cannot receive `uiContext` over IPC (`bindExtensions` sends `{ mode: "rpc" }` only). `wrapSession` always installs a local stub: the same IPC proxies for `select` / `confirm` / `input` / `editor` / `notify`, plus `createNoopUiExtras()` for TUI helpers (`setToolsExpanded`, `getToolsExpanded`, `setWidget`, `setStatus`, …). `hasUI` is true because those methods exist; missing noops abort `pi-subagents` before the child gets a turn. Do not invent new parentRequest channels for TUI widgets.
 
 Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session. Composer **Stop** calls `host.abort()`, which cancels every waiting `ctx.ui` prompt on that session **and** force-publishes `session.idle` even when Pi `abort()` is a no-op (the turn already finished or never emitted `agent_settled`).
 
@@ -590,7 +592,10 @@ the file. It does not create a public share URL. JSONL stays the round-trip /
 re-import format.
 
 Clone/fork `parentID` is `{ parentID }` on `pichamber.metadata`. Hydrate,
-disk list, and sidebar Refresh read it onto `info.parentID`.
+disk list, and sidebar Refresh read it onto `info.parentID`. Adapter
+children persist that same field when the Subagents slot is on so a cold
+`GET /api/session` still nests them. `pichamber.subagentRun.parentSessionID`
+is only a fallback when the top-level field is missing.
 
 ## MCP adapter
 
@@ -669,6 +674,12 @@ When the slot is on:
   polls for an openable child. If none appears (including a hung scout),
   the host writes an assistant error and idles the parent. Parent
   session id is never treated as the child.
+- `GET /api/session` / `listSessionInfos` attaches adapter children and
+  includes each attached `record.info` with `parentID` equal to the
+  parent Pi jsonl id. The sidebar tree reads that flat list; it does
+  not require a prior `/subagent-runs` call and must not send
+  `roots=true` (that filter drops `parentID` rows). Child ids are the
+  jsonl header ids, not newly minted `ses_*` chats.
 - `GET /api/session/:id/subagent-runs` lists this parent's fleet. Live
   `subagent` tool-call input/output (`sessionId` / `childSessionId`) and
   assistant `toolCall` arguments win over leftover adapter `status.json`
@@ -680,15 +691,19 @@ When the slot is on:
   stays cheap on the HTTP thread.
 - Management / action-only `subagent` calls (`list`, `status`, `get`,
   `models`, `guide`, `children.list`, and `details.mode === "management"`)
-  are not fleet runs. They do not appear in Work Status and do not mint a
-  facade session or child jsonl. `mode: "management"` is never treated as
-  foreground.
+  are not fleet runs. They do not appear in Work Status, do not enter
+  `GET /api/session`, and do not mint a facade session or child jsonl.
+  `mode: "management"` is never treated as foreground.
 - Terminal adapter files with no child id are dropped (not a pile of
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet. A finished tool-call without a child is
   not minted into an empty chat just to make the row clickable.
 -   A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
+  Attach also hydrates when only `sessionID` exists (`ensureRecord`); it
+  does not mint an empty chat. Attach persists `pichamber.metadata.parentID`
+  on the child jsonl so a new host still nests. An existing live record
+  that gains `parentID` emits `session.updated`.
   Attach and child-message refresh skip a full jsonl parse when that file's
   mtime and size are unchanged; a busy child still updates when the file
   changes.
@@ -696,5 +711,8 @@ When the slot is on:
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.
 
-When the slot is off, both lists are empty. Leftover OpenCode `parentID`
-children are not a Pi fleet. OpenCode kernel routes are unchanged.
+When the slot is off, adapter children are omitted from `GET /api/session`
+and both fleet lists are empty. Fork/clone `parentID` rows stay. Leftover
+OpenCode `parentID` children are not a Pi fleet. OpenCode kernel routes
+are unchanged. Do not implement `/subagents-fleet` or treat Work Status /
+Session Goal / multi-run catalog as the sidebar tree.

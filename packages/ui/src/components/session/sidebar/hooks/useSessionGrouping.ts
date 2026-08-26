@@ -27,7 +27,41 @@ type Args = {
   isVSCode: boolean;
 };
 
-const isArchivedSession = (session: Session): boolean => Boolean(session.time?.archived);
+const isArchivedSession = (session: { time?: { archived?: number | string | null } }): boolean => (
+  Boolean(session.time?.archived)
+);
+
+type SessionParentFields = {
+  id: string;
+  parentID?: string | null;
+  time?: { archived?: number | string | null };
+};
+
+export const nestSessionsByParentID = <T extends SessionParentFields>(
+  sessions: readonly T[],
+): { roots: T[]; childrenByParent: Map<string, T[]> } => {
+  const sessionMap = new Map(sessions.map((session) => [session.id, session]));
+  const childrenByParent = new Map<string, T[]>();
+  for (const session of sessions) {
+    const parentID = session.parentID;
+    if (!parentID) continue;
+    const parentSession = sessionMap.get(parentID);
+    if (!parentSession || isArchivedSession(parentSession) !== isArchivedSession(session)) {
+      continue;
+    }
+    const collection = childrenByParent.get(parentID) ?? [];
+    collection.push(session);
+    childrenByParent.set(parentID, collection);
+  }
+  const roots = sessions.filter((session) => {
+    const parentID = session.parentID;
+    if (!parentID) return true;
+    const parentSession = sessionMap.get(parentID);
+    if (!parentSession) return true;
+    return isArchivedSession(parentSession) !== isArchivedSession(session);
+  });
+  return { roots, childrenByParent };
+};
 
 export const useSessionGrouping = (args: Args) => {
   const { t } = useI18n();
@@ -81,20 +115,10 @@ export const useSessionGrouping = (args: Args) => {
         .filter((session) => !isHiddenBtwSession(session))
         .sort((a, b) => compareSessionsByLifecycleOrder(a, b, args.pinnedSessionIds, args.sessionOrderRanks));
 
-      const sessionMap = new Map(sortedProjectSessions.map((session) => [session.id, session]));
-      const childrenMap = new Map<string, Session[]>();
-      sortedProjectSessions.forEach((session) => {
-        const parentID = (session as Session & { parentID?: string | null }).parentID;
-        if (!parentID) return;
-        const parentSession = sessionMap.get(parentID);
-        if (!parentSession || isArchivedSession(parentSession) !== isArchivedSession(session)) {
-          return;
-        }
-        const collection = childrenMap.get(parentID) ?? [];
-        collection.push(session);
-        childrenMap.set(parentID, collection);
-      });
-      childrenMap.forEach((list) => list.sort((a, b) => compareSessionsByLifecycleOrder(a, b, args.pinnedSessionIds, args.sessionOrderRanks)));
+      const { roots, childrenByParent } = nestSessionsByParentID(
+        sortedProjectSessions as Array<Session & { parentID?: string | null }>,
+      );
+      childrenByParent.forEach((list) => list.sort((a, b) => compareSessionsByLifecycleOrder(a, b, args.pinnedSessionIds, args.sessionOrderRanks)));
 
       const worktreeByPath = new Map<string, WorktreeMetadata>();
       availableWorktrees.forEach((meta) => {
@@ -118,17 +142,9 @@ export const useSessionGrouping = (args: Args) => {
       };
 
       const buildProjectNode = (session: Session): SessionNode => {
-        const children = childrenMap.get(session.id) ?? [];
+        const children = childrenByParent.get(session.id) ?? [];
         return { session, children: children.map((child) => buildProjectNode(child)), worktree: getSessionWorktree(session) };
       };
-
-      const roots = sortedProjectSessions.filter((session) => {
-        const parentID = (session as Session & { parentID?: string | null }).parentID;
-        if (!parentID) return true;
-        const parentSession = sessionMap.get(parentID);
-        if (!parentSession) return true;
-        return isArchivedSession(parentSession) !== isArchivedSession(session);
-      });
 
       const groupedNodes = new Map<string, SessionNode[]>();
       const archivedKey = '__archived__';

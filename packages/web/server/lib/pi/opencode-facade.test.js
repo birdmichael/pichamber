@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-coding-agent';
 import { createPiKernel } from './index.js';
 import { registerPiFacade } from './opencode-facade.js';
+import { writeFeaturePlugins } from './feature-plugins.js';
 import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
 import { sessionArchiveDir } from './session-archive.js';
 import {
@@ -2085,6 +2086,72 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect((await auth.json()).nativeFlow).toBe(true);
       expect(createdSession.id).toBeTruthy();
     } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('lists adapter subagent children on GET /api/session with parentID', async () => {
+    const { url, close, kernel } = await startFacade({
+      createSession: async ({ sessionManager } = {}) => createInMemoryPiSession({
+        sessionId: sessionManager?.getSessionId?.() || 'mock',
+      }),
+    });
+    const originalTmp = process.env.TMPDIR;
+    try {
+      const home = kernel.host.getPath().home;
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-subagents'],
+      }, null, 2)}\n`);
+      writeFeaturePlugins(home, { subagents: { enabled: true, source: 'npm:pi-subagents' } });
+
+      const parent = await kernel.host.createSession({ directory: '/tmp/project', title: 'Parent' });
+      const tmpdir = path.join(home, 'tmp');
+      const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_scout');
+      fs.mkdirSync(runDir, { recursive: true });
+      const childFile = path.join(runDir, 'child.jsonl');
+      fs.writeFileSync(childFile, `${JSON.stringify({
+        type: 'session',
+        id: 'scout-child',
+        cwd: '/tmp/project',
+      })}\n${JSON.stringify({
+        type: 'message',
+        id: 'msg_user',
+        role: 'user',
+        content: 'Inspect the repo',
+        timestamp: new Date().toISOString(),
+      })}\n`);
+      fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+        runId: 'run_scout',
+        sessionId: parent.id,
+        state: 'complete',
+        mode: 'async',
+        sessionFile: childFile,
+        steps: [{ agent: 'scout', status: 'complete', sessionFile: childFile }],
+      }));
+      process.env.TMPDIR = tmpdir;
+
+      const dirQ = `directory=${encodeURIComponent('/tmp/project')}`;
+      const listed = await (await fetch(`${url}/api/session?${dirQ}`)).json();
+      expect(listed.find((item) => item.id === parent.id)).toBeTruthy();
+      expect(listed.find((item) => item.id === 'scout-child')).toMatchObject({
+        id: 'scout-child',
+        parentID: parent.id,
+      });
+      expect(listed.some((item) => item.id.startsWith('ses_') && item.parentID === parent.id)).toBe(false);
+
+      const children = await (await fetch(`${url}/api/session/${parent.id}/children?${dirQ}`)).json();
+      expect(children).toEqual([
+        expect.objectContaining({ id: 'scout-child', parentID: parent.id }),
+      ]);
+
+      const roots = await (await fetch(`${url}/api/session?roots=true&${dirQ}`)).json();
+      expect(roots.map((item) => item.id)).toContain(parent.id);
+      expect(roots.map((item) => item.id)).not.toContain('scout-child');
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
       kernel.dispose();
       await close();
     }

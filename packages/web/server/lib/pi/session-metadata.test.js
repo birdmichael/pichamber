@@ -76,6 +76,19 @@ describe('Pi session metadata persistence', () => {
     expect(readPersistedParentID({ parentID: 12 })).toBeUndefined();
   });
 
+  it('falls back to adapter subagentRun.parentSessionID when parentID is unset', () => {
+    expect(readPersistedParentID({
+      pichamber: { subagentRun: { parentSessionID: 'adapter-parent' } },
+    })).toBe('adapter-parent');
+    expect(readPersistedParentID({
+      parentID: 'clone-parent',
+      pichamber: { subagentRun: { parentSessionID: 'adapter-parent' } },
+    })).toBe('clone-parent');
+    expect(readPersistedParentID({
+      pichamber: { subagentRun: { parentSessionID: '   ' } },
+    })).toBeUndefined();
+  });
+
   it('reads archived: ms | 0 from pichamber.metadata and ignores invalid values', () => {
     expect(readPersistedArchivedTimestamp({ archived: 1_700_000_000_000 })).toBe(1_700_000_000_000);
     expect(readPersistedArchivedTimestamp({ archived: 0 })).toBe(0);

@@ -8,6 +8,8 @@ import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE } from './node-runtime.js';
 import { createNodeKernelClient } from './node-kernel-client.js';
+import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
+import { createInMemoryPiSession } from './pi-host.js';
 
 const require = createRequire(import.meta.url);
 const tempDirs = [];
@@ -345,6 +347,40 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
     } finally {
       kernel.dispose();
     }
+  });
+});
+
+describe('node kernel ctx.ui stub', () => {
+  it('bindExtensions uiContext noops TUI helpers pi-subagents calls when hasUI is true', async () => {
+    const session = createInMemoryPiSession({ sessionId: 'child-ui' });
+    const parentCalls = [];
+    const parentRequest = async (method, params) => {
+      parentCalls.push({ method, params });
+      return 'from-parent';
+    };
+    const originalBind = session.bindExtensions.bind(session);
+    session.bindExtensions = async (bindings = {}) => (
+      originalBind(bindNodeKernelChildUiContext(session, bindings, parentRequest))
+    );
+
+    await session.bindExtensions({ mode: 'rpc' });
+    const ui = session.extensionBindings.uiContext;
+    expect(typeof ui.setToolsExpanded).toBe('function');
+    expect(typeof ui.setWidget).toBe('function');
+    expect(typeof ui.setStatus).toBe('function');
+    expect(typeof ui.getToolsExpanded).toBe('function');
+    expect(() => ui.setToolsExpanded(false)).not.toThrow();
+    expect(() => ui.setWidget(null)).not.toThrow();
+    expect(() => ui.setStatus('working')).not.toThrow();
+    expect(ui.getToolsExpanded()).toBe(false);
+    expect(parentCalls).toEqual([]);
+    await expect(ui.select('Pick', ['A'])).resolves.toBe('from-parent');
+    expect(parentCalls[0]).toMatchObject({
+      method: 'ui.select',
+      params: { sessionId: 'child-ui', title: 'Pick', options: ['A'] },
+    });
+    const childSource = fs.readFileSync(new URL('./node-kernel-child.js', import.meta.url), 'utf8');
+    expect(childSource.includes('bindNodeKernelChildUiContext')).toBe(true);
   });
 });
 

@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { OpencodeClient, Session } from '@opencode-ai/sdk/v2'
 
 import { filterManagedChatsForRuntime, globalSessionListQuery, listGlobalSessionPages, splitGlobalSessionsByArchived } from './globalSessions'
@@ -22,6 +25,7 @@ describe('globalSessionListQuery', () => {
       archived: false,
       narrowToArchived: false,
     })
+    expect('roots' in globalSessionListQuery({ isPiKernel: true, surface: 'default' })).toBe(false)
     expect(globalSessionListQuery({ isPiKernel: true, surface: 'default' }).archived).not.toBe(true)
   })
 
@@ -135,6 +139,34 @@ describe('listGlobalSessionPages', () => {
     expect(calls[0]).toEqual({ directory: '/repo', archived: false, roots: false, limit: 2 })
     expect(calls[1]).toEqual({ directory: '/repo', archived: false, roots: false, limit: 2, cursor: 10 })
     expect(sessions.map((session) => session.id)).toEqual(['ses_root', 'ses_child_1', 'ses_child_2'])
+  })
+
+  test('omitted roots does not send roots:true on the production list path', async () => {
+    const calls: Array<Record<string, unknown>> = []
+    const apiClient = {
+      experimental: {
+        session: {
+          list: async (options: Record<string, unknown>) => {
+            calls.push(options)
+            return {
+              data: [{ id: 'ses_root', time: { updated: 20 } }, { id: 'ses_child', parentID: 'ses_root', time: { updated: 10 } }],
+              response: { headers: new Headers() },
+            }
+          },
+        },
+      },
+    } as unknown as OpencodeClient
+
+    const sessions = await listGlobalSessionPages(apiClient, {
+      directory: '/repo',
+      archived: false,
+      pageSize: 500,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toEqual({ directory: '/repo', archived: false, limit: 500 })
+    expect('roots' in calls[0]).toBe(false)
+    expect(sessions.map((session) => session.id)).toEqual(['ses_root', 'ses_child'])
   })
 
   test('returns only archived sessions when archived pages are requested', async () => {
@@ -352,5 +384,18 @@ describe('splitGlobalSessionsByArchived', () => {
 
     expect(active.map((session) => session.id)).toEqual(['ses_active', 'ses_restored'])
     expect(archived.map((session) => session.id)).toEqual(['ses_archived'])
+  })
+})
+
+describe('useGlobalSessionsStore loadSessions', () => {
+  test('production loadSessions does not send roots:true', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'useGlobalSessionsStore.ts'),
+      'utf8',
+    )
+    const loadSessions = source.slice(source.indexOf('loadSessions: async'))
+    expect(loadSessions).toContain('globalSessionListQuery({ isPiKernel, surface: \'default\' })')
+    expect(loadSessions).not.toMatch(/roots:\s*true/)
+    expect(source).not.toMatch(/listGlobalSessionPages\([\s\S]*roots:\s*true/)
   })
 })
