@@ -66,10 +66,28 @@ test('writes separate x64 and ARM64 Windows update channels', (context) => {
   assert.doesNotMatch(x64, /win-arm64\.exe/);
   assert.match(arm64, /win-arm64\.exe/);
   assert.doesNotMatch(arm64, /win-x64\.exe/);
+});
+
+test('writes latest-mac.yml from arm64 when the Intel artifact is missing', (context) => {
+  const fixture = createFixture();
+  context.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
+
+  execFileSync(process.execPath, [script], { env: environment(fixture) });
 
   const mac = fs.readFileSync(path.join(fixture.output, 'latest-mac.yml'), 'utf8');
   assert.match(mac, /Pichamber-1\.2\.3-mac-arm64\.zip/);
   assert.doesNotMatch(mac, /Pichamber-1\.2\.3-mac-x64\.zip/);
+});
+
+test('merges both Mac architectures into latest-mac.yml when both artifacts exist', (context) => {
+  const fixture = createFixture({ includeMacX64: true });
+  context.after(() => fs.rmSync(fixture.root, { recursive: true, force: true }));
+
+  execFileSync(process.execPath, [script], { env: environment(fixture) });
+
+  const mac = fs.readFileSync(path.join(fixture.output, 'latest-mac.yml'), 'utf8');
+  assert.match(mac, /Pichamber-1\.2\.3-mac-arm64\.zip/);
+  assert.match(mac, /Pichamber-1\.2\.3-mac-x64\.zip/);
 });
 
 test('fails instead of publishing Mac updates without the arm64 zip', (context) => {
