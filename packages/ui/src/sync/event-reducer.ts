@@ -20,6 +20,7 @@ import {
   findMessageIndex,
   insertMessageChronologically,
 } from "./message-ordering"
+import { isClientGeneratedMessageId, userTextFromParts } from "./optimistic"
 
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
 const DELTA_OVERLAP_FIELDS = ["text", "output"] as const
@@ -357,6 +358,18 @@ export function applyDirectoryEvent(
       if (!messages) {
         draft.message[info.sessionID] = [info]
         return true
+      }
+      if (info.role === "user" && findMessageIndex(messages, info.id) < 0) {
+        const incomingText = userTextFromParts(draft.part[info.id])
+        const incomingClient = isClientGeneratedMessageId(info.id)
+        const echo = messages.find((message) => {
+          if (message.role !== "user") return false
+          const existingClient = isClientGeneratedMessageId(message.id)
+          if (existingClient === incomingClient) return false
+          if (incomingText) return userTextFromParts(draft.part[message.id]) === incomingText
+          return existingClient && !incomingClient
+        })
+        if (echo) return false
       }
       const messageIndex = findMessageIndex(messages, info.id)
       if (messageIndex >= 0) {

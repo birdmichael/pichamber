@@ -1,5 +1,5 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2/client"
-import { mergeMessages } from "./optimistic"
+import { collapseClientAndHydratedUserTurns, isClientGeneratedMessageId, mergeMessages, userTextFromParts } from "./optimistic"
 import type { SessionMaterializationReason } from "./event-reducer"
 import { sortMessagesChronologically } from "./message-ordering"
 
@@ -267,10 +267,44 @@ export function materializeSessionSnapshots(
       .map((record) => [record.info.id, record] as const),
   )
   const nextMessages = sortMessagesChronologically([...recordsByMessageID.values()].map((record) => record.info))
-  const snapshots = nextMessages.map((message) => recordsByMessageID.get(message.id)!)
   const existingMessages = state.message[sessionID]
   const currentMessages = existingMessages ?? []
-  const messages = mergeMessages(currentMessages, nextMessages)
+  const remappedIncoming = nextMessages.map((message) => {
+    if (message.role !== "user" || isClientGeneratedMessageId(message.id)) return message
+    const incomingText = userTextFromParts(recordsByMessageID.get(message.id)?.parts)
+    if (!incomingText) return message
+    const live = currentMessages.find((candidate) => (
+      candidate.role === "user"
+      && isClientGeneratedMessageId(candidate.id)
+      && userTextFromParts(state.part[candidate.id]) === incomingText
+    ))
+    if (!live) return message
+    const incoming = recordsByMessageID.get(message.id)
+    if (incoming) {
+      recordsByMessageID.delete(message.id)
+      recordsByMessageID.set(live.id, {
+        info: {
+          ...incoming.info,
+          id: live.id,
+          time: {
+            ...incoming.info.time,
+            created: (live.time as { created?: number } | undefined)?.created
+              ?? incoming.info.time?.created,
+          },
+        } as Message,
+        parts: (incoming.parts ?? []).map((part) => ({ ...part, messageID: live.id })),
+      })
+    }
+    return recordsByMessageID.get(live.id)!.info
+  })
+  const snapshots = sortMessagesChronologically(
+    [...new Map(remappedIncoming.map((message) => [message.id, message] as const)).values()],
+  ).map((message) => recordsByMessageID.get(message.id)!)
+  const mergedMessages = mergeMessages(currentMessages, snapshots.map((record) => record.info))
+  const messages = collapseClientAndHydratedUserTurns(
+    mergedMessages,
+    (messageID) => state.part[messageID] ?? recordsByMessageID.get(messageID)?.parts,
+  )
   const messagesChanged = messages !== currentMessages || (existingMessages === undefined && snapshots.length === 0)
 
   let partsChanged = false

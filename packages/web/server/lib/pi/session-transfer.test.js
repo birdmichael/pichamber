@@ -760,6 +760,18 @@ describe('session-transfer', () => {
     expect(reconciled[0].parts[0].messageID).toBe('msg_optimistic');
   });
 
+  it('keeps the live turn when disk hydrate is still empty or shorter', () => {
+    const live = [{
+      info: { id: 'msg_user', role: 'user' },
+      parts: [{ type: 'text', text: 'hi' }],
+    }, {
+      info: { id: 'msg_assistant', role: 'assistant' },
+      parts: [{ type: 'text', text: 'ok' }],
+    }];
+    expect(reconcileHydratedMessages(live, [])).toEqual(live);
+    expect(reconcileHydratedMessages(live, [live[0]])).toEqual(live);
+  });
+
   it('pairs read and bash toolCalls with later toolResults on the same assistant', () => {
     const messages = facadeMessagesFromPiEntries([
       {
@@ -1162,5 +1174,41 @@ describe('session-transfer', () => {
       'late turn',
       'branched continue',
     ]);
+  });
+
+  it('parents later assistants to the user when jsonl parentId is a toolResult', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: '5bb000de',
+        message: { role: 'user', content: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘' }] },
+      },
+      {
+        type: 'message',
+        id: 'fdc1a9b3',
+        parentId: '5bb000de',
+        message: { role: 'assistant', content: [{ type: 'text', text: '先列出可用子代理' }] },
+      },
+      {
+        type: 'message',
+        id: '4993a1e7',
+        parentId: 'fdc1a9b3',
+        message: {
+          role: 'toolResult',
+          toolName: 'read',
+          toolCallId: 'c1',
+          content: [{ type: 'text', text: 'skill' }],
+        },
+      },
+      {
+        type: 'message',
+        id: '905ac93c',
+        parentId: '4993a1e7',
+        message: { role: 'assistant', content: [{ type: 'text', text: '磁盘检查用执行类 worker。' }] },
+      },
+    ], 'ses_disk');
+    expect(messages.map((entry) => entry.info.role)).toEqual(['user', 'assistant', 'assistant']);
+    expect(messages[1].info.parentID).toBe('5bb000de');
+    expect(messages[2].info.parentID).toBe('5bb000de');
   });
 });

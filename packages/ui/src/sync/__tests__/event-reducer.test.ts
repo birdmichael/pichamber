@@ -87,6 +87,40 @@ describe("applyDirectoryEvent", () => {
     expect(draft.message.ses_1).toEqual([legacy, current])
   })
 
+  test("does not insert a Pi-native user when the live client user already exists", () => {
+    const live = {
+      id: "msg_optimistic",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 100 },
+    } as Message
+    const draft = state({
+      message: { ses_1: [live] },
+      part: {
+        msg_optimistic: [{
+          id: "prt_opt",
+          messageID: "msg_optimistic",
+          sessionID: "ses_1",
+          type: "text",
+          text: "帮我启动一个子代理 查看 我电脑磁盘",
+        } as Part],
+      },
+    })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "5bb000de",
+          sessionID: "ses_1",
+          role: "user",
+          time: { created: 200 },
+        } as Message,
+      },
+    } as Event)).toBe(false)
+    expect(draft.message.ses_1.map((item) => item.id)).toEqual(["msg_optimistic"])
+  })
+
   test("preserves part event order across the part ID rollover", () => {
     const legacyPart = {
       id: "prt_ffffffffffffLegacy",

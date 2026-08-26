@@ -399,8 +399,14 @@ acceptance gate. There is no second install path.
 
 `POST /api/session/:id/command` (`host.runCommand`) is the command channel on
 the Pi kernel. It does **not** use `promptAsync` for unknown names or
-extension handlers. `promptAsync` inserts a user bubble first and is only
-for chat turns.
+extension handlers. `promptAsync` inserts a user bubble first (`body.messageID` when
+the client sent one) and is only for chat turns. Pi `message_start`
+for that same prompt uses a jsonl id and must not add a second user
+row. The translator skips that echo when the facade id is already
+set, and also skips a Pi-native user id when the facade id was not
+set yet. `applyEventToStore` does not append a non-`msg_*` user
+while a client id is already in the store, and reparents an
+assistant whose `parentID` is missing onto the last user.
 
 Resolution order:
 
@@ -584,7 +590,11 @@ line. `transcriptEntriesForHydrate` reads that file first and falls
 back to `getEntries` only when the file is empty. It never uses the
 live leaf path.
 Walk `type: "message"` entries in order. `thinking` → `reasoning` and
-`text` → `text` stay as they are. An assistant `toolCall` plus a later
+`text` → `text` stay as they are. Assistant `parentID` is the latest
+user message in that file, not the jsonl previous-line `parentId`
+(that is often a `toolResult`). Chat turns only render assistants
+whose `parentID` is the user bubble; a raw jsonl parent drops every
+later step of the same send. An assistant `toolCall` plus a later
 `toolResult` with the same `toolCallId` become one assistant `type: "tool"`
 part (`callID`, `tool`, `state.input`, `state.output`, `state.status`) —
 the same shape live SSE already emits in `event-translator.js`.
@@ -789,7 +799,8 @@ When the slot is on:
   does the same for children and idle parents. A live streaming parent
   keeps the translator as owner. Hydrate keeps the live user-message id
   when disk has the same text under a Pi-native id, so one send is one
-  bubble.
+  bubble. An empty or shorter hydrate must not replace a longer live
+  transcript — the jsonl may not have flushed the current turn yet.
   Follow-ups stay on the child; the parent transcript is unchanged.
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.

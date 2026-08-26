@@ -533,6 +533,16 @@ describe('createEventTranslator', () => {
     expect(events).toEqual([]);
     expect(t.userMessageID).toBe('msg_user');
   });
+
+  it('does not mint a Pi-native user bubble when the facade id was not set yet', () => {
+    const t = translator();
+    const events = t.translate({
+      type: 'message_start',
+      message: { role: 'user', id: '5bb000de', content: '帮我启动一个子代理 查看 我电脑磁盘' },
+    });
+    expect(events).toEqual([]);
+    expect(t.userMessageID).toBe('5bb000de');
+  });
   it('maps auto_retry_start to session.status retry', () => {
     const events = translator().translate({
       type: 'auto_retry_start',

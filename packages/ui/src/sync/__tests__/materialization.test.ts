@@ -136,6 +136,26 @@ describe("materializeSessionSnapshots", () => {
     expect(result.part.msg_1).toEqual([serverPart])
   })
 
+  test("keeps the live msg_* user when hydrate repeats the same text under a Pi id", () => {
+    const live = userMessage("msg_optimistic")
+    const livePart = part("prt_opt", "msg_optimistic", "text", "帮我启动一个子代理 查看 我电脑磁盘")
+    const hydrated = userMessage("5bb000de")
+    const hydratedPart = part("prt_pi", "5bb000de", "text", "帮我启动一个子代理 查看 我电脑磁盘")
+    const assistant = message("msg_assistant")
+    assistant.time = { created: 2 } as Message["time"]
+    const result = materializeSessionSnapshots(
+      { message: { ses_1: [live] }, part: { msg_optimistic: [livePart] } },
+      "ses_1",
+      [
+        { info: hydrated, parts: [hydratedPart] },
+        { info: assistant, parts: [part("prt_a", "msg_assistant")] },
+      ],
+    )
+
+    expect(result.message.ses_1.map((item) => item.id)).toEqual(["msg_optimistic", "msg_assistant"])
+    expect(result.part.msg_optimistic?.map((item) => item.id)).toEqual(["prt_pi"])
+  })
+
   test("preserves state.time from existing part when snapshot drops it", () => {
     const livePart = {
       id: "prt_1",

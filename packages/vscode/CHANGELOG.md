@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-- Chat: sending a message no longer shows the same user turn twice, and a Subagent card can open the child session even when the tool payload has no session id.
+- Chat: sending a message no longer shows the same user turn twice after Pi writes it under a different id, and a Subagent card can open the child session even when the tool payload has no session id.
 - Sessions: dismissing a leftover hover tooltip no longer eats the next click on a session row or other control.
 - Hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.
 - Chat: when `/` has no matching command, the popup footer no longer says Enter select. Enter still sends the typed text as a normal message; Esc still closes the menu.

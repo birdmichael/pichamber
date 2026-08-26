@@ -1945,7 +1945,9 @@ const userTextFromFacade = (entry) => {
 export const reconcileHydratedMessages = (live, hydrated) => {
   const next = Array.isArray(hydrated) ? hydrated : [];
   const previous = Array.isArray(live) ? live : [];
-  if (previous.length === 0 || next.length === 0) return next;
+  if (previous.length === 0) return next;
+  // Disk has not caught up (or has only metadata). Do not wipe the live turn.
+  if (next.length === 0 || next.length < previous.length) return previous;
   const liveUsers = previous.filter((entry) => entry?.info?.role === 'user');
   if (liveUsers.length === 0) return next;
   const used = new Set();
@@ -1976,6 +1978,7 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
   const fallbackModel = isRecord(options) ? options.fallbackModel : undefined;
   const messages = [];
   const toolPartsByCallID = new Map();
+  let lastUserId = '';
   for (const entry of Array.isArray(entries) ? entries : []) {
     if (entry?.type && entry.type !== 'message') continue;
     if (!entry?.message) continue;
@@ -1988,6 +1991,17 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
     }
     const facade = facadeFromPiMessage(entry, fallbackModel);
     if (!facade) continue;
+    if (facade.info.role === 'user') {
+      lastUserId = facade.info.id;
+    } else if (facade.info.role === 'assistant' && lastUserId) {
+      // Pi jsonl parentId is the previous line (often toolResult). Chat turns
+      // group assistants by parentID === the user message, same as live SSE.
+      const rawParent = asTrimmedString(facade.info.parentID);
+      const parentIsUser = rawParent && messages.some((item) => (
+        item.info.role === 'user' && item.info.id === rawParent
+      ));
+      if (!parentIsUser) facade.info.parentID = lastUserId;
+    }
     if (id) {
       facade.info.sessionID = id;
       facade.parts = facade.parts.map((part) => ({

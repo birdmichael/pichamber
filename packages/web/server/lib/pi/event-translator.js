@@ -377,12 +377,17 @@ export const createEventTranslator = ({
         const role = message?.role;
         if (role === 'user') {
           // Facade promptAsync already persisted the user bubble. Pi also
-          // emits message_start with the same text; echoing it adds a second
-          // text part on the same (or a new) user message.
+          // emits message_start with the same text and a jsonl id; echoing
+          // it adds a second user turn (often after the assistant).
           if (userMessageID) {
             return [];
           }
-          userMessageID = message.id || nextMessageId();
+          const incomingId = typeof message.id === 'string' ? message.id : '';
+          if (incomingId && !/^(msg_|usr_)/.test(incomingId)) {
+            userMessageID = incomingId;
+            return [];
+          }
+          userMessageID = incomingId || nextMessageId();
           const text = typeof message.content === 'string'
             ? message.content
             : Array.isArray(message.content)

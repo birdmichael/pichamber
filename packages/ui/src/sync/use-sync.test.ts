@@ -228,6 +228,23 @@ describe('mergeOptimisticPage idempotency across commits (#2084)', () => {
     expect(merged.confirmed).toEqual([optimistic.id])
   })
 
+  test('drops a Pi-native user when the page already has the same text under msg_*', () => {
+    const client = userMessage('msg_optimistic', 100)
+    const hydrated = userMessage('5bb000de', 200)
+    const text = '帮我启动一个子代理 查看 我电脑磁盘'
+    const page = {
+      session: [client, hydrated],
+      part: [
+        { id: client.id, part: [{ id: 'prt_client', messageID: client.id, sessionID: 'ses_1', type: 'text', text } as Part] },
+        { id: hydrated.id, part: [{ id: 'prt_pi', messageID: hydrated.id, sessionID: 'ses_1', type: 'text', text } as Part] },
+      ],
+      cursor: undefined,
+      complete: true,
+    }
+    const merged = mergeOptimisticPage(page, [])
+    expect(merged.session.map((message) => message.id)).toEqual([client.id])
+  })
+
   test('mergeOptimisticPage with empty items is a fast no-op path', () => {
     const page = {
       session: [assistantMessage('a_1')],

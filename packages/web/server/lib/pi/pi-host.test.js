@@ -436,7 +436,7 @@ describe('createPiHost', () => {
         },
         async prompt(text) {
           emit({ type: 'agent_start' });
-          emit({ type: 'message_start', message: { role: 'user', content: text } });
+          emit({ type: 'message_start', message: { role: 'user', id: '5bb000de', content: text } });
           emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
           emit({
             type: 'message_update',

@@ -592,6 +592,8 @@ const maybeApplyConversationTitle = (record) => {
   return true;
 };
 
+const isClientGeneratedMessageId = (id) => typeof id === 'string' && /^(msg_|usr_)/.test(id);
+
 const lastUserMessage = (store) => {
   for (let index = store.messages.length - 1; index >= 0; index -= 1) {
     const entry = store.messages[index];
@@ -632,7 +634,7 @@ const applyEventToStore = (store, ocEvent) => {
   const props = ocEvent?.properties || {};
   if (type === 'message.updated' && props.info) {
     const existing = store.messages.find((entry) => entry.info.id === props.info.id);
-    const nextInfo = stampAssistantStoreInfo(props.info, store, existing?.info);
+    let nextInfo = stampAssistantStoreInfo(props.info, store, existing?.info);
     if (existing) {
       const prevTime = existing.info.time || {};
       const nextTime = nextInfo.time || {};
@@ -654,7 +656,24 @@ const applyEventToStore = (store, ocEvent) => {
         existing.info.modelID = usable.modelID;
         existing.info.model = usable.model;
       }
+    } else if (
+      nextInfo.role === 'user'
+      && !isClientGeneratedMessageId(nextInfo.id)
+      && store.messages.some((entry) => (
+        entry?.info?.role === 'user' && isClientGeneratedMessageId(entry.info.id)
+      ))
+    ) {
+      // Pi jsonl id for a turn promptAsync already inserted with msg_*.
     } else {
+      if (nextInfo.role === 'assistant' && nextInfo.parentID) {
+        const parentExists = store.messages.some((entry) => entry?.info?.id === nextInfo.parentID);
+        if (!parentExists) {
+          const parent = lastUserMessage(store);
+          if (parent?.info?.id) {
+            nextInfo = { ...nextInfo, parentID: parent.info.id };
+          }
+        }
+      }
       store.messages.push({ info: nextInfo, parts: [] });
     }
   }
@@ -2794,7 +2813,9 @@ export const createPiHost = ({
         agent: userAgent,
         ...(body.model ? { model: body.model } : {}),
       };
-      record.messages.push({ info: userInfo, parts: userParts });
+      if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
+        record.messages.push({ info: userInfo, parts: userParts });
+      }
       if (maybeApplyConversationTitle(record)) {
         emit(record.directory, {
           id: createEventId(),
