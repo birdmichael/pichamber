@@ -3002,7 +3002,7 @@ export const dict: Record<I18nKey, string> = {
   "mobileUpdate.toast.available.description": "A versão {version} está pronta para Android.",
   "mobileUpdate.toast.actions.download": "Baixar",
   "mobileUpdate.toast.actions.dismiss": "Dispensar",
-  "piUpdate.toast.available.title": "Pi {version} disponível",
+  "piUpdate.toast.available.title": "Só um Pichamber mais recente inclui o Pi {version}",
   "piUpdate.toast.available.description": "Esta versão vem com um Pichamber mais recente. Atualize o app para obtê-la.",
   "piUpdate.toast.actions.dismiss": "Dispensar",
   "piUpdate.toast.actions.ok": "OK",

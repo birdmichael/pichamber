@@ -3036,7 +3036,7 @@ export const dict = {
   'mobileUpdate.toast.available.description': 'Version {version} is ready for Android.',
   'mobileUpdate.toast.actions.download': 'Download',
   'mobileUpdate.toast.actions.dismiss': 'Dismiss',
-  'piUpdate.toast.available.title': 'Pi {version} available',
+  'piUpdate.toast.available.title': 'Only a newer Pichamber includes Pi {version}',
   'piUpdate.toast.available.description': 'This version ships with a newer Pichamber. Update the app to get it.',
   'piUpdate.toast.actions.dismiss': 'Dismiss',
   'piUpdate.toast.actions.ok': 'OK',

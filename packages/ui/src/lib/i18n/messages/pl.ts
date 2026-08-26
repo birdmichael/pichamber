@@ -3022,7 +3022,7 @@ export const dict: Record<I18nKey, string> = {
   'updateDialog.status.serverRestarting': 'Ponowne uruchamianie serwera...',
   'updateDialog.status.updating': 'Aktualizowanie...',
   'updateDialog.status.waitingForServer': 'Oczekiwanie na serwer...',
-  'piUpdate.toast.available.title': 'Pi {version} jest dostępne',
+  'piUpdate.toast.available.title': 'Tylko nowszy Pichamber zawiera Pi {version}',
   'piUpdate.toast.available.description': 'Ta wersja jest dostarczana z nowszym Pichamber. Zaktualizuj aplikację, aby ją uzyskać.',
   'piUpdate.toast.actions.dismiss': 'Odrzuć',
   'piUpdate.toast.actions.ok': 'OK',

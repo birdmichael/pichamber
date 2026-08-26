@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Settings: Pi Update is hidden because Desktop runs the Pi SDK that ships with Pichamber. A newer npm version is a notice only — update the app to get a newer kernel.
+- Settings: Pi Update is hidden because Desktop runs the Pi SDK that ships with Pichamber. A newer npm version is a notice that only a newer Pichamber includes that kernel — update the app to get it.
 - Settings: Extensions shows user packages Desktop skipped, instead of looking like they loaded.
 - Desktop: if Pi cannot start, the error names the missing Node or SDK recovery instead of “Pi process is not running.”
 - Desktop: a failed session list or Subagent attach no longer looks like an empty or healthy tree.

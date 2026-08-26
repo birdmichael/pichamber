@@ -368,6 +368,13 @@ describe('settings search', () => {
       getPageTitle,
     });
     expect(uninstall.some((result) => result.id === 'extensions.packages')).toBe(true);
+    const skipped = buildSettingsSearchResults({
+      query: 'skipped extensions',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
+      t,
+      getPageTitle,
+    });
+    expect(skipped.some((result) => result.id === 'extensions.skipped')).toBe(false);
     expect(leftover.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
     expect(vsCode.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(false);
   });

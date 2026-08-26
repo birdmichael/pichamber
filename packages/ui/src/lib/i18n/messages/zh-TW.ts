@@ -2999,7 +2999,7 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.available.description': '版本 {version} 已可用於 Android。',
   'mobileUpdate.toast.actions.download': '下載',
   'mobileUpdate.toast.actions.dismiss': '忽略',
-  'piUpdate.toast.available.title': 'Pi {version} 可用',
+  'piUpdate.toast.available.title': 'Pichamber 才能帶到 Pi {version}',
   'piUpdate.toast.available.description': '此版本隨較新的 Pichamber 提供。請更新應用程式以取得。',
   'piUpdate.toast.actions.dismiss': '忽略',
   'piUpdate.toast.actions.ok': '確定',

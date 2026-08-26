@@ -887,14 +887,6 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
-    id: 'extensions.skipped',
-    page: 'extensions',
-    titleKey: 'settings.extensions.page.skipped.title',
-    descriptionKey: 'settings.extensions.page.skipped.info',
-    keywords: ['skipped', 'native', 'abi', 'electron', 'extension', 'extensions'],
-    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
-  },
-  {
     id: 'feature-plugins.goal',
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.goal.title',
