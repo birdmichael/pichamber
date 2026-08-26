@@ -25,7 +25,7 @@ describe('globalSessionListQuery', () => {
       archived: false,
       narrowToArchived: false,
     })
-    expect(globalSessionListQuery({ isPiKernel: true, surface: 'default' })).not.toHaveProperty('roots')
+    expect('roots' in globalSessionListQuery({ isPiKernel: true, surface: 'default' })).toBe(false)
     expect(globalSessionListQuery({ isPiKernel: true, surface: 'default' }).archived).not.toBe(true)
   })
 
@@ -165,7 +165,7 @@ describe('listGlobalSessionPages', () => {
 
     expect(calls).toHaveLength(1)
     expect(calls[0]).toEqual({ directory: '/repo', archived: false, limit: 500 })
-    expect(calls[0]).not.toHaveProperty('roots')
+    expect('roots' in calls[0]).toBe(false)
     expect(sessions.map((session) => session.id)).toEqual(['ses_root', 'ses_child'])
   })
 

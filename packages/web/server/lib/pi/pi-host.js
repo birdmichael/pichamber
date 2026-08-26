@@ -1893,18 +1893,24 @@ export const createPiHost = ({
       },
     };
     record.info.metadata = metadata;
-    if (persistSessionMetadata(record.sessionManager, metadata)) return true;
-    if (typeof record.sessionFile !== 'string' || !record.sessionFile) return false;
-    try {
-      fs.appendFileSync(record.sessionFile, `${JSON.stringify({
-        type: 'custom',
-        customType: PICHAMBER_METADATA_CUSTOM_TYPE,
-        data: { parentID: nextParentID, pichamber: metadata.pichamber },
-      })}\n`);
-      return true;
-    } catch {
+    const persisted = persistSessionMetadata(record.sessionManager, metadata);
+    if (!persisted && typeof record.sessionFile === 'string' && record.sessionFile) {
+      try {
+        fs.appendFileSync(record.sessionFile, `${JSON.stringify({
+          type: 'custom',
+          customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+          data: { parentID: nextParentID, pichamber: metadata.pichamber },
+        })}\n`);
+      } catch {
+        return false;
+      }
+    } else if (!persisted) {
       return false;
     }
+    if (typeof record.sessionFile === 'string' && record.sessionFile) {
+      record.sessionFileStamp = statSessionFile(record.sessionFile);
+    }
+    return true;
   };
 
   const applySubagentParentLink = (record, parentID, extraMetadata, { emitUpdated = true } = {}) => {
@@ -1965,13 +1971,15 @@ export const createPiHost = ({
       return existing;
     }
     let manager = null;
-    try {
-      const pi = await loadPiSdk();
-      if (typeof pi.SessionManager?.open === 'function') {
-        manager = pi.SessionManager.open(resolvedFile);
+    if (!mock) {
+      try {
+        const pi = await loadPiSdk();
+        if (typeof pi.SessionManager?.open === 'function') {
+          manager = pi.SessionManager.open(resolvedFile);
+        }
+      } catch {
+        manager = null;
       }
-    } catch {
-      manager = null;
     }
     const fileEntries = readSessionFileEntries(resolvedFile);
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
@@ -2293,7 +2301,16 @@ export const createPiHost = ({
     for (const info of live) {
       if (info.parentID) continue;
       const nested = readPersistedParentID(info.metadata);
-      if (nested) info.parentID = nested;
+      if (!nested) continue;
+      info.parentID = nested;
+      const liveRecord = sessions.get(info.id);
+      if (liveRecord?.info === info) {
+        emit(liveRecord.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: liveRecord.info },
+        });
+      }
     }
 
     if (!subagentsSlotActive()) {
