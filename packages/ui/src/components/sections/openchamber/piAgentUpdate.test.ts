@@ -57,7 +57,7 @@ describe('piAgentUpdate', () => {
 });
 
 describe('PiAgentSettings version display', () => {
-  test('shows muted current version text and Update, not chips or Current / Latest labels', () => {
+  test('shows muted current version text, not chips, Latest labels, or Update', () => {
     const source = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), 'PiAgentSettings.tsx'),
       'utf8',
@@ -74,9 +74,9 @@ describe('PiAgentSettings version display', () => {
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.currentVersion')}");
     expect(source).not.toContain("label={t('settings.openchamber.piAgent.field.latestVersion')}");
     expect(source).not.toContain('actions.upToDate');
-    expect(source).toContain('updateToVersion');
-    expect(source).toContain('data-settings-item="sessions.pi-update"');
-    expect(source).toContain('SETTINGS_ACTION_BUTTON_CLASS');
+    expect(source).not.toContain('updateToVersion');
+    expect(source).not.toContain('data-settings-item="sessions.pi-update"');
+    expect(source).not.toContain('sessions.pi-update-notifications');
     expect(source).toContain('justify-start');
     expect(source).not.toContain('justify-between');
     expect(source).not.toContain('justify-end');

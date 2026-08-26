@@ -902,7 +902,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.toast.reloadBusy': 'Ponowne wczytanie nie mogło się wykonać, bo sesja jest zajęta. Katalog jest zapisany. Spróbuj ponownie, gdy będzie bezczynna.',
   'settings.openchamber.piAgent.field.version': 'Wersja Pi',
   'settings.openchamber.piAgent.field.currentVersionAria': 'Bieżąca wersja Pi {version}',
-  'settings.openchamber.piAgent.field.versionInfo': 'Wersja, którą uruchamia ten Desktop. Najnowsza pochodzi z tego samego sprawdzenia npm co powiadomienie o aktualizacji Pi.',
+  'settings.openchamber.piAgent.field.versionInfo': 'To @earendil-works/pi-coding-agent dołączony do Pichamber. Desktop nie uruchamia pi z PATH. Aktualizacje aplikacji sprawdzisz w Informacje.',
   'settings.openchamber.piAgent.actions.update': 'Aktualizuj',
   'settings.openchamber.piAgent.actions.updateAria': 'Aktualizuj Pi',
   'settings.openchamber.piAgent.actions.updateToVersion': 'Aktualizuj do {version}',

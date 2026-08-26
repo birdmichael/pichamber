@@ -201,7 +201,8 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(upgradeRes.status).toBe(200);
       expect(upgrade.package).toBe('@earendil-works/pi-coding-agent');
       expect(upgrade.upgrade).toEqual({ supported: false, reason: 'bundled' });
-      expect(typeof upgrade.available).toBe('boolean');
+      expect(upgrade.available).toBe(false);
+      expect(upgrade.latestVersion).toBeNull();
 
       const providers = await (await fetch(`${url}/api/config/providers`)).json();
       expect(providers.providers[0].id).toBe('pi-mock');

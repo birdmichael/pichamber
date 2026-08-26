@@ -21,18 +21,15 @@ Empty string clears the override. Changing the directory does not copy
 `~/.pi/agent`. Creating an empty agent dir on first use is OK.
 
 `GET /api/path` and `getKernelInfo().paths` report the resolved dir.
-`GET /api/pi/upgrade-status` compares the installed
-`@earendil-works/pi-coding-agent` with npm (`available`, `currentVersion`,
-`latestVersion`). Settings → General and About use that same payload.
-The npm latest is cached in-process for 5 minutes so those surfaces share
-one check. A successful `POST /api/pi/upgrade` invalidates the cache.
-Every call still honors `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`. `POST
-/api/pi/upgrade` runs `pi update` on the in-process SDK `bin.pi`
-(`dist/cli.js`) with `PI_CODING_AGENT_DIR` set to the resolved agent dir,
-then `host.reload()`. It does not spawn a PATH `pi`. After success,
-Desktop reloads the in-process kernel (not an app Restart).
-`upgrade.supported` stays `false` (`reason: "bundled"`) so the header
-banner remains informational.
+`GET /api/pi/upgrade-status` reports the local bundled
+`@earendil-works/pi-coding-agent` version only (`currentVersion`,
+`available: false`, `latestVersion: null`). It does not fetch npm.
+Settings → General and About use that payload for the installed version.
+`upgrade.supported` stays `false` (`reason: "bundled"`): Desktop runs the
+app-bundled SDK, not PATH `pi`, so Settings has no Pi Update and
+`POST /api/pi/upgrade` returns 403. App updates stay on About /
+electron-updater. The leftover `runPiSelfUpdate` path is not reachable
+while `upgrade.supported` is false.
 
 `GET /api/pi/extensions` lists configured `settings.json` `packages` plus
 `currentVersion` / `latestVersion` / `updateAvailable` (npm registry
@@ -487,7 +484,7 @@ client claiming `browser=1` returns 503 immediately. Mobile, VS Code, and
 hosted web still cannot drive a page.
 
 Settings → Pichamber Tools is leftover OpenCode-kernel chrome. On Pi,
-Settings → General shows the Pi agent directory and update notifications
+Settings → General shows the Pi agent directory and bundled Pi version
 instead. Host tools still attach from persisted flags when those leftover
 settings exist. Toggle persist then `host.reloadIdleSessions()` /
 `POST /api/pi/sessions/reload-idle`. Do not call leftover OpenCode restart.

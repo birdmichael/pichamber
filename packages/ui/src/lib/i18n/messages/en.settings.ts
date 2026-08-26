@@ -1150,7 +1150,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.toast.reloadBusy': 'Reload could not run because a session is busy. The directory is saved. Retry when idle.',
   'settings.openchamber.piAgent.field.version': 'Pi version',
   'settings.openchamber.piAgent.field.currentVersionAria': 'Current Pi version {version}',
-  'settings.openchamber.piAgent.field.versionInfo': 'The version this Desktop is running. Latest comes from the same npm check as the Pi update notice.',
+  'settings.openchamber.piAgent.field.versionInfo': 'This is the @earendil-works/pi-coding-agent bundled in Pichamber. Desktop does not run your PATH pi. Check About for Pichamber app updates.',
   'settings.openchamber.piAgent.actions.update': 'Update',
   'settings.openchamber.piAgent.actions.updateAria': 'Update Pi',
   'settings.openchamber.piAgent.actions.updateToVersion': 'Update to {version}',

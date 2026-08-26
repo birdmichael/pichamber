@@ -1118,7 +1118,7 @@ export const settingsDict = {
   "settings.openchamber.piAgent.toast.reloadBusy": "A recarga não pôde ser executada porque uma sessão está ocupada. O diretório já está salvo. Tente de novo quando estiver ociosa.",
   "settings.openchamber.piAgent.field.version": "Versão do Pi",
   "settings.openchamber.piAgent.field.currentVersionAria": "Versão atual do Pi {version}",
-  "settings.openchamber.piAgent.field.versionInfo": "A versão que este Desktop está executando. A mais recente vem da mesma verificação npm do aviso de atualização do Pi.",
+  "settings.openchamber.piAgent.field.versionInfo": "Este é o @earendil-works/pi-coding-agent incluído no Pichamber. O Desktop não executa o pi do seu PATH. As atualizações do app ficam em Sobre.",
   "settings.openchamber.piAgent.actions.update": "Atualizar",
   "settings.openchamber.piAgent.actions.updateAria": "Atualizar o Pi",
   "settings.openchamber.piAgent.actions.updateToVersion": "Atualizar para {version}",

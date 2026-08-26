@@ -304,7 +304,7 @@ describe('settings search', () => {
     expect(piBinary.some((result) => result.id === 'sessions.opencode-update-notifications')).toBe(false);
   });
 
-  test('finds the Pi agent directory and update-notification rows on Pi', () => {
+  test('finds the Pi agent directory and hides Pi update-notification search on Pi', () => {
     const getPageTitle = (page: string) => page;
     const directory = buildSettingsSearchResults({
       query: 'agent directory',
@@ -339,7 +339,7 @@ describe('settings search', () => {
 
     expect(directory.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
     expect(env.some((result) => result.id === 'sessions.pi-agent-directory')).toBe(true);
-    expect(updates.some((result) => result.id === 'sessions.pi-update-notifications')).toBe(true);
+    expect(updates.some((result) => result.id === 'sessions.pi-update-notifications')).toBe(false);
     const version = buildSettingsSearchResults({
       query: 'current version',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
@@ -353,7 +353,7 @@ describe('settings search', () => {
       t,
       getPageTitle,
     });
-    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(true);
+    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(false);
     const updateAll = buildSettingsSearchResults({
       query: 'update all',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
