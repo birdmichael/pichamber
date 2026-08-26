@@ -11,7 +11,7 @@ import {
   serializeLatestYml,
 } from './latest-yml.mjs';
 
-export const parseMergeLatestMacYmlArgs = (argv) => {
+const parseMergeLatestMacYmlArgs = (argv) => {
   const options = {};
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -50,7 +50,7 @@ const assertIncomingZips = (files, version) => {
   }
 };
 
-export const mergeLatestMacYmlFiles = async ({
+const mergeLatestMacYmlFiles = async ({
   incoming,
   output,
   existing,
