@@ -211,6 +211,7 @@ jobs:
         run: |
           bun run build:web-assets
           bun run prepare:pi-kernel
+          bun run prepare:node
           bun run prepare:opencode-cli
           bun run bundle:main
           # npmRebuild=false in package.json, so electron-builder won't
@@ -226,6 +227,7 @@ jobs:
             # so that secret cannot trigger notarization.
             APPLE_SIGNING=false node ./scripts/package.mjs --mac --${{ matrix.arch }} --publish=never
           fi
+          bun run verify:pi-node-kernel:packaged
 
       - name: Verify signature + entitlements + notarization
         if: steps.apple_signing.outputs.signing == 'true'
@@ -363,6 +365,11 @@ jobs:
         shell: bash
         run: bun run prepare:opencode-cli
 
+      - name: Prepare bundled Node for the Pi kernel child
+        working-directory: packages/electron
+        shell: bash
+        run: bun run prepare:node
+
       - name: Bundle main process
         working-directory: packages/electron
         run: bun run bundle:main
@@ -381,7 +388,9 @@ jobs:
       - name: Build Windows app
         working-directory: packages/electron
         shell: bash
-        run: node ./scripts/package.mjs --win --${{ matrix.arch }} --publish=never
+        run: |
+          node ./scripts/package.mjs --win --${{ matrix.arch }} --publish=never
+          bun run verify:pi-node-kernel:packaged
 
       - name: Upload installer to release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -468,11 +477,14 @@ jobs:
         run: |
           set -euo pipefail
           bun run build:web-assets
+          bun run prepare:pi-kernel
+          bun run prepare:node
           bun run prepare:opencode-cli
           bun run bundle:main
           bun run rebuild:native
           node ./scripts/package.mjs --linux --${{ matrix.arch }} --publish=never
           bun run verify:linux-appimage
+          bun run verify:pi-node-kernel:packaged
 
       - name: Validate Linux update manifest
         working-directory: packages/electron

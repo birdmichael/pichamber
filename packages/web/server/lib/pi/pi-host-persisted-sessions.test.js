@@ -123,6 +123,44 @@ describe('persisted Pi sessions', () => {
     restarted.dispose();
   });
 
+  it('does not hydrate a persisted session onto the in-memory mock when fallback is closed', async () => {
+    const home = tempDir('pi-persist-fail-closed-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'Live session',
+      userText: 'hello',
+      assistantText: 'real reply',
+    });
+    const error = Object.assign(new Error('Pi node kernel did not become ready'), {
+      code: 'PI_NODE_UNAVAILABLE',
+      status: 503,
+    });
+    const host = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      allowInMemoryFallback: false,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async () => {
+        throw error;
+      },
+    });
+    try {
+      await expect(host.ensureSession(persisted.id, cwd)).rejects.toMatchObject({
+        code: 'PI_NODE_UNAVAILABLE',
+        status: 503,
+      });
+      expect(() => host.getSession(persisted.id)).toThrow(/Session not found/);
+      const listed = await host.listPersistedSessions(cwd);
+      expect(listed.map((item) => item.id)).toContain(persisted.id);
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('creates a session with a stable Pi UUID that survives a simulated restart', async () => {
     const home = tempDir('pi-persist-create-');
     const cwd = path.join(home, 'project');

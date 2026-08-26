@@ -21,16 +21,11 @@ const CHILD_SCRIPT = fileURLToPath(new URL('./node-kernel-child.js', import.meta
 
 const KERNEL_RELOAD_INTERRUPTED_KIND = 'opencode-restart-interrupted';
 
-const resolveNodeKernelChildScript = ({
+export const resolveNodeKernelChildScript = ({
   childScript,
-  resourcesPath,
 } = {}) => {
   if (typeof childScript === 'string' && childScript.trim()) {
     return toNodeReadablePath(childScript.trim());
-  }
-  if (resourcesPath) {
-    const staged = path.join(resourcesPath, 'pi-node-kernel', 'node-kernel-child.js');
-    return toNodeReadablePath(staged);
   }
   return toNodeReadablePath(CHILD_SCRIPT);
 };
@@ -198,7 +193,7 @@ export const createNodeKernelClient = ({
     resourcesPath,
     nodeBinary,
   });
-  const script = resolveNodeKernelChildScript({ childScript, resourcesPath });
+  const script = resolveNodeKernelChildScript({ childScript });
   let child = null;
   let started = null;
   let callId = 0;

@@ -137,10 +137,12 @@ Node child that runs the app-bundled `@earendil-works/pi-coding-agent`
 plus a resolved or packaged Node. User `.node` files are not `dlopen`'d
 in Electron, so a normal system `npm install` works without an Electron
 rebuild. Desktop prefers the app-bundled Node over PATH Node and does
-not spawn PATH `pi`. Missing Node is `PI_NODE_UNAVAILABLE`. A Node
-that cannot import the app Pi SDK is `PI_SDK_UNAVAILABLE` and is not
-described as missing Node.js. Neither case starts a mock or half-up
-kernel.
+not spawn PATH `pi`. The child script is the asar-unpacked
+`node-kernel-child.js`, not `resources/pi-node-kernel/`. Missing Node
+is `PI_NODE_UNAVAILABLE`. A Node that cannot import the app Pi SDK is
+`PI_SDK_UNAVAILABLE` and is not described as missing Node.js. Neither
+case starts a mock or half-up kernel, including when opening an
+existing session.
 `OPENCHAMBER_PI_NODE_KERNEL=0` restores the leftover in-process path
 (P0 skip + optional `{agentDir}/npm-electron/…` tree).
 

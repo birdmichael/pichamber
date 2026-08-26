@@ -71,13 +71,27 @@ and packagePath when `import()` succeeds. A real `import()` failure
 (including `markAsUncloneable`) stays `PI_SDK_UNAVAILABLE` and must
 not be described as missing Node.js.
 
+The child script is the module-relative `node-kernel-child.js` next to
+`node-kernel-client.js`, rewritten through `toNodeReadablePath` so a
+real Node reads `app.asar.unpacked/.../node-kernel-child.js`. Do not
+resolve it from `resources/pi-node-kernel/`. That extraResource is not
+staged, and a lone copied JS file would still miss the relative imports
+and `@earendil-works/pi-coding-agent`. `resourcesPath` is only for
+bundled Node (`resources/node/bin/node`). `prepare:node` must run in
+packaging CI; `verify:pi-node-kernel:packaged` fails the build when
+the bundled Node or unpacked child is missing.
+
 Missing Node or an unusable Node (SDK import throws, including
 `markAsUncloneable`): `host.ready()` returns false, `isReady()` is
 false, `createSession` throws `PI_NODE_UNAVAILABLE` /
 `PI_SDK_UNAVAILABLE` (503) with recovery text. The Node-child host
-does not fall back to `createInMemoryPiSession`. Empty
-`hello.sdk.packagePath` plus ready is a fail. That is not a half-up
-kernel. Child crash: the Desktop shell stays up;
+sets `allowInMemoryFallback: false`. That flag also covers
+`hydratePersistedSession` and `attachSessionFromFile` — they must not
+call `createInMemoryPiSession` or stream `Hello from the Pi mock
+kernel.` Session list still reads disk jsonl. Opening or prompting an
+existing session while the child is down is 503 + recovery, not a
+canned reply. Empty `hello.sdk.packagePath` plus ready is a fail. That
+is not a half-up kernel. Child crash: the Desktop shell stays up;
 `host.reload()` respawns the child; interrupted turns keep
 `session.error` plus `opencode-restart-interrupted`. `ctx.ui`, session
 create/prompt/fork, scheduled-task session create, and `pichamber`

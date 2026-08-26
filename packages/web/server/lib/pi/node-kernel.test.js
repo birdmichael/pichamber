@@ -4,12 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-coding-agent';
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
-import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE } from './node-runtime.js';
-import { createNodeKernelClient } from './node-kernel-client.js';
+import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
+import { createNodeKernelClient, resolveNodeKernelChildScript } from './node-kernel-client.js';
 import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
-import { createInMemoryPiSession } from './pi-host.js';
+import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
 
 const require = createRequire(import.meta.url);
 const tempDirs = [];
@@ -244,6 +245,61 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
     }
   });
 
+  it('does not hydrate a disk session onto the mock Hello when the Node child is down', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const sessionDir = sessionDirForCwd(cwd, home);
+    const manager = SessionManager.create(cwd, sessionDir);
+    const file = manager.getSessionFile();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'session',
+      version: CURRENT_SESSION_VERSION,
+      id: manager.getSessionId(),
+      timestamp: new Date().toISOString(),
+      cwd: manager.getCwd(),
+    })}\n`);
+    const opened = SessionManager.open(file, sessionDir);
+    opened.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: 'hi' }],
+      timestamp: Date.now(),
+    });
+    const sessionId = opened.getSessionId();
+
+    const { EventEmitter } = require('node:events');
+    const kernel = createPiKernel({
+      useNodeKernel: true,
+      nodeBinary: process.execPath,
+      home,
+      defaultDirectory: cwd,
+      versions: { electron: '43.0.0', modules: '88' },
+      spawnImpl: () => {
+        const fake = new EventEmitter();
+        fake.connected = false;
+        fake.send = () => {};
+        fake.kill = () => {};
+        process.nextTick(() => {
+          fake.emit('error', Object.assign(new Error('ENOENT: missing node-kernel-child.js'), {
+            code: 'ENOENT',
+          }));
+        });
+        return fake;
+      },
+    });
+    try {
+      await expect(kernel.ready()).resolves.toBe(false);
+      expect(kernel.host.isReady()).toBe(false);
+      await expect(kernel.host.ensureSession(sessionId, cwd)).rejects.toThrow(/ENOENT|not become ready|unavailable|node kernel/i);
+      expect(() => kernel.host.getSession(sessionId)).toThrow(/Session not found/);
+      await expect(
+        kernel.host.promptAsync(sessionId, { parts: [{ type: 'text', text: 'again' }] }),
+      ).rejects.toThrow();
+    } finally {
+      kernel.dispose();
+    }
+  });
+
   it('23: Plan cards, in-process create-send-fork, and scheduled-task session create work over IPC', async () => {
     const home = tempDir('pi-node-home-');
     const cwd = tempDir('pi-node-cwd-');
@@ -409,5 +465,60 @@ describe('node kernel client spawn contract', () => {
     } finally {
       client.dispose();
     }
+  });
+
+  it('ignores a missing Resources/pi-node-kernel extraResource and spawns the module child', async () => {
+    const home = tempDir('pi-node-home-');
+    const resourcesPath = tempDir('pi-empty-resources-');
+    const seen = [];
+    const client = createNodeKernelClient({
+      mock: true,
+      home,
+      defaultDirectory: home,
+      resourcesPath,
+      nodeBinary: process.execPath,
+      versions: { electron: '43.0.0' },
+      spawnImpl: (command, args, options) => {
+        seen.push({ command, args });
+        const { spawn } = require('node:child_process');
+        return spawn(command, args, options);
+      },
+    });
+    try {
+      await client.ensureStarted();
+      expect(seen[0].args[0]).toMatch(/node-kernel-child\.js$/);
+      expect(seen[0].args[0]).not.toContain(`${path.sep}pi-node-kernel${path.sep}`);
+      expect(seen[0].args[0]).toBe(resolveNodeKernelChildScript());
+    } finally {
+      client.dispose();
+    }
+  });
+
+  it('prefers an explicit childScript over the module default', () => {
+    const custom = path.join(tempDir('pi-custom-child-'), 'custom-child.js');
+    expect(resolveNodeKernelChildScript({ childScript: custom })).toBe(toNodeReadablePath(custom));
+    expect(resolveNodeKernelChildScript({ childScript: `  ${custom}  ` })).toBe(toNodeReadablePath(custom));
+  });
+
+  it('rewrites a packaged asar child path to app.asar.unpacked', () => {
+    const packed = [
+      '',
+      'Applications',
+      'Pichamber.app',
+      'Contents',
+      'Resources',
+      'app.asar',
+      'node_modules',
+      '@pichamber',
+      'web',
+      'server',
+      'lib',
+      'pi',
+      'node-kernel-child.js',
+    ].join(path.sep);
+    const resolved = resolveNodeKernelChildScript({ childScript: packed });
+    expect(resolved).toContain(`${path.sep}app.asar.unpacked${path.sep}`);
+    expect(resolved).not.toContain(`${path.sep}app.asar${path.sep}`);
+    expect(resolved).toMatch(/node-kernel-child\.js$/);
   });
 });
