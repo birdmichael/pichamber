@@ -14,6 +14,10 @@ import {
   isSdkHelloReady,
   resolveInstalledPiSdkInfo,
 } from './node-runtime.js';
+import {
+  installUserExtensionNodeTreeRemap,
+  syncUserExtensionNodeTree,
+} from './user-extension-node-tree.js';
 
 const require = createRequire(import.meta.url);
 const send = (message) => {
@@ -159,13 +163,72 @@ const resolveSdkInfo = async () => {
   return resolveInstalledPiSdkInfo({ packageName: PI_SDK_PACKAGE });
 };
 
+const readSessionIdFromFile = (file) => {
+  if (typeof file !== 'string' || !file || !fs.existsSync(file)) return '';
+  try {
+    const first = fs.readFileSync(file, 'utf8').split('\n').find((line) => line.trim());
+    if (!first) return '';
+    const parsed = JSON.parse(first);
+    return typeof parsed?.id === 'string' && parsed.id.trim() ? parsed.id.trim() : '';
+  } catch {
+    return '';
+  }
+};
+
+const prepareChildUserNatives = async () => {
+  const agentDir = boot?.agentDir;
+  const projectDir = boot?.defaultDirectory || process.cwd();
+  await syncUserExtensionNodeTree({
+    agentDir,
+    projectDir,
+    versions: process.versions,
+    nodeBinary: process.execPath,
+  });
+  installUserExtensionNodeTreeRemap({
+    agentDir,
+    projectDir,
+    versions: process.versions,
+  });
+};
+
+const ensureChildHost = async () => {
+  if (host) return host;
+  await prepareChildUserNatives();
+  host = createPiHost({
+    mock: false,
+    allowInMemoryFallback: false,
+    home: boot?.home,
+    defaultDirectory: boot?.defaultDirectory || process.cwd(),
+    getProcessVersions: () => process.versions,
+    getCustomTools: attachCustomTools,
+    electronNativeIsolation: false,
+    onEvent: (directory, event) => {
+      send({ type: 'host-event', directory, event });
+    },
+  });
+  await host.ready();
+  return host;
+};
+
+const openOrCreateChildSession = async (input = {}) => {
+  const childHost = await ensureChildHost();
+  const sessionFile = typeof input.sessionFile === 'string' ? input.sessionFile.trim() : '';
+  const sessionID = typeof input.sessionID === 'string' && input.sessionID.trim()
+    ? input.sessionID.trim()
+    : readSessionIdFromFile(sessionFile);
+  if (sessionID) {
+    return childHost.ensureSession(sessionID, input.directory || input.cwd);
+  }
+  return childHost.createSession(input);
+};
+
 const createChildSession = async (input = {}) => {
   const customTools = await attachCustomTools();
   const cwd = input.directory || input.cwd || boot?.defaultDirectory || process.cwd();
   const agentDir = boot?.agentDir;
   if (boot?.mock) {
     const session = createInMemoryPiSession({
-      sessionId: input.sessionId,
+      sessionId: input.sessionId || input.sessionID,
       customTools,
     });
     if (boot.loadUserNpmExtensions && agentDir) {
@@ -181,22 +244,7 @@ const createChildSession = async (input = {}) => {
       toolNames: (customTools || []).map((tool) => tool.name),
     });
   }
-  if (!host) {
-    host = createPiHost({
-      mock: false,
-      allowInMemoryFallback: false,
-      home: boot?.home,
-      defaultDirectory: boot?.defaultDirectory || process.cwd(),
-      getProcessVersions: () => process.versions,
-      getCustomTools: attachCustomTools,
-      electronNativeIsolation: false,
-      onEvent: (directory, event) => {
-        send({ type: 'host-event', directory, event });
-      },
-    });
-    await host.ready();
-  }
-  const record = await host.createSession(input);
+  const record = await openOrCreateChildSession(input);
   if (record?.piSession) {
     wrapSession(record.piSession, {
       sessionId: record.id,

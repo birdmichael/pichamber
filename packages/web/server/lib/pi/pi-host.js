@@ -1295,14 +1295,23 @@ export const createPiHost = ({
     try {
       const pi = await loadPiSdk();
       return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
-        const created = await pi.createAgentSession({
-          cwd,
-          agentDir: resolveAgentDir(),
-          modelRuntime: runtime,
-          ...(model ? { model } : {}),
-          sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
-          ...(customTools ? { customTools } : {}),
-        });
+        await ensureDirectoryRuntime(cwd);
+        const services = directoryRuntimes.get(cwd)?.services;
+        const created = services && typeof pi.createAgentSessionFromServices === 'function'
+          ? await pi.createAgentSessionFromServices({
+            services,
+            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
+            ...(model ? { model } : {}),
+            ...(customTools ? { customTools } : {}),
+          })
+          : await pi.createAgentSession({
+            cwd,
+            agentDir: resolveAgentDir(),
+            modelRuntime: runtime,
+            ...(model ? { model } : {}),
+            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
+            ...(customTools ? { customTools } : {}),
+          });
         harvestExtensionsResult(created?.extensionsResult || created, cwd);
         return created?.session || created;
       };
@@ -1994,6 +2003,9 @@ export const createPiHost = ({
     if (!resolvedId) {
       throw missingSession(sessionID || resolvedFile);
     }
+    if (!manager && !mock) {
+      throw missingSession(resolvedId);
+    }
     const alreadyAttached = sessions.get(resolvedId);
     if (alreadyAttached) {
       applySubagentParentLink(alreadyAttached, parentID, metadata);
@@ -2007,7 +2019,7 @@ export const createPiHost = ({
         cwd,
         modelRuntime,
         model,
-        ...(manager ? { sessionManager: manager } : {}),
+        sessionManager: manager,
       });
     } catch (error) {
       if (allowInMemoryFallback === false) {
@@ -2231,10 +2243,16 @@ export const createPiHost = ({
         record.piSession?.dispose?.();
       } catch {
       }
+      if (!record.sessionManager) {
+        const error = new Error(`Cannot reload session without a session file: ${record.id}`);
+        error.status = 500;
+        throw error;
+      }
       const factory = await resolveCreateSession();
       record.piSession = await invokeSessionFactory(factory, {
         cwd: record.directory,
         modelRuntime,
+        sessionManager: record.sessionManager,
       });
     }
     attachSession(record);

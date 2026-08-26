@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,6 +20,47 @@ import {
 const CHILD_SCRIPT = fileURLToPath(new URL('./node-kernel-child.js', import.meta.url));
 
 const KERNEL_RELOAD_INTERRUPTED_KIND = 'opencode-restart-interrupted';
+const PI_CHROME_CDP_PROCESS_PATTERN = 'pi-chrome-cdp-';
+
+const parseProcessIds = (text) => (
+  String(text || '')
+    .split(/[\s,]+/)
+    .map((value) => Number.parseInt(value, 10))
+    .filter((pid) => Number.isInteger(pid) && pid > 0)
+);
+
+/**
+ * Agent Chrome windows launched by pi-chrome detach from the kernel child.
+ * Quit must reap them or they stay on the desktop with PPID 1.
+ */
+export const reapPiChromeCdpProcesses = ({
+  platform = process.platform,
+  spawnSyncImpl = spawnSync,
+  killImpl = process.kill.bind(process),
+  selfPid = process.pid,
+} = {}) => {
+  if (platform === 'win32') return [];
+  let listing;
+  try {
+    listing = spawnSyncImpl('pgrep', ['-f', PI_CHROME_CDP_PROCESS_PATTERN], {
+      encoding: 'utf8',
+    });
+  } catch {
+    return [];
+  }
+  const pids = parseProcessIds(listing?.stdout).filter((pid) => pid !== selfPid);
+  for (const pid of pids) {
+    try {
+      killImpl(pid, 'SIGTERM');
+    } catch {
+    }
+    try {
+      killImpl(pid, 'SIGKILL');
+    } catch {
+    }
+  }
+  return pids;
+};
 
 export const resolveNodeKernelChildScript = ({
   childScript,
@@ -37,6 +78,40 @@ const asCustomToolList = (value) => {
     return Object.values(value).filter((tool) => tool && typeof tool.name === 'string');
   }
   return [];
+};
+
+const asTrimmedString = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
+
+const readManagerPath = (sessionManager, method) => {
+  if (!sessionManager || typeof sessionManager[method] !== 'function') return '';
+  try {
+    return asTrimmedString(sessionManager[method]());
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * IPC cannot carry a live SessionManager. Send the disk file / id so the
+ * child opens that jsonl instead of SessionManager.create (a new Untitled).
+ */
+export const serializeNodeKernelCreateSessionInput = (input = {}) => {
+  const cwd = asTrimmedString(input.cwd || input.directory);
+  const sessionFile = asTrimmedString(input.sessionFile)
+    || readManagerPath(input.sessionManager, 'getSessionFile');
+  const sessionID = asTrimmedString(input.sessionID)
+    || readManagerPath(input.sessionManager, 'getSessionId');
+  const title = asTrimmedString(input.title);
+  const rawModel = input.model && typeof input.model === 'object' ? input.model : null;
+  const modelId = asTrimmedString(rawModel?.id || rawModel?.modelId || rawModel?.modelID);
+  const modelProvider = asTrimmedString(rawModel?.provider || rawModel?.providerID);
+  return {
+    ...(cwd ? { cwd, directory: cwd } : {}),
+    ...(sessionFile ? { sessionFile } : {}),
+    ...(sessionID ? { sessionID } : {}),
+    ...(title ? { title } : {}),
+    ...(modelId ? { model: { id: modelId, ...(modelProvider ? { provider: modelProvider } : {}) } } : {}),
+  };
 };
 
 const createRemotePiSession = (client, snapshot) => {
@@ -457,11 +532,7 @@ export const createNodeKernelClient = ({
     },
     async createSession(input) {
       await ensureStarted();
-      const created = await call('createSession', {
-        ...input,
-        directory: input?.directory || input?.cwd,
-        cwd: input?.cwd || input?.directory,
-      });
+      const created = await call('createSession', serializeNodeKernelCreateSessionInput(input));
       const snapshot = created?.session || created;
       return createRemotePiSession(api, snapshot);
     },
@@ -479,20 +550,40 @@ export const createNodeKernelClient = ({
     dispose() {
       exitError = new Error('Pi node kernel disposed');
       rejectAll(exitError);
-      if (child) {
-        try {
-          child.removeAllListeners('exit');
-          child.kill('SIGTERM');
-        } catch {
-        }
-        child = null;
-      }
-      started = null;
+      stopChild('SIGKILL');
       liveSessionIds.clear();
       sessionListeners.clear();
       sessionSnapshots.clear();
     },
   };
+  const stopChild = (signal = 'SIGKILL') => {
+    process.removeListener('exit', onProcessExit);
+    const current = child;
+    const pid = current?.pid;
+    if (current) {
+      try {
+        current.removeAllListeners('exit');
+      } catch {
+      }
+      try {
+        current.kill('SIGTERM');
+      } catch {
+      }
+      if (pid && signal === 'SIGKILL') {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+        }
+      }
+    }
+    child = null;
+    started = null;
+    reapPiChromeCdpProcesses();
+  };
+  const onProcessExit = () => {
+    stopChild('SIGKILL');
+  };
+  process.on('exit', onProcessExit);
   return api;
 };
 

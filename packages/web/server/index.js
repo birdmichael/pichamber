@@ -1401,6 +1401,7 @@ const gracefulShutdownRuntime = createGracefulShutdownRuntime({
   },
   tunnelAuthController,
   scheduledTasksRuntime,
+  getPiKernel: () => piKernel,
 });
 
 const gracefulShutdown = (...args) => gracefulShutdownRuntime.gracefulShutdown(...args);
@@ -1960,9 +1961,17 @@ async function main(options = {}) {
         port: managed ? openCodePort : null,
       };
     },
+    disposePiKernel: () => {
+      piKernel?.dispose();
+    },
     stop: (shutdownOptions = {}) => {
       realtimeProxyRuntime.stop();
       clearInterval(relayReconcileTimer);
+      try {
+        piKernel?.dispose();
+      } catch {
+        // best-effort teardown of the Pi node kernel child
+      }
       try {
         relayService.stop();
       } catch {

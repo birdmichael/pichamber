@@ -97,11 +97,11 @@ That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
 2. `prepare:pi-kernel` to verify the app-bundled Pi SDK is installed.
-3. `prepare:node` to stage a Node binary for the Desktop kernel child.
+3. `prepare:node` to stage a relocatable Node binary for the Desktop kernel child. Homebrew-linked stubs and unofficial leftovers (`vX.Y.Z-alpha`, nightlies) are rejected; official nodejs.org builds are used when the local Node cannot run from `resources/node`.
 4. `prepare:opencode-cli` — skipped for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` to stage the leftover OpenCode CLI.
 5. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
 6. `rebuild:native` to rebuild native modules for Electron.
-7. `package.mjs` to run `electron-builder`; its `afterPack` hook stages the compiled macOS icon asset catalog.
+7. `package.mjs` to run `electron-builder`; its `afterPack` hook unpacks the Pi kernel child's asar-only production dependencies next to `app.asar.unpacked`, then stages the compiled macOS icon asset catalog.
 
 GitHub Release, desktop smoke, and the standalone Mac DMG job must call `prepare:node` (the local `package` script already does). After `package.mjs`, run `verify:pi-node-kernel:packaged`. That check requires `Contents/Resources/node/bin/node` (or the Windows `node.exe`) and `app.asar.unpacked/node_modules/@pichamber/web/server/lib/pi/node-kernel-child.js`. It does not require `resources/pi-node-kernel/`. The child script is the asar-unpacked module next to the Pi host, not a copied extraResource.
 
@@ -152,7 +152,7 @@ The macOS menu bar item is enabled by default and can be disabled in General set
 
 ## Bundled kernel (Pi)
 
-Packaged Mac Desktop boots the app-bundled Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`) in a Node child. There is no bundled Pi CLI binary and no managed OpenCode child on the default path. User extensions load with that Node, not inside Electron. The child script is the unpacked `node-kernel-child.js` under `app.asar.unpacked`; packaged Desktop also ships `resources/node`. If Node cannot be resolved or the child cannot start, Desktop reports a clear error and recovery instead of starting a half-ready kernel or answering with the in-memory mock.
+Packaged Mac Desktop boots the app-bundled Pi SDK that ships with `@pichamber/web` (`@earendil-works/pi-coding-agent`) in a Node child. There is no bundled Pi CLI binary and no managed OpenCode child on the default path. User extensions load with that Node, not inside Electron. The child script is the unpacked `node-kernel-child.js` under `app.asar.unpacked`; packaged Desktop also ships `resources/node`. If Node cannot be resolved or the child cannot start, Desktop reports a clear error and recovery instead of starting a half-ready kernel or answering with the in-memory mock. Quit disposes that child and leftover `pi-chrome-cdp-*` Chrome windows; do not leave the child as PPID 1. User natives that need the bundled Node ABI are isolated under `{agentDir}/npm-node`; the CLI tree in `{agentDir}/npm` is not rebuilt in place.
 
 The leftover OpenCode CLI extraResource is optional. `prepare:opencode-cli` downloads it only when `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` or `OPENCHAMBER_KERNEL=opencode`. The OpenCode CLI settings page stays visible for that leftover path.
 

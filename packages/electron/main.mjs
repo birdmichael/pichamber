@@ -1742,6 +1742,12 @@ const killSidecar = () => {
   if (!handle) return;
 
   try {
+    handle.disposePiKernel?.();
+  } catch (error) {
+    log.warn('[electron] failed to dispose Pi node kernel:', error);
+  }
+
+  try {
     launchDetachedOpenCodeKiller(handle.getOpenCodeProcessInfo?.());
   } catch (error) {
     log.warn('[electron] failed to launch OpenCode killer:', error);

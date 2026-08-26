@@ -30,6 +30,7 @@ export const createGracefulShutdownRuntime = (dependencies) => {
     getActiveTunnelController,
     setActiveTunnelController,
     tunnelAuthController,
+    getPiKernel,
   } = dependencies;
 
   let shutdownPromise = null;
@@ -43,6 +44,10 @@ export const createGracefulShutdownRuntime = (dependencies) => {
     const exitProcess = typeof options.exitProcess === 'boolean' ? options.exitProcess : getExitOnShutdown();
 
     openCodeWatcherRuntime.stop();
+    try {
+      getPiKernel?.()?.dispose?.();
+    } catch {
+    }
     sessionRuntime.dispose();
     sessionAssistRuntime?.stop?.();
     sessionGoalRuntime?.stop?.();

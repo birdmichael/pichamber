@@ -8,7 +8,7 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
-import { createNodeKernelClient, resolveNodeKernelChildScript } from './node-kernel-client.js';
+import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput } from './node-kernel-client.js';
 import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
 import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
 
@@ -500,6 +500,62 @@ describe('node kernel client spawn contract', () => {
     expect(resolveNodeKernelChildScript({ childScript: `  ${custom}  ` })).toBe(toNodeReadablePath(custom));
   });
 
+  it('kills the child process on dispose', async () => {
+    const { EventEmitter } = require('node:events');
+    const killed = [];
+    const fake = new EventEmitter();
+    fake.pid = 4242;
+    fake.connected = true;
+    fake.send = () => {};
+    fake.kill = (signal) => {
+      killed.push(signal);
+    };
+    const client = createNodeKernelClient({
+      mock: true,
+      home: tempDir('pi-node-home-'),
+      defaultDirectory: tempDir('pi-node-cwd-'),
+      nodeBinary: process.execPath,
+      versions: { electron: '43.0.0' },
+      spawnImpl: () => fake,
+    });
+    const started = client.ensureStarted();
+    process.nextTick(() => {
+      fake.emit('message', { type: 'ready', hello: { execPath: process.execPath } });
+    });
+    await started;
+    const originalKill = process.kill;
+    const killSpy = (...args) => {
+      killed.push(args);
+    };
+    process.kill = killSpy;
+    try {
+      client.dispose();
+    } finally {
+      process.kill = originalKill;
+    }
+    expect(killed).toContain('SIGTERM');
+    expect(killed.some((item) => Array.isArray(item) && item[0] === 4242 && item[1] === 'SIGKILL')).toBe(true);
+  });
+
+  it('reaps detached pi-chrome CDP Chrome processes', () => {
+    const killed = [];
+    const pids = reapPiChromeCdpProcesses({
+      platform: 'darwin',
+      selfPid: 1,
+      spawnSyncImpl: () => ({ stdout: '5555\n6666\n' }),
+      killImpl: (pid, signal) => {
+        killed.push([pid, signal]);
+      },
+    });
+    expect(pids).toEqual([5555, 6666]);
+    expect(killed).toEqual([
+      [5555, 'SIGTERM'],
+      [5555, 'SIGKILL'],
+      [6666, 'SIGTERM'],
+      [6666, 'SIGKILL'],
+    ]);
+  });
+
   it('rewrites a packaged asar child path to app.asar.unpacked', () => {
     const packed = [
       '',
@@ -520,5 +576,57 @@ describe('node kernel client spawn contract', () => {
     expect(resolved).toContain(`${path.sep}app.asar.unpacked${path.sep}`);
     expect(resolved).not.toContain(`${path.sep}app.asar${path.sep}`);
     expect(resolved).toMatch(/node-kernel-child\.js$/);
+  });
+});
+
+const listActiveSessionFiles = (cwd, home) => {
+  const dir = sessionDirForCwd(cwd, home);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((name) => name.endsWith('.jsonl'));
+};
+
+describe('node kernel session IPC', () => {
+  it('sends sessionFile and sessionID instead of a live SessionManager', () => {
+    expect(serializeNodeKernelCreateSessionInput({
+      cwd: '/repo',
+      sessionManager: {
+        getSessionFile: () => '/repo/session.jsonl',
+        getSessionId: () => 'ses_existing',
+      },
+      modelRuntime: { secret: 'drop-me' },
+      model: { provider: 'bmlab-grok', id: 'grok-4.6' },
+    })).toEqual({
+      cwd: '/repo',
+      directory: '/repo',
+      sessionFile: '/repo/session.jsonl',
+      sessionID: 'ses_existing',
+      model: { id: 'grok-4.6', provider: 'bmlab-grok' },
+    });
+  });
+
+  it('create then reopen does not mint a second Untitled jsonl', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const kernel = createPiKernel({
+      mock: false,
+      useNodeKernel: true,
+      nodeBinary: process.execPath,
+      home,
+      defaultDirectory: cwd,
+      versions: { electron: '43.0.0', modules: '88' },
+    });
+    try {
+      await expect(kernel.ready()).resolves.toBe(true);
+      const created = await kernel.host.createSession({ directory: cwd, title: 'Keep me' });
+      const afterCreate = listActiveSessionFiles(cwd, home);
+      expect(afterCreate).toHaveLength(1);
+      expect(created.sessionFile).toBeTruthy();
+
+      const reopened = await kernel.host.ensureSession(created.id, cwd);
+      expect(reopened.id).toBe(created.id);
+      expect(listActiveSessionFiles(cwd, home)).toEqual(afterCreate);
+    } finally {
+      kernel.dispose();
+    }
   });
 });

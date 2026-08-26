@@ -57,8 +57,10 @@ then PATH `node` (never `pi` / Electron / Bun), then the current
 prefers the app-bundled Node over an incompatible PATH Node. Feature
 Plugin install prepends that same Node onto the child's `PATH`.
 `packages/electron/scripts/prepare-node.mjs` stages a Node that can
-`import` the app-bundled `@earendil-works/pi-coding-agent` (official
-current/LTS if the local binary cannot). Do not spawn PATH `pi`.
+`import` the app-bundled `@earendil-works/pi-coding-agent` and that
+still runs after being copied into `resources/node` (official
+current/LTS if the local binary is Homebrew-linked or cannot import).
+Do not spawn PATH `pi`.
 
 SDK location uses `import()` / `import.meta.resolve`, then walks up to
 the `package.json` whose `name` is `@earendil-works/pi-coding-agent`.
@@ -76,7 +78,13 @@ staged, and a lone copied JS file would still miss the relative imports
 and `@earendil-works/pi-coding-agent`. `resourcesPath` is only for
 bundled Node (`resources/node/bin/node`). `prepare:node` must run in
 packaging CI; `verify:pi-node-kernel:packaged` fails the build when
-the bundled Node or unpacked child is missing.
+the bundled Node or unpacked child is missing, when the bundled
+Node still depends on Homebrew / `libnode` dylibs, or when the
+packaged Node cannot `import` the unpacked child and
+`@earendil-works/pi-coding-agent` from that child's directory.
+`afterPack` copies the child's asar-only production dependency
+tree (`yaml`, `chalk`, and the rest of the SDK graph) into
+`app.asar.unpacked/node_modules` so a real Node can resolve them.
 
 Missing Node or an unusable Node (SDK import throws, including
 `markAsUncloneable`): `host.ready()` returns false, `isReady()` is
@@ -90,10 +98,22 @@ existing session while the child is down is 503 + recovery, not a
 canned reply. Empty `hello.sdk.packagePath` plus ready is a fail. That
 is not a half-up kernel. Child crash: the Desktop shell stays up;
 `host.reload()` respawns the child; interrupted turns keep
-`session.error` plus `opencode-restart-interrupted`. `ctx.ui`, session
+`session.error` plus `opencode-restart-interrupted`. Quit /
+`handle.disposePiKernel()` / `process.exit` kill that child
+with SIGTERM then SIGKILL. They also reap leftover
+`pi-chrome-cdp-*` Chrome processes. Those windows detach from
+the child, so killing the child alone leaves them on the
+desktop. Do not rely on `killSidecar()`'s leftover OpenCode
+killer for the Pi child. `ctx.ui`, session
 create/prompt/fork, scheduled-task session create, and `pichamber`
 create-send-fork stay on the parent host and reach the child over IPC
-(not HTTP). `host.reload()` / 409-while-streaming stay the same.
+(not HTTP). IPC `createSession` cannot carry a live `SessionManager`.
+The payload is `cwd`, `sessionFile`, `sessionID`, and optional
+`title` / `model`. When `sessionFile` or `sessionID` is present the
+child `ensureSession`s that jsonl. It does not `SessionManager.create`
+a second Untitled chat. Opening, hydrating, or reloading a live
+record must pass the existing manager/file. `host.reload()` /
+409-while-streaming stay the same.
 `OPENCHAMBER_PI_NODE_KERNEL=0` restores the in-process fallback below.
 `OPENCHAMBER_KERNEL=opencode` is unchanged.
 
@@ -113,6 +133,22 @@ Do not hardcode ABI numbers or package names.
 The skip layer is off when `process.versions.electron` is empty (CLI /
 plain Node) so system-Node-built natives still load. App-owned natives
 under `app.asar.unpacked` are not reported as skipped user extensions.
+
+On the Desktop Node child the ABI is the **bundled Node**, not
+Electron and not PATH / Homebrew Node. Child boot copies native
+packages from `{agentDir}/npm` into
+`{agentDir}/npm-node/node-{modules}-{platform}-{arch}/{name}@{version}/`
+and `npm rebuild`s them with the bundled Node. `require()` remaps
+only `.node` files onto that tree; package JavaScript and
+`node_modules` stay in `{agentDir}/npm`. `{agentDir}/npm` stays the
+CLI / Homebrew install.
+If `process.versions.node` is not a public `vX.Y.Z` release (Homebrew
+alphas, nightlies), rebuild downloads official headers for the same
+`NODE_MODULE_VERSION` and compiles against those. A failed isolate
+stays stamped (`kind: official-headers`) and does not throw into the
+host. Older failed stamps without that kind are retried after this
+strategy. The `pi` CLI never reads `npm-node`. Do not rebuild
+`{agentDir}/npm` in place for Electron or for the bundled Node.
 
 The fallback also keeps a second prefix so the in-process kernel can
 load natives without rewriting the CLI tree. `{agentDir}/npm` stays the
@@ -438,6 +474,13 @@ list as fake OpenCode agents. Chip-owned `/model` and `/thinking` stay off
 the list. OpenCode kernel routes are unchanged.
 
 ## Desktop `pichamber` and `pichamber_web`
+
+`ensureDirectoryRuntime` builds cwd-scoped `createAgentSessionServices`
+once. Later `createFacadeSession` / hydrate / attach reuse
+`createAgentSessionFromServices` with that `resourceLoader`. Extension
+factories (`pi-chrome`, `pi-hermes-memory`, …) run once per project
+directory in the Node child. They do not run again on every chat
+open. `bindExtensions` still emits `session_start` per session.
 
 Desktop Electron Pi sessions receive host-owned `defineTool`s as
 `customTools` on both `createAgentSession` and `createAgentSessionFromServices`.

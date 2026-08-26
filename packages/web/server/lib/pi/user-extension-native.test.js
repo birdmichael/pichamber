@@ -78,6 +78,10 @@ describe('user npm trees', () => {
     const projectNode = path.join(projectDir, '.pi', 'npm', 'node_modules', 'two', 'build', 'Release', 'b.node');
     const appOwned = '/Applications/Pichamber.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/build/Release/pty.node';
 
+    expect(trees.filter((tree) => tree.kind === 'node').map((tree) => tree.root)).toEqual([
+      path.join(agentDir, 'npm-node'),
+      path.join(projectDir, '.pi', 'npm-node'),
+    ]);
     expect(isUserNpmTreePath(userNode, { agentDir, projectDir })).toBe(true);
     expect(isUserNpmTreePath(projectNode, { agentDir, projectDir })).toBe(true);
     expect(isUserNpmTreePath(appOwned, { agentDir, projectDir })).toBe(false);

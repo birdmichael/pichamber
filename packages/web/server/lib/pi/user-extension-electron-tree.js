@@ -83,7 +83,7 @@ const listUserElectronTreeRoots = ({
   arch = process.arch,
 } = {}) => (
   listUserNpmTrees({ agentDir, projectDir })
-    .filter((tree) => tree.kind !== 'electron')
+    .filter((tree) => tree.kind === 'cli')
     .map((tree) => ({
       ...tree,
       electronRoot: electronTreeRootForNpm(tree.root, { versions, platform, arch }),
@@ -492,7 +492,7 @@ export const createElectronTreeLoadHelpers = (context = {}) => {
       const trees = listUserNpmTrees({
         agentDir: context.agentDir,
         projectDir: context.projectDir,
-      }).filter((tree) => tree.kind !== 'electron');
+      }).filter((tree) => tree.kind === 'cli');
       const tree = trees.find((item) => packageDir.startsWith(`${item.root}${path.sep}`));
       if (!tree) return null;
       const identity = readPackageIdentity(packageDir);
