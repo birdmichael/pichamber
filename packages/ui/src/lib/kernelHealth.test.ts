@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isLocalKernelReady } from './kernelHealth';
+import { isLocalKernelReady, resolveKernelDownMessage } from './kernelHealth';
 
 describe('isLocalKernelReady', () => {
   test('treats Pi kernelReady as ready without OpenCode flags', () => {
@@ -51,5 +51,28 @@ describe('isLocalKernelReady', () => {
   test('rejects missing or non-object health payloads', () => {
     expect(isLocalKernelReady(null)).toBe(false);
     expect(isLocalKernelReady(undefined)).toBe(false);
+  });
+});
+
+describe('resolveKernelDownMessage', () => {
+  test('prefers Pi node runtime message and recovery over a generic process-down line', () => {
+    expect(resolveKernelDownMessage({
+      kernel: 'pi',
+      kernelReady: false,
+      piNodeRuntime: {
+        ok: false,
+        message: 'Desktop could not find a Node.js binary for the Pi kernel.',
+        recovery: 'Set PICHAMBER_NODE_BINARY, then reload Pi.',
+      },
+    }, 'Pi kernel is not running')).toBe(
+      'Desktop could not find a Node.js binary for the Pi kernel. Set PICHAMBER_NODE_BINARY, then reload Pi.',
+    );
+  });
+
+  test('keeps lastOpenCodeError when the leftover OpenCode process failed', () => {
+    expect(resolveKernelDownMessage({
+      kernel: 'opencode',
+      lastOpenCodeError: 'OpenCode exited with code 1',
+    }, 'OpenCode process is not running')).toBe('OpenCode exited with code 1');
   });
 });

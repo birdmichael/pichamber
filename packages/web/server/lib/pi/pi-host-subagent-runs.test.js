@@ -695,6 +695,7 @@ describe('Pi host subagent runs', () => {
     const home = makeHome();
     enableSubagentsSlot(home);
     let calls = 0;
+    const events = [];
     const host = createPiHost({
       home,
       defaultDirectory: '/tmp/project',
@@ -715,6 +716,9 @@ describe('Pi host subagent runs', () => {
             : undefined,
         });
       },
+      onEvent: (_directory, event) => {
+        events.push(event);
+      },
     });
     const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
     const { tmpdir, childId } = writeAdapterChildRun({ home, parentID: parent.id });
@@ -723,6 +727,11 @@ describe('Pi host subagent runs', () => {
     try {
       await host.listSessionInfos('/tmp/project');
       expect(() => host.getSession(childId)).toThrow(/Session not found/);
+      expect(events.some((event) => (
+        event.type === 'session.error'
+        && event.properties?.sessionID === parent.id
+        && event.properties?.error?.code === 'PI_NODE_UNAVAILABLE'
+      ))).toBe(true);
       await expect(host.ensureSession(childId, '/tmp/project')).rejects.toMatchObject({
         code: 'PI_NODE_UNAVAILABLE',
         status: 503,

@@ -2,7 +2,7 @@ import type { OpencodeClient, PermissionRequest, Project, QuestionRequest } from
 import { retry } from "./retry"
 import type { GlobalState, State } from "./types"
 import { runtimeFetch } from "../lib/runtime-fetch"
-import { isLocalKernelReady } from "../lib/kernelHealth"
+import { isLocalKernelReady, resolveKernelDownMessage } from "../lib/kernelHealth"
 import { emitSyncConfigChanged } from "./sync-refs"
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -99,10 +99,13 @@ export async function bootstrapGlobal(
       const healthRes = await runtimeFetch('/health', { signal: AbortSignal.timeout(4000) })
       if (healthRes.ok) {
         const health = await healthRes.json()
-        if (health.lastOpenCodeError) {
+        if (!isLocalKernelReady(health)) {
+          message = resolveKernelDownMessage(
+            health,
+            health.kernel === "pi" ? "Pi kernel is not running" : "OpenCode process is not running",
+          )
+        } else if (typeof health.lastOpenCodeError === "string" && health.lastOpenCodeError.trim()) {
           message = health.lastOpenCodeError
-        } else if (!isLocalKernelReady(health)) {
-          message = health.kernel === "pi" ? "Pi process is not running" : "OpenCode process is not running"
         }
       }
     } catch {

@@ -2847,6 +2847,7 @@ export const dict = {
   'mobileUpdate.toast.actions.download': 'Herunterladen',
   'mobileUpdate.toast.actions.dismiss': 'Ablehnen',
   'piUpdate.toast.available.title': 'Pi {version} verfügbar',
+  'piUpdate.toast.available.description': 'Diese Version kommt mit einem neueren Pichamber. Aktualisiere die App, um sie zu erhalten.',
   'piUpdate.toast.actions.dismiss': 'Ablehnen',
   'piUpdate.toast.actions.ok': 'OK',
   'opencodeUpdate.toast.available.title': 'Pi-Update',

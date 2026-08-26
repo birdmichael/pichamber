@@ -20,19 +20,32 @@ describe('piAgentUpdate', () => {
       available: false,
       currentVersion: '0.84.2',
       latestVersion: null,
+      upgradeSupported: false,
+      upgradeReason: null,
     });
     expect(parsePiUpgradeStatus(null)).toBeNull();
   });
 
-  test('shows latest and Update only when the banner source reports an update', () => {
-    const available = parsePiUpgradeStatus({
+  test('shows latest as informational, but Update only when upgrade is supported', () => {
+    const bundled = parsePiUpgradeStatus({
       available: true,
       currentVersion: '0.84.2',
       latestVersion: '0.90.0',
+      upgrade: { supported: false, reason: 'bundled' },
     });
-    expect(shouldShowPiLatestVersion(available)).toBe(true);
-    expect(canUpdatePiFromStatus(available)).toBe(true);
-    expect(isPiUpToDate(available)).toBe(false);
+    expect(shouldShowPiLatestVersion(bundled)).toBe(true);
+    expect(canUpdatePiFromStatus(bundled)).toBe(false);
+    expect(isPiUpToDate(bundled)).toBe(true);
+
+    const supported = parsePiUpgradeStatus({
+      available: true,
+      currentVersion: '0.84.2',
+      latestVersion: '0.90.0',
+      upgrade: { supported: true },
+    });
+    expect(shouldShowPiLatestVersion(supported)).toBe(true);
+    expect(canUpdatePiFromStatus(supported)).toBe(true);
+    expect(isPiUpToDate(supported)).toBe(false);
   });
 
   test('hides latest and Update when already current or latest is unknown', () => {

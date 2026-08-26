@@ -45,7 +45,7 @@ import {
 } from './feature-plugins.js';
 import { enrichPiPackageVersions } from './pi-package-versions.js';
 import { getPiUpgradeStatus, invalidatePiUpgradeStatusCache } from './pi-upgrade-status.js';
-import { runPiSelfUpdate } from './pi-upgrade.js';
+import { createPiUpgradeUnsupportedError, runPiSelfUpdate } from './pi-upgrade.js';
 import {
   collectSkippedUserExtensionsFromErrors,
   createUserExtensionNativeSkipStore,
@@ -1190,15 +1190,45 @@ export const createPiHost = ({
       : {}),
   });
 
+  let lastElectronNativeTree = {
+    enabled: Boolean(isolateUserNativesInElectron),
+    ok: true,
+    isolated: [],
+    skipped: [],
+    failed: [],
+  };
+
   const syncElectronNativeTree = async (directory) => {
     if (!isolateUserNativesInElectron) {
-      return { enabled: false, isolated: [], skipped: [], failed: [] };
+      lastElectronNativeTree = {
+        enabled: false,
+        ok: true,
+        isolated: [],
+        skipped: [],
+        failed: [],
+      };
+      return lastElectronNativeTree;
     }
     try {
-      return await syncUserExtensionElectronTree(electronTreeContext(directory));
+      const result = await syncUserExtensionElectronTree(electronTreeContext(directory));
+      lastElectronNativeTree = {
+        ...result,
+        enabled: result?.enabled !== false,
+        ok: true,
+      };
+      return lastElectronNativeTree;
     } catch (error) {
-      console.warn(`[pi-host] electron native tree sync failed: ${error?.message || error}`);
-      return { enabled: false, isolated: [], skipped: [], failed: [] };
+      const message = error?.message || String(error);
+      console.warn(`[pi-host] electron native tree sync failed: ${message}`);
+      lastElectronNativeTree = {
+        enabled: true,
+        ok: false,
+        error: message,
+        isolated: [],
+        skipped: [],
+        failed: [],
+      };
+      return lastElectronNativeTree;
     }
   };
 
@@ -1246,18 +1276,25 @@ export const createPiHost = ({
   const listPersistedSessionItems = async (cwd, { includeArchived = false } = {}) => {
     const sessionDir = sessionDirForCwd(cwd, home);
     const items = [];
+    let activeError = null;
     try {
       items.push(...(await listSessionsInDir(cwd, sessionDir) || []));
-    } catch {
+    } catch (error) {
       // Active-dir list failed: keep going. Do not pretend the directory is empty
       // if archive/ or live sessions still have rows.
+      activeError = error;
     }
+    let archiveError = null;
     if (includeArchived) {
       try {
         items.push(...(await listSessionsInDir(cwd, sessionArchiveDir(sessionDir)) || []));
-      } catch {
+      } catch (error) {
         // Archive-dir list failed: keep active rows.
+        archiveError = error;
       }
+    }
+    if (items.length === 0 && (activeError || archiveError)) {
+      throw activeError || archiveError;
     }
     return items;
   };
@@ -2135,18 +2172,32 @@ export const createPiHost = ({
       if (childId) {
         let record = sessions.get(childId);
         if (!record) {
-          try {
-            record = await ensureRecord(childId, parent.directory);
-          } catch {
-            return { ...run, sessionID: childId };
-          }
+          record = await ensureRecord(childId, parent.directory);
         }
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
         return { ...run, sessionID: record.id };
       }
     } catch (error) {
-      console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
+      const message = error?.message || String(error);
+      console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, message);
+      emit(parent.directory, {
+        id: createEventId(),
+        type: 'session.error',
+        properties: {
+          sessionID: parent.id,
+          error: {
+            name: error?.name || 'Error',
+            message,
+            ...(error?.code ? { code: error.code } : {}),
+          },
+        },
+      });
+      return {
+        ...run,
+        state: 'error',
+        error: message,
+      };
     }
     return run;
   };
@@ -2299,7 +2350,8 @@ export const createPiHost = ({
             // One unreadable session file does not drop other complete sessions.
           }
         }
-      } catch {
+      } catch (error) {
+        if (live.length === 0) throw error;
         // Persisted listing failed: keep live sessions. Do not return empty success.
       }
     }
@@ -2397,6 +2449,9 @@ export const createPiHost = ({
     },
     listSkippedUserExtensions() {
       return skippedUserExtensions.list();
+    },
+    getElectronNativeTree() {
+      return lastElectronNativeTree;
     },
     async createSession(input) {
       await ready();
@@ -2646,6 +2701,8 @@ export const createPiHost = ({
           skills: path.join(resolveAgentDir(), 'skills'),
           prompts: path.join(resolveAgentDir(), 'prompts'),
         },
+        skippedUserExtensions: skippedUserExtensions.list(),
+        electronNativeTree: lastElectronNativeTree,
       };
     },
     getConfigSkills(directory) {
@@ -2830,12 +2887,8 @@ export const createPiHost = ({
     },
     async listPersistedSessions(directory) {
       if (mock) return [];
-      try {
-        const cwd = directory || defaultDirectory;
-        return await listPersistedSessionItems(cwd, { includeArchived: false });
-      } catch {
-        return [];
-      }
+      const cwd = directory || defaultDirectory;
+      return await listPersistedSessionItems(cwd, { includeArchived: false });
     },
     async listSessionInfos(directory, query) {
       return collectSessionInfos(directory, query);
@@ -3322,6 +3375,13 @@ export const createPiHost = ({
       });
     },
     async upgradePi(options = {}) {
+      const status = await getPiUpgradeStatus({
+        env: options.env,
+        fetchImpl: options.fetchImpl,
+      });
+      if (status?.upgrade?.supported !== true) {
+        throw createPiUpgradeUnsupportedError();
+      }
       const updated = await selfUpdate({
         agentDir: resolveAgentDir(),
         env: options.env,

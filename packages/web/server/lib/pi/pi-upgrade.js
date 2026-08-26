@@ -6,7 +6,17 @@ import path from 'node:path';
 import { PI_SDK_PACKAGE, readInstalledPiSdkVersion } from './pi-upgrade-status.js';
 
 export const PI_UPDATE_IN_PROGRESS_CODE = 'PI_UPGRADE_IN_PROGRESS';
+const PI_UPGRADE_UNSUPPORTED_CODE = 'PI_UPGRADE_UNSUPPORTED';
 const PI_UPDATE_CLI_UNAVAILABLE_CODE = 'PI_UPGRADE_CLI_UNAVAILABLE';
+
+export const createPiUpgradeUnsupportedError = () => {
+  const error = new Error(
+    'The bundled Pi SDK cannot be upgraded in-app. Install a newer Pichamber to get a newer kernel.',
+  );
+  error.status = 403;
+  error.code = PI_UPGRADE_UNSUPPORTED_CODE;
+  return error;
+};
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 
 const defaultRequire = createRequire(import.meta.url);

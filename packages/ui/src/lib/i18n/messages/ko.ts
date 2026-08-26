@@ -3037,6 +3037,7 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.actions.download': '다운로드',
   'mobileUpdate.toast.actions.dismiss': '닫기',
   'piUpdate.toast.available.title': 'Pi {version} 사용 가능',
+  'piUpdate.toast.available.description': '이 버전은 더 새 Pichamber와 함께 제공됩니다. 받으려면 앱을 업데이트하세요.',
   'piUpdate.toast.actions.dismiss': '닫기',
   'piUpdate.toast.actions.ok': '확인',
   'opencodeUpdate.toast.available.title': 'Pi 업데이트',

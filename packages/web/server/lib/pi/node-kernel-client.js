@@ -649,10 +649,20 @@ export const createNodeKernelHost = (options = {}) => {
   host.isReady = () => kernelReady;
   host.getNodeRuntime = () => client?.describe() || runtime;
   host.listLoadedUserNativeDiagnostics = () => [];
-  host.getKernelInfo = () => ({
-    ...originalGetKernelInfo(),
-    sessionLoader: 'node',
-    nodeRuntime: host.getNodeRuntime(),
-  });
+  host.getKernelInfo = () => {
+    const info = originalGetKernelInfo();
+    const hello = host.getNodeRuntime()?.hello;
+    const skipped = Array.isArray(hello?.skippedUserExtensions)
+      ? hello.skippedUserExtensions
+      : info.skippedUserExtensions;
+    const electronNativeTree = hello?.electronNativeTree || info.electronNativeTree;
+    return {
+      ...info,
+      sessionLoader: 'node',
+      nodeRuntime: host.getNodeRuntime(),
+      skippedUserExtensions: skipped,
+      electronNativeTree,
+    };
+  };
   return host;
 };

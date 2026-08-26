@@ -66,6 +66,47 @@ export const isNpmExtensionPackage = (item: ExtensionPackageItem): boolean => (
 export type PackageVersionState = 'update' | 'upToDate' | 'unknown' | 'none';
 
 /** Distinguishes a known current latest from a failed/skipped latest lookup. */
+export type SkippedUserExtension = {
+  source: string;
+  nodePath: string;
+  tree: string;
+  compilerAbi: string;
+};
+
+export const parseSkippedUserExtensions = (data: unknown): SkippedUserExtension[] => {
+  if (data === null || typeof data !== 'object') return [];
+  const skipped = (data as { skippedUserExtensions?: unknown }).skippedUserExtensions;
+  if (!Array.isArray(skipped)) return [];
+  return skipped.flatMap((item) => {
+    if (item === null || typeof item !== 'object') return [];
+    const row = item as {
+      source?: unknown;
+      nodePath?: unknown;
+      tree?: unknown;
+      compilerAbi?: unknown;
+    };
+    const source = typeof row.source === 'string' ? row.source.trim() : '';
+    if (!source) return [];
+    return [{
+      source,
+      nodePath: typeof row.nodePath === 'string' ? row.nodePath : '',
+      tree: typeof row.tree === 'string' ? row.tree : '',
+      compilerAbi: typeof row.compilerAbi === 'string' ? row.compilerAbi : '',
+    }];
+  });
+};
+
+export const parseElectronNativeTreeError = (data: unknown): string | null => {
+  if (data === null || typeof data !== 'object') return null;
+  const tree = (data as { electronNativeTree?: unknown }).electronNativeTree;
+  if (!tree || typeof tree !== 'object') return null;
+  const payload = tree as { ok?: unknown; error?: unknown; enabled?: unknown };
+  if (payload.ok === false && typeof payload.error === 'string' && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  return null;
+};
+
 export const packageVersionState = (item: ExtensionPackageItem): PackageVersionState => {
   if (packageHasUpdate(item)) return 'update';
   if (item.currentVersion && item.latestVersion) return 'upToDate';

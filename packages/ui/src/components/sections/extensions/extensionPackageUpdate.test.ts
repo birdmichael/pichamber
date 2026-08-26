@@ -9,7 +9,9 @@ import {
   packageUninstallSource,
   packageVersionState,
   packagesWithUpdates,
+  parseElectronNativeTreeError,
   parseExtensionPackages,
+  parseSkippedUserExtensions,
 } from './extensionPackageUpdate';
 
 describe('extensionPackageUpdate', () => {
@@ -118,6 +120,29 @@ describe('extensionPackageUpdate', () => {
       currentVersion: '1.0.0',
       latestVersion: null,
     })).toBe('none');
+  });
+});
+
+describe('skipped user extensions', () => {
+  test('keeps one unreadable skip from erasing siblings', () => {
+    const skipped = parseSkippedUserExtensions({
+      skippedUserExtensions: [
+        { source: 'npm:bad-a', tree: 'agent', compilerAbi: '137', nodePath: '/tmp/a.node' },
+        null,
+        { source: 12 },
+        { source: 'npm:bad-b', tree: 'project' },
+      ],
+    });
+    expect(skipped.map((item) => item.source)).toEqual(['npm:bad-a', 'npm:bad-b']);
+  });
+
+  test('treats electron-tree sync failure as an error, not a disabled-success snapshot', () => {
+    expect(parseElectronNativeTreeError({
+      electronNativeTree: { enabled: true, ok: false, error: 'rebuild failed' },
+    })).toBe('rebuild failed');
+    expect(parseElectronNativeTreeError({
+      electronNativeTree: { enabled: false, ok: true },
+    })).toBeNull();
   });
 });
 

@@ -201,7 +201,7 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
       description={
         isPiKernel
-          ? null
+          ? t('piUpdate.toast.available.description', { version: availableVersion })
           : t('opencodeUpdate.toast.available.description', { version: availableVersion })
       }
       dismissLabel={

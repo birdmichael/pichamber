@@ -203,6 +203,16 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(upgrade.upgrade).toEqual({ supported: false, reason: 'bundled' });
       expect(typeof upgrade.available).toBe('boolean');
 
+      const upgradePost = await fetch(`${url}/api/pi/upgrade`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(upgradePost.status).toBe(403);
+      expect(await upgradePost.json()).toMatchObject({
+        error: expect.stringMatching(/bundled Pi SDK cannot be upgraded/i),
+      });
+
       const providers = await (await fetch(`${url}/api/config/providers`)).json();
       expect(providers.providers[0].id).toBe('pi-mock');
 
@@ -315,6 +325,8 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(kernelInfo.kernel).toBe('pi');
       expect(kernelInfo.product).toBe('Pichamber');
       expect(kernelInfo.thinkingLevels).toContain('high');
+      expect(Array.isArray(kernelInfo.skippedUserExtensions)).toBe(true);
+      expect(kernelInfo.electronNativeTree).toMatchObject({ enabled: false, ok: true });
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'compact')).toBe(true);
@@ -1515,6 +1527,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       ]);
       expect(extensions.packages.some((item) => item.name === 'pi-extensions')).toBe(false);
       expect(extensions.packages.every((item) => item.name !== undefined)).toBe(true);
+      expect(Array.isArray(extensions.skippedUserExtensions)).toBe(true);
 
       const updated = await fetch(`${url}/api/pi/extensions/update`, {
         method: 'POST',

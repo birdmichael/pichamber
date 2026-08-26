@@ -215,6 +215,10 @@ export const PiAgentSettings: React.FC = () => {
         reload?: { status?: unknown };
       };
       if (!response.ok) {
+        if (response.status === 403) {
+          toast.error(t('settings.openchamber.piAgent.toast.updateUnsupported'));
+          return;
+        }
         if (response.status === 409) {
           toast.error(t('settings.openchamber.piAgent.toast.updateBusy'));
           return;
@@ -351,6 +355,11 @@ export const PiAgentSettings: React.FC = () => {
             ) : null}
             <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
           </div>
+        ) : null}
+        {upgradeStatus && upgradeStatus.upgradeSupported !== true ? (
+          <p className={SETTINGS_DESCRIPTION_CLASS}>
+            {t('settings.openchamber.piAgent.field.bundledNotice')}
+          </p>
         ) : null}
 
         <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>

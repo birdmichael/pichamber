@@ -5,7 +5,7 @@ import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
 import { resolveListedSessionTitle } from './pi-host.js';
 import { getPiUpgradeStatus } from './pi-upgrade-status.js';
-import { PI_UPDATE_IN_PROGRESS_CODE } from './pi-upgrade.js';
+import { createPiUpgradeUnsupportedError, PI_UPDATE_IN_PROGRESS_CODE } from './pi-upgrade.js';
 
 const json = (res, status, body) => {
   res.status(status).json(body);
@@ -107,6 +107,10 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   let piUpgradePromise = null;
   app.post('/api/pi/upgrade', parseJson, handle(async (_req, res) => {
+    const status = await getPiUpgradeStatus();
+    if (status?.upgrade?.supported !== true) {
+      throw createPiUpgradeUnsupportedError();
+    }
     if (piUpgradePromise) {
       const error = new Error('A Pi update is already in progress.');
       error.status = 409;
@@ -473,6 +477,12 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, {
       extensions: typeof host.listExtensions === 'function' ? host.listExtensions(directory) : [],
       packages,
+      skippedUserExtensions: typeof host.listSkippedUserExtensions === 'function'
+        ? host.listSkippedUserExtensions()
+        : [],
+      electronNativeTree: typeof host.getElectronNativeTree === 'function'
+        ? host.getElectronNativeTree()
+        : (host.getKernelInfo?.().electronNativeTree || null),
     });
   }));
 

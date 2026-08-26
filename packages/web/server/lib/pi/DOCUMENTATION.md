@@ -25,14 +25,21 @@ Empty string clears the override. Changing the directory does not copy
 `@earendil-works/pi-coding-agent` with npm (`available`, `currentVersion`,
 `latestVersion`). Settings → General and About use that same payload.
 The npm latest is cached in-process for 5 minutes so those surfaces share
-one check. A successful `POST /api/pi/upgrade` invalidates the cache.
-Every call still honors `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`. `POST
-/api/pi/upgrade` runs `pi update` on the in-process SDK `bin.pi`
-(`dist/cli.js`) with `PI_CODING_AGENT_DIR` set to the resolved agent dir,
-then `host.reload()`. It does not spawn a PATH `pi`. After success,
-Desktop reloads the in-process kernel (not an app Restart).
-`upgrade.supported` stays `false` (`reason: "bundled"`) so the header
-banner remains informational.
+one check. Every call still honors `PI_OFFLINE` / `PI_SKIP_VERSION_CHECK`.
+`upgrade.supported` stays `false` (`reason: "bundled"`): Desktop runs the
+app-bundled SDK, not PATH `pi`, so Settings hides Update and
+`POST /api/pi/upgrade` returns 403. A newer npm version is informational
+until the user installs a newer Pichamber. The leftover
+`runPiSelfUpdate` path is not reachable while `upgrade.supported` is
+false.
+
+`GET /api/kernel` and `GET /api/pi/extensions` also report
+`skippedUserExtensions` and `electronNativeTree`. A skipped native is
+visible on Settings → Extensions instead of looking loaded. An
+electron-tree sync exception is `{ enabled: true, ok: false, error }`
+— not `{ enabled: false }` after a warn. Session-list I/O failure
+throws; it does not become `[]`. Subagent attach failure emits
+`session.error` on the parent and leaves the child unattached.
 
 `GET /api/pi/extensions` lists configured `settings.json` `packages` plus
 `currentVersion` / `latestVersion` / `updateAvailable` (npm registry

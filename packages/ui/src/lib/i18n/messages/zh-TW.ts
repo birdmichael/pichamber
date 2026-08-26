@@ -3000,6 +3000,7 @@ export const dict: Record<I18nKey, string> = {
   'mobileUpdate.toast.actions.download': '下載',
   'mobileUpdate.toast.actions.dismiss': '忽略',
   'piUpdate.toast.available.title': 'Pi {version} 可用',
+  'piUpdate.toast.available.description': '此版本隨較新的 Pichamber 提供。請更新應用程式以取得。',
   'piUpdate.toast.actions.dismiss': '忽略',
   'piUpdate.toast.actions.ok': '確定',
   'opencodeUpdate.toast.available.title': 'Pi 更新',

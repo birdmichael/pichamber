@@ -229,6 +229,12 @@ const handleCall = async (method, params = {}) => {
       versions: process.versions,
       sdk,
       cwd: process.cwd(),
+      skippedUserExtensions: typeof host?.listSkippedUserExtensions === 'function'
+        ? host.listSkippedUserExtensions()
+        : [],
+      electronNativeTree: typeof host?.getElectronNativeTree === 'function'
+        ? host.getElectronNativeTree()
+        : null,
     };
   }
   if (method === 'ready') {

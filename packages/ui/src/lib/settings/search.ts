@@ -531,7 +531,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'general',
     titleKey: 'settings.openchamber.piAgent.actions.update',
     keywords: ['pi', 'update', 'pi update', 'sdk'],
-    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+    isAvailable: () => false,
   },
   {
     id: 'sessions.agent-control-tool',
@@ -884,6 +884,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'extensions',
     titleKey: 'settings.extensions.page.packages.actions.updateAll',
     keywords: ['update all', 'packages', 'pi', 'extensions'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'extensions.skipped',
+    page: 'extensions',
+    titleKey: 'settings.extensions.page.skipped.title',
+    descriptionKey: 'settings.extensions.page.skipped.info',
+    keywords: ['skipped', 'native', 'abi', 'electron', 'extension', 'extensions'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {

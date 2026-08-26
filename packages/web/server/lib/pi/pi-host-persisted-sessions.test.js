@@ -78,6 +78,34 @@ const createHost = ({ home, cwd }) => createPiHost({
 });
 
 describe('persisted Pi sessions', () => {
+  it('does not treat a persisted list I/O failure as an empty session list', async () => {
+    const home = tempDir('pi-persist-list-fail-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const host = createPiHost({
+      home,
+      defaultDirectory: cwd,
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd: directory }) => ({ session: null, directory }),
+      createSession: async () => stubSession('live'),
+      listPersistedSessionsInDir: async () => {
+        throw Object.assign(new Error('EIO'), { code: 'EIO' });
+      },
+    });
+    try {
+      await expect(host.listPersistedSessions(cwd)).rejects.toMatchObject({
+        message: 'EIO',
+        code: 'EIO',
+      });
+      await expect(host.listSessionInfos(cwd)).rejects.toMatchObject({
+        message: 'EIO',
+        code: 'EIO',
+      });
+    } finally {
+      host.dispose();
+    }
+  });
+
   it('lists a disk session, hydrates get/message, and reopens the same id after a new host instance', async () => {
     const home = tempDir('pi-persist-home-');
     const cwd = path.join(home, 'project');

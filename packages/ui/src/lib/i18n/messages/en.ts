@@ -3037,6 +3037,7 @@ export const dict = {
   'mobileUpdate.toast.actions.download': 'Download',
   'mobileUpdate.toast.actions.dismiss': 'Dismiss',
   'piUpdate.toast.available.title': 'Pi {version} available',
+  'piUpdate.toast.available.description': 'This version ships with a newer Pichamber. Update the app to get it.',
   'piUpdate.toast.actions.dismiss': 'Dismiss',
   'piUpdate.toast.actions.ok': 'OK',
   'opencodeUpdate.toast.available.title': 'Pi update',

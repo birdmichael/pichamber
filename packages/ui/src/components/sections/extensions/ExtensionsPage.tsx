@@ -23,8 +23,11 @@ import {
   packageUninstallSource,
   packageVersionState,
   packagesWithUpdates,
+  parseElectronNativeTreeError,
   parseExtensionPackages,
+  parseSkippedUserExtensions,
   type ExtensionPackageItem,
+  type SkippedUserExtension,
 } from './extensionPackageUpdate';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
@@ -41,6 +44,9 @@ export const ExtensionsPage: React.FC = () => {
   const { t } = useI18n();
   const [extensions, setExtensions] = React.useState<ExtensionItem[]>([]);
   const [packages, setPackages] = React.useState<ExtensionPackageItem[]>([]);
+  const [skipped, setSkipped] = React.useState<SkippedUserExtension[]>([]);
+  const [nativeTreeError, setNativeTreeError] = React.useState<string | null>(null);
+  const [loadError, setLoadError] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<BusyState>(null);
   const [pendingUninstall, setPendingUninstall] = React.useState<ExtensionPackageItem | null>(null);
@@ -52,6 +58,9 @@ export const ExtensionsPage: React.FC = () => {
     } : null;
     setExtensions(Array.isArray(payload?.extensions) ? payload.extensions : []);
     setPackages(parseExtensionPackages(payload));
+    setSkipped(parseSkippedUserExtensions(payload));
+    setNativeTreeError(parseElectronNativeTreeError(payload));
+    setLoadError(false);
   }, []);
 
   const load = React.useCallback(async () => {
@@ -60,7 +69,11 @@ export const ExtensionsPage: React.FC = () => {
       const error = new Error('Could not load extensions');
       throw error;
     }
-    applyPayload(await response.json().catch(() => null));
+    const payload = await response.json().catch(() => null);
+    if (!payload) {
+      throw new Error('Could not load extensions');
+    }
+    applyPayload(payload);
   }, [applyPayload]);
 
   React.useEffect(() => {
@@ -69,10 +82,7 @@ export const ExtensionsPage: React.FC = () => {
       try {
         await load();
       } catch {
-        if (!cancelled) {
-          setExtensions([]);
-          setPackages([]);
-        }
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -177,6 +187,43 @@ export const ExtensionsPage: React.FC = () => {
       description={t('settings.page.extensions.description')}
       showSaveStatus={false}
     >
+      {loadError ? (
+        <p className="typography-ui text-muted-foreground" role="alert">
+          {t('settings.extensions.page.error.loadFailed')}
+        </p>
+      ) : null}
+      {skipped.length > 0 || nativeTreeError ? (
+        <SettingsSection
+          title={t('settings.extensions.page.skipped.title')}
+          info={t('settings.extensions.page.skipped.info')}
+          settingsItem="extensions.skipped"
+        >
+          {nativeTreeError ? (
+            <p className="typography-ui text-muted-foreground" role="alert">
+              {t('settings.extensions.page.nativeTree.error', { message: nativeTreeError })}
+            </p>
+          ) : null}
+          {skipped.length > 0 ? (
+            <ul className="space-y-2">
+              {skipped.map((item) => (
+                <li key={`${item.tree}:${item.source}:${item.nodePath}`} className="rounded-lg border border-border/50 px-3 py-2">
+                  <div className="typography-ui-label font-medium">{item.source}</div>
+                  <div className="typography-meta text-muted-foreground">
+                    {item.compilerAbi
+                      ? t('settings.extensions.page.skipped.itemWithAbi', {
+                          tree: item.tree || item.nodePath,
+                          abi: item.compilerAbi,
+                        })
+                      : t('settings.extensions.page.skipped.item', {
+                          tree: item.tree || item.nodePath,
+                        })}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </SettingsSection>
+      ) : null}
       {showExtensionsSection ? (
         <SettingsSection
           title={t('settings.extensions.page.extensions.title')}

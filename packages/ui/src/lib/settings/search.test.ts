@@ -353,7 +353,7 @@ describe('settings search', () => {
       t,
       getPageTitle,
     });
-    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(true);
+    expect(update.some((result) => result.id === 'sessions.pi-update')).toBe(false);
     const updateAll = buildSettingsSearchResults({
       query: 'update all',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true, isVSCode: false },
