@@ -89,6 +89,8 @@ if (winX64.version !== version || winArm64.version !== version) {
 output['latest.yml'] = serialize(winX64);
 output['latest-arm64.yml'] = serialize(winArm64);
 
+// GitHub Release packages Apple Silicon only. A missing Intel artifact stays
+// null; latest-mac.yml is still written from the arm64 file.
 const macX64 = await read('latest-yml-x86_64-apple-darwin', 'latest-mac.yml');
 const macArm64 = await read('latest-yml-aarch64-apple-darwin', 'latest-mac.yml');
 if (!macArm64) {
