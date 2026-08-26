@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: after Subagents creates a child run, the sidebar can expand that parent and open the child chat from the nested row.
+
 ## [1.2.0] - 2026-08-26
 
 - **Desktop:** GitHub Release macOS builds are Developer ID signed and notarized. Gatekeeper should open the downloaded app without the previous quarantine / ad-hoc re-sign steps. After that signed app is installed, Desktop can Restart to Update instead of opening GitHub.

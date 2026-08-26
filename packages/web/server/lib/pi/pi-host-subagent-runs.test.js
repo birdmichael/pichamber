@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { writeFeaturePlugins } from './feature-plugins.js';
 import { createInMemoryPiSession, createPiHost } from './pi-host.js';
+import { readPersistedSessionMetadataFromFile } from './session-metadata.js';
+import { applySessionListQuery } from './session-list-query.js';
 
 const tempHomes = [];
 afterEach(() => {
@@ -26,6 +28,53 @@ const enableSubagentsSlot = (home) => {
   }, null, 2)}\n`);
   writeFeaturePlugins(home, { subagents: { enabled: true, source: 'npm:pi-subagents' } });
 };
+
+const writeAdapterChildRun = ({
+  home,
+  parentID,
+  childId = 'scout-child',
+  runId = 'run_scout',
+  directory = '/tmp/project',
+  userText = 'Inspect the repo',
+} = {}) => {
+  const tmpdir = path.join(home, 'tmp');
+  const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', runId);
+  fs.mkdirSync(runDir, { recursive: true });
+  const childFile = path.join(runDir, 'child.jsonl');
+  fs.writeFileSync(childFile, `${JSON.stringify({
+    type: 'session',
+    id: childId,
+    cwd: directory,
+  })}\n${JSON.stringify({
+    type: 'message',
+    id: 'msg_user',
+    role: 'user',
+    content: userText,
+    timestamp: new Date().toISOString(),
+  })}\n`);
+  fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+    runId,
+    sessionId: parentID,
+    state: 'running',
+    mode: 'async',
+    sessionFile: childFile,
+    steps: [{ agent: 'scout', status: 'running', sessionFile: childFile }],
+  }));
+  return { tmpdir, childFile, childId, runId };
+};
+
+const createMockHost = (home, { onEvent } = {}) => createPiHost({
+  home,
+  defaultDirectory: '/tmp/project',
+  mock: true,
+  onEvent,
+  createSession: async ({ sessionManager } = {}) => {
+    const persistedId = typeof sessionManager?.getSessionId === 'function'
+      ? sessionManager.getSessionId()
+      : undefined;
+    return createInMemoryPiSession(persistedId ? { sessionId: persistedId } : {});
+  },
+});
 
 describe('Pi host subagent runs', () => {
   it('hides leftover parentID children when the slot is off', async () => {
@@ -498,5 +547,147 @@ describe('Pi host subagent runs', () => {
       else process.env.TMPDIR = originalTmp;
       host.dispose();
     }
+  });
+
+  it('includes adapter children on listSessionInfos without a prior subagent-runs call', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const events = [];
+    const originalTmp = process.env.TMPDIR;
+    const host = createMockHost(home, {
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const { tmpdir, childFile, childId } = writeAdapterChildRun({ home, parentID: parent.id });
+    process.env.TMPDIR = tmpdir;
+    try {
+      const listed = await host.listSessionInfos('/tmp/project');
+      const child = listed.find((info) => info.id === childId);
+      expect(child).toMatchObject({
+        id: childId,
+        parentID: parent.id,
+      });
+      expect(child.id.startsWith('ses_')).toBe(false);
+      expect(listed.some((info) => info.id.startsWith('ses_') && info.parentID === parent.id)).toBe(false);
+      expect(await host.listSessionChildren(parent.id)).toEqual([
+        expect.objectContaining({ id: childId, parentID: parent.id }),
+      ]);
+      expect(applySessionListQuery(listed, { roots: true }).sessions.map((info) => info.id))
+        .not.toContain(childId);
+      expect(applySessionListQuery(listed, {}).sessions.map((info) => info.id))
+        .toEqual(expect.arrayContaining([parent.id, childId]));
+      expect(readPersistedSessionMetadataFromFile(childFile)).toEqual(expect.objectContaining({
+        parentID: parent.id,
+      }));
+      expect(events.some((event) => (
+        (event?.type === 'session.created' || event?.type === 'session.updated')
+        && event.properties?.info?.id === childId
+        && event.properties?.info?.parentID === parent.id
+      ))).toBe(true);
+
+      const attached = host.getSession(childId);
+      delete attached.info.parentID;
+      if (attached.info.metadata) delete attached.info.metadata.parentID;
+      events.length = 0;
+      const relisted = await host.listSessionInfos('/tmp/project');
+      expect(relisted.find((info) => info.id === childId)?.parentID).toBe(parent.id);
+      expect(events.some((event) => (
+        event?.type === 'session.updated'
+        && event.properties?.info?.id === childId
+        && event.properties?.info?.parentID === parent.id
+      ))).toBe(true);
+
+      await host.promptAsync(childId, { text: 'also list the test entry points' });
+      expect(host.getMessages(parent.id).some((entry) => (
+        entry.parts?.some((part) => part.text === 'also list the test entry points')
+      ))).toBe(false);
+      expect(host.getMessages(childId).some((entry) => (
+        entry.parts?.some((part) => part.text === 'also list the test entry points')
+      ))).toBe(true);
+
+      host.dispose();
+      const restarted = createPiHost({
+        home,
+        defaultDirectory: '/tmp/project',
+        mock: true,
+        createSession: async () => createInMemoryPiSession({ sessionId: parent.id }),
+      });
+      await restarted.createSession({ directory: '/tmp/project', title: 'Parent' });
+      const cold = await restarted.listSessionInfos('/tmp/project');
+      expect(cold.find((info) => info.id === childId)).toMatchObject({
+        id: childId,
+        parentID: parent.id,
+      });
+      expect(readPersistedSessionMetadataFromFile(childFile)).toEqual(expect.objectContaining({
+        parentID: parent.id,
+      }));
+      restarted.dispose();
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+    }
+  });
+
+  it('hides adapter children from the session list when the slot is off', async () => {
+    const home = makeHome();
+    const originalTmp = process.env.TMPDIR;
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const leftover = await host.createSession({
+      directory: '/tmp/project',
+      title: 'Leftover clone',
+      parentID: parent.id,
+    });
+    const { tmpdir, childId } = writeAdapterChildRun({ home, parentID: parent.id });
+    process.env.TMPDIR = tmpdir;
+    try {
+      const listed = await host.listSessionInfos('/tmp/project');
+      expect(listed.map((info) => info.id)).toEqual(expect.arrayContaining([parent.id, leftover.id]));
+      expect(listed.map((info) => info.id)).not.toContain(childId);
+      expect(await host.listSessionChildren(parent.id)).toEqual([]);
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
+
+  it('does not mint an empty session from listSessionInfos for management or finished calls', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_list',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_list',
+        state: {
+          status: 'completed',
+          input: { action: 'list' },
+          output: JSON.stringify({ details: { mode: 'management', results: [] } }),
+        },
+      }, {
+        id: 'prt_done',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_done',
+        state: {
+          status: 'error',
+          input: { agent: 'scout', task: 'List the README filename' },
+          output: 'NotImplementedError: node:v8 createHook is not yet implemented in Bun',
+        },
+      }],
+    });
+    const before = (await host.listSessionInfos('/tmp/project')).map((info) => info.id);
+    const listed = await host.listSessionInfos('/tmp/project');
+    expect(listed.map((info) => info.id)).toEqual(before);
+    expect(listed.filter((info) => info.parentID === parent.id)).toEqual([]);
+    expect(await host.listSessionChildren(parent.id)).toEqual([]);
+    host.dispose();
   });
 });

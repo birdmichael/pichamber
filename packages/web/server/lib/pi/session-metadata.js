@@ -3,7 +3,10 @@
 // under ~/.pi/agent/sessions. Custom entries are not LLM context.
 // Archive is a Pichamber-only flag: `{ archived: ms | 0 }` on this entry.
 // `0` means restored. Clone/fork `parentID` is the same entry:
-// `{ parentID: "<source session id>" }`. Do not invent a second session store.
+// `{ parentID: "<source session id>" }`. Adapter children persist that same
+// field so the session list can nest them; `pichamber.subagentRun.parentSessionID`
+// is a fallback when only the adapter marker exists. Do not invent a second
+// session store.
 // Session list tail-scans the last pichamber.metadata; it does not full-read
 // jsonl again just to find archived / parentID. Archived files also move to
 // a sibling `archive/` so archived=false never opens them.
@@ -123,7 +126,9 @@ export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => 
 export const readPersistedParentID = (metadata) => {
   if (!isRecord(metadata)) return undefined;
   const parentID = typeof metadata.parentID === 'string' ? metadata.parentID.trim() : '';
-  return parentID || undefined;
+  if (parentID) return parentID;
+  const nested = metadata.pichamber?.subagentRun?.parentSessionID;
+  return typeof nested === 'string' && nested.trim() ? nested.trim() : undefined;
 };
 
 export const readPersistedArchivedTimestamp = (metadata) => {

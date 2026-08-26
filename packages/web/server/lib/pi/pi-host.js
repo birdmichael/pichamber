@@ -74,6 +74,7 @@ import {
   getRememberedMcpStatusSnapshot,
 } from './mcp-status.js';
 import {
+  PICHAMBER_METADATA_CUSTOM_TYPE,
   persistSessionMetadata,
   readPersistedArchivedTimestamp,
   readPersistedParentID,
@@ -1866,6 +1867,73 @@ export const createPiHost = ({
     return null;
   };
 
+  const subagentsSlotActive = () => isSubagentsSlotActive(toFeaturePluginsPayload({
+    plugins: readFeaturePlugins(home),
+    configuredSources: listConfiguredPiPackageSources(home),
+  }));
+
+  const isAdapterSubagentInfo = (info, record = info?.id ? sessions.get(info.id) : undefined) => Boolean(
+    record?.subagentRun
+    || (info?.metadata && typeof info.metadata === 'object' && info.metadata.pichamber?.subagentRun)
+  );
+
+  const persistAdapterParentID = (record, parentID) => {
+    if (!record?.info || typeof parentID !== 'string' || !parentID.trim()) return false;
+    const nextParentID = parentID.trim();
+    const existingRun = record.info.metadata?.pichamber?.subagentRun;
+    const metadata = {
+      ...(record.info.metadata || {}),
+      parentID: nextParentID,
+      pichamber: {
+        ...(record.info.metadata?.pichamber || {}),
+        subagentRun: {
+          ...(existingRun && typeof existingRun === 'object' ? existingRun : {}),
+          parentSessionID: nextParentID,
+        },
+      },
+    };
+    record.info.metadata = metadata;
+    if (persistSessionMetadata(record.sessionManager, metadata)) return true;
+    if (typeof record.sessionFile !== 'string' || !record.sessionFile) return false;
+    try {
+      fs.appendFileSync(record.sessionFile, `${JSON.stringify({
+        type: 'custom',
+        customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+        data: { parentID: nextParentID, pichamber: metadata.pichamber },
+      })}\n`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const applySubagentParentLink = (record, parentID, extraMetadata, { emitUpdated = true } = {}) => {
+    if (!record?.info || typeof parentID !== 'string' || !parentID.trim()) return record;
+    const nextParentID = parentID.trim();
+    const previousParentID = typeof record.info.parentID === 'string' && record.info.parentID.trim()
+      ? record.info.parentID.trim()
+      : undefined;
+    const gained = previousParentID !== nextParentID;
+    record.info.parentID = nextParentID;
+    if (extraMetadata && typeof extraMetadata === 'object') {
+      record.info.metadata = { ...(record.info.metadata || {}), ...extraMetadata };
+    }
+    const storedParentID = typeof record.info.metadata?.parentID === 'string'
+      ? record.info.metadata.parentID.trim()
+      : '';
+    if (storedParentID !== nextParentID) {
+      persistAdapterParentID(record, nextParentID);
+    }
+    if (gained && emitUpdated) {
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'session.updated',
+        properties: { info: record.info },
+      });
+    }
+    return record;
+  };
+
   const readSessionFileEntries = (file) => {
     try {
       return fs.readFileSync(file, 'utf8')
@@ -1893,22 +1961,17 @@ export const createPiHost = ({
       : readSessionIdFromSessionFile(resolvedFile);
     const existing = (hintedId && sessions.get(hintedId)) || findRecordBySessionFile(resolvedFile);
     if (existing) {
-      if (parentID) existing.info.parentID = parentID;
-      if (metadata && typeof metadata === 'object') {
-        existing.info.metadata = { ...(existing.info.metadata || {}), ...metadata };
-      }
+      applySubagentParentLink(existing, parentID, metadata);
       return existing;
     }
     let manager = null;
-    if (!mock) {
-      try {
-        const pi = await loadPiSdk();
-        if (typeof pi.SessionManager?.open === 'function') {
-          manager = pi.SessionManager.open(resolvedFile);
-        }
-      } catch {
-        manager = null;
+    try {
+      const pi = await loadPiSdk();
+      if (typeof pi.SessionManager?.open === 'function') {
+        manager = pi.SessionManager.open(resolvedFile);
       }
+    } catch {
+      manager = null;
     }
     const fileEntries = readSessionFileEntries(resolvedFile);
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
@@ -1922,10 +1985,7 @@ export const createPiHost = ({
     }
     const alreadyAttached = sessions.get(resolvedId);
     if (alreadyAttached) {
-      if (parentID) alreadyAttached.info.parentID = parentID;
-      if (metadata && typeof metadata === 'object') {
-        alreadyAttached.info.metadata = { ...(alreadyAttached.info.metadata || {}), ...metadata };
-      }
+      applySubagentParentLink(alreadyAttached, parentID, metadata);
       return alreadyAttached;
     }
     const factory = await resolveCreateSession();
@@ -1972,6 +2032,9 @@ export const createPiHost = ({
     attachSession(record);
     sessions.set(resolvedId, record);
     publishRecordTodos(record, entries);
+    applySubagentParentLink(record, parentID || readPersistedParentID(persistedMetadata), metadata, {
+      emitUpdated: false,
+    });
     emit(cwd, {
       id: createEventId(),
       type: 'session.created',
@@ -2017,6 +2080,18 @@ export const createPiHost = ({
   const attachSubagentRun = async (parent, run) => {
     const childId = run?.sessionID && run.sessionID !== parent.id ? run.sessionID : null;
     if (!run?.sessionFile && !childId) return run;
+    const extraMetadata = {
+      pichamber: {
+        subagentRun: {
+          runId: run.runId,
+          parentSessionID: parent.id,
+          mode: run.mode,
+          state: run.state,
+          name: run.name,
+          role: run.role,
+        },
+      },
+    };
     try {
       if (run.sessionFile) {
         const record = await attachSessionFromFile(run.sessionFile, {
@@ -2024,20 +2099,10 @@ export const createPiHost = ({
           directory: parent.directory,
           parentID: parent.id,
           title: run.title || run.name,
-          metadata: {
-            pichamber: {
-              subagentRun: {
-                runId: run.runId,
-                parentSessionID: parent.id,
-                mode: run.mode,
-                state: run.state,
-                name: run.name,
-                role: run.role,
-              },
-            },
-          },
+          metadata: extraMetadata,
         });
         record.subagentRun = run;
+        applySubagentParentLink(record, parent.id, extraMetadata);
         const nextState = run.state === 'running' || run.state === 'queued' || run.state === 'blocked'
           ? { type: 'busy' }
           : { type: 'idle' };
@@ -2054,7 +2119,17 @@ export const createPiHost = ({
         return { ...run, sessionID: record.id };
       }
       if (childId) {
-        return { ...run, sessionID: childId };
+        let record = sessions.get(childId);
+        if (!record) {
+          try {
+            record = await ensureRecord(childId, parent.directory);
+          } catch {
+            return { ...run, sessionID: childId };
+          }
+        }
+        record.subagentRun = run;
+        applySubagentParentLink(record, parent.id, extraMetadata);
+        return { ...run, sessionID: record.id };
       }
     } catch (error) {
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
@@ -2194,25 +2269,63 @@ export const createPiHost = ({
       .map((record) => record.info)
       .filter((info) => includeArchived || !info?.time?.archived);
     const seen = new Set(live.map((info) => info.id));
-    if (mock) return live;
-    try {
-      const cwd = directory || defaultDirectory;
-      const persisted = await listPersistedSessionItems(cwd, { includeArchived });
-      for (const item of persisted || []) {
-        try {
-          const info = toPersistedSessionInfo(item, directory);
-          if (!info || seen.has(info.id)) continue;
-          relocateListedArchivedItem(item, info, directory);
-          if (!includeArchived && info.time?.archived) continue;
-          seen.add(info.id);
-          live.push(info);
-        } catch {
-          // One unreadable session file does not drop other complete sessions.
+    if (!mock) {
+      try {
+        const cwd = directory || defaultDirectory;
+        const persisted = await listPersistedSessionItems(cwd, { includeArchived });
+        for (const item of persisted || []) {
+          try {
+            const info = toPersistedSessionInfo(item, directory);
+            if (!info || seen.has(info.id)) continue;
+            relocateListedArchivedItem(item, info, directory);
+            if (!includeArchived && info.time?.archived) continue;
+            seen.add(info.id);
+            live.push(info);
+          } catch {
+            // One unreadable session file does not drop other complete sessions.
+          }
         }
+      } catch {
+        // Persisted listing failed: keep live sessions. Do not return empty success.
       }
-    } catch {
-      // Persisted listing failed: keep live sessions. Do not return empty success.
     }
+
+    for (const info of live) {
+      if (info.parentID) continue;
+      const nested = readPersistedParentID(info.metadata);
+      if (nested) info.parentID = nested;
+    }
+
+    if (!subagentsSlotActive()) {
+      return live.filter((info) => !isAdapterSubagentInfo(info));
+    }
+
+    const parents = live.filter((info) => info && !info.parentID);
+    for (const parentInfo of parents) {
+      const parent = sessions.get(parentInfo.id) || {
+        id: parentInfo.id,
+        directory: parentInfo.directory || directory || defaultDirectory,
+        messages: [],
+      };
+      try {
+        for (const run of collectSubagentRuns(parent)) {
+          const attached = await attachSubagentRun(parent, run);
+          const child = attached?.sessionID ? sessions.get(attached.sessionID) : null;
+          if (!child?.info || child.id === parent.id) continue;
+          if (!includeArchived && child.info.time?.archived) continue;
+          if (seen.has(child.id)) {
+            const index = live.findIndex((info) => info.id === child.id);
+            if (index >= 0) live[index] = child.info;
+            continue;
+          }
+          seen.add(child.id);
+          live.push(child.info);
+        }
+      } catch {
+        // One parent attach failure must not drop other complete sessions.
+      }
+    }
+
     return live;
   };
 
