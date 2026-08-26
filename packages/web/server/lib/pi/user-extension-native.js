@@ -4,6 +4,7 @@ import path from 'node:path';
 const APP_OWNED_NATIVE_SEGMENT = `${path.sep}app.asar.unpacked${path.sep}`;
 const USER_NPM_DIR = 'npm';
 const USER_ELECTRON_NPM_DIR = 'npm-electron';
+const USER_NODE_NPM_DIR = 'npm-node';
 const PROJECT_PI_DIR = '.pi';
 
 const MODULE_PATH_PATTERN = /The module ['"]([^'"]+\.node)['"]/i;
@@ -59,6 +60,11 @@ export const listUserNpmTrees = ({ agentDir, projectDir } = {}) => {
       scope: 'user',
       kind: 'electron',
     });
+    trees.push({
+      root: path.join(agent, USER_NODE_NPM_DIR),
+      scope: 'user',
+      kind: 'node',
+    });
   }
   const project = resolveExisting(projectDir);
   if (project) {
@@ -71,6 +77,11 @@ export const listUserNpmTrees = ({ agentDir, projectDir } = {}) => {
       root: path.join(project, PROJECT_PI_DIR, USER_ELECTRON_NPM_DIR),
       scope: 'project',
       kind: 'electron',
+    });
+    trees.push({
+      root: path.join(project, PROJECT_PI_DIR, USER_NODE_NPM_DIR),
+      scope: 'project',
+      kind: 'node',
     });
   }
   return trees;

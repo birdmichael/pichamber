@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-08-27
+
+- Desktop: local Mac packages no longer copy a Homebrew Node stub into the app. Opening a chat waits on a real bundled Node instead of timing out after the kernel child fails to start.
+- Desktop: packaged Desktop unpacks the Pi kernel child and every production package it imports from asar, so opening a chat no longer fails with a missing `yaml` or `chalk` error after the bundled Node starts.
+- Desktop: opening or deleting a chat no longer leaves a leftover Untitled session in the sidebar.
+- Desktop: quitting the app now stops the Pi kernel child and leftover Chrome windows started by browser extensions.
+- Desktop: opening another chat in the same project no longer reloads installed extensions such as pi-chrome.
+- Desktop: session memory/search extensions now use a copy rebuilt for the app's Node, so Homebrew Node no longer breaks live session indexing.
+
 ## [1.2.3] - 2026-08-27
 
 - Settings: Desktop shows the bundled Pi version only. It does not check npm for a newer kernel, and app updates stay on About.

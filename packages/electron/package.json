@@ -1,6 +1,6 @@
 {
   "name": "@pichamber/electron",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "description": "Electron desktop runtime for Pichamber (Pi kernel)",
   "author": "Pichamber",
@@ -45,14 +45,14 @@
     "generate:product-icons": "node ./scripts/generate-product-icons.mjs",
     "rebuild:native": "node ./scripts/rebuild-native.mjs",
     "test": "node ../../scripts/run-isolated-tests.mjs .",
-    "test:architecture": "node --test ./startup-url-selection.test.mjs ./scripts/target-architecture.test.mjs ./scripts/verify-linux-appimage.test.mjs ./scripts/verify-update-manifest.test.mjs ./scripts/ensure-electron.test.mjs ./scripts/product-icons.test.mjs ./scripts/macos-signing.test.mjs ./scripts/prepare-node.test.mjs ./scripts/verify-pi-node-kernel.test.mjs",
+    "test:architecture": "node --test ./startup-url-selection.test.mjs ./scripts/target-architecture.test.mjs ./scripts/verify-linux-appimage.test.mjs ./scripts/verify-update-manifest.test.mjs ./scripts/ensure-electron.test.mjs ./scripts/product-icons.test.mjs ./scripts/macos-signing.test.mjs ./scripts/prepare-node.test.mjs ./scripts/verify-pi-node-kernel.test.mjs ./scripts/unpack-node-kernel-deps.test.mjs",
     "test:updater": "node --test ./updater-capability.test.mjs ./updater-channel.test.mjs ./updater-check.test.mjs ./updater-feed.test.mjs ./scripts/finalize-latest-yml.test.mjs ./scripts/merge-latest-mac-yml.test.mjs ./scripts/updater-e2e-fixture.test.mjs",
     "test:linux-desktop": "node --test ./linux-autostart.test.mjs ./menu-accelerators.test.mjs && node ./scripts/smoke-linux-app-discovery.mjs && node ./scripts/smoke-path-open-utils.mjs",
     "updater:e2e:fixture": "node ./scripts/updater-e2e-fixture.mjs",
     "verify:update-manifest": "node ./scripts/verify-update-manifest.mjs",
     "package": "bun run build:web-assets && bun run prepare:pi-kernel && bun run prepare:node && bun run prepare:opencode-cli && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
     "finalize:latest-yml": "node ./scripts/finalize-latest-yml.mjs",
-    "type-check": "node --check ./main.mjs && node --check ./preload.mjs && node --check ./kernel-env.mjs && node --check ./save-image-payload.mjs && node --check ./menu-accelerators.mjs && node --check ./scripts/prepare-node.mjs && node --check ./scripts/verify-pi-node-kernel.mjs",
+    "type-check": "node --check ./main.mjs && node --check ./preload.mjs && node --check ./kernel-env.mjs && node --check ./save-image-payload.mjs && node --check ./menu-accelerators.mjs && node --check ./scripts/prepare-node.mjs && node --check ./scripts/verify-pi-node-kernel.mjs && node --check ./scripts/after-pack.cjs && node --check ./scripts/unpack-node-kernel-deps.cjs",
     "lint": "node -e \"process.exit(0)\"",
     "prepare:pi-kernel": "node ./scripts/prepare-pi-kernel.mjs"
   },
@@ -91,7 +91,8 @@
     ],
     "asarUnpack": [
       "**/node_modules/@pichamber/web/server/**",
-      "**/node_modules/@earendil-works/**"
+      "**/node_modules/@earendil-works/**",
+      "**/node_modules/yaml/**"
     ],
     "afterPack": "scripts/after-pack.cjs",
     "directories": {

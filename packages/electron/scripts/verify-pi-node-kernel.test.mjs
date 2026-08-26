@@ -56,6 +56,7 @@ test('asarUnpack keeps the Pi server and SDK readable by a real Node', () => {
   assert.deepEqual(pkg.build.asarUnpack, [
     '**/node_modules/@pichamber/web/server/**',
     '**/node_modules/@earendil-works/**',
+    '**/node_modules/yaml/**',
   ]);
 });
 

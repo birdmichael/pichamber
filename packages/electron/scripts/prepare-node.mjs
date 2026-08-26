@@ -22,10 +22,54 @@ export const isNodeBinary = (filePath) => {
   return name === 'node' || name === 'node.exe';
 };
 
+const NON_RELOCATABLE_LIBRARY = /libnode(?:\.\d+)?\.(?:dylib|so)|\b(?:\/opt\/homebrew\/|\/usr\/local\/(?:opt|Cellar)\/|\/home\/linuxbrew\/|\/opt\/local\/)/i;
+
+export const listLinkedLibraries = ({
+  command,
+  platform = process.platform,
+  spawnImpl = spawnSync,
+} = {}) => {
+  if (!command) return { libraries: [], error: 'No Node binary' };
+  if (platform === 'win32') return { libraries: [] };
+  const result = platform === 'darwin'
+    ? spawnImpl('otool', ['-L', command], { encoding: 'utf8', windowsHide: true })
+    : spawnImpl('ldd', [command], { encoding: 'utf8', windowsHide: true });
+  if (result.status !== 0) {
+    return {
+      libraries: [],
+      error: String(result.stderr || result.stdout || `exit ${result.status}`).trim(),
+    };
+  }
+  return {
+    libraries: String(result.stdout || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  };
+};
+
+export const isRelocatableNodeBinary = (input) => {
+  const inspected = typeof input === 'string'
+    ? listLinkedLibraries({ command: input })
+    : input;
+  if (inspected?.error) return { ok: false, error: inspected.error };
+  const blocked = (inspected?.libraries || []).find((line) => NON_RELOCATABLE_LIBRARY.test(line));
+  if (blocked) {
+    return { ok: false, error: `not relocatable (${blocked})` };
+  }
+  return { ok: true };
+};
+
+export const officialNodeFileKey = ({ platform = process.platform, arch = process.arch } = {}) => {
+  if (platform === 'darwin') return `osx-${arch}-tar`;
+  if (platform === 'win32') return `win-${arch}-zip`;
+  return `linux-${arch}`;
+};
+
 export const pickOfficialNodeReleases = (index, { platform = process.platform, arch = process.arch } = {}) => {
   const plat = platform === 'win32' ? 'win' : platform === 'darwin' ? 'darwin' : 'linux';
   const ext = platform === 'win32' ? 'zip' : 'tar.gz';
-  const fileKey = `${plat}-${arch}`;
+  const fileKey = officialNodeFileKey({ platform, arch });
   const out = [];
   const seen = new Set();
   const add = (entry) => {
@@ -40,14 +84,12 @@ export const pickOfficialNodeReleases = (index, { platform = process.platform, a
       name,
     });
   };
-  if (Array.isArray(index) && index[0]) add(index[0]);
-  for (const entry of Array.isArray(index) ? index : []) {
-    if (entry?.lts) {
-      add(entry);
-      break;
-    }
+  if (Array.isArray(index)) {
+    const lts = index.find((entry) => entry?.lts);
+    if (lts) add(lts);
+    if (index[0]) add(index[0]);
+    for (const entry of index.slice(0, 15)) add(entry);
   }
-  for (const entry of Array.isArray(index) ? index.slice(0, 15) : []) add(entry);
   return out;
 };
 
@@ -112,14 +154,28 @@ const stageBinary = (source) => {
   return outputPath;
 };
 
+const downloadToFile = async (url, destination) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Download failed (${response.status}): ${url}`);
+    }
+    fs.writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
+    return;
+  } catch (error) {
+    const curl = spawnSync('curl', ['-fsSL', '--retry', '3', '--retry-delay', '1', '-o', destination, url], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    if (curl.status === 0 && fs.existsSync(destination)) return;
+    throw new Error(`${error?.message || error}; curl: ${curl.stderr || curl.stdout || `exit ${curl.status}`}`);
+  }
+};
+
 const downloadOfficialNode = async (release) => {
   fs.mkdirSync(cacheRoot, { recursive: true });
   const archivePath = path.join(cacheRoot, release.name);
-  const response = await fetch(release.url);
-  if (!response.ok) {
-    throw new Error(`Download failed (${response.status}): ${release.url}`);
-  }
-  fs.writeFileSync(archivePath, Buffer.from(await response.arrayBuffer()));
+  await downloadToFile(release.url, archivePath);
   const extractDir = path.join(cacheRoot, release.version.replace(/^v/, ''));
   fs.rmSync(extractDir, { recursive: true, force: true });
   fs.mkdirSync(extractDir, { recursive: true });
@@ -150,22 +206,49 @@ const downloadOfficialNode = async (release) => {
 export const preparePiNodeBinary = async ({
   probe = probeNodeLoadsPiSdk,
   fetchIndex = async () => {
-    const response = await fetch('https://nodejs.org/dist/index.json');
-    if (!response.ok) throw new Error(`nodejs.org index failed: ${response.status}`);
-    return response.json();
+    const indexPath = path.join(cacheRoot, 'index.json');
+    fs.mkdirSync(cacheRoot, { recursive: true });
+    try {
+      const response = await fetch('https://nodejs.org/dist/index.json');
+      if (!response.ok) throw new Error(`nodejs.org index failed: ${response.status}`);
+      return response.json();
+    } catch (error) {
+      await downloadToFile('https://nodejs.org/dist/index.json', indexPath);
+      return JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    }
   },
   downloadRelease = downloadOfficialNode,
   platform = process.platform,
   arch = process.arch,
 } = {}) => {
+  const acceptStaged = (staged, source, extra = {}) => {
+    const relocatable = isRelocatableNodeBinary(staged);
+    if (!relocatable.ok) {
+      console.warn(`[electron] staged Node from ${source} ${relocatable.error}`);
+      return null;
+    }
+    const probed = probe({ command: staged, cwd: webRoot });
+    if (!probed.ok) {
+      console.warn(`[electron] staged Node from ${source} cannot load ${PI_SDK_PACKAGE}: ${probed.error}`);
+      return null;
+    }
+    return { path: staged, source, ...extra };
+  };
+
   await resolveSdkPackageRoot();
   for (const candidate of localNodeCandidates()) {
-    const probed = probe({ command: candidate, cwd: webRoot });
-    if (probed.ok) {
-      const staged = stageBinary(candidate);
-      return { path: staged, source: candidate, downloaded: false };
+    const relocatable = isRelocatableNodeBinary(candidate);
+    if (!relocatable.ok) {
+      console.warn(`[electron] Node ${candidate} ${relocatable.error}`);
+      continue;
     }
-    console.warn(`[electron] Node ${candidate} cannot load ${PI_SDK_PACKAGE}: ${probed.error}`);
+    const probed = probe({ command: candidate, cwd: webRoot });
+    if (!probed.ok) {
+      console.warn(`[electron] Node ${candidate} cannot load ${PI_SDK_PACKAGE}: ${probed.error}`);
+      continue;
+    }
+    const accepted = acceptStaged(stageBinary(candidate), candidate, { downloaded: false });
+    if (accepted) return accepted;
   }
 
   const index = await fetchIndex();
@@ -177,11 +260,15 @@ export const preparePiNodeBinary = async ({
     try {
       const downloaded = await downloadRelease(release);
       const probed = probe({ command: downloaded, cwd: webRoot });
-      if (probed.ok) {
-        const staged = stageBinary(downloaded);
-        return { path: staged, source: release.url, downloaded: true, version: release.version };
+      if (!probed.ok) {
+        console.warn(`[electron] Official ${release.version} cannot load ${PI_SDK_PACKAGE}: ${probed.error}`);
+        continue;
       }
-      console.warn(`[electron] Official ${release.version} cannot load ${PI_SDK_PACKAGE}: ${probed.error}`);
+      const accepted = acceptStaged(stageBinary(downloaded), release.url, {
+        downloaded: true,
+        version: release.version,
+      });
+      if (accepted) return accepted;
     } catch (error) {
       console.warn(`[electron] failed to stage official ${release.version}: ${error?.message || error}`);
     }

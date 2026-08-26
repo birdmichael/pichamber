@@ -1,8 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { probeNodeLoadsPiSdk } from './prepare-node.mjs';
+import { isRelocatableNodeBinary, probeNodeLoadsPiSdk } from './prepare-node.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const electronRoot = path.resolve(__dirname, '..');
@@ -32,12 +33,15 @@ const isFile = (filePath) => {
   }
 };
 
+const SKIP_RESOURCE_WALK = new Set(['node_modules', 'app.asar.unpacked']);
+
 const collectDirs = (root, predicate, matches = []) => {
   if (!fs.existsSync(root)) return matches;
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     const fullPath = path.join(root, entry.name);
     if (!entry.isDirectory()) continue;
     if (predicate(entry.name, fullPath)) matches.push(fullPath);
+    if (SKIP_RESOURCE_WALK.has(entry.name)) continue;
     collectDirs(fullPath, predicate, matches);
   }
   return matches;
@@ -78,6 +82,10 @@ export const assertPiNodeKernelLoadsSdk = ({
   cwd = webRoot,
   probe = probeNodeLoadsPiSdk,
 } = {}) => {
+  const relocatable = isRelocatableNodeBinary(nodeBinary);
+  if (!relocatable.ok) {
+    throw new Error(`Bundled Node is not relocatable: ${relocatable.error || 'shared-library check failed'}`);
+  }
   const probed = probe({ command: nodeBinary, cwd });
   if (!probed.ok) {
     throw new Error(
@@ -85,6 +93,54 @@ export const assertPiNodeKernelLoadsSdk = ({
     );
   }
   return probed;
+};
+
+const runPackagedNodeImport = ({
+  nodeBinary,
+  specifier,
+  cwd,
+  spawnImpl = spawnSync,
+} = {}) => spawnImpl(nodeBinary, [
+  '--input-type=module',
+  '-e',
+  `import(${JSON.stringify(specifier)}).then(() => process.exit(0)).catch((error) => { console.error(error?.message || error); process.exit(2); })`,
+], {
+  cwd,
+  encoding: 'utf8',
+  timeout: 30_000,
+  windowsHide: true,
+});
+
+export const assertPiNodeKernelChildLoads = ({
+  nodeBinary,
+  unpackedChild,
+  spawnImpl = spawnSync,
+} = {}) => {
+  if (!nodeBinary || !unpackedChild) {
+    throw new Error('nodeBinary and unpackedChild are required');
+  }
+  const childImport = runPackagedNodeImport({
+    nodeBinary,
+    specifier: pathToFileURL(unpackedChild).href,
+    spawnImpl,
+  });
+  if (childImport.status !== 0) {
+    throw new Error(
+      `Bundled Node cannot import the unpacked Pi node kernel child: ${String(childImport.stderr || childImport.stdout || `exit ${childImport.status}`).trim()}`,
+    );
+  }
+  const sdkImport = runPackagedNodeImport({
+    nodeBinary,
+    specifier: '@earendil-works/pi-coding-agent',
+    cwd: path.dirname(unpackedChild),
+    spawnImpl,
+  });
+  if (sdkImport.status !== 0) {
+    throw new Error(
+      `Bundled Node cannot import @earendil-works/pi-coding-agent from the unpacked child: ${String(sdkImport.stderr || sdkImport.stdout || `exit ${sdkImport.status}`).trim()}`,
+    );
+  }
+  return { childImport, sdkImport };
 };
 
 export const verifyPackagedPiNodeKernel = ({
@@ -105,6 +161,10 @@ export const verifyPackagedPiNodeKernel = ({
     const layout = assertPiNodeKernelLayout({ resourcesPath, platform });
     if (probeSdk) {
       assertPiNodeKernelLoadsSdk({ nodeBinary: layout.nodeBinary, probe });
+      assertPiNodeKernelChildLoads({
+        nodeBinary: layout.nodeBinary,
+        unpackedChild: layout.unpackedChild,
+      });
     }
     verified.push({ resourcesPath, ...layout });
     console.log(`[electron] verified Pi node kernel: ${layout.unpackedChild}`);
