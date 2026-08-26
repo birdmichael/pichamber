@@ -123,6 +123,7 @@ import {
   lastModelChangeFromMessages,
   parseSessionImport,
   persistFacadeMessages,
+  reconcileHydratedMessages,
   resolveUsableFacadeModel,
   sanitizeExportBasename,
   transcriptEntriesForHydrate,
@@ -1970,6 +1971,7 @@ export const createPiHost = ({
     const existing = (hintedId && sessions.get(hintedId)) || findRecordBySessionFile(resolvedFile);
     if (existing) {
       applySubagentParentLink(existing, parentID, metadata);
+      refreshChildMessagesFromFile(existing, { publish: true });
       return existing;
     }
     let manager = null;
@@ -1999,6 +2001,7 @@ export const createPiHost = ({
     const alreadyAttached = sessions.get(resolvedId);
     if (alreadyAttached) {
       applySubagentParentLink(alreadyAttached, parentID, metadata);
+      refreshChildMessagesFromFile(alreadyAttached, { publish: true });
       return alreadyAttached;
     }
     const factory = await resolveCreateSession();
@@ -2059,19 +2062,58 @@ export const createPiHost = ({
     return record;
   };
 
-  const refreshChildMessagesFromFile = (record) => {
+  const publishRefreshedMessages = (record, previous) => {
+    const before = Array.isArray(previous) ? previous : [];
+    const next = Array.isArray(record?.messages) ? record.messages : [];
+    if (next.length === 0) return;
+    const beforeIds = new Set(before.map((entry) => entry?.info?.id).filter(Boolean));
+    const grew = next.length !== before.length || next.some((entry) => entry?.info?.id && !beforeIds.has(entry.info.id));
+    if (!grew && next === previous) return;
+    if (!grew) {
+      const lastBefore = before[before.length - 1];
+      const lastNext = next[next.length - 1];
+      const beforeParts = Array.isArray(lastBefore?.parts) ? lastBefore.parts.length : 0;
+      const nextParts = Array.isArray(lastNext?.parts) ? lastNext.parts.length : 0;
+      if (lastBefore?.info?.id === lastNext?.info?.id && beforeParts === nextParts) return;
+    }
+    for (const entry of next) {
+      if (!entry?.info) continue;
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'message.updated',
+        properties: { sessionID: record.id, info: entry.info },
+      });
+      for (const part of Array.isArray(entry.parts) ? entry.parts : []) {
+        if (!part) continue;
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'message.part.updated',
+          properties: { sessionID: record.id, part, time: Date.now() },
+        });
+      }
+    }
+  };
+
+  const refreshChildMessagesFromFile = (record, { publish = false } = {}) => {
     const file = record?.sessionFile;
-    if (!file || !fs.existsSync(file)) return;
+    if (!file || !fs.existsSync(file)) return false;
     const stamp = statSessionFile(file);
     if (stamp && sessionFileStampEquals(record.sessionFileStamp, stamp)) {
-      return;
+      return false;
     }
     try {
       const entries = transcriptEntriesForHydrate({ file, manager: record.sessionManager });
-      if (!Array.isArray(entries) || entries.length === 0) return;
-      record.messages = hydrateFacadeMessages(entries, record.id, record);
+      if (!Array.isArray(entries) || entries.length === 0) return false;
+      const previous = record.messages;
+      record.messages = reconcileHydratedMessages(
+        previous,
+        hydrateFacadeMessages(entries, record.id, record),
+      );
       record.sessionFileStamp = stamp;
+      if (publish) publishRefreshedMessages(record, previous);
+      return true;
     } catch {
+      return false;
     }
   };
 
@@ -2368,7 +2410,10 @@ export const createPiHost = ({
       }
       const manager = pi.SessionManager.open(file);
       const entries = transcriptEntriesForHydrate({ file, manager });
-      record.messages = hydrateFacadeMessages(entries, record.id, record);
+      record.messages = reconcileHydratedMessages(
+        record.messages,
+        hydrateFacadeMessages(entries, record.id, record),
+      );
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
       if (title) record.info.title = title;
       const metadata = readPersistedSessionMetadata(entries);
@@ -2493,8 +2538,11 @@ export const createPiHost = ({
     },
     getMessages(sessionID) {
       const record = getRecord(sessionID);
-      if (record.subagentRun) {
-        refreshChildMessagesFromFile(record);
+      const streamingParent = Boolean(record.piSession?.isStreaming)
+        && !record.subagentRun
+        && !record.info?.parentID;
+      if (!streamingParent) {
+        refreshChildMessagesFromFile(record, { publish: Boolean(record.subagentRun || record.info?.parentID) });
       }
       return record.messages;
     },

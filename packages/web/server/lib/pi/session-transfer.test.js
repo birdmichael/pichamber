@@ -9,6 +9,7 @@ import {
   cloneImportedMessages,
   facadeMessagesFromPiEntries,
   parseSessionImport,
+  reconcileHydratedMessages,
   persistFacadeMessages,
   piMessagesFromFacadeEntry,
   readPiCodingAgentVersion,
@@ -740,6 +741,23 @@ describe('session-transfer', () => {
     });
     expect(messages.filter((entry) => entry.info.role === 'user')).toHaveLength(1);
     expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('using-superpowers')))).toBe(false);
+  });
+
+  it('keeps the live user message id when disk hydrate uses a Pi-native id', () => {
+    const live = [{
+      info: { id: 'msg_optimistic', role: 'user', sessionID: 'ses_1' },
+      parts: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘', messageID: 'msg_optimistic' }],
+    }];
+    const hydrated = [{
+      info: { id: '3dc706f1', role: 'user', sessionID: 'ses_1' },
+      parts: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘', messageID: '3dc706f1' }],
+    }, {
+      info: { id: 'asst_1', role: 'assistant', sessionID: 'ses_1' },
+      parts: [{ type: 'text', text: '先看一下子代理配置', messageID: 'asst_1' }],
+    }];
+    const reconciled = reconcileHydratedMessages(live, hydrated);
+    expect(reconciled.map((entry) => entry.info.id)).toEqual(['msg_optimistic', 'asst_1']);
+    expect(reconciled[0].parts[0].messageID).toBe('msg_optimistic');
   });
 
   it('pairs read and bash toolCalls with later toolResults on the same assistant', () => {

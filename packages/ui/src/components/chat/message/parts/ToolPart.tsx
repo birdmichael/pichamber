@@ -106,6 +106,7 @@ interface ToolPartProps {
     onContentChange?: (reason?: ContentChangeReason) => void;
     onShowPopup?: (content: ToolPopupContent) => void;
     animateTailText?: boolean;
+    runChildSessionId?: string | null;
 }
 
 const normalizeToolName = (toolName: string | undefined | null): string => {
@@ -1684,6 +1685,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     onContentChange,
     onShowPopup,
     animateTailText = true,
+    runChildSessionId,
 }) => {
     const { t } = useI18n();
     const state = part.state;
@@ -1894,8 +1896,11 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
         }
         const fromOutput = readTaskSessionIdFromOutput(taskOutputString);
         if (fromOutput) return fromOutput;
-        return readSubagentChildSessionId(input, taskOutputString) ?? undefined;
-    }, [input, isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, taskOutputString]);
+        const fromTool = readSubagentChildSessionId(input, taskOutputString);
+        if (fromTool) return fromTool;
+        const fromRun = typeof runChildSessionId === 'string' ? runChildSessionId.trim() : '';
+        return fromRun || undefined;
+    }, [input, isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, runChildSessionId, taskOutputString]);
 
     const childSessionLookupId = hasFinalMetadataTaskSummary ? '' : (taskSessionId ?? '');
 

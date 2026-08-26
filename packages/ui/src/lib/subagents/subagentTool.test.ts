@@ -4,6 +4,7 @@ import {
   isSubagentManagementCall,
   readSubagentCardAgent,
   readSubagentChildSessionId,
+  readSubagentChildSessionIdFromRuns,
   shouldOfferSubagentChildOpen,
   shouldRenderDedicatedSubagentCard,
   shouldRenderOpenCodeSubtaskChrome,
@@ -81,5 +82,17 @@ describe('card fields', () => {
       childSessionId: 'child-1',
       input: { agent: 'scout', task: 'Inspect the repo' },
     })).toBe(true);
+  });
+
+  test('joins a child session id from adapter runs by toolCallId', () => {
+    expect(readSubagentChildSessionIdFromRuns([
+      { runId: '170eaa63', toolCallId: 'call-disk', sessionID: '01a03f76-bfdd' },
+    ], 'call-disk')).toBe('01a03f76-bfdd');
+    expect(readSubagentChildSessionIdFromRuns([
+      { runId: 'call-disk', sessionID: '01a03f76-bfdd' },
+    ], 'call-disk')).toBe('01a03f76-bfdd');
+    expect(readSubagentChildSessionIdFromRuns([
+      { runId: 'other', sessionID: 'child' },
+    ], 'call-disk')).toBeNull();
   });
 });

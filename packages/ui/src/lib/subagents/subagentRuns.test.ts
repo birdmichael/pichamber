@@ -24,6 +24,7 @@ describe('parseSubagentRunsPayload', () => {
       runId: 'run_1',
       parentID: 'ses_parent',
       sessionID: 'ses_child',
+      toolCallId: null,
       name: 'scout',
       role: 'scout',
       mode: 'background',

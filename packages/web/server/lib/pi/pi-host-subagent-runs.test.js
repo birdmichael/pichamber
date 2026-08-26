@@ -611,6 +611,59 @@ describe('Pi host subagent runs', () => {
     host.dispose();
   });
 
+  it('rereads a nested child jsonl on getMessages after the file grows', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async ({ sessionManager } = {}) => createInMemoryPiSession({
+        sessionId: typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      }),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const childId = 'nested-grow';
+    const childFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `${parent.id}`,
+      'run_disk',
+      'run-0',
+      'session.jsonl',
+    );
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    const writeChild = (extra = []) => {
+      fs.writeFileSync(childFile, [
+        JSON.stringify({ type: 'session', id: childId, cwd: '/tmp/project' }),
+        JSON.stringify({
+          type: 'message',
+          id: 'msg_user',
+          timestamp: new Date().toISOString(),
+          message: { role: 'user', content: [{ type: 'text', text: 'Task: check disk' }] },
+        }),
+        ...extra,
+      ].map((line) => `${line}\n`).join(''));
+    };
+    writeChild();
+    const opened = await host.ensureSession(childId, '/tmp/project');
+    expect(opened.id).toBe(childId);
+    expect(host.getMessages(childId).map((entry) => entry.info.role)).toEqual(['user']);
+    writeChild([JSON.stringify({
+      type: 'message',
+      id: 'msg_asst',
+      timestamp: new Date().toISOString(),
+      message: { role: 'assistant', content: [{ type: 'text', text: 'df -h looks fine' }] },
+    })]);
+    const afterGrow = host.getMessages(childId);
+    expect(afterGrow.some((entry) => (
+      entry.parts?.some((part) => part.text === 'df -h looks fine')
+    ))).toBe(true);
+    host.dispose();
+  });
+
   it('includes adapter children on listSessionInfos without a prior subagent-runs call', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);

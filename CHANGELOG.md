@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Chat: sending a message on Desktop no longer shows the same turn two or three times, and the reply no longer repeats each character.
-- Chat: when a session has Subagents, the sidebar can expand that parent, Work Status can open a running child, and opening a finished child shows that child's transcript.
+- Chat: when a session has Subagents, the sidebar can expand that parent, Work Status can open a running child, a Subagent card can open that child even when the tool payload has no session id, and opening a running or finished child shows the child's live transcript instead of only the Task line.
 - Chat: opening a session shows the full transcript from disk, including turns before auto-compact or after a later branch.
 - Desktop: session memory/search extensions now load the app's rebuilt native copy even when Desktop does not pass a home directory into the kernel child.
 

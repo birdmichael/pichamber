@@ -105,6 +105,22 @@ export const shouldOfferSubagentChildOpen = ({
   output?: unknown;
 }): boolean => Boolean(asTrimmed(childSessionId)) && !isSubagentManagementCall(input, output);
 
+export const readSubagentChildSessionIdFromRuns = (
+  runs: Array<{ runId?: string | null; toolCallId?: string | null; sessionID?: string | null }>,
+  callID?: string | null,
+): string | null => {
+  const call = asTrimmed(callID);
+  if (!call) return null;
+  for (const run of Array.isArray(runs) ? runs : []) {
+    const sessionID = asTrimmed(run?.sessionID);
+    if (!sessionID) continue;
+    if (asTrimmed(run.toolCallId) === call || asTrimmed(run.runId) === call) {
+      return sessionID;
+    }
+  }
+  return null;
+};
+
 export const readSubagentChildSessionId = (
   input?: Record<string, unknown> | null,
   output?: unknown,

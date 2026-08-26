@@ -70,7 +70,8 @@ import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedC
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { openSubagentChildSession } from '@/lib/subagents/childSession';
-import { shouldRenderOpenCodeSubtaskChrome } from '@/lib/subagents/subagentTool';
+import { readSubagentChildSessionIdFromRuns, shouldRenderOpenCodeSubtaskChrome } from '@/lib/subagents/subagentTool';
+import { useSubagentRuns } from '@/hooks/useSubagentRuns';
 import { useProviderLogo } from '@/hooks/useProviderLogo';
 import { getAgentColor } from '@/lib/agentColors';
 import { isCapacitorMobileApp } from '@/apps/mobileNativeChrome';
@@ -1127,6 +1128,9 @@ const AssistantMessageBody = React.memo(({
         toolRevealReadyRef.current = true;
     }, []);
 
+    const isPiKernel = usePiKernel();
+    const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+    const { runs: subagentRuns } = useSubagentRuns(sessionId ?? null, Boolean(isPiKernel && subagentsSlotActive && sessionId));
     const isTouchContext = Boolean(hasTouchInput ?? isMobile);
     const alwaysShowMessageActions = Boolean(alwaysShowActions ?? isMobile);
     const { src: footerLogoSrc, onError: handleFooterLogoError, hasLogo: footerHasLogo } = useProviderLogo(footerProviderID ?? null);
@@ -2034,6 +2038,7 @@ const AssistantMessageBody = React.memo(({
                                     onContentChange={onContentChange}
                                     onShowPopup={onShowPopup}
                                     animateTailText={animatedToolIdsLookup.has(toolPart.id)}
+                                    runChildSessionId={readSubagentChildSessionIdFromRuns(subagentRuns, toolPart.callID)}
                                 />
                             </ToolRevealOnMount>
                         </FadeInOnReveal>
@@ -2103,6 +2108,7 @@ const AssistantMessageBody = React.memo(({
         messageActionButtons,
         renderJustificationActions,
         sessionId,
+        subagentRuns,
         onContentChange,
         onShowPopup,
         onToggleTool,

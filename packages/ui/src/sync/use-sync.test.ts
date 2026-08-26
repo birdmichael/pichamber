@@ -211,6 +211,23 @@ describe('mergeOptimisticPage idempotency across commits (#2084)', () => {
     expect(merged2.complete).toBe(false)
   })
 
+  test('confirms an optimistic user when the server page has the same text under a different id', () => {
+    const server = userMessage('3dc706f1', 100)
+    const optimistic = userMessage('msg_optimistic', 100)
+    const page = {
+      session: [server],
+      part: [{ id: server.id, part: [{ id: 'prt_server', messageID: server.id, sessionID: 'ses_1', type: 'text', text: '帮我启动一个子代理' } as Part] }],
+      cursor: undefined,
+      complete: true,
+    }
+    const merged = mergeOptimisticPage(page, [{
+      message: optimistic,
+      parts: [{ id: 'prt_opt', messageID: optimistic.id, sessionID: 'ses_1', type: 'text', text: '帮我启动一个子代理' } as Part],
+    }])
+    expect(merged.session.map((message) => message.id)).toEqual([server.id])
+    expect(merged.confirmed).toEqual([optimistic.id])
+  })
+
   test('mergeOptimisticPage with empty items is a fast no-op path', () => {
     const page = {
       session: [assistantMessage('a_1')],

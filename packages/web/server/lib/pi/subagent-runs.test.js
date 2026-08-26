@@ -169,7 +169,14 @@ describe('listAdapterRunsFromFiles', () => {
       state: 'running',
       sessionID: 'scout-session',
     });
-    expect(toPublicSubagentRun(runs[0]).openable).toBe(true);
+    expect(toPublicSubagentRun(runs[0])).toMatchObject({
+      openable: true,
+      sessionID: 'scout-session',
+    });
+    expect(toPublicSubagentRun({
+      ...runs[0],
+      toolCallId: 'call-disk',
+    }).toolCallId).toBe('call-disk');
   });
 
   it('keeps a run without a child session id as status-only', () => {

@@ -1930,6 +1930,47 @@ export const transcriptEntriesForHydrate = ({ file, manager } = {}) => {
   return [];
 };
 
+const userTextFromFacade = (entry) => {
+  const parts = Array.isArray(entry?.parts) ? entry.parts : [];
+  return parts
+    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text.trim())
+    .join('\n');
+};
+
+/**
+ * Keep live / optimistic user ids when disk hydrate has the same turn
+ * under a Pi-native id. Otherwise one send becomes two bubbles.
+ */
+export const reconcileHydratedMessages = (live, hydrated) => {
+  const next = Array.isArray(hydrated) ? hydrated : [];
+  const previous = Array.isArray(live) ? live : [];
+  if (previous.length === 0 || next.length === 0) return next;
+  const liveUsers = previous.filter((entry) => entry?.info?.role === 'user');
+  if (liveUsers.length === 0) return next;
+  const used = new Set();
+  return next.map((entry) => {
+    if (entry?.info?.role !== 'user') return entry;
+    const text = userTextFromFacade(entry);
+    if (!text) return entry;
+    const matchIndex = liveUsers.findIndex((candidate, index) => (
+      !used.has(index) && userTextFromFacade(candidate) === text
+    ));
+    if (matchIndex < 0) return entry;
+    used.add(matchIndex);
+    const liveId = asTrimmedString(liveUsers[matchIndex]?.info?.id);
+    if (!liveId || liveId === entry.info.id) return entry;
+    return {
+      ...entry,
+      info: { ...entry.info, id: liveId },
+      parts: (Array.isArray(entry.parts) ? entry.parts : []).map((part) => ({
+        ...part,
+        messageID: liveId,
+      })),
+    };
+  });
+};
+
 export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) => {
   const id = asTrimmedString(sessionID);
   const fallbackModel = isRecord(options) ? options.fallbackModel : undefined;

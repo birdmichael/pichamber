@@ -663,10 +663,12 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
 
 export const toPublicSubagentRun = (run) => {
   const sessionID = asChildSessionId(run.sessionID, run.parentID);
+  const toolCallId = asTrimmedString(run.toolCallId);
   return {
     runId: run.runId,
     parentID: run.parentID || null,
     sessionID,
+    ...(toolCallId ? { toolCallId } : {}),
     name: run.name,
     role: run.role,
     mode: run.mode,

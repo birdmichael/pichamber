@@ -5,6 +5,7 @@ export type SubagentRun = {
   runId: string;
   parentID: string | null;
   sessionID: string | null;
+  toolCallId?: string | null;
   name: string;
   role: string;
   mode: SubagentRunMode;
@@ -27,10 +28,12 @@ const parseSubagentRun = (value: unknown): SubagentRun | null => {
   const mode = asTrimmed(record.mode) as SubagentRunMode;
   if (!runId || !STATES.has(state) || !MODES.has(mode)) return null;
   const sessionID = asTrimmed(record.sessionID) || null;
+  const toolCallId = asTrimmed(record.toolCallId) || null;
   return {
     runId,
     parentID: asTrimmed(record.parentID) || null,
     sessionID,
+    toolCallId,
     name,
     role: asTrimmed(record.role) || name,
     mode,

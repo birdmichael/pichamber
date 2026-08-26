@@ -754,9 +754,12 @@ When the slot is on:
   `subagent` tool-call input/output (`sessionId` / `childSessionId`) and
   assistant `toolCall` arguments win over leftover adapter `status.json`
   files. Each public run is
-  `{ runId, sessionID, name, role, mode, state, title, openable }`.
-  A tool that recorded a child id is `openable: true` so Work Status and
-  the transcript card open the same writable tab. Scraping a `.jsonl`
+  `{ runId, sessionID, toolCallId, name, role, mode, state, title, openable }`.
+  `toolCallId` is the parent `subagent` tool call so the transcript card
+  can open a child that never wrote `sessionId` on the tool payload
+  (async `workflowScript` runs). A tool that recorded a child id is
+  `openable: true` so Work Status and the transcript card open the same
+  writable tab. Scraping a `.jsonl`
   session path from tool text is a length-capped linear scan so listing
   stays cheap on the HTTP thread.
 - Management / action-only `subagent` calls (`list`, `status`, `get`,
@@ -780,7 +783,13 @@ When the slot is on:
   that gains `parentID` emits `session.updated`.
   Attach and child-message refresh skip a full jsonl parse when that file's
   mtime and size are unchanged; a busy child still updates when the file
-  changes.
+  changes. Re-attaching an already-live child rereads that file and
+  publishes `message.updated` / `message.part.updated` so the side panel
+  does not stay on the first Task line. `GET /api/session/:id/message`
+  does the same for children and idle parents. A live streaming parent
+  keeps the translator as owner. Hydrate keeps the live user-message id
+  when disk has the same text under a Pi-native id, so one send is one
+  bubble.
   Follow-ups stay on the child; the parent transcript is unchanged.
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.
