@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-26
+
 - **Desktop:** GitHub Release macOS builds are Developer ID signed and notarized. Gatekeeper should open the downloaded app without the previous quarantine / ad-hoc re-sign steps. After that signed app is installed, Desktop can Restart to Update instead of opening GitHub.
 - **Desktop:** user Pi extensions that ship a native module now run on the app's Node, so a normal npm install works in Desktop without an Electron rebuild.
 - **Desktop:** user Pi extensions that need a native module now load from a Desktop-only copy rebuilt for Electron. The system `pi` CLI keeps its own Node build.
