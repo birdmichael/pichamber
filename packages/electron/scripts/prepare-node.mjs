@@ -48,6 +48,24 @@ export const listLinkedLibraries = ({
   };
 };
 
+const PUBLIC_NODE_VERSION = /^v\d+\.\d+\.\d+$/;
+
+export const readNodeReleaseVersion = ({
+  command,
+  spawnImpl = spawnSync,
+} = {}) => {
+  if (!command) return '';
+  const result = spawnImpl(command, ['-p', 'process.version'], {
+    encoding: 'utf8',
+    timeout: 10_000,
+    windowsHide: true,
+  });
+  if (result.status !== 0) return '';
+  return String(result.stdout || '').trim();
+};
+
+export const isPublicNodeReleaseVersion = (version) => PUBLIC_NODE_VERSION.test(String(version || '').trim());
+
 export const isRelocatableNodeBinary = (input) => {
   const inspected = typeof input === 'string'
     ? listLinkedLibraries({ command: input })
@@ -205,6 +223,7 @@ const downloadOfficialNode = async (release) => {
 
 export const preparePiNodeBinary = async ({
   probe = probeNodeLoadsPiSdk,
+  readVersion = readNodeReleaseVersion,
   fetchIndex = async () => {
     const indexPath = path.join(cacheRoot, 'index.json');
     fs.mkdirSync(cacheRoot, { recursive: true });
@@ -237,6 +256,11 @@ export const preparePiNodeBinary = async ({
 
   await resolveSdkPackageRoot();
   for (const candidate of localNodeCandidates()) {
+    const version = readVersion({ command: candidate });
+    if (!isPublicNodeReleaseVersion(version)) {
+      console.warn(`[electron] Node ${candidate} is not a public nodejs.org release (${version || 'unknown'})`);
+      continue;
+    }
     const relocatable = isRelocatableNodeBinary(candidate);
     if (!relocatable.ok) {
       console.warn(`[electron] Node ${candidate} ${relocatable.error}`);

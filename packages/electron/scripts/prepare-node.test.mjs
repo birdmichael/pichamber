@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { isNodeBinary, isRelocatableNodeBinary, officialNodeFileKey, pickOfficialNodeReleases, probeNodeLoadsPiSdk } from './prepare-node.mjs';
+import { isNodeBinary, isPublicNodeReleaseVersion, isRelocatableNodeBinary, officialNodeFileKey, pickOfficialNodeReleases, probeNodeLoadsPiSdk } from './prepare-node.mjs';
 
 test('officialNodeFileKey matches nodejs.org index names', () => {
   assert.equal(officialNodeFileKey({ platform: 'darwin', arch: 'arm64' }), 'osx-arm64-tar');
@@ -41,6 +41,13 @@ test('probeNodeLoadsPiSdk fails closed when the binary cannot import the SDK', (
 test('isNodeBinary rejects PATH pi', () => {
   assert.equal(isNodeBinary('/usr/bin/node'), true);
   assert.equal(isNodeBinary('/usr/local/bin/pi'), false);
+});
+
+test('isPublicNodeReleaseVersion rejects unofficial leftover Node strings', () => {
+  assert.equal(isPublicNodeReleaseVersion('v26.8.0'), true);
+  assert.equal(isPublicNodeReleaseVersion('v26.8.0-alpha.0.0.0'), false);
+  assert.equal(isPublicNodeReleaseVersion('v26.8.0-nightly20260826'), false);
+  assert.equal(isPublicNodeReleaseVersion(''), false);
 });
 
 test('isRelocatableNodeBinary rejects Homebrew-linked Node stubs', () => {

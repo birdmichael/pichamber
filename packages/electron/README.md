@@ -97,7 +97,7 @@ That runs, in order:
 
 1. `build:web-assets` to build the web UI and copy it into `packages/electron/resources/web-dist`.
 2. `prepare:pi-kernel` to verify the app-bundled Pi SDK is installed.
-3. `prepare:node` to stage a relocatable Node binary for the Desktop kernel child. Homebrew-linked stubs are rejected; official LTS nodejs.org builds are used when the local Node cannot run from `resources/node`.
+3. `prepare:node` to stage a relocatable Node binary for the Desktop kernel child. Homebrew-linked stubs and unofficial leftovers (`vX.Y.Z-alpha`, nightlies) are rejected; official nodejs.org builds are used when the local Node cannot run from `resources/node`.
 4. `prepare:opencode-cli` — skipped for the default Pi kernel. Set `OPENCHAMBER_BUNDLE_OPENCODE_CLI=1` to stage the leftover OpenCode CLI.
 5. `bundle:main` to create `packages/electron/dist-bundle/main.mjs`.
 6. `rebuild:native` to rebuild native modules for Electron.

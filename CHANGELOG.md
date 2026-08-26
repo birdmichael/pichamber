@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.2.4] - 2026-08-27
 
-- Desktop: local Mac packages no longer copy a Homebrew Node stub into the app. Opening a chat waits on a real bundled Node instead of timing out after the kernel child fails to start.
+- Desktop: local Mac packages no longer copy a Homebrew Node stub or reuse an unofficial leftover Node. Opening a chat waits on a public bundled Node instead of timing out after the kernel child fails to start.
 - Desktop: packaged Desktop unpacks the Pi kernel child and every production package it imports from asar, so opening a chat no longer fails with a missing `yaml` or `chalk` error after the bundled Node starts.
 - Desktop: opening or deleting a chat no longer leaves a leftover Untitled session in the sidebar.
 - Desktop: quitting the app now stops the Pi kernel child and leftover Chrome windows started by browser extensions.
