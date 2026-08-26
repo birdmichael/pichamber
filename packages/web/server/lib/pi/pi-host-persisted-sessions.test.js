@@ -123,6 +123,57 @@ describe('persisted Pi sessions', () => {
     restarted.dispose();
   });
 
+  it('opens the full jsonl transcript after compaction and a later branch', async () => {
+    const home = tempDir('pi-persist-full-jsonl-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'Compacted chat',
+      userText: 'early turn',
+      assistantText: 'early reply',
+    });
+    const seed = SessionManager.open(persisted.path);
+    const last = seed.getEntries().at(-1);
+    fs.appendFileSync(persisted.path, `${[
+      JSON.stringify({
+        type: 'compaction',
+        id: 'cmp1',
+        parentId: last.id,
+        firstKeptEntryId: 'u-late',
+        timestamp: new Date().toISOString(),
+        summary: 'earlier work',
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'u-late',
+        parentId: 'cmp1',
+        timestamp: new Date().toISOString(),
+        message: { role: 'user', content: [{ type: 'text', text: 'late turn' }] },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'u-branch',
+        parentId: 'orphan-leaf',
+        timestamp: new Date().toISOString(),
+        message: { role: 'user', content: [{ type: 'text', text: 'branched continue' }] },
+      }),
+    ].join('\n')}\n`);
+
+    const host = createHost({ home, cwd });
+    await host.ensureSession(persisted.id, cwd);
+    const userTexts = host.getMessages(persisted.id)
+      .filter((entry) => entry.info.role === 'user')
+      .map((entry) => entry.parts[0].text);
+    expect(userTexts).toEqual(['early turn', 'late turn', 'branched continue']);
+    const leafUsers = SessionManager.open(persisted.path).getBranch()
+      .filter((entry) => entry?.message?.role === 'user')
+      .map((entry) => entry.id);
+    expect(leafUsers).not.toContain(seed.getEntries().find((entry) => entry?.message?.role === 'user')?.id);
+    host.dispose();
+  });
+
   it('does not hydrate a persisted session onto the in-memory mock when fallback is closed', async () => {
     const home = tempDir('pi-persist-fail-closed-');
     const cwd = path.join(home, 'project');

@@ -14,6 +14,7 @@ import {
   isSdkHelloReady,
   resolveInstalledPiSdkInfo,
 } from './node-runtime.js';
+import { resolvePiAgentDir } from './pi-resources.js';
 import {
   installUserExtensionNodeTreeRemap,
   syncUserExtensionNodeTree,
@@ -115,6 +116,8 @@ const attachCustomTools = async () => {
   return tools.length > 0 ? tools : undefined;
 };
 
+const CHILD_SESSION_EVENT_BRIDGE = Symbol('pichamberChildSessionEventBridge');
+
 const wrapSession = (session, extras = {}) => {
   const originalBind = typeof session.bindExtensions === 'function'
     ? session.bindExtensions.bind(session)
@@ -125,16 +128,21 @@ const wrapSession = (session, extras = {}) => {
     session.extensionBindings = next;
     return undefined;
   };
-  if (typeof session.subscribe === 'function') {
+  if (typeof session.subscribe === 'function' && !session[CHILD_SESSION_EVENT_BRIDGE]) {
+    session[CHILD_SESSION_EVENT_BRIDGE] = true;
+    const sessionId = extras.sessionId || session.sessionId;
     session.subscribe((event) => {
       send({
         type: 'session-event',
-        sessionId: session.sessionId,
+        sessionId,
         event,
       });
     });
   }
   sessions.set(session.sessionId, session);
+  if (extras.sessionId && extras.sessionId !== session.sessionId) {
+    sessions.set(extras.sessionId, session);
+  }
   return serializeSessionSnapshot(session, extras);
 };
 
@@ -176,7 +184,9 @@ const readSessionIdFromFile = (file) => {
 };
 
 const prepareChildUserNatives = async () => {
-  const agentDir = boot?.agentDir;
+  const agentDir = typeof boot?.agentDir === 'string' && boot.agentDir.trim()
+    ? boot.agentDir.trim()
+    : resolvePiAgentDir(boot?.home);
   const projectDir = boot?.defaultDirectory || process.cwd();
   await syncUserExtensionNodeTree({
     agentDir,
@@ -314,17 +324,7 @@ const handleCall = async (method, params = {}) => {
     return serializeSessionSnapshot(session);
   }
   if (method === 'packageManager') {
-    if (!host) {
-      host = createPiHost({
-        mock: boot?.mock === true,
-        allowInMemoryFallback: false,
-        home: boot?.home,
-        defaultDirectory: boot?.defaultDirectory || process.cwd(),
-        getProcessVersions: () => process.versions,
-        electronNativeIsolation: false,
-      });
-      await host.ready();
-    }
+    await ensureChildHost();
     const manager = await host.resolveFeaturePackageManager();
     const fn = manager?.[params.name];
     if (typeof fn !== 'function') {

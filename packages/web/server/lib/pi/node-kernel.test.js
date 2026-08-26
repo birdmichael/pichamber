@@ -8,9 +8,10 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
-import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput } from './node-kernel-client.js';
+import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
 import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
-import { createInMemoryPiSession, sessionDirForCwd } from './pi-host.js';
+import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
+import { resolvePiAgentDir } from './pi-resources.js';
 
 const require = createRequire(import.meta.url);
 const tempDirs = [];
@@ -467,6 +468,32 @@ describe('node kernel client spawn contract', () => {
     }
   });
 
+  it('boots the child with resolvePiAgentDir even when home is omitted', async () => {
+    const { spawn } = require('node:child_process');
+    let boot = null;
+    const client = createNodeKernelClient({
+      mock: true,
+      nodeBinary: process.execPath,
+      versions: { electron: '43.0.0' },
+      spawnImpl: (command, args, options) => {
+        const child = spawn(command, args, options);
+        const originalSend = child.send.bind(child);
+        child.send = (message) => {
+          if (message?.type === 'boot') boot = message.boot;
+          return originalSend(message);
+        };
+        return child;
+      },
+    });
+    try {
+      await client.ensureStarted();
+      expect(boot.home).toBe(os.homedir());
+      expect(boot.agentDir).toBe(resolvePiAgentDir());
+    } finally {
+      client.dispose();
+    }
+  });
+
   it('ignores a missing Resources/pi-node-kernel extraResource and spawns the module child', async () => {
     const home = tempDir('pi-node-home-');
     const resourcesPath = tempDir('pi-empty-resources-');
@@ -627,6 +654,112 @@ describe('node kernel session IPC', () => {
       expect(listActiveSessionFiles(cwd, home)).toEqual(afterCreate);
     } finally {
       kernel.dispose();
+    }
+  });
+});
+
+describe('node kernel host-event ownership', () => {
+  it('forwards child session and extension UI events, not the parent-owned transcript', () => {
+    expect(shouldForwardNodeKernelHostEvent({ type: 'session.created' })).toBe(true);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'session.updated' })).toBe(true);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'pi.ui.asked' })).toBe(true);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'pi.ui.notify' })).toBe(true);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'message.updated' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'message.part.updated' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'message.part.delta' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'message.removed' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'session.status' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent({ type: 'session.idle' })).toBe(false);
+    expect(shouldForwardNodeKernelHostEvent(null)).toBe(false);
+  });
+
+  it('one Desktop prompt stays one user turn when the child host also translates Pi user echo', async () => {
+    const cwd = tempDir('pi-node-event-cwd-');
+    const events = [];
+    const publish = (_directory, event) => events.push(event);
+
+    const createEchoSession = () => {
+      const listeners = new Set();
+      const emit = (event) => {
+        for (const listener of Array.from(listeners)) listener(event);
+      };
+      return {
+        sessionId: 'ses_echo',
+        isStreaming: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt(text) {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'user', id: 'pi_user', content: text } });
+          emit({ type: 'message_start', message: { role: 'assistant', id: 'pi_asst', content: [] } });
+          emit({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_start', contentIndex: 0 },
+          });
+          emit({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: '先摸清' },
+          });
+          emit({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_end', contentIndex: 0, content: '先摸清' },
+          });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', id: 'pi_asst', content: [{ type: 'text', text: '先摸清' }] },
+          });
+          emit({ type: 'agent_end', messages: [], willRetry: false });
+          emit({ type: 'agent_settled' });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      };
+    };
+
+    const childHost = createPiHost({
+      mock: true,
+      defaultDirectory: cwd,
+      createSession: async () => createEchoSession(),
+      onEvent: (directory, event) => {
+        if (shouldForwardNodeKernelHostEvent(event)) publish(directory, event);
+      },
+    });
+    const parentHost = createPiHost({
+      mock: true,
+      defaultDirectory: cwd,
+      createSession: async (input) => {
+        const record = await childHost.createSession(input);
+        return record.piSession;
+      },
+      onEvent: publish,
+    });
+
+    try {
+      await parentHost.ready();
+      const session = await parentHost.createSession({ directory: cwd, title: 'one send' });
+      await parentHost.promptAsync(session.id, {
+        messageID: 'msg_optimistic',
+        parts: [{ type: 'text', text: '清理我电脑垃圾' }],
+      });
+      await waitFor(
+        () => events,
+        (items) => items.some((event) => event.type === 'session.idle'),
+      );
+
+      const userIds = events
+        .filter((event) => event.type === 'message.updated' && event.properties?.info?.role === 'user')
+        .map((event) => event.properties.info.id);
+      expect(userIds).toEqual(['msg_optimistic']);
+
+      const textDeltas = events
+        .filter((event) => event.type === 'message.part.delta')
+        .map((event) => event.properties?.delta);
+      expect(textDeltas).toEqual(['先摸清']);
+    } finally {
+      parentHost.dispose();
+      childHost.dispose();
     }
   });
 });

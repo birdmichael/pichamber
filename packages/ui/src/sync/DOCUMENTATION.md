@@ -104,7 +104,7 @@ Directory bootstrap must publish a closed session hierarchy: when a child is
 returned before the roots query catches up during cold startup, retain or
 recover its referenced parent instead of exposing an orphan-only snapshot.
 
-Session message loads use runtime, normalized directory, session ID, SDK epoch, and loader generation as commit authority. Eviction, archive, delete, move, directory disposal, and runtime switching invalidate the applicable loader generation before stale in-flight work can publish. A move invalidates both source and destination loader targets.
+Session message loads use runtime, normalized directory, session ID, SDK epoch, and loader generation as commit authority. Eviction, archive, delete, move, directory disposal, and runtime switching invalidate the applicable loader generation before stale in-flight work can publish. A move invalidates both source and destination loader targets. `useEnsureSessionMessages` fetches even when the session is not yet in `state.session`: nested Pi subagent children can exist on the host before the directory list merge lands. Fetch failure is not empty success.
 
 An authoritative `session.deleted` event also clears persisted UI state before routing metadata can be removed. Confirmed local deletion and accepted `404` deletion do the same directly instead of depending on the event echo. Cleanup is identity-owned by runtime, normalized directory, and session ID: queued messages, persisted todos, composer drafts, inline-comment drafts, and pins clear only that tuple, while the active runtime's folder store removes the session from every active or archived folder scope. Stale-runtime events and unresolved/global directory identities do not mutate persisted state.
 

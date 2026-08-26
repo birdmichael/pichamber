@@ -83,7 +83,7 @@ import {
   sessionTimeWithArchived,
 } from './session-metadata.js';
 import {
-  findSessionJsonlInDir,
+  findSessionJsonlById,
   isUnderSessionArchiveDir,
   relocateSessionFileForArchiveState,
   sessionArchiveDir,
@@ -125,6 +125,7 @@ import {
   persistFacadeMessages,
   resolveUsableFacadeModel,
   sanitizeExportBasename,
+  transcriptEntriesForHydrate,
 } from './session-transfer.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -484,9 +485,9 @@ const findSessionFileById = (sessionID, home) => {
   for (const project of projects) {
     if (!project.isDirectory() && !project.isSymbolicLink()) continue;
     const dir = path.join(root, project.name);
-    const active = findSessionJsonlInDir(dir, id);
+    const active = findSessionJsonlById(dir, id);
     if (active) return active;
-    const archived = findSessionJsonlInDir(sessionArchiveDir(dir), id);
+    const archived = findSessionJsonlById(sessionArchiveDir(dir), id, { skipArchive: false });
     if (archived) return archived;
   }
   return undefined;
@@ -1790,7 +1791,7 @@ export const createPiHost = ({
         || persisted?.name,
       firstMessage: persisted?.firstMessage,
     });
-    const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
+    const entries = transcriptEntriesForHydrate({ file, manager });
     const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
     const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
     const metadata = readPersistedSessionMetadata(entries);
@@ -1952,17 +1953,6 @@ export const createPiHost = ({
     return record;
   };
 
-  const readSessionFileEntries = (file) => {
-    try {
-      return fs.readFileSync(file, 'utf8')
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line));
-    } catch {
-      return [];
-    }
-  };
-
   const attachSessionFromFile = async (file, {
     sessionID,
     directory,
@@ -1993,7 +1983,7 @@ export const createPiHost = ({
         manager = null;
       }
     }
-    const fileEntries = readSessionFileEntries(resolvedFile);
+    const fileEntries = transcriptEntriesForHydrate({ file: resolvedFile, manager });
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
       || directory
       || defaultDirectory;
@@ -2028,7 +2018,7 @@ export const createPiHost = ({
       console.warn(`[pi-host] failed to attach subagent session ${resolvedId}:`, error?.message || error);
       piSession = createInMemoryPiSession({ sessionId: resolvedId });
     }
-    const entries = typeof manager?.getEntries === 'function' ? manager.getEntries() : fileEntries;
+    const entries = fileEntries;
     const persistedMetadata = readPersistedSessionMetadata(entries);
     const record = {
       id: resolvedId,
@@ -2077,11 +2067,8 @@ export const createPiHost = ({
       return;
     }
     try {
-      const piSessionManager = record.sessionManager;
-      const entries = typeof piSessionManager?.getEntries === 'function'
-        ? piSessionManager.getEntries()
-        : readSessionFileEntries(file);
-      if (!Array.isArray(entries)) return;
+      const entries = transcriptEntriesForHydrate({ file, manager: record.sessionManager });
+      if (!Array.isArray(entries) || entries.length === 0) return;
       record.messages = hydrateFacadeMessages(entries, record.id, record);
       record.sessionFileStamp = stamp;
     } catch {
@@ -2380,7 +2367,7 @@ export const createPiHost = ({
         return true;
       }
       const manager = pi.SessionManager.open(file);
-      const entries = typeof manager.getEntries === 'function' ? manager.getEntries() : [];
+      const entries = transcriptEntriesForHydrate({ file, manager });
       record.messages = hydrateFacadeMessages(entries, record.id, record);
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
       if (title) record.info.title = title;

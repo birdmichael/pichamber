@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 
 import { createMessageId, createPartId } from './ids.js';
 
@@ -1888,6 +1889,45 @@ const registerToolParts = (parts, toolPartsByCallID) => {
       toolPartsByCallID.set(callID, part);
     }
   }
+};
+
+/**
+ * Read every JSONL entry from a Pi session file.
+ * One malformed line is skipped. A missing file is empty, not thrown.
+ */
+export const readPiSessionFileEntries = (file) => {
+  const path = asTrimmedString(file);
+  if (!path) return [];
+  let text;
+  try {
+    text = fs.readFileSync(path, 'utf8');
+  } catch {
+    return [];
+  }
+  const entries = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      entries.push(JSON.parse(line));
+    } catch {
+      // Keep the rest of the transcript.
+    }
+  }
+  return entries;
+};
+
+/**
+ * Transcript for opening a session: the full jsonl, not the live leaf path.
+ * `getBranch` / `buildContextEntries` omit compacted and abandoned turns.
+ */
+export const transcriptEntriesForHydrate = ({ file, manager } = {}) => {
+  const fromFile = readPiSessionFileEntries(file);
+  if (fromFile.length > 0) return fromFile;
+  if (typeof manager?.getEntries === 'function') {
+    const entries = manager.getEntries();
+    if (Array.isArray(entries) && entries.length > 0) return entries;
+  }
+  return [];
 };
 
 export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) => {

@@ -81,3 +81,88 @@ export const findSessionJsonlInDir = (dir, sessionID) => {
   const match = names.find((name) => name.endsWith('.jsonl') && name.includes(id));
   return match ? path.join(dir, match) : undefined;
 };
+
+const HEADER_READ_BYTES = 8 * 1024;
+const NESTED_SESSION_WALK_MAX_DEPTH = 6;
+const NESTED_SESSION_WALK_MAX_FILES = 256;
+const NESTED_SESSION_SKIP_DIRNAMES = new Set([SESSION_ARCHIVE_DIRNAME, 'node_modules', '.git']);
+
+const asTrimmedId = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
+
+/** Header `id` only. Child files are often named `session.jsonl`. */
+export const readSessionIdFromJsonlHeader = (file) => {
+  if (typeof file !== 'string' || !file) return '';
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const buffer = Buffer.alloc(HEADER_READ_BYTES);
+      const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+      const firstLine = buffer.slice(0, bytes).toString('utf8').split(/\r?\n/).find((line) => line.trim());
+      if (!firstLine) return '';
+      const parsed = JSON.parse(firstLine);
+      return asTrimmedId(parsed?.id);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return '';
+  }
+};
+
+const walkSessionJsonlFiles = (dir, {
+  skipDirnames = NESTED_SESSION_SKIP_DIRNAMES,
+  maxDepth = NESTED_SESSION_WALK_MAX_DEPTH,
+  maxFiles = NESTED_SESSION_WALK_MAX_FILES,
+} = {}) => {
+  const skip = skipDirnames instanceof Set ? skipDirnames : new Set(skipDirnames || []);
+  const files = [];
+  const walk = (current, depth) => {
+    if (files.length >= maxFiles) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (files.length >= maxFiles) return;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory() || entry.isSymbolicLink()) {
+        if (skip.has(entry.name) || depth >= maxDepth) continue;
+        if (entry.isSymbolicLink()) {
+          try {
+            if (!fs.statSync(full).isDirectory()) continue;
+          } catch {
+            continue;
+          }
+        }
+        walk(full, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
+      files.push(full);
+    }
+  };
+  walk(dir, 0);
+  return files;
+};
+
+/**
+ * Resolve a session id to a jsonl path. Top-level filename match first,
+ * then nested herdr/subagent files whose header id matches (`session.jsonl`).
+ * `archive/` is skipped unless it is the walk root.
+ */
+export const findSessionJsonlById = (dir, sessionID, { skipArchive = true } = {}) => {
+  const id = asTrimmedId(sessionID);
+  if (!id || typeof dir !== 'string' || !dir) return undefined;
+  const topLevel = findSessionJsonlInDir(dir, id);
+  if (topLevel) return topLevel;
+  const skipDirnames = skipArchive
+    ? NESTED_SESSION_SKIP_DIRNAMES
+    : new Set(['node_modules', '.git']);
+  for (const file of walkSessionJsonlFiles(dir, { skipDirnames })) {
+    if (path.basename(file).includes(id)) return file;
+    if (readSessionIdFromJsonlHeader(file) === id) return file;
+  }
+  return undefined;
+};

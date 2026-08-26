@@ -3293,12 +3293,10 @@ export function useSessionMessageRecords(
 
 /**
  * Ensures a session's messages are loaded into the sync store.
- * If the session exists in state.session but messages haven't been fetched
- * (state.message[sessionID] is absent), triggers a background API fetch.
- *
- * This covers the case where a user navigates to an old parent session
- * whose child session messages were never loaded — bootstrap only loads
- * session metadata, not messages.
+ * If messages haven't been fetched into a renderable snapshot, triggers a
+ * background API fetch. Child sessions may not be in `state.session` yet
+ * (nested herdr/subagent jsonl attach after list/open). Fetch anyway; a
+ * 404 is not treated as empty success.
  */
 
 // Module-level in-flight tracking for useEnsureSessionMessages.
@@ -3324,8 +3322,8 @@ export function useEnsureSessionMessages(sessionID: string, directory?: string, 
     const state = store.getState()
     // Already loaded into a renderable message/part snapshot — nothing to do.
     if (getSessionMaterializationStatus(state, sessionID).renderable) return
-    // Session doesn't exist — nothing to load
-    if (!state.session.some((s) => s.id === sessionID)) return
+    // Child sessions can exist on the host before they land in this directory
+    // list (nested herdr/subagent jsonl). Still fetch; a 404 is not empty success.
 
     const loadingKey = `${resolvedDirectory}:${sessionID}`
     // Already loading this session for this directory

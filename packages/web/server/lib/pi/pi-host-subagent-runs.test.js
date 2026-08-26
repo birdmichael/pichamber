@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { writeFeaturePlugins } from './feature-plugins.js';
-import { createInMemoryPiSession, createPiHost } from './pi-host.js';
+import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
 import { readPersistedSessionMetadataFromFile } from './session-metadata.js';
 import { applySessionListQuery } from './session-list-query.js';
 
@@ -547,6 +547,68 @@ describe('Pi host subagent runs', () => {
       else process.env.TMPDIR = originalTmp;
       host.dispose();
     }
+  });
+
+  it('attaches a nested herdr/subagent session.jsonl by header id without a sessionFile path', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async ({ sessionManager } = {}) => createInMemoryPiSession({
+        sessionId: typeof sessionManager?.getSessionId === 'function'
+          ? sessionManager.getSessionId()
+          : undefined,
+      }),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    const childId = 'nested-child';
+    const childFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `${parent.id}`,
+      'run_scout',
+      'run-0',
+      'session.jsonl',
+    );
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'message',
+      id: 'msg_user',
+      timestamp: new Date().toISOString(),
+      message: { role: 'user', content: [{ type: 'text', text: 'Inspect the nested session' }] },
+    })}\n`);
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_sub',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_nested',
+        state: {
+          status: 'running',
+          input: { agent: 'scout', sessionId: childId, task: 'Inspect the repo' },
+        },
+      }],
+    });
+
+    const listed = await host.listSessionInfos('/tmp/project');
+    expect(listed.find((info) => info.id === childId)).toMatchObject({
+      id: childId,
+      parentID: parent.id,
+    });
+    const opened = await host.ensureSession(childId, '/tmp/project');
+    expect(opened.id).toBe(childId);
+    expect(opened.sessionFile).toBe(childFile);
+    expect(host.getMessages(childId).some((entry) => (
+      entry.parts?.some((part) => part.text === 'Inspect the nested session')
+    ))).toBe(true);
+    host.dispose();
   });
 
   it('includes adapter children on listSessionInfos without a prior subagent-runs call', async () => {

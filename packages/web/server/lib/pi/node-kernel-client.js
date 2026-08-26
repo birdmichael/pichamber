@@ -1,8 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createPiHost } from './pi-host.js';
+import { resolvePiAgentDir } from './pi-resources.js';
 import {
   NODE_KERNEL_PROTOCOL,
   restoreKernelError,
@@ -95,6 +97,24 @@ const readManagerPath = (sessionManager, method) => {
  * IPC cannot carry a live SessionManager. Send the disk file / id so the
  * child opens that jsonl instead of SessionManager.create (a new Untitled).
  */
+// Child createPiHost still translates for its own record. The parent host
+// already turns raw `session-event` into the product OpenCode stream after
+// promptAsync inserts the user bubble. Forwarding those translated events
+// again would show one send as two (or three) turns and apply text deltas twice.
+const PARENT_OWNED_CHILD_HOST_EVENT_TYPES = new Set([
+  'message.updated',
+  'message.part.updated',
+  'message.part.delta',
+  'message.removed',
+  'session.status',
+  'session.idle',
+]);
+
+export const shouldForwardNodeKernelHostEvent = (event) => {
+  if (!event || typeof event !== 'object') return false;
+  return !PARENT_OWNED_CHILD_HOST_EVENT_TYPES.has(event.type);
+};
+
 export const serializeNodeKernelCreateSessionInput = (input = {}) => {
   const cwd = asTrimmedString(input.cwd || input.directory);
   const sessionFile = asTrimmedString(input.sessionFile)
@@ -250,7 +270,7 @@ export const createNodeKernelClient = ({
   nodeBinary,
   childScript,
   spawnImpl = spawn,
-  home,
+  home = os.homedir(),
   defaultDirectory = process.cwd(),
   mock = false,
   loadUserNpmExtensions = false,
@@ -334,7 +354,7 @@ export const createNodeKernelClient = ({
       return;
     }
     if (message.type === 'host-event') {
-      if (typeof onHostEvent === 'function') {
+      if (typeof onHostEvent === 'function' && shouldForwardNodeKernelHostEvent(message.event)) {
         onHostEvent(message.directory, message.event);
       }
       return;
@@ -456,7 +476,7 @@ export const createNodeKernelClient = ({
         mock,
         loadUserNpmExtensions,
         failSdkLoad,
-        agentDir: home ? path.join(home, '.pi', 'agent') : undefined,
+        agentDir: resolvePiAgentDir(home),
       },
     });
     return spawned;

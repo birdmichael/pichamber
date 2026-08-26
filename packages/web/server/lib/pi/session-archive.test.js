@@ -7,9 +7,11 @@ import {
   SESSION_ARCHIVE_DIRNAME,
   activeSessionFilePath,
   archivedSessionFilePath,
+  findSessionJsonlById,
   findSessionJsonlInDir,
   isUnderSessionArchiveDir,
   moveSessionFile,
+  readSessionIdFromJsonlHeader,
   relocateSessionFileForArchiveState,
   sessionArchiveDir,
 } from './session-archive.js';
@@ -72,6 +74,31 @@ describe('session archive directory', () => {
     );
     expect(findSessionJsonlInDir(sessionDir, 'ses_hidden')).toBeUndefined();
     expect(findSessionJsonlInDir(sessionDir, 'ses_archived')).toBeUndefined();
+  });
+
+  it('finds nested herdr/subagent session.jsonl by header id and skips archive/', () => {
+    const sessionDir = tempDir();
+    const parentFile = writeJsonl(path.join(sessionDir, 'parent-abc.jsonl'), `${JSON.stringify({
+      type: 'session',
+      id: 'parent-abc',
+    })}\n`);
+    const childFile = writeJsonl(
+      path.join(sessionDir, 'parent-abc', 'run_scout', 'run-0', 'session.jsonl'),
+      `${JSON.stringify({
+        type: 'session',
+        id: 'child-uuid',
+        cwd: '/tmp/project',
+      })}\n`,
+    );
+    writeJsonl(
+      path.join(sessionDir, SESSION_ARCHIVE_DIRNAME, 'session.jsonl'),
+      `${JSON.stringify({ type: 'session', id: 'child-uuid' })}\n`,
+    );
+    expect(readSessionIdFromJsonlHeader(childFile)).toBe('child-uuid');
+    expect(findSessionJsonlInDir(sessionDir, 'child-uuid')).toBeUndefined();
+    expect(findSessionJsonlById(sessionDir, 'child-uuid')).toBe(childFile);
+    expect(findSessionJsonlById(sessionDir, 'parent-abc')).toBe(parentFile);
+    expect(findSessionJsonlById(sessionDir, 'child-uuid', { skipArchive: true })).toBe(childFile);
   });
 
   it('keeps path helpers scoped to the session dir basename', () => {

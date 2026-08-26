@@ -107,7 +107,14 @@ desktop. Do not rely on `killSidecar()`'s leftover OpenCode
 killer for the Pi child. `ctx.ui`, session
 create/prompt/fork, scheduled-task session create, and `pichamber`
 create-send-fork stay on the parent host and reach the child over IPC
-(not HTTP). IPC `createSession` cannot carry a live `SessionManager`.
+(not HTTP). The parent host owns the product chat stream: `promptAsync`
+inserts the user bubble, then raw `session-event` from `wrapSession`
+goes through the parent translator. Child `createPiHost` still translates
+for its own record. `host-event` carries `session.created` /
+`session.updated` / `pi.ui.*` so child-created sessions and extension UI
+reach the parent. `message.*`, `session.status`, and `session.idle` on
+the product bus come only from that parent translator. `wrapSession`
+subscribes once per Pi session. IPC `createSession` cannot carry a live `SessionManager`.
 The payload is `cwd`, `sessionFile`, `sessionID`, and optional
 `title` / `model`. When `sessionFile` or `sessionID` is present the
 child `ensureSession`s that jsonl. It does not `SessionManager.create`
@@ -135,8 +142,11 @@ plain Node) so system-Node-built natives still load. App-owned natives
 under `app.asar.unpacked` are not reported as skipped user extensions.
 
 On the Desktop Node child the ABI is the **bundled Node**, not
-Electron and not PATH / Homebrew Node. Child boot copies native
-packages from `{agentDir}/npm` into
+Electron and not PATH / Homebrew Node. The child boot payload's
+`agentDir` is `resolvePiAgentDir(home)`. `home` defaults to
+`os.homedir()` when the server omits it — do not send a missing
+`agentDir`, or isolate sync sees no `{agentDir}/npm` tree. Child boot
+copies native packages from `{agentDir}/npm` into
 `{agentDir}/npm-node/node-{modules}-{platform}-{arch}/{name}@{version}/`
 and `npm rebuild`s them with the bundled Node. `require()` remaps
 only `.node` files onto that tree; package JavaScript and
@@ -567,6 +577,12 @@ skills/prompts/extensions only.
 
 Attach and sidebar Refresh assign
 `record.messages = facadeMessagesFromPiEntries(jsonl entries)`.
+The transcript is the full session file, not `getBranch` /
+`buildContextEntries`. Compaction and a later leaf still keep earlier
+turns on disk; opening the session must render every `type: "message"`
+line. `transcriptEntriesForHydrate` reads that file first and falls
+back to `getEntries` only when the file is empty. It never uses the
+live leaf path.
 Walk `type: "message"` entries in order. `thinking` → `reasoning` and
 `text` → `text` stay as they are. An assistant `toolCall` plus a later
 `toolResult` with the same `toolCallId` become one assistant `type: "tool"`
@@ -752,10 +768,14 @@ When the slot is on:
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet. A finished tool-call without a child is
   not minted into an empty chat just to make the row clickable.
--   A run with a child session file is attached as a facade session: stable Pi
+- A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
   Attach also hydrates when only `sessionID` exists (`ensureRecord`); it
-  does not mint an empty chat. Attach persists `pichamber.metadata.parentID`
+  does not mint an empty chat. Lookup by id walks nested herdr/subagent
+  jsonl (`{parentBasename}/{runId}/run-N/session.jsonl`) and matches the
+  header id — those files are not top-level and are often named
+  `session.jsonl`. `SessionManager.list()` stays non-recursive. Attach
+  persists `pichamber.metadata.parentID`
   on the child jsonl so a new host still nests. An existing live record
   that gains `parentID` emits `session.updated`.
   Attach and child-message refresh skip a full jsonl parse when that file's

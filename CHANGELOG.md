@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: sending a message on Desktop no longer shows the same turn two or three times, and the reply no longer repeats each character.
+- Chat: when a session has Subagents, the sidebar can expand that parent, Work Status can open a running child, and opening a finished child shows that child's transcript.
+- Chat: opening a session shows the full transcript from disk, including turns before auto-compact or after a later branch.
+- Desktop: session memory/search extensions now load the app's rebuilt native copy even when Desktop does not pass a home directory into the kernel child.
+
 ## [1.2.4] - 2026-08-27
 
 - Desktop: local Mac packages no longer copy a Homebrew Node stub or reuse an unofficial leftover Node. Opening a chat waits on a public bundled Node instead of timing out after the kernel child fails to start.

@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildSessionHtml,
@@ -10,7 +13,15 @@ import {
   piMessagesFromFacadeEntry,
   readPiCodingAgentVersion,
   resolveUsableFacadeModel,
+  transcriptEntriesForHydrate,
 } from './session-transfer.js';
+
+const transferTempDirs = [];
+afterEach(() => {
+  for (const dir of transferTempDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 const exampleAssistantUsage = {
   input: 1200,
@@ -1084,5 +1095,54 @@ describe('session-transfer', () => {
       tool: 'read',
       state: { status: 'completed', output: '---\nname: using-superpowers\n---\n' },
     });
+  });
+
+  it('hydrates every jsonl message even when getBranch only has the live leaf', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-transcript-hydrate-'));
+    transferTempDirs.push(dir);
+    const file = path.join(dir, 'session.jsonl');
+    const lines = [
+      { type: 'session', id: 'ses_full', cwd: dir },
+      {
+        type: 'message',
+        id: 'u-early',
+        parentId: null,
+        message: { role: 'user', content: [{ type: 'text', text: 'early turn' }] },
+      },
+      {
+        type: 'compaction',
+        id: 'cmp1',
+        parentId: 'u-early',
+        firstKeptEntryId: 'u-late',
+        summary: 'earlier work',
+      },
+      {
+        type: 'message',
+        id: 'u-late',
+        parentId: 'cmp1',
+        message: { role: 'user', content: [{ type: 'text', text: 'late turn' }] },
+      },
+      {
+        type: 'message',
+        id: 'u-branch',
+        parentId: 'u-late',
+        message: { role: 'user', content: [{ type: 'text', text: 'branched continue' }] },
+      },
+    ];
+    fs.writeFileSync(file, `${lines.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+    const leafOnly = [lines[4]];
+    const entries = transcriptEntriesForHydrate({
+      file,
+      manager: {
+        getEntries: () => leafOnly,
+        getBranch: () => leafOnly,
+      },
+    });
+    const messages = facadeMessagesFromPiEntries(entries, 'ses_full');
+    expect(messages.map((entry) => entry.parts[0].text)).toEqual([
+      'early turn',
+      'late turn',
+      'branched continue',
+    ]);
   });
 });
