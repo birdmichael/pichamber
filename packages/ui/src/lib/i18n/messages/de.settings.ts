@@ -1088,7 +1088,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.toast.reloadBusy': 'Neu laden war nicht möglich, weil eine Sitzung beschäftigt ist. Das Verzeichnis ist gespeichert. Versuchen Sie es erneut, wenn sie inaktiv ist.',
   'settings.openchamber.piAgent.field.version': 'Pi-Version',
   'settings.openchamber.piAgent.field.currentVersionAria': 'Aktuelle Pi-Version {version}',
-  'settings.openchamber.piAgent.field.versionInfo': 'Die Version, die dieses Desktop ausführt. Die neueste Version stammt aus derselben npm-Prüfung wie der Pi-Updatehinweis.',
+  'settings.openchamber.piAgent.field.versionInfo': 'Das ist das in Pichamber enthaltene @earendil-works/pi-coding-agent. Desktop startet nicht das pi aus deinem PATH. App-Updates prüfst du unter Info.',
   'settings.openchamber.piAgent.actions.update': 'Aktualisieren',
   'settings.openchamber.piAgent.actions.updateAria': 'Pi aktualisieren',
   'settings.openchamber.piAgent.actions.updateToVersion': 'Auf {version} aktualisieren',

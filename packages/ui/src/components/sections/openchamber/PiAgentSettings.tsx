@@ -5,9 +5,7 @@ import { Icon } from '@/components/icon/Icon';
 import {
   SettingsSection,
   SettingsFieldRow,
-  SettingsCheckboxRow,
   SettingsInset,
-  SETTINGS_ACTION_BUTTON_CLASS,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_DESCRIPTION_CLASS,
@@ -15,15 +13,12 @@ import {
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { canRequestNativeDirectoryAccess, requestDirectoryAccess } from '@/lib/desktop';
-import { updateDesktopSettings } from '@/lib/persistence';
 import { reloadOpenCodeConfiguration } from '@/stores/useAgentsStore';
-import { useUIStore } from '@/stores/useUIStore';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { toast } from '@/components/ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  canUpdatePiFromStatus,
   parsePiUpgradeStatus,
   type PiUpgradeStatus,
 } from './piAgentUpdate';
@@ -48,9 +43,6 @@ export const PiAgentSettings: React.FC = () => {
   const [loadState, setLoadState] = React.useState<LoadState>('loading');
   const [isSaving, setIsSaving] = React.useState(false);
   const [upgradeStatus, setUpgradeStatus] = React.useState<PiUpgradeStatus | null>(null);
-  const [isUpdating, setIsUpdating] = React.useState(false);
-  const showOpenCodeUpdateNotifications = useUIStore((state) => state.showOpenCodeUpdateNotifications);
-  const setShowOpenCodeUpdateNotifications = useUIStore((state) => state.setShowOpenCodeUpdateNotifications);
   const canBrowse = canRequestNativeDirectoryAccess();
   const fieldDisabled = loadState !== 'ready' || isSaving;
 
@@ -190,77 +182,6 @@ export const PiAgentSettings: React.FC = () => {
     }
   }, [isDirty, loadState, t, value]);
 
-  const handleShowUpdateNotificationsChange = React.useCallback((enabled: boolean) => {
-    setShowOpenCodeUpdateNotifications(enabled);
-    void updateDesktopSettings({ showOpenCodeUpdateNotifications: enabled });
-  }, [setShowOpenCodeUpdateNotifications]);
-
-  const handleUpdatePi = React.useCallback(async () => {
-    if (isUpdating || !canUpdatePiFromStatus(upgradeStatus)) return;
-    setIsUpdating(true);
-    try {
-      const response = await runtimeFetch('/api/pi/upgrade', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      const payload = await response.json().catch(() => null) as null | {
-        error?: unknown;
-        currentVersion?: unknown;
-        latestVersion?: unknown;
-        available?: unknown;
-        reload?: { status?: unknown };
-      };
-      if (!response.ok) {
-        if (response.status === 409) {
-          toast.error(t('settings.openchamber.piAgent.toast.updateBusy'));
-          return;
-        }
-        const message = typeof payload?.error === 'string' && payload.error.trim()
-          ? payload.error
-          : t('settings.openchamber.piAgent.toast.updateFailed');
-        toast.error(message);
-        return;
-      }
-      const next = parsePiUpgradeStatus(payload) || await loadUpgradeStatus();
-      if (next) setUpgradeStatus(next);
-      const version = next?.currentVersion;
-      toast.success(version
-        ? t('settings.openchamber.piAgent.toast.updateSuccess', { version })
-        : t('settings.openchamber.piAgent.toast.updateSuccessNoVersion'));
-      const reloadStatus = Number(payload?.reload?.status);
-      if (reloadStatus === 409) {
-        toast.error(t('settings.openchamber.piAgent.toast.reloadBusy'));
-        return;
-      }
-      try {
-        await reloadOpenCodeConfiguration({
-          message: t('settings.openchamber.piAgent.actions.reloading'),
-        });
-      } catch (error) {
-        const status = (error as Error & { status?: number })?.status;
-        if (status === 409) {
-          toast.error(t('settings.openchamber.piAgent.toast.reloadBusy'));
-          return;
-        }
-        const message = error instanceof Error && error.message
-          ? error.message
-          : t('settings.openchamber.piAgent.toast.reloadFailed');
-        toast.error(message);
-      }
-    } catch (error) {
-      const message = error instanceof Error && error.message
-        ? error.message
-        : t('settings.openchamber.piAgent.toast.updateFailed');
-      toast.error(message);
-    } finally {
-      setIsUpdating(false);
-    }
-  }, [isUpdating, loadUpgradeStatus, t, upgradeStatus]);
-
   return (
     <SettingsSection title={t('settings.openchamber.piAgent.title')}>
       <div className="space-y-0.5">
@@ -322,47 +243,11 @@ export const PiAgentSettings: React.FC = () => {
             >
               {upgradeStatus.currentVersion}
             </span>
-            {canUpdatePiFromStatus(upgradeStatus) && upgradeStatus.latestVersion ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={handleUpdatePi}
-                    disabled={isUpdating}
-                    className={`${SETTINGS_ACTION_BUTTON_CLASS} shrink-0 !font-normal`}
-                    aria-label={t('settings.openchamber.piAgent.actions.updateToVersion', {
-                      version: upgradeStatus.latestVersion,
-                    })}
-                    data-settings-item="sessions.pi-update"
-                  >
-                    {isUpdating
-                      ? t('settings.openchamber.piAgent.actions.updating')
-                      : t('settings.openchamber.piAgent.actions.update')}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent sideOffset={8}>
-                  {t('settings.openchamber.piAgent.actions.updateToVersion', {
-                    version: upgradeStatus.latestVersion,
-                  })}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
             <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
           </div>
         ) : null}
 
         <SettingsInset className={SETTINGS_OPTION_STACK_CLASS}>
-          <SettingsCheckboxRow
-            settingsItem="sessions.pi-update-notifications"
-            checked={showOpenCodeUpdateNotifications}
-            onChange={handleShowUpdateNotificationsChange}
-            label={t('settings.openchamber.piAgent.field.showUpdateNotifications')}
-            ariaLabel={t('settings.openchamber.piAgent.field.showUpdateNotificationsAria')}
-            info={t('settings.openchamber.piAgent.field.showUpdateNotificationsInfo')}
-          />
-
           <div className="flex justify-start gap-2 py-1.5">
             <Button
               type="button"

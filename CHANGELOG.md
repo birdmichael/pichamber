@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Desktop shows the bundled Pi version only. It does not check npm for a newer kernel, and app updates stay on About.
+
 ## [1.2.2] - 2026-08-26
 
 - **Desktop:** the packaged app now starts the real Pi kernel. Opening an existing chat no longer answers with “Hello from the Pi mock kernel,” and a kernel that cannot start shows an error instead of a fake reply.

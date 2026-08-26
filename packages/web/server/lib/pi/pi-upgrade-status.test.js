@@ -1,37 +1,31 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   comparePiSdkVersions,
   getPiUpgradeStatus,
-  invalidatePiUpgradeStatusCache,
   npmLatestUrlForPackage,
   PI_SDK_PACKAGE,
   shouldSkipPiVersionCheck,
 } from './pi-upgrade-status.js';
 
-afterEach(() => {
-  invalidatePiUpgradeStatusCache();
-});
-
 describe('pi-upgrade-status', () => {
-  it('compares SDK versions and treats a newer latest as available', () => {
+  it('compares SDK versions for user package rows', () => {
     expect(comparePiSdkVersions('0.85.0', '0.84.2')).toBeGreaterThan(0);
     expect(comparePiSdkVersions('0.84.2', '0.84.2')).toBe(0);
     expect(comparePiSdkVersions('0.84.1', '0.84.2')).toBeLessThan(0);
   });
 
-  it('skips the npm check when PI_OFFLINE or PI_SKIP_VERSION_CHECK is set', () => {
+  it('skips npm package-latest checks when PI_OFFLINE or PI_SKIP_VERSION_CHECK is set', () => {
     expect(shouldSkipPiVersionCheck({ PI_OFFLINE: '1' })).toBe(true);
     expect(shouldSkipPiVersionCheck({ PI_SKIP_VERSION_CHECK: 'true' })).toBe(true);
     expect(shouldSkipPiVersionCheck({ PI_OFFLINE: '0' })).toBe(false);
     expect(shouldSkipPiVersionCheck({})).toBe(false);
   });
 
-  it('returns a bundled upgrade payload without calling npm when skipped', async () => {
+  it('returns the bundled SDK version without calling npm', async () => {
     let called = 0;
     const status = await getPiUpgradeStatus({
       currentVersion: '0.84.2',
-      env: { PI_OFFLINE: '1' },
       fetchImpl: async () => {
         called += 1;
         throw new Error('should not fetch');
@@ -47,142 +41,26 @@ describe('pi-upgrade-status', () => {
     });
   });
 
-  it('reports an informational update when npm has a newer SDK', async () => {
+  it('never reports a Pi kernel update even when a fetch impl would return newer', async () => {
     const status = await getPiUpgradeStatus({
       currentVersion: '0.84.2',
-      env: {},
       fetchImpl: async () => ({
         ok: true,
         json: async () => ({ version: '0.90.0' }),
       }),
     });
     expect(status).toEqual({
-      available: true,
+      available: false,
       currentVersion: '0.84.2',
-      latestVersion: '0.90.0',
+      latestVersion: null,
       package: PI_SDK_PACKAGE,
       upgrade: { supported: false, reason: 'bundled' },
     });
   });
 
-  it('builds the same npm latest URL shape used by the header banner', () => {
+  it('builds the npm latest URL used by user extension package rows', () => {
     expect(npmLatestUrlForPackage(PI_SDK_PACKAGE)).toBe(
       'https://registry.npmjs.org/@earendil-works%2Fpi-coding-agent/latest',
     );
-  });
-
-  it('does not claim an update is available when the npm check fails', async () => {
-    const status = await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl: async () => {
-        throw new Error('offline');
-      },
-    });
-    expect(status.available).toBe(false);
-    expect(status.latestVersion).toBeNull();
-    expect(status.upgrade).toEqual({ supported: false, reason: 'bundled' });
-  });
-
-  it('reuses a short-TTL cache so banner and Settings share one npm check', async () => {
-    let called = 0;
-    const fetchImpl = async () => {
-      called += 1;
-      return { ok: true, json: async () => ({ version: '0.90.0' }) };
-    };
-    const first = await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 1_000,
-    });
-    const second = await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 2_000,
-    });
-    expect(called).toBe(1);
-    expect(second).toEqual(first);
-    expect(first.available).toBe(true);
-  });
-
-  it('coalesces concurrent upgrade-status fetches into one npm request', async () => {
-    let called = 0;
-    let release;
-    const gate = new Promise((resolve) => {
-      release = resolve;
-    });
-    const fetchImpl = async () => {
-      called += 1;
-      await gate;
-      return { ok: true, json: async () => ({ version: '0.91.0' }) };
-    };
-    const pending = [
-      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
-      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
-      getPiUpgradeStatus({ currentVersion: '0.84.2', env: {}, fetchImpl }),
-    ];
-    release();
-    const results = await Promise.all(pending);
-    expect(called).toBe(1);
-    expect(results.every((status) => status.latestVersion === '0.91.0')).toBe(true);
-  });
-
-  it('invalidates the cache after a successful pi update and when the TTL expires', async () => {
-    let called = 0;
-    const fetchImpl = async () => {
-      called += 1;
-      return { ok: true, json: async () => ({ version: `0.9${called}.0` }) };
-    };
-    await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 1_000,
-      ttlMs: 5_000,
-    });
-    await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 4_000,
-      ttlMs: 5_000,
-    });
-    expect(called).toBe(1);
-    invalidatePiUpgradeStatusCache();
-    await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 4_000,
-      ttlMs: 5_000,
-    });
-    expect(called).toBe(2);
-    await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl,
-      now: () => 10_000,
-      ttlMs: 5_000,
-    });
-    expect(called).toBe(3);
-  });
-
-  it('still honors PI_OFFLINE even when a cached latest exists', async () => {
-    await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: {},
-      fetchImpl: async () => ({ ok: true, json: async () => ({ version: '0.90.0' }) }),
-    });
-    const skipped = await getPiUpgradeStatus({
-      currentVersion: '0.84.2',
-      env: { PI_SKIP_VERSION_CHECK: '1' },
-      fetchImpl: async () => {
-        throw new Error('should not fetch');
-      },
-    });
-    expect(skipped.available).toBe(false);
-    expect(skipped.latestVersion).toBeNull();
   });
 });

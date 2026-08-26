@@ -516,14 +516,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.openchamber.piAgent.field.showUpdateNotifications',
     descriptionKey: 'settings.openchamber.piAgent.field.showUpdateNotificationsInfo',
     keywords: ['pi', 'update', 'updates', 'notifications', 'update notifications', 'sdk'],
-    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+    isAvailable: () => false,
   },
   {
     id: 'sessions.pi-version',
     page: 'general',
     titleKey: 'settings.openchamber.piAgent.field.version',
     descriptionKey: 'settings.openchamber.piAgent.field.versionInfo',
-    keywords: ['pi', 'version', 'sdk', 'current version', 'latest version', 'update'],
+    keywords: ['pi', 'version', 'sdk', 'current version'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
   },
   {
@@ -531,7 +531,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'general',
     titleKey: 'settings.openchamber.piAgent.actions.update',
     keywords: ['pi', 'update', 'pi update', 'sdk'],
-    isAvailable: (ctx) => Boolean(ctx.isPiKernel) && !ctx.isVSCode,
+    isAvailable: () => false,
   },
   {
     id: 'sessions.agent-control-tool',

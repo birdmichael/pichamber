@@ -201,7 +201,18 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(upgradeRes.status).toBe(200);
       expect(upgrade.package).toBe('@earendil-works/pi-coding-agent');
       expect(upgrade.upgrade).toEqual({ supported: false, reason: 'bundled' });
-      expect(typeof upgrade.available).toBe('boolean');
+      expect(upgrade.available).toBe(false);
+      expect(upgrade.latestVersion).toBeNull();
+
+      const upgradePost = await fetch(`${url}/api/pi/upgrade`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(upgradePost.status).toBe(403);
+      expect(await upgradePost.json()).toMatchObject({
+        error: expect.stringMatching(/bundled Pi SDK cannot be upgraded/i),
+      });
 
       const providers = await (await fetch(`${url}/api/config/providers`)).json();
       expect(providers.providers[0].id).toBe('pi-mock');
@@ -278,6 +289,31 @@ describe('OpenCode facade HTTP/SSE', () => {
 
       const status = await (await fetch(`${url}/api/session/status`)).json();
       expect(status).toEqual({});
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('rejects POST /api/pi/upgrade without calling host.upgradePi', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      let called = 0;
+      kernel.host.upgradePi = async () => {
+        called += 1;
+        return { success: true, command: 'pi update' };
+      };
+
+      const upgradePost = await fetch(`${url}/api/pi/upgrade`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(upgradePost.status).toBe(403);
+      expect(await upgradePost.json()).toMatchObject({
+        error: expect.stringMatching(/bundled Pi SDK cannot be upgraded/i),
+      });
+      expect(called).toBe(0);
     } finally {
       kernel.dispose();
       await close();

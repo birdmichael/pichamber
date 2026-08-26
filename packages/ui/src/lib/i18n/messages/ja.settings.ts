@@ -1151,7 +1151,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.toast.reloadBusy': 'セッションが実行中のため再読み込みできませんでした。ディレクトリは保存済みです。アイドルになってから再試行してください。',
   'settings.openchamber.piAgent.field.version': 'Pi バージョン',
   'settings.openchamber.piAgent.field.currentVersionAria': '現在の Pi バージョン {version}',
-  'settings.openchamber.piAgent.field.versionInfo': 'この Desktop が実行しているバージョンです。最新版は Pi 更新通知と同じ npm 確認から取得します。',
+  'settings.openchamber.piAgent.field.versionInfo': 'これは Pichamber に同梱された @earendil-works/pi-coding-agent です。Desktop は PATH 上の pi を実行しません。アプリの更新は About で確認します。',
   'settings.openchamber.piAgent.actions.update': '更新',
   'settings.openchamber.piAgent.actions.updateAria': 'Pi を更新',
   'settings.openchamber.piAgent.actions.updateToVersion': '{version} に更新',

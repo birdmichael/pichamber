@@ -15,7 +15,6 @@ import {
   resolveDismissedOpenCodeUpdateVersion,
   resolveOpenCodeUpdateVersion,
   resolveOpenCodeUpgradeStatusVersion,
-  resolvePiUpgradeStatusVersion,
   shouldShowOpenCodeUpdateToast,
   type OpenCodeUpgradeStatusLike,
 } from './openCodeUpdateDedup';
@@ -141,14 +140,14 @@ export const OpenCodeUpdateToast: React.FC = () => {
     const timeoutIds: Array<ReturnType<typeof setTimeout>> = [];
 
     const checkForUpdate = async (attempt: number, runtimeKey = getRuntimeKey()) => {
+      if (isPiKernel) return;
       try {
-        const path = isPiKernel ? '/api/pi/upgrade-status' : '/api/opencode/upgrade-status';
-        const response = await runtimeFetch(path, { headers: { Accept: 'application/json' } });
+        const response = await runtimeFetch('/api/opencode/upgrade-status', {
+          headers: { Accept: 'application/json' },
+        });
         if (!response.ok) throw new Error(response.statusText || 'Upgrade status check failed');
         const status = await response.json().catch(() => null) as OpenCodeUpgradeStatusLike | null;
-        const version = isPiKernel
-          ? resolvePiUpgradeStatusVersion(status)
-          : resolveOpenCodeUpgradeStatusVersion(status);
+        const version = resolveOpenCodeUpgradeStatusVersion(status);
         if (!cancelled && runtimeKey === getRuntimeKey() && version) {
           offerAvailableUpdate(version);
         }
@@ -167,14 +166,14 @@ export const OpenCodeUpdateToast: React.FC = () => {
       }
     };
 
-    if (showOpenCodeUpdateNotifications) {
+    if (!isPiKernel && showOpenCodeUpdateNotifications) {
       timeoutIds.push(setTimeout(() => { void checkForUpdate(0); }, INITIAL_CHECK_DELAY_MS));
     }
 
     const unsubscribeRuntime = subscribeRuntimeEndpointChanged(({ runtimeKey }) => {
       seenVersionsRef.current.clear();
       hideAvailableBanner();
-      if (useUIStore.getState().showOpenCodeUpdateNotifications) {
+      if (!isPiKernel && useUIStore.getState().showOpenCodeUpdateNotifications) {
         void checkForUpdate(0, runtimeKey);
       }
     });
@@ -188,38 +187,18 @@ export const OpenCodeUpdateToast: React.FC = () => {
     };
   }, [hideAvailableBanner, isPiKernel, showOpenCodeUpdateNotifications]);
 
-  if (!availableVersion || !showOpenCodeUpdateNotifications) {
+  if (isPiKernel || !availableVersion || !showOpenCodeUpdateNotifications) {
     return null;
   }
 
   return (
     <OpenCodeUpdateBanner
-      title={
-        isPiKernel
-          ? t('piUpdate.toast.available.title', { version: availableVersion })
-          : t('opencodeUpdate.toast.available.title')
-      }
-      description={
-        isPiKernel
-          ? null
-          : t('opencodeUpdate.toast.available.description', { version: availableVersion })
-      }
-      dismissLabel={
-        isPiKernel
-          ? t('piUpdate.toast.actions.dismiss')
-          : t('opencodeUpdate.toast.actions.dismiss')
-      }
-      primaryLabel={
-        isPiKernel
-          ? t('piUpdate.toast.actions.ok')
-          : t('opencodeUpdate.toast.actions.update')
-      }
+      title={t('opencodeUpdate.toast.available.title')}
+      description={t('opencodeUpdate.toast.available.description', { version: availableVersion })}
+      dismissLabel={t('opencodeUpdate.toast.actions.dismiss')}
+      primaryLabel={t('opencodeUpdate.toast.actions.update')}
       onDismiss={() => dismissAvailableBanner(availableVersion)}
       onPrimary={() => {
-        if (isPiKernel) {
-          dismissAvailableBanner(availableVersion);
-          return;
-        }
         void runUpgrade();
       }}
     />

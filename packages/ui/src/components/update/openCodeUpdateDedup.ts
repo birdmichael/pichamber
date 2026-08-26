@@ -196,9 +196,9 @@ export const resolveOpenCodeUpgradeStatusVersion = (
 };
 
 /**
- * Pulls the candidate version out of an `/api/pi/upgrade-status` JSON
- * payload. The bundled SDK cannot be upgraded in-app, so this ignores
- * `upgrade.supported` and only requires `available === true`.
+ * Pulls a candidate version out of an `/api/pi/upgrade-status` JSON
+ * payload. The bundled kernel no longer reports npm latest, so this
+ * stays empty unless a leftover payload still sets `available`.
  */
 export const resolvePiUpgradeStatusVersion = (
   status: OpenCodeUpgradeStatusLike | null | undefined,

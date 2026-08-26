@@ -21,12 +21,12 @@ const headerSource = readFileSync(
 );
 
 describe('Pi update available banner', () => {
-  test('available update is React state, not a sonner Infinity toast', () => {
-    expect(toastSource).toContain('const [availableVersion, setAvailableVersion]');
-    expect(toastSource).toContain('setAvailableVersion(version)');
+  test('Pi kernel does not poll npm or render a Pi kernel banner', () => {
+    expect(toastSource).toContain('if (isPiKernel) return');
+    expect(toastSource).not.toContain('/api/pi/upgrade-status');
+    expect(toastSource).not.toContain("t('piUpdate.toast.actions.ok')");
+    expect(toastSource).toContain('/api/opencode/upgrade-status');
     expect(toastSource).toContain('<OpenCodeUpdateBanner');
-    expect(toastSource).toContain("t('piUpdate.toast.actions.dismiss')");
-    expect(toastSource).toContain("t('piUpdate.toast.actions.ok')");
     expect(toastSource).not.toMatch(/toast\.info\(/);
   });
 

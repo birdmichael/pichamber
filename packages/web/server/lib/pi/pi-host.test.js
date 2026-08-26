@@ -292,7 +292,7 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
-  it('runs injected `pi update` against the resolved agent dir then reloads', async () => {
+  it('rejects in-app Pi upgrade because the bundled SDK is not supported', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-upgrade-'));
     const seen = [];
     const host = createPiHost({
@@ -304,11 +304,12 @@ describe('createPiHost', () => {
         return { ok: true, command: 'pi update' };
       },
     });
-    const result = await host.upgradePi();
-    expect(seen).toEqual([path.join(home, '.pi', 'agent')]);
-    expect(result.success).toBe(true);
-    expect(result.command).toBe('pi update');
-    expect(result.package).toBe('@earendil-works/pi-coding-agent');
+    await expect(host.upgradePi()).rejects.toMatchObject({
+      status: 403,
+      code: 'PI_UPGRADE_UNSUPPORTED',
+      message: expect.stringMatching(/bundled Pi SDK cannot be upgraded/i),
+    });
+    expect(seen).toEqual([]);
     host.dispose();
   });
 

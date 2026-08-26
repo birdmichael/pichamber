@@ -1118,7 +1118,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.toast.reloadBusy': '有会话正在运行，无法重新加载。目录已保存。空闲后再试。',
   'settings.openchamber.piAgent.field.version': 'Pi 版本',
   'settings.openchamber.piAgent.field.currentVersionAria': '当前 Pi 版本 {version}',
-  'settings.openchamber.piAgent.field.versionInfo': '此 Desktop 正在运行的版本。最新版本与 Pi 更新通知使用同一项 npm 检查。',
+  'settings.openchamber.piAgent.field.versionInfo': '这是 Pichamber 自带的 @earendil-works/pi-coding-agent。Desktop 不会运行你 PATH 上的 pi。应用更新请到关于页检查。',
   'settings.openchamber.piAgent.actions.update': '更新',
   'settings.openchamber.piAgent.actions.updateAria': '更新 Pi',
   'settings.openchamber.piAgent.actions.updateToVersion': '更新到 {version}',
