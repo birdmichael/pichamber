@@ -73,6 +73,15 @@ describe('assignTranscriptSessionIds', () => {
     expect(assigned[0]?.openable).toBe(true);
   });
 
+  test('joins a workflow runId to the parent tool call id', () => {
+    const assigned = assignTranscriptSessionIds(
+      [run({ runId: 'c10cff12', toolCallId: 'call_1' })],
+      [{ runId: 'call_1', sessionID: 'child-1' }],
+    );
+    expect(assigned[0]?.sessionID).toBe('child-1');
+    expect(assigned[0]?.openable).toBe(true);
+  });
+
   test('assigns an unmatched transcript child onto a status-only row in order', () => {
     const assigned = assignTranscriptSessionIds(
       [run({ runId: 'run_file' })],

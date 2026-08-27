@@ -5,8 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Chat: sending a message on Desktop no longer shows the same user bubble twice after Pi writes the turn under a different id, and the reply no longer repeats each character.
-- Chat: when a session has Subagents, the sidebar can expand that parent, Work Status can open a running child, a Subagent card can open that child even when the tool payload has no session id, and opening a running or finished child shows the child's live transcript instead of only the Task line.
+- Chat: when a session has Subagents, the sidebar can expand that parent, Work Status names an async workflow after its agent instead of a generic Subagent row, the row stays clickable after the parent tool detaches, a Subagent card can open that child even when the tool payload has no session id, and opening a running or finished child shows the child's live transcript instead of only the Task line.
 - Chat: opening a session shows the full transcript from disk, including later assistant steps in the same send, turns before auto-compact, and turns after a later branch.
+- Chat: the first message becomes the session title and stays after reopen. Untitled chats no longer come back nameless when Pi never wrote a session name.
 - Desktop: session memory/search extensions now load the app's rebuilt native copy even when Desktop does not pass a home directory into the kernel child.
 
 ## [1.2.4] - 2026-08-27

@@ -11,6 +11,8 @@ import {
 import {
   createInMemoryPiSession,
   createPiHost,
+  firstUserTextFromPiEntries,
+  firstUserTextFromSessionFile,
   isPlaceholderSessionTitle,
   resolveListedSessionTitle,
   mapPiModelsToProviders,
@@ -229,6 +231,27 @@ describe('session conversation titles', () => {
   it('uses the first line of the user message as the title', () => {
     expect(titleFromUserText('  nihao\nsecond line  ')).toBe('nihao second line');
     expect(titleFromUserText('x'.repeat(80))).toBe(`${'x'.repeat(57)}...`);
+    expect(firstUserTextFromPiEntries([{
+      type: 'session',
+      id: '01a',
+    }, {
+      type: 'message',
+      message: { role: 'user', content: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘' }] },
+    }])).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+  });
+
+  it('reads the first user line from a jsonl that has no session_info name', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-title-file-'));
+    const file = path.join(dir, 'session.jsonl');
+    fs.writeFileSync(file, [
+      JSON.stringify({ type: 'session', id: '01a', cwd: '/tmp' }),
+      JSON.stringify({
+        type: 'message',
+        message: { role: 'user', content: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘' }] },
+      }),
+    ].join('\n'));
+    expect(firstUserTextFromSessionFile(file)).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('renames a placeholder session from the first prompt and keeps a custom title', async () => {

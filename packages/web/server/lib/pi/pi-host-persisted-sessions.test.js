@@ -212,6 +212,45 @@ describe('persisted Pi sessions', () => {
     }
   });
 
+  it('titles an unnamed jsonl from the first user line after reopen', async () => {
+    const home = tempDir('pi-persist-untitled-title-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      userText: '帮我启动一个子代理 查看 我电脑磁盘',
+      assistantText: '好的',
+    });
+
+    const host = createHost({ home, cwd });
+    const listed = await host.listSessionInfos(cwd);
+    expect(listed.find((item) => item.id === persisted.id)?.title).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    const loaded = await host.ensureSession(persisted.id, cwd);
+    expect(loaded.info.title).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    host.dispose();
+  });
+
+  it('persists the first-prompt title so a new host still shows it', async () => {
+    const home = tempDir('pi-persist-prompt-title-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd });
+    expect(created.info.title).toBe('New session');
+    await first.promptAsync(created.id, { parts: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘' }] });
+    expect(first.getSession(created.id).info.title).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    const sessionFile = first.getSession(created.id).sessionFile;
+    first.dispose();
+
+    expect(fs.readFileSync(sessionFile, 'utf8')).toContain('帮我启动一个子代理 查看 我电脑磁盘');
+    const restarted = createHost({ home, cwd });
+    const loaded = await restarted.ensureSession(created.id, cwd);
+    expect(loaded.info.title).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    restarted.dispose();
+  });
+
   it('creates a session with a stable Pi UUID that survives a simulated restart', async () => {
     const home = tempDir('pi-persist-create-');
     const cwd = path.join(home, 'project');

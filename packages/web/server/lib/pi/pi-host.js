@@ -574,6 +574,57 @@ export const titleFromUserText = (text) => {
   return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
 };
 
+const userTextFromPiContent = (content) => {
+  if (typeof content === 'string' && content.trim()) return content.trim();
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((item) => (typeof item?.text === 'string' ? item.text : ''))
+    .join('')
+    .trim();
+};
+
+export const firstUserTextFromPiEntries = (entries) => {
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const message = entry?.message || entry;
+    if (message?.role !== 'user') continue;
+    const text = userTextFromPiContent(message.content);
+    if (text) return text;
+  }
+  return '';
+};
+
+const FIRST_USER_TEXT_FILE_LIMIT = 32 * 1024;
+
+export const firstUserTextFromSessionFile = (filePath) => {
+  const file = typeof filePath === 'string' ? filePath.trim() : '';
+  if (!file || !fs.existsSync(file)) return '';
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const buffer = Buffer.alloc(FIRST_USER_TEXT_FILE_LIMIT);
+      const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+      const text = buffer.slice(0, bytes).toString('utf8');
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        const message = parsed?.message || parsed;
+        if (message?.role !== 'user') continue;
+        const userText = userTextFromPiContent(message.content);
+        if (userText) return userText;
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+  }
+  return '';
+};
+
 const firstUserText = (store) => {
   for (const entry of store.messages || []) {
     if (entry?.info?.role !== 'user') continue;
@@ -583,12 +634,22 @@ const firstUserText = (store) => {
   return '';
 };
 
+const persistConversationTitle = (record, title) => {
+  const next = typeof title === 'string' ? title.trim() : '';
+  if (!next || typeof record?.sessionManager?.appendSessionInfo !== 'function') return;
+  try {
+    record.sessionManager.appendSessionInfo(next);
+  } catch {
+  }
+};
+
 const maybeApplyConversationTitle = (record) => {
   if (!record?.info || !isPlaceholderSessionTitle(record.info.title)) return false;
   const next = titleFromUserText(firstUserText(record));
   if (!next) return false;
   record.info.title = next;
   record.info.time = { ...(record.info.time || {}), updated: Date.now() };
+  persistConversationTitle(record, next);
   return true;
 };
 
@@ -1806,12 +1867,13 @@ export const createPiHost = ({
       console.warn(`[pi-host] failed to attach live Pi session ${sessionID}:`, error?.message || error);
       piSession = createInMemoryPiSession({ sessionId: sessionID });
     }
-    const title = resolveListedSessionTitle({
-      name: (typeof manager.getSessionName === 'function' && manager.getSessionName())
-        || persisted?.name,
-      firstMessage: persisted?.firstMessage,
-    });
     const entries = transcriptEntriesForHydrate({ file, manager });
+    const storedName = (typeof manager.getSessionName === 'function' && manager.getSessionName())
+      || persisted?.name;
+    const title = resolveListedSessionTitle({
+      name: storedName,
+      firstMessage: persisted?.firstMessage || firstUserTextFromPiEntries(entries),
+    });
     const created = persisted?.created ? new Date(persisted.created).getTime() : Date.now();
     const updated = persisted?.modified ? new Date(persisted.modified).getTime() : created;
     const metadata = readPersistedSessionMetadata(entries);
@@ -1841,6 +1903,9 @@ export const createPiHost = ({
       unsubscribe: null,
     };
     attachSession(record);
+    if (isPlaceholderSessionTitle(storedName) && !isPlaceholderSessionTitle(title)) {
+      persistConversationTitle(record, title);
+    }
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
     publishRecordTodos(record, entries);
@@ -2332,7 +2397,10 @@ export const createPiHost = ({
       id,
       projectID: item.cwd || directory || 'pi',
       directory: item.cwd || directory,
-      title: resolveListedSessionTitle(item),
+      title: resolveListedSessionTitle({
+        ...item,
+        firstMessage: item.firstMessage || firstUserTextFromSessionFile(item.path),
+      }),
       version: 'pi',
       ...(parentID ? { parentID } : {}),
       time: sessionTimeWithArchived({

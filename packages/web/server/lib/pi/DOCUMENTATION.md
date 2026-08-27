@@ -643,6 +643,10 @@ not full-read jsonl again after `SessionManager.list()`. Reuse that list
 item's title / firstMessage / timestamps. Placeholder list names
 (`New session`, `Pi session`, `(no messages)`) collapse to `New session`
 so list, hydrate, and sidebar Refresh agree on one empty-session title.
+The first user prompt writes that title through `appendSessionInfo` so
+it survives reopen. If jsonl has no `session_info` name, list/hydrate
+take the first user line from the file (32KB cap) instead of leaving
+the sidebar on Untitled.
 After `archived: ms`, stop.
 `GET /api/session` and `GET /api/experimental/session` honor `archived`,
 `roots`, `limit`, and `cursor` before building the response: omit truthy
@@ -767,7 +771,13 @@ When the slot is on:
   `{ runId, sessionID, toolCallId, name, role, mode, state, title, openable }`.
   `toolCallId` is the parent `subagent` tool call so the transcript card
   can open a child that never wrote `sessionId` on the tool payload
-  (async `workflowScript` runs). A tool that recorded a child id is
+  (async `workflowScript` runs). Collapse the parent `call-*` tool id and
+  the adapter workflow `runId` into one fleet row; copy `status.json`
+  child `sessionFile`, agent/label, and terminal state onto that row.
+  An async `workflow` launch is `mode: "background"` (Work Status 「后台」)
+  — that is the adapter contract, not a missing child. Name the row from
+  `steps[].agent` / `runs.run("label", { agent })`, not the generic
+  `subagent` fallback. A tool that recorded a child id is
   `openable: true` so Work Status and the transcript card open the same
   writable tab. Scraping a `.jsonl`
   session path from tool text is a length-capped linear scan so listing

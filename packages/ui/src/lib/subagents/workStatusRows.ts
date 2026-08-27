@@ -86,7 +86,10 @@ export const assignTranscriptSessionIds = (
   const byRunId = new Map(transcriptIds.map((item) => [item.runId, item.sessionID]));
   const used = new Set<string>();
   const assigned = runs.map((run) => {
-    const matched = run.sessionID || byRunId.get(run.runId) || null;
+    const matched = run.sessionID
+      || byRunId.get(run.runId)
+      || (run.toolCallId ? byRunId.get(run.toolCallId) : null)
+      || null;
     if (matched) used.add(matched);
     if (matched === run.sessionID) return run;
     return {

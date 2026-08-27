@@ -68,6 +68,11 @@ export const readSessionIdFromSessionFile = (filePath) => {
   }
 };
 
+const sessionPathStem = (value) => {
+  const name = path.basename(asTrimmedString(value));
+  return name.endsWith('.jsonl') ? name.slice(0, -'.jsonl'.length) : name;
+};
+
 export const parentSessionMatches = (statusSessionId, parent = {}) => {
   const candidate = asTrimmedString(statusSessionId);
   if (!candidate) return false;
@@ -79,10 +84,16 @@ export const parentSessionMatches = (statusSessionId, parent = {}) => {
     parent.info?.id,
   ].map(asTrimmedString).filter(Boolean);
   if (ids.includes(candidate)) return true;
+  const candidateStem = sessionPathStem(candidate);
   return ids.some((id) => (
     candidate.endsWith(id)
     || id.endsWith(candidate)
     || path.basename(candidate) === path.basename(id)
+    // Adapter status.sessionId is the parent jsonl path. Untitled chats store
+    // `{timestamp}_{piId}.jsonl`; parent.id is only the Pi header id.
+    || candidateStem === id
+    || candidateStem.endsWith(`_${id}`)
+    || candidateStem.endsWith(`-${id}`)
   ));
 };
 
@@ -112,10 +123,42 @@ const firstStepSessionFile = (status) => {
 const firstAgentName = (status) => {
   const steps = Array.isArray(status?.steps) ? status.steps : [];
   for (const step of steps) {
-    const agent = asTrimmedString(step?.agent || step?.label);
+    const agent = asTrimmedString(step?.agent);
     if (agent) return agent;
   }
   return asTrimmedString(status?.agent || status?.role);
+};
+
+const firstStepLabel = (status) => {
+  const steps = Array.isArray(status?.steps) ? status.steps : [];
+  for (const step of steps) {
+    const label = asTrimmedString(step?.label || step?.workflowKey);
+    if (label) return label;
+  }
+  return '';
+};
+
+/**
+ * Async `workflowScript` launches omit top-level `agent` / `task`. The name
+ * lives in `runs.run("disk-scan", { agent: "worker", task: \`…\` })`.
+ */
+export const readWorkflowScriptHints = (script) => {
+  const text = asTrimmedString(script);
+  if (!text) return { agent: '', label: '', task: '' };
+  const readQuoted = (from) => {
+    if (from < 0) return '';
+    let index = from;
+    while (index < text.length && /\s/.test(text[index])) index += 1;
+    const quote = text[index];
+    if (quote !== '"' && quote !== "'") return '';
+    const end = text.indexOf(quote, index + 1);
+    return end > index ? text.slice(index + 1, end) : '';
+  };
+  const runAt = text.indexOf('runs.run(');
+  const label = runAt >= 0 ? readQuoted(runAt + 'runs.run('.length) : '';
+  const agentKey = text.match(/\bagent\s*:/);
+  const agent = agentKey ? readQuoted(agentKey.index + agentKey[0].length) : '';
+  return { agent: asTrimmedString(agent), label: asTrimmedString(label), task: '' };
 };
 
 export const mapStatusToSubagentRun = (status, {
@@ -147,7 +190,7 @@ export const mapStatusToSubagentRun = (status, {
     role: asTrimmedString(status.role) || agent,
     mode,
     state,
-    title: asTrimmedString(status.goal || status.task) || agent,
+    title: asTrimmedString(status.goal || status.task) || firstStepLabel(status) || agent,
     toolCallId: asTrimmedString(status.toolCallId) || null,
     asyncDir: asTrimmedString(asyncDir) || null,
     startedAt: typeof status.startedAt === 'number' ? status.startedAt : null,
@@ -412,7 +455,10 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   })) {
     return null;
   }
-  const agent = asTrimmedString(input.agent || details.agent || metadata.agent || input.subagent_type) || 'subagent';
+  const hints = readWorkflowScriptHints(input.workflowScript || details.workflowScript);
+  const agent = asTrimmedString(
+    input.agent || details.agent || metadata.agent || input.subagent_type || hints.agent,
+  ) || 'subagent';
   const runId = asTrimmedString(
     details.runId
     || details.id
@@ -451,7 +497,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     role: asTrimmedString(input.role) || agent,
     mode,
     state: normalizeSubagentRunState(stateFromOutput || (running ? 'running' : 'done')),
-    title: asTrimmedString(input.task || input.description || details.goal) || agent,
+    title: asTrimmedString(input.task || input.description || details.goal || hints.label) || agent,
     toolCallId: asTrimmedString(part.callID || part.id) || null,
     asyncDir: null,
     startedAt: typeof state.time?.start === 'number' ? state.time.start : null,
@@ -459,22 +505,50 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   };
 };
 
+const findStoredRunId = (byId, run) => {
+  if (byId.has(run.runId)) return run.runId;
+  const toolCallId = asTrimmedString(run.toolCallId);
+  if (toolCallId && byId.has(toolCallId)) return toolCallId;
+  if (toolCallId) {
+    for (const [id, existing] of byId) {
+      if (asTrimmedString(existing.toolCallId) === toolCallId || existing.runId === toolCallId) {
+        return id;
+      }
+    }
+  }
+  for (const [id, existing] of byId) {
+    if (asTrimmedString(existing.toolCallId) === run.runId) return id;
+  }
+  return '';
+};
+
+const mergeRunFields = (existing, run) => ({
+  ...existing,
+  ...run,
+  runId: existing.runId === existing.toolCallId && run.runId && run.runId !== run.toolCallId
+    ? run.runId
+    : existing.runId,
+  sessionID: run.sessionID || existing.sessionID,
+  sessionFile: run.sessionFile || existing.sessionFile,
+  toolCallId: run.toolCallId || existing.toolCallId,
+  name: run.name && run.name !== 'subagent' ? run.name : existing.name,
+  role: run.role && run.role !== 'subagent' ? run.role : existing.role,
+  title: run.title && run.title !== run.name && run.title !== 'subagent'
+    ? run.title
+    : (existing.title && existing.title !== 'subagent' ? existing.title : run.title || existing.title),
+});
+
 const upsertSubagentRun = (byId, run) => {
   if (!run?.runId) return;
-  const existing = byId.get(run.runId);
-  if (!existing) {
-    byId.set(run.runId, run);
+  const storedId = findStoredRunId(byId, run);
+  if (!storedId) {
+    byId.set(run.runId, { ...run });
     return;
   }
-  byId.set(run.runId, {
-    ...existing,
-    ...run,
-    sessionID: run.sessionID || existing.sessionID,
-    sessionFile: run.sessionFile || existing.sessionFile,
-    name: run.name && run.name !== 'subagent' ? run.name : existing.name,
-    role: run.role && run.role !== 'subagent' ? run.role : existing.role,
-    title: run.title && run.title !== run.name ? run.title : existing.title,
-  });
+  const existing = byId.get(storedId);
+  const merged = mergeRunFields(existing, run);
+  if (storedId !== merged.runId) byId.delete(storedId);
+  byId.set(merged.runId, merged);
 };
 
 export const extractRunsFromPiEntries = (entries, parentID) => {
@@ -496,16 +570,18 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         const sessionFile = asTrimmedString(args.sessionFile) || null;
         const mode = normalizeSubagentRunMode(args.mode, args.async === true ? 'background' : 'foreground');
         if (!mode) continue;
+        const hints = readWorkflowScriptHints(args.workflowScript);
+        const agent = asTrimmedString(args.agent || args.role || args.subagent_type || hints.agent) || 'subagent';
         upsertSubagentRun(byId, {
           runId,
           parentID: asTrimmedString(parentID),
           sessionID: readChildSessionIdFromToolFields({ parentID, input: args, sessionFile }),
           sessionFile,
-          name: asTrimmedString(args.agent || args.role || args.subagent_type) || 'subagent',
-          role: asTrimmedString(args.role || args.agent) || 'subagent',
+          name: agent,
+          role: asTrimmedString(args.role || args.agent || hints.agent) || agent,
           mode,
           state: 'running',
-          title: asTrimmedString(args.task || args.description || args.goal) || asTrimmedString(args.agent) || 'subagent',
+          title: asTrimmedString(args.task || args.description || args.goal || hints.label) || agent,
           toolCallId: asTrimmedString(block.id) || null,
           asyncDir: null,
           startedAt: null,
@@ -541,6 +617,8 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       byId.delete(runId);
       continue;
     }
+    const hints = readWorkflowScriptHints(details.workflowScript);
+    const agent = asTrimmedString(details.agent || details.role || hints.agent) || 'subagent';
     upsertSubagentRun(byId, {
       runId,
       parentID: asTrimmedString(parentID),
@@ -552,11 +630,11 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         sessionFile,
       }),
       sessionFile: sessionFile || null,
-      name: asTrimmedString(details.agent || details.role) || 'subagent',
-      role: asTrimmedString(details.role || details.agent) || 'subagent',
+      name: agent,
+      role: asTrimmedString(details.role || details.agent || hints.agent) || agent,
       mode,
       state: normalizeSubagentRunState(details.state || (message.isError ? 'failed' : 'done')),
-      title: asTrimmedString(details.goal || details.task) || asTrimmedString(details.agent) || 'subagent',
+      title: asTrimmedString(details.goal || details.task || hints.label) || agent,
       toolCallId: asTrimmedString(message.toolCallId || entry.id) || null,
       asyncDir: asTrimmedString(details.asyncDir) || null,
       startedAt: null,
@@ -601,20 +679,7 @@ export const mergeSubagentRuns = (...lists) => {
   for (const list of lists) {
     for (const run of Array.isArray(list) ? list : []) {
       if (!run?.runId) continue;
-      const existing = byId.get(run.runId);
-      if (!existing) {
-        byId.set(run.runId, { ...run });
-        continue;
-      }
-      byId.set(run.runId, {
-        ...existing,
-        ...run,
-        sessionID: run.sessionID || existing.sessionID,
-        sessionFile: run.sessionFile || existing.sessionFile,
-        name: run.name && run.name !== 'subagent' ? run.name : existing.name,
-        role: run.role && run.role !== 'subagent' ? run.role : existing.role,
-        title: run.title && run.title !== run.name ? run.title : existing.title,
-      });
+      upsertSubagentRun(byId, run);
     }
   }
   return [...byId.values()].sort((left, right) => {
@@ -639,9 +704,17 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
     if (match) {
       match.sessionID = match.sessionID || file.sessionID;
       match.sessionFile = match.sessionFile || file.sessionFile;
+      match.toolCallId = match.toolCallId || file.toolCallId;
       if (!match.name || match.name === 'subagent') match.name = file.name;
-      if (!match.title || match.title === match.name) match.title = file.title || match.title;
+      if (!match.title || match.title === match.name || match.title === 'subagent') {
+        match.title = file.title || match.title;
+      }
       if (file.mode) match.mode = file.mode;
+      // Adapter status.json is the child lifecycle. The parent tool often
+      // completes as soon as the async workflow detaches.
+      if (file.state && (isLiveRunState(match.state) || !isLiveRunState(file.state))) {
+        match.state = file.state;
+      }
       continue;
     }
     const childId = asChildSessionId(file.sessionID, file.parentID);

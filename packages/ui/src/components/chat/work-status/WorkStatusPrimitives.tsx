@@ -155,6 +155,9 @@ export const WorkStatusRow: React.FC<RowProps> = ({
       {value !== undefined && value !== null ? (
         <span className="flex shrink-0 items-center gap-1.5 text-[13px] tabular-nums">{value}</span>
       ) : null}
+      {onClick ? (
+        <Icon name="arrow-right-s" className="size-3.5 shrink-0 text-muted-foreground" />
+      ) : null}
     </>
   );
 

@@ -17,6 +17,7 @@ import {
   parentSessionMatches,
   readSessionFileFromText,
   readSessionIdFromSessionFile,
+  readWorkflowScriptHints,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
 } from './subagent-runs.js';
@@ -128,6 +129,31 @@ describe('session file and parent matching', () => {
     expect(parentSessionMatches('parent-1', parent)).toBe(true);
     expect(parentSessionMatches('/tmp/parent.jsonl', parent)).toBe(true);
     expect(parentSessionMatches('other', parent)).toBe(false);
+  });
+
+  it('matches an Untitled jsonl path when parent.id is only the Pi header id', () => {
+    const parent = { id: '01a03f89-7d6b-734b-9e31-78b07afd96a7' };
+    expect(parentSessionMatches(
+      '/Users/me/.pi/agent/sessions/chat/2026-08-26T19-26-10-283Z_01a03f89-7d6b-734b-9e31-78b07afd96a7.jsonl',
+      parent,
+    )).toBe(true);
+    expect(parentSessionMatches(
+      '/Users/me/.pi/agent/sessions/chat/2026-08-26T19-26-10-283Z_01a03f89-7d6b-734b-9e31-78b07afd96a7.jsonl',
+      { id: 'someone-else' },
+    )).toBe(false);
+  });
+});
+
+describe('readWorkflowScriptHints', () => {
+  it('reads the run label and agent from an async workflow script', () => {
+    expect(readWorkflowScriptHints(`return runs.run("disk-scan", {
+  agent: "worker",
+  task: \`只读检查磁盘\`,
+})`)).toEqual({
+      agent: 'worker',
+      label: 'disk-scan',
+      task: '',
+    });
   });
 });
 
@@ -277,6 +303,42 @@ describe('tool-part extraction', () => {
     }, 'parent-1')).toMatchObject({
       runId: 'call_child',
       sessionID: 'child-from-field',
+    });
+  });
+
+  it('collapses an async workflow toolCall and toolResult that use different ids', () => {
+    const runs = extractRunsFromPiEntries([{
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'toolCall',
+          id: 'call-22a00b99-4358-4bde-a794-9074f07932fd-21|fc_ae8d6f68',
+          name: 'subagent',
+          arguments: {
+            async: true,
+            workflowScript: 'return runs.run("disk-scan", { agent: "worker", task: `只读检查磁盘` })',
+          },
+        }],
+      },
+    }, {
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call-22a00b99-4358-4bde-a794-9074f07932fd-21|fc_ae8d6f68',
+        content: 'Async workflow [c10cff12-5d1f-44dd-b1a1-b4f4a0d26541]',
+        details: { mode: 'workflow', runId: 'c10cff12-5d1f-44dd-b1a1-b4f4a0d26541' },
+        isError: false,
+      },
+    }], 'parent-1');
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'c10cff12-5d1f-44dd-b1a1-b4f4a0d26541',
+      toolCallId: 'call-22a00b99-4358-4bde-a794-9074f07932fd-21|fc_ae8d6f68',
+      name: 'worker',
+      title: 'disk-scan',
+      mode: 'background',
     });
   });
 
@@ -451,6 +513,38 @@ describe('reconcileParentSubagentRuns', () => {
       runId: 'call_live',
       sessionID: 'child-live',
     })]);
+    expect(toPublicSubagentRun(reconciled[0]).openable).toBe(true);
+  });
+
+  it('joins a live workflow toolCall to the adapter child and copies terminal state', () => {
+    const dir = makeTemp();
+    const childFile = path.join(dir, 'session.jsonl');
+    fs.writeFileSync(childFile, `${JSON.stringify({ type: 'session', id: '01a03f8b-child' })}\n`);
+    const reconciled = reconcileParentSubagentRuns([{
+      runId: 'c10cff12-5d1f-44dd-b1a1-b4f4a0d26541',
+      toolCallId: 'call-22a00b99',
+      name: 'worker',
+      title: 'disk-scan',
+      mode: 'background',
+      state: 'failed',
+      sessionID: '01a03f8b-child',
+      sessionFile: childFile,
+    }], [{
+      runId: 'call-22a00b99',
+      toolCallId: 'call-22a00b99',
+      name: 'subagent',
+      title: 'subagent',
+      mode: 'background',
+      state: 'running',
+      sessionID: null,
+    }]);
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toMatchObject({
+      name: 'worker',
+      title: 'disk-scan',
+      state: 'failed',
+      sessionID: '01a03f8b-child',
+    });
     expect(toPublicSubagentRun(reconciled[0]).openable).toBe(true);
   });
 
