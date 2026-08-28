@@ -13,6 +13,7 @@ import os from 'os';
 import path from 'path';
 
 import { dispatchPiSessionRequest, resolvePiHost } from '../pi/in-process-session.js';
+import { isGoalCommandUserText } from '../pi/session-plan.js';
 
 const OPENCHAMBER_SETTINGS_FILE = path.join(
   process.env.OPENCHAMBER_DATA_DIR
@@ -230,6 +231,14 @@ export const createSessionAssistRuntime = ({
     const lastAssistantInfo = lastAssistant?.info;
     if (!lastAssistantInfo?.id) return;
 
+    let lastUserText = '';
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.info?.role !== 'user') continue;
+      lastUserText = messagePartsToText(messages[i]);
+      break;
+    }
+    if (isGoalCommandUserText(lastUserText)) return;
+
     // Only the last exchange: the assistant reply plus the user message it
     // answered (assistant info.parentID → user info.id). Everything else is
     // token waste for a one-line recap and a single suggestion.
@@ -238,6 +247,7 @@ export const createSessionAssistRuntime = ({
       : null;
     const userText = parentUserMessage ? messagePartsToText(parentUserMessage) : '';
     const assistantText = messagePartsToText(lastAssistant);
+    if (isGoalCommandUserText(userText) || /goal complete/i.test(assistantText)) return;
     const transcript = [
       userText ? `User:\n${userText}` : '',
       assistantText ? `Assistant:\n${assistantText}` : '',

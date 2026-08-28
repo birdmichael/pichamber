@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDirectoryStore, useSession, useSessionStatus } from '@/sync/sync-context';
+import { isPiGoalSessionAssistHidden } from '@/lib/piGoal';
 import { getSessionAssist, type SessionAssistPayload } from '@/lib/sessionAssistMetadata';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -66,6 +67,11 @@ export function useSessionAssistState(sessionId: string, directory?: string): Se
 
   const isIdle = !status || status.type === 'idle';
   const payload = getSessionAssist(session);
+  const store = useDirectoryStore(directory);
+  const goalAssistHidden = isPiGoalSessionAssistHidden(
+    store.getState().message[sessionId],
+    store.getState().part,
+  );
 
   // Fresh = the payload's target message is still the session's last message.
   const assist = payload
@@ -73,6 +79,7 @@ export function useSessionAssistState(sessionId: string, directory?: string): Se
     && lastMessage.role === 'assistant'
     && lastMessage.id === payload.forMessageID
     && isIdle
+    && !goalAssistHidden
     ? payload
     : null;
 

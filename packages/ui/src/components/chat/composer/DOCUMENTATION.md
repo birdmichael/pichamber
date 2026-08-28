@@ -20,8 +20,10 @@ appends that `/goal` text as a user bubble and titles an Untitled session
 from the objective. A `PiGoalStatusRow` above the composer shows the
 latest `/goal` objective from the same chat Start Goal targets
 (current session, then URL `?session=`, then last-active) until an
-assistant says Goal complete. Read-only; not leftover OpenChamber
-Session Goal. Sidebar Goal rows use `metadata.pichamber.piGoal`.
+assistant says Goal complete — including when `/goal` is last in the
+transcript. Read-only; not leftover OpenChamber Session Goal. Sidebar
+Goal rows use `metadata.pichamber.piGoal.active`. Recap and the
+follow-up chip stay hidden while the latest user turn is `/goal`.
 A new-session draft mints a real session first and does not switch the
 open chat onto that id until `/goal` is accepted. If the store, URL
 `?session=`, or last-active session already names a chat, Start Goal

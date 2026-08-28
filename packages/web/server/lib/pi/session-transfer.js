@@ -1946,12 +1946,33 @@ const isGoalCommandFacadeUser = (entry) => (
   entry?.info?.role === 'user' && /^\/goal(?::\d+)?\s+\S/i.test(userTextFromFacade(entry))
 );
 
+/**
+ * Client transcripts sort by time.created. After hydrate, Pi assistant times
+ * can be earlier than the facade /goal bubble — array order is not enough.
+ */
+export const stampGoalCommandChronology = (messages) => {
+  if (!Array.isArray(messages)) return messages;
+  for (let index = 0; index < messages.length; index += 1) {
+    if (!isGoalCommandFacadeUser(messages[index])) continue;
+    let end = index + 1;
+    while (end < messages.length && !isGoalCommandFacadeUser(messages[end])) end += 1;
+    const previousCreated = messages[index - 1]?.info?.time?.created;
+    const base = (typeof previousCreated === 'number' ? previousCreated : Date.now()) + 1;
+    for (let cursor = index; cursor < end; cursor += 1) {
+      const entry = messages[cursor];
+      if (!entry?.info) continue;
+      entry.info.time = { ...(entry.info.time || {}), created: base + (cursor - index) };
+    }
+  }
+  return messages;
+};
+
 /** Keep the live /goal bubble ahead of Goal-turn assistants after jsonl hydrate. */
 export const restoreGoalCommandPlacement = (live, hydrated) => {
   const previous = Array.isArray(live) ? live : [];
   const next = Array.isArray(hydrated) ? [...hydrated] : [];
   const goals = previous.filter(isGoalCommandFacadeUser);
-  if (goals.length === 0) return next;
+  if (goals.length === 0) return stampGoalCommandChronology(next);
   const taken = new Set();
   const without = next.filter((entry) => {
     if (!isGoalCommandFacadeUser(entry)) return true;
@@ -1978,7 +1999,7 @@ export const restoreGoalCommandPlacement = (live, hydrated) => {
     }
     without.splice(insertAt, 0, goal);
   }
-  return without;
+  return stampGoalCommandChronology(without);
 };
 
 export const reconcileHydratedMessages = (live, hydrated) => {

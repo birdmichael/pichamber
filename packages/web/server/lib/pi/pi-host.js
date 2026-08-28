@@ -142,6 +142,7 @@ import {
   persistFacadeMessages,
   reconcileHydratedMessages,
   resolveUsableFacadeModel,
+  stampGoalCommandChronology,
   sanitizeExportBasename,
   transcriptEntriesForHydrate,
 } from './session-transfer.js';
@@ -1237,6 +1238,20 @@ const emitFacadeMessage = (emit, record, entry) => {
   });
 };
 
+const writePiGoalMarker = (record, active) => {
+  if (!record?.info) return;
+  const existing = record.info.metadata?.pichamber?.piGoal;
+  record.info.metadata = {
+    ...(record.info.metadata || {}),
+    pichamber: {
+      ...(record.info.metadata?.pichamber || {}),
+      piGoal: existing && typeof existing === 'object'
+        ? { ...existing, active }
+        : { active },
+    },
+  };
+};
+
 const placeGoalCommandUserMessage = (emit, record, userMessageID, insertAt) => {
   const messages = record?.messages;
   if (!Array.isArray(messages) || !userMessageID) return;
@@ -1248,17 +1263,9 @@ const placeGoalCommandUserMessage = (emit, record, userMessageID, insertAt) => {
     messages.splice(Math.min(at, messages.length), 0, goal);
     index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
   }
-  const previous = messages[index - 1]?.info?.time?.created;
-  const base = (typeof previous === 'number' ? previous : Date.now()) + 1;
-  const goal = messages[index];
-  if (!goal?.info) return;
-  goal.info.time = { ...(goal.info.time || {}), created: base };
-  emitFacadeMessage(emit, record, goal);
-  for (let i = index + 1; i < messages.length; i += 1) {
-    const entry = messages[i];
-    const time = entry?.info?.time;
-    entry.info.time = { ...(time || {}), created: base + (i - index) };
-    emitFacadeMessage(emit, record, entry);
+  stampGoalCommandChronology(messages);
+  for (let i = index; i < messages.length; i += 1) {
+    emitFacadeMessage(emit, record, messages[i]);
   }
 };
 
@@ -3404,17 +3411,11 @@ export const createPiHost = ({
         if (name === goalCommand || name === 'goal') {
           goalInsertAt = record.messages.length;
           goalUserID = appendFacadeUserMessage(emit, record, body, userText);
-          const existingGoal = record.info.metadata?.pichamber?.piGoal;
-          record.info.metadata = {
-            ...(record.info.metadata || {}),
-            pichamber: {
-              ...(record.info.metadata?.pichamber || {}),
-              piGoal: existingGoal && typeof existingGoal === 'object'
-                ? { ...existingGoal, active: true }
-                : true,
-            },
-          };
-          persistSessionMetadata(record.sessionManager, record.info.metadata);
+          record.translator?.setUserMessage?.(goalUserID, {
+            agent: typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi',
+            model: body.model,
+          });
+          writePiGoalMarker(record, true);
           maybeApplyConversationTitle(record);
           emit(record.directory, {
             id: createEventId(),
@@ -3423,7 +3424,19 @@ export const createPiHost = ({
           });
         }
         await record.piSession.prompt(promptText);
-        if (goalUserID) placeGoalCommandUserMessage(emit, record, goalUserID, goalInsertAt);
+        if (goalUserID) {
+          placeGoalCommandUserMessage(emit, record, goalUserID, goalInsertAt);
+          writePiGoalMarker(
+            record,
+            isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record)),
+          );
+          persistSessionMetadata(record.sessionManager, record.info.metadata);
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
         await refreshRecordCommands(record);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));

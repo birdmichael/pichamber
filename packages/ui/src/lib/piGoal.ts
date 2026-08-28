@@ -146,6 +146,33 @@ export function readPiGoalObjectiveFromSession(
   return null;
 }
 
+const lastGoalUserIndex = (
+  messages: Array<{ id?: string; role?: string }> | null | undefined,
+  parts: Record<string, Array<{ type?: string; text?: string }>>,
+): number => {
+  if (!Array.isArray(messages)) return -1;
+  let lastGoalIndex = -1;
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message?.role !== 'user' || typeof message.id !== 'string' || !message.id) continue;
+    if (objectiveFromUserText(textFromParts(parts[message.id]))) lastGoalIndex = index;
+  }
+  return lastGoalIndex;
+};
+
+const hasGoalCompleteText = (
+  messages: Array<{ id?: string; role?: string }> | null | undefined,
+  parts: Record<string, Array<{ type?: string; text?: string }>>,
+): boolean => {
+  if (!Array.isArray(messages)) return false;
+  return messages.some((message) => (
+    message?.role === 'assistant'
+    && typeof message.id === 'string'
+    && message.id
+    && isPiGoalCompleteText(textFromParts(parts[message.id]))
+  ));
+};
+
 export function isPiGoalComposerRowActive(
   messages: Array<{ id?: string; role?: string }> | null | undefined,
   partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
@@ -153,13 +180,10 @@ export function isPiGoalComposerRowActive(
   if (!readPiGoalObjectiveFromSession(messages, partsByMessageID)) return false;
   if (!Array.isArray(messages)) return false;
   const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
-  let lastGoalIndex = -1;
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index];
-    if (message?.role !== 'user' || typeof message.id !== 'string' || !message.id) continue;
-    if (objectiveFromUserText(textFromParts(parts[message.id]))) lastGoalIndex = index;
-  }
+  const lastGoalIndex = lastGoalUserIndex(messages, parts);
   if (lastGoalIndex < 0) return false;
+  const laterUser = messages.slice(lastGoalIndex + 1).some((message) => message?.role === 'user');
+  if (!laterUser && hasGoalCompleteText(messages, parts)) return false;
   for (let index = lastGoalIndex + 1; index < messages.length; index += 1) {
     const message = messages[index];
     if (message?.role !== 'assistant' || typeof message.id !== 'string' || !message.id) continue;
@@ -168,12 +192,30 @@ export function isPiGoalComposerRowActive(
   return true;
 }
 
+/** Hide leftover OpenChamber recap/suggestion after a /goal turn. */
+export function isPiGoalSessionAssistHidden(
+  messages: Array<{ id?: string; role?: string }> | null | undefined,
+  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+): boolean {
+  if (!Array.isArray(messages)) return false;
+  const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user' || typeof message.id !== 'string' || !message.id) continue;
+    return Boolean(objectiveFromUserText(textFromParts(parts[message.id])));
+  }
+  return false;
+}
+
 export function sessionHasPiGoalMarker(session: { metadata?: unknown } | null | undefined): boolean {
   const metadata = session?.metadata;
   if (!metadata || typeof metadata !== 'object') return false;
   const namespace = (metadata as { pichamber?: unknown }).pichamber;
   if (!namespace || typeof namespace !== 'object') return false;
-  return Boolean((namespace as { piGoal?: unknown }).piGoal);
+  const piGoal = (namespace as { piGoal?: unknown }).piGoal;
+  if (piGoal === true) return true;
+  if (!piGoal || typeof piGoal !== 'object') return false;
+  return (piGoal as { active?: unknown }).active === true;
 }
 
 export async function resolvePiGoalSession(input: {

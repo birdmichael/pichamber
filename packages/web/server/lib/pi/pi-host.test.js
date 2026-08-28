@@ -1799,6 +1799,43 @@ describe('createPiHost', () => {
     }
   });
 
+  it('binds empty-draft /goal before prompt and persists the target mark after', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-empty-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.registerCommand('goal', async () => {}, { description: 'Set a goal' });
+      record.sessionManager = record.piSession.sessionManager;
+      const order = [];
+      const originalAppend = record.sessionManager.appendCustomEntry.bind(record.sessionManager);
+      record.sessionManager.appendCustomEntry = (type, data) => {
+        order.push(`custom:${type}`);
+        return originalAppend(type, data);
+      };
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text) => {
+        order.push('prompt');
+        expect(record.translator.userMessageID).toBeTruthy();
+        expect(record.messages.some((entry) => entry?.info?.id === record.translator.userMessageID)).toBe(true);
+        expect(order.filter((item) => item.startsWith('custom:'))).toEqual([]);
+        return originalPrompt(text);
+      };
+
+      await host.runCommand(record.id, { command: 'goal', arguments: 'name one file' });
+
+      expect(order[0]).toBe('prompt');
+      expect(order).toContain('custom:pichamber.metadata');
+      expect(record.info.metadata?.pichamber?.piGoal).toEqual({ active: false });
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('returns 409 when /goal needs a reload while the session is busy', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-busy-'));
     try {

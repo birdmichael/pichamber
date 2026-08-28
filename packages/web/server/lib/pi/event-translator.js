@@ -383,13 +383,9 @@ export const createEventTranslator = ({
               ? message.content.filter((block) => block?.type === 'text').map((block) => block.text).join('')
               : '';
           // Goal plugin injects this system line as a user turn. Never show it.
-          // Still consume the slot so a later /goal echo cannot land after the
-          // assistant (that is what reversed the user bubble).
+          // Do not take the user-message slot — empty-draft /goal has no prior
+          // user id, and parenting assistants to this hidden line hides them.
           if (isGoalSystemPreamble(text)) {
-            if (!userMessageID) {
-              const incomingId = typeof message.id === 'string' ? message.id : '';
-              userMessageID = incomingId || nextMessageId();
-            }
             return [];
           }
           // Facade promptAsync already persisted the user bubble. Pi also

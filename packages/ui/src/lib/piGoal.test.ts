@@ -8,6 +8,7 @@ import {
   isPiGoalBlockedByPlan,
   isPiGoalComposerButtonVisible,
   isPiGoalComposerRowActive,
+  isPiGoalSessionAssistHidden,
   isPiGoalSystemPreamble,
   sessionHasPiGoalMarker,
   isPiGoalPluginAvailable,
@@ -195,7 +196,45 @@ describe('Pi Goal start command', () => {
         msg_done: [{ type: 'text', text: 'Goal complete' }],
       },
     )).toBe(false);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_ok', role: 'user' },
+        { id: 'msg_bye', role: 'assistant' },
+        { id: 'msg_done', role: 'assistant' },
+        { id: 'msg_goal', role: 'user' },
+      ],
+      {
+        msg_ok: [{ type: 'text', text: 'ok' }],
+        msg_bye: [{ type: 'text', text: 'Bye' }],
+        msg_done: [{ type: 'text', text: 'Goal complete' }],
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+      },
+    )).toBe(false);
+    expect(isPiGoalSessionAssistHidden(
+      [
+        { id: 'msg_ok', role: 'user' },
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_done', role: 'assistant' },
+      ],
+      {
+        msg_ok: [{ type: 'text', text: 'ok' }],
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_done: [{ type: 'text', text: 'Goal complete' }],
+      },
+    )).toBe(true);
+    expect(isPiGoalSessionAssistHidden(
+      [
+        { id: 'msg_ok', role: 'user' },
+        { id: 'msg_reply', role: 'assistant' },
+      ],
+      {
+        msg_ok: [{ type: 'text', text: 'ok' }],
+        msg_reply: [{ type: 'text', text: 'ok' }],
+      },
+    )).toBe(false);
     expect(sessionHasPiGoalMarker({ metadata: { pichamber: { piGoal: true } } })).toBe(true);
+    expect(sessionHasPiGoalMarker({ metadata: { pichamber: { piGoal: { active: true } } } })).toBe(true);
+    expect(sessionHasPiGoalMarker({ metadata: { pichamber: { piGoal: { active: false } } } })).toBe(false);
     expect(sessionHasPiGoalMarker({ metadata: {} })).toBe(false);
   });
 
