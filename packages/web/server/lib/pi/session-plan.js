@@ -2,6 +2,8 @@
 // Mirrors @narumitw/pi-plan-mode presentation.formatStatus. Do not scrape TUI
 // widgets or read leftover .opencode/plans files.
 
+import { readLatestCustomEntryDataFromFileTail } from './session-metadata.js';
+
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
 export const GOAL_STATE_ENTRY_TYPE = 'goal-state';
 
@@ -207,6 +209,40 @@ export const isGoalMutexHeld = (memoryEntries, diskEntries) => {
   const entry = chooseLatestCustomEntry(memoryEntries, diskEntries, GOAL_STATE_ENTRY_TYPE);
   const status = entry?.data?.goal?.status;
   return typeof status === 'string' && ACTIVE_GOAL_STATUSES.has(status);
+};
+
+export const isActivePiGoalMarker = (metadata) => {
+  const current = isRecord(metadata) ? metadata.pichamber?.piGoal : undefined;
+  return current === true
+    || Boolean(current && typeof current === 'object' && current.active === true);
+};
+
+export const withPiGoalActive = (metadata, active) => {
+  const existing = isRecord(metadata) ? metadata.pichamber?.piGoal : undefined;
+  return {
+    ...(isRecord(metadata) ? metadata : {}),
+    pichamber: {
+      ...(isRecord(metadata?.pichamber) ? metadata.pichamber : {}),
+      piGoal: existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? { ...existing, active }
+        : { active },
+    },
+  };
+};
+
+export const isGoalMutexHeldFromFile = (file) => {
+  const data = readLatestCustomEntryDataFromFileTail(file, GOAL_STATE_ENTRY_TYPE);
+  const status = data?.goal?.status;
+  return typeof status === 'string' && ACTIVE_GOAL_STATUSES.has(status);
+};
+
+/** List / restore: show 🎯 only while goal-state still holds the mutex. */
+export const reconcileListedPiGoalMetadata = (metadata, sessionFile) => {
+  if (!isActivePiGoalMarker(metadata)) return metadata;
+  if (typeof sessionFile === 'string' && sessionFile && isGoalMutexHeldFromFile(sessionFile)) {
+    return metadata;
+  }
+  return withPiGoalActive(metadata, false);
 };
 
 /** Plan holds the mutex while the session is in Plan (active or ready). */

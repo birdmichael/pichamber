@@ -108,6 +108,7 @@ import {
   isGoalCommandUserText,
   isGoalMutexHeld,
   isGoalSystemPreamble,
+  reconcileListedPiGoalMetadata,
   isPlanMutexHeld,
   isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
@@ -2070,6 +2071,7 @@ export const createPiHost = ({
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
     publishRecordTodos(record, entries);
+    syncPiGoalMarker(record);
     return record;
   };
 
@@ -2471,7 +2473,10 @@ export const createPiHost = ({
 
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
-    if (existing) return existing;
+    if (existing) {
+      syncPiGoalMarker(existing);
+      return existing;
+    }
     if (mock) {
       throw missingSession(sessionID);
     }
@@ -2568,6 +2573,7 @@ export const createPiHost = ({
     } catch {
       // Reload still succeeded. Keep the last good snapshot instead of [].
     }
+    syncPiGoalMarker(record);
     emit(record.directory, {
       id: createEventId(),
       type: 'session.updated',
@@ -2600,9 +2606,13 @@ export const createPiHost = ({
     const id = item?.id || item?.path;
     if (!id) return null;
     // Reuse title / firstMessage / timestamps from SessionManager.list().
-    // Tail-scan only for the last pichamber.metadata (archived / parentID).
+    // Tail-scan the last pichamber.metadata (archived / parentID / Goal mark)
+    // and drop a leftover 🎯 unless goal-state still holds the mutex.
     const metadata = item.path ? readListMetadata(item.path) : undefined;
-    const parentID = readListedParentID(metadata, item.path);
+    const listedMetadata = item.path
+      ? reconcileListedPiGoalMetadata(metadata, item.path)
+      : metadata;
+    const parentID = readListedParentID(listedMetadata, item.path);
     return {
       id,
       projectID: item.cwd || directory || 'pi',
@@ -2613,10 +2623,11 @@ export const createPiHost = ({
       }),
       version: 'pi',
       ...(parentID ? { parentID } : {}),
+      ...(listedMetadata ? { metadata: listedMetadata } : {}),
       time: sessionTimeWithArchived({
         created: item.created ? new Date(item.created).getTime() : Date.now(),
         updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
-      }, metadata),
+      }, listedMetadata),
     };
   };
 
@@ -2741,6 +2752,7 @@ export const createPiHost = ({
         ...(record.info.time || {}),
         ...(Number.isFinite(updated) ? { updated } : {}),
       }, metadata || record.info.metadata);
+      syncPiGoalMarker(record);
       return true;
     } catch (error) {
       console.warn(`[pi-host] session record refresh failed for ${record.id}:`, error?.message || error);

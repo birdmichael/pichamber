@@ -24,6 +24,9 @@ assistant says Goal complete, a Goal complete tool result lands, or
 `metadata.pichamber.piGoal.active` is false — including when `/goal`
 is last in the transcript. Read-only; not leftover OpenChamber
 Session Goal. Sidebar Goal rows use `metadata.pichamber.piGoal.active`.
+That mark is also cleared when the session is listed or opened and
+`goal-state` is no longer in-flight, so interrupt, an abandoned empty
+draft, or a leftover mark after restart does not keep 🎯.
 Recap and the follow-up chip stay hidden while the latest user turn
 is `/goal`.
 A new-session draft mints a real session first and does not switch the
@@ -111,6 +114,11 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
+A user-initiated New session (sidebar project/group `+`, File menu, or
+Cmd+N) starts with an empty composer. It does not restore a leftover
+`/` from the previous new-session draft, and the `+` button’s mousedown
+does not insert `/` into a still-focused composer. Automatic boot
+drafts still restore typed text.
 Desktop `/` docks a new-session composer to the bottom of the chat column
 so the menu can use the space above it (a centered welcome only leaves
 ~256px). Docking the whole welcome block is not enough: the title and

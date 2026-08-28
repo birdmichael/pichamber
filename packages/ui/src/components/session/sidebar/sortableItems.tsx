@@ -434,7 +434,12 @@ export const SortableProjectItem: React.FC<SortableProjectItemProps> = ({
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           onNewSession();
                         }}

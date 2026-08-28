@@ -864,6 +864,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         onDraftRestored: () => composerRef.current?.selectAll(),
     });
 
+    // Sidebar / File-menu New session must not keep a leftover `/` or an open
+    // slash menu from the previous composer identity.
+    React.useEffect(() => {
+        if (!newSessionDraft?.open || !newSessionDraft.resetComposer) return;
+        setOpenAutocomplete(null);
+        setAutocompleteQuery('');
+        dismissedAutocompleteKindRef.current = null;
+        if (messageRef.current) {
+            messageRef.current = '';
+            setMessage('');
+            persistDraftImmediately(chatDraftIdentity, '');
+        }
+    }, [chatDraftIdentity, newSessionDraft?.draftId, newSessionDraft?.open, newSessionDraft?.resetComposer, persistDraftImmediately]);
+
     // Focus textarea when new session draft is opened
     const prevNewSessionDraftOpenRef = React.useRef(newSessionDraftOpen);
     React.useEffect(() => {

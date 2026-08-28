@@ -15,6 +15,7 @@ import {
   LIST_METADATA_TAIL_CHUNK_SIZE,
   readPersistedSessionMetadataFromFile,
   readPersistedSessionMetadataFromFileTail,
+  readLatestCustomEntryDataFromFileTail,
   sessionTimeWithArchived,
 } from './session-metadata.js';
 
@@ -175,6 +176,26 @@ describe('Pi session metadata persistence', () => {
     expect(bytesRead).toBeLessThan(LIST_METADATA_TAIL_CHUNK_SIZE * 2);
     expect(bytesRead).toBeLessThan(size / 8);
     expect(readPersistedSessionMetadataFromFileTail(path.join(dir, 'missing.jsonl'))).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('tail-scans the latest custom entry of a given type', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-custom-tail-'));
+    const file = path.join(dir, 'session.jsonl');
+    fs.writeFileSync(file, [
+      JSON.stringify({ type: 'session', id: 'ses_1' }),
+      JSON.stringify({ type: 'custom', customType: 'goal-state', data: { goal: { status: 'active' } } }),
+      JSON.stringify({ type: 'custom', customType: PICHAMBER_METADATA_CUSTOM_TYPE, data: { pichamber: { piGoal: { active: true } } } }),
+      JSON.stringify({ type: 'custom', customType: 'goal-state', data: { goal: { status: 'complete' } } }),
+      '',
+    ].join('\n'));
+    expect(readLatestCustomEntryDataFromFileTail(file, 'goal-state')).toEqual({
+      goal: { status: 'complete' },
+    });
+    expect(readLatestCustomEntryDataFromFileTail(file, PICHAMBER_METADATA_CUSTOM_TYPE)).toEqual({
+      pichamber: { piGoal: { active: true } },
+    });
+    expect(readLatestCustomEntryDataFromFileTail(file, 'missing-type')).toBeUndefined();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

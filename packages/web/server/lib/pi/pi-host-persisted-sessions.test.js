@@ -379,6 +379,58 @@ describe('persisted Pi sessions', () => {
     restarted.dispose();
   });
 
+  it('clears a leftover Goal target mark on list and hydrate when goal-state is not in-flight', async () => {
+    const home = tempDir('pi-persist-stale-goal-mark-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'mutex-goal-alone',
+      userText: 'say hi in one word',
+    });
+    const opened = SessionManager.open(persisted.path, sessionDirForCwd(cwd, home));
+    opened.appendCustomEntry('pichamber.metadata', { pichamber: { piGoal: { active: true } } });
+
+    const host = createHost({ home, cwd });
+    const listed = await host.listSessionInfos(cwd);
+    expect(listed.find((info) => info.id === persisted.id)?.metadata?.pichamber?.piGoal)
+      .toEqual({ active: false });
+
+    const loaded = await host.ensureSession(persisted.id, cwd);
+    expect(loaded.info.metadata?.pichamber?.piGoal).toEqual({ active: false });
+    host.dispose();
+
+    const restarted = createHost({ home, cwd });
+    const reloaded = await restarted.ensureSession(persisted.id, cwd);
+    expect(reloaded.info.metadata?.pichamber?.piGoal).toEqual({ active: false });
+    restarted.dispose();
+  });
+
+  it('keeps the Goal target mark on list and hydrate while goal-state is in-flight', async () => {
+    const home = tempDir('pi-persist-live-goal-mark-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const persisted = writePersistedSession({
+      home,
+      cwd,
+      title: 'live-goal',
+      userText: '/goal say hi in one word',
+    });
+    const opened = SessionManager.open(persisted.path, sessionDirForCwd(cwd, home));
+    opened.appendCustomEntry('pichamber.metadata', { pichamber: { piGoal: { active: true } } });
+    opened.appendCustomEntry('goal-state', { goal: { status: 'active' } });
+
+    const host = createHost({ home, cwd });
+    const listed = await host.listSessionInfos(cwd);
+    expect(listed.find((info) => info.id === persisted.id)?.metadata?.pichamber?.piGoal)
+      .toEqual({ active: true });
+
+    const loaded = await host.ensureSession(persisted.id, cwd);
+    expect(loaded.info.metadata?.pichamber?.piGoal).toEqual({ active: true });
+    host.dispose();
+  });
+
   it('persists archive on pichamber.metadata so a new host still reports time.archived', async () => {
     const home = tempDir('pi-persist-archive-');
     const cwd = path.join(home, 'project');

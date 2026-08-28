@@ -10,6 +10,7 @@ import { useSkillsStore } from '@/stores/useSkillsStore';
 import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+import { createChatDraftIdentity, readChatDraft, writeChatDraft } from '@/lib/chatDraftPersistence';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import { applyFeaturePluginsPayload, resetPiFeaturePluginsStore } from './pi-feature-plugins-store';
 
@@ -410,6 +411,30 @@ describe('openNewSessionDraft project binding', () => {
     expect(draft.open).toBe(true);
     expect(draft.target).toBe('project');
     expect(draft.selectedProjectId).toBe(projectB.id);
+  });
+
+  test('user-initiated new session drops a leftover slash draft', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, '/', []);
+
+    useSessionUIStore.getState().openNewSessionDraft({ selectedProjectId: projectB.id });
+
+    expect(readChatDraft(identity).text).toBe('');
+    expect(useSessionUIStore.getState().newSessionDraft.resetComposer).toBe(true);
+  });
+
+  test('automatic new session keeps the persisted composer draft', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, '/', []);
+
+    useSessionUIStore.getState().openNewSessionDraft({
+      selectedProjectId: projectB.id,
+      automatic: true,
+    });
+
+    expect(readChatDraft(identity).text).toBe('/');
+    expect(useSessionUIStore.getState().newSessionDraft.resetComposer).toBeFalsy();
+    writeChatDraft(identity, '', []);
   });
 });
 

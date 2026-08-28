@@ -10,7 +10,9 @@
 // hydrate ignore that parent so the conversation stays a root. Do not invent
 // a second session store.
 // Session list tail-scans the last pichamber.metadata; it does not full-read
-// jsonl again just to find archived / parentID. Archived files also move to
+// jsonl again just to find archived / parentID / Goal mark. A leftover
+// piGoal.active is listed inactive unless the latest goal-state still holds
+// the mutex (see reconcileListedPiGoalMetadata). Archived files also move to
 // a sibling `archive/` so archived=false never opens them.
 
 import fs from 'node:fs';
@@ -63,22 +65,30 @@ const defaultListMetadataIo = {
   closeSync: (fd) => fs.closeSync(fd),
 };
 
-const parsePersistedSessionMetadataLine = (line) => {
-  if (!line) return undefined;
+const parseCustomEntryDataLine = (line, customType) => {
+  if (!line || typeof customType !== 'string' || !customType) return undefined;
   let parsed;
   try {
     parsed = JSON.parse(line);
   } catch {
     return undefined;
   }
-  if (parsed?.type !== 'custom' || parsed.customType !== PICHAMBER_METADATA_CUSTOM_TYPE) {
+  if (parsed?.type !== 'custom' || parsed.customType !== customType) {
     return undefined;
   }
   return isRecord(parsed.data) ? parsed.data : undefined;
 };
 
-export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => {
-  if (typeof file !== 'string' || !file) return undefined;
+const parsePersistedSessionMetadataLine = (line) => (
+  parseCustomEntryDataLine(line, PICHAMBER_METADATA_CUSTOM_TYPE)
+);
+
+// List / restore hot path: scan from the end for the last matching custom
+// entry and stop. Do not full-read jsonl just to find goal-state or metadata.
+export const readLatestCustomEntryDataFromFileTail = (file, customType, options = {}) => {
+  if (typeof file !== 'string' || !file || typeof customType !== 'string' || !customType) {
+    return undefined;
+  }
   const io = options.io && typeof options.io === 'object'
     ? { ...defaultListMetadataIo, ...options.io }
     : defaultListMetadataIo;
@@ -107,15 +117,13 @@ export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => 
       if (start > 0) leftover = lines.shift() ?? '';
       else leftover = '';
       for (let i = lines.length - 1; i >= 0; i -= 1) {
-        const metadata = parsePersistedSessionMetadataLine(lines[i]);
-        if (!metadata) continue;
-        // Last pichamber.metadata wins. After archived: ms (or any latest
-        // metadata), stop — do not keep reading earlier messages for list.
-        return metadata;
+        const data = parseCustomEntryDataLine(lines[i], customType);
+        if (!data) continue;
+        return data;
       }
       position = start;
     }
-    return parsePersistedSessionMetadataLine(leftover);
+    return parseCustomEntryDataLine(leftover, customType);
   } catch {
     return undefined;
   } finally {
@@ -125,6 +133,10 @@ export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => 
     }
   }
 };
+
+export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => (
+  readLatestCustomEntryDataFromFileTail(file, PICHAMBER_METADATA_CUSTOM_TYPE, options)
+);
 
 export const readPersistedParentID = (metadata) => {
   if (!isRecord(metadata)) return undefined;

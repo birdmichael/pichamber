@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
   isGoalCommandUserText,
   isGoalMutexHeld,
+  isGoalMutexHeldFromFile,
   isGoalSystemPreamble,
   isPlanMutexHeld,
+  reconcileListedPiGoalMetadata,
   isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
@@ -102,6 +107,42 @@ describe('session-plan', () => {
     expect(isPlanMutexHeld({ status: 'active' })).toBe(true);
     expect(isPlanMutexHeld({ status: 'ready' })).toBe(true);
     expect(isPlanMutexHeld({ status: 'off' })).toBe(false);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-goal-mutex-file-'));
+    const dirty = path.join(dir, 'dirty.jsonl');
+    const live = path.join(dir, 'live.jsonl');
+    fs.writeFileSync(dirty, [
+      JSON.stringify({ type: 'session', id: 'ses_dirty' }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'pichamber.metadata',
+        data: { pichamber: { piGoal: { active: true } } },
+      }),
+      '',
+    ].join('\n'));
+    fs.writeFileSync(live, [
+      JSON.stringify({ type: 'session', id: 'ses_live' }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'pichamber.metadata',
+        data: { pichamber: { piGoal: { active: true } } },
+      }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'goal-state',
+        data: { goal: { status: 'active' } },
+      }),
+      '',
+    ].join('\n'));
+    expect(isGoalMutexHeldFromFile(dirty)).toBe(false);
+    expect(isGoalMutexHeldFromFile(live)).toBe(true);
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: { active: true } } }, dirty))
+      .toEqual({ pichamber: { piGoal: { active: false } } });
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: true } }, dirty))
+      .toEqual({ pichamber: { piGoal: { active: false } } });
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: { active: true } } }, live))
+      .toEqual({ pichamber: { piGoal: { active: true } } });
+    expect(reconcileListedPiGoalMetadata({ archived: 0 }, dirty)).toEqual({ archived: 0 });
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   it('prefers disk jsonl plan-mode-state when memory getEntries is stale', () => {

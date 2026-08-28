@@ -87,6 +87,7 @@ import { getAttachedSessionDirectory } from "./session-worktree-contract"
 import { setSessionOpener } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isVSCodeRuntime } from "@/lib/desktop"
+import { clearChatDraft, createChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import {
   CHAT_DRAFT_PROJECT_ID,
   deleteChatDirectory,
@@ -309,6 +310,8 @@ export type NewSessionDraftState = {
   targetFolderId?: string
   target: "chat" | "project"
   preparedChatDirectory?: string | null
+  /** User-initiated New session: start empty, do not restore a leftover `/`. */
+  resetComposer?: boolean
 }
 
 export type ViewportAnchor = {
@@ -1004,6 +1007,16 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     persistDraftTarget({ projectId: selectedProject?.id ?? null, directory })
 
     const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
+    const resetComposer = !options?.automatic && !options?.initialPrompt
+    // Drop a leftover new-session `/` (or other typed text) before ChatInput
+    // restores that identity. Automatic boot and initialPrompt keep the draft.
+    if (resetComposer) {
+      const draftDirectory = target === "chat"
+        ? normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
+        : directory
+      const identity = createChatDraftIdentity(getRuntimeKey(), draftDirectory, null)
+      if (identity) clearChatDraft(identity, true)
+    }
     const nextDraft: NewSessionDraftState = {
       draftId: nextDraftId++,
       open: true,
@@ -1021,6 +1034,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       initialPrompt: options?.initialPrompt,
       syntheticParts: options?.syntheticParts,
       targetFolderId: options?.targetFolderId,
+      resetComposer,
     }
 
     set({
