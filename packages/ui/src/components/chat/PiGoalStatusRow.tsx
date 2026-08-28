@@ -2,9 +2,16 @@ import React from 'react';
 
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
-import { readPiGoalObjectiveFromSession } from '@/lib/piGoal';
+import {
+  readPiGoalObjectiveFromSession,
+  readPiGoalRouteSessionID,
+  resolvePiGoalTargetSession,
+} from '@/lib/piGoal';
+import { getRuntimeKey } from '@/lib/runtime-switch';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
+import { readLastActiveSession } from '@/sync/last-session-cache';
+import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useDirectorySync } from '@/sync/sync-context';
 
 interface PiGoalStatusRowProps {
@@ -20,12 +27,23 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
 }) => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
+  const routeSessionID = typeof window === 'undefined'
+    ? ''
+    : readPiGoalRouteSessionID(window.location.search);
+  const lastActiveSessionID = readLastActiveSession(getRuntimeKey())?.sessionId ?? '';
+  const resolvedSessionId = resolvePiGoalTargetSession({
+    sessionID: sessionId,
+    currentSessionID: currentSessionId,
+    routeSessionID,
+    lastActiveSessionID,
+  }) || null;
   const objective = useDirectorySync((state) => {
-    if (!sessionId) return null;
-    return readPiGoalObjectiveFromSession(state.message[sessionId], state.part);
+    if (!resolvedSessionId) return null;
+    return readPiGoalObjectiveFromSession(state.message[resolvedSessionId], state.part);
   }, directory);
 
-  if (!isPiKernel || !sessionId || !objective) return null;
+  if (!isPiKernel || !resolvedSessionId || !objective) return null;
 
   return (
     <div

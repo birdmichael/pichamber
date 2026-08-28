@@ -18,15 +18,18 @@ objective submits `/goal <objective>` (or the configured command) through
 `session.command` / `piSession.prompt`, not `promptAsync`. The host also
 appends that `/goal` text as a user bubble and titles an Untitled session
 from the objective. A `PiGoalStatusRow` above the composer shows the
-latest `/goal` objective (read-only; not leftover OpenChamber Session Goal).
+latest `/goal` objective from the same chat Start Goal targets
+(current session, then URL `?session=`, then last-active). Read-only;
+not leftover OpenChamber Session Goal.
 A new-session draft mints a real session first and does not switch the
 open chat onto that id until `/goal` is accepted. If the store, URL
 `?session=`, or last-active session already names a chat, Start Goal
 must use that id even when an auto-draft welcome cleared
 `currentSessionId`. Mint only when all of those are empty. A failed start keeps the
 draft and the modal; retry reuses the minted session instead of creating
-another. Start does not require a provider/model from the config store. Failures (no session,
-missing live command, send error) render inside the modal — Desktop
+another. Start does not require a provider/model from the config store. The host
+409s `/goal` while that session is already in Plan. Failures (no session,
+missing live command, Plan mutex, send error) render inside the modal — Desktop
 dialogs sit on the top layer, so toasts are not visible while it is open. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.

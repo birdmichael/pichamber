@@ -395,20 +395,27 @@ from the session `plan-mode-state` custom entry (same mapping as
 `getPlanModeState()`; the Node child snapshot and host read restore
 that entry (and fall back to a live getter only when it is actually
 on). An empty getter must not win over jsonl `enabled: true`.
-It does not scrape TUI widgets or read `.opencode/plans`. Fetch
+Memory `getEntries()` can be stale after a cold open or `/plan start`;
+the host also reads the session jsonl file and prefers a disk
+`plan-mode-state` entry when the snapshot omits it. It does not scrape
+TUI widgets or read `.opencode/plans`. Fetch
 failure is an HTTP error, not an empty `off`.
 
 `POST /api/pi/session/:id/plan` `{ action, model? }`:
 
 | action | Dispatch |
 |---|---|
-| `start` | `session.prompt("/plan start")`, then refresh the snapshot and re-read plan-mode-state. If status is still `off`, 500 — do not treat an empty `prompt()` stub as success |
+| `start` | `session.prompt("/plan start")`, then refresh the snapshot and re-read plan-mode-state from memory and the session jsonl. If both still say `off`, 500 — do not treat an empty `prompt()` stub as success. Disk `enabled: true` is success even when the snapshot entries are stale. |
 | `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
 | `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
 | `exit` | `session.prompt("/plan exit")` — discard only |
 | `resume` | append saved → ready `plan-mode-state` via `sessionManager.appendCustomEntry`, then `reload({ sessionID })`. Do not IPC `setPlanModeState` (real `AgentSession` has no such method). Do not send `/plan start` (that errors while a saved plan exists) |
 
-Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
+`resume` and a missing live `/plan` (reload to attach the command) still
+409 while the session is compacting, streaming, or busy. `start` /
+`exit` / `save` / `implement` with a live `/plan` only prompt — they
+must not 409 on a leftover `isStreaming` or busy flag after a Goal or
+ordinary send already finished. Successful actions emit `pi.plan.updated`.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.
@@ -569,12 +576,14 @@ the list. OpenCode kernel routes are unchanged.
 
 ## Desktop `pichamber` and `pichamber_web`
 
-`ensureDirectoryRuntime` builds cwd-scoped `createAgentSessionServices`
-once. Later `createFacadeSession` / hydrate / attach reuse
-`createAgentSessionFromServices` with that `resourceLoader`. Extension
-factories (`pi-chrome`, `pi-hermes-memory`, …) run once per project
-directory in the Node child. They do not run again on every chat
-open. `bindExtensions` still emits `session_start` per session.
+`ensureDirectoryRuntime` still warms cwd-scoped services for the
+directory placeholder. User chats do **not** reuse that factory:
+`createFacadeSession` / hydrate / attach call `createAgentSession` so
+each chat has its own Goal and Plan runtime. Those plugins call
+`pi.sendUserMessage` on the factory; a shared factory sent the Goal
+preamble and Plan start to another session while this chat only got
+the `/goal` bubble. `bindExtensions` still emits `session_start` per
+session.
 
 Desktop Electron Pi sessions receive host-owned `defineTool`s as
 `customTools` on both `createAgentSession` and `createAgentSessionFromServices`.
@@ -834,7 +843,10 @@ start stays in the modal on the draft (and must not look like success).
 Retry reuses the minted id. Do not require a provider/model for this
 command-only start.
 Replacing an existing goal still uses `ctx.ui.confirm`. Goal and Plan
-cannot both hold the workflow mutex.
+cannot both hold the workflow mutex. The host also 409s `/goal` while
+Plan is `active`/`ready`, and `POST plan start` while a `goal-state`
+entry is still in-flight, so Desktop can show a failure instead of
+appending `/goal` on a Plan chat.
 
 ## Subagent children
 

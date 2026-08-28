@@ -2055,6 +2055,57 @@ describe('session plan status and actions', () => {
     host.dispose();
   });
 
+  it('reads plan-mode-state from the session file when memory entries are empty', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stale entries' });
+    const file = path.join(os.tmpdir(), `pichamber-plan-${record.id}.jsonl`);
+    fs.writeFileSync(file, `${JSON.stringify({
+      type: 'custom',
+      customType: 'plan-mode-state',
+      timestamp: '2026-08-28T16:00:00.000Z',
+      data: { enabled: true, awaitingAction: false },
+    })}\n`);
+    record.sessionFile = file;
+    record.piSession.getPlanModeState = () => null;
+    record.piSession.sessionManager.getEntries = () => [];
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    fs.unlinkSync(file);
+    host.dispose();
+  });
+
+  it('returns 409 when Goal starts while Plan is on, or Plan starts while Goal is on', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const planHeld = await host.createSession({ directory: '/tmp/project', title: 'Plan holds' });
+    await host.runPlanAction(planHeld.id, { action: 'start' });
+    await expect(host.runCommand(planHeld.id, {
+      command: 'goal',
+      arguments: 'say hi',
+    })).rejects.toMatchObject({
+      status: 409,
+      message: 'Plan mode is active. Exit Plan before starting a Goal.',
+    });
+
+    const goalHeld = await host.createSession({ directory: '/tmp/project', title: 'Goal holds' });
+    goalHeld.piSession.sessionManager.appendCustomEntry('goal-state', {
+      goal: { status: 'active', text: 'say hi' },
+    });
+    await expect(host.runPlanAction(goalHeld.id, { action: 'start' })).rejects.toMatchObject({
+      status: 409,
+      message: 'A Goal is active. Finish or stop it before starting Plan.',
+    });
+    host.dispose();
+  });
+
   it('treats /plan start as notify-only and queues a select for bare /plan', async () => {
     const events = [];
     const host = createPiHost({
@@ -2119,7 +2170,7 @@ describe('session plan status and actions', () => {
     host.dispose();
   });
 
-  it('refuses plan actions while the session is busy', async () => {
+  it('refuses plan actions while the session is compacting', async () => {
     const busy = createInMemoryPiSession({ compacting: true });
     const host = createPiHost({
       mock: true,
@@ -2129,6 +2180,24 @@ describe('session plan status and actions', () => {
     const record = await host.createSession({ directory: '/tmp/project', title: 'Busy' });
     await expect(host.runPlanAction(record.id, { action: 'start' })).rejects.toMatchObject({
       status: 409,
+    });
+    host.dispose();
+  });
+
+  it('starts Plan on a live /plan session even when isStreaming is leftover', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stale stream' });
+    record.piSession.getCommands = () => [
+      { name: 'plan', source: 'extension', description: 'Plan' },
+    ];
+    Object.defineProperty(record.piSession, 'isStreaming', { get: () => true });
+    record.status = { type: 'busy' };
+    expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
     });
     host.dispose();
   });

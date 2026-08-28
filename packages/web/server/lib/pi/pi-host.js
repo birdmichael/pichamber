@@ -105,6 +105,9 @@ import { adaptQuestionToolForDesktop } from './question-desktop.js';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalMutexHeld,
+  isPlanMutexHeld,
+  parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
   resumeSavedPlanState,
   resolvePlanModeState,
@@ -1440,22 +1443,18 @@ export const createPiHost = ({
       const pi = await loadPiSdk();
       return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
         await ensureDirectoryRuntime(cwd);
-        const services = directoryRuntimes.get(cwd)?.services;
-        const created = services && typeof pi.createAgentSessionFromServices === 'function'
-          ? await pi.createAgentSessionFromServices({
-            services,
-            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
-            ...(model ? { model } : {}),
-            ...(customTools ? { customTools } : {}),
-          })
-          : await pi.createAgentSession({
-            cwd,
-            agentDir: resolveAgentDir(),
-            modelRuntime: runtime,
-            ...(model ? { model } : {}),
-            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
-            ...(customTools ? { customTools } : {}),
-          });
+        // Goal and Plan register one runtime per extension factory and then
+        // call `pi.sendUserMessage`. Reusing directory services makes every
+        // chat in that project share one factory, so /goal and /plan start
+        // on another session. Each user chat gets its own AgentSession.
+        const created = await pi.createAgentSession({
+          cwd,
+          agentDir: resolveAgentDir(),
+          modelRuntime: runtime,
+          ...(model ? { model } : {}),
+          sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
+          ...(customTools ? { customTools } : {}),
+        });
         harvestExtensionsResult(created?.extensionsResult || created, cwd);
         return created?.session || created;
       };
@@ -1982,11 +1981,27 @@ export const createPiHost = ({
     return [];
   };
 
+  const readRecordDiskEntries = (record) => {
+    const file = typeof record?.sessionFile === 'string' && record.sessionFile
+      ? record.sessionFile
+      : (typeof record?.piSession?.sessionFile === 'string' ? record.piSession.sessionFile : '');
+    if (!file) return [];
+    try {
+      return parseSessionEntriesFromJsonl(fs.readFileSync(file, 'utf8'));
+    } catch {
+      return [];
+    }
+  };
+
   const readRecordPlan = (record) => {
     const live = typeof record?.piSession?.getPlanModeState === 'function'
       ? record.piSession.getPlanModeState()
       : null;
-    return sessionPlanFromState(resolvePlanModeState(live, readRecordEntries(record)));
+    return sessionPlanFromState(resolvePlanModeState(
+      live,
+      readRecordEntries(record),
+      readRecordDiskEntries(record),
+    ));
   };
 
   const persistRecordPlanState = async (record, next) => {
@@ -3416,6 +3431,11 @@ export const createPiHost = ({
           error.status = 400;
           throw error;
         }
+        if (isPlanMutexHeld(readRecordPlan(record))) {
+          const error = new Error('Plan mode is active. Exit Plan before starting a Goal.');
+          error.status = 409;
+          throw error;
+        }
         const liveGoal = findLiveSessionCommand(record.piSession, name);
         if (liveGoal) {
           return dispatchLiveSessionCommand(liveGoal);
@@ -3577,9 +3597,22 @@ export const createPiHost = ({
     async runPlanAction(sessionID, body = {}) {
       const record = await ensureRecord(sessionID);
       const { action, model } = parseSessionPlanAction(body);
-      const blocked = sessionBlocksPiReload(record);
+      await refreshRecordCommands(record);
+      // Compaction and resume still need a quiet session (reload). Start/exit
+      // with a live `/plan` only prompt; do not 409 on a stale isStreaming or
+      // leftover busy after Goal/ordinary send already finished.
+      const needsReloadGate = Boolean(record.piSession?.isCompacting)
+        || action === 'resume'
+        || !findLiveSessionCommand(record.piSession, 'plan');
+      const blocked = needsReloadGate ? sessionBlocksPiReload(record) : null;
       if (blocked) {
         const error = new Error(blocked);
+        error.status = 409;
+        throw error;
+      }
+
+      if (action === 'start' && isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record))) {
+        const error = new Error('A Goal is active. Finish or stop it before starting Plan.');
         error.status = 409;
         throw error;
       }
@@ -3590,6 +3623,7 @@ export const createPiHost = ({
             ? record.piSession.getPlanModeState()
             : null,
           readRecordEntries(record),
+          readRecordDiskEntries(record),
         );
         const next = resumeSavedPlanState(current);
         if (!next) {

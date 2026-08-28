@@ -3,6 +3,15 @@
 // widgets or read leftover .opencode/plans files.
 
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
+export const GOAL_STATE_ENTRY_TYPE = 'goal-state';
+const ACTIVE_GOAL_STATUSES = new Set([
+  'active',
+  'queued',
+  'paused',
+  'blocked',
+  'usage_limited',
+  'budget_limited',
+]);
 const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
 const SESSION_PLAN_ACTIONS = Object.freeze([
   'start',
@@ -113,12 +122,100 @@ export const restoreSessionPlanState = (entries) => {
   };
 };
 
-/** Prefer the jsonl custom entry. Live getPlanModeState() is only a fallback. */
-export const resolvePlanModeState = (liveState, entries) => {
+const isPlanModeStateEntry = (entry) => (
+  entry?.type === 'custom' && entry?.customType === PLAN_MODE_STATE_ENTRY_TYPE
+);
+
+const latestPlanModeStateTimestamp = (entries) => {
   const list = Array.isArray(entries) ? entries : [];
-  const hasEntry = list.some((entry) => (
-    entry?.type === 'custom' && entry?.customType === PLAN_MODE_STATE_ENTRY_TYPE
-  ));
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const entry = list[index];
+    if (!isPlanModeStateEntry(entry)) continue;
+    const raw = entry.timestamp;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()) {
+      const parsed = Date.parse(raw);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return index + 1;
+  }
+  return 0;
+};
+
+/** Parse a session jsonl file. One bad line must not drop later plan-mode-state. */
+export const parseSessionEntriesFromJsonl = (text) => {
+  if (typeof text !== 'string' || !text) return [];
+  const entries = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) entries.push(parsed);
+    } catch {
+    }
+  }
+  return entries;
+};
+
+const entryTimestamp = (entry, index) => {
+  const raw = entry?.timestamp;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return index + 1;
+};
+
+const latestCustomEntry = (entries, customType) => {
+  const list = Array.isArray(entries) ? entries : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const entry = list[index];
+    if (entry?.type === 'custom' && entry?.customType === customType) {
+      return { entry, timestamp: entryTimestamp(entry, index) };
+    }
+  }
+  return null;
+};
+
+const chooseLatestCustomEntry = (memoryEntries, diskEntries, customType) => {
+  const memory = latestCustomEntry(memoryEntries, customType);
+  const disk = latestCustomEntry(diskEntries, customType);
+  if (disk && memory) return disk.timestamp >= memory.timestamp ? disk.entry : memory.entry;
+  return (disk || memory)?.entry || null;
+};
+
+/** Goal holds workflow:mutex:v1 while goal-state is still in-flight. */
+export const isGoalMutexHeld = (memoryEntries, diskEntries) => {
+  const entry = chooseLatestCustomEntry(memoryEntries, diskEntries, GOAL_STATE_ENTRY_TYPE);
+  const status = entry?.data?.goal?.status;
+  return typeof status === 'string' && ACTIVE_GOAL_STATUSES.has(status);
+};
+
+/** Plan holds the mutex while the session is in Plan (active or ready). */
+export const isPlanMutexHeld = (plan) => (
+  plan?.status === 'active' || plan?.status === 'ready'
+);
+
+const choosePlanModeEntries = (memoryEntries, diskEntries) => {
+  const memory = Array.isArray(memoryEntries) ? memoryEntries : [];
+  const disk = Array.isArray(diskEntries) ? diskEntries : [];
+  const memoryHas = memory.some(isPlanModeStateEntry);
+  const diskHas = disk.some(isPlanModeStateEntry);
+  if (diskHas && memoryHas) {
+    return latestPlanModeStateTimestamp(disk) >= latestPlanModeStateTimestamp(memory)
+      ? disk
+      : memory;
+  }
+  if (diskHas) return disk;
+  return memory;
+};
+
+/** Prefer the jsonl custom entry. Live getPlanModeState() is only a fallback. */
+export const resolvePlanModeState = (liveState, entries, diskEntries) => {
+  const list = choosePlanModeEntries(entries, diskEntries);
+  const hasEntry = list.some(isPlanModeStateEntry);
   const restored = restoreSessionPlanState(list);
   if (hasEntry) return restored;
   if (liveState && typeof liveState === 'object') {

@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalMutexHeld,
+  isPlanMutexHeld,
+  parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
   resolvePlanModeState,
   restoreSessionPlanState,
@@ -66,6 +69,39 @@ describe('session-plan', () => {
     ])).toMatchObject({ enabled: false });
     expect(resolvePlanModeState({ enabled: true }, [])).toMatchObject({ enabled: true });
     expect(resolvePlanModeState(null, [])).toMatchObject({ enabled: false });
+  });
+
+  it('holds the Goal mutex from the latest goal-state entry', () => {
+    expect(isGoalMutexHeld([], [])).toBe(false);
+    expect(isGoalMutexHeld([{
+      type: 'custom',
+      customType: 'goal-state',
+      data: { goal: { status: 'complete' } },
+    }], [])).toBe(false);
+    expect(isGoalMutexHeld([{
+      type: 'custom',
+      customType: 'goal-state',
+      data: { goal: { status: 'active' } },
+    }], [])).toBe(true);
+    expect(isGoalMutexHeld([], [{
+      type: 'custom',
+      customType: 'goal-state',
+      timestamp: '2026-08-28T16:00:00.000Z',
+      data: { goal: { status: 'active' } },
+    }])).toBe(true);
+    expect(isPlanMutexHeld({ status: 'active' })).toBe(true);
+    expect(isPlanMutexHeld({ status: 'ready' })).toBe(true);
+    expect(isPlanMutexHeld({ status: 'off' })).toBe(false);
+  });
+
+  it('prefers disk jsonl plan-mode-state when memory getEntries is stale', () => {
+    const disk = parseSessionEntriesFromJsonl([
+      '{"type":"session","id":"ses_1"}',
+      '{"type":"custom","customType":"plan-mode-state","timestamp":"2026-08-28T16:00:00.000Z","data":{"enabled":true,"awaitingAction":false}}',
+    ].join('\n'));
+    expect(resolvePlanModeState(null, [], disk)).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: false }, [], disk)).toMatchObject({ enabled: true });
+    expect(parseSessionEntriesFromJsonl('{"type":"custom","customType":"plan-mode-state","data":{"enabled":true}}\nnot-json\n')).toHaveLength(1);
   });
 
   it('restores the latest plan-mode-state custom entry', () => {
