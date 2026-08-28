@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.5] - 2026-08-28
+
 - **Settings:** Add Provider always lists xAI / Grok for SuperGrok or X Premium login, even when that row already has models. Other / Custom stays available for another endpoint. API key is secondary. Install Feature Plugins Grok Usage to see allowance, cycle, and expiry on Work Status and the xAI provider card. Grok Usage now reads the real credits envelope instead of failing with “no usable current-period usage” while the token expiry still showed.
 - Settings: SuperGrok sits above the API key. An unconnected xAI row no longer appears in the sidebar as `xAI 0`. Searching Grok no longer opens External Tunnel. The Grok Usage card keeps “sign-in stays on Providers” visible. A catalog load failure is shown instead of pretending only Grok remains.
 - Chat: Work Status Tasks count sits next to the Tasks title instead of overlapping the sections button.
