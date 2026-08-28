@@ -220,6 +220,27 @@ describe('Pi Goal start command', () => {
         msg_mid: [{ type: 'text', text: "I'll mark the goal complete so it actually stops." }],
       },
     )).toBe(true);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_tool', role: 'assistant' },
+      ],
+      {
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_tool: [{ type: 'tool', state: { output: 'Goal complete: said bye' } }],
+      },
+    )).toBe(false);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_bye', role: 'assistant' },
+      ],
+      {
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_bye: [{ type: 'text', text: 'Bye' }],
+      },
+      { metadata: { pichamber: { piGoal: { active: false } } } },
+    )).toBe(false);
     expect(isPiGoalSessionAssistHidden(
       [
         { id: 'msg_ok', role: 'user' },

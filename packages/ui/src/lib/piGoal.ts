@@ -113,6 +113,30 @@ const textFromParts = (parts: Array<{ type?: string; text?: string }> | null | u
     .trim()
 );
 
+const toolOutputFromPart = (part: {
+  type?: string;
+  output?: unknown;
+  state?: { output?: unknown };
+} | null | undefined): string => {
+  if (part?.type !== 'tool') return '';
+  const output = part.state && typeof part.state === 'object'
+    ? part.state.output
+    : part.output;
+  return typeof output === 'string' ? output : '';
+};
+
+const completeTextFromParts = (
+  parts: Array<{ type?: string; text?: string; output?: unknown; state?: { output?: unknown } }> | null | undefined,
+): string => (
+  (parts || [])
+    .map((part) => {
+      if (part?.type === 'text' && typeof part.text === 'string') return part.text;
+      return toolOutputFromPart(part);
+    })
+    .join('\n')
+    .trim()
+);
+
 export function readPiGoalObjectiveFromMessages(
   messages: Array<{
     role?: string;
@@ -169,15 +193,26 @@ const hasGoalCompleteText = (
     message?.role === 'assistant'
     && typeof message.id === 'string'
     && message.id
-    && isPiGoalCompleteText(textFromParts(parts[message.id]))
+    && isPiGoalCompleteText(completeTextFromParts(parts[message.id]))
   ));
+};
+
+const isExplicitInactivePiGoalMarker = (session: { metadata?: unknown } | null | undefined): boolean => {
+  const metadata = session?.metadata;
+  if (!metadata || typeof metadata !== 'object') return false;
+  const namespace = (metadata as { pichamber?: unknown }).pichamber;
+  if (!namespace || typeof namespace !== 'object') return false;
+  const piGoal = (namespace as { piGoal?: unknown }).piGoal;
+  return Boolean(piGoal && typeof piGoal === 'object' && (piGoal as { active?: unknown }).active === false);
 };
 
 export function isPiGoalComposerRowActive(
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+  partsByMessageID: Record<string, Array<{ type?: string; text?: string; output?: unknown; state?: { output?: unknown } }>> | null | undefined,
+  session?: { metadata?: unknown } | null,
 ): boolean {
   if (!readPiGoalObjectiveFromSession(messages, partsByMessageID)) return false;
+  if (isExplicitInactivePiGoalMarker(session)) return false;
   if (!Array.isArray(messages)) return false;
   const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
   const lastGoalIndex = lastGoalUserIndex(messages, parts);
@@ -187,7 +222,7 @@ export function isPiGoalComposerRowActive(
   for (let index = lastGoalIndex + 1; index < messages.length; index += 1) {
     const message = messages[index];
     if (message?.role !== 'assistant' || typeof message.id !== 'string' || !message.id) continue;
-    if (isPiGoalCompleteText(textFromParts(parts[message.id]))) return false;
+    if (isPiGoalCompleteText(completeTextFromParts(parts[message.id]))) return false;
   }
   return true;
 }

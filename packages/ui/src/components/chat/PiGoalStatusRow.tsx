@@ -43,7 +43,8 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
     if (!resolvedSessionId) return null;
     const messages = state.message[resolvedSessionId];
     const parts = state.part;
-    if (!isPiGoalComposerRowActive(messages, parts)) return null;
+    const session = state.session.find((item) => item.id === resolvedSessionId);
+    if (!isPiGoalComposerRowActive(messages, parts, session)) return null;
     return readPiGoalObjectiveFromSession(messages, parts);
   }, directory);
 
