@@ -2636,6 +2636,13 @@ export const createPiHost = ({
     const live = Array.from(sessions.values())
       .filter((record) => !directory || record.directory === directory)
       .map((record) => {
+        const current = record.info?.metadata?.pichamber?.piGoal;
+        if (
+          current === true
+          || (current && typeof current === 'object' && current.active === true)
+        ) {
+          syncPiGoalMarker(record);
+        }
         const listedParent = readListedParentID(record.info?.metadata, record.sessionFile);
         if (record.info?.parentID && !listedParent && isTopLevelUserSessionFile(record.sessionFile)) {
           delete record.info.parentID;

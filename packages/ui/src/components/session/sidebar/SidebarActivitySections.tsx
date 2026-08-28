@@ -218,7 +218,12 @@ export function SidebarActivitySections(props: Props): React.ReactNode {
                     <TooltipTrigger asChild>
                       <button
                         type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
                         onClick={(event) => {
+                          event.preventDefault();
                           event.stopPropagation();
                           props.onNewChat?.();
                         }}

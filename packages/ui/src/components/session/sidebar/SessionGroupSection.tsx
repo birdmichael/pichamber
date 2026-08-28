@@ -1270,7 +1270,12 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
               <TooltipTrigger asChild>
                 <button
                   type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
                   onClick={(event) => {
+                    event.preventDefault();
                     event.stopPropagation();
                     if (projectId && projectId !== activeProjectId) setActiveProjectIdOnly(projectId);
                     setActiveMainTab('chat');
