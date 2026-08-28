@@ -858,8 +858,10 @@ those messages are restamped so `time.created` sorts `/goal` first
 (jsonl must not move it below Goal complete). Disk session names that
 are the preamble or `继续` do not replace an objective title. `/goal`
 sets in-memory `metadata.pichamber.piGoal.active` before send so the
-sidebar can show the target mark, and persists that marker only after
-`prompt` with `active: false` when `goal-state` is no longer in-flight.
+sidebar can show the target mark, persists it after `prompt`, and
+clears `active` on `agent_settled` when `goal-state` is no longer
+in-flight. `/goal`'s `prompt` returns when the command handler
+queues the Goal follow-up, not when Goal complete arrives.
 
 ## Subagent children
 

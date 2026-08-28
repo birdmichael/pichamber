@@ -1836,6 +1836,32 @@ describe('createPiHost', () => {
     }
   });
 
+  it('clears the Goal target mark when goal-state is no longer in-flight', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-mark-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.sessionManager = record.piSession.sessionManager;
+      record.info.metadata = { pichamber: { piGoal: { active: true } } };
+      record.sessionManager.appendCustomEntry('goal-state', { goal: { status: 'active' } });
+      record.status = { type: 'busy' };
+      await host.abort(record.id);
+      expect(record.info.metadata?.pichamber?.piGoal).toEqual({ active: true });
+
+      record.sessionManager.appendCustomEntry('goal-state', { goal: { status: 'complete' } });
+      record.status = { type: 'busy' };
+      await host.abort(record.id);
+      expect(record.info.metadata?.pichamber?.piGoal).toEqual({ active: false });
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('returns 409 when /goal needs a reload while the session is busy', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-busy-'));
     try {

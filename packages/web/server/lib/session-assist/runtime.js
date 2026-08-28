@@ -247,7 +247,7 @@ export const createSessionAssistRuntime = ({
       : null;
     const userText = parentUserMessage ? messagePartsToText(parentUserMessage) : '';
     const assistantText = messagePartsToText(lastAssistant);
-    if (isGoalCommandUserText(userText) || /goal complete/i.test(assistantText)) return;
+    if (isGoalCommandUserText(userText) || /^goal complete\b/i.test(assistantText.trim())) return;
     const transcript = [
       userText ? `User:\n${userText}` : '',
       assistantText ? `Assistant:\n${assistantText}` : '',

@@ -91,7 +91,7 @@ export function resolvePiGoalTargetSession(input: {
 }
 
 const PI_GOAL_USER_TEXT = /^\/goal(?::\d+)?\s+(.+)$/is;
-const PI_GOAL_COMPLETE_TEXT = /goal complete/i;
+const PI_GOAL_COMPLETE_TEXT = /^goal complete\b/i;
 
 export function isPiGoalSystemPreamble(text: string | null | undefined): boolean {
   return /^Goal mode is active\./i.test(typeof text === 'string' ? text.trim() : '');

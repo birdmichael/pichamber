@@ -1702,7 +1702,28 @@ export const createPiHost = ({
         // Keep the last good snapshot. Do not replace a failed replay with [].
       }
     }
+    if (piEvent?.type === 'agent_settled') {
+      syncPiGoalMarker(record);
+    }
     return ocEvents;
+  };
+
+  const syncPiGoalMarker = (record) => {
+    if (!record?.info) return false;
+    const current = record.info.metadata?.pichamber?.piGoal;
+    const wasActive = current === true
+      || (current && typeof current === 'object' && current.active === true);
+    if (!wasActive && current == null) return false;
+    const active = isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record));
+    if (current && typeof current === 'object' && current.active === active) return false;
+    writePiGoalMarker(record, active);
+    persistSessionMetadata(record.sessionManager, record.info.metadata);
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.updated',
+      properties: { info: record.info },
+    });
+    return true;
   };
 
   const sessionIsLive = (record) => (
