@@ -85,8 +85,10 @@ import {
 import {
   PICHAMBER_METADATA_CUSTOM_TYPE,
   persistSessionMetadata,
+  readListedParentID,
   readPersistedArchivedTimestamp,
   readPersistedParentID,
+  isTopLevelUserSessionFile,
   readPersistedSessionMetadata,
   readPersistedSessionMetadataFromFileTail,
   sessionTimeWithArchived,
@@ -1896,7 +1898,7 @@ export const createPiHost = ({
           id: sessionID,
           directory: cwd,
           title,
-          parentID: readPersistedParentID(metadata),
+          parentID: readListedParentID(metadata, file),
           projectID: cwd,
           metadata,
         }),
@@ -2023,6 +2025,10 @@ export const createPiHost = ({
   const applySubagentParentLink = (record, parentID, extraMetadata, { emitUpdated = true } = {}) => {
     if (!record?.info || typeof parentID !== 'string' || !parentID.trim()) return record;
     const nextParentID = parentID.trim();
+    // Adapter children live under async-subagent-runs or a nested
+    // session.jsonl. A top-level `{timestamp}_{id}.jsonl` chat is its own
+    // conversation — status/debug dumps must not reparent it.
+    if (isTopLevelUserSessionFile(record.sessionFile)) return record;
     const previousParentID = typeof record.info.parentID === 'string' && record.info.parentID.trim()
       ? record.info.parentID.trim()
       : undefined;
@@ -2116,6 +2122,9 @@ export const createPiHost = ({
     }
     const entries = fileEntries;
     const persistedMetadata = readPersistedSessionMetadata(entries);
+    const listedParentID = isTopLevelUserSessionFile(resolvedFile)
+      ? readListedParentID(persistedMetadata, resolvedFile)
+      : (parentID || readListedParentID(persistedMetadata, resolvedFile));
     const record = {
       id: resolvedId,
       directory: cwd,
@@ -2127,10 +2136,10 @@ export const createPiHost = ({
         title: title
           || (typeof manager?.getSessionName === 'function' && manager.getSessionName())
           || 'Subagent',
-        parentID: parentID || readPersistedParentID(persistedMetadata),
+        parentID: listedParentID,
         metadata: {
           ...(persistedMetadata || {}),
-          ...(metadata || {}),
+          ...(isTopLevelUserSessionFile(resolvedFile) ? {} : (metadata || {})),
         },
         projectID: cwd,
       }),
@@ -2144,7 +2153,7 @@ export const createPiHost = ({
     attachSession(record);
     sessions.set(resolvedId, record);
     publishRecordTodos(record, entries);
-    applySubagentParentLink(record, parentID || readPersistedParentID(persistedMetadata), metadata, {
+    applySubagentParentLink(record, parentID || readListedParentID(persistedMetadata, resolvedFile), metadata, {
       emitUpdated: false,
     });
     emit(cwd, {
@@ -2401,7 +2410,7 @@ export const createPiHost = ({
     // Reuse title / firstMessage / timestamps from SessionManager.list().
     // Tail-scan only for the last pichamber.metadata (archived / parentID).
     const metadata = item.path ? readListMetadata(item.path) : undefined;
-    const parentID = readPersistedParentID(metadata);
+    const parentID = readListedParentID(metadata, item.path);
     return {
       id,
       projectID: item.cwd || directory || 'pi',
@@ -2423,7 +2432,13 @@ export const createPiHost = ({
     const includeArchived = !query || includeArchivedSessions(query.archived);
     const live = Array.from(sessions.values())
       .filter((record) => !directory || record.directory === directory)
-      .map((record) => record.info)
+      .map((record) => {
+        const listedParent = readListedParentID(record.info?.metadata, record.sessionFile);
+        if (record.info?.parentID && !listedParent && isTopLevelUserSessionFile(record.sessionFile)) {
+          delete record.info.parentID;
+        }
+        return record.info;
+      })
       .filter((info) => includeArchived || !info?.time?.archived);
     const seen = new Set(live.map((info) => info.id));
     if (!mock) {
@@ -2449,7 +2464,7 @@ export const createPiHost = ({
 
     for (const info of live) {
       if (info.parentID) continue;
-      const nested = readPersistedParentID(info.metadata);
+      const nested = readListedParentID(info.metadata, sessions.get(info.id)?.sessionFile);
       if (!nested) continue;
       info.parentID = nested;
       const liveRecord = sessions.get(info.id);
@@ -2516,8 +2531,9 @@ export const createPiHost = ({
       if (metadata) {
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
       }
-      const parentID = readPersistedParentID(metadata || record.info.metadata);
+      const parentID = readListedParentID(metadata || record.info.metadata, record.sessionFile);
       if (parentID) record.info.parentID = parentID;
+      else if (isTopLevelUserSessionFile(record.sessionFile)) delete record.info.parentID;
       let updated;
       try {
         const mtime = fs.statSync(file).mtimeMs;

@@ -5,13 +5,16 @@
 // `0` means restored. Clone/fork `parentID` is the same entry:
 // `{ parentID: "<source session id>" }`. Adapter children persist that same
 // field so the session list can nest them; `pichamber.subagentRun.parentSessionID`
-// is a fallback when only the adapter marker exists. Do not invent a second
-// session store.
+// is a fallback when only the adapter marker exists. A `subagentRun` marker
+// on a top-level `{timestamp}_{id}.jsonl` chat is a stolen attach — list and
+// hydrate ignore that parent so the conversation stays a root. Do not invent
+// a second session store.
 // Session list tail-scans the last pichamber.metadata; it does not full-read
 // jsonl again just to find archived / parentID. Archived files also move to
 // a sibling `archive/` so archived=false never opens them.
 
 import fs from 'node:fs';
+import path from 'node:path';
 
 export const PICHAMBER_METADATA_CUSTOM_TYPE = 'pichamber.metadata';
 
@@ -129,6 +132,38 @@ export const readPersistedParentID = (metadata) => {
   if (parentID) return parentID;
   const nested = metadata.pichamber?.subagentRun?.parentSessionID;
   return typeof nested === 'string' && nested.trim() ? nested.trim() : undefined;
+};
+
+const TOP_LEVEL_USER_SESSION_FILE = /^\d{4}-\d{2}-\d{2}T.+\.jsonl$/i;
+
+// Project chats are `{timestamp}_{id}.jsonl` in the cwd session dir.
+// Adapter / herdr children are `session.jsonl` (or a file under
+// async-subagent-runs), not a second top-level conversation.
+export const isTopLevelUserSessionFile = (file) => {
+  if (typeof file !== 'string' || !file.trim()) return false;
+  return TOP_LEVEL_USER_SESSION_FILE.test(path.basename(file.trim()));
+};
+
+const hasAdapterSubagentRunMarker = (metadata) => {
+  if (!isRecord(metadata)) return false;
+  const run = metadata.pichamber?.subagentRun;
+  if (!isRecord(run)) return false;
+  return Boolean(
+    (typeof run.parentSessionID === 'string' && run.parentSessionID.trim())
+    || (typeof run.runId === 'string' && run.runId.trim()),
+  );
+};
+
+// List / hydrate nesting. Clone/fork `parentID` on a top-level chat stays.
+// A `subagentRun` marker on that same top-level file is a stolen attach —
+// ignore it so the conversation stays a root.
+export const readListedParentID = (metadata, sessionFile) => {
+  const parentID = readPersistedParentID(metadata);
+  if (!parentID) return undefined;
+  if (isTopLevelUserSessionFile(sessionFile) && hasAdapterSubagentRunMarker(metadata)) {
+    return undefined;
+  }
+  return parentID;
 };
 
 export const readPersistedArchivedTimestamp = (metadata) => {

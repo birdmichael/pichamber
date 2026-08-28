@@ -806,6 +806,86 @@ describe('Pi host subagent runs', () => {
     host.dispose();
   });
 
+  it('does not reparent an existing top-level chat from a debug.run dump', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Packaging' });
+    const sibling = await host.createSession({ directory: '/tmp/project', title: 'Lody' });
+    const siblingFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `2026-08-28T11-52-33-467Z_${sibling.id}.jsonl`,
+    );
+    fs.mkdirSync(path.dirname(siblingFile), { recursive: true });
+    fs.writeFileSync(siblingFile, `${JSON.stringify({
+      type: 'session',
+      id: sibling.id,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'message',
+      id: 'msg_user',
+      timestamp: new Date().toISOString(),
+      message: { role: 'user', content: [{ type: 'text', text: 'https://github.com/LodyAI/Lody' }] },
+    })}\n`);
+    sibling.sessionFile = siblingFile;
+    parent.messages.push({
+      info: { id: 'msg_asst', role: 'assistant', sessionID: parent.id },
+      parts: [{
+        id: 'prt_debug',
+        type: 'tool',
+        tool: 'subagent',
+        callID: 'call_debug',
+        state: {
+          status: 'completed',
+          input: { action: 'debug.run', id: '41584961-a3ae-4c57-9163-84b1a0b8a65a' },
+          output: `Debug run\nSession: ${siblingFile}`,
+        },
+      }],
+    });
+
+    const listed = await host.listSessionInfos('/tmp/project');
+    expect(listed.find((info) => info.id === sibling.id)?.parentID).toBeUndefined();
+    expect(sibling.info.parentID).toBeUndefined();
+    expect(readPersistedSessionMetadataFromFile(siblingFile)?.parentID).toBeUndefined();
+    host.dispose();
+  });
+
+  it('lists a top-level chat as a root when stolen subagentRun metadata is already on disk', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Packaging' });
+    const sibling = await host.createSession({ directory: '/tmp/project', title: 'Lody' });
+    const siblingFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `2026-08-28T11-52-33-467Z_${sibling.id}.jsonl`,
+    );
+    fs.mkdirSync(path.dirname(siblingFile), { recursive: true });
+    fs.writeFileSync(siblingFile, `${JSON.stringify({
+      type: 'session',
+      id: sibling.id,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'custom',
+      customType: 'pichamber.metadata',
+      data: {
+        parentID: parent.id,
+        pichamber: { subagentRun: { parentSessionID: parent.id, runId: 'call_debug' } },
+      },
+    })}\n`);
+    sibling.sessionFile = siblingFile;
+    sibling.info.parentID = parent.id;
+    sibling.info.metadata = {
+      parentID: parent.id,
+      pichamber: { subagentRun: { parentSessionID: parent.id, runId: 'call_debug' } },
+    };
+
+    const listed = await host.listSessionInfos('/tmp/project');
+    expect(listed.find((info) => info.id === sibling.id)?.parentID).toBeUndefined();
+    expect(sibling.info.parentID).toBeUndefined();
+    host.dispose();
+  });
+
   it('does not attach a subagent file onto the in-memory mock when fallback is closed', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);

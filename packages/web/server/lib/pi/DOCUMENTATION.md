@@ -836,10 +836,17 @@ When the slot is on:
   session path from tool text is a length-capped linear scan so listing
   stays cheap on the HTTP thread.
 - Management / action-only `subagent` calls (`list`, `status`, `get`,
-  `models`, `guide`, `children.list`, and `details.mode === "management"`)
-  are not fleet runs. They do not appear in Work Status, do not enter
-  `GET /api/session`, and do not mint a facade session or child jsonl.
-  `mode: "management"` is never treated as foreground.
+  `models`, `guide`, `children.list`, `debug` / `debug.run`, and
+  `details.mode === "management"`) are not fleet runs. Status and
+  `debug.run` toolResults that keep `mode: "single"` and dump
+  `Session: {timestamp}_{id}.jsonl` are still management — they do not
+  scrape that path into a child. They do not appear in Work Status, do
+  not enter `GET /api/session`, and do not mint a facade session or
+  child jsonl. `mode: "management"` is never treated as foreground.
+  Attach never persists `parentID` onto a top-level project chat
+  (`{timestamp}_{id}.jsonl`). A stolen `subagentRun` marker already on
+  that file is ignored on list / hydrate so the conversation stays a
+  root. Clone/fork `parentID` without that marker is unchanged.
 - Terminal adapter files with no child id are dropped (not a pile of
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet. A finished tool-call without a child is
@@ -852,8 +859,9 @@ When the slot is on:
   header id — those files are not top-level and are often named
   `session.jsonl`. `SessionManager.list()` stays non-recursive. Attach
   persists `pichamber.metadata.parentID`
-  on the child jsonl so a new host still nests. An existing live record
-  that gains `parentID` emits `session.updated`.
+  on the child jsonl so a new host still nests. An existing live child
+  that gains `parentID` emits `session.updated`. Top-level project chats
+  never gain adapter `parentID` from attach.
   Attach and child-message refresh skip a full jsonl parse when that file's
   mtime and size are unchanged; a busy child still updates when the file
   changes. Re-attaching an already-live child rereads that file and
