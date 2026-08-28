@@ -29,8 +29,16 @@ export type ViewTarget = 'files' | 'mcp' | 'instances' | 'update';
  * ideas should add a variant here first, then teach deepLinkNavigation how to apply it —
  * that keeps the "blocks" composable without leaking ad-hoc URL parsing into features.
  */
+export type DeepLinkSessionAction = 'confirm' | 'cancel';
+
 export type DeepLinkIntent =
-  | { type: 'session'; sessionId: string; directory?: string }
+  | {
+    type: 'session';
+    sessionId: string;
+    directory?: string;
+    promptId?: string;
+    action?: DeepLinkSessionAction;
+  }
   | { type: 'new-session'; directory?: string; projectId?: string; agent?: string; model?: string }
   | { type: 'sessions'; filter?: SessionsFilter }
   | { type: 'status' }
@@ -83,7 +91,14 @@ export function parseDeepLink(raw: string | null | undefined): DeepLinkIntent | 
       if (!sessionId) {
         return null;
       }
-      return { type: 'session', sessionId, directory: query.get('dir') ?? undefined };
+      const directory = query.get('dir') ?? undefined;
+      const promptId = query.get('prompt') ?? undefined;
+      return {
+        type: 'session',
+        sessionId,
+        ...(directory ? { directory } : {}),
+        ...(promptId ? { promptId } : {}),
+      };
     }
 
     case 'new':
@@ -132,4 +147,77 @@ export function parseDeepLink(raw: string | null | undefined): DeepLinkIntent | 
     default:
       return null;
   }
+}
+
+const withQuery = (path: string, params: Record<string, string | undefined>): string => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+  const query = search.toString();
+  return query ? `${path}?${query}` : path;
+};
+
+/** Build a `pichamber://` URL for widgets, notification taps, and native actions. */
+export function buildDeepLink(intent: DeepLinkIntent): string {
+  switch (intent.type) {
+    case 'session':
+      return withQuery(`pichamber://session/${intent.sessionId}`, {
+        dir: intent.directory,
+        prompt: intent.promptId,
+      });
+    case 'new-session':
+      return withQuery('pichamber://new', {
+        dir: intent.directory,
+        project: intent.projectId,
+        agent: intent.agent,
+        model: intent.model,
+      });
+    case 'sessions':
+      return withQuery('pichamber://sessions', { filter: intent.filter });
+    case 'status':
+      return 'pichamber://status';
+    case 'settings':
+      return intent.section ? `pichamber://settings/${intent.section}` : 'pichamber://settings';
+    case 'changes':
+      return withQuery(intent.path ? `pichamber://changes/${intent.path}` : 'pichamber://changes', {
+        staged: intent.staged ? 'true' : undefined,
+      });
+    case 'view':
+      return `pichamber://view/${intent.target}`;
+  }
+}
+
+type PushActionPerformed = {
+  actionId?: string;
+  notification?: { data?: Record<string, unknown> };
+};
+
+const asNonEmptyString = (value: unknown): string | undefined => (
+  typeof value === 'string' && value.length > 0 ? value : undefined
+);
+
+/** Turn a Capacitor push tap/action into a deep-link intent. */
+export function intentFromPushAction(action: PushActionPerformed | null | undefined): DeepLinkIntent | null {
+  const data = action?.notification?.data;
+  const nativeUrl = asNonEmptyString(data?.deeplink) ?? asNonEmptyString(data?.url);
+  const fromUrl = nativeUrl ? parseDeepLink(nativeUrl) : null;
+  const sessionId = fromUrl?.type === 'session'
+    ? fromUrl.sessionId
+    : asNonEmptyString(data?.sessionId);
+  if (!sessionId) {
+    return fromUrl;
+  }
+  const promptId = (fromUrl?.type === 'session' ? fromUrl.promptId : undefined)
+    ?? asNonEmptyString(data?.promptId);
+  const actionId = action?.actionId;
+  const buttonAction: DeepLinkSessionAction | undefined =
+    actionId === 'confirm' || actionId === 'cancel' ? actionId : undefined;
+  return {
+    type: 'session',
+    sessionId,
+    ...(fromUrl?.type === 'session' && fromUrl.directory ? { directory: fromUrl.directory } : {}),
+    ...(promptId ? { promptId } : {}),
+    ...(buttonAction ? { action: buttonAction } : {}),
+  };
 }

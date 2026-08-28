@@ -59,6 +59,29 @@ export const createNotificationTriggerRuntime = (deps) => {
     goal_budget: 'Goal reached its token budget',
   };
 
+  const PI_UI_PROMPT_KINDS = new Set(['select', 'confirm', 'input', 'editor']);
+  const BLOCKING_PUSH_TYPES = new Set(['question', 'permission']);
+
+  const opaqueApnsData = (data) => {
+    const opaque = {};
+    if (typeof data.sessionId === 'string' && data.sessionId.length > 0) {
+      opaque.sessionId = data.sessionId;
+    }
+    if (typeof data.url === 'string' && data.url.length > 0) {
+      opaque.url = data.url;
+    }
+    if (typeof data.deeplink === 'string' && data.deeplink.length > 0) {
+      opaque.deeplink = data.deeplink;
+    }
+    if (typeof data.promptId === 'string' && data.promptId.length > 0) {
+      opaque.promptId = data.promptId;
+    }
+    if (PI_UI_PROMPT_KINDS.has(data.kind)) {
+      opaque.kind = data.kind;
+    }
+    return Object.keys(opaque).length > 0 ? opaque : undefined;
+  };
+
   const toApnsGenericPayload = (payload) => {
     const data = payload?.data && typeof payload.data === 'object' ? payload.data : {};
     const sessionName = typeof data.sessionName === 'string' && data.sessionName.trim().length > 0
@@ -69,27 +92,30 @@ export const createNotificationTriggerRuntime = (deps) => {
       body: sessionName,
       badge: trackPushAndCountBadge(typeof payload?.tag === 'string' ? payload.tag : undefined),
       tag: payload?.tag,
-      // sessionId is forwarded so a tapped push can deep-link; it is an opaque id, not content.
-      data: typeof data.sessionId === 'string' ? { sessionId: data.sessionId } : undefined,
+      // Opaque ids only — never prompt titles, options, or transcript text.
+      data: opaqueApnsData(data),
+      ...(data.kind === 'confirm' ? { category: 'pi.ui.confirm' } : {}),
     };
   };
 
   // Fan a notification out to every delivery channel: browser web-push (full templated
-  // payload) and native iOS APNs (generic model-based text). Both share the dedup tag and
-  // `requireNoSse` focus gate; a failure in one channel must not block the other.
-  const fanoutPush = (payload, options) => {
-    // Presence-aware routing: if any interactive (non-mobile) client — desktop/web/vscode — is
-    // currently visible, it already shows the in-app notification, so skip the native push to the
-    // phone. Gated on the desktop's visibility (reliable), never the phone's own. When we skip we
-    // also skip toApnsGenericPayload, so the badge isn't incremented for an undelivered push.
-    const interactiveVisible = isAnyInteractiveClientVisible?.() === true;
+  // payload) and native iOS APNs (generic model-based text). Both share the dedup tag.
+  // Ready/error/goal skip APNs while an interactive desktop/web client is visible.
+  // Blocking question/permission pushes always reach the phone so a focused Mac window
+  // cannot swallow a waiting prompt. Skipping APNs also skips toApnsGenericPayload so
+  // the badge is not incremented for an undelivered push.
+  const fanoutPush = (payload, options = {}) => {
+    const type = payload?.data && typeof payload.data === 'object' ? payload.data.type : undefined;
+    const bypassInteractiveGate = options.bypassInteractiveGate === true || BLOCKING_PUSH_TYPES.has(type);
+    const interactiveVisible = !bypassInteractiveGate && isAnyInteractiveClientVisible?.() === true;
+    const pushOptions = { ...options, bypassInteractiveGate };
     return Promise.all([
-      Promise.resolve(sendPushToAllUiSessions?.(payload, options)).catch((error) => {
+      Promise.resolve(sendPushToAllUiSessions?.(payload, pushOptions)).catch((error) => {
         console.warn('[Push] web-push fanout failed:', error?.message ?? error);
       }),
       interactiveVisible
         ? Promise.resolve()
-        : Promise.resolve(sendApnsToAllUiSessions?.(toApnsGenericPayload(payload), options)).catch((error) => {
+        : Promise.resolve(sendApnsToAllUiSessions?.(toApnsGenericPayload(payload), pushOptions)).catch((error) => {
             console.warn('[APNs] fanout failed:', error?.message ?? error);
           }),
     ]);
@@ -141,6 +167,26 @@ export const createNotificationTriggerRuntime = (deps) => {
     }
     return `/?session=${encodeURIComponent(sessionId)}`;
   };
+
+  const buildPiUiDeepLinkUrl = (sessionId, promptId, kind) => {
+    if (!sessionId || typeof sessionId !== 'string') {
+      return '/';
+    }
+    const params = new URLSearchParams();
+    if (typeof promptId === 'string' && promptId.length > 0) {
+      params.set('prompt', promptId);
+    }
+    if (PI_UI_PROMPT_KINDS.has(kind)) {
+      params.set('kind', kind);
+    }
+    const query = params.toString();
+    return `pichamber://session/${encodeURIComponent(sessionId)}${query ? `?${query}` : ''}`;
+  };
+
+  const shouldEmitDesktopNotification = (settings) => (
+    settings.nativeNotificationsEnabled
+    && (settings.notificationMode === 'always' || !getIsWindowFocused?.())
+  );
 
   const getSessionParentCacheKey = (sessionId, directory) => `${directory || ''}\0${sessionId}`;
 
@@ -536,10 +582,6 @@ export const createNotificationTriggerRuntime = (deps) => {
           return;
         }
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
-
         const firstQuestion = payload.properties?.questions?.[0];
         const header = typeof firstQuestion?.header === 'string' ? firstQuestion.header.trim() : '';
         const questionText = typeof firstQuestion?.question === 'string' ? firstQuestion.question.trim() : '';
@@ -568,7 +610,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Question template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (shouldEmitDesktopNotification(settings)) {
           const notificationPayload = {
             kind: 'question',
             title,
@@ -599,6 +641,105 @@ export const createNotificationTriggerRuntime = (deps) => {
       }, PUSH_QUESTION_DEBOUNCE_MS);
 
       pushQuestionDebounceTimers.set(sessionId, timer);
+      return;
+    }
+
+    if (payload.type === 'pi.ui.asked' && sessionId) {
+      const prompt = payload.properties?.prompt && typeof payload.properties.prompt === 'object'
+        ? payload.properties.prompt
+        : {};
+      const promptId = typeof prompt.id === 'string' && prompt.id.length > 0 ? prompt.id : null;
+      const kind = prompt.kind;
+      if (!PI_UI_PROMPT_KINDS.has(kind)) {
+        return;
+      }
+
+      // Key by prompt, not session: concurrent ctx.ui prompts must not cancel each other.
+      const debounceKey = promptId ? `pi-ui:${promptId}` : `pi-ui:${sessionId}`;
+      const existingTimer = pushQuestionDebounceTimers.get(debounceKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      const timer = setTimeout(async () => {
+        pushQuestionDebounceTimers.delete(debounceKey);
+
+        const settings = await readSettingsFromDisk();
+        if (settings.notifyOnQuestion === false) {
+          return;
+        }
+
+        const header = typeof prompt.title === 'string' ? prompt.title.trim() : '';
+        const questionText = typeof prompt.message === 'string' ? prompt.message.trim() : '';
+        let title = header || 'Input needed';
+        let body = questionText || 'Agent is waiting for your response';
+        let sessionName = '';
+
+        try {
+          const variables = await buildTemplateVariables(payload, sessionId);
+          sessionName = typeof variables.session_name === 'string' ? variables.session_name : sessionName;
+          variables.last_message = questionText || header || '';
+          const templates = settings.notificationTemplates || {};
+          const questionTemplate = templates.question || { title: 'Input needed', message: '{last_message}' };
+          const resolvedTitle = resolveNotificationTemplate(questionTemplate.title, variables);
+          const resolvedBody = resolveNotificationTemplate(questionTemplate.message, variables);
+          if (resolvedTitle) title = resolvedTitle;
+          if (shouldApplyResolvedTemplateMessage(questionTemplate.message, resolvedBody, variables)) body = resolvedBody;
+        } catch (error) {
+          console.warn('[Notification] Pi UI question template resolution failed, using defaults:', error?.message || error);
+        }
+
+        const tag = promptId ? `question-${promptId}` : `question-${sessionId}`;
+        if (shouldEmitDesktopNotification(settings)) {
+          const notificationPayload = {
+            kind: 'question',
+            title,
+            body,
+            tag,
+            sessionId,
+            directory: notificationDirectory,
+            requireHidden: settings.notificationMode !== 'always',
+          };
+          const desktopNotificationDelivered = emitDesktopNotification(notificationPayload);
+          broadcastUiNotification(notificationPayload, { desktopNotificationDelivered });
+        }
+
+        void fanoutPush(
+          {
+            title,
+            body,
+            tag,
+            data: {
+              url: buildSessionDeepLinkUrl(sessionId),
+              deeplink: buildPiUiDeepLinkUrl(sessionId, promptId, kind),
+              sessionId,
+              sessionName,
+              type: 'question',
+              ...(promptId ? { promptId } : {}),
+              kind,
+            },
+          },
+          { requireNoSse: true },
+        );
+      }, PUSH_QUESTION_DEBOUNCE_MS);
+
+      pushQuestionDebounceTimers.set(debounceKey, timer);
+      return;
+    }
+
+    if (payload.type === 'pi.ui.settled' && sessionId) {
+      const settledPrompt = payload.properties?.prompt && typeof payload.properties.prompt === 'object'
+        ? payload.properties.prompt
+        : {};
+      const settledPromptId = typeof settledPrompt.id === 'string' && settledPrompt.id.length > 0
+        ? settledPrompt.id
+        : null;
+      const debounceKey = settledPromptId ? `pi-ui:${settledPromptId}` : `pi-ui:${sessionId}`;
+      const existingTimer = pushQuestionDebounceTimers.get(debounceKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        pushQuestionDebounceTimers.delete(debounceKey);
+      }
       return;
     }
 
@@ -657,10 +798,6 @@ export const createNotificationTriggerRuntime = (deps) => {
           return;
         }
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
-
         const sessionTitle = payload.properties?.sessionTitle;
         const permissionText = typeof permission === 'string' && permission.length > 0 ? permission : '';
         const fallbackMessage = typeof sessionTitle === 'string' && sessionTitle.trim().length > 0
@@ -687,7 +824,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Permission template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (shouldEmitDesktopNotification(settings)) {
           const notificationPayload = {
             kind: 'permission',
             title,

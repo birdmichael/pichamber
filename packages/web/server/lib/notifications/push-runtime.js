@@ -244,7 +244,10 @@ export const createPushRuntime = (deps) => {
         // when an interactive (desktop/web) client is visible. The phone PWA's own foreground is
         // handled in the service worker (focused-client check), so it won't double-notify.
         // Non-mobile (desktop/web) subscriptions keep the existing any-visible gate.
-        const suppressed = isMobilePlatform(sub.platform) ? isAnyInteractiveClientVisible() : isAnyUiVisible();
+        const bypassInteractiveGate = options.bypassInteractiveGate === true;
+        const suppressed = isMobilePlatform(sub.platform)
+          ? (!bypassInteractiveGate && isAnyInteractiveClientVisible())
+          : isAnyUiVisible();
         if (suppressed) return;
       }
       await sendPushToSubscription(sub, payload);

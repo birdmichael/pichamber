@@ -363,7 +363,7 @@ Answers resolve the waiting promise on that session. Cancel settles **that promp
 
 Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
-- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
+- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`. `asked` fans out a content-free native question push (`question-<promptId>`); `settled` cancels a pending debounce; `notify` does not push.
 - `GET /api/pi/ui?session=` — pending prompts. Opening a session hydrates this list into the transcript; fetch failure must not clear local cards. A session with no messages still shows a pending select card (do not replace it with the empty-chat welcome).
 - `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a short auto-dismiss toast, not a question card or OK confirm. The settled card title may still say "Status: Off". Routine Hermes `Session backfill complete` does not publish; failed backfill still does.
 - `POST /api/pi/ui/:id/reply` `{ sessionID, value }`

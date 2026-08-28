@@ -5654,6 +5654,18 @@ app.whenReady().then(async () => {
   // reconnect immediately instead of waiting for the heartbeat watchdog.
   powerMonitor.on('resume', () => {
     emitToAllWindows('openchamber:system-resume', { timestamp: Date.now() });
+    emitToAllWindows('openchamber:system-presence', { visible: true, reason: 'resume' });
+  });
+  // Lock/sleep is not a document blur on macOS — report hidden so blocking
+  // mobile push is not suppressed while the user has walked away.
+  powerMonitor.on('lock-screen', () => {
+    emitToAllWindows('openchamber:system-presence', { visible: false, reason: 'lock-screen' });
+  });
+  powerMonitor.on('unlock-screen', () => {
+    emitToAllWindows('openchamber:system-presence', { visible: true, reason: 'unlock-screen' });
+  });
+  powerMonitor.on('suspend', () => {
+    emitToAllWindows('openchamber:system-presence', { visible: false, reason: 'suspend' });
   });
 }).catch((error) => {
   log.error('[electron] startup failed:', error);

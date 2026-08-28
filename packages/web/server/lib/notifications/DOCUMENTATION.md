@@ -45,12 +45,12 @@ This module provides notification message preparation utilities for the web serv
 - Returned API:
   - `maybeSendPushForTrigger(payload)`
 - Owns:
-  - completion/error/question/permission trigger routing; permission suppression consults the authoritative permission-auto-accept runtime
+  - completion/error/question/permission trigger routing; Pi `pi.ui.asked` / `pi.ui.settled` use the question path (not OpenCode `/api/question`), with debounce keyed by prompt id so settling one pending `ctx.ui` prompt does not cancel another; permission suppression consults the authoritative permission-auto-accept runtime
   - ready/completion fanout only on `session.idle` (Pi `agent_settled`) or `session.error`, never on intermediate assistant `message.updated` `finish: 'stop'` / `message_end` hops
   - session parent cache for subtask suppression
   - template resolution and fallback behavior
   - native notification fanout and web push payload fanout
-  - push suppression while any fresh UI visibility heartbeat reports a focused client
+  - ready/error/goal APNs suppression while any fresh UI visibility heartbeat reports a focused interactive (desktop/web) client; blocking question/permission/`pi.ui.asked` pushes always fan out to native APNs so a focused Mac window cannot swallow a waiting prompt
 
 ### Push runtime API (push-runtime.js)
 - `createPushRuntime(dependencies)`: creates runtime for web push and UI visibility state.

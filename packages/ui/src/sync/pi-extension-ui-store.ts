@@ -66,6 +66,7 @@ type PiExtensionUiState = {
   promptsBySession: Record<string, PiExtensionUiPrompt[]>;
   notifies: PiExtensionUiNotifyItem[];
   editorStash: EditorStash | null;
+  focusPromptId: string | null;
 };
 
 let notifySeq = 0;
@@ -119,11 +120,42 @@ export const usePiExtensionUiStore = create<PiExtensionUiState>(() => ({
   promptsBySession: {},
   notifies: [],
   editorStash: null,
+  focusPromptId: null,
 }));
+
+let focusClearTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const resetPiExtensionUiStore = (): void => {
   recentNotifyAt.clear();
-  usePiExtensionUiStore.setState({ promptsBySession: {}, notifies: [], editorStash: null });
+  if (focusClearTimer) {
+    clearTimeout(focusClearTimer);
+    focusClearTimer = null;
+  }
+  usePiExtensionUiStore.setState({
+    promptsBySession: {},
+    notifies: [],
+    editorStash: null,
+    focusPromptId: null,
+  });
+};
+
+export const requestPiExtensionUiFocus = (promptId: string): void => {
+  if (!promptId) return;
+  if (focusClearTimer) {
+    clearTimeout(focusClearTimer);
+    focusClearTimer = null;
+  }
+  usePiExtensionUiStore.setState({ focusPromptId: promptId });
+  focusClearTimer = setTimeout(() => {
+    focusClearTimer = null;
+    clearPiExtensionUiFocus(promptId);
+  }, 2000);
+};
+
+export const clearPiExtensionUiFocus = (promptId?: string): void => {
+  const current = usePiExtensionUiStore.getState().focusPromptId;
+  if (promptId && current !== promptId) return;
+  usePiExtensionUiStore.setState({ focusPromptId: null });
 };
 
 export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | null => {

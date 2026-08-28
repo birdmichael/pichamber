@@ -96,12 +96,13 @@ iOS Simulator helpers: `mobile:sim:{boot,install,launch,run,serve,list,kill}` (s
   `NSCameraUsageDescription` declared.
 - **Secure storage** — `@aparajita/capacitor-secure-storage` for connection tokens.
 - **Deep links** — `pichamber://` URL scheme (parsers still accept leftover `openchamber://`); a reusable intent vocabulary (`apps/deepLinks.ts`)
-  used by notification taps, widgets, and Control Center. Cold-launch intents are stashed.
-- **Push notifications** — iOS APNs + Android FCM (see below). Presence-aware routing suppresses a
-  device's push when an interactive (desktop/web) client is visible.
+  used by notification taps, widgets, and Control Center. Session links accept `?prompt=` (scroll to the waiting card) and `?action=confirm|cancel`.
+  Cold-launch intents are stashed.
+- **Push notifications** — iOS APNs + Android FCM (see below). Ready/error pushes suppress when an interactive (desktop/web) client is visible.
+  Waiting `ctx.ui` / question pushes always reach the phone. iOS confirm prompts use category `pi.ui.confirm` (NSE sets it from opaque `kind`).
 - **iOS widgets + Control Center + Notification Service Extension** — WidgetKit extension
   (`PichamberWidget`), a Control Center control, and an NSE (`PichamberNotificationService`)
-  that refreshes widgets from push. All share the App Group `group.com.pichamber.app`.
+  that refreshes widgets from push and attaches confirm notification actions. All share the App Group `group.com.pichamber.app`.
 - **Native chrome** — status bar (iOS overlay + safe-area; Android inset + themed background),
   keyboard handling (iOS CSS inset; Android native `adjustResize`), edge-swipe session switch,
   back-button handling, app-icon badge.

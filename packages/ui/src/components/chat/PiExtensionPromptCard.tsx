@@ -14,7 +14,12 @@ import {
   isPiExtensionUiNotFoundError,
   replyPiExtensionUi,
 } from '@/sync/pi-extension-ui';
-import { presentPiExtensionUiNotify, stashPiExtensionUiEditorText } from '@/sync/pi-extension-ui-store';
+import {
+  clearPiExtensionUiFocus,
+  presentPiExtensionUiNotify,
+  stashPiExtensionUiEditorText,
+  usePiExtensionUiStore,
+} from '@/sync/pi-extension-ui-store';
 import type { PiExtensionUiPrompt } from '@/sync/pi-extension-ui';
 import { localizePiPlanSelectOption, localizePiPlanSelectTitle } from '@/sync/pi-plan-locale';
 import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
@@ -98,11 +103,21 @@ const CustomAnswerTextarea = React.memo(function CustomAnswerTextarea({
 export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ prompt }) => {
   const { t } = useI18n();
   const isMobile = useUIStore((state) => state.isMobile);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const focusPromptId = usePiExtensionUiStore((state) => state.focusPromptId);
+  const isFocusedPrompt = focusPromptId === prompt.id;
   const [isResponding, setIsResponding] = React.useState(false);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [customMode, setCustomMode] = React.useState(false);
   const customTextRef = React.useRef(prompt.prefill ?? '');
   const [customFilled, setCustomFilled] = React.useState(() => Boolean((prompt.prefill ?? '').trim()));
+
+  React.useEffect(() => {
+    if (!isFocusedPrompt) return;
+    rootRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const timeout = window.setTimeout(() => clearPiExtensionUiFocus(prompt.id), 1200);
+    return () => window.clearTimeout(timeout);
+  }, [isFocusedPrompt, prompt.id]);
 
   const options = React.useMemo(() => prompt.options ?? [], [prompt.options]);
   const isMultiple = prompt.multiple;
@@ -207,7 +222,14 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
   }, [customMode, prompt.status, prompt.value, selected, t]);
 
   return (
-    <div className="group w-full pt-0 pb-2">
+    <div
+      ref={rootRef}
+      data-pi-ui-prompt={prompt.id}
+      className={cn(
+        'group w-full pt-0 pb-2',
+        isFocusedPrompt ? 'ring-2 ring-primary/40 rounded-xl' : null,
+      )}
+    >
       <div className="chat-column">
         <div className="-mt-1 border border-border/30 rounded-xl bg-muted/10">
           <div className="px-2 py-1.5 border-b border-border/20">

@@ -22,8 +22,9 @@ class NotificationService: UNNotificationServiceExtension {
         self.bestAttempt = request.content.mutableCopy() as? UNMutableNotificationContent
 
         refreshWidgetSnapshot(from: request)
+        applyPiUiCategory(to: bestAttempt, from: request)
 
-        // Deliver the notification unchanged (we only used the push to refresh widgets).
+        // Deliver the (possibly recategorized) notification. We still make no network calls.
         contentHandler(bestAttempt ?? request.content)
     }
 
@@ -31,6 +32,42 @@ class NotificationService: UNNotificationServiceExtension {
         if let handler = contentHandler {
             handler(bestAttempt ?? UNNotificationContent())
         }
+    }
+
+    /// Confirm prompts get lock-screen Confirm/Cancel without putting option text in APNs.
+    /// Kind is opaque (`select`/`confirm`/…) and may arrive at the root, nested under `data`,
+    /// or as `kind=` on the deep-link URL if the relay strips custom keys.
+    private func applyPiUiCategory(to content: UNMutableNotificationContent?, from request: UNNotificationRequest) {
+        guard let content else { return }
+        if piUiKind(from: request) == "confirm" {
+            content.categoryIdentifier = "pi.ui.confirm"
+        }
+    }
+
+    private func piUiKind(from request: UNNotificationRequest) -> String? {
+        let info = request.content.userInfo
+        if let kind = stringValue(info["kind"]) { return kind }
+        if let nested = info["data"] as? [AnyHashable: Any], let kind = stringValue(nested["kind"]) {
+            return kind
+        }
+        if let url = stringValue(info["deeplink"])
+            ?? nestedString(info, "deeplink")
+            ?? stringValue(info["url"])
+            ?? nestedString(info, "url"),
+           let kind = URLComponents(string: url)?.queryItems?.first(where: { $0.name == "kind" })?.value {
+            return kind
+        }
+        return nil
+    }
+
+    private func nestedString(_ info: [AnyHashable: Any], _ key: String) -> String? {
+        guard let nested = info["data"] as? [AnyHashable: Any] else { return nil }
+        return stringValue(nested[key])
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        guard let value = value as? String, !value.isEmpty else { return nil }
+        return value
     }
 
     private func refreshWidgetSnapshot(from request: UNNotificationRequest) {

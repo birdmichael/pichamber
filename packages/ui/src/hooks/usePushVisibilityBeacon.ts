@@ -3,7 +3,25 @@ import { isWebRuntime } from '@/lib/desktop';
 import { getClientPlatform, isCapacitorApp } from '@/lib/platform';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 
-const HEARTBEAT_MS = 20000;
+export const HEARTBEAT_MS = 20000;
+
+/** macOS lock/sleep is not a document blur. Latch hidden until unlock/resume. */
+export const createSystemPresenceLatch = () => {
+  let systemHidden = false;
+  return {
+    apply(visible: boolean | undefined): 'hidden' | 'report' {
+      if (visible === false) {
+        systemHidden = true;
+        return 'hidden';
+      }
+      systemHidden = false;
+      return 'report';
+    },
+    allowsVisibleHeartbeat(): boolean {
+      return !systemHidden;
+    },
+  };
+};
 
 const resolveVisibilityState = (): 'visible' | 'hidden' => {
   if (typeof document === 'undefined') return 'visible';
@@ -79,11 +97,18 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
       return;
     }
 
+    const presenceLatch = createSystemPresenceLatch();
+
     const report = () => {
+      if (!presenceLatch.allowsVisibleHeartbeat()) {
+        sendVisibility(false);
+        return;
+      }
       sendVisibility(resolveVisibilityState() === 'visible');
     };
 
     const reportVisibleOnly = () => {
+      if (!presenceLatch.allowsVisibleHeartbeat()) return;
       if (resolveVisibilityState() === 'visible') {
         sendVisibility(true);
       }
@@ -97,11 +122,21 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
 
     const interval = window.setInterval(reportVisibleOnly, HEARTBEAT_MS);
 
+    const onSystemPresence = (event: Event) => {
+      const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
+      if (presenceLatch.apply(detail?.visible) === 'hidden') {
+        sendVisibility(false);
+        return;
+      }
+      report();
+    };
+
     document.addEventListener('visibilitychange', report);
     window.addEventListener('pagehide', reportPageHidden);
     window.addEventListener('pageshow', report);
     window.addEventListener('focus', report);
     window.addEventListener('blur', report);
+    window.addEventListener('openchamber:system-presence', onSystemPresence);
 
     return () => {
       window.clearInterval(interval);
@@ -110,6 +145,7 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
       window.removeEventListener('pageshow', report);
       window.removeEventListener('focus', report);
       window.removeEventListener('blur', report);
+      window.removeEventListener('openchamber:system-presence', onSystemPresence);
     };
   }, [enabled]);
 };

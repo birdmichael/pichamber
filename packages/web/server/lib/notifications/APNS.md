@@ -13,7 +13,7 @@ registered them — so a leaked device token alone can't be used to push.
    `POST /v1/push/register-token`, signed with its auto-generated ECDSA P-256 key
    (`getOrCreateRelayKeypair`, persisted in settings like the VAPID keys). The relay records
    `token → serverId` where `serverId = SHA-256(publicKey)`.
-3. On a trigger (ready/error/question/permission), the server composes **generic, content-free**
+3. On a trigger (ready/error/question/permission, including Pi `pi.ui.asked`), the server composes **generic, content-free**
    text — a fixed scenario title ("Agent response is ready" / "Agent needs your input" / "Agent
    needs permission" / "Agent hit an error") + the **session name** as the body, no model/project/
    message content — plus a **`badge`** count (see below) — and POSTs `{ tokens, title, body,
@@ -28,14 +28,26 @@ registered them — so a leaked device token alone can't be used to push.
 
 ## Foreground suppression
 
-APNs is **not** gated on UI visibility. A backgrounded WKWebView can't reliably report "hidden"
-before iOS suspends it, so a server-side visibility gate dropped background push for short
-responses. Instead the server always sends, and **iOS** suppresses the foreground banner
+Ready/error/goal APNs is gated on **interactive** (desktop/web/vscode) visibility: if the Mac
+window is focused, those pushes stay off the phone. Blocking question/permission/`pi.ui.asked`
+pushes **always** fan out to APNs so walking away from a still-open Desktop window cannot leave
+a waiting prompt silent. Electron reports lock-screen/sleep as hidden (`openchamber:system-presence`)
+because macOS lock is not a document blur.
+
+The phone's own foreground is **not** gated on the server. A backgrounded WKWebView can't reliably
+report "hidden" before iOS suspends it. **iOS** suppresses the foreground banner
 (`PushNotifications.presentationOptions: []` in `capacitor.config`) — so there is no notification
-while the app is active, with no race. APNs is the native app's **only** channel; local
+while the native app is active, with no race. APNs is the native app's **only** channel; local
 notifications were removed (a WKWebView can't tell foreground from background — `document.hasFocus()`
 is unreliable — so they leaked while the app was open). Cloudflare is touched only when a native
 app with notifications on has a registered token and a trigger fires.
+
+Shared web-push `data.url` stays same-origin (`/?session=`). Native carries `data.deeplink` as
+`pichamber://session/…`. Confirm prompts send `category: pi.ui.confirm` on the APNs/relay payload
+and also attach that category in the Notification Service Extension from opaque `kind` (root,
+nested `data`, or `kind=` on the deep-link URL — not prompt text). iOS Confirm requires unlock and
+opens the app (`authenticationRequired` + `foreground`); Cancel also opens the app. The reply uses
+`POST /api/pi/ui/:id/reply|cancel`.
 
 ## App-icon badge
 
