@@ -29,15 +29,15 @@ const HEADING_CLASS = 'text-xs font-normal text-muted-foreground';
 
 export const WorkStatusSection: React.FC<{
   title: string;
-  /** Aggregate for the whole section; belongs on the heading, not on a row. */
+  /** Aggregate for the whole section; sits next to the title, not flush right. */
   summary?: React.ReactNode;
   children: React.ReactNode;
 }> = ({ title, summary, children }) => (
   <section className={SECTION_CLASS}>
-    <div className="mb-0.5 flex items-center gap-2 px-1">
-      <h3 className={cn(HEADING_CLASS, 'min-w-0 flex-1 truncate')}>{title}</h3>
+    <div className="mb-0.5 flex min-w-0 items-center gap-1.5 px-1 pr-6">
+      <h3 className={cn(HEADING_CLASS, 'shrink-0')}>{title}</h3>
       {summary !== undefined && summary !== null ? (
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{summary}</span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">{summary}</span>
       ) : null}
     </div>
     {children}

@@ -271,7 +271,8 @@ not read as two. Two deliberate differences:
   within each rank, since the agent's own ordering carries meaning.
 
 Rows truncate at this width, so each carries a delayed tooltip with the full
-task text.
+task text. The done/total count sits next to the Tasks heading so it does not
+share the top-right with the panel's sections button.
 
 ## Collapsed Usage headline
 
