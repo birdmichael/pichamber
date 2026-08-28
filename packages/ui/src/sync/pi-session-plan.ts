@@ -61,6 +61,24 @@ const trimmedSessionID = (sessionID?: string | null): string => (
   typeof sessionID === 'string' ? sessionID.trim() : ''
 );
 
+/** Open chat first. Draft Plan intent only when none of these name a session. */
+export const resolvePlanChromeSessionID = (input: {
+  sessionID?: string | null;
+  currentSessionID?: string | null;
+  routeSessionID?: string | null;
+  lastActiveSessionID?: string | null;
+}): string => (
+  trimmedSessionID(input.sessionID)
+  || trimmedSessionID(input.currentSessionID)
+  || trimmedSessionID(input.routeSessionID)
+  || trimmedSessionID(input.lastActiveSessionID)
+);
+
+export const isPlanChromeDraft = (
+  draftOpen: boolean,
+  sessionID?: string | null,
+): boolean => Boolean(draftOpen && !trimmedSessionID(sessionID));
+
 /** Footer chips: Plan slot on, plus a session id or an idle new-session draft. */
 export const canShowPiPlanToggle = (
   available: boolean,

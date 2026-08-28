@@ -968,6 +968,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.missingCommand': 'Goal jest zainstalowany, ale ten czat nie mógł go uruchomić. Kliknij Uruchom jeszcze raz albo ponownie wczytaj sesję.',
   'chat.piGoal.error.failed': 'Nie udało się uruchomić Goal.',
   'chat.piGoal.error.noSession': 'Otwórz sesję, zanim uruchomisz Goal.',
+  'chat.piGoal.row.aria': 'Bieżący Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': 'Nie znaleziono projektu dla tej sesji',
   'chat.textSelection.toast.addToNotesFailed': 'Nie udało się dodać do notatek',
   'chat.textSelection.toast.addToNotesSuccess': 'Dodano zaznaczony tekst do notatek',

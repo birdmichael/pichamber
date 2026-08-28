@@ -1,3 +1,5 @@
+import { readPlanModeStateFromSession } from './session-plan.js';
+
 export const NODE_KERNEL_PROTOCOL = 1;
 
 export const serializeKernelError = (error) => ({
@@ -64,7 +66,7 @@ export const serializeSessionSnapshot = (session, extras = {}) => ({
   thinkingLevel: typeof session?.thinkingLevel === 'string' ? session.thinkingLevel : 'medium',
   currentModel: session?.currentModel || null,
   commands: listSessionCommands(session),
-  planModeState: typeof session?.getPlanModeState === 'function' ? session.getPlanModeState() : null,
+  planModeState: readPlanModeStateFromSession(session),
   availableThinkingLevels: typeof session?.getAvailableThinkingLevels === 'function'
     ? session.getAvailableThinkingLevels()
     : [],

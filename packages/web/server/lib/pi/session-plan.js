@@ -113,6 +113,38 @@ export const restoreSessionPlanState = (entries) => {
   };
 };
 
+/** Prefer the jsonl custom entry. Live getPlanModeState() is only a fallback. */
+export const resolvePlanModeState = (liveState, entries) => {
+  const list = Array.isArray(entries) ? entries : [];
+  const hasEntry = list.some((entry) => (
+    entry?.type === 'custom' && entry?.customType === PLAN_MODE_STATE_ENTRY_TYPE
+  ));
+  const restored = restoreSessionPlanState(list);
+  if (hasEntry) return restored;
+  if (liveState && typeof liveState === 'object') {
+    const liveOn = liveState.enabled === true
+      || Boolean(liveState.savedPlan)
+      || Boolean(liveState.activeImplementation);
+    if (liveOn) return liveState;
+  }
+  return restored;
+};
+
+export const readPlanModeStateFromSession = (session) => {
+  let live = null;
+  if (typeof session?.getPlanModeState === 'function') {
+    try {
+      const next = session.getPlanModeState();
+      if (next && typeof next === 'object') live = next;
+    } catch {
+    }
+  }
+  const entries = typeof session?.sessionManager?.getEntries === 'function'
+    ? session.sessionManager.getEntries()
+    : [];
+  return resolvePlanModeState(live, entries);
+};
+
 export const sessionPlanFromState = (state) => {
   const enabled = state?.enabled === true;
   const latestPlan = normalizePlanMarkdown(state?.latestPlan);

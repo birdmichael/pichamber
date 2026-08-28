@@ -2056,6 +2056,8 @@ export const dict = {
   'chat.piGoal.error.missingCommand': 'Goal ist installiert, konnte in diesem Chat aber nicht gestartet werden. Erneut auf Start klicken oder die Sitzung neu laden.',
   'chat.piGoal.error.failed': 'Goal konnte nicht gestartet werden.',
   'chat.piGoal.error.noSession': 'Öffnen Sie eine Sitzung, bevor Sie Goal starten.',
+  'chat.piGoal.row.aria': 'Aktuelles Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': 'Kein Projekt für diese Sitzung gefunden',
   'chat.textSelection.toast.addToNotesFailed': 'Fehler beim Hinzufügen zu Notizen',
   'chat.textSelection.toast.addToNotesSuccess': 'Ausgewählter Text zu Notizen hinzugefügt',

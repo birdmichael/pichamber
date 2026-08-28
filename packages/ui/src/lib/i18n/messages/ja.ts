@@ -2233,6 +2233,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.missingCommand': 'Goal はインストール済みですが、このチャットでは開始できませんでした。もう一度開始するか、セッションを再読み込みしてください。',
   'chat.piGoal.error.failed': 'Goal を開始できませんでした。',
   'chat.piGoal.error.noSession': 'Goal を開始する前にセッションを開いてください。',
+  'chat.piGoal.row.aria': '現在の Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': 'このセッションのプロジェクトが見つかりません',
   'chat.textSelection.toast.addToNotesFailed': 'メモへの追加に失敗しました',
   'chat.textSelection.toast.addToNotesSuccess': '選択テキストをメモに追加しました',

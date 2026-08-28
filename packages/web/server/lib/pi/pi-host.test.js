@@ -231,6 +231,9 @@ describe('session conversation titles', () => {
   it('uses the first line of the user message as the title', () => {
     expect(titleFromUserText('  nihao\nsecond line  ')).toBe('nihao second line');
     expect(titleFromUserText('x'.repeat(80))).toBe(`${'x'.repeat(57)}...`);
+    expect(titleFromUserText('/goal say bye')).toBe('say bye');
+    expect(titleFromUserText('/goal:1 ship the footer')).toBe('ship the footer');
+    expect(titleFromUserText('/plan start')).toBe('start');
     expect(firstUserTextFromPiEntries([{
       type: 'session',
       id: '01a',
@@ -1717,6 +1720,47 @@ describe('createPiHost', () => {
       };
       await host.runCommand(record.id, { command: 'goal', arguments: 'keep going' });
       expect(prompted).toEqual(['/goal keep going']);
+      expect(record.messages.some((entry) => (
+        entry?.info?.role === 'user'
+        && entry.parts?.some((part) => part?.text === '/goal keep going')
+      ))).toBe(true);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('starts /goal on a session that already replied without creating another chat', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-existing-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.registerCommand('goal', async () => {}, { description: 'Set a goal' });
+      record.info.title = 'ok';
+      record.messages.push(
+        {
+          info: { id: 'msg_ok', sessionID: record.id, role: 'user', time: { created: Date.now() } },
+          parts: [{ id: 'prt_ok', sessionID: record.id, messageID: 'msg_ok', type: 'text', text: 'ok' }],
+        },
+        {
+          info: { id: 'msg_reply', sessionID: record.id, role: 'assistant', time: { created: Date.now() } },
+          parts: [{ id: 'prt_reply', sessionID: record.id, messageID: 'msg_reply', type: 'text', text: 'ok' }],
+        },
+      );
+      const beforeIds = host.listSessions().map((item) => item.id);
+
+      await host.runCommand(record.id, { command: 'goal', arguments: 'say bye' });
+
+      expect(host.listSessions().map((item) => item.id)).toEqual(beforeIds);
+      const texts = host.getMessages(record.id).flatMap((entry) => (
+        (entry.parts || []).map((part) => part?.text).filter(Boolean)
+      ));
+      expect(texts).toContain('ok');
+      expect(texts).toContain('/goal say bye');
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
@@ -1902,6 +1946,19 @@ describe('session plan status and actions', () => {
     });
     expect(prompted).toEqual(['/plan start']);
 
+    const stubHost = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const stub = await stubHost.createSession({ directory: '/tmp/project', title: 'Plan stub' });
+    stub.piSession.prompt = async () => {};
+    stub.piSession.getPlanModeState = () => null;
+    await expect(stubHost.runPlanAction(stub.id, { action: 'start' })).rejects.toMatchObject({
+      status: 500,
+    });
+    expect(await stubHost.getSessionPlan(stub.id)).toEqual({ status: 'off', planMarkdown: '' });
+    stubHost.dispose();
+
     record.piSession.setPlanModeState({
       enabled: true,
       latestPlan: '# Ready plan\n\nDo the work.',
@@ -1964,6 +2021,37 @@ describe('session plan status and actions', () => {
     expect(prompted).toEqual(['/plan start']);
     expect(record.piSession.reloadCount).toBe(1);
     expect(record.piSession.bindCount).toBe(2);
+    host.dispose();
+  });
+
+  it('reads plan from jsonl entries when getPlanModeState is empty', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan entries' });
+    let setPlanModeStateCalls = 0;
+    record.piSession.getPlanModeState = () => null;
+    record.piSession.setPlanModeState = () => {
+      setPlanModeStateCalls += 1;
+      throw new Error('must not IPC setPlanModeState');
+    };
+    record.piSession.sessionManager.appendCustomEntry('plan-mode-state', {
+      enabled: true,
+      awaitingAction: false,
+    });
+    expect(await host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+
+    record.piSession.sessionManager.appendCustomEntry('plan-mode-state', {
+      enabled: false,
+      savedPlan: { plan: '# Saved from disk\n\nKeep this.', source: 'plan_mode_complete' },
+    });
+    const resumed = await host.runPlanAction(record.id, { action: 'resume' });
+    expect(resumed).toMatchObject({
+      status: 'ready',
+      planMarkdown: '# Saved from disk\n\nKeep this.',
+    });
+    expect(setPlanModeStateCalls).toBe(0);
     host.dispose();
   });
 

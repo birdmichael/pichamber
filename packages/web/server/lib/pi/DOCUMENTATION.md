@@ -390,19 +390,23 @@ Busy/retry sessions still 409.
 
 `GET /api/pi/session/:id/plan` returns
 `{ status: off|active|ready|saved|implementing, planMarkdown, title? }`
-from the live `plan-mode-state` custom entry (same mapping as
-`pi-plan-mode` `formatStatus`). It does not scrape TUI widgets or read
-`.opencode/plans`. Fetch failure is an HTTP error, not an empty `off`.
+from the session `plan-mode-state` custom entry (same mapping as
+`pi-plan-mode` `formatStatus`). Real `AgentSession` has no
+`getPlanModeState()`; the Node child snapshot and host read restore
+that entry (and fall back to a live getter only when it is actually
+on). An empty getter must not win over jsonl `enabled: true`.
+It does not scrape TUI widgets or read `.opencode/plans`. Fetch
+failure is an HTTP error, not an empty `off`.
 
 `POST /api/pi/session/:id/plan` `{ action, model? }`:
 
 | action | Dispatch |
 |---|---|
-| `start` | `session.prompt("/plan start")` |
+| `start` | `session.prompt("/plan start")`, then refresh the snapshot and re-read plan-mode-state. If status is still `off`, 500 — do not treat an empty `prompt()` stub as success |
 | `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
 | `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
 | `exit` | `session.prompt("/plan exit")` — discard only |
-| `resume` | rewrite saved → ready `plan-mode-state`, then `reload({ sessionID })`. Do not send `/plan start` (that errors while a saved plan exists) |
+| `resume` | append saved → ready `plan-mode-state` via `sessionManager.appendCustomEntry`, then `reload({ sessionID })`. Do not IPC `setPlanModeState` (real `AgentSession` has no such method). Do not send `/plan start` (that errors while a saved plan exists) |
 
 Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
@@ -812,7 +816,9 @@ chat:
 3. Live command present (including a prompt overlay of the same name, or
    `invocationName` `goal:1` when two factories registered `goal`) —
    `record.piSession.prompt("/<invocation> <objective>")` so
-   `registerCommand` runs.
+   `registerCommand` runs. Also append a facade user message
+   `/goal <objective>` (so the chat shows the user’s goal) and
+   title the session from that text when it is still Untitled.
 
 `@narumitw/pi-goal` starts on any idle session, including one with
 history. Opening a persisted session hydrates, binds Desktop `ctx.ui`,
@@ -820,8 +826,10 @@ then serializes the runner command list onto the parent snapshot. A new
 empty session lists `goal` on `GET /api/command?session=` because that
 GET hydrates the session and the Goal slot also injects a catalog row.
 The composer Goal button may mint a draft session before
-`session.command` with `createSession({ activate: false })`. Do not
-switch the open chat onto that minted id until start succeeds; a failed
+`session.command` with `createSession({ activate: false })` only when
+there is no current session. An already-open chat (including one whose
+welcome still looks empty) must send `/goal` to that id. Do not
+switch the open chat onto a minted id until start succeeds; a failed
 start stays in the modal on the draft (and must not look like success).
 Retry reuses the minted id. Do not require a provider/model for this
 command-only start.

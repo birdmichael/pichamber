@@ -2239,6 +2239,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.missingCommand': 'Goal은 설치되어 있지만 이 채팅에서 시작하지 못했습니다. 다시 시작하거나 세션을 다시 불러오세요.',
   'chat.piGoal.error.failed': 'Goal을 시작하지 못했습니다.',
   'chat.piGoal.error.noSession': 'Goal을 시작하기 전에 세션을 여세요.',
+  'chat.piGoal.row.aria': '현재 Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': '이 세션의 프로젝트를 찾을 수 없음',
   'chat.textSelection.toast.addToNotesFailed': '메모 추가 실패',
   'chat.textSelection.toast.addToNotesSuccess': '선택한 텍스트를 메모에 추가함',

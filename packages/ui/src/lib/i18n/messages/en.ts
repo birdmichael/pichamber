@@ -2237,6 +2237,8 @@ export const dict = {
   'chat.piGoal.error.missingCommand': 'Goal is installed but this chat could not start it. Try Start again, or reload the session.',
   'chat.piGoal.error.failed': 'Could not start Goal.',
   'chat.piGoal.error.noSession': 'Open a session before starting Goal.',
+  'chat.piGoal.row.aria': 'Current Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': 'No project found for this session',
   'chat.textSelection.toast.addToNotesFailed': 'Failed to add to notes',
   'chat.textSelection.toast.addToNotesSuccess': 'Added selected text to notes',

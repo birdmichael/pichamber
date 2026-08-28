@@ -106,8 +106,8 @@ import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
   parseSessionPlanAction,
-  restoreSessionPlanState,
   resumeSavedPlanState,
+  resolvePlanModeState,
   sessionPlanFromState,
 } from './session-plan.js';
 import {
@@ -580,7 +580,8 @@ export const resolvePromptModelRef = (model) => {
 };
 
 export const titleFromUserText = (text) => {
-  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  let line = String(text || '').replace(/\s+/g, ' ').trim();
+  line = line.replace(/^\/(?:goal|plan)(?::\d+)?\s+/i, '');
   if (!line) return '';
   return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
 };
@@ -1161,38 +1162,45 @@ const refreshRecordCommands = async (record) => {
   }
 };
 
-const createLocalReply = (emit) => (record, body, userText, assistantText) => {
+const appendFacadeUserMessage = (emit, record, body, userText) => {
   const sessionID = record.id;
   const userMessageID = body.messageID || createMessageId();
   const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
-  if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
-    const userPart = {
-      id: createPartId(),
-      sessionID,
-      messageID: userMessageID,
-      type: 'text',
-      text: userText,
-    };
-    const userInfo = {
-      id: userMessageID,
-      sessionID,
-      role: 'user',
-      time: { created: Date.now() },
-      agent: userAgent,
-      ...(body.model ? { model: body.model } : {}),
-    };
-    record.messages.push({ info: userInfo, parts: [userPart] });
-    emit(record.directory, {
-      id: createEventId(),
-      type: 'message.updated',
-      properties: { sessionID, info: userInfo },
-    });
-    emit(record.directory, {
-      id: createEventId(),
-      type: 'message.part.updated',
-      properties: { sessionID, part: userPart, time: Date.now() },
-    });
+  if (record.messages.some((entry) => entry.info.id === userMessageID)) {
+    return userMessageID;
   }
+  const userPart = {
+    id: createPartId(),
+    sessionID,
+    messageID: userMessageID,
+    type: 'text',
+    text: userText,
+  };
+  const userInfo = {
+    id: userMessageID,
+    sessionID,
+    role: 'user',
+    time: { created: Date.now() },
+    agent: userAgent,
+    ...(body.model ? { model: body.model } : {}),
+  };
+  record.messages.push({ info: userInfo, parts: [userPart] });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.updated',
+    properties: { sessionID, info: userInfo },
+  });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.part.updated',
+    properties: { sessionID, part: userPart, time: Date.now() },
+  });
+  return userMessageID;
+};
+
+const createLocalReply = (emit) => (record, body, userText, assistantText) => {
+  const sessionID = record.id;
+  const userMessageID = appendFacadeUserMessage(emit, record, body, userText);
 
   const assistantID = createMessageId();
   const assistantInfo = {
@@ -1967,25 +1975,34 @@ export const createPiHost = ({
     return record;
   };
 
-  const readRecordPlan = (record) => {
-    if (typeof record?.piSession?.getPlanModeState === 'function') {
-      return sessionPlanFromState(record.piSession.getPlanModeState());
-    }
-    const manager = record?.sessionManager;
-    const entries = typeof manager?.getEntries === 'function'
-      ? manager.getEntries()
-      : (typeof manager?.getBranch === 'function' ? manager.getBranch() : []);
-    return sessionPlanFromState(restoreSessionPlanState(entries));
+  const readRecordEntries = (record) => {
+    const manager = record?.sessionManager || record?.piSession?.sessionManager;
+    if (typeof manager?.getEntries === 'function') return manager.getEntries();
+    if (typeof manager?.getBranch === 'function') return manager.getBranch();
+    return [];
   };
 
-  const persistRecordPlanState = (record, next) => {
-    if (typeof record?.piSession?.setPlanModeState === 'function') {
-      record.piSession.setPlanModeState(next);
+  const readRecordPlan = (record) => {
+    const live = typeof record?.piSession?.getPlanModeState === 'function'
+      ? record.piSession.getPlanModeState()
+      : null;
+    return sessionPlanFromState(resolvePlanModeState(live, readRecordEntries(record)));
+  };
+
+  const persistRecordPlanState = async (record, next) => {
+    const manager = record?.sessionManager || record?.piSession?.sessionManager;
+    const write = (fn, ...args) => {
+      const result = fn(...args);
+      return result && typeof result.then === 'function' ? result : undefined;
+    };
+    if (typeof manager?.appendCustomEntry === 'function') {
+      await write(manager.appendCustomEntry.bind(manager), PLAN_MODE_STATE_ENTRY_TYPE, next);
+      return;
     }
-    if (typeof record?.sessionManager?.appendCustomEntry === 'function') {
-      record.sessionManager.appendCustomEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+    if (typeof record?.piSession?.setPlanModeState === 'function') {
+      await write(record.piSession.setPlanModeState.bind(record.piSession), next);
     } else if (typeof record?.piSession?.appendEntry === 'function') {
-      record.piSession.appendEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+      await write(record.piSession.appendEntry.bind(record.piSession), PLAN_MODE_STATE_ENTRY_TYPE, next);
     }
   };
 
@@ -3292,7 +3309,18 @@ export const createPiHost = ({
         ensureQuestionToolAdapted(record);
         const invoke = liveCommandInvocation(liveCommand, name);
         const promptText = `/${[invoke, argument].filter(Boolean).join(' ')}`;
+        if (name === goalCommand || name === 'goal') {
+          appendFacadeUserMessage(emit, record, body, userText);
+          if (maybeApplyConversationTitle(record)) {
+            emit(record.directory, {
+              id: createEventId(),
+              type: 'session.updated',
+              properties: { info: record.info },
+            });
+          }
+        }
         await record.piSession.prompt(promptText);
+        await refreshRecordCommands(record);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
         }
@@ -3557,20 +3585,19 @@ export const createPiHost = ({
       }
 
       if (action === 'resume') {
-        const current = typeof record.piSession?.getPlanModeState === 'function'
-          ? record.piSession.getPlanModeState()
-          : restoreSessionPlanState(
-            typeof record.sessionManager?.getEntries === 'function'
-              ? record.sessionManager.getEntries()
-              : [],
-          );
+        const current = resolvePlanModeState(
+          typeof record.piSession?.getPlanModeState === 'function'
+            ? record.piSession.getPlanModeState()
+            : null,
+          readRecordEntries(record),
+        );
         const next = resumeSavedPlanState(current);
         if (!next) {
           const error = new Error('No saved plan to resume');
           error.status = 409;
           throw error;
         }
-        persistRecordPlanState(record, next);
+        await persistRecordPlanState(record, next);
         await this.reload({ sessionID: record.id });
         const reloaded = await ensureRecord(record.id);
         const plan = readRecordPlan(reloaded);
@@ -3586,8 +3613,14 @@ export const createPiHost = ({
         command: 'plan',
         arguments: action === 'exit' ? 'exit' : action,
       });
+      await refreshRecordCommands(record);
       const plan = readRecordPlan(record);
       emitPlanUpdated(record, plan);
+      if (action === 'start' && plan.status === 'off') {
+        const error = new Error('Plan mode did not start');
+        error.status = 500;
+        throw error;
+      }
       return plan;
     },
     listExtensions(directory) {

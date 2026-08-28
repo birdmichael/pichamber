@@ -7,7 +7,12 @@ import {
   getPiGoalCommand,
   isPiGoalComposerButtonVisible,
   isPiGoalPluginAvailable,
+  readPiGoalObjectiveFromMessages,
+  readPiGoalObjectiveFromSession,
   resolvePiGoalSession,
+  readPiGoalRouteSessionID,
+  resolvePiGoalDirectory,
+  resolvePiGoalTargetSession,
   startPiGoalCommand,
   submitPiGoalFromDialog,
 } from './piGoal';
@@ -99,6 +104,72 @@ describe('Pi Goal start command', () => {
     expect(result).toEqual({ ok: false, reason: 'empty' });
     expect(sendCommandCalls).toEqual([]);
     expect(sendMessageCalls).toEqual([]);
+  });
+
+  test('never mints when the store already has a current session', async () => {
+    expect(resolvePiGoalTargetSession({
+      sessionID: null,
+      currentSessionID: 'ses_open',
+      mintedSessionID: 'ses_minted',
+    })).toBe('ses_open');
+    expect(await resolvePiGoalSession({
+      sessionID: null,
+      currentSessionID: 'ses_open',
+      draftOpen: true,
+      createSession: async () => {
+        throw new Error('must not mint over an open session');
+      },
+    })).toEqual({ ok: true, sessionID: 'ses_open', minted: false });
+  });
+
+  test('never mints when the URL or last-active session still names an open chat', async () => {
+    expect(readPiGoalRouteSessionID('?session=ses_route&tab=chat')).toBe('ses_route');
+    expect(resolvePiGoalTargetSession({
+      sessionID: null,
+      currentSessionID: null,
+      routeSessionID: 'ses_route',
+      lastActiveSessionID: 'ses_last',
+      mintedSessionID: 'ses_minted',
+    })).toBe('ses_route');
+    expect(resolvePiGoalTargetSession({
+      sessionID: null,
+      lastActiveSessionID: 'ses_last',
+      mintedSessionID: 'ses_minted',
+    })).toBe('ses_last');
+    expect(resolvePiGoalDirectory({
+      sessionDirectory: '/repo',
+      lastActiveDirectory: '/chats/old',
+      composerDirectory: '/chats/draft',
+    })).toBe('/repo');
+    expect(await resolvePiGoalSession({
+      sessionID: null,
+      routeSessionID: 'ses_route',
+      draftOpen: true,
+      createSession: async () => {
+        throw new Error('must not mint over a routed session');
+      },
+    })).toEqual({ ok: true, sessionID: 'ses_route', minted: false });
+  });
+
+  test('reads the latest /goal user bubble as the visible objective', () => {
+    expect(readPiGoalObjectiveFromMessages([
+      { info: { role: 'user' }, parts: [{ type: 'text', text: 'ok' }] },
+      { info: { role: 'user' }, parts: [{ type: 'text', text: '/goal say bye' }] },
+      { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'Goal mode is active.' }] },
+    ])).toBe('say bye');
+    expect(readPiGoalObjectiveFromMessages([
+      { info: { role: 'user' }, parts: [{ type: 'text', text: 'ok' }] },
+    ])).toBeNull();
+    expect(readPiGoalObjectiveFromSession(
+      [
+        { id: 'msg_ok', role: 'user' },
+        { id: 'msg_goal', role: 'user' },
+      ],
+      {
+        msg_ok: [{ type: 'text', text: 'ok' }],
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+      },
+    )).toBe('say bye');
   });
 
   test('mints a draft session instead of treating an empty composer as no-session', async () => {
@@ -203,6 +274,51 @@ describe('Pi Goal dialog submit', () => {
       directory: '/tmp/minted',
     });
     expect(created).toBe(1);
+  });
+
+  test('does not mint when the open chat already has a current session', async () => {
+    const result = await submitPiGoalFromDialog({
+      sessionID: null,
+      currentSessionID: 'ses_open',
+      draftOpen: true,
+      directory: '/tmp/project',
+      command: 'goal',
+      objective: 'say bye',
+      createSession: async () => {
+        throw new Error('must not mint over an open session');
+      },
+      sendCommand: async (params) => {
+        expect(params.id).toBe('ses_open');
+      },
+    });
+    expect(result).toEqual({
+      ok: true,
+      sessionID: 'ses_open',
+      directory: '/tmp/project',
+    });
+  });
+
+  test('does not mint when a draft welcome still has a routed session', async () => {
+    const result = await submitPiGoalFromDialog({
+      sessionID: null,
+      currentSessionID: null,
+      routeSessionID: 'ses_route',
+      draftOpen: true,
+      directory: '/tmp/chats/draft',
+      command: 'goal',
+      objective: 'say bye',
+      createSession: async () => {
+        throw new Error('must not mint over a routed session');
+      },
+      sendCommand: async (params) => {
+        expect(params.id).toBe('ses_route');
+      },
+    });
+    expect(result).toEqual({
+      ok: true,
+      sessionID: 'ses_route',
+      directory: '/tmp/chats/draft',
+    });
   });
 
   test('reports the minted session only after /goal is accepted', async () => {

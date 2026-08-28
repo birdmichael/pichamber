@@ -6,6 +6,8 @@ import {
   canShowPiPlanToggle,
   decidePlanToggleSelect,
   isFooterPlanSelected,
+  isPlanChromeDraft,
+  resolvePlanChromeSessionID,
   parseSessionPlan,
   planBuildAvailable,
   planToggleAction,
@@ -159,6 +161,40 @@ describe('plan toggle and build dispatch', () => {
     expect(resolveOpenedDraftPlanSelected(undefined, true)).toBe(true);
     expect(resolveOpenedDraftPlanSelected(false, true)).toBe(false);
     expect(resolveOpenedDraftPlanSelected(undefined, false)).toBe(false);
+  });
+
+  test('Plan chrome prefers the open chat over an auto-draft welcome', () => {
+    expect(resolvePlanChromeSessionID({
+      currentSessionID: null,
+      routeSessionID: 'ses_route',
+      lastActiveSessionID: 'ses_last',
+    })).toBe('ses_route');
+    expect(resolvePlanChromeSessionID({
+      currentSessionID: null,
+      routeSessionID: '',
+      lastActiveSessionID: 'ses_last',
+    })).toBe('ses_last');
+    expect(resolvePlanChromeSessionID({
+      sessionID: 'ses_override',
+      currentSessionID: 'ses_current',
+      routeSessionID: 'ses_route',
+    })).toBe('ses_override');
+    expect(isPlanChromeDraft(true, 'ses_route')).toBe(false);
+    expect(isPlanChromeDraft(true, null)).toBe(true);
+    expect(isPlanChromeDraft(true, '')).toBe(true);
+    expect(decidePlanToggleSelect({
+      sessionID: resolvePlanChromeSessionID({
+        currentSessionID: null,
+        routeSessionID: 'ses_route',
+      }),
+      draftOpen: isPlanChromeDraft(true, 'ses_route'),
+      status: 'off',
+      side: 'plan',
+    })).toEqual({
+      kind: 'session-action',
+      sessionID: 'ses_route',
+      action: 'start',
+    });
   });
 
   test('existing-session Plan toggle stays on that session and never creates one', async () => {

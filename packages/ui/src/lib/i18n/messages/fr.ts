@@ -3115,6 +3115,8 @@ export const dict = {
   'chat.piGoal.error.missingCommand': 'Goal est installé, mais cette discussion n’a pas pu le démarrer. Réessayez Démarrer, ou rechargez la session.',
   'chat.piGoal.error.failed': 'Impossible de démarrer Goal.',
   'chat.piGoal.error.noSession': 'Ouvrez une session avant de démarrer Goal.',
+  'chat.piGoal.row.aria': 'Goal en cours',
+  'chat.piGoal.row.label': 'Goal',
   'chat.messageBody.forkDialog.title': 'Démarrer une nouvelle session',
   'chat.messageBody.forkDialog.instructions.label': 'Instructions',
   'chat.messageBody.forkDialog.instructions.placeholder': 'Ajouter des instructions pour la nouvelle session…',

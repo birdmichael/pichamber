@@ -1,4 +1,5 @@
 import type { FeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
+import { ROUTE_PARAMS } from '@/lib/router/types';
 
 const DEFAULT_GOAL_COMMAND = 'goal';
 
@@ -44,12 +45,102 @@ export function canSubmitPiGoalObjective(objective: string): boolean {
   return objective.trim().length > 0;
 }
 
+const pickSessionID = (value?: string | null): string => (
+  typeof value === 'string' ? value.trim() : ''
+);
+
+export function readPiGoalRouteSessionID(search: string | null | undefined): string {
+  const raw = typeof search === 'string' ? search : '';
+  const query = raw.startsWith('?') ? raw.slice(1) : raw;
+  return pickSessionID(new URLSearchParams(query).get(ROUTE_PARAMS.SESSION));
+}
+
+export function resolvePiGoalDirectory(input: {
+  sessionDirectory?: string | null;
+  lastActiveDirectory?: string | null;
+  composerDirectory?: string | null;
+}): string | null {
+  return pickSessionID(input.sessionDirectory)
+    || pickSessionID(input.lastActiveDirectory)
+    || pickSessionID(input.composerDirectory)
+    || null;
+}
+
+export function resolvePiGoalTargetSession(input: {
+  sessionID?: string | null;
+  currentSessionID?: string | null;
+  routeSessionID?: string | null;
+  lastActiveSessionID?: string | null;
+  mintedSessionID?: string | null;
+}): string {
+  return pickSessionID(input.currentSessionID)
+    || pickSessionID(input.sessionID)
+    || pickSessionID(input.routeSessionID)
+    || pickSessionID(input.lastActiveSessionID)
+    || pickSessionID(input.mintedSessionID);
+}
+
+const PI_GOAL_USER_TEXT = /^\/goal(?::\d+)?\s+(.+)$/is;
+
+const objectiveFromUserText = (text: string): string | null => {
+  const match = text.trim().match(PI_GOAL_USER_TEXT);
+  return match?.[1]?.trim() || null;
+};
+
+const textFromParts = (parts: Array<{ type?: string; text?: string }> | null | undefined): string => (
+  (parts || [])
+    .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
+    .join('')
+    .trim()
+);
+
+export function readPiGoalObjectiveFromMessages(
+  messages: Array<{
+    role?: string;
+    info?: { role?: string };
+    parts?: Array<{ type?: string; text?: string }>;
+  }> | null | undefined,
+): string | null {
+  if (!Array.isArray(messages)) return null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const entry = messages[index];
+    const role = entry?.info?.role || entry?.role;
+    if (role !== 'user') continue;
+    const objective = objectiveFromUserText(textFromParts(entry.parts));
+    if (objective) return objective;
+  }
+  return null;
+}
+
+export function readPiGoalObjectiveFromSession(
+  messages: Array<{ id?: string; role?: string }> | null | undefined,
+  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+): string | null {
+  if (!Array.isArray(messages)) return null;
+  const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user' || typeof message.id !== 'string' || !message.id) continue;
+    const objective = objectiveFromUserText(textFromParts(parts[message.id]));
+    if (objective) return objective;
+  }
+  return null;
+}
+
 export async function resolvePiGoalSession(input: {
   sessionID: string | null | undefined;
+  currentSessionID?: string | null | undefined;
+  routeSessionID?: string | null | undefined;
+  lastActiveSessionID?: string | null | undefined;
   draftOpen?: boolean;
   createSession?: () => Promise<{ id: string } | null | undefined>;
 }): Promise<PiGoalSessionResolution> {
-  const sessionID = typeof input.sessionID === 'string' ? input.sessionID.trim() : '';
+  const sessionID = resolvePiGoalTargetSession({
+    sessionID: input.sessionID,
+    currentSessionID: input.currentSessionID,
+    routeSessionID: input.routeSessionID,
+    lastActiveSessionID: input.lastActiveSessionID,
+  });
   if (sessionID) return { ok: true, sessionID, minted: false };
   if (!input.draftOpen || typeof input.createSession !== 'function') {
     return { ok: false, reason: 'no-session' };
@@ -80,6 +171,9 @@ export type PiGoalDialogSubmitResult =
 /** Mint if needed, send /goal, and only then report success so the dialog can close. */
 export async function submitPiGoalFromDialog(input: {
   sessionID: string | null | undefined;
+  currentSessionID?: string | null | undefined;
+  routeSessionID?: string | null | undefined;
+  lastActiveSessionID?: string | null | undefined;
   draftOpen?: boolean;
   directory?: string | null;
   command: string;
@@ -95,6 +189,9 @@ export async function submitPiGoalFromDialog(input: {
   let mintedDirectory = input.directory ?? null;
   const resolved = await resolvePiGoalSession({
     sessionID: input.sessionID,
+    currentSessionID: input.currentSessionID,
+    routeSessionID: input.routeSessionID,
+    lastActiveSessionID: input.lastActiveSessionID,
     draftOpen: input.draftOpen,
     createSession: async () => {
       const created = await input.createSession();

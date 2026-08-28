@@ -642,6 +642,50 @@ describe('node kernel session snapshot commands', () => {
     ]);
   });
 
+  it('serializes plan-mode-state from session entries when getPlanModeState is missing', () => {
+    expect(serializeSessionSnapshot({
+      sessionId: 'ses_plan',
+      sessionManager: {
+        getEntries: () => ([{
+          type: 'custom',
+          customType: 'plan-mode-state',
+          data: { enabled: true, awaitingAction: false },
+        }]),
+      },
+    }).planModeState).toMatchObject({ enabled: true });
+  });
+
+  it('GET/POST plan after start follow child snapshot entries over IPC', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const kernel = createDesktopKernel({ home, cwd });
+    try {
+      await expect(kernel.ready()).resolves.toBe(true);
+      const record = await kernel.host.createSession({ directory: cwd, title: 'Plan ipc' });
+      expect(await kernel.host.getSessionPlan(record.id)).toEqual({ status: 'off', planMarkdown: '' });
+
+      const started = await kernel.host.runPlanAction(record.id, { action: 'start' });
+      expect(started).toEqual({ status: 'active', planMarkdown: '' });
+      expect(await kernel.host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+      expect(record.piSession.getPlanModeState()?.enabled).toBe(true);
+
+      record.piSession.setPlanModeState = () => {
+        throw new Error('must not IPC setPlanModeState');
+      };
+      await record.piSession.sessionManager.appendCustomEntry('plan-mode-state', {
+        enabled: false,
+        savedPlan: { plan: '# Saved over IPC', source: 'plan_mode_complete' },
+      });
+      const resumed = await kernel.host.runPlanAction(record.id, { action: 'resume' });
+      expect(resumed).toMatchObject({
+        status: 'ready',
+        planMarkdown: '# Saved over IPC',
+      });
+    } finally {
+      kernel.dispose();
+    }
+  });
+
   it('refreshes parent getCommands() from the child session.get snapshot', async () => {
     const home = tempDir('pi-node-home-');
     const cwd = tempDir('pi-node-cwd-');

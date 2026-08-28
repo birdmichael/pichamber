@@ -12,8 +12,15 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/lib/i18n';
 import { opencodeClient } from '@/lib/opencode/client';
-import { canSubmitPiGoalObjective, submitPiGoalFromDialog } from '@/lib/piGoal';
+import {
+  canSubmitPiGoalObjective,
+  readPiGoalRouteSessionID,
+  resolvePiGoalDirectory,
+  resolvePiGoalTargetSession,
+  submitPiGoalFromDialog,
+} from '@/lib/piGoal';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+import { readLastActiveSession } from '@/sync/last-session-cache';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
 interface PiGoalDialogProps {
@@ -38,13 +45,25 @@ export function PiGoalDialog({
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const mintedRef = React.useRef<{ sessionID: string; directory: string | null } | null>(null);
+  const openedTargetRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    if (open) return;
-    mintedRef.current = null;
-    setObjective('');
-    setError(null);
-  }, [open]);
+    if (!open) {
+      mintedRef.current = null;
+      openedTargetRef.current = null;
+      setObjective('');
+      setError(null);
+      return;
+    }
+    const store = useSessionUIStore.getState();
+    const lastActive = readLastActiveSession(getRuntimeKey());
+    openedTargetRef.current = resolvePiGoalTargetSession({
+      sessionID: sessionId,
+      currentSessionID: store.currentSessionId,
+      routeSessionID: typeof window === 'undefined' ? '' : readPiGoalRouteSessionID(window.location.search),
+      lastActiveSessionID: lastActive?.sessionId,
+    }) || null;
+  }, [open, sessionId]);
 
   const trimmed = objective.trim();
   const canSubmit = canSubmitPiGoalObjective(objective) && !busy;
@@ -54,10 +73,28 @@ export function PiGoalDialog({
     setBusy(true);
     setError(null);
     try {
+      const store = useSessionUIStore.getState();
+      const lastActive = readLastActiveSession(getRuntimeKey());
+      const routeSessionID = typeof window === 'undefined' ? '' : readPiGoalRouteSessionID(window.location.search);
+      const liveCurrentID = store.currentSessionId;
+      const targetSessionID = resolvePiGoalTargetSession({
+        sessionID: sessionId || mintedRef.current?.sessionID || openedTargetRef.current,
+        currentSessionID: liveCurrentID,
+        routeSessionID,
+        lastActiveSessionID: lastActive?.sessionId,
+      });
+      const sessionDirectory = targetSessionID ? store.getDirectoryForSession(targetSessionID) : null;
       const result = await submitPiGoalFromDialog({
-        sessionID: sessionId || mintedRef.current?.sessionID,
-        draftOpen: draftOpen && !mintedRef.current,
-        directory: mintedRef.current?.directory ?? directory,
+        sessionID: sessionId || mintedRef.current?.sessionID || openedTargetRef.current,
+        currentSessionID: liveCurrentID,
+        routeSessionID,
+        lastActiveSessionID: lastActive?.sessionId,
+        draftOpen: draftOpen && !mintedRef.current && !targetSessionID,
+        directory: mintedRef.current?.directory ?? resolvePiGoalDirectory({
+          sessionDirectory,
+          lastActiveDirectory: lastActive?.directory,
+          composerDirectory: directory,
+        }),
         command,
         objective,
         createSession: async () => {

@@ -2207,6 +2207,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.missingCommand': 'Goal 已安裝，但目前工作階段沒能啟動。請再按一次開始，或先重載工作階段。',
   'chat.piGoal.error.failed': '無法開始 Goal。',
   'chat.piGoal.error.noSession': '請先開啟工作階段再開始 Goal。',
+  'chat.piGoal.row.aria': '目前 Goal',
+  'chat.piGoal.row.label': 'Goal',
   'chat.textSelection.toast.noProject': '找不到此會話對應的專案',
   'chat.textSelection.toast.addToNotesFailed': '加入筆記失敗',
   'chat.textSelection.toast.addToNotesSuccess': '已將選取文字加入筆記',

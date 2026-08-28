@@ -4,6 +4,7 @@ import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
   parseSessionPlanAction,
+  resolvePlanModeState,
   restoreSessionPlanState,
   resumeSavedPlanState,
   sessionPlanFromState,
@@ -51,6 +52,20 @@ describe('session-plan', () => {
       status: 'implementing',
       planMarkdown: 'Implement this',
     });
+  });
+
+  it('prefers jsonl plan-mode-state when live getPlanModeState is empty', () => {
+    expect(resolvePlanModeState(null, [
+      stateEntry({ enabled: true, awaitingAction: false }),
+    ])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: false }, [
+      stateEntry({ enabled: true }),
+    ])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: true }, [
+      stateEntry({ enabled: false, awaitingAction: false }),
+    ])).toMatchObject({ enabled: false });
+    expect(resolvePlanModeState({ enabled: true }, [])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState(null, [])).toMatchObject({ enabled: false });
   });
 
   it('restores the latest plan-mode-state custom entry', () => {
