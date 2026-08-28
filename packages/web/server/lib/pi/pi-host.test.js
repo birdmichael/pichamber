@@ -356,6 +356,26 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('updatePiPackages reloads idle sessions outside the default directory', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-pkg-update-dirs-'));
+    const host = createPiHost({
+      mock: true,
+      home,
+      defaultDirectory: '/tmp/project',
+    });
+    await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-question-tool');
+    const defaultSession = await host.createSession({ directory: '/tmp/project' });
+    const otherSession = await host.createSession({ directory: '/tmp/other-box' });
+    const result = await host.updatePiPackages({ source: 'npm:pi-question-tool' });
+    expect(result.reload.reloaded).toEqual(expect.arrayContaining([
+      defaultSession.id,
+      otherSession.id,
+    ]));
+    expect(defaultSession.piSession.reloadCount).toBe(1);
+    expect(otherSession.piSession.reloadCount).toBe(1);
+    host.dispose();
+  });
+
   it('uninstalls one configured settings.json package and leaves siblings', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-pkg-uninstall-'));
     await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-question-tool');
@@ -1581,6 +1601,41 @@ describe('createPiHost', () => {
       await expect(host.runCommand(record.id, { command: 'goal', arguments: 'again' }))
         .rejects.toMatchObject({ status: 404 });
       expect(record.piSession.reloadCount).toBe(1);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('clears the plugin-command reload memo on session reload', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-reload-memo-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.getCommands = () => [];
+      record.piSession.refreshSnapshot = async () => [];
+      const originalReload = record.piSession.reload.bind(record.piSession);
+      record.piSession.reload = async () => originalReload();
+
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'first' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(record.piSession.reloadCount).toBe(1);
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'memo' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(record.piSession.reloadCount).toBe(1);
+
+      await host.reload({ sessionID: record.id });
+      expect(record.piSession.reloadCount).toBe(2);
+      record.piSession.getCommands = () => [];
+      record.piSession.refreshSnapshot = async () => [];
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'after reload' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(record.piSession.reloadCount).toBe(3);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

@@ -67,6 +67,80 @@ export function buildPiGoalStartCommand(command: string, objective: string): PiG
   return { command: name, arguments: argument };
 }
 
+export type PiGoalDialogSubmitResult =
+  | { ok: true; sessionID: string; directory: string | null }
+  | {
+    ok: false;
+    reason: 'empty' | 'no-session' | 'missing-command' | 'failed';
+    command?: string;
+    sessionID?: string;
+    directory?: string | null;
+  };
+
+/** Mint if needed, send /goal, and only then report success so the dialog can close. */
+export async function submitPiGoalFromDialog(input: {
+  sessionID: string | null | undefined;
+  draftOpen?: boolean;
+  directory?: string | null;
+  command: string;
+  objective: string;
+  createSession: () => Promise<{ id: string; directory?: string | null } | null | undefined>;
+  sendCommand: (params: {
+    id: string;
+    command: string;
+    arguments: string;
+    directory: string | null;
+  }) => Promise<unknown>;
+}): Promise<PiGoalDialogSubmitResult> {
+  let mintedDirectory = input.directory ?? null;
+  const resolved = await resolvePiGoalSession({
+    sessionID: input.sessionID,
+    draftOpen: input.draftOpen,
+    createSession: async () => {
+      const created = await input.createSession();
+      if (!created?.id) return null;
+      mintedDirectory = created.directory ?? input.directory ?? null;
+      return created;
+    },
+  });
+  if (!resolved.ok) return { ok: false, reason: 'no-session' };
+
+  const result = await startPiGoalCommand({
+    request: {
+      sessionID: resolved.sessionID,
+      command: input.command,
+      objective: input.objective,
+    },
+    sendCommand: async (params) => {
+      await input.sendCommand({
+        ...params,
+        directory: mintedDirectory,
+      });
+    },
+  });
+  if (result.ok) {
+    return { ok: true, sessionID: resolved.sessionID, directory: mintedDirectory };
+  }
+  if (result.reason === 'empty') return { ok: false, reason: 'empty' };
+  if (result.reason === 'no-session') return { ok: false, reason: 'no-session' };
+  if (result.reason === 'missing-command') {
+    return {
+      ok: false,
+      reason: 'missing-command',
+      command: result.command,
+      sessionID: resolved.sessionID,
+      directory: mintedDirectory,
+    };
+  }
+  return {
+    ok: false,
+    reason: 'failed',
+    command: result.command,
+    sessionID: resolved.sessionID,
+    directory: mintedDirectory,
+  };
+}
+
 export async function startPiGoalCommand(input: {
   request: PiGoalStartRequest;
   sendCommand: (params: { id: string; command: string; arguments: string }) => Promise<unknown>;

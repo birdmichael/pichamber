@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Chat: Goal and Plan can start on an already-open conversation, not only a new chat. Start Goal and the Agent | Plan toggle no longer fail after you reopen a thread.
+- Chat: Goal and Plan can start on an already-open conversation, not only a new chat. Start Goal and the Agent | Plan toggle no longer fail after you reopen a thread. An empty-draft Start Goal that fails stays in the dialog instead of switching away as if it succeeded.
 - Chat: checking Subagent status or debug on one conversation no longer hides another open chat under that parent or marks the other chat complete.
 
 ## [1.2.5] - 2026-08-28

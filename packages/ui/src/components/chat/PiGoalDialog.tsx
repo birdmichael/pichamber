@@ -12,7 +12,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/lib/i18n';
 import { opencodeClient } from '@/lib/opencode/client';
-import { canSubmitPiGoalObjective, resolvePiGoalSession, startPiGoalCommand } from '@/lib/piGoal';
+import { canSubmitPiGoalObjective, submitPiGoalFromDialog } from '@/lib/piGoal';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
@@ -37,9 +37,11 @@ export function PiGoalDialog({
   const [objective, setObjective] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const mintedRef = React.useRef<{ sessionID: string; directory: string | null } | null>(null);
 
   React.useEffect(() => {
-    if (!open) return;
+    if (open) return;
+    mintedRef.current = null;
     setObjective('');
     setError(null);
   }, [open]);
@@ -51,45 +53,45 @@ export function PiGoalDialog({
     if (!canSubmitPiGoalObjective(objective)) return;
     setBusy(true);
     setError(null);
-    let mintedDirectory = directory ?? null;
     try {
-      const resolved = await resolvePiGoalSession({
-        sessionID: sessionId,
-        draftOpen,
+      const result = await submitPiGoalFromDialog({
+        sessionID: sessionId || mintedRef.current?.sessionID,
+        draftOpen: draftOpen && !mintedRef.current,
+        directory: mintedRef.current?.directory ?? directory,
+        command,
+        objective,
         createSession: async () => {
           const created = await useSessionUIStore.getState().createSession(
             undefined,
             directory ?? null,
+            null,
+            undefined,
+            { activate: false },
           );
           if (!created?.id) return null;
-          mintedDirectory = created.directory ?? directory ?? null;
           return created;
         },
-      });
-      if (!resolved.ok) {
-        setError(t('chat.piGoal.error.noSession'));
-        return;
-      }
-
-      const result = await startPiGoalCommand({
-        request: { sessionID: resolved.sessionID, command, objective },
         sendCommand: async (params) => {
           await opencodeClient.sendCommand({
             runtimeKey: getRuntimeKey(),
             id: params.id,
             command: params.command,
             arguments: params.arguments,
-            directory: directory ?? null,
+            directory: params.directory,
           });
         },
       });
       if (result.ok) {
-        useSessionUIStore.getState().setCurrentSession(
-          resolved.sessionID,
-          mintedDirectory,
-        );
+        mintedRef.current = null;
+        useSessionUIStore.getState().setCurrentSession(result.sessionID, result.directory);
         onOpenChange(false);
         return;
+      }
+      if (result.sessionID) {
+        mintedRef.current = {
+          sessionID: result.sessionID,
+          directory: result.directory ?? null,
+        };
       }
       if (result.reason === 'empty') {
         setError(t('chat.piGoal.error.empty'));
@@ -100,7 +102,7 @@ export function PiGoalDialog({
         return;
       }
       if (result.reason === 'missing-command') {
-        setError(t('chat.piGoal.error.missingCommand', { command: result.command }));
+        setError(t('chat.piGoal.error.missingCommand', { command: result.command ?? command }));
         return;
       }
       setError(t('chat.piGoal.error.failed'));

@@ -70,6 +70,7 @@ import {
   forkFromMessage as forkFromMessageAction,
   fetchMessagesForSession,
   type ArchiveSessionsOptions,
+  type CreateSessionOptions,
   type DeleteSessionOptions,
   type DeleteSessionsOptions,
   type UnarchiveSessionsOptions,
@@ -390,7 +391,13 @@ export type SessionUIState = {
     options?: SendMessageOptions,
   ) => Promise<void>
 
-  createSession: (title?: string, directoryOverride?: string | null, parentID?: string | null, metadata?: Record<string, unknown>) => Promise<Session | null>
+  createSession: (
+    title?: string,
+    directoryOverride?: string | null,
+    parentID?: string | null,
+    metadata?: Record<string, unknown>,
+    options?: CreateSessionOptions,
+  ) => Promise<Session | null>
   deleteSession: (id: string, options?: DeleteSessionOptions) => Promise<boolean>
   deleteSessions: (ids: string[], options?: DeleteSessionsOptions) => Promise<{ deletedIds: string[]; failedIds: string[] }>
   archiveSession: (id: string) => Promise<boolean>
@@ -1580,16 +1587,18 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   // ---------------------------------------------------------------------------
   // createSession
   // ---------------------------------------------------------------------------
-  createSession: async (title, directoryOverride, parentID, metadata) => {
+  createSession: async (title, directoryOverride, parentID, metadata, options) => {
     const draft = get().newSessionDraft
     const targetFolderId = draft.targetFolderId
 
     try {
       const dir = directoryOverride ?? opencodeClient.getDirectory()
-      const session = await createSessionAction(title, dir, parentID ?? null, metadata)
+      const session = await createSessionAction(title, dir, parentID ?? null, metadata, options)
       if (!session) return null
 
-      get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
+      if (options?.activate !== false) {
+        get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
+      }
 
       if (targetFolderId) {
         const scopeKey = directoryOverride || get().lastLoadedDirectory || session.directory

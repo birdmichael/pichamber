@@ -820,10 +820,11 @@ then serializes the runner command list onto the parent snapshot. A new
 empty session lists `goal` on `GET /api/command?session=` because that
 GET hydrates the session and the Goal slot also injects a catalog row.
 The composer Goal button may mint a draft session before
-`session.command`. Do not switch the open chat onto that minted id until
-start succeeds; a failed start stays in the modal (and must not look
-like success). Do not require a provider/model for this command-only
-start.
+`session.command` with `createSession({ activate: false })`. Do not
+switch the open chat onto that minted id until start succeeds; a failed
+start stays in the modal on the draft (and must not look like success).
+Retry reuses the minted id. Do not require a provider/model for this
+command-only start.
 Replacing an existing goal still uses `ctx.ui.confirm`. Goal and Plan
 cannot both hold the workflow mutex.
 

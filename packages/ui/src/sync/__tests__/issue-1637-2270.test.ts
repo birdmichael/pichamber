@@ -301,3 +301,20 @@ describe("issue #2270 — registerSessionDirectory called with effective directo
     expect(registerSessionDirectoryCalls[0].directory).not.toBe(overrideDir)
   })
 })
+
+describe("createSession activate:false", () => {
+  test("indexes the session without switching the current chat", async () => {
+    nextCreateSessionResponse = { id: "ses_goal_mint", time: { created: 1 } } as Session
+
+    const result = await createSession("Untitled", "/projects/alpha", null, undefined, { activate: false })
+
+    expect(result?.id).toBe("ses_goal_mint")
+    expect(setCurrentSessionCalls).toEqual([])
+    expect(markSessionAsOpenChamberCreatedCalls).toEqual(["ses_goal_mint"])
+    expect(upsertSessionCalls.map((session) => session.id)).toEqual(["ses_goal_mint"])
+    expect(registerSessionDirectoryCalls).toEqual([{
+      sessionID: "ses_goal_mint",
+      directory: "/projects/alpha",
+    }])
+  })
+})

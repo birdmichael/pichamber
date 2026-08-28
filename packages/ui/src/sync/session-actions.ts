@@ -728,11 +728,17 @@ function getRequestReplyClient(
 // Session CRUD
 // ---------------------------------------------------------------------------
 
+export type CreateSessionOptions = {
+  /** When false, index the session but do not make it current. Default true. */
+  activate?: boolean;
+};
+
 export async function createSession(
   title?: string,
   directoryOverride?: string | null,
   parentID?: string | null,
   metadata?: Record<string, unknown>,
+  options?: CreateSessionOptions,
 ): Promise<Session | null> {
   try {
     // Capture the effective directory used for session creation so we can fall
@@ -753,7 +759,9 @@ export async function createSession(
     if (sessionDirectory) {
       registerSessionDirectory(session.id, sessionDirectory)
     }
-    useSessionUIStore.getState().setCurrentSession(session.id, sessionDirectory)
+    if (options?.activate !== false) {
+      useSessionUIStore.getState().setCurrentSession(session.id, sessionDirectory)
+    }
     useSessionUIStore.getState().markSessionAsOpenChamberCreated(session.id)
     useGlobalSessionsStore.getState().upsertSession(session)
     return session

@@ -16,10 +16,12 @@ When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows
 one `PiGoalButton` in that same cluster. Click opens a modal; a non-empty
 objective submits `/goal <objective>` (or the configured command) through
 `session.command` / `piSession.prompt`, not `promptAsync`. A new-session draft
-mints a real session first. Start does not require a provider/model from the
-config store. Failures (no session, missing live command, send error) render
-inside the modal — Desktop dialogs sit on the top layer, so toasts are not
-visible while it is open. Bare `/goal` is rejected. Disable or uninstall
+mints a real session first and does not switch the open chat onto that id
+until `/goal` is accepted. A failed start keeps the draft and the modal;
+retry reuses the minted session instead of creating another. Start does
+not require a provider/model from the config store. Failures (no session,
+missing live command, send error) render inside the modal — Desktop
+dialogs sit on the top layer, so toasts are not visible while it is open. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
 On Pi it also no longer mounts the footer context-usage percent chip;

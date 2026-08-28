@@ -9,6 +9,7 @@ import {
   isPiGoalPluginAvailable,
   resolvePiGoalSession,
   startPiGoalCommand,
+  submitPiGoalFromDialog,
 } from './piGoal';
 
 const enabledGoalPayload = () => {
@@ -135,5 +136,91 @@ describe('Pi Goal start command', () => {
     });
     expect(result).toEqual({ ok: false, reason: 'missing-command', command: 'broken-goal' });
     expect(sendMessageCalls).toEqual([]);
+  });
+});
+
+describe('Pi Goal dialog submit', () => {
+  test('does not switch session when a minted draft command 404s', async () => {
+    const order: string[] = [];
+    const result = await submitPiGoalFromDialog({
+      sessionID: null,
+      draftOpen: true,
+      directory: '/tmp/project',
+      command: 'goal',
+      objective: 'ship the footer',
+      createSession: async () => {
+        order.push('mint');
+        return { id: 'ses_minted', directory: '/tmp/minted' };
+      },
+      sendCommand: async (params) => {
+        order.push(`command:${params.id}:${params.directory}`);
+        throw Object.assign(new Error('Command /goal is not available on this session'), { status: 404 });
+      },
+    });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'missing-command',
+      command: 'goal',
+      sessionID: 'ses_minted',
+      directory: '/tmp/minted',
+    });
+    expect(order).toEqual(['mint', 'command:ses_minted:/tmp/minted']);
+  });
+
+  test('retries a minted session instead of creating another draft', async () => {
+    let created = 0;
+    const first = await submitPiGoalFromDialog({
+      sessionID: null,
+      draftOpen: true,
+      directory: '/tmp/project',
+      command: 'goal',
+      objective: 'ship the footer',
+      createSession: async () => {
+        created += 1;
+        return { id: 'ses_minted', directory: '/tmp/minted' };
+      },
+      sendCommand: async () => {
+        throw Object.assign(new Error('Command /goal is not available on this session'), { status: 404 });
+      },
+    });
+    expect(first).toMatchObject({ ok: false, sessionID: 'ses_minted' });
+
+    const second = await submitPiGoalFromDialog({
+      sessionID: first.sessionID,
+      draftOpen: false,
+      directory: first.directory,
+      command: 'goal',
+      objective: 'ship the footer',
+      createSession: async () => {
+        created += 1;
+        return { id: 'ses_other' };
+      },
+      sendCommand: async () => undefined,
+    });
+    expect(second).toEqual({
+      ok: true,
+      sessionID: 'ses_minted',
+      directory: '/tmp/minted',
+    });
+    expect(created).toBe(1);
+  });
+
+  test('reports the minted session only after /goal is accepted', async () => {
+    const result = await submitPiGoalFromDialog({
+      sessionID: 'ses_existing',
+      draftOpen: false,
+      directory: '/tmp/project',
+      command: 'goal',
+      objective: 'ship the footer',
+      createSession: async () => {
+        throw new Error('must not mint an existing session');
+      },
+      sendCommand: async () => undefined,
+    });
+    expect(result).toEqual({
+      ok: true,
+      sessionID: 'ses_existing',
+      directory: '/tmp/project',
+    });
   });
 });

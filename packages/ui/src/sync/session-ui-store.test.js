@@ -490,6 +490,26 @@ describe('createSession draft lifecycle', () => {
     expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true);
     expect(useSessionUIStore.getState().newSessionDraft.title).toBe('Draft title');
   });
+
+  test('keeps the draft open when createSession is asked not to activate', async () => {
+    opencodeClient.createSession = async () => ({
+      id: 'ses_goal_mint',
+      directory: '/projects/alpha',
+      time: { created: 1 },
+    });
+
+    const session = await useSessionUIStore.getState().createSession(
+      'Draft title',
+      '/projects/alpha',
+      null,
+      undefined,
+      { activate: false },
+    );
+
+    expect(session?.id).toBe('ses_goal_mint');
+    expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

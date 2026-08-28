@@ -259,7 +259,10 @@ Rules:
 
 Examples of global-store updates performed in `session-actions.ts`:
 
-- `createSession()` -> `upsertSession(session)`
+- `createSession()` -> `upsertSession(session)`. `activate: false` still
+  indexes and upserts, but does not call `setCurrentSession` or close a
+  new-session draft. Start Goal uses that so a failed `/goal` cannot
+  look like a successful chat switch.
 - `updateSessionTitle()` -> `upsertSession(result.data)`
 - `shareSession()` / `unshareSession()` -> `upsertSession(result.data)`
 - `archiveSession()` / `archiveSessions()` -> wait for server confirmation, then upsert each archived session
