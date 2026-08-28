@@ -38,9 +38,10 @@ export const WorkStatusSectionsDialog: React.FC<{
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
+  const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive, xaiSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive, xaiSlotActive],
   );
   const sectionIds = getAvailableWorkStatusSectionIds(sectionContext);
 

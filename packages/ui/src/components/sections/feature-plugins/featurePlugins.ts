@@ -1,6 +1,6 @@
 import type { I18nKey } from '@/lib/i18n';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'] as const;
+export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai'] as const;
 
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
@@ -11,6 +11,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
+  xai: 'npm:pi-xai-oauth',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS: Partial<Record<FeaturePluginSlot, string>> = {
@@ -66,6 +67,7 @@ export const FEATURE_PLUGIN_SLOT_UI_IMPACT: Record<FeaturePluginSlot, readonly F
   subagents: ['workStatus', 'commands', 'session'],
   btw: ['commands', 'session'],
   todo: ['workStatus'],
+  xai: ['workStatus', 'settings', 'commands'],
 };
 
 const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
@@ -97,6 +99,11 @@ const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
   },
   todo: {
     workStatus: 'settings.featurePlugins.slot.todo.surface.workStatus.tooltip',
+  },
+  xai: {
+    workStatus: 'settings.featurePlugins.slot.xai.surface.workStatus.tooltip',
+    settings: 'settings.featurePlugins.slot.xai.surface.settings.tooltip',
+    commands: 'settings.featurePlugins.slot.xai.surface.commands.tooltip',
   },
 };
 
@@ -174,6 +181,11 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
     titleKey: 'settings.featurePlugins.slot.todo.title',
     infoKey: 'settings.featurePlugins.slot.todo.info',
     settingsItem: 'feature-plugins.todo',
+  },
+  xai: {
+    titleKey: 'settings.featurePlugins.slot.xai.title',
+    infoKey: 'settings.featurePlugins.slot.xai.info',
+    settingsItem: 'feature-plugins.xai',
   },
 };
 

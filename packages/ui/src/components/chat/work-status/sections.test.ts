@@ -24,8 +24,10 @@ describe('section registry', () => {
 });
 
 describe('isWorkStatusSectionAvailable', () => {
-  test('hides the OpenCode provider-quota section on Pi', () => {
+  test('hides the OpenCode provider-quota section on Pi unless Grok Usage is installed', () => {
     expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: false })).toBe(false);
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('session', { isPiKernel: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('usage', { isPiKernel: false })).toBe(true);
     expect(isWorkStatusSectionAvailable('usage')).toBe(true);
@@ -41,6 +43,7 @@ describe('isWorkStatusSectionAvailable', () => {
 
   test('keeps session context on the available list for Pi', () => {
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('usage');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, xaiSlotActive: true })).toContain('usage');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('subagents');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('tasks');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
@@ -81,8 +84,9 @@ describe('isWorkStatusSectionVisible', () => {
     expect(isWorkStatusSectionVisible(['usage'], 'tasks')).toBe(true);
   });
 
-  test('never shows provider usage on Pi, even when the hidden set is empty', () => {
+  test('never shows provider usage on Pi until the Grok Usage slot is on', () => {
     expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true })).toBe(false);
+    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
     expect(isWorkStatusSectionVisible([], 'session', { isPiKernel: true })).toBe(true);
   });
 

@@ -235,6 +235,56 @@ capability that pretends to be user-set. Family inference and the UI
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).
 
+## Built-in xAI catalog and subscription login
+
+`GET /api/provider` (and SDK `GET /provider`) returns
+`{ all, default, connected }`. `all` merges `ModelRuntime.getAvailable()`
+with `PI_BUILTIN_CATALOG_PROVIDERS` (`xai`) so Add can list xAI before
+login. `connected` is provider ids that already have models — a catalog
+stub with empty `models` stays off that list. Mock kernel still returns
+only `pi-mock`. `getPiAuthMethods` always reports `xai` as SuperGrok /
+X Premium OAuth first, API key second — connected or not.
+
+`POST /api/provider/:id/oauth/authorize` and `/callback` wrap Pi
+`xaiOAuth.login` (device-code). The helper is loaded from the bundled
+`pi-ai` next to `@earendil-works/pi-coding-agent` (`dist/auth/oauth/xai.js`);
+that file is not a public package export. Authorize times out if
+`device_code` never arrives. Callback writes `{ type, access, refresh,
+expires }` to `{agentDir}/auth.json` through `writePiProviderAuth`. Refresh
+uses `xaiOAuth.refresh`, not a copied token exchange. Other provider ids
+are 404. No pending authorize is 400. Responses never echo tokens.
+
+Product login is this built-in `/login xai`, not the Feature Plugin
+`xai-auth` catalog. Composer `/login` for `xai` points at Settings →
+Providers. Feature Plugins `xai` is Usage only.
+
+## Grok Usage (feature-plugin slot)
+
+Gate is Feature Plugins `xai` (`npm:pi-xai-oauth`) installed+enabled.
+Chrome follows `{agentDir}/settings.json` `packages` only. Chamber
+`enabled` is ignored. Opening Feature Plugins never auto-installs the
+package and must not run the plugin `npx` setup (that would change
+`defaultProvider`). Do not install `@blockedpath/pi-xai-oauth` alongside
+it.
+
+When the slot is on:
+
+- `GET /api/pi/xai-usage` uses the same grok billing REST surface as the
+  plugin (not a chat `/xai-usage` turn). It refreshes oauth through Pi
+  when `expires` is near or billing returns 401/403, then maps the
+  credits envelope (`config.creditUsagePercent`, `currentPeriod.end`,
+  `{ val }` cents wrappers, `productUsage`) onto `UsageWindow`. Slot off
+  or missing oauth is `{ ok: false, configured: false }` — not empty
+  success. Billing or refresh failure is
+  `{ ok: false, configured: true, usage: null, error }` and must not
+  invent `usedPercent: 0`. The response never includes the access token,
+  refresh token, or user id. Do not probe `/v1/user` for usage.
+- Leftover `/api/quota/*` stays unregistered.
+- `GET /api/command` lists `/xai-usage` before a session exists.
+
+Work Status Usage and the Providers xAI card share that payload. Session
+context % / cost stay in the Session block.
+
 ## Tool part timing
 
 Live `tool_execution_*` events keep the first `state.time.start` for that
@@ -277,7 +327,7 @@ unbound sessions stay `ui_unavailable`.
 | `select` | In-chat option card (single, or multi when `opts.multiple`) |
 | `confirm` | Modal confirm / cancel → boolean |
 | `input` / `editor` | In-chat text field. Plan **Other** is a `select` option, then `editor` |
-| `notify` | Toast via `pi.ui.notify` |
+| `notify` | Toast via `pi.ui.notify`. Routine Hermes `Session backfill complete` is dropped; `Session backfill failed` / `check failed` still toast |
 | `custom` | No TUI factory. Installed Pi `question` is remapped onto `select` + `editor` (see Question tool). Other `custom()` callers get an in-chat editor, not silent `undefined` |
 | TUI-only (widgets, terminal input) | No-op (`createNoopUiExtras`) |
 
@@ -291,7 +341,7 @@ Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
 - Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
 - `GET /api/pi/ui?session=` — pending prompts. Opening a session hydrates this list into the transcript; fetch failure must not clear local cards. A session with no messages still shows a pending select card (do not replace it with the empty-chat welcome).
-- `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a short auto-dismiss toast, not a question card or OK confirm. The settled card title may still say "Status: Off".
+- `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a short auto-dismiss toast, not a question card or OK confirm. The settled card title may still say "Status: Off". Routine Hermes `Session backfill complete` does not publish; failed backfill still does.
 - `POST /api/pi/ui/:id/reply` `{ sessionID, value }`
 - `POST /api/pi/ui/:id/cancel` `{ sessionID }`
 
@@ -467,7 +517,8 @@ that project. Settings → Extensions packages lists those configured package na
   one exists so Settings can load the real template.
 - Feature Plugins slash names that must appear before a session exists
   (Plan slot installed+enabled → `/plan`; Subagents slot
-  installed+enabled → `/run`; Btw slot installed+enabled → `/btw`).
+  installed+enabled → `/run`; Btw slot installed+enabled → `/btw`;
+  Grok Usage slot installed+enabled → `/xai-usage`).
   `/run` copy is user-facing ("Run a subagent as a one-shot workflow"),
   not plugin jargon. `/btw` is listed as `source: "extension"` so the
   slash menu can show it; the composer intercepts the command and forks

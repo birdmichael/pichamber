@@ -58,6 +58,8 @@ is installed and enabled.
 
 `useFeaturePluginsStore` caches `GET /api/pi/feature-plugins`. Fetch failure is not treated as an authoritative empty slot list: a prior successful payload is kept, and MCP Settings / Work Status stay hidden until a successful `installed && enabled` payload arrives. Leftover adapter config files are not a visibility signal.
 
+`useXaiUsageStore` caches `GET /api/pi/xai-usage` for Work Status Usage and the Providers xAI card. A failed fetch or configured `{ ok: false }` keeps the last successful `ok` snapshot and must not become empty 0% usage. First-load failure stays an error, not "not signed in". A refresh while a request is in flight is queued so the click is not dropped. `reset()` invalidates in-flight results (runtime switch). The Grok Usage slot off hides both surfaces.
+
 Context-panel session chats mount only the active chat iframe. After installing
 its message listener, the iframe requests its authoritative visibility from the
 parent. The parent accepts requests only from a currently mounted chat frame and

@@ -1,5 +1,5 @@
 import express from 'express';
-import { resolveActiveProjectDirectory, resolvePiDefaultModel } from './pi-resources.js';
+import { resolveActiveProjectDirectory, resolvePiDefaultModel, toPiProviderListPayload } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
 import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
@@ -176,8 +176,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/provider', handle(async (_req, res) => {
-    const { providers } = await host.getProviders();
-    json(res, 200, providers);
+    json(res, 200, toPiProviderListPayload(await host.getProviders()));
   }));
 
   const providerAuth = (_req, res) => {
@@ -281,6 +280,45 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       path: result.path,
       config: result.config,
     });
+  }));
+
+  const authorizeProviderOAuth = async (req, res) => {
+    const providerId = providerIdFromRequest(req);
+    if (typeof host.authorizeProviderOAuth !== 'function') {
+      json(res, 404, unsupported(`POST /api/provider/${providerId}/oauth/authorize`));
+      return;
+    }
+    json(res, 200, await host.authorizeProviderOAuth(providerId));
+  };
+  app.post('/api/provider/:providerID/oauth/authorize', parseJson, handle(async (req, res) => {
+    await authorizeProviderOAuth(req, res);
+  }));
+  app.post('/api/provider/:providerId/oauth/authorize', parseJson, handle(async (req, res) => {
+    await authorizeProviderOAuth(req, res);
+  }));
+
+  const completeProviderOAuth = async (req, res) => {
+    const providerId = providerIdFromRequest(req);
+    if (typeof host.completeProviderOAuth !== 'function') {
+      json(res, 404, unsupported(`POST /api/provider/${providerId}/oauth/callback`));
+      return;
+    }
+    await host.completeProviderOAuth(providerId);
+    json(res, 200, true);
+  };
+  app.post('/api/provider/:providerID/oauth/callback', parseJson, handle(async (req, res) => {
+    await completeProviderOAuth(req, res);
+  }));
+  app.post('/api/provider/:providerId/oauth/callback', parseJson, handle(async (req, res) => {
+    await completeProviderOAuth(req, res);
+  }));
+
+  app.get('/api/pi/xai-usage', handle(async (_req, res) => {
+    if (typeof host.getXaiUsage !== 'function') {
+      json(res, 200, { ok: false, configured: false, slotActive: false });
+      return;
+    }
+    json(res, 200, await host.getXaiUsage());
   }));
 
   app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {

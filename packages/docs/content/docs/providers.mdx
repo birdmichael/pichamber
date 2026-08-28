@@ -11,9 +11,12 @@ Before OpenChamber can do anything, it needs at least one AI provider connected.
 
 1. Open **Settings → Providers**.
 2. Open the **Add provider** menu and pick a provider that isn't connected yet, or choose **Other / Custom** for an OpenAI-compatible endpoint.
+   **xAI / Grok** is in that list before you sign in. If every catalog provider is already connected, Add opens **Other / Custom** so you can still add another.
 3. Sign in one of two ways, depending on the provider:
-   - **API key** — paste your key and save.
-   - **Sign-in (device flow)** — OpenChamber shows a link and a short code. Open the link, enter the code, and approve. OpenChamber finishes connecting on its own.
+   - **Sign-in (device flow)** — OpenChamber shows a link and a short code. Open the link, enter the code, and approve. OpenChamber finishes connecting on its own. For xAI this is the default: SuperGrok or X Premium. The token is stored in `~/.pi/agent/auth.json` and Pi refreshes it.
+   - **API key** — paste your key and save. For xAI this is the secondary method.
+
+xAI subscription allowance, cycle, and expiry appear on **Work Status** and the xAI card only after you install **Settings → Feature Plugins → Grok Usage**. You can sign in and chat without that plugin. Pichamber does not open the leftover **Settings → Usage** page for Grok.
 
 ### Custom / Other providers
 
@@ -52,7 +55,7 @@ On the leftover OpenCode kernel (`OPENCHAMBER_KERNEL=opencode`), **Settings → 
 
 ## Where your sign-ins live
 
-Provider sign-ins are stored by OpenCode, not OpenChamber, so they're shared with the OpenCode CLI. If you set the same provider in more than one place, the most specific setting wins: a per-project setting overrides your personal one.
+Provider sign-ins are stored in `~/.pi/agent/auth.json`, shared with the Pi CLI. If you set the same provider in more than one place, the most specific setting wins: a per-project setting overrides your personal one.
 
 ## Related
 

@@ -117,8 +117,8 @@ Work Status is not a workspace tab and not the Desktop Context rail
 ring opens `MobileWorkStatusHost`, which wraps the same Desktop sections
 (session, branch, context %, MCP, Subagents). MCP follows
 `isWorkStatusSectionAvailable('mcp')` / `isMcpFeaturePluginActive`; Subagents
-follows `useFeaturePluginSlotActive('subagents')`. Usage quotas stay hidden
-on Pi. Clicking a live child uses `openSubagentChildSession` (`setCurrentSession`
+follows `useFeaturePluginSlotActive('subagents')`. Usage quotas on Pi appear
+only when Feature Plugins Grok Usage (`xai`) is installed. Clicking a live child uses `openSubagentChildSession` (`setCurrentSession`
 in-place).
 
 Git opens the following Desktop surfaces with the same store actions as the

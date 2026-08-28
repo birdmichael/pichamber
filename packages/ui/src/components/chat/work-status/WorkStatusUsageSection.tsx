@@ -5,15 +5,19 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { preloadProviderLogos } from '@/hooks/useProviderLogo';
-import { formatQuotaResetLabel, formatQuotaValueLabel } from '@/lib/quota';
+import { formatQuotaResetLabel, formatQuotaValueLabel, formatWindowLabel } from '@/lib/quota';
+import type { TimeFormatPreference } from '@/stores/useUIStore';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
 import { useUIStore } from '@/stores/useUIStore';
-import { useUsageProviderGroups } from '@/components/usage/usageGroups';
+import { useUsageProviderGroups, type UsageProviderGroup } from '@/components/usage/usageGroups';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { pickUsageHeadline } from './usageHeadline';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { WorkStatusRow, WorkStatusCollapsibleSection, WorkStatusValue } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useXaiUsageStore } from '@/stores/useXaiUsageStore';
+import { presentXaiUsage } from '@/lib/pi/xai-usage';
 import type { UsageWindow } from '@/types';
 
 /**
@@ -29,9 +33,9 @@ import type { UsageWindow } from '@/types';
  * belongs with the readouts that hold for the whole session rather than with
  * whatever happens to be running.
  *
- * Pi has no quota API. The panel and section dialog must not mount this
- * section there (`isWorkStatusSectionAvailable`); session context % / cost
- * live in the Session block instead.
+ * On Pi this section mounts only when the Grok Usage feature-plugin slot is
+ * on (`isWorkStatusSectionAvailable`). Session context % / cost stay in the
+ * Session block.
  */
 
 const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {
@@ -42,7 +46,75 @@ const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {
   return 'default';
 };
 
-export const WorkStatusUsageSection: React.FC = () => {
+const useXaiUsageGroups = (): UsageProviderGroup[] => {
+  const { t } = useI18n();
+  const payload = useXaiUsageStore((state) => state.payload);
+  const error = useXaiUsageStore((state) => state.error);
+  const isLoading = useXaiUsageStore((state) => state.isLoading);
+  return React.useMemo(() => {
+    const presentation = presentXaiUsage({ payload, error, isLoading });
+    if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
+    if (payload && !payload.slotActive) return [];
+    const windows = payload?.usage?.windows ?? {};
+    const rows = Object.entries(windows).map(([label, window]) => ({
+      key: `window-${label}`,
+      label: formatWindowLabel(label),
+      window,
+    }));
+    const status = presentation.kind === 'notConfigured'
+      ? t('settings.providers.page.xaiUsage.notConfigured')
+      : presentation.kind === 'error'
+        ? (presentation.auth
+          ? t('settings.providers.page.xaiUsage.refreshFailed')
+          : (presentation.message || t('settings.providers.page.xaiUsage.error')))
+        : rows.length === 0
+          ? t('header.services.noRateLimitsReported')
+          : null;
+    if (presentation.kind === 'loading' && rows.length === 0) return [];
+    return [{
+      providerId: 'xai',
+      providerName: payload?.providerName || 'xAI',
+      rows,
+      status,
+    }];
+  }, [error, isLoading, payload, t]);
+};
+
+const PiXaiUsageSection: React.FC = () => {
+  const { t } = useI18n();
+  const groups = useXaiUsageGroups();
+  const isLoading = useXaiUsageStore((state) => state.isLoading);
+  const fetchUsage = useXaiUsageStore((state) => state.fetchUsage);
+  const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
+  const displayMode = useQuotaStore((state) => state.displayMode);
+
+  React.useEffect(() => {
+    void runBackgroundNetworkTask(() => fetchUsage());
+  }, [fetchUsage]);
+
+  React.useEffect(() => {
+    if (groups.length === 0) return;
+    preloadProviderLogos(groups.map((group) => group.providerId));
+  }, [groups]);
+
+  useReportWorkStatusPresence('usage', groups.length > 0);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <UsageSectionBody
+      groups={groups}
+      displayMode={displayMode}
+      isLoading={isLoading}
+      onRefresh={() => void fetchUsage()}
+      timeFormatPreference={timeFormatPreference}
+      currentProviderId="xai"
+      modeLabel={displayMode === 'remaining' ? t('header.services.remaining') : t('header.services.used')}
+    />
+  );
+};
+
+const OpenCodeUsageSection: React.FC = () => {
   const { t } = useI18n();
   const groups = useUsageProviderGroups();
   const displayMode = useQuotaStore((state) => state.displayMode);
@@ -79,14 +151,37 @@ export const WorkStatusUsageSection: React.FC = () => {
 
   if (groups.length === 0) return null;
 
-  const modeLabel = displayMode === 'remaining'
-    ? t('header.services.remaining')
-    : t('header.services.used');
+  return (
+    <UsageSectionBody
+      groups={groups}
+      displayMode={displayMode}
+      isLoading={isLoading}
+      onRefresh={() => void fetchQuotas(dropdownProviderIds)}
+      timeFormatPreference={timeFormatPreference}
+      currentProviderId={currentProviderId}
+      modeLabel={displayMode === 'remaining' ? t('header.services.remaining') : t('header.services.used')}
+    />
+  );
+};
 
-  // Collapsed, the section shows the tightest quota of the provider the
-  // composer is pointed at — the number that decides whether the next turn
-  // lands. With no match it falls back to the display-mode label rather than
-  // showing some other provider's quota as if it were the active one.
+const UsageSectionBody: React.FC<{
+  groups: UsageProviderGroup[];
+  displayMode: 'usage' | 'remaining';
+  isLoading: boolean;
+  onRefresh: () => void;
+  timeFormatPreference: TimeFormatPreference;
+  currentProviderId: string | null;
+  modeLabel: string;
+}> = ({
+  groups,
+  displayMode,
+  isLoading,
+  onRefresh,
+  timeFormatPreference,
+  currentProviderId,
+  modeLabel,
+}) => {
+  const { t } = useI18n();
   const headline = pickUsageHeadline(groups, currentProviderId);
   const headlineMetric = headline
     ? formatQuotaValueLabel(
@@ -115,7 +210,7 @@ export const WorkStatusUsageSection: React.FC = () => {
           size="icon"
           variant="ghost"
           className="size-6 shrink-0 text-muted-foreground"
-          onClick={() => void fetchQuotas(dropdownProviderIds)}
+          onClick={onRefresh}
           aria-label={t('settings.usage.sidebar.actions.refreshAria')}
           title={t('settings.usage.sidebar.actions.refreshTitle')}
           disabled={isLoading}
@@ -130,7 +225,7 @@ export const WorkStatusUsageSection: React.FC = () => {
             leading={<ProviderLogo providerId={group.providerId} className="size-4 shrink-0" />}
             label={group.providerName}
             muted
-            value={group.status && group.rows.length === 0 ? (
+            value={group.status ? (
               <WorkStatusValue tone="muted">{group.status}</WorkStatusValue>
             ) : undefined}
           />
@@ -168,3 +263,7 @@ export const WorkStatusUsageSection: React.FC = () => {
     </WorkStatusCollapsibleSection>
   );
 };
+
+export const WorkStatusUsageSection: React.FC = () => (
+  usePiKernel() ? <PiXaiUsageSection /> : <OpenCodeUsageSection />
+);

@@ -80,6 +80,13 @@ export const parsePiExtensionUiPromptList = (value: unknown): PiExtensionUiPromp
   return prompts;
 };
 
+const SESSION_BACKFILL_COMPLETE = /Session backfill complete:/i;
+
+/** Hermes startup indexing status. Keep real backfill failures visible. */
+export const isRoutineSessionBackfillNotify = (message: string): boolean => (
+  SESSION_BACKFILL_COMPLETE.test(message.trim())
+);
+
 export const parsePiExtensionUiNotify = (value: unknown): PiExtensionUiNotify | null => {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;

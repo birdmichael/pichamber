@@ -9,7 +9,7 @@ import {
 } from './pi-resources.js';
 import { wrapPackageManagerWithElectronNativeTree } from './user-extension-electron-tree.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -18,6 +18,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
+  xai: 'npm:pi-xai-oauth',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
@@ -276,6 +277,14 @@ export const listFeaturePluginSlashCommands = (payload) => {
     listed.push({
       name: typeof btw.command === 'string' && btw.command.trim() ? btw.command.trim() : 'btw',
       description: 'Ask a side question in a temporary forked session',
+      source: 'extension',
+    });
+  }
+  const xai = payload?.slots?.xai;
+  if (xai?.installed && xai.enabled) {
+    listed.push({
+      name: 'xai-usage',
+      description: 'Show Grok subscription usage',
       source: 'extension',
     });
   }

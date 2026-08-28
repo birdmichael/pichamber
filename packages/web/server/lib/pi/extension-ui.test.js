@@ -104,6 +104,16 @@ describe('Desktop ExtensionUIContext', () => {
       level: 'info',
       sessionID: 'ses_test',
     });
+
+    const before = events.length;
+    controller.context.notify(
+      '🧠 Session backfill complete: 0 indexed, 51 skipped, 0 messages (1 file error).',
+      'warning',
+    );
+    controller.context.notify('⚠️ Session backfill failed: sqlite busy', 'warning');
+    expect(events.slice(before).map((item) => item.event.properties.message)).toEqual([
+      '⚠️ Session backfill failed: sqlite busy',
+    ]);
   });
 
   it('honors abort and timeout without hanging', async () => {

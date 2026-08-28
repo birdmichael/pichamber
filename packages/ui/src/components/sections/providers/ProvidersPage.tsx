@@ -25,8 +25,17 @@ import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { opencodeClient } from '@/lib/opencode/client';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
-import { requiresProviderAuth, shouldLoadAvailableProviders } from './providerAvailability';
+import {
+  parseConnectedProviderIds,
+  providerHasConnectedModels,
+  requiresProviderAuth,
+  selectAddCatalogProviders,
+  shouldAutoSelectBuiltinAddProvider,
+  shouldAutoSelectCustomProvider,
+  shouldLoadAvailableProviders,
+} from './providerAvailability';
 import {
   getOAuthAuthMethods,
   parseAuthPayload,
@@ -37,6 +46,7 @@ import {
 } from './providerAuth';
 import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
+import { ProviderXaiUsage } from './ProviderXaiUsage';
 import {
   buildAuthSetRequest,
   buildProviderUpsertRequest,
@@ -148,6 +158,7 @@ const parseProvidersPayload = (payload: unknown): ProviderOption[] => {
 export const ProvidersPage: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
+  const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
   const piAgentDir = useResolvedPiAgentDir();
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
@@ -168,6 +179,7 @@ export const ProvidersPage: React.FC = () => {
   const [authBusyKey, setAuthBusyKey] = React.useState<string | null>(null);
   const [modelQuery, setModelQuery] = React.useState('');
   const [availableProviders, setAvailableProviders] = React.useState<ProviderOption[]>([]);
+  const [availableConnectedIds, setAvailableConnectedIds] = React.useState<string[]>([]);
   const [availableLoading, setAvailableLoading] = React.useState(false);
   const [availableError, setAvailableError] = React.useState<string | null>(null);
   const [candidateProviderId, setCandidateProviderId] = React.useState('');
@@ -250,10 +262,13 @@ export const ProvidersPage: React.FC = () => {
         }
         if (!isMounted) return;
         setAvailableProviders(parseProvidersPayload(result.data));
+        setAvailableConnectedIds(parseConnectedProviderIds(result.data));
       } catch (error) {
         if (!isMounted) return;
         console.error('Failed to load available providers:', error);
-        setAvailableError(t('settings.providers.page.state.unableToLoadProviderList'));
+        setAvailableProviders([]);
+        setAvailableConnectedIds([]);
+        setAvailableError(null);
       } finally {
         if (isMounted) {
           setAvailableLoading(false);
@@ -268,20 +283,18 @@ export const ProvidersPage: React.FC = () => {
     };
   }, [isAddMode, t]);
 
-  const connectedProviderIds = React.useMemo(
-    () => new Set(providers.map((provider) => provider.id)),
-    [providers]
-  );
+  const connectedProviderIds = React.useMemo(() => {
+    const ids = new Set(
+      providers.filter((provider) => providerHasConnectedModels(provider)).map((provider) => provider.id),
+    );
+    for (const id of availableConnectedIds) {
+      ids.add(id);
+    }
+    return ids;
+  }, [availableConnectedIds, providers]);
 
-  const unconnectedProviders = React.useMemo(
-    () =>
-      availableProviders
-        .filter((provider) => !connectedProviderIds.has(provider.id))
-        .sort((a, b) => {
-          const labelA = (a.name || a.id).toLowerCase();
-          const labelB = (b.name || b.id).toLowerCase();
-          return labelA.localeCompare(labelB);
-        }),
+  const addCatalogProviders = React.useMemo(
+    () => selectAddCatalogProviders(availableProviders, connectedProviderIds),
     [availableProviders, connectedProviderIds]
   );
 
@@ -293,11 +306,42 @@ export const ProvidersPage: React.FC = () => {
     if (
       candidateProviderId
       && candidateProviderId !== CUSTOM_PROVIDER_ID
-      && !unconnectedProviders.some((provider) => provider.id === candidateProviderId)
+      && !addCatalogProviders.some((provider) => provider.id === candidateProviderId)
     ) {
       setCandidateProviderId('');
     }
-  }, [selectedProviderId, candidateProviderId, unconnectedProviders]);
+  }, [selectedProviderId, candidateProviderId, addCatalogProviders]);
+
+  const catalogAutoSelectedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isAddMode) {
+      catalogAutoSelectedRef.current = false;
+      return;
+    }
+    if (catalogAutoSelectedRef.current) {
+      return;
+    }
+    const builtinId = shouldAutoSelectBuiltinAddProvider(
+      isAddMode,
+      availableLoading,
+      addCatalogProviders,
+      candidateProviderId,
+    );
+    if (builtinId) {
+      catalogAutoSelectedRef.current = true;
+      setCandidateProviderId(builtinId);
+      return;
+    }
+    if (shouldAutoSelectCustomProvider(
+      isAddMode,
+      availableLoading,
+      addCatalogProviders.length,
+      candidateProviderId,
+    )) {
+      catalogAutoSelectedRef.current = true;
+      setCandidateProviderId(CUSTOM_PROVIDER_ID);
+    }
+  }, [addCatalogProviders, availableLoading, candidateProviderId, isAddMode]);
 
   React.useEffect(() => {
     if (selectedProviderId === ADD_PROVIDER_ID) {
@@ -485,11 +529,12 @@ export const ProvidersPage: React.FC = () => {
   const oauthMethodFallbackLabel = (index: number) =>
     t('settings.providers.page.auth.oauthMethodFallback', { index: String(index + 1) });
 
-  const handleOAuthConnected = (providerId: string) => {
+  const handleOAuthConnected = async (providerId: string) => {
     setShowAuthPanel(false);
-    if (requiresOpenCodeRestartAfterOAuth(providerId)) {
+    if (!isPiKernel && requiresOpenCodeRestartAfterOAuth(providerId)) {
       recordDeferredOpenCodeRestart('providers', { id: providerId });
     }
+    await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
     setSelectedProvider(providerId);
   };
 
@@ -584,7 +629,7 @@ export const ProvidersPage: React.FC = () => {
                               {candidateProviderId === CUSTOM_PROVIDER_ID
                                 ? t('settings.providers.page.custom.optionLabel')
                                 : candidateProviderId
-                                  ? (unconnectedProviders.find(p => p.id === candidateProviderId)?.name || candidateProviderId)
+                                  ? (addCatalogProviders.find(p => p.id === candidateProviderId)?.name || candidateProviderId)
                                   : t('settings.providers.page.connect.selectProviderPlaceholder')}
                             </span>
                           </span>
@@ -615,12 +660,12 @@ export const ProvidersPage: React.FC = () => {
                           {(() => {
                             const query = providerSearchQuery.toLowerCase();
                             const customLabel = t('settings.providers.page.custom.optionLabel');
-                            const customMatches = unconnectedProviders.length === 0
+                            const customMatches = addCatalogProviders.length === 0
                               || !query
                               || customLabel.toLowerCase().includes(query)
                               || 'other'.includes(query)
                               || 'custom'.includes(query);
-                            const filtered = unconnectedProviders.filter(p => {
+                            const filtered = addCatalogProviders.filter(p => {
                               return (p.name || p.id).toLowerCase().includes(query) || p.id.toLowerCase().includes(query);
                             });
                             if (filtered.length === 0 && !customMatches) {
@@ -628,9 +673,11 @@ export const ProvidersPage: React.FC = () => {
                             }
                             return (
                               <>
-                                {unconnectedProviders.length === 0 && !query ? (
+                                {addCatalogProviders.length === 0 && !query ? (
                                   <p className="px-2 py-2 typography-meta text-muted-foreground">
-                                    {t('settings.providers.page.connect.emptyCatalog')}
+                                    {t(connectedProviderIds.size > 0
+                                      ? 'settings.providers.page.connect.allCatalogConnected'
+                                      : 'settings.providers.page.connect.emptyCatalog')}
                                   </p>
                                 ) : null}
                                 {filtered.map((provider) => (
@@ -946,6 +993,9 @@ export const ProvidersPage: React.FC = () => {
             )}
       </SettingsSection>
 
+      {xaiSlotActive && selectedProvider.id === 'xai' && hasCredentials ? (
+        <ProviderXaiUsage />
+      ) : null}
 
       <SettingsSection
         title={t('settings.providers.page.connectionDetails.title')}

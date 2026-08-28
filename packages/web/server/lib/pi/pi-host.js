@@ -24,6 +24,7 @@ import {
   getPiProviderSources,
   hydrateKnownModelCapabilities,
   listPiProviderPublicConfigs,
+  mergeBuiltinPiCatalogProviders,
   upsertPiProviderConfig,
   deletePiProviderConfig,
   writePiProviderAuth,
@@ -32,6 +33,14 @@ import {
   resolvePiAuthPath,
   resolvePiModelsPath,
 } from './pi-resources.js';
+import {
+  authorizePiXaiOAuth,
+  completePiXaiOAuth,
+} from './xai-oauth.js';
+import {
+  getPiXaiUsage,
+  isXaiSlotActive,
+} from './xai-usage.js';
 import {
   createSdkPackageManager,
   createSettingsJsonPackageManager,
@@ -2744,6 +2753,16 @@ export const createPiHost = ({
       invalidateModelRuntime();
       return result;
     },
+    authorizeProviderOAuth(providerId) {
+      return authorizePiXaiOAuth(providerId);
+    },
+    async completeProviderOAuth(providerId) {
+      const credential = await completePiXaiOAuth(providerId);
+      return this.setProviderAuth(providerId, credential);
+    },
+    getXaiUsage(options = {}) {
+      return getPiXaiUsage({ home, ...options });
+    },
     removeProviderAuth(providerId) {
       const result = removePiProviderAuth(providerId, { home });
       invalidateModelRuntime();
@@ -2815,9 +2834,9 @@ export const createPiHost = ({
         const available = runtime && typeof runtime.getAvailable === 'function'
           ? await runtime.getAvailable()
           : [];
-        const providers = mapPiModelsToProviders(available, {
+        const providers = mergeBuiltinPiCatalogProviders(mapPiModelsToProviders(available, {
           configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
-        });
+        }));
         const first = providers[0];
         const firstModel = first ? Object.keys(first.models)[0] : undefined;
         return {
@@ -2825,7 +2844,10 @@ export const createPiHost = ({
           default: first && firstModel ? { [first.id]: firstModel } : {},
         };
       } catch {
-        return { providers: [], default: {} };
+        return {
+          providers: mergeBuiltinPiCatalogProviders([]),
+          default: {},
+        };
       }
     },
     async promptAsync(sessionID, body = {}) {
@@ -3252,8 +3274,29 @@ export const createPiHost = ({
         );
       }
       if (name === 'login') {
+        const target = typeof argument === 'string' ? argument.trim() : '';
+        if (target === 'xai') {
+          return reply(
+            'Open Settings → Providers → xAI and choose Sign in with SuperGrok or X Premium. Tokens stay in ~/.pi/agent/auth.json and Pi refreshes them.',
+          );
+        }
         return reply(
           'Pi authentication is managed in Settings → Providers and stored in ~/.pi/agent. Interactive /login is not run in this desktop UI.',
+        );
+      }
+
+      if (name === 'xai-usage') {
+        if (!isXaiSlotActive(this.getFeaturePlugins())) {
+          const error = new Error('Command /xai-usage is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        const liveUsage = findLiveSessionCommand(record.piSession, name);
+        if (liveUsage && isExtensionCommandSource(liveUsage.source)) {
+          return dispatchLiveSessionCommand();
+        }
+        return reply(
+          'Grok usage is shown in Work Status and Settings → Providers when the Grok Usage plugin is installed.',
         );
       }
 

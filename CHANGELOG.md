@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Settings:** Add Provider always lists xAI / Grok for SuperGrok or X Premium login, even when that row already has models. Other / Custom stays available for another endpoint. API key is secondary. Install Feature Plugins Grok Usage to see allowance, cycle, and expiry on Work Status and the xAI provider card. Grok Usage now reads the real credits envelope instead of failing with “no usable current-period usage” while the token expiry still showed.
+- Chat: opening a session no longer shows a Session backfill complete toast from session memory search. A failed backfill still warns.
 - Chat: sending a message on Desktop no longer shows the same user bubble twice after Pi writes the turn under a different id, and the reply no longer repeats each character.
 - Chat: when a session has Subagents, the sidebar can expand that parent, Work Status names an async workflow after its agent instead of a generic Subagent row, the row stays clickable after the parent tool detaches, a Subagent card can open that child even when the tool payload has no session id, and opening a running or finished child shows the child's live transcript instead of only the Task line.
 - Chat: opening a session shows the full transcript from disk, including later assistant steps in the same send, turns before auto-compact, and turns after a later branch.

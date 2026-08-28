@@ -497,6 +497,62 @@ describe('OpenCode facade HTTP/SSE', () => {
       const source = await (await fetch(`${url}/api/provider/example-provider/source`)).json();
       expect(source.sources.auth.exists).toBe(true);
       expect(source.sources.user.exists).toBe(true);
+
+      expect(methods.xai).toEqual([
+        { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
+        { type: 'api', label: 'API Key' },
+      ]);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('lists unconnected xAI on the provider catalog and keeps leftover quota unregistered', async () => {
+    const { url, close, kernel } = await startFacade({
+      mock: false,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    try {
+      const catalog = await (await fetch(`${url}/api/provider`)).json();
+      expect(Array.isArray(catalog.all)).toBe(true);
+      expect(catalog.connected).toEqual([]);
+      expect(catalog.all.map((provider) => provider.id)).toContain('xai');
+      expect(catalog.all.find((provider) => provider.id === 'xai')).toMatchObject({
+        id: 'xai',
+        name: 'xAI',
+      });
+
+      const unsupported = await fetch(`${url}/api/provider/openai/oauth/authorize`, { method: 'POST' });
+      expect(unsupported.status).toBe(404);
+
+      const callback = await fetch(`${url}/api/provider/xai/oauth/callback`, { method: 'POST' });
+      expect(callback.status).toBe(400);
+
+      const usage = await (await fetch(`${url}/api/pi/xai-usage`)).json();
+      expect(usage).toEqual({ ok: false, configured: false, slotActive: false });
+      expect(usage).not.toMatchObject({ usage: { windows: expect.anything() } });
+
+      const leftoverQuota = await fetch(`${url}/api/quota`);
+      expect(leftoverQuota.status).toBe(404);
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reports xAI usage as unconfigured when the Grok Usage slot is on without oauth', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const agent = path.join(home, '.pi', 'agent');
+      fs.mkdirSync(agent, { recursive: true });
+      fs.writeFileSync(path.join(agent, 'settings.json'), JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }));
+      const usage = await (await fetch(`${url}/api/pi/xai-usage`)).json();
+      expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
+      expect(usage.usage).toBeUndefined();
     } finally {
       kernel.dispose();
       await close();
@@ -1382,6 +1438,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.btw.source).toBe('npm:@narumitw/pi-btw');
       expect(body.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
       expect(body.slots.todo.source).not.toBe('npm:rpiv-todo');
+      expect(body.slots.xai.source).toBe('npm:pi-xai-oauth');
       expect(body.slots.goal.command).toBe('goal');
       expect(body.slots.btw.command).toBe('btw');
       expect(body.slots.plan.command).toBeUndefined();
@@ -1390,6 +1447,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.plan.installed).toBe(false);
       expect(body.slots.btw.installed).toBe(false);
       expect(body.slots.todo.installed).toBe(false);
+      expect(body.slots.xai.installed).toBe(false);
       expect(body.slots.goal.enabled).toBe(false);
       const home = kernel.host.getPath().home;
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);

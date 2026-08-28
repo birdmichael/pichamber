@@ -89,6 +89,9 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.todo.source).toBe('npm:@juicesharp/rpiv-todo');
     expect(plugins.todo.source).not.toBe('npm:rpiv-todo');
     expect(plugins.todo.command).toBeUndefined();
+    expect(plugins.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
+    expect(plugins.xai.source).toBe('npm:pi-xai-oauth');
+    expect(plugins.xai.command).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -177,6 +180,16 @@ describe('feature plugin slash commands', () => {
       description: 'Ask a side question in a temporary forked session',
       source: 'extension',
     }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { xai: { installed: true, enabled: true } },
+    })).toEqual([{
+      name: 'xai-usage',
+      description: 'Show Grok subscription usage',
+      source: 'extension',
+    }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { xai: { installed: true, enabled: false } },
+    })).toEqual([]);
   });
 });
 
@@ -214,8 +227,10 @@ describe('settings.json package manager', () => {
     expect(payload.slots.subagents.installed).toBe(false);
     expect(payload.slots.btw.installed).toBe(false);
     expect(payload.slots.todo.installed).toBe(false);
+    expect(payload.slots.xai.installed).toBe(false);
     expect(payload.slots.goal.enabled).toBe(false);
     expect(payload.slots.todo.enabled).toBe(false);
+    expect(payload.slots.xai.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
   });
 
@@ -248,8 +263,22 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.xai).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
+  });
+
+  it('enables Grok Usage when packages lists npm:pi-xai-oauth', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: {},
+      configuredSources: ['npm:pi-xai-oauth'],
+    });
+    expect(scoped.slots.xai).toMatchObject({
+      source: 'npm:pi-xai-oauth',
+      installed: true,
+      enabled: true,
+    });
+    expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['xai-usage']);
   });
 
   it('enables Todo when packages lists @juicesharp/rpiv-todo, not unscoped rpiv-todo', () => {
@@ -291,6 +320,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.plan).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
+    expect(payload.slots.xai).toMatchObject({ installed: false, enabled: false });
     expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
     expect(readFeaturePlugins(home).subagents.enabled).toBeUndefined();
     expect(resolveFeaturePluginEnabled(true)).toBe(true);
@@ -324,6 +354,9 @@ describe('existing Pi agent recognition', () => {
     });
     expect(chamber.featurePlugins.todo).toEqual({
       source: DEFAULT_FEATURE_PLUGIN_SOURCES.todo,
+    });
+    expect(chamber.featurePlugins.xai).toEqual({
+      source: DEFAULT_FEATURE_PLUGIN_SOURCES.xai,
     });
     expect(JSON.stringify(chamber)).not.toContain('"enabled"');
   });

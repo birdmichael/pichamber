@@ -29,7 +29,6 @@ export const WORK_STATUS_SECTION_IDS = [
 type WorkStatusSectionId = (typeof WORK_STATUS_SECTION_IDS)[number];
 
 type WorkStatusSectionContext = {
-  /** Pi has no provider-quota API; the OpenCode usage section is unavailable. */
   isPiKernel?: boolean;
   /** Pi MCP follows the feature-plugin slot, not leftover mcp.json files. */
   isMcpFeaturePluginActive?: boolean;
@@ -43,12 +42,18 @@ type WorkStatusSectionContext = {
    * (installed + enabled). OpenCode is unchanged.
    */
   todoSlotActive?: boolean;
+  /**
+   * Pi Usage is gated on the Grok Usage feature-plugin slot. OpenCode keeps
+   * the leftover provider-quota section.
+   */
+  xaiSlotActive?: boolean;
 };
 
 /**
- * Provider-quota usage is an OpenCode API. Pi has no quota source, so that
- * section is not offered — session context % / cost stay in the Session block.
- * MCP on Pi is offered only when the adapter slot is installed and enabled.
+ * Provider-quota usage on Pi is the Grok Usage feature-plugin slot, not the
+ * leftover OpenCode quota API. Session context % / cost stay in the Session
+ * block. MCP on Pi is offered only when the adapter slot is installed and
+ * enabled.
  *
  * Subagents on Pi exist only when the Subagents feature-plugin slot is
  * installed and enabled. Leftover OpenCode parentID children are not a Pi
@@ -61,7 +66,7 @@ export const isWorkStatusSectionAvailable = (
   id: WorkStatusSectionId,
   context?: WorkStatusSectionContext,
 ): boolean => {
-  if (context?.isPiKernel && id === 'usage') return false;
+  if (context?.isPiKernel && id === 'usage') return context.xaiSlotActive === true;
   if (id === 'mcp' && context?.isPiKernel && !context.isMcpFeaturePluginActive) return false;
   if (context?.isPiKernel && id === 'subagents') return context.subagentsSlotActive === true;
   if (context?.isPiKernel && id === 'tasks') return context.todoSlotActive === true;

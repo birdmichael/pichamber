@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { requiresProviderAuth, shouldLoadAvailableProviders } from './providerAvailability';
+import {
+  mergeAddCatalogProviders,
+  parseConnectedProviderIds,
+  providerHasConnectedModels,
+  requiresProviderAuth,
+  selectAddCatalogProviders,
+  selectUnconnectedProviders,
+  shouldAutoSelectBuiltinAddProvider,
+  shouldAutoSelectCustomProvider,
+  shouldLoadAvailableProviders,
+} from './providerAvailability';
 import {
   getOAuthAuthMethods,
   normalizeAuthType,
@@ -12,6 +22,29 @@ describe('ProvidersPage available provider loading', () => {
   test('loads available providers only in add-provider mode', () => {
     expect(shouldLoadAvailableProviders(false)).toBe(false);
     expect(shouldLoadAvailableProviders(true)).toBe(true);
+  });
+
+  test('keeps xAI in Add when the live list already treated the stub as connected', () => {
+    expect(providerHasConnectedModels({ models: {} })).toBe(false);
+    expect(providerHasConnectedModels({ models: [] })).toBe(false);
+    expect(providerHasConnectedModels({ models: [{ id: 'grok-4.6' }] })).toBe(true);
+    expect(parseConnectedProviderIds({ all: [{ id: 'xai' }], connected: ['xai'], default: {} })).toEqual(['xai']);
+    expect(parseConnectedProviderIds([{ id: 'xai' }])).toEqual([]);
+    const catalog = mergeAddCatalogProviders([{ id: 'bmlab', name: 'bmlab' }]);
+    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai']);
+    expect(catalog.find((provider) => provider.id === 'xai')?.name).toBe('xAI / Grok');
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['xai']);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai']))).toEqual([]);
+    expect(selectAddCatalogProviders(
+      [{ id: 'bmlab', name: 'bmlab' }, { id: 'xai', name: 'xai' }],
+      new Set(['bmlab', 'xai']),
+    )).toEqual([{ id: 'xai', name: 'xAI / Grok' }]);
+    expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
+    expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
+    expect(shouldAutoSelectCustomProvider(true, false, 0, '')).toBe(true);
+    expect(shouldAutoSelectCustomProvider(true, true, 0, '')).toBe(false);
+    expect(shouldAutoSelectCustomProvider(true, false, 1, '')).toBe(false);
+    expect(shouldAutoSelectCustomProvider(true, false, 0, 'xai')).toBe(false);
   });
 
   test('skips the standalone auth panel for config-defined custom providers', () => {

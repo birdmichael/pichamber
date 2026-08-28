@@ -935,6 +935,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
+    id: 'feature-plugins.xai',
+    page: 'feature-plugins',
+    titleKey: 'settings.featurePlugins.slot.xai.title',
+    descriptionKey: 'settings.featurePlugins.slot.xai.info',
+    keywords: ['xai', 'grok', 'pi-xai-oauth', 'npm', 'install', 'usage', 'quota', ...featurePluginSlotSearchKeywords('xai')],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'snippets.create',
     page: 'snippets',
     titleKey: 'settings.snippets.sidebar.actions.create',

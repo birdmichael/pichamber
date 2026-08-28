@@ -5,6 +5,7 @@ import { toast } from '@/components/ui';
 import { formatMessage, useI18nStore } from '@/lib/i18n';
 import {
   isBlockingPiExtensionUiKind,
+  isRoutineSessionBackfillNotify,
   parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
   type PiExtensionUiPrompt,
@@ -77,7 +78,7 @@ export const presentPiExtensionUiNotify = (notify: {
   level: PiExtensionUiNotifyLevel;
 }): void => {
   const message = notify.message.trim();
-  if (!message) return;
+  if (!message || isRoutineSessionBackfillNotify(message)) return;
   const now = Date.now();
   const dedupeKey = planNotifyDedupeKey(message);
   const last = recentNotifyAt.get(dedupeKey) ?? 0;
@@ -145,7 +146,7 @@ export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | 
 
 export const applyPiExtensionUiNotify = (value: unknown): PiExtensionUiNotifyItem | null => {
   const notify = parsePiExtensionUiNotify(value);
-  if (!notify) return null;
+  if (!notify || isRoutineSessionBackfillNotify(notify.message)) return null;
   const item: PiExtensionUiNotifyItem = {
     id: nextNotifyId(),
     sessionID: notify.sessionID,

@@ -8,6 +8,13 @@ const noop = () => {};
 
 const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
 
+const SESSION_BACKFILL_COMPLETE = /Session backfill complete:/i;
+
+/** Hermes startup indexing status. Keep real backfill failures visible. */
+export const isRoutineSessionBackfillNotify = (message) => (
+  SESSION_BACKFILL_COMPLETE.test(asTrimmedString(message))
+);
+
 const publicPrompt = (prompt) => ({
   id: prompt.id,
   sessionID: prompt.sessionID,
@@ -185,7 +192,7 @@ export const createExtensionUIController = ({
     },
     notify(message, type) {
       const text = asTrimmedString(message);
-      if (!text) return;
+      if (!text || isRoutineSessionBackfillNotify(text)) return;
       const level = type === 'warning' || type === 'error' ? type : 'info';
       publish(UI_NOTIFY, { message: text, level });
     },

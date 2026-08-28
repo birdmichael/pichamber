@@ -75,9 +75,10 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
+  const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive, xaiSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive, xaiSlotActive],
   );
   const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   // Starts optimistic: sections report after their first commit, and rendering

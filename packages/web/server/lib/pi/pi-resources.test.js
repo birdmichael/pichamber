@@ -13,6 +13,8 @@ import {
   writePiPrompt,
   deletePiPrompt,
   getPiAuthMethods,
+  mergeBuiltinPiCatalogProviders,
+  toPiProviderListPayload,
   getPiProviderSources,
   listPiProviderPublicConfigs,
   hydrateKnownModelCapabilities,
@@ -337,6 +339,10 @@ description: >
     }));
     const methods = getPiAuthMethods(home);
     expect(methods['example-provider']).toEqual([{ type: 'api', label: 'API Key' }]);
+    expect(methods.xai).toEqual([
+      { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
+      { type: 'api', label: 'API Key' },
+    ]);
     expect(JSON.stringify(methods)).not.toContain('sk-test');
     const sources = getPiProviderSources('example-provider', { home });
     expect(sources.sources.auth.exists).toBe(true);
@@ -345,6 +351,45 @@ description: >
     const publicConfigs = listPiProviderPublicConfigs({ home });
     expect(publicConfigs['example-provider'].baseUrl).toBe('https://example.test');
     expect(JSON.stringify(publicConfigs)).not.toContain('sk-test');
+  });
+
+  it('always lists xAI with subscription OAuth first even when unconnected', () => {
+    const home = makeTemp();
+    const methods = getPiAuthMethods(home);
+    expect(methods.xai).toEqual([
+      { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
+      { type: 'api', label: 'API Key' },
+    ]);
+    expect(mergeBuiltinPiCatalogProviders([])).toEqual([
+      { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
+    ]);
+    expect(mergeBuiltinPiCatalogProviders([
+      { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
+    ])).toEqual([
+      { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
+    ]);
+    expect(toPiProviderListPayload({
+      providers: mergeBuiltinPiCatalogProviders([]),
+      default: {},
+    })).toEqual({
+      all: [{ id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} }],
+      default: {},
+      connected: [],
+    });
+    expect(toPiProviderListPayload({
+      providers: [
+        { id: 'xai', name: 'xAI', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+        { id: 'bmlab', name: 'bmlab', models: {} },
+      ],
+      default: { xai: 'grok-4.6' },
+    })).toEqual({
+      all: [
+        { id: 'xai', name: 'xAI', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+        { id: 'bmlab', name: 'bmlab', models: {} },
+      ],
+      default: { xai: 'grok-4.6' },
+      connected: ['xai'],
+    });
   });
 
   it('writes Pi auth.json as api_key with 0600 and never returns the key', () => {

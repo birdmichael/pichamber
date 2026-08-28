@@ -447,6 +447,7 @@ describe('settings search', () => {
       { query: 'pi-subagents', id: 'feature-plugins.subagents' },
       { query: '@narumitw/pi-btw', id: 'feature-plugins.btw' },
       { query: '@juicesharp/rpiv-todo', id: 'feature-plugins.todo' },
+      { query: 'pi-xai-oauth', id: 'feature-plugins.xai' },
     ] as const;
 
     for (const { query, id } of queries) {
@@ -476,11 +477,13 @@ describe('settings search', () => {
       'feature-plugins.plan',
       'feature-plugins.subagents',
       'feature-plugins.btw',
+      'feature-plugins.xai',
     ]);
     expect(idsFor('work status')).toEqual([
       'feature-plugins.mcp',
       'feature-plugins.subagents',
       'feature-plugins.todo',
+      'feature-plugins.xai',
     ]);
     expect(idsFor('sidebar')).toEqual(['feature-plugins.plan']);
     expect(idsFor('session').filter((id) => id.startsWith('feature-plugins.'))).toEqual([
@@ -489,6 +492,7 @@ describe('settings search', () => {
       'feature-plugins.btw',
     ]);
     expect(idsFor('settings')).toContain('feature-plugins.mcp');
+    expect(idsFor('settings')).toContain('feature-plugins.xai');
     expect(idsFor('settings')).not.toContain('feature-plugins.goal');
     expect(idsFor('composer')).not.toContain('feature-plugins.mcp');
     expect(idsFor('composer')).not.toContain('feature-plugins.btw');

@@ -327,13 +327,71 @@ const authMethodType = (entry) => {
 
 const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API Key');
 
+export const XAI_PROVIDER_ID = 'xai';
+const XAI_OAUTH_LOGIN_LABEL = 'Sign in with SuperGrok or X Premium';
+
+const XAI_AUTH_METHODS = [
+  { type: 'oauth', label: XAI_OAUTH_LOGIN_LABEL },
+  { type: 'api', label: 'API Key' },
+];
+
+export const PI_BUILTIN_CATALOG_PROVIDERS = [
+  { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
+];
+
+/** Catalog entries Settings can Add even when ModelRuntime has not connected them yet. */
+export const mergeBuiltinPiCatalogProviders = (providers) => {
+  const list = Array.isArray(providers) ? [...providers] : [];
+  const ids = new Set(list.map((provider) => (
+    provider && typeof provider === 'object' && typeof provider.id === 'string' ? provider.id : ''
+  )).filter(Boolean));
+  for (const builtin of PI_BUILTIN_CATALOG_PROVIDERS) {
+    if (ids.has(builtin.id)) continue;
+    list.push({
+      id: builtin.id,
+      name: builtin.name,
+      source: builtin.source,
+      env: [...builtin.env],
+      models: { ...builtin.models },
+    });
+  }
+  return list;
+};
+
+export const providerHasCatalogModels = (provider) => {
+  if (!provider || typeof provider !== 'object') return false;
+  const models = provider.models;
+  if (Array.isArray(models)) return models.length > 0;
+  if (models && typeof models === 'object') return Object.keys(models).length > 0;
+  return false;
+};
+
+/** OpenCode SDK `GET /provider` shape: `all` is Add-able catalog, `connected` has models. */
+export const toPiProviderListPayload = (catalog) => {
+  const providers = Array.isArray(catalog?.providers) ? catalog.providers : [];
+  const defaults = catalog?.default && typeof catalog.default === 'object' && !Array.isArray(catalog.default)
+    ? catalog.default
+    : {};
+  return {
+    all: providers,
+    default: defaults,
+    connected: providers
+      .filter((provider) => providerHasCatalogModels(provider) && typeof provider.id === 'string' && provider.id)
+      .map((provider) => provider.id),
+  };
+};
+
 export const getPiAuthMethods = (home = os.homedir()) => {
   const auth = readJsonObject(resolvePiAuthPath(home));
   const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
-  const ids = new Set([...Object.keys(auth), ...Object.keys(providers)]);
+  const ids = new Set([...Object.keys(auth), ...Object.keys(providers), XAI_PROVIDER_ID]);
   const result = {};
   for (const id of ids) {
     if (!id) continue;
+    if (id === XAI_PROVIDER_ID) {
+      result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
+      continue;
+    }
     const methodType = authMethodType(auth[id]);
     result[id] = [{
       type: methodType,

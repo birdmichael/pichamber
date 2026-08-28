@@ -21,6 +21,7 @@ import { resetSessionActivityTiming } from '@/sync/session-activity-timing';
 import { resetPiExtensionUiStore } from '@/sync/pi-extension-ui-store';
 import { resetPiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { resetPiSessionPlanStore } from '@/sync/pi-session-plan-store';
+import { useXaiUsageStore } from '@/stores/useXaiUsageStore';
 import { syncDesktopSettings } from '@/lib/persistence';
 
 // Same-device transport switch (LAN⇄relay for one paired device): rebind the SDK
@@ -66,6 +67,7 @@ export const resetAppForRuntimeEndpointChange = (detail: RuntimeEndpointChangedD
   resetPiExtensionUiStore();
   resetPiFeaturePluginsStore();
   resetPiSessionPlanStore();
+  useXaiUsageStore.getState().reset();
   usePermissionStore.getState().reset();
   useFileSearchStore.getState().resetForRuntimeSwitch();
   useGitStore.getState().resetForRuntimeSwitch(detail.runtimeKey);

@@ -44,6 +44,7 @@ mock.module('@/lib/runtime-fetch', () => ({
 import {
   displaySelectOption,
   isFreeformOtherOption,
+  isRoutineSessionBackfillNotify,
   isTypeSomethingOption,
   parsePiExtensionUiNotify,
   parsePiExtensionUiPrompt,
@@ -279,6 +280,25 @@ describe('pi extension UI store', () => {
     consumePiExtensionUiNotify(queued[0]!.id);
     expect(usePiExtensionUiStore.getState().notifies).toEqual([]);
     expect(applyPiExtensionUiNotify({ message: '' })).toBeNull();
+  });
+
+  test('does not toast routine session backfill complete status', () => {
+    expect(isRoutineSessionBackfillNotify(
+      '🧠 Session backfill complete: 0 indexed, 51 skipped, 0 messages (1 file error).',
+    )).toBe(true);
+    expect(isRoutineSessionBackfillNotify('⚠️ Session backfill failed: sqlite busy')).toBe(false);
+    expect(isRoutineSessionBackfillNotify('⚠️ Session backfill check failed: missing dir')).toBe(false);
+    expect(applyPiExtensionUiNotify({
+      message: '🧠 Session backfill complete: 0 indexed, 51 skipped, 0 messages (1 file error).',
+      level: 'warning',
+    })).toBeNull();
+    expect(usePiExtensionUiStore.getState().notifies).toEqual([]);
+    presentPiExtensionUiNotify({
+      message: '🧠 Session backfill complete: 0 indexed, 51 skipped, 0 messages.',
+      level: 'info',
+    });
+    expect(sonnerToastCalls.info).toEqual([]);
+    expect(sonnerToastCalls.warning).toEqual([]);
   });
 
   test('maps info notifies to a short top toast without an OK action', () => {
