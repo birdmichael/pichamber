@@ -240,6 +240,9 @@ describe('session conversation titles', () => {
       message: { role: 'user', content: 'Goal mode is active. Complete this goal fully: say bye' },
     }, {
       type: 'message',
+      message: { role: 'user', content: '继续' },
+    }, {
+      type: 'message',
       message: { role: 'user', content: '/goal say bye' },
     }])).toBe('/goal say bye');
     expect(firstUserTextFromPiEntries([{

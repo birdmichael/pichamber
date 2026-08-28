@@ -19,12 +19,16 @@ export const isPlaceholderSessionTitle = (title: unknown): boolean => {
   return !trimmed || PLACEHOLDER_SESSION_TITLES.has(trimmed.toLowerCase());
 };
 
+const isUnhelpfulSessionTitle = (title: string): boolean => (
+  /^Goal mode is active\./i.test(title) || /^(继续|continue)$/i.test(title)
+);
+
 export const resolveSessionDisplayTitle = (
   title: unknown,
   untitledLabel: string,
 ): string => {
   const trimmed = typeof title === 'string' ? title.trim() : '';
-  if (!trimmed || isPlaceholderSessionTitle(trimmed)) {
+  if (!trimmed || isPlaceholderSessionTitle(trimmed) || isUnhelpfulSessionTitle(trimmed)) {
     return untitledLabel;
   }
   return trimmed;

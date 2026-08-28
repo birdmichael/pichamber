@@ -91,6 +91,15 @@ export function resolvePiGoalTargetSession(input: {
 }
 
 const PI_GOAL_USER_TEXT = /^\/goal(?::\d+)?\s+(.+)$/is;
+const PI_GOAL_COMPLETE_TEXT = /goal complete/i;
+
+export function isPiGoalSystemPreamble(text: string | null | undefined): boolean {
+  return /^Goal mode is active\./i.test(typeof text === 'string' ? text.trim() : '');
+}
+
+function isPiGoalCompleteText(text: string | null | undefined): boolean {
+  return PI_GOAL_COMPLETE_TEXT.test(typeof text === 'string' ? text : '');
+}
 
 const objectiveFromUserText = (text: string): string | null => {
   const match = text.trim().match(PI_GOAL_USER_TEXT);
@@ -135,6 +144,36 @@ export function readPiGoalObjectiveFromSession(
     if (objective) return objective;
   }
   return null;
+}
+
+export function isPiGoalComposerRowActive(
+  messages: Array<{ id?: string; role?: string }> | null | undefined,
+  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+): boolean {
+  if (!readPiGoalObjectiveFromSession(messages, partsByMessageID)) return false;
+  if (!Array.isArray(messages)) return false;
+  const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
+  let lastGoalIndex = -1;
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message?.role !== 'user' || typeof message.id !== 'string' || !message.id) continue;
+    if (objectiveFromUserText(textFromParts(parts[message.id]))) lastGoalIndex = index;
+  }
+  if (lastGoalIndex < 0) return false;
+  for (let index = lastGoalIndex + 1; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message?.role !== 'assistant' || typeof message.id !== 'string' || !message.id) continue;
+    if (isPiGoalCompleteText(textFromParts(parts[message.id]))) return false;
+  }
+  return true;
+}
+
+export function sessionHasPiGoalMarker(session: { metadata?: unknown } | null | undefined): boolean {
+  const metadata = session?.metadata;
+  if (!metadata || typeof metadata !== 'object') return false;
+  const namespace = (metadata as { pichamber?: unknown }).pichamber;
+  if (!namespace || typeof namespace !== 'object') return false;
+  return Boolean((namespace as { piGoal?: unknown }).piGoal);
 }
 
 export async function resolvePiGoalSession(input: {

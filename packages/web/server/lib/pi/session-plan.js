@@ -4,6 +4,22 @@
 
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
 export const GOAL_STATE_ENTRY_TYPE = 'goal-state';
+
+export const isGoalSystemPreamble = (text) => (
+  /^Goal mode is active\./i.test(String(text || '').trim())
+);
+
+export const isGoalCommandUserText = (text) => (
+  /^\/goal(?::\d+)?\s+\S/i.test(String(text || '').trim())
+);
+
+export const isUnhelpfulSessionTitle = (title) => {
+  const trimmed = typeof title === 'string' ? title.trim() : '';
+  if (!trimmed) return true;
+  if (isGoalSystemPreamble(trimmed)) return true;
+  return /^(继续|continue)$/i.test(trimmed);
+};
+
 const ACTIVE_GOAL_STATUSES = new Set([
   'active',
   'queued',

@@ -7,6 +7,9 @@ import {
   getPiGoalCommand,
   isPiGoalBlockedByPlan,
   isPiGoalComposerButtonVisible,
+  isPiGoalComposerRowActive,
+  isPiGoalSystemPreamble,
+  sessionHasPiGoalMarker,
   isPiGoalPluginAvailable,
   readPiGoalObjectiveFromMessages,
   readPiGoalObjectiveFromSession,
@@ -171,6 +174,29 @@ describe('Pi Goal start command', () => {
         msg_goal: [{ type: 'text', text: '/goal say bye' }],
       },
     )).toBe('say bye');
+    expect(isPiGoalSystemPreamble('Goal mode is active. Complete this goal fully: say bye')).toBe(true);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_bye', role: 'assistant' },
+      ],
+      {
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_bye: [{ type: 'text', text: 'Bye' }],
+      },
+    )).toBe(true);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_done', role: 'assistant' },
+      ],
+      {
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_done: [{ type: 'text', text: 'Goal complete' }],
+      },
+    )).toBe(false);
+    expect(sessionHasPiGoalMarker({ metadata: { pichamber: { piGoal: true } } })).toBe(true);
+    expect(sessionHasPiGoalMarker({ metadata: {} })).toBe(false);
   });
 
   test('mints a draft session instead of treating an empty composer as no-session', async () => {

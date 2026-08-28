@@ -15,6 +15,7 @@ import { Icon } from '@/components/icon/Icon';
 import { StopIcon } from '@/components/icons/StopIcon';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
 import { PiGoalStatusRow } from '@/components/chat/PiGoalStatusRow';
+import { PiPlanStatusRow } from '@/components/chat/PiPlanStatusRow';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
 import { useI18n } from '@/lib/i18n';
 import { usePiKernel } from '@/lib/usePiKernel';
@@ -75,11 +76,14 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
     return (
         <div className="flex flex-col">
         {isPiKernel ? (
+        <>
         <PiGoalStatusRow
             sessionId={currentSessionId}
             directory={directory}
             className="mb-1.5"
         />
+        <PiPlanStatusRow className="mb-1.5" />
+        </>
         ) : (
         <SessionGoalRow
             sessionId={currentSessionId}

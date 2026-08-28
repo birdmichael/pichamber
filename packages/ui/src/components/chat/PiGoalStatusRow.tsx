@@ -3,6 +3,7 @@ import React from 'react';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import {
+  isPiGoalComposerRowActive,
   readPiGoalObjectiveFromSession,
   readPiGoalRouteSessionID,
   resolvePiGoalTargetSession,
@@ -40,7 +41,10 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
   }) || null;
   const objective = useDirectorySync((state) => {
     if (!resolvedSessionId) return null;
-    return readPiGoalObjectiveFromSession(state.message[resolvedSessionId], state.part);
+    const messages = state.message[resolvedSessionId];
+    const parts = state.part;
+    if (!isPiGoalComposerRowActive(messages, parts)) return null;
+    return readPiGoalObjectiveFromSession(messages, parts);
   }, directory);
 
   if (!isPiKernel || !resolvedSessionId || !objective) return null;

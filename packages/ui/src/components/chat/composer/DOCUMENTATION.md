@@ -19,8 +19,9 @@ objective submits `/goal <objective>` (or the configured command) through
 appends that `/goal` text as a user bubble and titles an Untitled session
 from the objective. A `PiGoalStatusRow` above the composer shows the
 latest `/goal` objective from the same chat Start Goal targets
-(current session, then URL `?session=`, then last-active). Read-only;
-not leftover OpenChamber Session Goal.
+(current session, then URL `?session=`, then last-active) until an
+assistant says Goal complete. Read-only; not leftover OpenChamber
+Session Goal. Sidebar Goal rows use `metadata.pichamber.piGoal`.
 A new-session draft mints a real session first and does not switch the
 open chat onto that id until `/goal` is accepted. If the store, URL
 `?session=`, or last-active session already names a chat, Start Goal
@@ -30,9 +31,12 @@ draft and the modal; retry reuses the minted session instead of creating
 another. Start does not require a provider/model from the config store. The host
 409s `/goal` while that session is already in Plan. Desktop also refuses Start
 Goal while the Plan chip is on — including local draft Plan — and does not mint
-or send `/goal`. Failures (no session,
+or send `/goal`. The dialog copy matches the host 409, Start stays disabled,
+and Exit Plan switches the chip back to Agent. Failures (no session,
 missing live command, Plan mutex, send error) render inside the modal — Desktop
-dialogs sit on the top layer, so toasts are not visible while it is open. Bare `/goal` is rejected. Disable or uninstall
+dialogs sit on the top layer, so toasts are not visible while it is open.
+Agent→Plan on a draft toasts and shows a Plan row (`Plan starts when you send`).
+A live `/plan start` also opens the Desktop Plan rail. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
 On Pi it also no longer mounts the footer context-usage percent chip;

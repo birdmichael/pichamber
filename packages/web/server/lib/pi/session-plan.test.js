@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalCommandUserText,
   isGoalMutexHeld,
+  isGoalSystemPreamble,
   isPlanMutexHeld,
+  isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
   resolvePlanModeState,
@@ -23,6 +26,13 @@ const stateEntry = (data) => ({
 });
 
 describe('session-plan', () => {
+  it('recognizes Goal preamble, /goal user text, and unhelpful titles', () => {
+    expect(isGoalSystemPreamble('Goal mode is active. Complete this goal fully: say bye')).toBe(true);
+    expect(isGoalCommandUserText('/goal say bye')).toBe(true);
+    expect(isUnhelpfulSessionTitle('继续')).toBe(true);
+    expect(isUnhelpfulSessionTitle('say bye')).toBe(false);
+  });
+
   it('maps live plan-mode-state to off/active/ready/saved/implementing', () => {
     expect(sessionPlanFromState({ enabled: false, awaitingAction: false })).toEqual({
       status: 'off',

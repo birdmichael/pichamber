@@ -10,6 +10,7 @@ import {
   isTaskDetails,
   mapTasksToOpenCodeTodos,
 } from './session-todo.js';
+import { isGoalSystemPreamble } from './session-plan.js';
 
 export { mapPiUsageToOpenCodeTokens, resolveUsableFacadeModel } from './session-transfer.js';
 
@@ -376,6 +377,21 @@ export const createEventTranslator = ({
         const message = piEvent.message;
         const role = message?.role;
         if (role === 'user') {
+          const text = typeof message.content === 'string'
+            ? message.content
+            : Array.isArray(message.content)
+              ? message.content.filter((block) => block?.type === 'text').map((block) => block.text).join('')
+              : '';
+          // Goal plugin injects this system line as a user turn. Never show it.
+          // Still consume the slot so a later /goal echo cannot land after the
+          // assistant (that is what reversed the user bubble).
+          if (isGoalSystemPreamble(text)) {
+            if (!userMessageID) {
+              const incomingId = typeof message.id === 'string' ? message.id : '';
+              userMessageID = incomingId || nextMessageId();
+            }
+            return [];
+          }
           // Facade promptAsync already persisted the user bubble. Pi also
           // emits message_start with the same text and a jsonl id; echoing
           // it adds a second user turn (often after the assistant).
@@ -388,11 +404,6 @@ export const createEventTranslator = ({
             return [];
           }
           userMessageID = incomingId || nextMessageId();
-          const text = typeof message.content === 'string'
-            ? message.content
-            : Array.isArray(message.content)
-              ? message.content.filter((block) => block?.type === 'text').map((block) => block.text).join('')
-              : '';
           const partID = nextPartId();
           return [
             messageUpdated({

@@ -849,6 +849,12 @@ The host also 409s `/goal` while Plan is `active`/`ready`, and
 `POST plan start` while a `goal-state` entry is still in-flight, so a
 live Plan chat cannot append `/goal`. Session titles skip the Goal
 plugin preamble (`Goal mode is active.`) and keep `/goal <objective>`.
+The translator does not emit that preamble as a user bubble. After
+hydrate, the live `/goal` user message stays ahead of the Goal-turn
+assistants (jsonl must not move it below Goal complete). Disk session
+names that are the preamble or `继续` do not replace an objective
+title. `/goal` also sets `metadata.pichamber.piGoal` so the sidebar
+can show the target mark.
 
 ## Subagent children
 

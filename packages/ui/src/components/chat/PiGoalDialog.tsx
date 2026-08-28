@@ -23,6 +23,8 @@ import {
 } from '@/lib/piGoal';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { readLastActiveSession } from '@/sync/last-session-cache';
+import { applyPlanToggleSelect } from '@/sync/pi-session-plan';
+import { dispatchSessionPlanAction } from '@/sync/pi-session-plan-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
 interface PiGoalDialogProps {
@@ -81,8 +83,34 @@ export function PiGoalDialog({
   const trimmed = objective.trim();
   const canSubmit = canSubmitPiGoalObjective(objective) && !busy && !planBlocked;
 
+  const exitPlan = async () => {
+    if (!planBlocked || busy) return;
+    setBusy(true);
+    try {
+      const result = await applyPlanToggleSelect({
+        sessionID: chrome.sessionID,
+        draftOpen: chrome.draftOpen,
+        status: chrome.status,
+        side: 'agent',
+        setDraftPlanSelected: useSessionUIStore.getState().setDraftPlanSelected,
+        dispatchSessionPlanAction,
+      });
+      if (result.kind === 'session-action-failed') {
+        setError(t('chat.piPlan.actionFailed'));
+        return;
+      }
+      setError(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submit = async () => {
-    if (planBlocked || !canSubmitPiGoalObjective(objective)) return;
+    if (planBlocked) {
+      setError(t('chat.piGoal.error.planActive'));
+      return;
+    }
+    if (!canSubmitPiGoalObjective(objective)) return;
     setBusy(true);
     setError(null);
     try {
@@ -202,10 +230,16 @@ export function PiGoalDialog({
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => onOpenChange(false)}>
               {t('chat.piGoal.dialog.cancel')}
             </Button>
+            {planBlocked ? (
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void exitPlan()}>
+                {t('chat.piGoal.dialog.exitPlan')}
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
               disabled={!canSubmit || !trimmed}
+              aria-disabled={!canSubmit || !trimmed}
               onClick={() => void submit()}
             >
               {t('chat.piGoal.dialog.submit')}

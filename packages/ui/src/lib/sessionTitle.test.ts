@@ -16,6 +16,14 @@ describe('session display titles', () => {
     expect(isPlaceholderSessionTitle('hello')).toBe(false);
   });
 
+  test('maps Goal preamble and continue-only titles to untitled', () => {
+    const untitled = 'Untitled Session';
+    expect(resolveSessionDisplayTitle('Goal mode is active. Complete this goal fully: say bye', untitled)).toBe(untitled);
+    expect(resolveSessionDisplayTitle('继续', untitled)).toBe(untitled);
+    expect(resolveSessionDisplayTitle('continue', untitled)).toBe(untitled);
+    expect(resolveSessionDisplayTitle('say bye', untitled)).toBe('say bye');
+  });
+
   test('maps every empty-session placeholder to one untitled label', () => {
     const untitled = 'Untitled Session';
     expect(resolveSessionDisplayTitle('', untitled)).toBe(untitled);

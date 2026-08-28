@@ -105,8 +105,11 @@ import { adaptQuestionToolForDesktop } from './question-desktop.js';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalCommandUserText,
   isGoalMutexHeld,
+  isGoalSystemPreamble,
   isPlanMutexHeld,
+  isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
   resumeSavedPlanState,
@@ -582,9 +585,7 @@ export const resolvePromptModelRef = (model) => {
   return modelID;
 };
 
-export const isGoalSystemPreamble = (text) => (
-  /^Goal mode is active\./i.test(String(text || '').trim())
-);
+export { isGoalSystemPreamble } from './session-plan.js';
 
 export const titleFromUserText = (text) => {
   let line = String(text || '').replace(/\s+/g, ' ').trim();
@@ -604,13 +605,16 @@ const userTextFromPiContent = (content) => {
 };
 
 export const firstUserTextFromPiEntries = (entries) => {
+  let fallback = '';
   for (const entry of Array.isArray(entries) ? entries : []) {
     const message = entry?.message || entry;
     if (message?.role !== 'user') continue;
     const text = userTextFromPiContent(message.content);
-    if (text && !isGoalSystemPreamble(text)) return text;
+    if (!text || isGoalSystemPreamble(text) || isUnhelpfulSessionTitle(text)) continue;
+    if (isGoalCommandUserText(text)) return text;
+    if (!fallback) fallback = text;
   }
-  return '';
+  return fallback;
 };
 
 const FIRST_USER_TEXT_FILE_LIMIT = 32 * 1024;
@@ -624,6 +628,7 @@ export const firstUserTextFromSessionFile = (filePath) => {
       const buffer = Buffer.alloc(FIRST_USER_TEXT_FILE_LIMIT);
       const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
       const text = buffer.slice(0, bytes).toString('utf8');
+      let fallback = '';
       for (const line of text.split(/\r?\n/)) {
         if (!line.trim()) continue;
         let parsed;
@@ -635,8 +640,11 @@ export const firstUserTextFromSessionFile = (filePath) => {
         const message = parsed?.message || parsed;
         if (message?.role !== 'user') continue;
         const userText = userTextFromPiContent(message.content);
-        if (userText && !isGoalSystemPreamble(userText)) return userText;
+        if (!userText || isGoalSystemPreamble(userText) || isUnhelpfulSessionTitle(userText)) continue;
+        if (isGoalCommandUserText(userText)) return userText;
+        if (!fallback) fallback = userText;
       }
+      return fallback;
     } finally {
       fs.closeSync(fd);
     }
@@ -646,12 +654,15 @@ export const firstUserTextFromSessionFile = (filePath) => {
 };
 
 const firstUserText = (store) => {
+  let fallback = '';
   for (const entry of store.messages || []) {
     if (entry?.info?.role !== 'user') continue;
     const part = (entry.parts || []).find((item) => item?.type === 'text' && typeof item.text === 'string' && item.text.trim());
-    if (part && !isGoalSystemPreamble(part.text)) return part.text;
+    if (!part || isGoalSystemPreamble(part.text) || isUnhelpfulSessionTitle(part.text)) continue;
+    if (isGoalCommandUserText(part.text)) return part.text;
+    if (!fallback) fallback = part.text;
   }
-  return '';
+  return fallback;
 };
 
 const persistConversationTitle = (record, title) => {
@@ -664,9 +675,12 @@ const persistConversationTitle = (record, title) => {
 };
 
 const maybeApplyConversationTitle = (record) => {
-  if (!record?.info || !isPlaceholderSessionTitle(record.info.title)) return false;
+  if (!record?.info) return false;
+  if (!isPlaceholderSessionTitle(record.info.title) && !isUnhelpfulSessionTitle(record.info.title)) {
+    return false;
+  }
   const next = titleFromUserText(firstUserText(record));
-  if (!next) return false;
+  if (!next || isUnhelpfulSessionTitle(next)) return false;
   record.info.title = next;
   record.info.time = { ...(record.info.time || {}), updated: Date.now() };
   persistConversationTitle(record, next);
@@ -1214,7 +1228,16 @@ const appendFacadeUserMessage = (emit, record, body, userText) => {
   return userMessageID;
 };
 
-const placeGoalCommandUserMessage = (record, userMessageID, insertAt) => {
+const emitFacadeMessage = (emit, record, entry) => {
+  if (!entry?.info) return;
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.updated',
+    properties: { sessionID: record.id, info: entry.info },
+  });
+};
+
+const placeGoalCommandUserMessage = (emit, record, userMessageID, insertAt) => {
   const messages = record?.messages;
   if (!Array.isArray(messages) || !userMessageID) return;
   let index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
@@ -1225,13 +1248,17 @@ const placeGoalCommandUserMessage = (record, userMessageID, insertAt) => {
     messages.splice(Math.min(at, messages.length), 0, goal);
     index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
   }
-  const created = messages[index]?.info?.time?.created;
-  if (typeof created !== 'number') return;
+  const previous = messages[index - 1]?.info?.time?.created;
+  const base = (typeof previous === 'number' ? previous : Date.now()) + 1;
+  const goal = messages[index];
+  if (!goal?.info) return;
+  goal.info.time = { ...(goal.info.time || {}), created: base };
+  emitFacadeMessage(emit, record, goal);
   for (let i = index + 1; i < messages.length; i += 1) {
-    const time = messages[i]?.info?.time;
-    if (typeof time?.created === 'number' && time.created <= created) {
-      messages[i].info.time = { ...time, created: created + (i - index) };
-    }
+    const entry = messages[i];
+    const time = entry?.info?.time;
+    entry.info.time = { ...(time || {}), created: base + (i - index) };
+    emitFacadeMessage(emit, record, entry);
   }
 };
 
@@ -2663,7 +2690,11 @@ export const createPiHost = ({
         hydrateFacadeMessages(entries, record.id, record),
       );
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
-      if (title) record.info.title = title;
+      if (title && !isPlaceholderSessionTitle(title) && !isUnhelpfulSessionTitle(title)) {
+        record.info.title = title;
+      } else if (maybeApplyConversationTitle(record)) {
+        // Prefer /goal objective over a Goal preamble or “继续” session name.
+      }
       const metadata = readPersistedSessionMetadata(entries);
       if (metadata) {
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
@@ -3373,16 +3404,26 @@ export const createPiHost = ({
         if (name === goalCommand || name === 'goal') {
           goalInsertAt = record.messages.length;
           goalUserID = appendFacadeUserMessage(emit, record, body, userText);
-          if (maybeApplyConversationTitle(record)) {
-            emit(record.directory, {
-              id: createEventId(),
-              type: 'session.updated',
-              properties: { info: record.info },
-            });
-          }
+          const existingGoal = record.info.metadata?.pichamber?.piGoal;
+          record.info.metadata = {
+            ...(record.info.metadata || {}),
+            pichamber: {
+              ...(record.info.metadata?.pichamber || {}),
+              piGoal: existingGoal && typeof existingGoal === 'object'
+                ? { ...existingGoal, active: true }
+                : true,
+            },
+          };
+          persistSessionMetadata(record.sessionManager, record.info.metadata);
+          maybeApplyConversationTitle(record);
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
         }
         await record.piSession.prompt(promptText);
-        if (goalUserID) placeGoalCommandUserMessage(record, goalUserID, goalInsertAt);
+        if (goalUserID) placeGoalCommandUserMessage(emit, record, goalUserID, goalInsertAt);
         await refreshRecordCommands(record);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
