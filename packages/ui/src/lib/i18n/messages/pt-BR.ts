@@ -2214,6 +2214,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.piGoal.error.empty": "Digite um objetivo para iniciar o Goal.",
   "chat.piGoal.error.missingCommand": "O Goal está instalado, mas este chat não conseguiu iniciá-lo. Toque em Iniciar de novo ou recarregue a sessão.",
   "chat.piGoal.error.failed": "Não foi possível iniciar o Goal.",
+  "chat.piGoal.error.planActive": "Saia do Plan antes de iniciar o Goal.",
   "chat.piGoal.error.noSession": "Abra uma sessão antes de iniciar o Goal.",
   "chat.piGoal.row.aria": "Goal atual",
   "chat.piGoal.row.label": "Goal",

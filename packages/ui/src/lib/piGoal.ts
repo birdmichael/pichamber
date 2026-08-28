@@ -19,6 +19,7 @@ export type PiGoalStartResult =
   | { ok: false; reason: 'empty' }
   | { ok: false; reason: 'no-session' }
   | { ok: false; reason: 'missing-command'; command: string }
+  | { ok: false; reason: 'plan-mutex'; command: string; status?: number }
   | { ok: false; reason: 'failed'; command: string; status?: number };
 
 export type PiGoalSessionResolution =
@@ -43,6 +44,15 @@ export function getPiGoalCommand(payload: FeaturePluginsPayload | null | undefin
 
 export function canSubmitPiGoalObjective(objective: string): boolean {
   return objective.trim().length > 0;
+}
+
+/** Draft Plan chip or a live session already in Plan. Do not mint or send /goal. */
+export function isPiGoalBlockedByPlan(input: {
+  draftPlanSelected?: boolean;
+  planStatus?: 'off' | 'active' | 'ready' | 'saved' | 'implementing' | null;
+}): boolean {
+  if (input.draftPlanSelected === true) return true;
+  return input.planStatus === 'active' || input.planStatus === 'ready';
 }
 
 const pickSessionID = (value?: string | null): string => (
@@ -162,7 +172,7 @@ export type PiGoalDialogSubmitResult =
   | { ok: true; sessionID: string; directory: string | null }
   | {
     ok: false;
-    reason: 'empty' | 'no-session' | 'missing-command' | 'failed';
+    reason: 'empty' | 'no-session' | 'missing-command' | 'plan-mutex' | 'failed';
     command?: string;
     sessionID?: string;
     directory?: string | null;
@@ -175,6 +185,8 @@ export async function submitPiGoalFromDialog(input: {
   routeSessionID?: string | null | undefined;
   lastActiveSessionID?: string | null | undefined;
   draftOpen?: boolean;
+  draftPlanSelected?: boolean;
+  planStatus?: 'off' | 'active' | 'ready' | 'saved' | 'implementing' | null;
   directory?: string | null;
   command: string;
   objective: string;
@@ -186,6 +198,15 @@ export async function submitPiGoalFromDialog(input: {
     directory: string | null;
   }) => Promise<unknown>;
 }): Promise<PiGoalDialogSubmitResult> {
+  const built = buildPiGoalStartCommand(input.command, input.objective);
+  if ('error' in built) return { ok: false, reason: 'empty' };
+  if (isPiGoalBlockedByPlan({
+    draftPlanSelected: input.draftPlanSelected,
+    planStatus: input.planStatus,
+  })) {
+    return { ok: false, reason: 'plan-mutex' };
+  }
+
   let mintedDirectory = input.directory ?? null;
   const resolved = await resolvePiGoalSession({
     sessionID: input.sessionID,
@@ -229,6 +250,15 @@ export async function submitPiGoalFromDialog(input: {
       directory: mintedDirectory,
     };
   }
+  if (result.reason === 'plan-mutex') {
+    return {
+      ok: false,
+      reason: 'plan-mutex',
+      command: result.command,
+      sessionID: resolved.sessionID,
+      directory: mintedDirectory,
+    };
+  }
   return {
     ok: false,
     reason: 'failed',
@@ -263,6 +293,9 @@ export async function startPiGoalCommand(input: {
     const message = error instanceof Error ? error.message : '';
     if (status === 404 || /\(404\)/.test(message) || /not available on this session/i.test(message)) {
       return { ok: false, reason: 'missing-command', command: built.command };
+    }
+    if (status === 409 || /plan mode is active/i.test(message)) {
+      return { ok: false, reason: 'plan-mutex', command: built.command, status };
     }
     return { ok: false, reason: 'failed', command: built.command, status };
   }

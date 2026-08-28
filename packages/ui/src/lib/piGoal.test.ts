@@ -5,6 +5,7 @@ import {
   buildPiGoalStartCommand,
   canSubmitPiGoalObjective,
   getPiGoalCommand,
+  isPiGoalBlockedByPlan,
   isPiGoalComposerButtonVisible,
   isPiGoalPluginAvailable,
   readPiGoalObjectiveFromMessages,
@@ -192,6 +193,45 @@ describe('Pi Goal start command', () => {
     expect(await resolvePiGoalSession({ sessionID: '  ', draftOpen: false })).toEqual({
       ok: false,
       reason: 'no-session',
+    });
+  });
+
+  test('refuses Start Goal while Plan is on without minting or sending', async () => {
+    expect(isPiGoalBlockedByPlan({ draftPlanSelected: true, planStatus: 'off' })).toBe(true);
+    expect(isPiGoalBlockedByPlan({ draftPlanSelected: false, planStatus: 'active' })).toBe(true);
+    expect(isPiGoalBlockedByPlan({ draftPlanSelected: false, planStatus: 'ready' })).toBe(true);
+    expect(isPiGoalBlockedByPlan({ draftPlanSelected: false, planStatus: 'off' })).toBe(false);
+
+    const result = await submitPiGoalFromDialog({
+      sessionID: null,
+      draftOpen: true,
+      draftPlanSelected: true,
+      planStatus: 'off',
+      directory: '/tmp/project',
+      command: 'goal',
+      objective: 'say bye',
+      createSession: async () => {
+        throw new Error('must not mint while Plan is on');
+      },
+      sendCommand: async () => {
+        throw new Error('must not send /goal while Plan is on');
+      },
+    });
+    expect(result).toEqual({ ok: false, reason: 'plan-mutex' });
+  });
+
+  test('maps a host Plan mutex 409 to plan-mutex', async () => {
+    const result = await startPiGoalCommand({
+      request: { sessionID: 'ses_plan', command: 'goal', objective: 'say bye' },
+      sendCommand: async () => {
+        throw Object.assign(new Error('Plan mode is active. Exit Plan before starting a Goal.'), { status: 409 });
+      },
+    });
+    expect(result).toEqual({
+      ok: false,
+      reason: 'plan-mutex',
+      command: 'goal',
+      status: 409,
     });
   });
 

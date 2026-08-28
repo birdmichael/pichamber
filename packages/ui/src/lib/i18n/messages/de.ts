@@ -2055,6 +2055,7 @@ export const dict = {
   'chat.piGoal.error.empty': 'Geben Sie ein Ziel ein, um Goal zu starten.',
   'chat.piGoal.error.missingCommand': 'Goal ist installiert, konnte in diesem Chat aber nicht gestartet werden. Erneut auf Start klicken oder die Sitzung neu laden.',
   'chat.piGoal.error.failed': 'Goal konnte nicht gestartet werden.',
+  'chat.piGoal.error.planActive': 'Beenden Sie Plan, bevor Sie Goal starten.',
   'chat.piGoal.error.noSession': 'Öffnen Sie eine Sitzung, bevor Sie Goal starten.',
   'chat.piGoal.row.aria': 'Aktuelles Goal',
   'chat.piGoal.row.label': 'Goal',

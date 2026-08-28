@@ -2238,6 +2238,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.empty': 'Goal을 시작하려면 목표를 입력하세요.',
   'chat.piGoal.error.missingCommand': 'Goal은 설치되어 있지만 이 채팅에서 시작하지 못했습니다. 다시 시작하거나 세션을 다시 불러오세요.',
   'chat.piGoal.error.failed': 'Goal을 시작하지 못했습니다.',
+  'chat.piGoal.error.planActive': 'Plan을 종료한 다음 Goal을 시작하세요.',
   'chat.piGoal.error.noSession': 'Goal을 시작하기 전에 세션을 여세요.',
   'chat.piGoal.row.aria': '현재 Goal',
   'chat.piGoal.row.label': 'Goal',

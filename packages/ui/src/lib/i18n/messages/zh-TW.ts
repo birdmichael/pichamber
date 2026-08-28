@@ -2206,6 +2206,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piGoal.error.empty': '請輸入目標後再開始 Goal。',
   'chat.piGoal.error.missingCommand': 'Goal 已安裝，但目前工作階段沒能啟動。請再按一次開始，或先重載工作階段。',
   'chat.piGoal.error.failed': '無法開始 Goal。',
+  'chat.piGoal.error.planActive': '請先退出 Plan，再開始 Goal。',
   'chat.piGoal.error.noSession': '請先開啟工作階段再開始 Goal。',
   'chat.piGoal.row.aria': '目前 Goal',
   'chat.piGoal.row.label': 'Goal',

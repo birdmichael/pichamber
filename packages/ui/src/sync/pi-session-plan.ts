@@ -145,8 +145,8 @@ export const resolveFooterPlanSelected = (input: {
 };
 
 /**
- * Last Agent/Plan choice for the empty composer.
- * Sidebar navigation keeps it; send or an explicit Agent pick consumes it.
+ * Last Agent/Plan choice for this empty composer.
+ * Send or an explicit Agent pick consumes it. A later New session does not inherit it.
  */
 export const resolveEmptyComposerPlanSelected = (input: {
   current: boolean;
@@ -159,11 +159,10 @@ export const resolveEmptyComposerPlanSelected = (input: {
   return input.current;
 };
 
-/** Restore last empty-composer Plan when a new-session draft reopens. */
+/** A new New-session draft is Agent unless the caller asks for Plan. */
 export const resolveOpenedDraftPlanSelected = (
   option: boolean | undefined,
-  emptyComposerPlanSelected: boolean,
-): boolean => option ?? emptyComposerPlanSelected;
+): boolean => option === true;
 
 export const shouldStartPlanAfterDraftMaterialize = (
   draftPlanSelected?: boolean,

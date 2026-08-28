@@ -28,7 +28,9 @@ must use that id even when an auto-draft welcome cleared
 `currentSessionId`. Mint only when all of those are empty. A failed start keeps the
 draft and the modal; retry reuses the minted session instead of creating
 another. Start does not require a provider/model from the config store. The host
-409s `/goal` while that session is already in Plan. Failures (no session,
+409s `/goal` while that session is already in Plan. Desktop also refuses Start
+Goal while the Plan chip is on — including local draft Plan — and does not mint
+or send `/goal`. Failures (no session,
 missing live command, Plan mutex, send error) render inside the modal — Desktop
 dialogs sit on the top layer, so toasts are not visible while it is open. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
@@ -85,9 +87,9 @@ dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
 fetch. On a new-session draft, choosing Plan is local composer intent: it does
-not `createSession` or leave the draft. That intent stays on the empty
-composer after you open another session and come back, until you send or
-pick Agent. An already-open session still shows its own stored Agent or Plan.
+not `createSession` or leave the draft. That intent stays on this draft
+until you send or pick Agent. A later New session starts on Agent. An
+already-open session still shows its own stored Agent or Plan.
 Send uses the same Agent materialize path, then `/plan start` on that new
 session if Plan is not already on, then the prompt. An already-open session
 still runs `/plan start` / save / exit on that same session. If an auto-draft welcome cleared `currentSessionId` while `?session=` or last-active still names a chat, Agent→Plan still `/plan start` on that id instead of storing local draft Plan intent. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`

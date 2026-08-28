@@ -1003,10 +1003,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     persistDraftTarget({ projectId: selectedProject?.id ?? null, directory })
 
-    const planSelected = resolveOpenedDraftPlanSelected(
-      options?.planSelected,
-      get().emptyComposerPlanSelected,
-    )
+    const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
     const nextDraft: NewSessionDraftState = {
       draftId: nextDraftId++,
       open: true,
@@ -1032,6 +1029,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       },
       currentSessionId: null,
       currentSessionDirectory: null,
+      emptyComposerPlanSelected: planSelected,
       error: null,
     })
 

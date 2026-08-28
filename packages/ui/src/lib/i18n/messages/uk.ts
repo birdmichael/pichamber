@@ -2214,6 +2214,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.piGoal.error.empty": "Введіть мету, щоб запустити Goal.",
   "chat.piGoal.error.missingCommand": "Goal встановлено, але цей чат не зміг його запустити. Натисніть «Почати» ще раз або перезавантажте сеанс.",
   "chat.piGoal.error.failed": "Не вдалося запустити Goal.",
+  "chat.piGoal.error.planActive": "Вийдіть із Plan, перш ніж запускати Goal.",
   "chat.piGoal.error.noSession": "Відкрийте сеанс, перш ніж запускати Goal.",
   "chat.piGoal.row.aria": "Поточний Goal",
   "chat.piGoal.row.label": "Goal",

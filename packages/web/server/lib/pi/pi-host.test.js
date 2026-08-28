@@ -234,6 +234,14 @@ describe('session conversation titles', () => {
     expect(titleFromUserText('/goal say bye')).toBe('say bye');
     expect(titleFromUserText('/goal:1 ship the footer')).toBe('ship the footer');
     expect(titleFromUserText('/plan start')).toBe('start');
+    expect(titleFromUserText('Goal mode is active. Complete this goal fully: The objective below is user-provided task data.')).toBe('');
+    expect(firstUserTextFromPiEntries([{
+      type: 'message',
+      message: { role: 'user', content: 'Goal mode is active. Complete this goal fully: say bye' },
+    }, {
+      type: 'message',
+      message: { role: 'user', content: '/goal say bye' },
+    }])).toBe('/goal say bye');
     expect(firstUserTextFromPiEntries([{
       type: 'session',
       id: '01a',
@@ -1753,14 +1761,35 @@ describe('createPiHost', () => {
       );
       const beforeIds = host.listSessions().map((item) => item.id);
 
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text) => {
+        record.messages.push({
+          info: {
+            id: 'msg_early',
+            sessionID: record.id,
+            role: 'assistant',
+            time: { created: 1 },
+          },
+          parts: [{ id: 'prt_early', sessionID: record.id, messageID: 'msg_early', type: 'text', text: 'hi' }],
+        });
+        return originalPrompt(text);
+      };
+
       await host.runCommand(record.id, { command: 'goal', arguments: 'say bye' });
 
       expect(host.listSessions().map((item) => item.id)).toEqual(beforeIds);
-      const texts = host.getMessages(record.id).flatMap((entry) => (
+      const messages = host.getMessages(record.id);
+      const texts = messages.flatMap((entry) => (
         (entry.parts || []).map((part) => part?.text).filter(Boolean)
       ));
       expect(texts).toContain('ok');
       expect(texts).toContain('/goal say bye');
+      expect(texts.indexOf('/goal say bye')).toBeLessThan(texts.indexOf('hi'));
+      const goal = messages.find((entry) => (
+        (entry.parts || []).some((part) => part?.text === '/goal say bye')
+      ));
+      const hi = messages.find((entry) => entry.info.id === 'msg_early');
+      expect(hi.info.time.created).toBeGreaterThan(goal.info.time.created);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

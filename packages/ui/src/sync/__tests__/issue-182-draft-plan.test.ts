@@ -177,7 +177,7 @@ describe('issue 182 draft Plan send', () => {
     expect(sendMessageCalls).toHaveLength(1)
   })
 
-  test('draft Plan survives opening a history session and returning to New session', () => {
+  test('New session after visiting history starts Agent, not the previous draft Plan', () => {
     openAlphaDraft()
     useSessionUIStore.getState().setDraftPlanSelected(true)
 
@@ -195,7 +195,8 @@ describe('issue 182 draft Plan send', () => {
 
     expect(useSessionUIStore.getState().currentSessionId).toBeNull()
     expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true)
-    expect(useSessionUIStore.getState().newSessionDraft.planSelected).toBe(true)
+    expect(useSessionUIStore.getState().newSessionDraft.planSelected).toBe(false)
+    expect(useSessionUIStore.getState().emptyComposerPlanSelected).toBe(false)
     expect(createSessionCalls).toHaveLength(0)
   })
 

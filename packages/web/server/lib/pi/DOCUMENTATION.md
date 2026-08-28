@@ -843,10 +843,12 @@ start stays in the modal on the draft (and must not look like success).
 Retry reuses the minted id. Do not require a provider/model for this
 command-only start.
 Replacing an existing goal still uses `ctx.ui.confirm`. Goal and Plan
-cannot both hold the workflow mutex. The host also 409s `/goal` while
-Plan is `active`/`ready`, and `POST plan start` while a `goal-state`
-entry is still in-flight, so Desktop can show a failure instead of
-appending `/goal` on a Plan chat.
+cannot both hold the workflow mutex. Desktop refuses Start Goal while
+the Plan chip is on, including local draft Plan, and does not mint.
+The host also 409s `/goal` while Plan is `active`/`ready`, and
+`POST plan start` while a `goal-state` entry is still in-flight, so a
+live Plan chat cannot append `/goal`. Session titles skip the Goal
+plugin preamble (`Goal mode is active.`) and keep `/goal <objective>`.
 
 ## Subagent children
 

@@ -137,7 +137,7 @@ describe('plan toggle and build dispatch', () => {
     })).toBe(false);
   });
 
-  test('empty-composer Plan survives sidebar navigation and is consumed on send or Agent', () => {
+  test('empty-composer Plan stays on this draft until send or Agent, and a new draft is Agent', () => {
     expect(resolveEmptyComposerPlanSelected({
       current: false,
       draftOpen: true,
@@ -158,9 +158,9 @@ describe('plan toggle and build dispatch', () => {
       draftPlanSelected: true,
       consume: true,
     })).toBe(false);
-    expect(resolveOpenedDraftPlanSelected(undefined, true)).toBe(true);
-    expect(resolveOpenedDraftPlanSelected(false, true)).toBe(false);
-    expect(resolveOpenedDraftPlanSelected(undefined, false)).toBe(false);
+    expect(resolveOpenedDraftPlanSelected(undefined)).toBe(false);
+    expect(resolveOpenedDraftPlanSelected(true)).toBe(true);
+    expect(resolveOpenedDraftPlanSelected(false)).toBe(false);
   });
 
   test('Plan chrome prefers the open chat over an auto-draft welcome', () => {

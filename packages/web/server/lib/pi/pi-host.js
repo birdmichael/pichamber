@@ -582,8 +582,13 @@ export const resolvePromptModelRef = (model) => {
   return modelID;
 };
 
+export const isGoalSystemPreamble = (text) => (
+  /^Goal mode is active\./i.test(String(text || '').trim())
+);
+
 export const titleFromUserText = (text) => {
   let line = String(text || '').replace(/\s+/g, ' ').trim();
+  if (isGoalSystemPreamble(line)) return '';
   line = line.replace(/^\/(?:goal|plan)(?::\d+)?\s+/i, '');
   if (!line) return '';
   return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
@@ -603,7 +608,7 @@ export const firstUserTextFromPiEntries = (entries) => {
     const message = entry?.message || entry;
     if (message?.role !== 'user') continue;
     const text = userTextFromPiContent(message.content);
-    if (text) return text;
+    if (text && !isGoalSystemPreamble(text)) return text;
   }
   return '';
 };
@@ -630,7 +635,7 @@ export const firstUserTextFromSessionFile = (filePath) => {
         const message = parsed?.message || parsed;
         if (message?.role !== 'user') continue;
         const userText = userTextFromPiContent(message.content);
-        if (userText) return userText;
+        if (userText && !isGoalSystemPreamble(userText)) return userText;
       }
     } finally {
       fs.closeSync(fd);
@@ -644,7 +649,7 @@ const firstUserText = (store) => {
   for (const entry of store.messages || []) {
     if (entry?.info?.role !== 'user') continue;
     const part = (entry.parts || []).find((item) => item?.type === 'text' && typeof item.text === 'string' && item.text.trim());
-    if (part) return part.text;
+    if (part && !isGoalSystemPreamble(part.text)) return part.text;
   }
   return '';
 };
@@ -782,6 +787,14 @@ const applyEventToStore = (store, ocEvent) => {
       && entry.parts.some((part) => part.type === 'text' && part.text === props.part.text)
     ) {
       // Pi message_start echo of the facade prompt — keep one text part.
+    } else if (
+      entry.info.role === 'user'
+      && props.part.type === 'text'
+      && isGoalSystemPreamble(props.part.text)
+    ) {
+      if (entry.parts.length === 0) {
+        store.messages = store.messages.filter((item) => item !== entry);
+      }
     } else {
       entry.parts.push(props.part);
     }
@@ -1199,6 +1212,27 @@ const appendFacadeUserMessage = (emit, record, body, userText) => {
     properties: { sessionID, part: userPart, time: Date.now() },
   });
   return userMessageID;
+};
+
+const placeGoalCommandUserMessage = (record, userMessageID, insertAt) => {
+  const messages = record?.messages;
+  if (!Array.isArray(messages) || !userMessageID) return;
+  let index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
+  if (index < 0) return;
+  const at = Math.min(Math.max(insertAt, 0), messages.length);
+  if (index !== at) {
+    const [goal] = messages.splice(index, 1);
+    messages.splice(Math.min(at, messages.length), 0, goal);
+    index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
+  }
+  const created = messages[index]?.info?.time?.created;
+  if (typeof created !== 'number') return;
+  for (let i = index + 1; i < messages.length; i += 1) {
+    const time = messages[i]?.info?.time;
+    if (typeof time?.created === 'number' && time.created <= created) {
+      messages[i].info.time = { ...time, created: created + (i - index) };
+    }
+  }
 };
 
 const createLocalReply = (emit) => (record, body, userText, assistantText) => {
@@ -1756,9 +1790,19 @@ export const createPiHost = ({
     fallbackModel: resolveHostFallbackModel(record),
   });
 
-  const hydrateFacadeMessages = (entries, sessionID, record) => facadeMessagesFromPiEntries(entries, sessionID, {
-    fallbackModel: resolveHostFallbackModel(record),
-  });
+  const hydrateFacadeMessages = (entries, sessionID, record) => {
+    const messages = facadeMessagesFromPiEntries(entries, sessionID, {
+      fallbackModel: resolveHostFallbackModel(record),
+    });
+    return messages.filter((entry) => {
+      if (entry?.info?.role !== 'user') return true;
+      const text = (entry.parts || [])
+        .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
+        .join('')
+        .trim();
+      return !isGoalSystemPreamble(text);
+    });
+  };
 
   const createPersistedSessionManager = async (cwd, { title } = {}) => {
     try {
@@ -3324,8 +3368,11 @@ export const createPiHost = ({
         ensureQuestionToolAdapted(record);
         const invoke = liveCommandInvocation(liveCommand, name);
         const promptText = `/${[invoke, argument].filter(Boolean).join(' ')}`;
+        let goalUserID = '';
+        let goalInsertAt = record.messages.length;
         if (name === goalCommand || name === 'goal') {
-          appendFacadeUserMessage(emit, record, body, userText);
+          goalInsertAt = record.messages.length;
+          goalUserID = appendFacadeUserMessage(emit, record, body, userText);
           if (maybeApplyConversationTitle(record)) {
             emit(record.directory, {
               id: createEventId(),
@@ -3335,6 +3382,7 @@ export const createPiHost = ({
           }
         }
         await record.piSession.prompt(promptText);
+        if (goalUserID) placeGoalCommandUserMessage(record, goalUserID, goalInsertAt);
         await refreshRecordCommands(record);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));

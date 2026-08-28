@@ -12,8 +12,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/lib/i18n';
 import { opencodeClient } from '@/lib/opencode/client';
+import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import {
   canSubmitPiGoalObjective,
+  isPiGoalBlockedByPlan,
   readPiGoalRouteSessionID,
   resolvePiGoalDirectory,
   resolvePiGoalTargetSession,
@@ -41,6 +43,12 @@ export function PiGoalDialog({
   draftOpen = false,
 }: PiGoalDialogProps) {
   const { t } = useI18n();
+  const chrome = usePiPlanChrome();
+  const draftPlanSelected = useSessionUIStore((state) => state.newSessionDraft?.planSelected === true);
+  const planBlocked = isPiGoalBlockedByPlan({
+    draftPlanSelected: chrome.footerPlanSelected || draftPlanSelected,
+    planStatus: chrome.status,
+  });
   const [objective, setObjective] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -65,11 +73,16 @@ export function PiGoalDialog({
     }) || null;
   }, [open, sessionId]);
 
+  React.useEffect(() => {
+    if (!open) return;
+    if (planBlocked) setError(t('chat.piGoal.error.planActive'));
+  }, [open, planBlocked, t]);
+
   const trimmed = objective.trim();
-  const canSubmit = canSubmitPiGoalObjective(objective) && !busy;
+  const canSubmit = canSubmitPiGoalObjective(objective) && !busy && !planBlocked;
 
   const submit = async () => {
-    if (!canSubmitPiGoalObjective(objective)) return;
+    if (planBlocked || !canSubmitPiGoalObjective(objective)) return;
     setBusy(true);
     setError(null);
     try {
@@ -90,6 +103,8 @@ export function PiGoalDialog({
         routeSessionID,
         lastActiveSessionID: lastActive?.sessionId,
         draftOpen: draftOpen && !mintedRef.current && !targetSessionID,
+        draftPlanSelected: chrome.footerPlanSelected || draftPlanSelected,
+        planStatus: chrome.status,
         directory: mintedRef.current?.directory ?? resolvePiGoalDirectory({
           sessionDirectory,
           lastActiveDirectory: lastActive?.directory,
@@ -142,6 +157,10 @@ export function PiGoalDialog({
         setError(t('chat.piGoal.error.missingCommand', { command: result.command ?? command }));
         return;
       }
+      if (result.reason === 'plan-mutex') {
+        setError(t('chat.piGoal.error.planActive'));
+        return;
+      }
       setError(t('chat.piGoal.error.failed'));
     } finally {
       setBusy(false);
@@ -159,7 +178,7 @@ export function PiGoalDialog({
           value={objective}
           onChange={(event) => {
             setObjective(event.target.value);
-            if (error) setError(null);
+            if (error && !planBlocked) setError(null);
           }}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canSubmit) {
