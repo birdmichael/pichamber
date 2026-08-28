@@ -358,6 +358,15 @@ export const mergeBuiltinPiCatalogProviders = (providers) => {
   return list;
 };
 
+const builtinCatalogIds = new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
+
+/** Live connected list: do not keep a model-less builtin stub in the sidebar. */
+export const withoutUnconnectedBuiltinCatalogProviders = (providers) => (
+  (Array.isArray(providers) ? providers : []).filter((provider) => (
+    !builtinCatalogIds.has(provider?.id) || providerHasCatalogModels(provider)
+  ))
+);
+
 export const providerHasCatalogModels = (provider) => {
   if (!provider || typeof provider !== 'object') return false;
   const models = provider.models;
@@ -368,7 +377,9 @@ export const providerHasCatalogModels = (provider) => {
 
 /** OpenCode SDK `GET /provider` shape: `all` is Add-able catalog, `connected` has models. */
 export const toPiProviderListPayload = (catalog) => {
-  const providers = Array.isArray(catalog?.providers) ? catalog.providers : [];
+  const providers = mergeBuiltinPiCatalogProviders(
+    Array.isArray(catalog?.providers) ? catalog.providers : [],
+  );
   const defaults = catalog?.default && typeof catalog.default === 'object' && !Array.isArray(catalog.default)
     ? catalog.default
     : {};

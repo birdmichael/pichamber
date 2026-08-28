@@ -5,6 +5,7 @@ import {
   providerHasConnectedModels,
   requiresProviderAuth,
   selectAddCatalogProviders,
+  selectSidebarProviders,
   selectUnconnectedProviders,
   shouldAutoSelectBuiltinAddProvider,
   shouldAutoSelectCustomProvider,
@@ -41,7 +42,13 @@ describe('ProvidersPage available provider loading', () => {
     )).toEqual([{ id: 'xai', name: 'xAI / Grok' }]);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
+    expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], '', 'xai', true)).toBe(null);
+    expect(selectSidebarProviders([
+      { id: 'xai', models: {} },
+      { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
+    ]).map((provider) => provider.id)).toEqual(['bmlab']);
     expect(shouldAutoSelectCustomProvider(true, false, 0, '')).toBe(true);
+    expect(shouldAutoSelectCustomProvider(true, false, 0, '', true)).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, true, 0, '')).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, false, 1, '')).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, false, 0, 'xai')).toBe(false);

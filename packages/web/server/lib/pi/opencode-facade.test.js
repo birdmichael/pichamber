@@ -522,6 +522,8 @@ describe('OpenCode facade HTTP/SSE', () => {
         id: 'xai',
         name: 'xAI',
       });
+      const connected = await (await fetch(`${url}/api/config/providers`)).json();
+      expect((connected.providers ?? []).some((provider) => provider.id === 'xai' && Object.keys(provider.models || {}).length === 0)).toBe(false);
 
       const unsupported = await fetch(`${url}/api/provider/openai/oauth/authorize`, { method: 'POST' });
       expect(unsupported.status).toBe(404);

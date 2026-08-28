@@ -32,6 +32,7 @@ import {
   providerHasConnectedModels,
   requiresProviderAuth,
   selectAddCatalogProviders,
+  selectSidebarProviders,
   shouldAutoSelectBuiltinAddProvider,
   shouldAutoSelectCustomProvider,
   shouldLoadAvailableProviders,
@@ -163,7 +164,9 @@ export const ProvidersPage: React.FC = () => {
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
   const settingsDirectory = useSettingsDirectory();
-  const providers = useConfigStore((state) => selectProvidersForDirectory(state, settingsDirectory));
+  const providers = selectSidebarProviders(
+    useConfigStore((state) => selectProvidersForDirectory(state, settingsDirectory)),
+  );
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
   const loadProviders = useConfigStore((state) => state.loadProviders);
@@ -266,9 +269,9 @@ export const ProvidersPage: React.FC = () => {
       } catch (error) {
         if (!isMounted) return;
         console.error('Failed to load available providers:', error);
-        setAvailableProviders([]);
-        setAvailableConnectedIds([]);
-        setAvailableError(null);
+        const message = t('settings.providers.page.toast.catalogLoadFailed');
+        setAvailableError(message);
+        toast.error(message);
       } finally {
         if (isMounted) {
           setAvailableLoading(false);
@@ -326,6 +329,8 @@ export const ProvidersPage: React.FC = () => {
       availableLoading,
       addCatalogProviders,
       candidateProviderId,
+      'xai',
+      Boolean(availableError),
     );
     if (builtinId) {
       catalogAutoSelectedRef.current = true;
@@ -337,11 +342,12 @@ export const ProvidersPage: React.FC = () => {
       availableLoading,
       addCatalogProviders.length,
       candidateProviderId,
+      Boolean(availableError),
     )) {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(CUSTOM_PROVIDER_ID);
     }
-  }, [addCatalogProviders, availableLoading, candidateProviderId, isAddMode]);
+  }, [addCatalogProviders, availableError, availableLoading, candidateProviderId, isAddMode]);
 
   React.useEffect(() => {
     if (selectedProviderId === ADD_PROVIDER_ID) {
@@ -609,9 +615,11 @@ export const ProvidersPage: React.FC = () => {
                 <span className="typography-ui-label text-foreground">{t('settings.providers.page.connect.providerField')}</span>
                   {availableLoading ? (
                     <p className="typography-meta text-muted-foreground">{t('settings.providers.page.state.loading')}</p>
-                  ) : availableError ? (
-                    <p className="typography-meta text-muted-foreground">{availableError}</p>
                   ) : (
+                    <>
+                    {availableError ? (
+                      <p className="typography-meta text-[var(--status-error)]">{availableError}</p>
+                    ) : null}
                     <DropdownMenu open={providerDropdownOpen} onOpenChange={(open) => {
                       setProviderDropdownOpen(open);
                       if (!open) setProviderSearchQuery('');
@@ -724,6 +732,7 @@ export const ProvidersPage: React.FC = () => {
                         </ScrollableOverlay>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </>
                    )}
               </div>
         </SettingsSection>
@@ -766,8 +775,17 @@ export const ProvidersPage: React.FC = () => {
 
                     return (
                       <>
+                        {candidateOAuthMethods.length > 0 ? (
+                          <ProviderOAuthMethods
+                            key={candidateProviderId}
+                            providerId={candidateProviderId}
+                            methods={candidateOAuthMethods}
+                            onConnected={() => handleOAuthConnected(candidateProviderId)}
+                          />
+                        ) : null}
+
                         {showApiKey ? (
-                          <div className="py-1.5">
+                          <div className={cn('py-1.5', candidateOAuthMethods.length > 0 && 'border-t border-[var(--surface-subtle)] pt-2')}>
                             <label className="typography-ui-label text-foreground flex items-center gap-1.5">
                               {t('settings.providers.page.auth.apiKeyLabel')}
                               <SettingsInfoHint>{t('settings.providers.page.auth.apiKeyTooltip')}</SettingsInfoHint>
@@ -795,16 +813,6 @@ export const ProvidersPage: React.FC = () => {
                               </Button>
                             </div>
                           </div>
-                        ) : null}
-
-                        {candidateOAuthMethods.length > 0 ? (
-                          <ProviderOAuthMethods
-                            key={candidateProviderId}
-                            providerId={candidateProviderId}
-                            methods={candidateOAuthMethods}
-                            onConnected={() => handleOAuthConnected(candidateProviderId)}
-                            className={cn(showApiKey && 'border-t border-[var(--surface-subtle)] pt-2')}
-                          />
                         ) : null}
                       </>
                     );
@@ -949,8 +957,17 @@ export const ProvidersPage: React.FC = () => {
               <div className="py-1.5 typography-meta text-muted-foreground">{t('settings.providers.page.auth.loadingMethods')}</div>
             ) : (
               <div className="space-y-4">
+                {oauthAuthMethods.length > 0 && (
+                  <ProviderOAuthMethods
+                    key={selectedProvider.id}
+                    providerId={selectedProvider.id}
+                    methods={oauthAuthMethods}
+                    onConnected={() => handleOAuthConnected(selectedProvider.id)}
+                  />
+                )}
+
                 {showApiKeyAuth ? (
-                  <div className="py-1.5">
+                  <div className={cn('py-1.5', oauthAuthMethods.length > 0 && 'border-t border-[var(--surface-subtle)] pt-2')}>
                     <label className="typography-ui-label text-foreground flex items-center gap-1.5">
                       {t('settings.providers.page.auth.apiKeyLabel')}
                       <SettingsInfoHint>{t('settings.providers.page.auth.apiKeyTooltip')}</SettingsInfoHint>
@@ -979,16 +996,6 @@ export const ProvidersPage: React.FC = () => {
                     </div>
                   </div>
                 ) : null}
-
-                {oauthAuthMethods.length > 0 && (
-                  <ProviderOAuthMethods
-                    key={selectedProvider.id}
-                    providerId={selectedProvider.id}
-                    methods={oauthAuthMethods}
-                    onConnected={() => handleOAuthConnected(selectedProvider.id)}
-                    className={cn(showApiKeyAuth && 'border-t border-[var(--surface-subtle)] pt-2')}
-                  />
-                )}
               </div>
             )}
       </SettingsSection>

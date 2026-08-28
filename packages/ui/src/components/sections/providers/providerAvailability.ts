@@ -78,8 +78,9 @@ export const shouldAutoSelectBuiltinAddProvider = (
   catalog: readonly AddCatalogProvider[],
   candidateProviderId: string,
   builtinId = 'xai',
+  catalogLoadFailed = false,
 ): string | null => {
-  if (!isAddMode || availableLoading || candidateProviderId) return null;
+  if (!isAddMode || availableLoading || catalogLoadFailed || candidateProviderId) return null;
   return catalog.some((provider) => provider.id === builtinId) ? builtinId : null;
 };
 
@@ -89,5 +90,15 @@ export const shouldAutoSelectCustomProvider = (
   availableLoading: boolean,
   unconnectedCount: number,
   candidateProviderId: string,
+  catalogLoadFailed = false,
 ): boolean =>
-  isAddMode && !availableLoading && unconnectedCount === 0 && candidateProviderId === '';
+  isAddMode
+  && !availableLoading
+  && !catalogLoadFailed
+  && unconnectedCount === 0
+  && candidateProviderId === '';
+
+/** Sidebar / connected list: hide the model-less xAI catalog stub. */
+export const selectSidebarProviders = <T extends { id: string; models?: unknown }>(
+  providers: readonly T[],
+): T[] => providers.filter((provider) => provider.id !== 'xai' || providerHasConnectedModels(provider));

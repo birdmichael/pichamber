@@ -65,6 +65,16 @@ describe('presentXaiUsage', () => {
     });
   });
 
+  test('does not treat a missing refresh helper as sign-in-again', () => {
+    expect(presentXaiUsage({
+      payload: { ok: false, configured: true, slotActive: true, error: 'Pi xAI OAuth refresh helper is unavailable' },
+    })).toEqual({
+      kind: 'error',
+      auth: false,
+      message: 'Pi xAI OAuth refresh helper is unavailable',
+    });
+  });
+
   test('keeps last-good rows visible as an auth error when refresh failed', () => {
     expect(presentXaiUsage({
       payload: {

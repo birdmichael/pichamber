@@ -15,6 +15,7 @@ import {
   getPiAuthMethods,
   mergeBuiltinPiCatalogProviders,
   toPiProviderListPayload,
+  withoutUnconnectedBuiltinCatalogProviders,
   getPiProviderSources,
   listPiProviderPublicConfigs,
   hydrateKnownModelCapabilities,
@@ -368,8 +369,14 @@ description: >
     ])).toEqual([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
     ]);
+    expect(withoutUnconnectedBuiltinCatalogProviders([
+      { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
+      { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } },
+    ])).toEqual([
+      { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } },
+    ]);
     expect(toPiProviderListPayload({
-      providers: mergeBuiltinPiCatalogProviders([]),
+      providers: [],
       default: {},
     })).toEqual({
       all: [{ id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} }],

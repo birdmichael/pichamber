@@ -1205,6 +1205,13 @@ function normalizeSearchText(value: string): string {
   return value.trim().toLocaleLowerCase();
 }
 
+/** Whole-token match so "grok" does not hit "ngrok" / External Tunnel. */
+export const searchHaystackContainsTerm = (haystack: string, term: string): boolean => {
+  if (!term) return true;
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}])${escaped}(?:$|[^\\p{L}\\p{N}])`, 'u').test(haystack);
+};
+
 export function buildSettingsSearchResults({
   query,
   runtimeCtx,
@@ -1239,7 +1246,7 @@ export function buildSettingsSearchResults({
       ...(item.keywords ?? []),
     ].filter(Boolean).join(' '));
 
-    if (!terms.every((term) => haystack.includes(term))) {
+    if (!terms.every((term) => searchHaystackContainsTerm(haystack, term))) {
       return [];
     }
 

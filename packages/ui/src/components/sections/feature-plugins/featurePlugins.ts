@@ -150,6 +150,7 @@ export function featurePluginSlotUiSurfaces(slot: FeaturePluginSlot): readonly F
 export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
   titleKey: I18nKey;
   infoKey: I18nKey;
+  infoHintKey?: I18nKey;
   settingsItem: string;
 }> = {
   goal: {
@@ -185,6 +186,7 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
   xai: {
     titleKey: 'settings.featurePlugins.slot.xai.title',
     infoKey: 'settings.featurePlugins.slot.xai.info',
+    infoHintKey: 'settings.featurePlugins.slot.xai.infoHint',
     settingsItem: 'feature-plugins.xai',
   },
 };

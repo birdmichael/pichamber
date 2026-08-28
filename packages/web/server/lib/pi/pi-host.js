@@ -24,7 +24,7 @@ import {
   getPiProviderSources,
   hydrateKnownModelCapabilities,
   listPiProviderPublicConfigs,
-  mergeBuiltinPiCatalogProviders,
+  withoutUnconnectedBuiltinCatalogProviders,
   upsertPiProviderConfig,
   deletePiProviderConfig,
   writePiProviderAuth,
@@ -2834,7 +2834,7 @@ export const createPiHost = ({
         const available = runtime && typeof runtime.getAvailable === 'function'
           ? await runtime.getAvailable()
           : [];
-        const providers = mergeBuiltinPiCatalogProviders(mapPiModelsToProviders(available, {
+        const providers = withoutUnconnectedBuiltinCatalogProviders(mapPiModelsToProviders(available, {
           configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
         }));
         const first = providers[0];
@@ -2845,7 +2845,7 @@ export const createPiHost = ({
         };
       } catch {
         return {
-          providers: mergeBuiltinPiCatalogProviders([]),
+          providers: [],
           default: {},
         };
       }

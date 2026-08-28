@@ -179,6 +179,8 @@ describe('feature plugin payload parsing', () => {
       expect(FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem).toBe(`feature-plugins.${slot}`);
     }
     expect(pageSource.includes('<FeaturePluginImpactTags slot={slot} />')).toBe(true);
+    expect(FEATURE_PLUGIN_SLOT_COPY.xai.infoHintKey).toBe('settings.featurePlugins.slot.xai.infoHint');
+    expect(pageSource.includes('copy.infoHintKey')).toBe(true);
     expect(pageSource.indexOf('t(copy.infoKey)')).toBeLessThan(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />'));
     expect(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />')).toBeLessThan(pageSource.indexOf('featurePluginPackageLabel(slot)'));
     expect(pageSource.includes("pending?.action === 'install'")).toBe(true);

@@ -17,6 +17,7 @@ Settings search uses an explicit registry; it does not scrape JSX.
 - Prefer the visible label key as `titleKey`.
 - Add `descriptionKey` only when it improves context.
 - Add useful synonyms/acronyms as keywords.
+- Match whole tokens (`searchHaystackContainsTerm`) so a query like `grok` does not hit `ngrok` / External Tunnel.
 - Do not generate items for dynamic entities such as individual agents, providers, projects, skills, hosts, or sessions.
 
 ## Conditional Targets

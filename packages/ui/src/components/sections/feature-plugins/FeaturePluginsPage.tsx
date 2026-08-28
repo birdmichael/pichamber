@@ -11,6 +11,7 @@ import {
 import { toast } from '@/components/ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
+import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import {
   SETTINGS_HELPER_CLASS,
   SettingsSection,
@@ -236,7 +237,10 @@ function FeaturePluginCard({
     >
       <div className="flex min-w-0 items-start gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">{t(copy.titleKey)}</div>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="truncate text-sm font-semibold text-foreground">{t(copy.titleKey)}</div>
+            {copy.infoHintKey ? <SettingsInfoHint>{t(copy.infoHintKey)}</SettingsInfoHint> : null}
+          </div>
           <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
             {t(copy.infoKey)}
           </p>

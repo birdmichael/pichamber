@@ -241,9 +241,11 @@ and a missing `input` becomes `["text"]` (images are omitted).
 `{ all, default, connected }`. `all` merges `ModelRuntime.getAvailable()`
 with `PI_BUILTIN_CATALOG_PROVIDERS` (`xai`) so Add can list xAI before
 login. `connected` is provider ids that already have models — a catalog
-stub with empty `models` stays off that list. Mock kernel still returns
-only `pi-mock`. `getPiAuthMethods` always reports `xai` as SuperGrok /
-X Premium OAuth first, API key second — connected or not.
+stub with empty `models` stays off that list. `GET /api/config/providers`
+is the live connected list only: it must not keep a model-less xAI stub
+in the sidebar. Mock kernel still returns only `pi-mock`.
+`getPiAuthMethods` always reports `xai` as SuperGrok / X Premium OAuth
+first, API key second — connected or not.
 
 `POST /api/provider/:id/oauth/authorize` and `/callback` wrap Pi
 `xaiOAuth.login` (device-code). The helper is loaded from the bundled

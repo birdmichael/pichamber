@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { I18nKey } from '@/lib/i18n/store';
 import { dict as enDict } from '@/lib/i18n/messages/en';
-import { buildSettingsSearchResults } from './search';
+import { buildSettingsSearchResults, searchHaystackContainsTerm } from './search';
 
 const t = (key: I18nKey): string => key;
 
@@ -18,6 +18,11 @@ const runtimeCtx = {
 };
 
 describe('settings search', () => {
+  test('does not treat grok as a substring of ngrok', () => {
+    expect(searchHaystackContainsTerm('external tunnel ngrok', 'grok')).toBe(false);
+    expect(searchHaystackContainsTerm('grok usage pi-xai-oauth', 'grok')).toBe(true);
+  });
+
   test('finds the Claude Code third-party integration', () => {
     const results = buildSettingsSearchResults({
       query: 'claude',
@@ -94,22 +99,23 @@ describe('settings search', () => {
 
   test('hides leftover Commands Override Agent search on Pi and keeps it on OpenCode', () => {
     const getPageTitle = (page: string) => page;
+    const translate = (key: I18nKey) => enDict[key];
     const openCodeResults = buildSettingsSearchResults({
       query: 'override agent',
       runtimeCtx,
-      t,
+      t: translate,
       getPageTitle,
     });
     const piOverrideResults = buildSettingsSearchResults({
       query: 'override agent',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true },
-      t,
+      t: translate,
       getPageTitle,
     });
     const piCommandsResults = buildSettingsSearchResults({
       query: 'commands',
       runtimeCtx: { ...runtimeCtx, isPiKernel: true },
-      t,
+      t: translate,
       getPageTitle,
     });
 
@@ -140,18 +146,19 @@ describe('settings search', () => {
       { query: 'permissions', id: 'agents.permissions' },
     ] as const;
     const getPageTitle = (page: string) => page;
+    const translate = (key: I18nKey) => enDict[key];
 
     for (const { query, id } of leftoverQueries) {
       const openCodeResults = buildSettingsSearchResults({
         query,
         runtimeCtx,
-        t,
+        t: translate,
         getPageTitle,
       });
       const piResults = buildSettingsSearchResults({
         query,
         runtimeCtx: { ...runtimeCtx, isPiKernel: true },
-        t,
+        t: translate,
         getPageTitle,
       });
 
@@ -436,6 +443,17 @@ describe('settings search', () => {
 
     expect(modelResults.some((result) => result.id === 'projects.default-model')).toBe(true);
     expect(thinkingResults.some((result) => result.id === 'projects.default-thinking')).toBe(true);
+  });
+
+  test('searching grok does not match External Tunnel via ngrok', () => {
+    const results = buildSettingsSearchResults({
+      query: 'grok',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t: (key) => enDict[key],
+      getPageTitle: (page) => (page === 'tunnel' ? 'External Tunnel' : page),
+    });
+    expect(results.some((result) => result.page === 'tunnel' || result.id.startsWith('tunnel.'))).toBe(false);
+    expect(results.some((result) => result.id === 'feature-plugins.xai')).toBe(true);
   });
 
   test('lands Feature Plugins search on each slot card', () => {

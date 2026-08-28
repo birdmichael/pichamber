@@ -63,7 +63,7 @@ export const parseXaiUsagePayload = (value: unknown): XaiUsagePayload | null => 
 
 export const isXaiUsageAuthError = (message?: string | null): boolean => {
   if (!message) return false;
-  return /\b(401|403|unauthorized|invalid_grant|expired|refresh)\b/i.test(message)
+  return /\b(401|403|unauthorized|invalid_grant)\b/i.test(message)
     || /sign in again/i.test(message);
 };
 
