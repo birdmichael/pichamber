@@ -299,10 +299,28 @@ const readSubagentDeclaredMode = (...values) => {
   return '';
 };
 
+const SUBAGENT_DUMP_TEXT = /^(debug run|status target:|run lifecycle debug)\b/im;
+
+const isSubagentDumpOutput = (value) => {
+  if (typeof value === 'string') return SUBAGENT_DUMP_TEXT.test(value.trim());
+  if (Array.isArray(value)) {
+    return value.some((item) => typeof item?.text === 'string' && SUBAGENT_DUMP_TEXT.test(item.text.trim()));
+  }
+  return false;
+};
+
+const isSubagentDumpDetails = (details) => {
+  if (!isRecord(details) || hasSubagentExecutionPayload(details)) return false;
+  if (asTrimmedString(details.sessionFile) || asTrimmedString(details.childSessionId)) return false;
+  return Boolean(details.lifecycleStatus) && Array.isArray(details.results);
+};
+
 /**
- * Catalog / CRUD / status calls are not fleet children. pi-subagents marks
- * those results `mode: "management"` and omits execution fields (`task`,
- * `tasks`, `chain`, `workflowScript`).
+ * Catalog / CRUD / status / debug dumps are not fleet children. pi-subagents
+ * marks those results `mode: "management"` and omits execution fields (`task`,
+ * `tasks`, `chain`, `workflowScript`). Status and `debug.run` toolResults
+ * often keep `mode: "single"` and only put `action` on the toolCall — the
+ * dump text / `lifecycleStatus` shape still counts as management.
  */
 export const isSubagentManagementCall = (payload = {}) => {
   const input = isRecord(payload.input) ? payload.input : {};
@@ -316,6 +334,13 @@ export const isSubagentManagementCall = (payload = {}) => {
     || hasSubagentExecutionPayload(status)
     || hasSubagentExecutionPayload(payload)) {
     return false;
+  }
+  if (isSubagentDumpOutput(payload.output)
+    || isSubagentDumpOutput(output)
+    || isSubagentDumpDetails(details)
+    || isSubagentDumpDetails(outputDetails)
+    || isSubagentDumpDetails(status)) {
+    return true;
   }
   const mode = readSubagentDeclaredMode(
     payload,
@@ -551,8 +576,19 @@ const upsertSubagentRun = (byId, run) => {
   byId.set(merged.runId, merged);
 };
 
+const managementToolCallMatches = (toolCallId, managementCallIds) => {
+  const id = asTrimmedString(toolCallId);
+  if (!id) return false;
+  if (managementCallIds.has(id)) return true;
+  for (const known of managementCallIds) {
+    if (id === known || id.startsWith(`${known}_`) || id.startsWith(`${known}|`)) return true;
+  }
+  return false;
+};
+
 export const extractRunsFromPiEntries = (entries, parentID) => {
   const byId = new Map();
+  const managementCallIds = new Set();
   for (const entry of Array.isArray(entries) ? entries : []) {
     const message = isRecord(entry?.message) ? entry.message : entry;
     if (!isRecord(message)) continue;
@@ -563,6 +599,8 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         if (asTrimmedString(block.name).toLowerCase() !== 'subagent') continue;
         const args = isRecord(block.arguments) ? block.arguments : {};
         if (isSubagentManagementCall({ input: args, details: args, mode: args.mode })) {
+          const callId = asTrimmedString(block.id || args.runId || args.id);
+          if (callId) managementCallIds.add(callId);
           continue;
         }
         const runId = asTrimmedString(block.id || args.runId || args.id);
@@ -602,13 +640,18 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       : Array.isArray(message.content)
         ? message.content.map((item) => (typeof item?.text === 'string' ? item.text : '')).join('')
         : '';
-    if (isSubagentManagementCall({
-      input: details,
-      details,
-      output: rawContent,
-      mode: details.mode,
-    })) {
-      byId.delete(runId);
+    if (managementToolCallMatches(message.toolCallId, managementCallIds)
+      || isSubagentManagementCall({
+        input: details,
+        details,
+        output: rawContent,
+        mode: details.mode,
+      })) {
+      const storedId = findStoredRunId(byId, { runId, toolCallId: asTrimmedString(message.toolCallId) });
+      const existing = storedId ? byId.get(storedId) : null;
+      if (existing && !existing.sessionFile && !existing.sessionID) {
+        byId.delete(storedId);
+      }
       continue;
     }
     const sessionFile = asTrimmedString(details.sessionFile) || readSessionFileFromText(rawContent);

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: checking Subagent status or debug on one conversation no longer hides another open chat under that parent or marks the other chat complete.
+
 ## [1.2.5] - 2026-08-28
 
 - **Settings:** Add Provider always lists xAI / Grok for SuperGrok or X Premium login, even when that row already has models. Other / Custom stays available for another endpoint. API key is secondary. Install Feature Plugins Grok Usage to see allowance, cycle, and expiry on Work Status and the xAI provider card. Grok Usage now reads the real credits envelope instead of failing with “no usable current-period usage” while the token expiry still showed.

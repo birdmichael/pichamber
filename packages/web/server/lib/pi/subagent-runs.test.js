@@ -70,6 +70,19 @@ describe('isSubagentManagementCall', () => {
     expect(isSubagentManagementCall({ input: { action: 'models' } })).toBe(true);
     expect(isSubagentManagementCall({ input: { action: 'guide', topic: 'workflows' } })).toBe(true);
     expect(isSubagentManagementCall({ input: { action: 'children.list' } })).toBe(true);
+    expect(isSubagentManagementCall({ input: { action: 'debug.run', id: 'run_1' } })).toBe(true);
+    expect(isSubagentManagementCall({
+      details: {
+        mode: 'single',
+        results: [],
+        lifecycleStatus: { processTerminal: { state: 'pending' } },
+      },
+      output: 'Debug run\nSession: /tmp/other.jsonl',
+    })).toBe(true);
+    expect(isSubagentManagementCall({
+      details: { mode: 'single', results: [], lifecycleStatus: {} },
+      output: 'Status target: run 41584961-a3ae-4c57-9163-84b1a0b8a65a',
+    })).toBe(true);
   });
 
   it('keeps a real scout/worker launch as a fleet run', () => {
@@ -485,6 +498,38 @@ describe('tool-part extraction', () => {
         },
       }],
     }], 'parent-1')).toEqual([]);
+  });
+
+  it('does not treat a debug.run dump that names another chat as a fleet child', () => {
+    const dir = makeTemp();
+    const otherFile = path.join(dir, '2026-08-28T11-52-33-467Z_01a04836-e9bb-7f89-b60b-5b9346813f73.jsonl');
+    fs.writeFileSync(otherFile, `${JSON.stringify({ type: 'session', id: '01a04836-e9bb-7f89-b60b-5b9346813f73' })}\n`);
+    expect(extractRunsFromPiEntries([{
+      type: 'message',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'toolCall',
+          id: 'call-debug|fc_1',
+          name: 'subagent',
+          arguments: { action: 'debug.run', id: '41584961-a3ae-4c57-9163-84b1a0b8a65a' },
+        }],
+      },
+    }, {
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolName: 'subagent',
+        toolCallId: 'call-debug|fc_1_1',
+        content: `Debug run\nSession: ${otherFile}`,
+        details: {
+          mode: 'single',
+          results: [],
+          lifecycleStatus: { processTerminal: { state: 'pending' } },
+        },
+        isError: false,
+      },
+    }], '01a03dfa-077b-7710-aad7-6844ac3e0259')).toEqual([]);
   });
 });
 

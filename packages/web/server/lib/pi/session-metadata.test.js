@@ -8,7 +8,9 @@ import {
   PICHAMBER_METADATA_CUSTOM_TYPE,
   persistSessionMetadata,
   readPersistedArchivedTimestamp,
+  readListedParentID,
   readPersistedParentID,
+  isTopLevelUserSessionFile,
   readPersistedSessionMetadata,
   LIST_METADATA_TAIL_CHUNK_SIZE,
   readPersistedSessionMetadataFromFile,
@@ -74,6 +76,21 @@ describe('Pi session metadata persistence', () => {
     expect(readPersistedParentID({})).toBeUndefined();
     expect(readPersistedParentID(undefined)).toBeUndefined();
     expect(readPersistedParentID({ parentID: 12 })).toBeUndefined();
+  });
+
+  it('ignores a stolen subagentRun parent on a top-level user session file', () => {
+    const file = '/Users/me/.pi/agent/sessions/project/2026-08-28T11-52-33-467Z_01a04836-e9bb-7f89-b60b-5b9346813f73.jsonl';
+    expect(isTopLevelUserSessionFile(file)).toBe(true);
+    expect(isTopLevelUserSessionFile('/tmp/async-subagent-runs/run_scout/session.jsonl')).toBe(false);
+    expect(readListedParentID({
+      parentID: 'old-packaging-session',
+      pichamber: { subagentRun: { parentSessionID: 'old-packaging-session', runId: 'call_debug' } },
+    }, file)).toBeUndefined();
+    expect(readListedParentID({ parentID: 'clone-parent' }, file)).toBe('clone-parent');
+    expect(readListedParentID({
+      parentID: 'adapter-parent',
+      pichamber: { subagentRun: { parentSessionID: 'adapter-parent' } },
+    }, '/tmp/async-subagent-runs/run_scout/session.jsonl')).toBe('adapter-parent');
   });
 
   it('falls back to adapter subagentRun.parentSessionID when parentID is unset', () => {
