@@ -87,7 +87,13 @@ import { isManagedChatDirectory } from '@/lib/chatDirectories';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { sessionEvents } from '@/lib/sessionEvents';
-import { fetchResponseStyleInstruction } from '@/lib/responseStyle';
+import { fetchResponseStyleInstruction, prefetchResponseStyleInstruction } from '@/lib/responseStyle';
+import {
+    beginPendingComposerTurn,
+    clearPendingComposerTurn,
+    pendingComposerDraftKey,
+    pendingComposerSessionKey,
+} from '@/sync/pending-composer-turn';
 import { wrapSystemReminder } from '@/lib/systemReminder';
 import { getSyncMessages } from '@/sync/sync-refs';
 import { eventMatchesShortcut, getEffectiveShortcutCombo, normalizeCombo } from '@/lib/shortcuts';
@@ -896,6 +902,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             });
         }
         prevNewSessionDraftOpenRef.current = newSessionDraftOpen;
+        if (newSessionDraftOpen) prefetchResponseStyleInstruction();
     }, [newSessionDraftOpen, isMobile]);
 
     // Session activity for queue availability and controls. In btw mode the
@@ -1204,6 +1211,31 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
         if (outgoing.isEmpty) return;
 
+        const pendingKey = capturedDraftSnapshot?.open
+            ? pendingComposerDraftKey(capturedDraftSnapshot.draftId)
+            : currentSessionId
+                ? pendingComposerSessionKey(currentSessionId)
+                : null;
+        const pendingFiles = (files: AttachedFile[]) => files.map((attachment) => ({
+            type: 'file' as const,
+            mime: attachment.mimeType,
+            url: attachment.dataUrl,
+            filename: attachment.filename,
+        }));
+        const startPendingTurn = (text: string, files: AttachedFile[] = primaryAttachments) => {
+            if (!pendingKey) return;
+            beginPendingComposerTurn({
+                key: pendingKey,
+                text,
+                files: pendingFiles(files),
+            });
+        };
+        const stopPendingTurn = () => {
+            if (pendingKey) clearPendingComposerTurn(pendingKey);
+            else clearPendingComposerTurn();
+        };
+        if (!queuedOnly) startPendingTurn(primaryText);
+
         // Clear queue and input
         if (capturedTarget && queuedMessageId) {
             removeFromQueue(capturedTarget, queuedMessageId);
@@ -1236,24 +1268,29 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             // Commands that manipulate session state or open UI rather than
             // sending a message.
             if (canUseOpenCodeSessionStubs && commandName === 'undo' && currentSessionId) {
+                stopPendingTurn();
                 await useSessionUIStore.getState().handleSlashUndo(currentSessionId);
                 scrollToBottom?.();
                 return;
             }
             if (canUseOpenCodeSessionStubs && commandName === 'redo' && currentSessionId) {
+                stopPendingTurn();
                 await useSessionUIStore.getState().handleSlashRedo(currentSessionId);
                 scrollToBottom?.();
                 return;
             }
             if (commandName === 'timeline' && currentSessionId) {
+                stopPendingTurn();
                 setTimelineDialogOpen(true);
                 return;
             }
             if (commandName === 'handoff-review' && currentSessionId && !isMobile && !isVSCodeRuntime()) {
+                stopPendingTurn();
                 setReviewDialogOpen(true);
                 return;
             }
             if (commandName === 'compact' && currentSessionId) {
+                stopPendingTurn();
                 try {
                     await sessionActions.waitForConnectionOrThrow();
                     const compactDirectory = useSessionUIStore.getState().getDirectoryForSession(currentSessionId) || currentDirectory || undefined;
@@ -1264,6 +1301,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 return;
             }
             if (shouldInterceptBtwSlash(commandName, btwPluginAvailable) && currentSessionId) {
+                stopPendingTurn();
                 const question = argument.trim();
                 if (!question) {
                     toast.error(t('chat.btw.toast.emptyArgument'));
@@ -1310,6 +1348,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     await sessionActions.waitForConnectionOrThrow();
                     const visibleText = await renderMagicPrompt(command.visiblePrompt, variables.visible);
                     const instructionsText = await renderMagicPrompt(command.instructionsPrompt, variables.instructions);
+                    startPendingTurn(visibleText, []);
                     await sendMessage(
                         visibleText,
                         providerIdToSend,
@@ -1324,6 +1363,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     );
                     scrollToBottom?.();
                 } catch (error) {
+                    stopPendingTurn();
                     toast.error(getSubmitErrorMessage(error, t(command.errorToastKey)));
                 }
                 return;
@@ -1351,6 +1391,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         } catch (error) {
             console.warn('[ChatInput] Failed to expand snippets, sending original text:', error);
         }
+        startPendingTurn(primaryText);
 
         // Collect all attachments for error recovery
         const allAttachments = [
@@ -1441,6 +1482,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             const normalized = rawMessage.toLowerCase();
 
             console.error('Message send failed:', rawMessage || error);
+            stopPendingTurn();
             restoreConsumedDrafts();
 
             const currentInput = composerRef.current?.getValue() ?? messageRef.current;

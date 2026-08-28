@@ -88,6 +88,13 @@ import { setSessionOpener } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isVSCodeRuntime } from "@/lib/desktop"
 import { clearChatDraft, createChatDraftIdentity } from "@/lib/chatDraftPersistence"
+import { warmDirectoryRuntime } from "@/lib/directoryRuntimeWarm"
+import {
+  clearPendingComposerTurn,
+  pendingComposerDraftKey,
+  pendingComposerSessionKey,
+  retargetPendingComposerTurn,
+} from "./pending-composer-turn"
 import {
   CHAT_DRAFT_PROJECT_ID,
   deleteChatDirectory,
@@ -153,6 +160,8 @@ export function routeMessage(params: {
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
   additionalParts?: Array<{ text: string; synthetic?: boolean; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
   delivery?: 'steer' | 'followUp'
+  beforeSend?: (messageID: string) => Promise<void>
+  onOptimisticInsert?: () => void
 }): Promise<void> {
   const requestDirectory = params.directory ?? undefined
   if (params.inputMode === "shell") {
@@ -213,6 +222,8 @@ export function routeMessage(params: {
         agent: params.agent,
         directory: requestDirectory,
         files: params.files,
+        beforeSend: params.beforeSend,
+        onOptimisticInsert: params.onOptimisticInsert,
         send: (messageID) => opencodeClient.sendCommand({
           runtimeKey: params.runtimeKey,
           id: params.sessionId,
@@ -240,6 +251,8 @@ export function routeMessage(params: {
     agent: params.agent,
     directory: requestDirectory,
     files: params.files,
+    beforeSend: params.beforeSend,
+    onOptimisticInsert: params.onOptimisticInsert,
     send: (messageID) => opencodeClient.sendMessage({
       runtimeKey: params.runtimeKey,
       id: params.sessionId,
@@ -696,6 +709,7 @@ export async function materializeOpenDraftSession(selection: {
   }
 
   await waitForWorktreeBootstrapIfConfigured(draftDirectoryOverride, draftProjectId)
+  warmDirectoryRuntime(draftDirectoryOverride)
 
   const created = await store.createSession(draft.title, draftDirectoryOverride, draft.parentID ?? null)
   if (!created?.id) {
@@ -735,6 +749,11 @@ export async function materializeOpenDraftSession(selection: {
   store.initializeNewOpenChamberSession(created.id, configState.agents ?? [])
 
   store.setCurrentSession(created.id, createdDirectory)
+
+  retargetPendingComposerTurn(
+    pendingComposerDraftKey(draft.draftId),
+    pendingComposerSessionKey(created.id),
+  )
 
   if (draftPermissionAutoAcceptEnabled) {
     void import("@/stores/permissionStore")
@@ -797,6 +816,13 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   // ---------------------------------------------------------------------------
   setCurrentSession: (id, directoryHint?: string | null) => {
     if (id) {
+      const draft = get().newSessionDraft
+      if (draft?.open) {
+        retargetPendingComposerTurn(
+          pendingComposerDraftKey(draft.draftId),
+          pendingComposerSessionKey(id),
+        )
+      }
       get().closeNewSessionDraft()
     }
 
@@ -1103,6 +1129,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         return null
       }
       set({ newSessionDraft: { ...current, preparedChatDirectory: directory } })
+      warmDirectoryRuntime(directory)
       return directory
     }).finally(() => {
       pendingChatDirectoryByDraft.delete(key)
@@ -1479,15 +1506,6 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         filename: a.filename,
       }))
 
-      await applyArmedGoal(createdDraftSession.sessionId, createdDraftSession.directory)
-      await applyDraftPlanStartAfterMaterialize({
-        sessionID: createdDraftSession.sessionId,
-        draftPlanSelected: draft.planSelected,
-        startPlan: async (sessionID) => {
-          const { dispatchSessionPlanAction } = await import("./pi-session-plan-store")
-          return dispatchSessionPlanAction(sessionID, "start")
-        },
-      })
       await routeMessage({
         sessionId: createdDraftSession.sessionId,
         directory: createdDraftSession.directory,
@@ -1500,6 +1518,24 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         inputMode,
         files,
         delivery: options?.delivery,
+        onOptimisticInsert: () => {
+          clearPendingComposerTurn(pendingComposerSessionKey(createdDraftSession.sessionId))
+        },
+        beforeSend: async () => {
+          await applyArmedGoal(createdDraftSession.sessionId, createdDraftSession.directory)
+          try {
+            await applyDraftPlanStartAfterMaterialize({
+              sessionID: createdDraftSession.sessionId,
+              draftPlanSelected: draft.planSelected,
+              startPlan: async (sessionID) => {
+                const { dispatchSessionPlanAction } = await import("./pi-session-plan-store")
+                return dispatchSessionPlanAction(sessionID, "start")
+              },
+            })
+          } catch (error) {
+            console.warn("[session-ui-store] draft plan start failed after send", error)
+          }
+        },
         additionalParts: mergedAdditionalParts?.map((p) => ({
           text: p.text,
           synthetic: p.synthetic,
@@ -1567,9 +1603,6 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       filename: a.filename,
     }))
 
-    if (targetSessionId) {
-      await applyArmedGoal(targetSessionId, currentSessionDirectory)
-    }
     await routeMessage({
       runtimeKey: capturedTarget?.runtimeKey,
       sessionId: targetSessionId || "",
@@ -1583,6 +1616,12 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       inputMode,
       files,
       delivery: options?.delivery,
+      onOptimisticInsert: () => {
+        if (targetSessionId) clearPendingComposerTurn(pendingComposerSessionKey(targetSessionId))
+      },
+      beforeSend: async () => {
+        if (targetSessionId) await applyArmedGoal(targetSessionId, currentSessionDirectory)
+      },
       additionalParts: additionalParts?.map((p) => ({
         text: p.text,
         synthetic: p.synthetic,

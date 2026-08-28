@@ -44,7 +44,11 @@ const buildResponseStyleInstruction = ({
   return getResponseStylePresetInstructions(preset);
 };
 
-export const fetchResponseStyleInstruction = async (): Promise<string | null> => {
+const RESPONSE_STYLE_CACHE_TTL_MS = 30_000;
+let cachedInstruction: { value: string | null; at: number } | null = null;
+let inflightInstruction: Promise<string | null> | null = null;
+
+const loadResponseStyleInstruction = async (): Promise<string | null> => {
   const response = await runtimeFetch('/api/config/settings', {
     method: 'GET',
     headers: { Accept: 'application/json' },
@@ -61,4 +65,25 @@ export const fetchResponseStyleInstruction = async (): Promise<string | null> =>
     preset: settings.responseStylePreset,
     customInstructions: settings.responseStyleCustomInstructions,
   });
+};
+
+export const fetchResponseStyleInstruction = async (): Promise<string | null> => {
+  if (cachedInstruction && Date.now() - cachedInstruction.at < RESPONSE_STYLE_CACHE_TTL_MS) {
+    return cachedInstruction.value;
+  }
+  if (inflightInstruction) return inflightInstruction;
+  inflightInstruction = loadResponseStyleInstruction()
+    .then((value) => {
+      cachedInstruction = { value, at: Date.now() };
+      return value;
+    })
+    .catch(() => null)
+    .finally(() => {
+      inflightInstruction = null;
+    });
+  return inflightInstruction;
+};
+
+export const prefetchResponseStyleInstruction = (): void => {
+  void fetchResponseStyleInstruction();
 };

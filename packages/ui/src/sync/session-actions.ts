@@ -1361,6 +1361,8 @@ export async function optimisticSend(input: {
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
+  /** Runs after the bubble is visible and before the prompt HTTP call. */
+  beforeSend?: (messageID: string) => Promise<void>
   /** The actual API call — receives the optimistic messageID so the server can use the same ID */
   send: (messageID: string) => Promise<void>
 }): Promise<void> {
@@ -1463,6 +1465,8 @@ export async function optimisticSend(input: {
   })
 
   try {
+    assertRuntimeUnchanged()
+    if (input.beforeSend) await input.beforeSend(messageID)
     assertRuntimeUnchanged()
     await input.send(messageID)
   } catch (error) {

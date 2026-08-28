@@ -68,6 +68,12 @@ import { usePlanDetection } from '@/hooks/usePlanDetection';
 import { useI18n } from '@/lib/i18n';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { isVSCodeRuntime } from '@/lib/desktop';
+import { USER_BUBBLE_FLEX_ITEM_CLASS } from './message/userBubbleLayout';
+import {
+    pendingComposerDraftKey,
+    pendingComposerSessionKey,
+    usePendingComposerTurn,
+} from '@/sync/pending-composer-turn';
 import { WorkStatusPanel } from './work-status/WorkStatusPanel';
 import { useWorkStatusVisibility } from './work-status/useWorkStatusVisibility';
 import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/contextPanelEmbeddedChat';
@@ -817,6 +823,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const isVSCode = isVSCodeRuntime();
     const chatSurfaceMode = useChatSurfaceMode();
     const draftOpen = Boolean(newSessionDraft?.open);
+    const pendingComposerTurn = usePendingComposerTurn();
+    const pendingComposerVisible = Boolean(
+        pendingComposerTurn && (
+            (draftOpen && pendingComposerTurn.key === pendingComposerDraftKey(newSessionDraft.draftId))
+            || (currentSessionId && pendingComposerTurn.key === pendingComposerSessionKey(currentSessionId))
+            || (Boolean(currentSessionId) && pendingComposerTurn.key.startsWith('draft:'))
+        ),
+    );
     const isManagedChatContext = draftOpen
         ? newSessionDraft?.target === 'chat'
         : isChatDirectoryPath(effectiveSessionDirectory);
@@ -987,7 +1001,30 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         onActiveTurnChange: handleActiveTurnChange,
     });
 
-    const viewportMessages = sessionMessages;
+    const viewportMessages = React.useMemo(() => {
+        if (sessionMessages.length > 0 || !pendingComposerVisible || !pendingComposerTurn || !currentSessionId) {
+            return sessionMessages;
+        }
+        const pendingId = `pending:${pendingComposerTurn.key}`;
+        return [{
+            info: {
+                id: pendingId,
+                role: 'user',
+                sessionID: currentSessionId,
+                time: { created: pendingComposerTurn.createdAt },
+            } as Message,
+            parts: [
+                { id: `${pendingId}:text`, type: 'text', text: pendingComposerTurn.text } as Part,
+                ...pendingComposerTurn.files.map((file, index) => ({
+                    id: `${pendingId}:file:${index}`,
+                    type: 'file',
+                    mime: file.mime,
+                    url: file.url,
+                    filename: file.filename,
+                } as Part)),
+            ],
+        }];
+    }, [currentSessionId, pendingComposerTurn, pendingComposerVisible, sessionMessages]);
 
     const timelineController = useChatTimelineController({
         sessionId: currentSessionId,
@@ -1150,13 +1187,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         [effectiveSessionDirectory, planModeEnabled],
     );
     const hasVisibleTranscript = React.useMemo(
-        () => sessionMessages.some((message) => {
+        () => pendingComposerVisible || sessionMessages.some((message) => {
             if (message.info.role === 'user') {
                 return !isHiddenUserMessage(message, userMessageVisibility);
             }
             return message.parts.length > 0;
         }),
-        [sessionMessages, userMessageVisibility],
+        [pendingComposerVisible, sessionMessages, userMessageVisibility],
     );
     const pendingUserTranscriptPaint = React.useMemo(
         () => hasPendingUserTranscriptPaint(sessionMessages, userMessageVisibility),
@@ -1224,11 +1261,19 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 			// mobile browsers (see ChatInput's composerFormRef effect).
 			<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
 				<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col bg-background">
-					{useCompactDraftLayout && !isDesktopExpandedInput ? <DraftWelcome /> : null}
+					{pendingComposerVisible ? (
+						<div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6">
+							<div className="flex justify-end">
+								<div className={cn(USER_BUBBLE_FLEX_ITEM_CLASS, 'rounded-2xl bg-muted px-4 py-2 text-sm text-foreground')}>
+									<p className="whitespace-pre-wrap break-words">{pendingComposerTurn?.text}</p>
+								</div>
+							</div>
+						</div>
+					) : useCompactDraftLayout && !isDesktopExpandedInput ? <DraftWelcome /> : null}
 					<div
 						className={cn(
 							'relative z-10 flex min-h-0',
-							isDesktopExpandedInput
+							isDesktopExpandedInput || pendingComposerVisible
 								? 'flex-1 bg-background'
 								: useCompactDraftLayout
 									? 'bg-background px-0'
@@ -1263,7 +1308,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         return null;
     }
 
-	if (isSessionHydrating && !hasVisibleTranscript && !sessionIsWorking && !hasOverlayChrome) {
+	if (isSessionHydrating && !hasVisibleTranscript && !pendingComposerVisible && !sessionIsWorking && !hasOverlayChrome) {
 		if (sessionMessageLoadState.status === 'error') {
 			return (
 				<div data-composer-bound className="relative flex h-full flex-col bg-background">
@@ -1341,7 +1386,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         );
     }
 
-	if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome) {
+	if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible) {
 		return (
 			// Same welcome chrome as New session: starter chips + Session panel.
 			// No transform here — same fixed-positioning constraint as the draft

@@ -124,7 +124,19 @@ subscribes once per Pi session. IPC `createSession` cannot carry a live `Session
 The payload is `cwd`, `sessionFile`, `sessionID`, and optional
 `title` / `model`. When `sessionFile` or `sessionID` is present the
 child `ensureSession`s that jsonl. It does not `SessionManager.create`
-a second Untitled chat. Opening, hydrating, or reloading a live
+a second Untitled chat.
+Parent `POST /api/session` is a shell create: persist the jsonl header,
+emit `session.created`, and return the Pi UUID without waiting for the
+live `AgentSession`. `promptAsync` / `runCommand` / `setSessionModel` /
+`setSessionThinking` / `compactSession` / `runPlanAction` call
+`ensureLiveRecord`, which binds extensions in the Node child (or
+in-process factory) and reuses that id. Reload awaits the in-flight bind
+instead of starting a second AgentSession. Delete and host dispose mark
+the record disposed so a late bind cannot attach. `promptAsync` binds
+before inserting the user message so a failed bind does not leave a ghost
+turn. `GET` messages/list/session stay live-free on the shell record.
+`POST /api/pi/directory-runtime/warm` fire-and-forgets
+`ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /
 409-while-streaming stay the same.
 `OPENCHAMBER_PI_NODE_KERNEL=0` restores the in-process fallback below.
