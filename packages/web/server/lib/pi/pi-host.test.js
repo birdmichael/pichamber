@@ -892,6 +892,24 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /goal from the Goal slot before any session exists', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-slot-cmd-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => (
+        command.name === 'goal' && command.source === 'extension'
+      ))).toBe(true);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('lists /plan from the Plan slot before any session exists', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-plan-slot-cmd-'));
     try {
@@ -1471,6 +1489,7 @@ describe('createPiHost', () => {
         });
       expect(promptAsyncCalls).toBe(0);
       expect(host.getMessages(record.id)).toEqual([]);
+      expect(record.piSession.reloadCount).toBe(0);
 
       const prompted = [];
       const originalPrompt = record.piSession.prompt.bind(record.piSession);
@@ -1487,6 +1506,223 @@ describe('createPiHost', () => {
       fs.rmSync(home, { recursive: true, force: true });
     }
   });
+
+  it('starts /goal on a live session after refreshing a stale command snapshot', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-refresh-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.registerCommand('goal', async () => {}, { description: 'Set a goal' });
+      const originalGetCommands = record.piSession.getCommands.bind(record.piSession);
+      let hidden = true;
+      record.piSession.getCommands = () => (hidden ? [] : originalGetCommands());
+      record.piSession.refreshSnapshot = async () => {
+        hidden = false;
+        return originalGetCommands();
+      };
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+
+      await host.runCommand(record.id, { command: 'goal', arguments: 'implement snake game' });
+      expect(prompted).toEqual(['/goal implement snake game']);
+      expect(promptAsyncCalls).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('reloads once to attach /goal when refresh still sees no live command', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-reload-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      const originalGetCommands = record.piSession.getCommands.bind(record.piSession);
+      let attached = false;
+      record.piSession.getCommands = () => (attached ? originalGetCommands() : []);
+      record.piSession.refreshSnapshot = async () => [];
+      const originalReload = record.piSession.reload.bind(record.piSession);
+      record.piSession.reload = async () => {
+        record.piSession.registerCommand('goal', async () => {}, { description: 'Set a goal' });
+        attached = true;
+        return originalReload();
+      };
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+
+      await host.runCommand(record.id, { command: 'goal', arguments: 'ship the footer' });
+      expect(prompted).toEqual(['/goal ship the footer']);
+      expect(record.piSession.reloadCount).toBe(1);
+      record.piSession.getCommands = () => [];
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'again' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(record.piSession.reloadCount).toBe(1);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('dispatches /goal from extensionRunner when getCommands is missing', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-runner-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      delete record.piSession.getCommands;
+      record.piSession.extensionRunner = {
+        getRegisteredCommands: () => [{ name: 'goal', invocationName: 'goal:1', description: 'Set a goal' }],
+      };
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      await host.runCommand(record.id, { command: 'goal', arguments: 'from runner' });
+      expect(prompted).toEqual(['/goal:1 from runner']);
+      expect(record.piSession.reloadCount).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('dispatches /goal when getCommands() only has invocationName', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-inv-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.getCommands = () => [{
+        invocationName: 'goal',
+        source: 'extension',
+        description: 'Set a goal',
+      }];
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      await host.runCommand(record.id, { command: 'goal', arguments: 'named' });
+      expect(prompted).toEqual(['/goal named']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('dispatches /goal when the live list overlays a prompt source', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-overlay-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.getCommands = () => [{ name: 'goal', source: 'prompt', description: 'Goal' }];
+      const prompted = [];
+      const originalPrompt = record.piSession.prompt.bind(record.piSession);
+      record.piSession.prompt = async (text, options) => {
+        prompted.push(text);
+        return originalPrompt(text, options);
+      };
+      await host.runCommand(record.id, { command: 'goal', arguments: 'keep going' });
+      expect(prompted).toEqual(['/goal keep going']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('returns 409 when /goal needs a reload while the session is busy', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-goal-busy-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-goal');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.getCommands = () => [];
+      record.piSession.refreshSnapshot = async () => [];
+      record.status = { type: 'busy' };
+      await expect(host.runCommand(record.id, { command: 'goal', arguments: 'wait' }))
+        .rejects.toMatchObject({ status: 409 });
+      expect(record.piSession.reloadCount).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('does not promptAsync /plan when the Plan slot is on and the live command is missing', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-plan-missing-'));
+    try {
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:@narumitw/pi-plan-mode');
+      writePiPrompt({
+        home,
+        name: 'plan',
+        template: 'Do not send this as chat: $ARGUMENTS',
+      });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      record.piSession.getCommands = () => [];
+      record.piSession.refreshSnapshot = async () => [];
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+      const reloadCountBefore = record.piSession.reloadCount;
+      await expect(host.runPlanAction(record.id, { action: 'start' }))
+        .rejects.toMatchObject({ status: 404 });
+      expect(promptAsyncCalls).toBe(0);
+      expect(record.piSession.reloadCount).toBe(reloadCountBefore + 1);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('live session command helpers', () => {
@@ -1495,10 +1731,19 @@ describe('live session command helpers', () => {
       getCommands: () => [{ name: 'plan', source: 'extension', description: 'Plan' }],
     })).toEqual([{ name: 'plan', source: 'extension', description: 'Plan' }]);
     expect(readLiveSessionCommands({
+      getCommands: () => [{ invocationName: 'goal', source: 'extension', description: 'Set a goal' }],
+    })).toEqual([{ invocationName: 'goal', source: 'extension', description: 'Set a goal' }]);
+    expect(readLiveSessionCommands({
       extensionRunner: {
         getRegisteredCommands: () => [{ invocationName: 'goal', description: 'Set a goal' }],
       },
     })).toEqual([{ name: 'goal', description: 'Set a goal', source: 'extension' }]);
+    expect(readLiveSessionCommands({
+      getCommands: () => [],
+      extensionRunner: {
+        getRegisteredCommands: () => [{ name: 'goal', invocationName: 'goal:1', description: 'Set a goal' }],
+      },
+    })).toEqual([{ name: 'goal', invocationName: 'goal:1', description: 'Set a goal', source: 'extension' }]);
     expect(readLiveSessionCommands({})).toEqual([]);
   });
 

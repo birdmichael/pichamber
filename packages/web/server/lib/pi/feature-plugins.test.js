@@ -145,8 +145,17 @@ describe('feature plugin defaults and persist', () => {
 describe('feature plugin slash commands', () => {
   it('lists /plan and /run for the slash menu when those slots are installed and enabled', () => {
     expect(listFeaturePluginSlashCommands({
+      slots: { goal: { installed: true, enabled: true } },
+    })).toEqual([{ name: 'goal', description: 'Run a goal to completion', source: 'extension' }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { goal: { installed: true, enabled: true, command: 'ship' } },
+    })).toEqual([{ name: 'ship', description: 'Run a goal to completion', source: 'extension' }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { goal: { installed: true, enabled: false } },
+    })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
       slots: { plan: { installed: true, enabled: true } },
-    })).toEqual([{ name: 'plan', description: 'Plan mode', source: 'extension' }]);
+    })).toEqual([{ name: 'plan', description: 'Enter or manage Plan mode', source: 'extension' }]);
     expect(listFeaturePluginSlashCommands({
       slots: { plan: { installed: true, enabled: false } },
     })).toEqual([]);
@@ -264,7 +273,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.xai).toMatchObject({ installed: false, enabled: false });
-    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
+    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['goal', 'run']);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -321,7 +330,7 @@ describe('existing Pi agent recognition', () => {
     expect(payload.slots.btw).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.todo).toMatchObject({ installed: false, enabled: false });
     expect(payload.slots.xai).toMatchObject({ installed: false, enabled: false });
-    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['run']);
+    expect(listFeaturePluginSlashCommands(payload).map((item) => item.name)).toEqual(['goal', 'run']);
     expect(readFeaturePlugins(home).subagents.enabled).toBeUndefined();
     expect(resolveFeaturePluginEnabled(true)).toBe(true);
     expect(resolveFeaturePluginEnabled(false)).toBe(false);

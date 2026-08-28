@@ -256,11 +256,19 @@ const slotPresets = (slot) => ([
 /** Slash entries that must appear even before a live session calls getCommands(). */
 export const listFeaturePluginSlashCommands = (payload) => {
   const listed = [];
+  const goal = payload?.slots?.goal;
+  if (goal?.installed && goal.enabled) {
+    listed.push({
+      name: typeof goal.command === 'string' && goal.command.trim() ? goal.command.trim() : 'goal',
+      description: 'Run a goal to completion',
+      source: 'extension',
+    });
+  }
   const plan = payload?.slots?.plan;
   if (plan?.installed && plan.enabled) {
     listed.push({
       name: 'plan',
-      description: 'Plan mode',
+      description: 'Enter or manage Plan mode',
       source: 'extension',
     });
   }

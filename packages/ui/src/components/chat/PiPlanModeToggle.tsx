@@ -74,6 +74,8 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
           level: 'info',
         });
       }
+    } catch {
+      toast.error(t('chat.piPlan.actionFailed'));
     } finally {
       setPending(false);
     }

@@ -179,6 +179,11 @@ const createRemotePiSession = (client, snapshot) => {
     getCommands() {
       return Array.isArray(state.commands) ? state.commands : [];
     },
+    async refreshSnapshot() {
+      const snapshot = await client.call('session.get', { sessionId: state.sessionId });
+      applySnapshot(snapshot);
+      return Array.isArray(state.commands) ? state.commands : [];
+    },
     getToolDefinition(name) {
       return (state.toolNames || []).includes(name) ? { name } : undefined;
     },

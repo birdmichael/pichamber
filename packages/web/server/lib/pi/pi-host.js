@@ -1045,13 +1045,35 @@ const expandPromptTemplate = (template, argument) => {
     .replaceAll('$1', args);
 };
 
-const commandNameOf = (command) => (
-  typeof command?.name === 'string' ? command.name.trim() : ''
+const commandNameOf = (command) => {
+  const raw = typeof command?.name === 'string' && command.name.trim()
+    ? command.name
+    : (typeof command?.invocationName === 'string' ? command.invocationName : '');
+  return raw.trim().replace(/^\//, '');
+};
+
+const isPluginSlotOn = (payload, slot) => Boolean(
+  payload?.slots?.[slot]?.installed && payload?.slots?.[slot]?.enabled,
 );
 
 const isExtensionCommandSource = (source) => (
   source !== 'prompt' && source !== 'skill' && source !== 'builtin'
 );
+
+const normalizeLiveCommand = (command) => {
+  const name = commandNameOf(command);
+  if (!name) return null;
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  const entry = {
+    name,
+    description: command.description || '',
+    source: command.source || 'extension',
+  };
+  if (invocation && invocation !== name) entry.invocationName = invocation;
+  return entry;
+};
 
 /** Live session getCommands() / extensionRunner.registerCommand results. */
 export const readLiveSessionCommands = (piSession) => {
@@ -1059,18 +1081,15 @@ export const readLiveSessionCommands = (piSession) => {
   if (typeof piSession.getCommands === 'function') {
     try {
       const commands = piSession.getCommands();
-      return Array.isArray(commands) ? commands : [];
+      if (Array.isArray(commands) && commands.length > 0) {
+        return commands;
+      }
     } catch {
-      return [];
     }
   }
   const registered = piSession.extensionRunner?.getRegisteredCommands?.();
   if (!Array.isArray(registered)) return [];
-  return registered.map((command) => ({
-    name: command.invocationName || command.name,
-    description: command.description || '',
-    source: command.source || 'extension',
-  }));
+  return registered.map(normalizeLiveCommand).filter(Boolean);
 };
 
 export const toFacadeExtensionCommand = (command) => {
@@ -1114,9 +1133,33 @@ export const mergeLiveExtensionCommands = (listed, live) => {
   return merged;
 };
 
+const commandMatchesName = (command, requested) => {
+  if (!requested) return false;
+  if (commandNameOf(command) === requested) return true;
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  return invocation === requested;
+};
+
 const findLiveSessionCommand = (piSession, name) => (
-  readLiveSessionCommands(piSession).find((item) => commandNameOf(item) === name)
+  readLiveSessionCommands(piSession).find((item) => commandMatchesName(item, name))
 );
+
+const liveCommandInvocation = (command, fallback) => {
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  return invocation || commandNameOf(command) || fallback;
+};
+
+const refreshRecordCommands = async (record) => {
+  if (typeof record?.piSession?.refreshSnapshot !== 'function') return;
+  try {
+    await record.piSession.refreshSnapshot();
+  } catch {
+  }
+};
 
 const createLocalReply = (emit) => (record, body, userText, assistantText) => {
   const sessionID = record.id;
@@ -1661,6 +1704,7 @@ export const createPiHost = ({
         mode: 'rpc',
       });
       ensureQuestionToolAdapted(record);
+      await refreshRecordCommands(record);
     } catch (error) {
       console.warn(`[pi-host] bindExtensions failed for ${record.id}:`, error?.message || error);
     }
@@ -2400,6 +2444,23 @@ export const createPiHost = ({
     });
   };
 
+  const ensureLivePluginCommand = async (record, name) => {
+    if (findLiveSessionCommand(record.piSession, name)) return record;
+    await refreshRecordCommands(record);
+    if (findLiveSessionCommand(record.piSession, name)) return record;
+    record.pluginCommandReloads ??= new Set();
+    if (record.pluginCommandReloads.has(name)) return null;
+    const blocked = sessionBlocksPiReload(record);
+    if (blocked) {
+      const error = new Error(blocked);
+      error.status = 409;
+      throw error;
+    }
+    record.pluginCommandReloads.add(name);
+    await reloadLiveRecord(record);
+    return findLiveSessionCommand(record.piSession, name) ? record : null;
+  };
+
   const readListMetadata = typeof readListSessionMetadata === 'function'
     ? readListSessionMetadata
     : readPersistedSessionMetadataFromFileTail;
@@ -3029,6 +3090,7 @@ export const createPiHost = ({
 
       if (sessionID) {
         const record = await ensureRecord(sessionID, directory);
+        record.pluginCommandReloads = undefined;
         await reloadLiveRecord(record);
         const skills = listPiSkills({ home, directory: record.directory });
         const commands = listPiCommands({ home, directory: record.directory });
@@ -3221,14 +3283,16 @@ export const createPiHost = ({
 
       const reply = async (assistantText) => completeLocalReply(record, body, userText, assistantText);
 
-      const dispatchLiveSessionCommand = async () => {
+      const dispatchLiveSessionCommand = async (liveCommand) => {
         if (typeof record.piSession?.prompt !== 'function') {
           const error = new Error(`Command /${name} is not available on this session`);
           error.status = 500;
           throw error;
         }
         ensureQuestionToolAdapted(record);
-        await record.piSession.prompt(userText);
+        const invoke = liveCommandInvocation(liveCommand, name);
+        const promptText = `/${[invoke, argument].filter(Boolean).join(' ')}`;
+        await record.piSession.prompt(promptText);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
         }
@@ -3307,9 +3371,8 @@ export const createPiHost = ({
           error.status = 404;
           throw error;
         }
-        const liveUsage = findLiveSessionCommand(record.piSession, name);
-        if (liveUsage && isExtensionCommandSource(liveUsage.source)) {
-          return dispatchLiveSessionCommand();
+        if (await ensureLivePluginCommand(record, name)) {
+          return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
         }
         return reply(
           'Grok usage is shown in Work Status and Settings → Providers when the Grok Usage plugin is installed.',
@@ -3326,12 +3389,20 @@ export const createPiHost = ({
           throw error;
         }
         const liveGoal = findLiveSessionCommand(record.piSession, name);
-        if (!liveGoal || !isExtensionCommandSource(liveGoal.source)) {
+        if (liveGoal) {
+          return dispatchLiveSessionCommand(liveGoal);
+        }
+        if (!isPluginSlotOn(this.getFeaturePlugins(), 'goal')) {
           const error = new Error(`Command /${name} is not available on this session`);
           error.status = 404;
           throw error;
         }
-        return dispatchLiveSessionCommand();
+        if (!await ensureLivePluginCommand(record, name)) {
+          const error = new Error(`Command /${name} is not available on this session`);
+          error.status = 404;
+          throw error;
+        }
+        return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
       }
 
       if (name === 'run') {
@@ -3345,8 +3416,7 @@ export const createPiHost = ({
             '/run needs an agent and a task, for example `/run scout Inspect the README`. Bare /run is the TUI launcher and is not supported on Desktop.',
           );
         }
-        const liveRun = findLiveSessionCommand(record.piSession, name);
-        if (!liveRun || !isExtensionCommandSource(liveRun.source)) {
+        if (!await ensureLivePluginCommand(record, name)) {
           const error = new Error('Command /run is not available on this session');
           error.status = 404;
           throw error;
@@ -3434,9 +3504,24 @@ export const createPiHost = ({
         };
       }
 
+      if (name === 'plan') {
+        const livePlan = findLiveSessionCommand(record.piSession, name);
+        if (livePlan) {
+          return dispatchLiveSessionCommand(livePlan);
+        }
+        if (isPluginSlotOn(this.getFeaturePlugins(), 'plan')) {
+          if (await ensureLivePluginCommand(record, name)) {
+            return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
+          }
+          const error = new Error('Command /plan is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+      }
+
       const liveCommand = findLiveSessionCommand(record.piSession, name);
       if (liveCommand && isExtensionCommandSource(liveCommand.source)) {
-        return dispatchLiveSessionCommand();
+        return dispatchLiveSessionCommand(liveCommand);
       }
 
       const listed = listPiCommands({ home, directory: record.directory });
@@ -3450,7 +3535,7 @@ export const createPiHost = ({
       }
 
       if (liveCommand) {
-        return dispatchLiveSessionCommand();
+        return dispatchLiveSessionCommand(liveCommand);
       }
 
       const error = new Error(`Unknown command: /${name}`);
@@ -3566,7 +3651,7 @@ export const createPiHost = ({
       const spec = typeof source === 'string' ? source.trim() : '';
       await manager.update(spec || undefined);
       const cwd = directory || defaultDirectory;
-      const reload = await this.reloadIdleSessions(cwd);
+      const reload = await this.reloadIdleSessions();
       return {
         extensions: this.listExtensions(cwd),
         packages: await this.listPackagesWithVersions(cwd, { env, fetchImpl }),
@@ -3745,6 +3830,7 @@ export const createPiHost = ({
           continue;
         }
         try {
+          record.pluginCommandReloads = undefined;
           await this.reload({ sessionID: record.id });
           reloaded.push(record.id);
         } catch (error) {

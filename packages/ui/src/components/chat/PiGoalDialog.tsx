@@ -51,6 +51,7 @@ export function PiGoalDialog({
     if (!canSubmitPiGoalObjective(objective)) return;
     setBusy(true);
     setError(null);
+    let mintedDirectory = directory ?? null;
     try {
       const resolved = await resolvePiGoalSession({
         sessionID: sessionId,
@@ -61,7 +62,7 @@ export function PiGoalDialog({
             directory ?? null,
           );
           if (!created?.id) return null;
-          useSessionUIStore.getState().setCurrentSession(created.id, created.directory ?? directory ?? null);
+          mintedDirectory = created.directory ?? directory ?? null;
           return created;
         },
       });
@@ -83,6 +84,10 @@ export function PiGoalDialog({
         },
       });
       if (result.ok) {
+        useSessionUIStore.getState().setCurrentSession(
+          resolved.sessionID,
+          mintedDirectory,
+        );
         onOpenChange(false);
         return;
       }
