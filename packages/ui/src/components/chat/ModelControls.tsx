@@ -3176,12 +3176,12 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             <div className={inlineClassName}>
                 <div
                     className={cn(
-                        'model-controls__row flex items-center min-w-0 flex-1 justify-end',
+                        'model-controls__row flex items-center min-w-0 flex-1 justify-end m-0',
                         inlineGapClass,
                         isMobile && 'overflow-hidden'
                     )}
                 >
-                    <div className="model-controls__variant-slot shrink-0 overflow-hidden">
+                    <div className="model-controls__variant-slot shrink-0 overflow-hidden m-0">
                         {renderVariantSelector()}
                     </div>
                     <div className="model-controls__model-slot overflow-hidden">

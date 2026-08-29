@@ -129,7 +129,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
             <PiPlanBuildRow className="w-full justify-end" />
             <div
                 className={cn(
-                    isMobile ? 'flex items-center gap-x-1.5' : cn('flex items-center justify-between', footerGapClass)
+                    isMobile ? 'flex items-center gap-x-1.5' : 'flex items-center justify-between gap-x-2'
                 )}
             >
             {isMobile ? (
@@ -219,7 +219,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                 </>
             ) : (
                 <>
-                    <div className={cn("flex items-center flex-shrink-0", footerGapClass)}>
+                    <div className="flex items-center flex-shrink-0 gap-x-2">
                         <ComposerAttachmentControls
                             isVSCode={isVSCode}
                             footerIconButtonClass={footerIconButtonClass}
@@ -267,7 +267,10 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             withTooltip
                         />
                     </div>
-                    <div className={cn('flex items-center flex-1 justify-end min-w-0', footerGapClass)}>
+                    <div
+                        data-composer-chip-row="true"
+                        className="flex items-center flex-1 justify-end min-w-0 gap-x-2 m-0"
+                    >
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
                             radius={chatInputRadius}

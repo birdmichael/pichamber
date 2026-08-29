@@ -777,15 +777,18 @@ html:not(.dark) .chat-scroll {
    itself.
 
    Hide the entire Agent chip (the slot, not just the word) when the
-   model-controls container is at or below ~27rem / 432px. That covers
-   the child footer band (~315–430px) where Agent reappeared as `Ag(`
-   after the 20.5rem / 328px hide. A wide child pane stays above 27rem
-   and keeps Agent. The model label may remain as a clean ellipsis
-   (`grok-…`). Same container queries apply to the parent composer and
-   the child/embedded composer.
+   model-controls container is at or below ~36rem / 576px. That covers
+   a ~500px child footer (intermediate: sidebar 280 + parent ~475) where
+   27rem / 432px still painted `Ager`. A wide parent (~1000px) stays
+   above 36rem and keeps Agent. The model label may remain as a clean
+   ellipsis (`grok-…`). Same container queries apply to the parent
+   composer and the child/embedded composer.
 
-   Hide the thinking *label* (keep the icon) at the same 22rem squeeze
-   as the leftover agent word, before icon+word paint `H⊘gh` / `M⊘dium`.
+   Hide the thinking *label* at the 22rem squeeze so High/Medium cannot
+   paint over the icon. Keep a real row gap and shrink-0 / zero negative
+   margin on the chip row so an icon-only thinking chip cannot sit on
+   the preceding toolbar icon. If that squeeze is still too tight, hide
+   the whole thinking chip (slot, not just the word).
 
    The named container is the composer footer (`[data-chat-input-footer]`),
    not html. Nesting `@container model-controls` under html made the
@@ -794,6 +797,8 @@ html:not(.dark) .chat-scroll {
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
   min-width: 0;
+  column-gap: 0.75rem;
+  margin: 0;
 }
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
@@ -806,8 +811,13 @@ html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .mode
   max-width: 100%;
 }
 
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-slot,
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
   flex-shrink: 0;
+  margin: 0;
+}
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
   overflow: hidden;
 }
 
@@ -859,19 +869,21 @@ html:not(.vscode-runtime) {
       display: none;
     }
 
-    .model-controls__variant-label {
+    .model-controls__variant-label,
+    .model-controls__variant-slot,
+    .model-controls__variant-trigger {
       display: none;
     }
 
     .model-controls__row {
-      column-gap: 0.375rem;
+      column-gap: 0.75rem;
     }
   }
 
-  /* Whole Agent chip — not just the label. 27rem / 432px covers the
-     child footer band (~315–430px) where a 20.5rem hide still painted
-     `Ag(`. Parent at ~475px stays above this and keeps Agent. */
-  @container model-controls (max-width: 27rem) {
+  /* Whole Agent chip — not just the label. 36rem / 576px covers a
+     ~500px child footer where 27rem still painted `Ager`. Wide parent
+     (~1000px) stays above this and keeps Agent. */
+  @container model-controls (max-width: 36rem) {
     .model-controls__agent-slot,
     .model-controls__agent-trigger {
       display: none;
