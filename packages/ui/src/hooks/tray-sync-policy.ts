@@ -5,7 +5,7 @@
 export const TRAY_STATUS_POLL_INTERVAL_MS = 5000;
 export const TRAY_GLOBAL_REFRESH_MS = 45000;
 
-export type TrayPollSession = {
+type TrayPollSession = {
   status?: string | null;
 };
 
@@ -22,7 +22,7 @@ export const shouldRunTraySafetyPolls = (input: {
   hasBusySession: boolean;
 }): boolean => input.trayEnabled === true && input.hasBusySession === true;
 
-export type TraySafetyPollScheduler = {
+type TraySafetyPollScheduler = {
   sync: (input: { trayEnabled: boolean; hasBusySession: boolean }) => void;
   dispose: () => void;
   isPolling: () => boolean;

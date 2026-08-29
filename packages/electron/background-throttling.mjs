@@ -5,7 +5,7 @@
 
 const WINDOW_PAINT_EVENTS = ['focus', 'blur', 'show', 'hide', 'minimize', 'restore'];
 
-export const HIDDEN_TRAY_SNAPSHOT_INTERVAL_MS = 5000;
+const HIDDEN_TRAY_SNAPSHOT_INTERVAL_MS = 5000;
 
 export const shouldPaintAtFullRate = ({ focused, visible } = {}) =>
   focused === true && visible === true;
