@@ -278,6 +278,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             onInsertAndSend={onDictationInsertAndSend}
                             onContentHeightChange={onDictationContentHeightChange}
                         />
+                        <div data-composer-send="true" className="shrink-0">
                         <ComposerActionButtons
                             isMobile={isMobile}
                             footerIconButtonClass={footerIconButtonClass}
@@ -292,6 +293,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             onQueueMessage={onQueueMessage}
                             onAbort={onAbort}
                         />
+                        </div>
                     </div>
                 </>
             )}

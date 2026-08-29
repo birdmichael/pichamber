@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
 
 import {
@@ -5,11 +8,16 @@ import {
     USER_BUBBLE_HOVER_ACTIONS_SHIFT_CLASS,
     USER_MESSAGE_CONTENT_OVERFLOW_CLASS,
     USER_TEXT_COLLAPSED_CLASS,
+    USER_TEXT_COMPACT_CLAMP_CLASS,
     USER_TEXT_EXPANDED_CLASS,
+    USER_TEXT_PARENT_WRAP_CLASS,
     getUserBubbleHoverActionsFrameClass,
     getUserMessageContentOverflowClass,
+    getUserTextClampClass,
     isUserTextOverflowing,
 } from './userBubbleLayout';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('userBubbleLayout', () => {
     test('user bubble flex item can shrink and wrap inside the 85% cap', () => {
@@ -60,6 +68,22 @@ describe('userBubbleLayout', () => {
         expect(getUserMessageContentOverflowClass(true)).toContain('overflow-y-auto');
     });
 
+    test('parent user bubble does not use line-clamp-1 for normal text', () => {
+        expect(USER_TEXT_PARENT_WRAP_CLASS).toContain('whitespace-normal');
+        expect(USER_TEXT_PARENT_WRAP_CLASS).toContain('break-words');
+        expect(USER_TEXT_PARENT_WRAP_CLASS).not.toContain('line-clamp-1');
+        expect(USER_TEXT_PARENT_WRAP_CLASS).not.toContain('line-clamp-2');
+        expect(USER_TEXT_PARENT_WRAP_CLASS).not.toContain('truncate');
+        expect(USER_TEXT_PARENT_WRAP_CLASS).not.toContain('nowrap');
+
+        expect(getUserTextClampClass({ collapsed: false })).toBeUndefined();
+        expect(getUserTextClampClass({ collapsed: true })).toBeUndefined();
+        expect(getUserTextClampClass({ collapsed: true, compact: false })).toBeUndefined();
+        expect(getUserTextClampClass({ collapsed: true, compact: true })).toBe(USER_TEXT_COMPACT_CLAMP_CLASS);
+        expect(USER_TEXT_COMPACT_CLAMP_CLASS).toBe('line-clamp-2');
+        expect(USER_TEXT_COMPACT_CLAMP_CLASS).not.toContain('line-clamp-1');
+    });
+
     test('treats vertical or horizontal overflow as truncated', () => {
         expect(isUserTextOverflowing({
             scrollHeight: 48,
@@ -81,5 +105,17 @@ describe('userBubbleLayout', () => {
             scrollWidth: 200,
             clientWidth: 200,
         })).toBe(false);
+    });
+});
+
+const userTextPartSource = readFileSync(join(__dirname, 'parts/UserTextPart.tsx'), 'utf-8');
+
+describe('UserTextPart parent clamp wiring', () => {
+    test('does not apply line-clamp-1 or a compact clamp in the main parent column', () => {
+        expect(userTextPartSource).toContain('getUserTextClampClass');
+        expect(userTextPartSource).toContain('USER_TEXT_PARENT_WRAP_CLASS');
+        expect(userTextPartSource).toContain('compact: false');
+        expect(userTextPartSource).not.toMatch(/line-clamp-1/);
+        expect(userTextPartSource).not.toMatch(/isCollapsed && \[\s*"line-clamp-2"/);
     });
 });

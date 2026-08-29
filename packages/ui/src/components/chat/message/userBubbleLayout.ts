@@ -53,6 +53,28 @@ export const USER_TEXT_COLLAPSED_CLASS = 'user-text-collapsed';
 /** Expanded long CJK must wrap whole glyphs instead of clipping at the edge. */
 export const USER_TEXT_EXPANDED_CLASS = 'user-text-expanded';
 
+/**
+ * Main parent-column user text wraps inside the 85% bubble. Never a 1-line
+ * clamp — a compact ellipsis row is for navigator/docks, not the transcript.
+ */
+export const USER_TEXT_PARENT_WRAP_CLASS =
+    'w-full whitespace-normal break-words [overflow-wrap:anywhere]';
+
+/** Compact-row clamp (prompt navigator, docks). Two wrapped lines, never one. */
+export const USER_TEXT_COMPACT_CLAMP_CLASS = 'line-clamp-2';
+
+export function getUserTextClampClass(options: {
+    collapsed: boolean;
+    /** Compact list/row. The main parent column must pass false. */
+    compact?: boolean;
+}): string | undefined {
+    if (!options.collapsed) return undefined;
+    // Do not clamp the main parent transcript just because Work Status and a
+    // child tab narrowed the column. Let the bubble wrap.
+    if (!options.compact) return undefined;
+    return USER_TEXT_COMPACT_CLAMP_CLASS;
+}
+
 export const USER_MESSAGE_CONTENT_OVERFLOW_CLASS = {
     sticky: 'min-w-0 overflow-x-clip overflow-y-auto overscroll-contain scrollbar-none',
     default: 'min-w-0 overflow-x-clip',

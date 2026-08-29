@@ -761,100 +761,129 @@ html:not(.dark) .chat-scroll {
    (several letters + ellipsis — never a single glyph). The provider glyph
    hides on that squeeze so the name can use the slot. Agent/Plan yields
    next so chips cannot overlap. Icon-only is last resort only. Leftover
-   OpenCode agent still hides first. Do not hardcode a provider/model name. */
-@container model-controls (max-width: 22rem) {
-  :root:not(.vscode-runtime) .model-controls__agent-label {
-    display: none;
-  }
+   OpenCode agent still hides first. Do not hardcode a provider/model name.
+
+   Container-query subjects must be descendants of the named container.
+   Do not start the inner selector at :root — that never matches, and the
+   row then overflow-clips mid-glyph (`grok-4.(`, a bare `A`). Nest the
+   query under html so the subject is the chip, and ellipsize the label
+   itself. Hide a chip that cannot keep a readable label. */
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
+  min-width: 0;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
-  overflow: hidden;
-}
-
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
   min-width: 5.5rem;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .model-controls__model-trigger {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .model-controls__model-trigger {
   max-width: 100%;
 }
 
-@container model-controls (max-width: 22rem) {
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
-    column-gap: 0.375rem;
-  }
-}
-
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
   flex-shrink: 0;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-label {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-label {
   flex-shrink: 0;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-trigger {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-trigger {
   min-width: 0;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
   min-width: 5ch;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__agent-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
   min-width: 0;
   flex-shrink: 1;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
+  display: block;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@container model-controls (max-width: 14rem) {
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-icon {
-    display: none;
+html:not(.vscode-runtime) {
+  @container model-controls (max-width: 22rem) {
+    .model-controls__agent-label {
+      display: none;
+    }
+
+    .model-controls__row {
+      column-gap: 0.375rem;
+    }
   }
 
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
-    min-width: 3.25rem;
+  @container model-controls (max-width: 16rem) {
+    .model-controls__agent-slot,
+    .model-controls__agent-trigger {
+      display: none;
+    }
   }
-}
 
-@container model-controls (max-width: 8rem) {
-  :root:not(.vscode-runtime) .model-controls__variant-label {
-    display: none;
+  @container model-controls (max-width: 14rem) {
+    &:not(.mobile-pointer) .model-controls__model-icon {
+      display: none;
+    }
+
+    &:not(.mobile-pointer) .model-controls__model-slot {
+      min-width: 3.25rem;
+    }
   }
-}
 
-@container model-controls (max-width: 6rem) {
-  :root:not(.vscode-runtime) .model-controls__model-label {
-    display: none;
+  @container model-controls (max-width: 8rem) {
+    .model-controls__variant-label {
+      display: none;
+    }
+  }
+
+  @container model-controls (max-width: 6rem) {
+    .model-controls__model-label {
+      display: none;
+    }
   }
 }
 
 /* VS Code side panel: tighter thresholds since the panel is narrow and labels are smaller. */
-@container model-controls (max-width: 11rem) {
-  :root.vscode-runtime .model-controls__agent-label {
-    display: none;
+html.vscode-runtime {
+  @container model-controls (max-width: 11rem) {
+    .model-controls__agent-label {
+      display: none;
+    }
   }
-}
 
-@container model-controls (max-width: 9rem) {
-  :root.vscode-runtime .model-controls__variant-label {
-    display: none;
+  @container model-controls (max-width: 9rem) {
+    .model-controls__variant-label {
+      display: none;
+    }
   }
-}
 
-@container model-controls (max-width: 10rem) {
-  :root.vscode-runtime .model-controls__model-label {
-    display: none;
+  @container model-controls (max-width: 10rem) {
+    .model-controls__model-label {
+      display: none;
+    }
   }
 }
 

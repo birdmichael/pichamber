@@ -2987,7 +2987,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
                                     <div className={cn(
-                                        'flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        'model-controls__agent-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
                                         buttonHeight
                                     )}>
                                         {!isReady ? (
@@ -3187,7 +3187,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
-                    {renderAgentSelector()}
+                    <div className="model-controls__agent-slot min-w-0">
+                        {renderAgentSelector()}
+                    </div>
                     <div className="model-controls__plan-slot">
                         <PiPlanModeToggle />
                     </div>
