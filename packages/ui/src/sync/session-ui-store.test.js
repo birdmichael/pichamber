@@ -987,6 +987,21 @@ describe('routeMessage skill invocation', () => {
     ]);
     expect(sendMessageCalls).toHaveLength(0);
   });
+
+  test('routes a padded /plan with a trailing newline through session.command', async () => {
+    await routeMessage({
+      sessionId: 'session-plan-padded',
+      directory: '/chats/new',
+      content: ' /plan \n',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls).toEqual([
+      expect.objectContaining({ command: 'plan', arguments: '' }),
+    ]);
+    expect(sendMessageCalls).toHaveLength(0);
+  });
 });
 
 describe('archiveSessions option forwarding', () => {

@@ -121,5 +121,12 @@ describe('leftover /plan user bubbles', () => {
         const entry = userMessage([{ type: 'text', text: '/not-a-real-cmd' } as Part]);
         expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);
     });
+
+    test('normalizeUserDisplayParts strips leftover /plan so the bubble has no parts', () => {
+        const parts = [{ type: 'text', text: '/plan' } as Part];
+        expect(normalizeUserDisplayParts(parts)).toEqual([]);
+        applyFeaturePluginsPayload(emptyFeaturePluginsPayload());
+        expect(normalizeUserDisplayParts(parts)).toEqual(parts);
+    });
 });
 
