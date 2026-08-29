@@ -227,11 +227,11 @@ describe('issue #2903 busy embedded subagent status-line-only', () => {
   });
 
   test('empty+busy branch skips empty state so StatusRowContainer can stand alone', () => {
-    expect(chatContainerSource).toContain('if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)');
+    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)';
+    expect(chatContainerSource).toContain(emptyBusyGuard);
     expect(chatContainerSource).toContain('<ChatEmptyState');
     expect(chatContainerSource).toContain('<StatusRowContainer />');
 
-    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)';
     const emptyStateReturn = chatContainerSource.indexOf(emptyBusyGuard);
     expect(emptyStateReturn).toBeGreaterThan(-1);
     const emptyStateBlock = chatContainerSource.slice(
@@ -243,6 +243,13 @@ describe('issue #2903 busy embedded subagent status-line-only', () => {
     expect(emptyStateBlock).toContain('emptySessionWelcome');
     expect(emptyStateBlock).not.toContain('<ChatEmptyState');
     expect(emptyStateBlock).not.toContain('<StatusRowContainer />');
+
+    // First-send optimistic bubble skips that welcome. Busy still skips it via
+    // !sessionIsWorking; pending composer is the other skip.
+    expect(emptyBusyGuard).toContain('!sessionIsWorking');
+    expect(emptyBusyGuard).toContain('!pendingComposerVisible');
+    expect(chatContainerSource).toContain('pendingComposerVisible ? (');
+    expect(chatContainerSource).toContain('pendingComposerTurn?.text');
   });
 
   test('visibility handshake remains as defense-in-depth for background work', () => {
