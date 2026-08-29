@@ -33,18 +33,22 @@ const createNodeKernelChildUi = ({ parentRequest, sessionId } = {}) => {
         message,
       });
     },
-    async input(title, opts) {
+    async input(title, placeholder, opts) {
+      const hasPlaceholder = typeof placeholder === 'string';
       return request('ui.input', {
         sessionId,
         title,
-        opts: serializeUiOpts(opts),
+        placeholder: hasPlaceholder ? placeholder : undefined,
+        opts: serializeUiOpts(hasPlaceholder ? opts : placeholder),
       });
     },
-    async editor(title, opts) {
+    async editor(title, prefill, opts) {
+      const hasPrefill = typeof prefill === 'string';
       return request('ui.editor', {
         sessionId,
         title,
-        opts: serializeUiOpts(opts),
+        prefill: hasPrefill ? prefill : undefined,
+        opts: serializeUiOpts(hasPrefill ? opts : prefill),
       });
     },
     notify(message, level) {

@@ -48,4 +48,18 @@ describe('createSystemPresenceLatch', () => {
     expect(latch.apply(true)).toBe('report');
     expect(latch.allowsVisibleHeartbeat()).toBe(true);
   });
+
+  test('lock then apply(undefined) stays hidden', () => {
+    const latch = createSystemPresenceLatch();
+    expect(latch.apply(false)).toBe('hidden');
+    expect(latch.apply(undefined)).toBe('noop');
+    expect(latch.allowsVisibleHeartbeat()).toBe(false);
+  });
+
+  test('lock then apply(true) reports and allows heartbeat', () => {
+    const latch = createSystemPresenceLatch();
+    expect(latch.apply(false)).toBe('hidden');
+    expect(latch.apply(true)).toBe('report');
+    expect(latch.allowsVisibleHeartbeat()).toBe(true);
+  });
 });

@@ -115,6 +115,15 @@ export const shouldForwardNodeKernelHostEvent = (event) => {
   return !PARENT_OWNED_CHILD_HOST_EVENT_TYPES.has(event.type);
 };
 
+/** Parent forwards Pi string placeholder/prefill; empty string is a valid prefill. */
+export const dispatchNodeKernelParentUiCall = (ui, method, params = {}) => {
+  if (method === 'ui.notify') return ui?.notify?.(params.message, params.level);
+  if (method === 'ui.select') return ui?.select?.(params.title, params.options, params.opts);
+  if (method === 'ui.confirm') return ui?.confirm?.(params.title, params.message);
+  if (method === 'ui.input') return ui?.input?.(params.title, params.placeholder, params.opts);
+  if (method === 'ui.editor') return ui?.editor?.(params.title, params.prefill);
+};
+
 export const serializeNodeKernelCreateSessionInput = (input = {}) => {
   const cwd = asTrimmedString(input.cwd || input.directory);
   const sessionFile = asTrimmedString(input.sessionFile)
@@ -411,13 +420,15 @@ export const createNodeKernelClient = ({
     if (method.startsWith('ui.')) {
       const session = sessionSnapshots.get(params.sessionId)?.session;
       const ui = session?.extensionBindings?.uiContext;
-      if (method === 'ui.notify') {
-        return ui?.notify?.(params.message, params.level);
+      if (
+        method === 'ui.notify'
+        || method === 'ui.select'
+        || method === 'ui.confirm'
+        || method === 'ui.input'
+        || method === 'ui.editor'
+      ) {
+        return dispatchNodeKernelParentUiCall(ui, method, params);
       }
-      if (method === 'ui.select') return ui?.select?.(params.title, params.options, params.opts);
-      if (method === 'ui.confirm') return ui?.confirm?.(params.title, params.message);
-      if (method === 'ui.input') return ui?.input?.(params.title, params.opts);
-      if (method === 'ui.editor') return ui?.editor?.(params.title, params.opts);
     }
     throw new Error(`Unknown parent kernel method: ${method}`);
   };

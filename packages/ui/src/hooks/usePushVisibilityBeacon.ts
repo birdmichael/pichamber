@@ -12,17 +12,20 @@ export const shouldReportPushVisibility = (input: {
   isDesktop: boolean;
 }): boolean => input.isWeb || input.isCapacitor || input.isDesktop;
 
-/** macOS lock/sleep is not a document blur. Latch hidden until unlock/resume. */
+/** macOS lock/sleep is not a document blur. Latch hidden until unlock-screen. */
 export const createSystemPresenceLatch = () => {
   let systemHidden = false;
   return {
-    apply(visible: boolean | undefined): 'hidden' | 'report' {
+    apply(visible: boolean | undefined): 'hidden' | 'report' | 'noop' {
       if (visible === false) {
         systemHidden = true;
         return 'hidden';
       }
-      systemHidden = false;
-      return 'report';
+      if (visible === true) {
+        systemHidden = false;
+        return 'report';
+      }
+      return 'noop';
     },
     allowsVisibleHeartbeat(): boolean {
       return !systemHidden;
@@ -142,11 +145,14 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
 
     const onSystemPresence = (event: Event) => {
       const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
-      if (presenceLatch.apply(detail?.visible) === 'hidden') {
+      const outcome = presenceLatch.apply(detail?.visible);
+      if (outcome === 'hidden') {
         sendVisibility(false);
         return;
       }
-      report();
+      if (outcome === 'report') {
+        report();
+      }
     };
 
     document.addEventListener('visibilitychange', report);

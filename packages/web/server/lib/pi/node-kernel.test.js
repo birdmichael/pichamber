@@ -8,7 +8,7 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
-import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
+import { createNodeKernelClient, dispatchNodeKernelParentUiCall, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
 import { serializeSessionCommands, serializeSessionSnapshot } from './node-kernel-protocol.js';
 import { bindNodeKernelChildUiContext, serializeUiOpts } from './node-kernel-ui.js';
 import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
@@ -457,6 +457,92 @@ describe('node kernel ctx.ui stub', () => {
     const abort = new AbortController();
     abort.abort();
     expect(serializeUiOpts({ signal: abort.signal })).toEqual({ signal: { aborted: true } });
+    expect(serializeUiOpts('type something')).toBeUndefined();
+  });
+
+  it('sends input placeholder and editor prefill as their own IPC fields', async () => {
+    const session = createInMemoryPiSession({ sessionId: 'child-ui-text' });
+    const parentCalls = [];
+    const parentRequest = async (method, params) => {
+      parentCalls.push({ method, params });
+      return 'from-parent';
+    };
+    const originalBind = session.bindExtensions.bind(session);
+    session.bindExtensions = async (bindings = {}) => (
+      originalBind(bindNodeKernelChildUiContext(session, bindings, parentRequest))
+    );
+    await session.bindExtensions({ mode: 'rpc' });
+    const ui = session.extensionBindings.uiContext;
+
+    await expect(ui.input('Enter', 'type something...')).resolves.toBe('from-parent');
+    expect(parentCalls.at(-1)).toEqual({
+      method: 'ui.input',
+      params: {
+        sessionId: 'child-ui-text',
+        title: 'Enter',
+        placeholder: 'type something...',
+        opts: undefined,
+      },
+    });
+
+    await expect(ui.editor('Refine the plan:', '')).resolves.toBe('from-parent');
+    expect(parentCalls.at(-1)).toEqual({
+      method: 'ui.editor',
+      params: {
+        sessionId: 'child-ui-text',
+        title: 'Refine the plan:',
+        prefill: '',
+        opts: undefined,
+      },
+    });
+
+    await expect(ui.editor('Edit', 'Line 1\nLine 2')).resolves.toBe('from-parent');
+    expect(parentCalls.at(-1).params.prefill).toBe('Line 1\nLine 2');
+
+    const abort = new AbortController();
+    abort.abort();
+    await ui.select('Pick', ['A'], { signal: abort.signal });
+    expect(parentCalls.at(-1).params.opts).toEqual({ signal: { aborted: true } });
+    await ui.input('Enter', 'type something...', { signal: abort.signal });
+    expect(parentCalls.at(-1)).toMatchObject({
+      method: 'ui.input',
+      params: {
+        title: 'Enter',
+        placeholder: 'type something...',
+        opts: { signal: { aborted: true } },
+      },
+    });
+
+    await ui.input('Enter', { signal: abort.signal });
+    expect(parentCalls.at(-1).params.placeholder).toBeUndefined();
+    expect(parentCalls.at(-1).params.opts).toEqual({ signal: { aborted: true } });
+  });
+
+  it('forwards parent ui.input/editor string args without treating empty prefill as missing', () => {
+    const calls = [];
+    const ui = {
+      input: (...args) => {
+        calls.push(['input', args]);
+        return 'input-ok';
+      },
+      editor: (...args) => {
+        calls.push(['editor', args]);
+        return 'editor-ok';
+      },
+    };
+    expect(dispatchNodeKernelParentUiCall(ui, 'ui.input', {
+      title: 'Enter',
+      placeholder: 'type something...',
+      opts: { signal: { aborted: false } },
+    })).toBe('input-ok');
+    expect(dispatchNodeKernelParentUiCall(ui, 'ui.editor', {
+      title: 'Refine the plan:',
+      prefill: '',
+    })).toBe('editor-ok');
+    expect(calls).toEqual([
+      ['input', ['Enter', 'type something...', { signal: { aborted: false } }]],
+      ['editor', ['Refine the plan:', '']],
+    ]);
   });
 });
 

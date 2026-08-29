@@ -32,9 +32,10 @@ Ready/error/goal APNs is gated on **interactive** (desktop/web/vscode) visibilit
 window is focused, those pushes stay off the phone. Blocking question/permission/`pi.ui.asked`
 pushes **always** fan out to APNs so walking away from a still-open Desktop window cannot leave
 a waiting prompt silent. Electron reports lock-screen/sleep as hidden (`openchamber:system-presence`)
-because macOS lock is not a document blur. The Desktop renderer now listens
+because macOS lock is not a document blur. `resume` emits SSE reconnect only;
+presence `visible: true` is `unlock-screen`. The Desktop renderer now listens
 for that event and reports hidden; a 20s visible heartbeat cannot undo lock
-until unlock/resume.
+until unlock-screen.
 
 The phone's own foreground is **not** gated on the server. A backgrounded WKWebView can't reliably
 report "hidden" before iOS suspends it. **iOS** suppresses the foreground banner
