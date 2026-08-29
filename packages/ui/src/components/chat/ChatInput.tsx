@@ -143,6 +143,8 @@ import {
     findMagicPromptCommand,
     parseSlashCommand,
 } from './composer/submit/slashCommands';
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
 import {
     shouldDockComposerForDesktopSlashMenu,
@@ -1238,7 +1240,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (pendingKey) clearPendingComposerTurn(pendingKey);
             else clearPendingComposerTurn();
         };
-        if (!queuedOnly) startPendingTurn(primaryText);
+        const featurePlugins = usePiFeaturePluginsStore.getState();
+        const skipPendingPlanBubble = isLeftoverPlanSlashText(
+            primaryText,
+            featurePlugins.payload,
+            featurePlugins.status,
+        );
+        if (!queuedOnly && !skipPendingPlanBubble) startPendingTurn(primaryText);
 
         // Clear queue and input
         if (capturedTarget && queuedMessageId) {
@@ -1395,7 +1403,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         } catch (error) {
             console.warn('[ChatInput] Failed to expand snippets, sending original text:', error);
         }
-        startPendingTurn(primaryText);
+        if (!skipPendingPlanBubble) startPendingTurn(primaryText);
 
         // Collect all attachments for error recovery
         const allAttachments = [

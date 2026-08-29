@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import {
   isFeaturePluginSlotActive,
+  isLeftoverPlanSlashText,
+  isPlanSlashCommandText,
   parseFeaturePluginSlotActive,
   shouldDispatchFeaturePluginSlash,
 } from './slotStatus';
@@ -51,3 +53,28 @@ describe('shouldDispatchFeaturePluginSlash', () => {
     expect(shouldDispatchFeaturePluginSlash(' PLAN ', payload, 'ready')).toBe(true);
   });
 });
+
+describe('isLeftoverPlanSlashText', () => {
+  test('matches /plan with leading space or a trailing newline', () => {
+    expect(isPlanSlashCommandText('/plan')).toBe(true);
+    expect(isPlanSlashCommandText(' /plan ')).toBe(true);
+    expect(isPlanSlashCommandText('/plan\n')).toBe(true);
+    expect(isPlanSlashCommandText('/plan start')).toBe(true);
+    expect(isPlanSlashCommandText('/not-a-real-cmd')).toBe(false);
+    expect(isPlanSlashCommandText('outline the repo')).toBe(false);
+  });
+
+  test('hides typed /plan while Feature Plugins have not loaded or Plan is on', () => {
+    const payload = emptyFeaturePluginsPayload();
+    payload.slots.plan.installed = true;
+    payload.slots.plan.enabled = true;
+    expect(isLeftoverPlanSlashText('/plan', null, 'idle')).toBe(true);
+    expect(isLeftoverPlanSlashText(' /plan\n', payload, 'ready')).toBe(true);
+  });
+
+  test('keeps typed /plan as chat when the Plan slot is loaded and off', () => {
+    const payload = emptyFeaturePluginsPayload();
+    expect(isLeftoverPlanSlashText('/plan', payload, 'ready')).toBe(false);
+  });
+});
+

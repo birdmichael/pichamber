@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Message, Part } from '@opencode-ai/sdk/v2';
 
 import {
@@ -7,6 +7,11 @@ import {
     isPendingUserMessagePaint,
 } from './hiddenUserMessage';
 import { normalizeUserDisplayParts } from './normalizeUserDisplayParts';
+import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
+import {
+    applyFeaturePluginsPayload,
+    resetPiFeaturePluginsStore,
+} from '@/sync/pi-feature-plugins-store';
 
 const userMessage = (parts: Part[]): { info: Message; parts: Part[] } => ({
     info: { id: 'msg_user', role: 'user', sessionID: 'ses_1', time: { created: 1 } } as Message,
@@ -80,3 +85,41 @@ describe('user message visibility', () => {
         ], { planModeEnabled: false })).toBe(false);
     });
 });
+
+describe('leftover /plan user bubbles', () => {
+    beforeEach(() => {
+        resetPiFeaturePluginsStore();
+    });
+
+    test('hides typed /plan while Feature Plugins have not loaded', () => {
+        const entry = userMessage([{ type: 'text', text: '/plan' } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(true);
+        expect(isPendingUserMessagePaint(entry, { planModeEnabled: false })).toBe(false);
+    });
+
+    test('hides a pasted /plan with whitespace or a trailing newline', () => {
+        const entry = userMessage([{ type: 'text', text: ' /plan \n' } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(true);
+    });
+
+    test('hides /plan when the Plan slot is on', () => {
+        const payload = emptyFeaturePluginsPayload();
+        payload.slots.plan.installed = true;
+        payload.slots.plan.enabled = true;
+        applyFeaturePluginsPayload(payload);
+        const entry = userMessage([{ type: 'text', text: '/plan start' } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(true);
+    });
+
+    test('keeps typed /plan as chat when the Plan slot is loaded and off', () => {
+        applyFeaturePluginsPayload(emptyFeaturePluginsPayload());
+        const entry = userMessage([{ type: 'text', text: '/plan' } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);
+    });
+
+    test('keeps an unknown slash as a normal chat bubble', () => {
+        const entry = userMessage([{ type: 'text', text: '/not-a-real-cmd' } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);
+    });
+});
+

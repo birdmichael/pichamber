@@ -43,3 +43,23 @@ export const shouldDispatchFeaturePluginSlash = (
   if (status !== 'ready') return true;
   return isFeaturePluginSlotActive(payload, slot);
 };
+
+/** First slash token is `plan`, matching ChatInput parseSlashCommand. */
+export const isPlanSlashCommandText = (text: string): boolean => {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith('/')) return false;
+  const name = trimmed.slice(1).trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+  return name === 'plan';
+}
+
+/**
+ * Typed `/plan` that will POST session.command. The kernel still prompts
+ * `/plan` as a user turn; hide that leftover bubble. When the Plan slot is
+ * loaded and off, `/plan` is chat and stays visible.
+ */
+export const isLeftoverPlanSlashText = (
+  text: string,
+  payload: FeaturePluginsPayload | null | undefined,
+  status: FeaturePluginLoadStatus = 'idle',
+): boolean => isPlanSlashCommandText(text) && shouldDispatchFeaturePluginSlash('plan', payload, status)
+
