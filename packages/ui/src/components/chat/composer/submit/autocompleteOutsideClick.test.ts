@@ -28,12 +28,8 @@ class TestElement {
 
     closest(selector: string): TestElement | null {
         if (selector !== `[${COMPOSER_SEND_ATTR}]`) return null;
-        let current: TestElement | null = this;
-        while (current) {
-            if (current.attrs.has(COMPOSER_SEND_ATTR)) return current;
-            current = current.parent;
-        }
-        return null;
+        if (this.attrs.has(COMPOSER_SEND_ATTR)) return this;
+        return this.parent?.closest(selector) ?? null;
     }
 }
 
