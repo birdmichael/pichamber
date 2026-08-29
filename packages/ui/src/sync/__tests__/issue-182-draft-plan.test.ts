@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 const createSessionCalls: Array<string | null | undefined> = []
 const planStarts: Array<{ sessionID: string; action: string }> = []
+const planApplies: Array<{ sessionID: string; status: string }> = []
 const sendMessageCalls: Array<{ id?: string }> = []
 
 mock.module('../pi-session-plan-store', () => ({
@@ -9,7 +10,9 @@ mock.module('../pi-session-plan-store', () => ({
     planStarts.push({ sessionID, action })
     return { status: 'active', planMarkdown: '' }
   }),
-  applySessionPlan: () => undefined,
+  applySessionPlan: (sessionID: string, plan: { status?: string } | null) => {
+    if (plan?.status) planApplies.push({ sessionID, status: plan.status })
+  },
   refreshSessionPlan: async () => null,
   applySessionPlanEvent: () => null,
   resetPiSessionPlanStore: () => undefined,
@@ -58,6 +61,7 @@ describe('issue 182 draft Plan send', () => {
   beforeEach(() => {
     createSessionCalls.length = 0
     planStarts.length = 0
+    planApplies.length = 0
     sendMessageCalls.length = 0
 
     const childStore = {
@@ -139,6 +143,7 @@ describe('issue 182 draft Plan send', () => {
     )
 
     expect(createSessionCalls).toHaveLength(1)
+    expect(planApplies[0]).toEqual({ sessionID: 'ses_issue_182', status: 'active' })
     expect(planStarts).toEqual([{ sessionID: 'ses_issue_182', action: 'start' }])
     expect(sendMessageCalls).toHaveLength(1)
     expect(sendMessageCalls[0]?.id).toBe('ses_issue_182')

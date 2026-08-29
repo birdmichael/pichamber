@@ -47,6 +47,14 @@ export function isSessionGoalVisibleOnPiKernel(isPiKernel: boolean): boolean {
 }
 
 /**
+ * Leftover OpenCode Recap / suggestion stay hidden on the Pi kernel.
+ * They must not appear after a normal or /goal turn on session switch.
+ */
+export function isSessionAssistVisibleOnPiKernel(isPiKernel: boolean): boolean {
+  return !isPiKernel;
+}
+
+/**
  * Provider-quota Usage (`/api/quota/*`) is leftover OpenCode. Pi has no
  * quota source. Session tokens and cache read/write stay elsewhere.
  */

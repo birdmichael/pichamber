@@ -432,8 +432,9 @@ failure is an HTTP error, not an empty `off`.
 `resume` and a missing live `/plan` (reload to attach the command) still
 409 while the session is compacting, streaming, or busy. `start` /
 `exit` / `save` / `implement` with a live `/plan` only prompt — they
-must not 409 on a leftover `isStreaming` or busy flag after a Goal or
-ordinary send already finished. Successful actions emit `pi.plan.updated`.
+must not 409 on a leftover `isStreaming` or busy flag after a Goal,
+shell bind, or ordinary send already finished. Successful actions emit
+`pi.plan.updated`. `start` that leaves status `off` is a 500.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.

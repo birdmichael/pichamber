@@ -17,12 +17,22 @@ const empty: PiSessionPlanState = { plansBySession: {} };
 
 export const usePiSessionPlanStore = create<PiSessionPlanState>(() => empty);
 
+const planRevisionBySession: Record<string, number> = {};
+
+const bumpPlanRevision = (sessionID: string): number => {
+  const next = (planRevisionBySession[sessionID] ?? 0) + 1;
+  planRevisionBySession[sessionID] = next;
+  return next;
+};
+
 export const resetPiSessionPlanStore = (): void => {
   usePiSessionPlanStore.setState(empty);
+  for (const key of Object.keys(planRevisionBySession)) delete planRevisionBySession[key];
 };
 
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
+  bumpPlanRevision(sessionID);
   const previous = usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   usePiSessionPlanStore.setState((state) => ({
     plansBySession: {
@@ -35,7 +45,9 @@ export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): v
 };
 
 export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan | null> => {
+  const startedRevision = planRevisionBySession[sessionID] ?? 0;
   const plan = await fetchSessionPlan(sessionID);
+  if ((planRevisionBySession[sessionID] ?? 0) !== startedRevision) return plan;
   applySessionPlan(sessionID, plan);
   return plan;
 };

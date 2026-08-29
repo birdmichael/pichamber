@@ -65,6 +65,7 @@ import {
 } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { usePlanDetection } from '@/hooks/usePlanDetection';
+import { isSettledAssistantMessage } from '@/hooks/useSessionActivity';
 import { useI18n } from '@/lib/i18n';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -72,6 +73,7 @@ import { USER_BUBBLE_FLEX_ITEM_CLASS } from './message/userBubbleLayout';
 import {
     pendingComposerDraftKey,
     pendingComposerSessionKey,
+    clearPendingComposerTurn,
     usePendingComposerTurn,
 } from '@/sync/pending-composer-turn';
 import { WorkStatusPanel } from './work-status/WorkStatusPanel';
@@ -746,6 +748,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         }
 
         const lastMessage = sessionMessages[sessionMessages.length - 1]?.info as Message | undefined;
+        if (isSettledAssistantMessage(lastMessage)) {
+            return false;
+        }
         return Boolean(
             lastMessage
             && lastMessage.role === 'assistant'
@@ -831,6 +836,13 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             || (Boolean(currentSessionId) && pendingComposerTurn.key.startsWith('draft:'))
         ),
     );
+    React.useEffect(() => {
+        if (!currentSessionId || sessionMessages.length === 0) return;
+        clearPendingComposerTurn(pendingComposerSessionKey(currentSessionId));
+        if (pendingComposerTurn?.key.startsWith('draft:')) {
+            clearPendingComposerTurn(pendingComposerTurn.key);
+        }
+    }, [currentSessionId, pendingComposerTurn?.key, sessionMessages.length]);
     const isManagedChatContext = draftOpen
         ? newSessionDraft?.target === 'chat'
         : isChatDirectoryPath(effectiveSessionDirectory);

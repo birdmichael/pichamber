@@ -110,6 +110,7 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveOpenedDraftPlanSelected,
 } from "./pi-session-plan"
+import { applySessionPlan } from "./pi-session-plan-store"
 import { usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
 
 export type { AttachedFile }
@@ -1499,6 +1500,10 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
       markPendingUserSendAnimation(createdDraftSession.sessionId)
 
+      if (draft.planSelected === true) {
+        applySessionPlan(createdDraftSession.sessionId, { status: "active", planMarkdown: "" })
+      }
+
       const files = attachments?.map((a) => ({
         type: "file" as const,
         mime: a.mimeType,
@@ -1533,6 +1538,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
               },
             })
           } catch (error) {
+            applySessionPlan(createdDraftSession.sessionId, { status: "off", planMarkdown: "" })
             console.warn("[session-ui-store] draft plan start failed after send", error)
           }
         },

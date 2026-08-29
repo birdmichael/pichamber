@@ -2476,5 +2476,27 @@ describe('session plan status and actions', () => {
     });
     host.dispose();
   });
+
+  it('starts Plan on a leftover busy flag after shell bind', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover busy' });
+    record.status = { type: 'busy' };
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).resolves.toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(prompted).toEqual(['/plan start']);
+    host.dispose();
+  });
 });
 

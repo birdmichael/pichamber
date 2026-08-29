@@ -3904,7 +3904,7 @@ export const createPiHost = ({
       await refreshRecordCommands(record);
       // Compaction and resume still need a quiet session (reload). Start/exit
       // with a live `/plan` only prompt; do not 409 on a stale isStreaming or
-      // leftover busy after Goal/ordinary send already finished.
+      // leftover busy after Goal, shell bind, or an ordinary send already finished.
       const needsReloadGate = Boolean(record.piSession?.isCompacting)
         || action === 'resume'
         || !findLiveSessionCommand(record.piSession, 'plan');

@@ -203,6 +203,7 @@ export const createSessionAssistRuntime = ({
   };
 
   const generateAssist = async (sessionId, directory) => {
+    if (typeof isPiKernelEnabled === 'function' ? isPiKernelEnabled() : Boolean(isPiKernelEnabled)) return;
     const targets = getSessionAssistTargets();
     if (!targets.recap && !targets.suggestion) return;
     const session = await openCodeFetch(`/session/${encodeURIComponent(sessionId)}`, { directory })
@@ -376,6 +377,7 @@ export const createSessionAssistRuntime = ({
 
   const processPayload = (payload, directoryHint = '') => {
     if (stopped) return;
+    if (typeof isPiKernelEnabled === 'function' ? isPiKernelEnabled() : Boolean(isPiKernelEnabled)) return;
     const status = extractSessionStatus(payload);
     if (status) {
       if (status.type === 'idle') {

@@ -119,6 +119,18 @@ function areJsonEquivalent(left: unknown, right: unknown): boolean {
   }
 }
 
+export function preserveFrozenAssistantCompletion<T extends Message>(existing: T | undefined, next: T): T {
+  if (next.role !== "assistant" || !existing || existing.role !== "assistant") return next
+  const frozen = (existing.time as { completed?: number } | undefined)?.completed
+  const incoming = (next.time as { completed?: number } | undefined)?.completed
+  if (typeof frozen !== "number" || frozen <= 0) return next
+  if (typeof incoming === "number" && incoming > 0 && incoming <= frozen) return next
+  return {
+    ...next,
+    time: { ...(next.time as object), completed: frozen },
+  } as T
+}
+
 function areMessageUpdateFieldsEqual(existing: Message, next: Message): boolean {
   if (existing.role !== next.role) return false
   if ((existing as { finish?: unknown }).finish !== (next as { finish?: unknown }).finish) return false
@@ -375,17 +387,18 @@ export function applyDirectoryEvent(
       if (messageIndex >= 0) {
         // Skip message replacement if unchanged — preserves reference, avoids re-render
         const existing = messages[messageIndex]
-        const unchanged = areMessageUpdateFieldsEqual(existing, info)
+        const nextInfo = preserveFrozenAssistantCompletion(existing, info)
+        const unchanged = areMessageUpdateFieldsEqual(existing, nextInfo)
         if (unchanged) {
           syncDebug.reducer.messageUpdatedUnchanged(info.sessionID, info.id, info.role, (info as { finish?: unknown }).finish, (info.time as { completed?: number })?.completed)
           return false
         }
         const next = [...messages]
-        if (compareMessagesChronologically(existing, info) === 0) {
-          next[messageIndex] = info
+        if (compareMessagesChronologically(existing, nextInfo) === 0) {
+          next[messageIndex] = nextInfo
         } else {
           next.splice(messageIndex, 1)
-          insertMessageChronologically(next, info)
+          insertMessageChronologically(next, nextInfo)
         }
         draft.message[info.sessionID] = next
       } else {
