@@ -2498,5 +2498,22 @@ describe('session plan status and actions', () => {
     expect(prompted).toEqual(['/plan start']);
     host.dispose();
   });
+
+  it('keeps Plan active when leftover streaming throws from /plan start', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover stream' });
+    record.piSession.prompt = async () => {
+      throw new Error('Already streaming; use steer or followUp');
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).resolves.toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    host.dispose();
+  });
 });
 

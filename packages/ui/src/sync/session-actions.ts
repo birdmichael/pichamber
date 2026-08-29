@@ -42,6 +42,7 @@ import { normalizePath } from "@/lib/pathNormalization"
 import { mergeMessages } from "./optimistic"
 import { messagesBefore, messagesFrom } from "./message-ordering"
 import { deleteChatDirectory } from "@/lib/chatDirectories"
+import { adoptDraftPlanForSession } from "./pi-session-plan-store"
 
 const MESSAGE_REFETCH_LIMIT = 100
 const SEND_CONFIRMATION_REFETCH_LIMIT = 30
@@ -758,6 +759,13 @@ export async function createSession(
     // can be routed to the correct child store
     if (sessionDirectory) {
       registerSessionDirectory(session.id, sessionDirectory)
+    }
+    const draft = useSessionUIStore.getState().newSessionDraft
+    // Activate-path only: Goal mint uses activate:false and must not inherit
+    // draft Plan. Adopt before setCurrentSession closes the draft so chrome
+    // never sees sessionID + draft gone + plan off.
+    if (options?.activate !== false && draft?.open && draft.planSelected === true) {
+      adoptDraftPlanForSession(session.id)
     }
     if (options?.activate !== false) {
       useSessionUIStore.getState().setCurrentSession(session.id, sessionDirectory)

@@ -138,13 +138,14 @@ export const resolveFooterPlanSelected = (input: {
   sessionID?: string | null;
   draftOpen?: boolean;
   draftPlanSelected?: boolean;
+  pendingDraftPlan?: boolean;
 }): boolean => {
   if (!input.available) return false;
   if (isFooterPlanSelected(input.status)) return true;
   // Keep the Desktop Agent/Plan chip on Plan from the draft pick through
-  // first-send materialize. A session id arriving must not drop that intent
-  // before `/plan start` is authoritative.
-  return Boolean(input.draftPlanSelected);
+  // first-send materialize. createSession closes the draft before `/plan start`
+  // is authoritative, so pending first-send Plan must also keep the chip.
+  return Boolean(input.draftPlanSelected || input.pendingDraftPlan);
 };
 
 /** Composer Plan row: draft hint until send, then the enabled notify. */
@@ -178,9 +179,10 @@ export const resolveOpenedDraftPlanSelected = (
 
 export const shouldStartPlanAfterDraftMaterialize = (
   draftPlanSelected?: boolean,
-  status?: SessionPlanStatus | null,
 ): boolean => (
-  draftPlanSelected === true && !isFooterPlanSelected(status)
+  // Optimistic `active` from adopt/createSession is not `/plan start`.
+  // Always start when the draft asked for Plan; the host start is idempotent.
+  draftPlanSelected === true
 );
 
 export const applyPlanToggleSelect = async (input: {
@@ -214,7 +216,7 @@ export const applyDraftPlanStartAfterMaterialize = async (input: {
   currentStatus?: SessionPlanStatus | null;
   startPlan: (sessionID: string) => Promise<SessionPlan | null>;
 }): Promise<'skipped' | 'started'> => {
-  if (!shouldStartPlanAfterDraftMaterialize(input.draftPlanSelected, input.currentStatus)) {
+  if (!shouldStartPlanAfterDraftMaterialize(input.draftPlanSelected)) {
     return 'skipped';
   }
   const next = await input.startPlan(input.sessionID);

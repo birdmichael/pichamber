@@ -17,6 +17,7 @@ mock.module('@/lib/runtime-fetch', () => ({
 }));
 
 const {
+  adoptDraftPlanForSession,
   applySessionPlan,
   refreshSessionPlan,
   resetPiSessionPlanStore,
@@ -42,6 +43,14 @@ describe('pi session plan store', () => {
 
   test('does not let a later GET off overwrite optimistic Plan after apply', async () => {
     applySessionPlan('ses_plan', { status: 'active', planMarkdown: '' });
+    const refresh = refreshSessionPlan('ses_plan');
+    pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
+    await refresh;
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('active');
+  });
+
+  test('does not let GET off overwrite pending first-send Plan', async () => {
+    adoptDraftPlanForSession('ses_plan');
     const refresh = refreshSessionPlan('ses_plan');
     pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
     await refresh;

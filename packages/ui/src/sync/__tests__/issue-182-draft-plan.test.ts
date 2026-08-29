@@ -13,14 +13,21 @@ mock.module('../pi-session-plan-store', () => ({
   applySessionPlan: (sessionID: string, plan: { status?: string } | null) => {
     if (plan?.status) planApplies.push({ sessionID, status: plan.status })
   },
+  adoptDraftPlanForSession: (sessionID: string) => {
+    planApplies.push({ sessionID, status: 'active' })
+  },
+  markPendingDraftPlan: () => undefined,
+  clearPendingDraftPlan: () => undefined,
+  isPendingDraftPlan: () => false,
   refreshSessionPlan: async () => null,
   applySessionPlanEvent: () => null,
   resetPiSessionPlanStore: () => undefined,
   usePiSessionPlanStore: {
-    getState: () => ({ plansBySession: {} }),
+    getState: () => ({ plansBySession: {}, pendingDraftPlanBySession: {} }),
     setState: () => undefined,
   },
   useSessionPlan: () => null,
+  usePendingDraftPlan: () => false,
 }))
 
 const { opencodeClient } = await import('@/lib/opencode/client')

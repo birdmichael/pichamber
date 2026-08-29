@@ -105,9 +105,13 @@ back. A later New session starts on Agent. The Desktop chip stays on Plan after
 first-send materialize until `/plan start` is authoritative; a later
 `GET /plan` `off` must not revert it. An already-open session still shows its
 own stored Agent or Plan.
-Send uses the same Agent materialize path, then `/plan start` on that new
-session if Plan is not already on, then the prompt. An already-open session
-still runs `/plan start` / save / exit on that same session. If an auto-draft welcome cleared `currentSessionId` while `?session=` or last-active still names a chat, Agent→Plan still `/plan start` on that id instead of storing local draft Plan intent. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
+Send uses the same Agent materialize path. `createSession` adopts draft Plan
+onto that session before the draft closes, then `/plan start` runs before the
+prompt. Optimistic `active` does not skip that start. An already-open session
+still runs `/plan start` / save / exit on that same session. If an auto-draft
+welcome cleared `currentSessionId` while `?session=` or last-active still names
+a chat, Agent→Plan still `/plan start` on that id instead of storing local
+draft Plan intent. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
 and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
 does not host those controls; they appear after expand). The left cluster
 class `composer-mobile-actions` still clamps attach / Goal to a 24px icon

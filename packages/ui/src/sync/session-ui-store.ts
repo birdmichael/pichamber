@@ -110,7 +110,7 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveOpenedDraftPlanSelected,
 } from "./pi-session-plan"
-import { applySessionPlan } from "./pi-session-plan-store"
+import { adoptDraftPlanForSession } from "./pi-session-plan-store"
 import { usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
 
 export type { AttachedFile }
@@ -1501,7 +1501,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       markPendingUserSendAnimation(createdDraftSession.sessionId)
 
       if (draft.planSelected === true) {
-        applySessionPlan(createdDraftSession.sessionId, { status: "active", planMarkdown: "" })
+        adoptDraftPlanForSession(createdDraftSession.sessionId)
       }
 
       const files = attachments?.map((a) => ({
@@ -1538,7 +1538,8 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
               },
             })
           } catch (error) {
-            applySessionPlan(createdDraftSession.sessionId, { status: "off", planMarkdown: "" })
+            // Keep adopted / pending Plan chrome. Writing off here flips the
+            // Desktop chip to Agent and lets the prompt go as a normal turn.
             console.warn("[session-ui-store] draft plan start failed after send", error)
           }
         },
@@ -1650,9 +1651,13 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     try {
       const dir = directoryOverride ?? opencodeClient.getDirectory()
+      const planSelected = draft.planSelected === true
       const session = await createSessionAction(title, dir, parentID ?? null, metadata, options)
       if (!session) return null
 
+      if (planSelected && options?.activate !== false) {
+        adoptDraftPlanForSession(session.id)
+      }
       if (options?.activate !== false) {
         get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
       }
