@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-08-30
+
 - **Mobile:** when an agent asks a question, the phone is notified even if Desktop is still open. Tapping the notification opens that chat on the waiting card. On iPhone, Confirm prompts unlock the phone and open the app to answer. Locking the Mac no longer hides waiting-question or finished-session alerts. Settings → Notifications explains that a waiting prompt still reaches the phone while Desktop is focused. The default question banner uses the session name, not the prompt text.
 - Chat: a waiting Input needed card is one live card, not a greyed transcript copy plus a dock duplicate. Enter while that card is open says to submit or dismiss it, and Submit stays disabled until you pick an option. The busy line stays visible and says “asking a question.” A late Plan menu does not stack on an earlier confirm.
 - Chat: text typed in the composer stays on that session. Switching chats or opening New session no longer copies the previous draft into the other composer.
