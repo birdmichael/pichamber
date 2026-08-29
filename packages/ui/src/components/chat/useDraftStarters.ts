@@ -114,7 +114,7 @@ export function useDraftStarters(): UseDraftStartersResult {
             if (builtin) {
                 return { id: chipId(group, ref), ref, group, label: t(builtin.labelKey), icon: builtin.icon, submitText: builtin.command };
             }
-            if (!commandNames.has(ref.name)) return null;
+            if (!commandNames.has(ref.name) || !shouldOfferLiveCommandAsStarter(ref.name)) return null;
             return { id: chipId(group, ref), ref, group, label: normalizeStarterLabel(ref.name), icon: COMMAND_FALLBACK_ICON, submitText: `/${ref.name}` };
         }
         if (!skillNames.has(ref.name)) return null;

@@ -1260,6 +1260,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             clearQueue(capturedTarget);
         }
         if (!queuedOnly) {
+            messageRef.current = '';
             setMessage('');
             confirmedMentionsRef.current.clear();
             // Clear per-session draft on submit
