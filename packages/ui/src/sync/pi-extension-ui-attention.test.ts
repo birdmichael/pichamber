@@ -8,6 +8,7 @@ const pending = (id: string, sessionID: string, kind: PiExtensionUiPrompt['kind'
   sessionID,
   kind,
   title: 'Should we continue?',
+  multiple: false,
   status: 'pending',
 });
 

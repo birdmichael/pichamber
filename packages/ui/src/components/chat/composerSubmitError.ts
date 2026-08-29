@@ -1,4 +1,4 @@
-export type ComposerSubmitErrorKind = 'runtime-changed' | 'unknown-command' | 'command-failed' | 'raw';
+type ComposerSubmitErrorKind = 'runtime-changed' | 'unknown-command' | 'command-failed' | 'raw';
 
 export const classifyComposerSubmitError = (error: unknown): {
   kind: ComposerSubmitErrorKind;
