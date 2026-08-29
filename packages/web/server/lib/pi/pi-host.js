@@ -132,8 +132,10 @@ import {
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
   listNestedSessionRuns,
+  preferSubagentTitle,
   readSessionCwdFromSessionFile,
   readSessionIdFromSessionFile,
+  readSessionTitleFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
 } from './subagent-runs.js';
@@ -2577,9 +2579,11 @@ export const createPiHost = ({
       info: createSessionInfo({
         id: resolvedId,
         directory: cwd,
-        title: title
-          || (typeof manager?.getSessionName === 'function' && manager.getSessionName())
-          || 'Subagent',
+        title: preferSubagentTitle(
+          typeof manager?.getSessionName === 'function' ? manager.getSessionName() : '',
+          title,
+          'Subagent',
+        ),
         parentID: listedParentID,
         metadata: {
           ...(persistedMetadata || {}),
@@ -2702,7 +2706,7 @@ export const createPiHost = ({
         role: existing?.role || existing?.name || 'subagent',
         mode: existing?.mode || 'background',
         state: existing?.state || (record.status?.type === 'busy' ? 'running' : 'done'),
-        title: existing?.title || record.info?.title || existing?.name || 'subagent',
+        title: preferSubagentTitle(record.info?.title, existing?.title, existing?.name),
         toolCallId: existing?.toolCallId || null,
         asyncDir: existing?.asyncDir || null,
         startedAt: existing?.startedAt || record.info?.time?.created || null,
@@ -2777,7 +2781,11 @@ export const createPiHost = ({
           sessionID: run.sessionID || undefined,
           directory: run.directory || parent.directory,
           parentID: parent.id,
-          title: run.title || run.name,
+          title: preferSubagentTitle(
+            readSessionTitleFromSessionFile(run.sessionFile),
+            run.title,
+            run.name,
+          ),
           metadata: extraMetadata,
         });
         record.subagentRun = run;
@@ -2795,7 +2803,12 @@ export const createPiHost = ({
               : { sessionID: record.id },
           });
         }
-        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
+        return {
+          ...run,
+          sessionID: record.id,
+          directory: record.directory || run.directory || null,
+          title: preferSubagentTitle(record.info?.title, run.title, run.name),
+        };
       }
       // A completed adapter can leave a stale sessionFile after its temporary
       // child workspace has been cleaned up. Fall back to the child id without

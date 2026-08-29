@@ -55,17 +55,22 @@ import { isTerminalEventTarget } from '@/lib/terminalFocus';
 const CONTEXT_PANEL_MIN_WIDTH = 380;
 const CONTEXT_PANEL_MAX_WIDTH = 1400;
 const CONTEXT_PANEL_DEFAULT_WIDTH = 600;
+const CHAT_COLUMN_MIN_WIDTH = 280;
 const RESIZE_FOLLOW_INTERVAL_MS = 100;
 const CONTEXT_TAB_LABEL_MAX_CHARS = 24;
 type TranslateFn = ReturnType<typeof useI18n>['t'];
 const EMPTY_SESSION_TITLE_MAP = new Map<string, string>();
 
-const clampWidth = (width: number): number => {
+const clampWidth = (width: number, availableWidth?: number | null): number => {
   if (!Number.isFinite(width)) {
     return CONTEXT_PANEL_DEFAULT_WIDTH;
   }
 
-  return Math.min(CONTEXT_PANEL_MAX_WIDTH, Math.max(CONTEXT_PANEL_MIN_WIDTH, Math.round(width)));
+  const maxForChat = availableWidth && availableWidth > 0
+    ? Math.max(200, availableWidth - CHAT_COLUMN_MIN_WIDTH)
+    : CONTEXT_PANEL_MAX_WIDTH;
+  const minWidth = Math.min(CONTEXT_PANEL_MIN_WIDTH, maxForChat);
+  return Math.min(CONTEXT_PANEL_MAX_WIDTH, maxForChat, Math.max(minWidth, Math.round(width)));
 };
 
 const getAvailablePanelWidth = (panel: HTMLElement | null): number | null => {
@@ -458,7 +463,7 @@ export const ContextPanel: React.FC = () => {
   const widthFraction = activeModeForWidth ? getContextSurfaceWidthFraction(activeModeForWidth) : 0.5;
   const widthFallbackBase = availablePanelAreaWidth
     ?? (typeof window !== 'undefined' ? window.innerWidth : CONTEXT_PANEL_DEFAULT_WIDTH * 2);
-  const width = clampWidth(manualWidth ?? Math.round(widthFraction * widthFallbackBase));
+  const width = clampWidth(manualWidth ?? Math.round(widthFraction * widthFallbackBase), availablePanelAreaWidth);
   const chatSessionIDs = React.useMemo(() => {
     const ids: string[] = [];
     for (const tab of tabs) {
@@ -538,9 +543,8 @@ export const ContextPanel: React.FC = () => {
   }, []);
 
   const clampWidthForDrag = React.useCallback((nextWidth: number) => {
-    const clamped = clampWidth(nextWidth);
     const available = resizeAvailableWidthRef.current;
-    return available === null ? clamped : Math.min(clamped, Math.max(1, available));
+    return clampWidth(nextWidth, available);
   }, []);
 
   const handleResizeStart = React.useCallback((event: React.PointerEvent) => {

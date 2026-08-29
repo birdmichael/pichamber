@@ -3205,6 +3205,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.action.openGit': 'Git 패널 열기',
   'chat.workStatus.action.openPr': '풀 리퀘스트 열기',
   'chat.workStatus.action.openSubagent': '{name} 열기',
+  'chat.workStatus.action.open': '열기',
+  'chat.workStatus.subagent.unopenableTooltip': '열 세션이 없습니다',
   'chat.workStatus.section.usage': '사용량',
   'chat.workStatus.goal.open': '목표 관리',
   'chat.workStatus.goal.pause': '일시정지',

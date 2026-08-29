@@ -1444,6 +1444,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 		<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
 		<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col h-full bg-background">
 			{returnToParentButton}
+			{returnToParentButton ? <div className="h-11 shrink-0" aria-hidden /> : null}
 			<ChatViewport
 				currentSessionId={currentSessionId}
                 currentSessionKey={currentSessionKey ?? currentSessionId}

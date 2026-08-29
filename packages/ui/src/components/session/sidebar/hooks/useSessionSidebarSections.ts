@@ -5,6 +5,7 @@ import { dedupeSessionsById, normalizePath } from '../utils';
 import type { WorktreeMetadata } from '@/types/worktree';
 import type { SessionFoldersMap } from '@/stores/useSessionFoldersStore';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
+import { countMatchingSessionNodes } from '../sessionSearch';
 
 type ProjectItem = {
   id: string;
@@ -53,6 +54,7 @@ type Args = {
   hasSessionSearchQuery: boolean;
   normalizedSessionSearchQuery: string;
   filterSessionNodesForSearch: (nodes: SessionNode[], query: string) => SessionNode[];
+  buildSessionSearchText: (session: Session) => string;
   buildGroupSearchText: (group: SessionGroup) => string;
   foldersMap: SessionFoldersMap;
 };
@@ -70,6 +72,7 @@ export const useSessionSidebarSections = (args: Args) => {
     hasSessionSearchQuery,
     normalizedSessionSearchQuery,
     filterSessionNodesForSearch,
+    buildSessionSearchText,
     buildGroupSearchText,
     foldersMap,
   } = args;
@@ -155,12 +158,14 @@ export const useSessionSidebarSections = (args: Args) => {
       return result;
     }
 
-    const countNodes = (nodes: SessionNode[]): number => nodes.reduce((total, node) => total + 1 + countNodes(node.children), 0);
-
     visibleProjectSections.forEach((section) => {
       section.groups.forEach((group) => {
         const filteredNodes = filterSessionNodesForSearch(group.sessions, normalizedSessionSearchQuery);
-        const matchedSessionCount = countNodes(filteredNodes);
+        const matchedSessionCount = countMatchingSessionNodes(
+          filteredNodes,
+          normalizedSessionSearchQuery,
+          buildSessionSearchText,
+        );
         const groupMatches = buildGroupSearchText(group).includes(normalizedSessionSearchQuery);
         const scopeKey = normalizePath(group.directory ?? null);
         const scopeFolders = scopeKey ? (foldersMap[scopeKey] ?? []) : [];
@@ -181,6 +186,7 @@ export const useSessionSidebarSections = (args: Args) => {
     hasSessionSearchQuery,
     visibleProjectSections,
     filterSessionNodesForSearch,
+    buildSessionSearchText,
     normalizedSessionSearchQuery,
     buildGroupSearchText,
     foldersMap,

@@ -237,8 +237,9 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         pointerEvents: interactive ? undefined : 'none',
       }}
     >
-      {/* Overlaid rather than placed in flow: the panel has no header of its
-          own, and giving it one would cost a row of height on every session. */}
+      <div className="flex h-7 shrink-0 items-center px-3 pr-8">
+        <h2 className="text-xs font-normal text-muted-foreground">{t('chat.workStatus.ariaLabel')}</h2>
+      </div>
       <button
         type="button"
         aria-label={t('chat.workStatus.sections.open')}

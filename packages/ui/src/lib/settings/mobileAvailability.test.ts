@@ -76,7 +76,6 @@ const PI_MOBILE_MUST_INCLUDE: readonly SettingsPageSlug[] = [
 const PI_MOBILE_MUST_EXCLUDE: readonly SettingsPageSlug[] = [
   'usage',
   'plugins',
-  'agents',
   'shortcuts',
   'remote-instances',
   'tunnel',
@@ -121,7 +120,7 @@ describe('mobile settings availability', () => {
     expect(desktop).toContain('tunnel');
     expect(desktop).not.toContain('usage');
     expect(desktop).not.toContain('plugins');
-    expect(desktop).not.toContain('agents');
+    expect(desktop).toContain('agents');
     expect(desktop).not.toContain('about');
 
     expect(mobile).toContain('about');
@@ -144,13 +143,13 @@ describe('mobile settings availability', () => {
     expect(listVisibleSettingsPageSlugs(mobilePiCapacitor)).not.toContain('about');
   });
 
-  test('OpenCode Settings keep leftover Agents; Pi hides it on Desktop and mobile', () => {
+  test('Pi Settings keep a visible Agents page for the read-only model UI', () => {
     expect(listVisibleSettingsPageSlugs(desktopOpenCode)).toContain('agents');
     expect(listVisibleSettingsPageSlugs(mobileOpenCode)).toContain('agents');
-    expect(listVisibleSettingsPageSlugs(desktopPi)).not.toContain('agents');
-    expect(listVisibleSettingsPageSlugs(mobilePi)).not.toContain('agents');
+    expect(listVisibleSettingsPageSlugs(desktopPi)).toContain('agents');
+    expect(listVisibleSettingsPageSlugs(mobilePi)).toContain('agents');
     expect(searchPages(desktopOpenCode, 'agents')).toContain('agents');
-    expect(searchPages(desktopPi, 'agents')).not.toContain('agents');
+    expect(searchPages(desktopPi, 'agents')).toContain('agents');
   });
 
   test('OpenCode mobile keeps Usage and Plugins and hides Pi-only pages', () => {
@@ -196,7 +195,7 @@ describe('mobile settings availability', () => {
 
     expect(searchPages(mobilePi, 'usage', visible)).not.toContain('usage');
     expect(searchPages(mobilePi, 'plugins', visible)).not.toContain('plugins');
-    expect(searchPages(mobilePi, 'agents', visible)).not.toContain('agents');
+    expect(searchPages(mobilePi, 'agents', visible)).toContain('agents');
     expect(searchPages(mobilePi, 'shortcuts', visible)).not.toContain('shortcuts');
     expect(searchPages(mobilePi, 'remote', visible)).not.toContain('remote-instances');
     expect(searchPages(mobilePi, 'tunnel', visible)).not.toContain('tunnel');

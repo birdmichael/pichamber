@@ -76,6 +76,42 @@ export const readSessionIdFromSessionFile = (filePath) => readSessionHeaderFromS
 
 export const readSessionCwdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).cwd;
 
+export const preferSubagentTitle = (...candidates) => {
+  for (const value of candidates) {
+    const title = asTrimmedString(value);
+    if (title && title !== 'subagent') return title;
+  }
+  return 'subagent';
+};
+
+/** Prefer session_info.name over a run-folder basename like scout/scout_b. */
+export const readSessionTitleFromSessionFile = (filePath) => {
+  const file = asTrimmedString(filePath);
+  if (!file || !fs.existsSync(file)) return '';
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const buffer = Buffer.alloc(16 * 1024);
+      const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+      const text = buffer.slice(0, bytes).toString('utf8');
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (asTrimmedString(parsed?.type) === 'session_info' && asTrimmedString(parsed?.name)) {
+            return asTrimmedString(parsed.name);
+          }
+        } catch {
+        }
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+  }
+  return '';
+};
+
 const sessionPathStem = (value) => {
   const name = path.basename(asTrimmedString(value));
   return name.endsWith('.jsonl') ? name.slice(0, -'.jsonl'.length) : name;
@@ -501,7 +537,7 @@ export const listNestedSessionRuns = ({
         role: name,
         mode: 'background',
         state: 'done',
-        title: name,
+        title: preferSubagentTitle(readSessionTitleFromSessionFile(file), name),
         toolCallId: null,
         asyncDir: null,
         startedAt,

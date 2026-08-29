@@ -3205,6 +3205,8 @@ export const dict = {
   'chat.workStatus.action.openGit': 'Open Git panel',
   'chat.workStatus.action.openPr': 'Open pull request',
   'chat.workStatus.action.openSubagent': 'Open {name}',
+  'chat.workStatus.action.open': 'Open',
+  'chat.workStatus.subagent.unopenableTooltip': 'No session to open',
   'chat.workStatus.section.usage': 'Usage',
   'chat.workStatus.goal.open': 'Manage goal',
   'chat.workStatus.goal.pause': 'Pause',

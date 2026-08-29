@@ -3205,6 +3205,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.action.openGit': 'Git パネルを開く',
   'chat.workStatus.action.openPr': 'プルリクエストを開く',
   'chat.workStatus.action.openSubagent': '{name} を開く',
+  'chat.workStatus.action.open': '開く',
+  'chat.workStatus.subagent.unopenableTooltip': '開くセッションがありません',
   'chat.workStatus.section.usage': '使用量',
   'chat.workStatus.goal.open': '目標を管理',
   'chat.workStatus.goal.pause': '一時停止',

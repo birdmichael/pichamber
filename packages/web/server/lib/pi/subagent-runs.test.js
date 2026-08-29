@@ -19,9 +19,11 @@ import {
   normalizeSubagentRunState,
   parentSessionMatches,
   listGitWorktreePaths,
+  preferSubagentTitle,
   readSessionCwdFromSessionFile,
   readSessionFileFromText,
   readSessionIdFromSessionFile,
+  readSessionTitleFromSessionFile,
   readWorkflowScriptHints,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
@@ -392,6 +394,34 @@ describe('child-session directory plumbing', () => {
       directory: childDir,
       openable: true,
     });
+  });
+
+  it('prefers session_info name over the run-folder basename', () => {
+    const sessionDir = makeTemp('pi-nested-titles-');
+    const parentID = 'parent-title';
+    const childFile = path.join(sessionDir, parentID, 'scout', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, [
+      JSON.stringify({ type: 'session', id: 'child-wt', cwd: '/repo-wt' }),
+      JSON.stringify({ type: 'session_info', name: 'scout-wt' }),
+    ].join('\n'));
+    const siblingFile = path.join(sessionDir, parentID, 'scout_b', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(siblingFile), { recursive: true });
+    fs.writeFileSync(siblingFile, [
+      JSON.stringify({ type: 'session', id: 'child-b', cwd: '/repo-b' }),
+      JSON.stringify({ type: 'session_info', name: 'scout-b' }),
+    ].join('\n'));
+
+    expect(readSessionTitleFromSessionFile(childFile)).toBe('scout-wt');
+    expect(preferSubagentTitle(readSessionTitleFromSessionFile(childFile), 'scout')).toBe('scout-wt');
+    const runs = listNestedSessionRuns({
+      parent: { id: parentID },
+      sessionDir,
+    });
+    const titles = runs.map((run) => toPublicSubagentRun(run).title).sort();
+    expect(titles).toEqual(['scout-b', 'scout-wt']);
+    expect(titles).not.toContain('scout');
+    expect(titles).not.toContain('scout_b');
   });
 });
 

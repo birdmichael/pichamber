@@ -57,6 +57,21 @@ describe('useUIStore context panel tabs', () => {
     expect(byDirectory[directory]?.isOpen).toBe(true);
     expect(byDirectory[directory]?.activeTabId).toBe('chat:session:child-b');
   });
+
+  test('opening a worktree child focuses the parent-scoped chat tab', () => {
+    useUIStore.getState().openContextPanelTab('/repo', { mode: 'file', targetPath: '/repo/a.ts' });
+    useUIStore.getState().openContextPanelTab('/repo-worktree', {
+      mode: 'chat',
+      dedupeKey: 'session:child-b',
+      label: 'scout-b',
+      sessionScope: 'session:parent-a',
+    });
+
+    const scope = useUIStore.getState().contextPanelByDirectory['session:parent-a'];
+    expect(scope?.tabs.map((tab) => tab.id)).toEqual(['chat:session:child-b']);
+    expect(scope?.activeTabId).toBe('chat:session:child-b');
+    expect(scope?.isOpen).toBe(true);
+  });
 });
 
 describe('useUIStore openContextSurface', () => {

@@ -3205,6 +3205,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.action.openGit': '開啟 Git 面板',
   'chat.workStatus.action.openPr': '開啟提取請求',
   'chat.workStatus.action.openSubagent': '開啟 {name}',
+  'chat.workStatus.action.open': '開啟',
+  'chat.workStatus.subagent.unopenableTooltip': '還沒有可開啟的工作階段',
   'chat.workStatus.section.usage': '用量',
   'chat.workStatus.goal.open': '管理目標',
   'chat.workStatus.goal.pause': '暫停',

@@ -146,7 +146,11 @@ export function mergeContextPanelChatScope<T extends BrowserScopedTab>(
     touchedAt: chatState?.touchedAt ?? Date.now(),
   };
 
-  const requestedActiveTabId = sessionState?.activeTabId ?? null;
+  const sessionTouched = sessionState?.touchedAt ?? 0;
+  const chatTouched = chatState?.touchedAt ?? 0;
+  const requestedActiveTabId = chatTouched >= sessionTouched
+    ? (chatState?.activeTabId ?? sessionState?.activeTabId ?? null)
+    : (sessionState?.activeTabId ?? chatState?.activeTabId ?? null);
   const activeTabId = requestedActiveTabId && tabs.some((tab) => tab.id === requestedActiveTabId)
     ? requestedActiveTabId
     : (chatTabs[chatTabs.length - 1]?.id ?? sessionState?.activeTabId ?? tabs[tabs.length - 1]?.id ?? null);
