@@ -242,13 +242,30 @@ export const usePiExtensionUiPrompts = (sessionID: string | null | undefined): P
   usePiExtensionUiStore((state) => (sessionID ? state.promptsBySession[sessionID] ?? empty : empty))
 );
 
+export const countPendingPiExtensionUiPrompts = (
+  promptsBySession: Record<string, PiExtensionUiPrompt[] | undefined>,
+  sessionIds: readonly string[],
+): number => {
+  let count = 0;
+  for (const sessionID of sessionIds) {
+    for (const prompt of promptsBySession[sessionID] ?? empty) {
+      if (prompt.status === 'pending' && isBlockingPiExtensionUiKind(prompt.kind)) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+};
+
 export const useHasPendingPiExtensionUiPrompt = (sessionID: string | null | undefined): boolean => (
   usePiExtensionUiStore((state) => {
     if (!sessionID) return false;
-    return (state.promptsBySession[sessionID] ?? empty).some((prompt) => (
-      prompt.status === 'pending' && isBlockingPiExtensionUiKind(prompt.kind)
-    ));
+    return countPendingPiExtensionUiPrompts(state.promptsBySession, [sessionID]) > 0;
   })
+);
+
+export const usePendingPiExtensionUiPromptCount = (sessionIds: readonly string[]): number => (
+  usePiExtensionUiStore((state) => countPendingPiExtensionUiPrompts(state.promptsBySession, sessionIds))
 );
 
 /** Bottom-dock cards: pending select/input/editor that are not bound to a question-tool turn. */

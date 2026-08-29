@@ -34,7 +34,9 @@ Use this doc when you ask an agent to change tool/header/description behavior.
     answers stay on the asking turn (`User selected` / `User wrote` /
     `User cancelled`, plus `{ question, options }` input and
     `details.answer`). `questionToolItems.ts` owns materialization and
-    prompt matching.
+    prompt matching. Binding prefers live directory `state.part` when the
+    rendered message snapshot still lacks the running question tool, so the
+    dock does not duplicate the in-turn card.
   - If you want to change expandable tool layout, edit here.
 
 - `taskToolModel.ts`

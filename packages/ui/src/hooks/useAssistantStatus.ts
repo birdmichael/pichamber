@@ -94,7 +94,7 @@ const TOOL_STATUS_PHRASES: Record<string, string> = {
     todowrite: 'updating todos',
     todoread: 'reading todos',
     skill: 'learning skill',
-    question: 'asking question',
+    question: 'asking a question',
     plan_enter: 'switching to planning',
     plan_exit: 'switching to building',
 };

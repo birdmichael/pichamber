@@ -274,9 +274,13 @@ describe('pi.ui question push',
     expect(JSON.stringify(apnsPayload)).not.toContain('Keep going');
     expect(emitDesktopNotification).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'question',
+      title: 'Input needed',
+      body: 'Demo session',
       sessionId: 'ses_1',
       tag: 'question-pui_1',
     }));
+    expect(JSON.stringify(emitDesktopNotification.mock.calls[0][0])).not.toContain('Secret option text');
+    expect(JSON.stringify(emitDesktopNotification.mock.calls[0][0])).not.toContain('Pick a path');
   });
 
   it('does not send ready APNs while an interactive client is visible',
@@ -334,6 +338,23 @@ describe('pi.ui question push',
     await vi.advanceTimersByTimeAsync(500);
 
     expect(sendApnsToAllUiSessions).not.toHaveBeenCalled();
+  });
+
+  it('unwraps a nested bus payload and still fans out while Desktop is visible',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions } = createRuntime({
+      isAnyInteractiveClientVisible: () => true,
+    });
+
+    await runtime.maybeSendPushForTrigger({ payload: piUiAsked('ses_1') });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).toHaveBeenCalledTimes(1);
+    expect(sendApnsToAllUiSessions.mock.calls[0][0]).toEqual(expect.objectContaining({
+      title: 'Agent needs your input',
+      tag: 'question-pui_1',
+    }));
   });
 
   it('does not cancel another pending prompt when one settles on the same session',

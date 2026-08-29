@@ -238,6 +238,10 @@ export const createPushRuntime = (deps) => {
       }
     }
 
+    if (subscriptionsByEndpoint.size === 0) {
+      console.info('[Push] web-push fanout skipped: no subscriptions');
+    }
+
     await Promise.all(Array.from(subscriptionsByEndpoint.values()).map(async (sub) => {
       if (requireNoSse) {
         // Mobile PWA subscriptions follow the same presence model as native push: suppress only

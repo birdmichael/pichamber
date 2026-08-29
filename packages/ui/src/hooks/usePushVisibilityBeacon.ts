@@ -1,9 +1,16 @@
 import React from 'react';
-import { isWebRuntime } from '@/lib/desktop';
+import { isDesktopShell, isWebRuntime } from '@/lib/desktop';
 import { getClientPlatform, isCapacitorApp } from '@/lib/platform';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 
 export const HEARTBEAT_MS = 20000;
+
+/** Electron lock/unlock is not a browser visibilitychange. Desktop must beacon. */
+export const shouldReportPushVisibility = (input: {
+  isWeb: boolean;
+  isCapacitor: boolean;
+  isDesktop: boolean;
+}): boolean => input.isWeb || input.isCapacitor || input.isDesktop;
 
 /** macOS lock/sleep is not a document blur. Latch hidden until unlock/resume. */
 export const createSystemPresenceLatch = () => {
@@ -29,7 +36,11 @@ const resolveVisibilityState = (): 'visible' | 'hidden' => {
 };
 
 const sendVisibility = (visible: boolean) => {
-  if (!isWebRuntime() && !isCapacitorApp()) {
+  if (!shouldReportPushVisibility({
+    isWeb: isWebRuntime(),
+    isCapacitor: isCapacitorApp(),
+    isDesktop: isDesktopShell(),
+  })) {
     return;
   }
 
@@ -46,7 +57,14 @@ const sendVisibility = (visible: boolean) => {
 export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true;
   React.useEffect(() => {
-    if (!enabled || (!isWebRuntime() && !isCapacitorApp()) || typeof window === 'undefined') {
+    if (!enabled || typeof window === 'undefined') {
+      return;
+    }
+    if (!shouldReportPushVisibility({
+      isWeb: isWebRuntime(),
+      isCapacitor: isCapacitorApp(),
+      isDesktop: isDesktopShell(),
+    })) {
       return;
     }
 

@@ -512,7 +512,10 @@ export const createApnsRuntime = (deps) => {
         tokensByEnvironment.set(entry.environment, group);
       }
     }
-    if (seen.size === 0) return;
+    if (seen.size === 0) {
+      console.info('[APNs] skipped: no tokens');
+      return;
+    }
 
     const relay = resolveRelayConfig();
     if (relay) {

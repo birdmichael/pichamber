@@ -51,6 +51,7 @@ This module provides notification message preparation utilities for the web serv
   - template resolution and fallback behavior
   - native notification fanout and web push payload fanout
   - ready/error/goal APNs suppression while any fresh UI visibility heartbeat reports a focused interactive (desktop/web) client; blocking question/permission/`pi.ui.asked` pushes always fan out to native APNs so a focused Mac window cannot swallow a waiting prompt
+  - `console.info('[Push] fanout start', …)` at the start of every fanout, plus skip reasons (`notifyOnQuestion=false`, no web-push subscriptions) so a silent no-op is observable
 
 ### Push runtime API (push-runtime.js)
 - `createPushRuntime(dependencies)`: creates runtime for web push and UI visibility state.
@@ -71,7 +72,7 @@ This module provides notification message preparation utilities for the web serv
   - `addOrUpdateApnsToken(uiSessionToken, deviceToken, userAgent, platform, environment)` — also binds a newly-seen token on the relay (signed `/v1/push/register-token`). `environment` is the APNs environment the token was minted for (`sandbox` for Xcode/dev-signed installs, `production` otherwise — reported by the client at registration); delivery groups tokens by it.
   - `removeApnsToken(uiSessionToken, deviceToken)`
   - `removeApnsTokenFromAllSessions(deviceToken)`
-  - `sendApnsToAllUiSessions(payload)` — signs + sends to all registered tokens (no UI-visibility gate; iOS suppresses the foreground banner). No-ops with a single warning when APNs is unconfigured. Drops tokens on `410` / `BadDeviceToken` / `Unregistered`.
+  - `sendApnsToAllUiSessions(payload)` — signs + sends to all registered tokens (no UI-visibility gate; iOS suppresses the foreground banner). Logs `[APNs] skipped: no tokens` when the path ran and no device tokens were registered, so a box without APNs still proves fanout entered. No-ops with a single warning when APNs is unconfigured. Drops tokens on `410` / `BadDeviceToken` / `Unregistered`.
   - `resolveApnsConfig()`
 - Configuration (env first, then `settings.apnsConfig`): `OPENCHAMBER_APNS_KEY_ID`, `OPENCHAMBER_APNS_TEAM_ID`, `OPENCHAMBER_APNS_P8` (PEM contents; literal `\n` accepted) or `OPENCHAMBER_APNS_P8_PATH`, `OPENCHAMBER_APNS_BUNDLE_ID` (default `com.pichamber.app`), `OPENCHAMBER_APNS_ENVIRONMENT` (optional override forcing every send to `sandbox` or `production`; when unset, each token is delivered to the environment it registered with, defaulting to `production` for tokens without one).
 

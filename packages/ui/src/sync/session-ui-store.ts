@@ -657,6 +657,16 @@ type MaterializedDraftSession = {
   syntheticParts?: SyntheticContextPart[]
 }
 
+/** Failed first send after minting a draft must not leave an empty Untitled chat. */
+const rollbackEmptyMaterializedDraftSession = async (created: MaterializedDraftSession): Promise<void> => {
+  const state = getDirectoryState(created.directory ?? undefined)
+  const messages = state?.message?.[created.sessionId] ?? []
+  if (messages.some((message) => message.role === "user")) return
+  await deleteSessionAction(created.sessionId).catch(() => undefined)
+  clearPendingComposerTurn(pendingComposerSessionKey(created.sessionId))
+  useSessionUIStore.getState().openNewSessionDraft()
+}
+
 const resolveProjectRefForWorktreeDirectory = (directory: string | null, projectId?: string | null): { id: string; path: string } | null => {
   const projectsState = useProjectsStore.getState()
   if (projectId) {
@@ -1511,49 +1521,54 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
         filename: a.filename,
       }))
 
-      await routeMessage({
-        sessionId: createdDraftSession.sessionId,
-        directory: createdDraftSession.directory,
-        content,
-        providerID,
-        modelID,
-        agent: createdDraftSession.agent,
-        agentMentionName,
-        variant,
-        inputMode,
-        files,
-        delivery: options?.delivery,
-        onOptimisticInsert: () => {
-          clearPendingComposerTurn(pendingComposerSessionKey(createdDraftSession.sessionId))
-        },
-        beforeSend: async () => {
-          await applyArmedGoal(createdDraftSession.sessionId, createdDraftSession.directory)
-          try {
-            await applyDraftPlanStartAfterMaterialize({
-              sessionID: createdDraftSession.sessionId,
-              draftPlanSelected: draft.planSelected,
-              startPlan: async (sessionID) => {
-                const { dispatchSessionPlanAction } = await import("./pi-session-plan-store")
-                return dispatchSessionPlanAction(sessionID, "start")
-              },
-            })
-          } catch (error) {
-            // Keep adopted / pending Plan chrome. Writing off here flips the
-            // Desktop chip to Agent and lets the prompt go as a normal turn.
-            console.warn("[session-ui-store] draft plan start failed after send", error)
-          }
-        },
-        additionalParts: mergedAdditionalParts?.map((p) => ({
-          text: p.text,
-          synthetic: p.synthetic,
-          files: p.attachments?.map((a: AttachedFile) => ({
-            type: "file" as const,
-            mime: a.mimeType,
-            url: a.dataUrl,
-            filename: a.filename,
+      try {
+        await routeMessage({
+          sessionId: createdDraftSession.sessionId,
+          directory: createdDraftSession.directory,
+          content,
+          providerID,
+          modelID,
+          agent: createdDraftSession.agent,
+          agentMentionName,
+          variant,
+          inputMode,
+          files,
+          delivery: options?.delivery,
+          onOptimisticInsert: () => {
+            clearPendingComposerTurn(pendingComposerSessionKey(createdDraftSession.sessionId))
+          },
+          beforeSend: async () => {
+            await applyArmedGoal(createdDraftSession.sessionId, createdDraftSession.directory)
+            try {
+              await applyDraftPlanStartAfterMaterialize({
+                sessionID: createdDraftSession.sessionId,
+                draftPlanSelected: draft.planSelected,
+                startPlan: async (sessionID) => {
+                  const { dispatchSessionPlanAction } = await import("./pi-session-plan-store")
+                  return dispatchSessionPlanAction(sessionID, "start")
+                },
+              })
+            } catch (error) {
+              // Keep adopted / pending Plan chrome. Writing off here flips the
+              // Desktop chip to Agent and lets the prompt go as a normal turn.
+              console.warn("[session-ui-store] draft plan start failed after send", error)
+            }
+          },
+          additionalParts: mergedAdditionalParts?.map((p) => ({
+            text: p.text,
+            synthetic: p.synthetic,
+            files: p.attachments?.map((a: AttachedFile) => ({
+              type: "file" as const,
+              mime: a.mimeType,
+              url: a.dataUrl,
+              filename: a.filename,
+            })),
           })),
-        })),
-      })
+        })
+      } catch (error) {
+        await rollbackEmptyMaterializedDraftSession(createdDraftSession)
+        throw error
+      }
       return
     }
 

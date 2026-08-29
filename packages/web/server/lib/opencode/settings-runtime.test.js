@@ -229,6 +229,65 @@ describe('settings runtime', () => {
     }
   });
 
+  it('defaults a missing question template to the session name, not last_message', async () => {
+    const { runtime, cleanup } = await createRuntime();
+    try {
+      const settings = await runtime.readSettingsFromDiskMigrated();
+      expect(settings.notificationTemplates.question).toEqual({
+        title: 'Input needed',
+        message: '{session_name}',
+      });
+      expect(settings.notificationTemplates.question.message).not.toBe('{last_message}');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('migrates the shipped question template off {last_message} and keeps custom copy', async () => {
+    const { runtime, settingsFilePath, cleanup } = await createRuntime();
+    try {
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({
+          notificationTemplates: {
+            completion: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
+            error: { title: 'Tool error', message: '{last_message}' },
+            question: { title: 'Input needed', message: '{last_message}' },
+            subtask: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
+          },
+        }, null, 2),
+        'utf8',
+      );
+
+      const migrated = await runtime.readSettingsFromDiskMigrated();
+      expect(migrated.notificationTemplates.question).toEqual({
+        title: 'Input needed',
+        message: '{session_name}',
+      });
+      expect(migrated.notificationTemplates.error.message).toBe('{last_message}');
+
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({
+          notificationTemplates: {
+            completion: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
+            error: { title: 'Tool error', message: '{last_message}' },
+            question: { title: 'Ask me', message: '{last_message}' },
+            subtask: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
+          },
+        }, null, 2),
+        'utf8',
+      );
+      const custom = await runtime.readSettingsFromDiskMigrated();
+      expect(custom.notificationTemplates.question).toEqual({
+        title: 'Ask me',
+        message: '{last_message}',
+      });
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('keeps a first-install persist of empty projects from wiping the seed', async () => {
     const { runtime, settingsFilePath, tempRoot, cleanup } = await createRuntime();
     const projectsRoot = await fsPromises.mkdtemp(path.join(os.homedir(), 'oc-seed-kept-'));

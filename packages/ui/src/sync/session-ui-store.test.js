@@ -884,6 +884,26 @@ describe('routeMessage skill invocation', () => {
     expect(sendMessageCalls).toHaveLength(0);
   });
 
+  test('routes empty /plan through session.command after session create when the Plan slot is on', async () => {
+    const payload = emptyFeaturePluginsPayload();
+    payload.slots.plan.installed = true;
+    payload.slots.plan.enabled = true;
+    applyFeaturePluginsPayload(payload);
+
+    await routeMessage({
+      sessionId: 'session-plan-empty',
+      directory: '/skills/project',
+      content: '/plan',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls).toEqual([
+      expect.objectContaining({ command: 'plan', arguments: '' }),
+    ]);
+    expect(sendMessageCalls).toHaveLength(0);
+  });
+
   test('sends /btw as a plain message even when the Btw slot is on', async () => {
     setFeaturePluginSlot('btw', { installed: true, enabled: true });
 

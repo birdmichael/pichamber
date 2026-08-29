@@ -12,6 +12,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { useGlobalSessionStatus } from '@/sync/sync-context';
 import { useSessionUnseenCount } from '@/sync/notification-store';
+import { usePendingPiExtensionUiPromptCount } from '@/sync/pi-extension-ui-store';
 import { useSwitcherItems, type SwitcherItem } from '@/components/session/sidebar/hooks/useSwitcherItems';
 import { useUIStore } from '@/stores/useUIStore';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
@@ -195,6 +196,7 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
 
   const sessionStatus = useGlobalSessionStatus(session.id);
   const unseenCount = useSessionUnseenCount(session.id);
+  const pendingPiQuestionCount = usePendingPiExtensionUiPromptCount([session.id]);
 
   const isActive = currentSessionId === session.id;
   const sessionTitle = resolveSessionDisplayTitle(
@@ -202,7 +204,7 @@ function SwitcherRow({ session, depth, variant, secondaryMeta, hasChildren, isEx
     t('sessions.sidebar.session.untitled'),
   );
   const isSubtask = Boolean((session as Session & { parentID?: string | null }).parentID);
-  const needsAttention = unseenCount > 0 && (!isSubtask || notifyOnSubtasks);
+  const needsAttention = (unseenCount > 0 || pendingPiQuestionCount > 0) && (!isSubtask || notifyOnSubtasks);
   const statusType = sessionStatus?.type ?? 'idle';
   const isStreaming = statusType === 'busy' || statusType === 'retry';
   const showUnreadDot = !isStreaming && needsAttention && !isActive;

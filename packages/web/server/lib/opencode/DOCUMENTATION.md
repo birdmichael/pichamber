@@ -99,7 +99,7 @@ This module provides OpenCode server integration utilities for the web server ru
 ## Public exports (session-runtime.js)
 - `createSessionRuntime({ writeSseEvent, getNotificationClients, broadcastEvent? })`: creates runtime-owned state machine and APIs for session status.
 - Returned API:
-  - `processOpenCodeSsePayload(payload)`
+  - `processOpenCodeSsePayload(payload)` — session.status plus waiting `question.asked` / `pi.ui.asked` (sets `needsAttention` when no client is viewing, even while status stays `busy`) and `pi.ui.settled` / question reply-or-reject (clears the pending-question latch; unviewing a still-waiting session marks attention again)
   - `getSessionActivitySnapshot()`
   - `getActiveSessionCount()`
   - `getSessionStateSnapshot()`

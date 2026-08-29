@@ -7,6 +7,7 @@ import { createMessageQueueTarget, getMessageQueueKey, useMessageQueueStore, typ
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useHasPendingPiExtensionUiPrompt } from '@/sync/pi-extension-ui-store';
+import { classifyComposerSubmitError } from './composerSubmitError';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useInputStore } from '@/sync/input-store';
 import {
@@ -1057,10 +1058,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     }, []);
 
     const getSubmitErrorMessage = (error: unknown, fallback: string) => {
-        const message = error instanceof Error ? error.message : '';
-        return message.toLowerCase().includes('runtime changed')
-            ? t('chat.chatInput.toast.messageSendFailed')
-            : message || fallback;
+        const classified = classifyComposerSubmitError(error);
+        if (classified.kind === 'runtime-changed') return t('chat.chatInput.toast.messageSendFailed');
+        if (classified.kind === 'unknown-command') return t('chat.chatInput.toast.unknownCommand');
+        if (classified.kind === 'command-failed') return t('chat.chatInput.toast.commandFailed');
+        return classified.raw || fallback;
     };
 
     const handleSubmit = async (options?: SubmitOptions) => {
@@ -1092,6 +1094,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         ).filter((message) => !sendingIds.includes(message.id));
 
         if (queuedOnly && autoReviewRunning) {
+            return;
+        }
+
+        if (hasPendingPiExtensionUi && !queuedOnly) {
+            toast.info(t('chat.chatInput.pendingPromptHint'));
             return;
         }
 
@@ -1529,7 +1536,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (allAttachments.length > 0) {
                 useInputStore.getState().setAttachedFiles(allAttachments);
             }
-            toast.error(rawMessage || t('chat.chatInput.toast.messageSendFailed'));
+            toast.error(getSubmitErrorMessage(error, t('chat.chatInput.toast.messageSendFailed')));
         });
 
         if (!isMobile) {
@@ -1767,6 +1774,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (e.key === 'Enter' && !e.shiftKey && (!requiresModifierToSend || e.ctrlKey || e.metaKey)) {
             if (hasPendingPiExtensionUi) {
                 e.preventDefault();
+                toast.info(t('chat.chatInput.pendingPromptHint'));
                 return;
             }
             e.preventDefault();
@@ -3056,6 +3064,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                             />
                         </div>
                     </div>
+                    {hasPendingPiExtensionUi ? (
+                        <div
+                            className="flex items-center gap-1.5 px-3 pb-1 typography-meta text-[var(--status-warning)]"
+                            role="status"
+                        >
+                            <Icon name="alert" className="h-3.5 w-3.5 shrink-0" />
+                            <span>{t('chat.chatInput.pendingPromptHint')}</span>
+                        </div>
+                    ) : null}
                     <ComposerFooter
                         isMobile={isMobile}
                         isVSCode={isVSCode}

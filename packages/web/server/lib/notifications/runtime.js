@@ -109,6 +109,12 @@ export const createNotificationTriggerRuntime = (deps) => {
     const bypassInteractiveGate = options.bypassInteractiveGate === true || BLOCKING_PUSH_TYPES.has(type);
     const interactiveVisible = !bypassInteractiveGate && isAnyInteractiveClientVisible?.() === true;
     const pushOptions = { ...options, bypassInteractiveGate };
+    console.info('[Push] fanout start', {
+      type: type || payload?.data?.type || 'unknown',
+      tag: typeof payload?.tag === 'string' ? payload.tag : undefined,
+      bypassInteractiveGate,
+      interactiveVisible,
+    });
     return Promise.all([
       Promise.resolve(sendPushToAllUiSessions?.(payload, pushOptions)).catch((error) => {
         console.warn('[Push] web-push fanout failed:', error?.message ?? error);
@@ -351,7 +357,18 @@ export const createNotificationTriggerRuntime = (deps) => {
     }
   };
 
+  const unwrapEventPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (typeof payload.type === 'string') return payload;
+    const nested = payload.payload;
+    if (nested && typeof nested === 'object' && typeof nested.type === 'string') {
+      return nested;
+    }
+    return payload;
+  };
+
   const maybeSendPushForTrigger = async (payload) => {
+    payload = unwrapEventPayload(payload);
     if (!payload || typeof payload !== 'object') {
       return;
     }
@@ -579,6 +596,7 @@ export const createNotificationTriggerRuntime = (deps) => {
 
         const settings = await readSettingsFromDisk();
         if (settings.notifyOnQuestion === false) {
+          console.info('[Push] skipped: notifyOnQuestion=false', { type: 'question.asked', sessionId });
           return;
         }
 
@@ -586,12 +604,14 @@ export const createNotificationTriggerRuntime = (deps) => {
         const header = typeof firstQuestion?.header === 'string' ? firstQuestion.header.trim() : '';
         const questionText = typeof firstQuestion?.question === 'string' ? firstQuestion.question.trim() : '';
 
+        // Default Desktop banner stays content-free. Custom templates may still
+        // use {last_message}; shipped defaults use {session_name}.
         let title = /plan\s*mode/i.test(header)
           ? 'Switch to plan mode'
           : /build\s*agent/i.test(header)
             ? 'Switch to build mode'
-            : header || 'Input needed';
-        let body = questionText || 'Agent is waiting for your response';
+            : 'Input needed';
+        let body = 'Agent is waiting for your response';
         let sessionName = '';
 
         try {
@@ -600,7 +620,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           variables.last_message = questionText || header || '';
 
           const templates = settings.notificationTemplates || {};
-          const questionTemplate = templates.question || { title: 'Input needed', message: '{last_message}' };
+          const questionTemplate = templates.question || { title: 'Input needed', message: '{session_name}' };
 
           const resolvedTitle = resolveNotificationTemplate(questionTemplate.title, variables);
           const resolvedBody = resolveNotificationTemplate(questionTemplate.message, variables);
@@ -666,13 +686,16 @@ export const createNotificationTriggerRuntime = (deps) => {
 
         const settings = await readSettingsFromDisk();
         if (settings.notifyOnQuestion === false) {
+          console.info('[Push] skipped: notifyOnQuestion=false', { type: 'pi.ui.asked', sessionId, promptId });
           return;
         }
 
         const header = typeof prompt.title === 'string' ? prompt.title.trim() : '';
         const questionText = typeof prompt.message === 'string' ? prompt.message.trim() : '';
-        let title = header || 'Input needed';
-        let body = questionText || 'Agent is waiting for your response';
+        // Default Desktop banner stays content-free. Custom templates may still
+        // use {last_message}; shipped defaults use {session_name}.
+        let title = 'Input needed';
+        let body = 'Agent is waiting for your response';
         let sessionName = '';
 
         try {
@@ -680,7 +703,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           sessionName = typeof variables.session_name === 'string' ? variables.session_name : sessionName;
           variables.last_message = questionText || header || '';
           const templates = settings.notificationTemplates || {};
-          const questionTemplate = templates.question || { title: 'Input needed', message: '{last_message}' };
+          const questionTemplate = templates.question || { title: 'Input needed', message: '{session_name}' };
           const resolvedTitle = resolveNotificationTemplate(questionTemplate.title, variables);
           const resolvedBody = resolveNotificationTemplate(questionTemplate.message, variables);
           if (resolvedTitle) title = resolvedTitle;

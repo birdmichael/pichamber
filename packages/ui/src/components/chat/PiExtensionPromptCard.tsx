@@ -342,6 +342,11 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
                 <Icon name="check" className="h-3 w-3" />
                 {t('chat.piExtensionUi.submit')}
               </button>
+              {!requiredSatisfied && !isTextPrompt && !customMode ? (
+                <span className="typography-micro text-muted-foreground">
+                  {t('chat.piExtensionUi.chooseOption')}
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleDismiss()}

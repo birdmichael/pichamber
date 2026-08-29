@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   boundQuestionPromptIds,
+  messagesWithLiveQuestionParts,
   isActiveQuestionToolStatus,
   isQuestionToolName,
   matchPendingQuestionPrompt,
@@ -177,6 +178,29 @@ describe('matchPendingQuestionPrompt', () => {
         },
       }],
     }])]).toEqual(['pui_q']);
+  });
+
+  test('binds using live parts when the rendered message snapshot is still empty', () => {
+    const prompts = [
+      { id: 'pui_q', title: 'Should we continue?', kind: 'select', status: 'pending' },
+    ];
+    const rendered = [{
+      info: { id: 'msg_1' },
+      parts: [],
+    }];
+    const liveParts = {
+      msg_1: [{
+        type: 'tool',
+        tool: 'question',
+        state: {
+          status: 'running',
+          input: { question: 'Should we continue?', options: ['Yes', 'No'] },
+        },
+      }],
+    };
+    expect([...boundQuestionPromptIds(prompts, rendered)]).toEqual([]);
+    expect([...boundQuestionPromptIds(prompts, messagesWithLiveQuestionParts(rendered, liveParts))])
+      .toEqual(['pui_q']);
   });
 
   test('treats pending and running as active question-tool statuses', () => {
