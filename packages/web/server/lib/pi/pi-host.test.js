@@ -1398,8 +1398,7 @@ describe('createPiHost', () => {
     });
     const record = await host.createSession({ directory: '/tmp/project' });
     expect(host.getSessionUsage(record.id)).toEqual({ available: false });
-    await host.reload({ sessionID: record.id });
-    expect(host.getSessionUsage(record.id)).toEqual({
+    await expect.poll(() => host.getSessionUsage(record.id)).toEqual({
       available: true,
       tokens: 2560,
       contextLimit: 128000,
