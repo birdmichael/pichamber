@@ -115,15 +115,21 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationContentHeightChange,
     } = props;
 
+    const footerRef = React.useRef<HTMLDivElement>(null);
     const chipRowRef = React.useRef<HTMLDivElement>(null);
-    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile);
+    // Parent main-window ChatInput uses this footer (~328px when squeezed).
+    // Observe the footer, not only the chip row: a wide overflowing row
+    // would skip the hide and paint a 2-letter `Ag`.
+    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile, footerRef);
 
     return (
         <div
+            ref={footerRef}
             className={cn(
                 // Named container for @container model-controls hide rules.
                 // Query this footer (~328px parent column when squeezed), not html.
-                // Same footer is used in the child/embedded session-chat iframe.
+                // Same footer is used in the parent ChatInput and the
+                // child/embedded session-chat iframe.
                 '@container/model-controls min-w-0 w-full bg-transparent flex-shrink-0 flex flex-col',
                 hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
                 footerPaddingClass,
@@ -138,7 +144,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
             <PiPlanBuildRow className="w-full justify-end" />
             <div
                 className={cn(
-                    isMobile ? 'flex items-center gap-x-1.5' : 'flex items-center justify-between gap-x-2'
+                    isMobile ? 'flex items-center gap-x-1.5' : 'flex min-w-0 w-full items-center justify-between gap-x-2'
                 )}
             >
             {isMobile ? (

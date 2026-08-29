@@ -20,6 +20,10 @@ const chatViewSource = readFileSync(
   join(__dirname, '../../../views/ChatView.tsx'),
   'utf-8',
 );
+const chatContainerSource = readFileSync(
+  join(__dirname, '../../ChatContainer.tsx'),
+  'utf-8',
+);
 const embeddedSource = readFileSync(
   join(__dirname, '../../../layout/contextPanelEmbeddedChat.ts'),
   'utf-8',
@@ -33,22 +37,46 @@ describe('shouldHideComposerAgentSlot', () => {
     expect(shouldHideComposerAgentSlot({ rowWidth: 575 })).toBe(true);
   });
 
+  test('hides Agent at a 328px parent footer even if the chip row looks wide', () => {
+    // Original 1280 squeeze: parent column footer is ~328px. A 2-letter
+    // `Ag` truncation is a fail — hide the whole slot, not a compact label.
+    expect(shouldHideComposerAgentSlot({
+      rowWidth: 800,
+      footerWidth: 328,
+    })).toBe(true);
+    expect(shouldHideComposerAgentSlot({ footerWidth: 328, rowWidth: 0 })).toBe(true);
+    expect(shouldHideComposerAgentSlot({ footerWidth: 575, rowWidth: 1000 })).toBe(true);
+  });
+
   test('keeps Agent on a wide parent chip row (~1000px)', () => {
     expect(shouldHideComposerAgentSlot({ rowWidth: 576 })).toBe(false);
-    expect(shouldHideComposerAgentSlot({ rowWidth: 1000 })).toBe(false);
+    expect(shouldHideComposerAgentSlot({ rowWidth: 1000, footerWidth: 1000 })).toBe(false);
   });
 
   test('hides Agent when the slot overflow-clips even if the row is wide', () => {
     expect(shouldHideComposerAgentSlot({
       rowWidth: 1000,
+      footerWidth: 1000,
       agentScrollWidth: 80,
       agentClientWidth: 24,
+    })).toBe(true);
+  });
+
+  test('hides Agent when the label overflow-clips to Ag', () => {
+    expect(shouldHideComposerAgentSlot({
+      rowWidth: 1000,
+      footerWidth: 1000,
+      agentScrollWidth: 24,
+      agentClientWidth: 24,
+      agentLabelScrollWidth: 48,
+      agentLabelClientWidth: 16,
     })).toBe(true);
   });
 
   test('does not treat a display:none slot (clientWidth 0) as overflow', () => {
     expect(shouldHideComposerAgentSlot({
       rowWidth: 1000,
+      footerWidth: 1000,
       agentScrollWidth: 0,
       agentClientWidth: 0,
     })).toBe(false);
@@ -56,25 +84,72 @@ describe('shouldHideComposerAgentSlot', () => {
 });
 
 describe('measureComposerAgentSlot', () => {
-  test('reads the chip row width and Agent slot overflow box', () => {
+  test('reads the chip row, parent footer, and Agent slot overflow box', () => {
     const slot = {
       scrollWidth: 64,
       clientWidth: 20,
     };
+    const label = {
+      scrollWidth: 48,
+      clientWidth: 16,
+    };
+    const footer = {
+      clientWidth: 328,
+    };
     const row = {
       clientWidth: 420,
       querySelector: (selector: string) => {
-        expect(selector).toBe('.model-controls__agent-slot');
-        return slot;
+        if (selector === '.model-controls__agent-slot') return slot;
+        if (selector === '.model-controls__agent-label') return label;
+        return null;
+      },
+      closest: (selector: string) => {
+        expect(selector).toBe('[data-chat-input-footer="true"]');
+        return footer;
       },
     } as unknown as HTMLElement;
 
     expect(measureComposerAgentSlot(row)).toEqual({
       rowWidth: 420,
+      footerWidth: 328,
       agentScrollWidth: 64,
       agentClientWidth: 20,
+      agentLabelScrollWidth: 48,
+      agentLabelClientWidth: 16,
     });
     expect(shouldHideComposerAgentSlot(measureComposerAgentSlot(row))).toBe(true);
+  });
+});
+
+describe('parent main-window composer Agent hide wiring', () => {
+  test('parent ChatInput ComposerFooter mounts the measure hook on the footer', () => {
+    expect(chatContainerSource).toContain('data-parent-chat-column="true"');
+    expect(chatContainerSource).toContain('<ChatInput');
+    expect(chatInputSource).toContain('<ComposerFooter');
+    expect(composerFooterSource).toContain('useComposerAgentSlotHide');
+    expect(composerFooterSource).toContain('footerRef');
+    expect(composerFooterSource).toContain('chipRowRef');
+    expect(composerFooterSource).toContain('data-chat-input-footer="true"');
+    expect(composerFooterSource).toMatch(/ref=\{footerRef\}[\s\S]*?data-chat-input-footer="true"/);
+    expect(composerFooterSource).toContain('COMPOSER_AGENT_SLOT_HIDE_CLASS');
+  });
+
+  test('at 328px parent footer the Agent slot is display:none / hidden class', () => {
+    expect(shouldHideComposerAgentSlot({ rowWidth: 240, footerWidth: 328 })).toBe(true);
+    expect(COMPOSER_AGENT_SLOT_HIDE_CLASS).toBe('model-controls--hide-agent');
+    expect(indexCss).toMatch(
+      /\.model-controls--hide-agent \.model-controls__agent-slot[\s\S]*?display:\s*none;/,
+    );
+    expect(indexCss).toMatch(
+      /\.model-controls--hide-agent \.model-controls__agent-trigger[\s\S]*?display:\s*none;/,
+    );
+    expect(composerFooterSource).toMatch(
+      /hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS/,
+    );
+    // Compact `Ag` ellipsis is a fail — hide the chip instead.
+    expect(indexCss).not.toMatch(
+      /html:not\(\.vscode-runtime\):not\(\.mobile-pointer\) \.model-controls__agent-label \{[^}]*text-overflow:\s*ellipsis;/,
+    );
   });
 });
 
@@ -102,6 +177,7 @@ describe('child/embedded composer Agent hide wiring', () => {
   test('measure hook hides Agent below 576px via display:none class', () => {
     expect(composerFooterSource).toContain('useComposerAgentSlotHide');
     expect(composerFooterSource).toContain('chipRowRef');
+    expect(composerFooterSource).toContain('footerRef');
     expect(composerFooterSource).toContain('COMPOSER_AGENT_SLOT_HIDE_CLASS');
     expect(COMPOSER_AGENT_SLOT_HIDE_CLASS).toBe('model-controls--hide-agent');
     expect(indexCss).toMatch(
@@ -118,6 +194,10 @@ describe('child/embedded composer Agent hide wiring', () => {
     );
     expect(indexCss).not.toMatch(
       /html:not\(\.vscode-runtime\) \{\s*@container model-controls \(max-width: 36rem\)/,
+    );
+    // Starting the subject at html never matches a footer descendant.
+    expect(indexCss).not.toMatch(
+      /@container model-controls \(max-width: 36rem\)\s*\{\s*html:not\(\.vscode-runtime\)/,
     );
   });
 });

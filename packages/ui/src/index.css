@@ -255,8 +255,10 @@ div[data-chat-input-footer="true"] {
   min-width: 0;
 }
 
-/* Measurement hook: hide Agent from the real chip-row width (parent and
-   child/iframe). @container can still resolve against a wide ancestor. */
+/* Measurement hook: hide Agent from the real footer / chip-row width
+   (parent main-window ChatInput and child/iframe). A ~328px parent
+   footer must hide the whole slot — not a compact `Ag` label.
+   @container can still resolve against a wide ancestor. */
 .model-controls--hide-agent .model-controls__agent-slot,
 .model-controls--hide-agent .model-controls__agent-trigger {
   display: none;
@@ -792,9 +794,10 @@ html:not(.dark) .chat-scroll {
    Hide the entire Agent chip (the slot, not just the word) when the
    model-controls container is at or below ~36rem / 576px, or when the
    measure hook adds `.model-controls--hide-agent`. That covers a
-   ~315–500px child/embedded footer. A wide parent (~1000px) stays
-   above 36rem and keeps Agent. The model label may remain as a clean
-   ellipsis (`grok-…`).
+   ~328px parent footer (1280 isolate + Work Status + child tabs) and
+   a ~315–500px child/embedded footer. A 2-letter `Ag` truncation is a
+   fail — hide the chip. A wide parent (~1000px) stays above 36rem and
+   keeps Agent. The model label may remain as a clean ellipsis (`grok-…`).
 
    Hide the thinking *label* at the 22rem squeeze so High/Medium cannot
    paint over the icon. Keep a real row gap and shrink-0 / zero negative
@@ -806,7 +809,8 @@ html:not(.dark) .chat-scroll {
    (`[data-chat-input-footer]`, `[data-composer-chip-row]`), not html.
    The Agent slot hide query is not nested under html so a child iframe
    cannot inherit the parent/window as the named container. The measure
-   hook is the reliable hide for parent and child composers. */
+   hook (footer + chip row) is the reliable hide for the parent
+   main-window ChatInput and the child/embedded composer. */
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
   min-width: 0;
@@ -856,10 +860,10 @@ html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__agent-slot {
 }
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__agent-label {
+  /* Full "Agent" or hide the slot — never a 2-letter `Ag` ellipsis. */
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
@@ -878,10 +882,12 @@ html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .m
 
 /* Top-level named query so the nearest model-controls container is the
    composer footer / chip row in THIS document (parent or child iframe),
-   not html. The measure hook still hides Agent if this query misses. */
+   not html. Do not start the subject at html — that never matches a
+   descendant of the footer. The measure hook still hides Agent if this
+   query misses (parent ~328px footer / overflowing chip row). */
 @container model-controls (max-width: 36rem) {
-  html:not(.vscode-runtime) .model-controls__agent-slot,
-  html:not(.vscode-runtime) .model-controls__agent-trigger {
+  .model-controls__agent-slot,
+  .model-controls__agent-trigger {
     display: none;
   }
 }
