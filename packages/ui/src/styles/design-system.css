@@ -277,6 +277,16 @@
     background-color: var(--oc-glass-color);
   }
 }
+
+  /* Hidden windows skip live backdrop-filter. Visible/focused overlays keep
+     the same frosting; this class is only applied when document.hidden. */
+  html.oc-pause-expensive-paint .oc-glass-popover,
+  html.oc-pause-expensive-paint .oc-glass-tooltip,
+  html.oc-pause-expensive-paint .oc-glass-panel,
+  html.oc-pause-expensive-paint .oc-glass-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 @theme inline {

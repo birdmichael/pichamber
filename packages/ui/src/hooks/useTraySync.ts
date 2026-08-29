@@ -29,6 +29,12 @@ import type { WorktreeMetadata } from '@/types/worktree';
 import { toast } from '@/components/ui';
 import type { PermissionRequest } from '@/types/permission';
 import type { QuestionRequest } from '@/types/question';
+import {
+  TRAY_GLOBAL_REFRESH_MS,
+  TRAY_STATUS_POLL_INTERVAL_MS,
+  createTraySafetyPolls,
+  traySnapshotHasBusySession,
+} from './tray-sync-policy';
 
 // Native tray/menu bar bridge. The Electron main process owns the Tray UI; this hook
 // streams a compact snapshot of live session/approval state to it via the
@@ -38,13 +44,7 @@ import type { QuestionRequest } from '@/types/question';
 // no-ops the command elsewhere, but we still gate here to avoid pointless work.
 
 const TRAY_ACTION_EVENT = 'openchamber:tray-action';
-// Event-driven updates do the real work; this is just a slow safety net.
-const POLL_INTERVAL_MS = 5000;
 const FLUSH_DEBOUNCE_MS = 500;
-// Pull the full cross-project session list periodically. SSE keeps the active
-// directory instant; this catches sessions created in directories this client
-// never opened (other worktrees, other projects, the TUI, …).
-const GLOBAL_REFRESH_MS = 45000;
 const MAX_SESSIONS = 20;
 
 type TraySessionStatus = 'idle' | 'busy' | 'retry';
@@ -447,9 +447,11 @@ export const useTraySync = (): void => {
     // The active instance is fixed per window load (switching hosts re-navigates
     // the window, remounting this hook). Resolve it once, then re-push.
     let instanceName = '';
+    let syncSafetyPolls: (snapshot: ReturnType<typeof buildSnapshot>) => void = () => {};
     const flushNow = () => {
       if (disposed) return;
       const snapshot = buildSnapshot(instanceName, isPiKernel);
+      syncSafetyPolls(snapshot);
       const serialized = JSON.stringify(snapshot);
       if (serialized === lastSerialized) return;
       lastSerialized = serialized;
@@ -523,7 +525,7 @@ export const useTraySync = (): void => {
         scheduleFlush();
       });
     } catch {
-      // Sync provider not mounted yet — the fallback poll below recovers.
+      // Sync provider not mounted yet — becoming visible and later events recover.
     }
     rebindStores();
 
@@ -546,21 +548,39 @@ export const useTraySync = (): void => {
     const unsubscribePinnedSessions = useSessionPinnedStore.subscribe(() => scheduleFlush());
 
     // Make the tray self-sufficient: load the full cross-project list now
-    // (independent of the sidebar) and refresh it periodically so sessions from
-    // directories this client never opened still show up and stay current.
+    // (independent of the sidebar). Periodic refresh is a safety net and only
+    // runs while a session is busy — event subscriptions own idle→busy.
     void ensureGlobalSessionsLoaded(getAllSyncSessions());
-    const refreshInterval = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      void refreshGlobalSessions();
-    }, GLOBAL_REFRESH_MS);
 
-    // Global busy/retry status: fetch now and poll, so unsynced sessions don't
-    // sit looking idle. Synced directories stay instant via their SSE stores.
+    // Global busy/retry status: fetch once so unsynced sessions don't sit
+    // looking idle on first paint. Synced directories stay instant via SSE.
     void refreshGlobalStatus();
-    const globalStatusInterval = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      void refreshGlobalStatus();
-    }, POLL_INTERVAL_MS);
+
+    const safetyPolls = createTraySafetyPolls({
+      setInterval: (fn, ms) => window.setInterval(fn, ms),
+      clearInterval: (id) => window.clearInterval(id),
+      onStatusPoll: () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        void refreshGlobalStatus();
+      },
+      onGlobalRefresh: () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        void refreshGlobalSessions();
+      },
+      onSafetyFlush: () => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        rebindStores();
+        flushNow();
+      },
+      statusIntervalMs: TRAY_STATUS_POLL_INTERVAL_MS,
+      globalRefreshMs: TRAY_GLOBAL_REFRESH_MS,
+    });
+    syncSafetyPolls = (snapshot) => {
+      safetyPolls.sync({
+        trayEnabled: true,
+        hasBusySession: traySnapshotHasBusySession(snapshot),
+      });
+    };
 
     // Leftover OpenCode only: Pi has no `/api/quota/*` source. Empty groups
     // omit the tray Usage submenu.
@@ -576,14 +596,6 @@ export const useTraySync = (): void => {
       });
     }
 
-    // Safety net: catches anything the event subscriptions miss (e.g. a store
-    // that existed before the registry subscription was attached).
-    const interval = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      rebindStores();
-      flushNow();
-    }, POLL_INTERVAL_MS);
-
     const onVisibility = () => {
       if (typeof document === 'undefined' || document.hidden) return;
       void refreshGlobalSessions();
@@ -598,9 +610,7 @@ export const useTraySync = (): void => {
     return () => {
       disposed = true;
       if (flushTimer !== null) window.clearTimeout(flushTimer);
-      window.clearInterval(interval);
-      window.clearInterval(refreshInterval);
-      window.clearInterval(globalStatusInterval);
+      safetyPolls.dispose();
       document.removeEventListener('visibilitychange', onVisibility);
       unsubscribeNotif();
       unsubscribeGlobal();
