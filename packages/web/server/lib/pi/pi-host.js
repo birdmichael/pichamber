@@ -105,9 +105,16 @@ import { adaptQuestionToolForDesktop } from './question-desktop.js';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalCommandUserText,
+  isGoalMutexHeld,
+  isGoalSystemPreamble,
+  reconcileListedPiGoalMetadata,
+  isPlanMutexHeld,
+  isUnhelpfulSessionTitle,
+  parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
-  restoreSessionPlanState,
   resumeSavedPlanState,
+  resolvePlanModeState,
   sessionPlanFromState,
 } from './session-plan.js';
 import {
@@ -136,6 +143,7 @@ import {
   persistFacadeMessages,
   reconcileHydratedMessages,
   resolveUsableFacadeModel,
+  stampGoalCommandChronology,
   sanitizeExportBasename,
   transcriptEntriesForHydrate,
 } from './session-transfer.js';
@@ -579,8 +587,12 @@ export const resolvePromptModelRef = (model) => {
   return modelID;
 };
 
+export { isGoalSystemPreamble } from './session-plan.js';
+
 export const titleFromUserText = (text) => {
-  const line = String(text || '').replace(/\s+/g, ' ').trim();
+  let line = String(text || '').replace(/\s+/g, ' ').trim();
+  if (isGoalSystemPreamble(line)) return '';
+  line = line.replace(/^\/(?:goal|plan)(?::\d+)?\s+/i, '');
   if (!line) return '';
   return line.length > 60 ? `${line.slice(0, 57).trimEnd()}...` : line;
 };
@@ -595,13 +607,16 @@ const userTextFromPiContent = (content) => {
 };
 
 export const firstUserTextFromPiEntries = (entries) => {
+  let fallback = '';
   for (const entry of Array.isArray(entries) ? entries : []) {
     const message = entry?.message || entry;
     if (message?.role !== 'user') continue;
     const text = userTextFromPiContent(message.content);
-    if (text) return text;
+    if (!text || isGoalSystemPreamble(text) || isUnhelpfulSessionTitle(text)) continue;
+    if (isGoalCommandUserText(text)) return text;
+    if (!fallback) fallback = text;
   }
-  return '';
+  return fallback;
 };
 
 const FIRST_USER_TEXT_FILE_LIMIT = 32 * 1024;
@@ -615,6 +630,7 @@ export const firstUserTextFromSessionFile = (filePath) => {
       const buffer = Buffer.alloc(FIRST_USER_TEXT_FILE_LIMIT);
       const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
       const text = buffer.slice(0, bytes).toString('utf8');
+      let fallback = '';
       for (const line of text.split(/\r?\n/)) {
         if (!line.trim()) continue;
         let parsed;
@@ -626,8 +642,11 @@ export const firstUserTextFromSessionFile = (filePath) => {
         const message = parsed?.message || parsed;
         if (message?.role !== 'user') continue;
         const userText = userTextFromPiContent(message.content);
-        if (userText) return userText;
+        if (!userText || isGoalSystemPreamble(userText) || isUnhelpfulSessionTitle(userText)) continue;
+        if (isGoalCommandUserText(userText)) return userText;
+        if (!fallback) fallback = userText;
       }
+      return fallback;
     } finally {
       fs.closeSync(fd);
     }
@@ -637,12 +656,15 @@ export const firstUserTextFromSessionFile = (filePath) => {
 };
 
 const firstUserText = (store) => {
+  let fallback = '';
   for (const entry of store.messages || []) {
     if (entry?.info?.role !== 'user') continue;
     const part = (entry.parts || []).find((item) => item?.type === 'text' && typeof item.text === 'string' && item.text.trim());
-    if (part) return part.text;
+    if (!part || isGoalSystemPreamble(part.text) || isUnhelpfulSessionTitle(part.text)) continue;
+    if (isGoalCommandUserText(part.text)) return part.text;
+    if (!fallback) fallback = part.text;
   }
-  return '';
+  return fallback;
 };
 
 const persistConversationTitle = (record, title) => {
@@ -655,9 +677,12 @@ const persistConversationTitle = (record, title) => {
 };
 
 const maybeApplyConversationTitle = (record) => {
-  if (!record?.info || !isPlaceholderSessionTitle(record.info.title)) return false;
+  if (!record?.info) return false;
+  if (!isPlaceholderSessionTitle(record.info.title) && !isUnhelpfulSessionTitle(record.info.title)) {
+    return false;
+  }
   const next = titleFromUserText(firstUserText(record));
-  if (!next) return false;
+  if (!next || isUnhelpfulSessionTitle(next)) return false;
   record.info.title = next;
   record.info.time = { ...(record.info.time || {}), updated: Date.now() };
   persistConversationTitle(record, next);
@@ -778,6 +803,14 @@ const applyEventToStore = (store, ocEvent) => {
       && entry.parts.some((part) => part.type === 'text' && part.text === props.part.text)
     ) {
       // Pi message_start echo of the facade prompt — keep one text part.
+    } else if (
+      entry.info.role === 'user'
+      && props.part.type === 'text'
+      && isGoalSystemPreamble(props.part.text)
+    ) {
+      if (entry.parts.length === 0) {
+        store.messages = store.messages.filter((item) => item !== entry);
+      }
     } else {
       entry.parts.push(props.part);
     }
@@ -1045,13 +1078,35 @@ const expandPromptTemplate = (template, argument) => {
     .replaceAll('$1', args);
 };
 
-const commandNameOf = (command) => (
-  typeof command?.name === 'string' ? command.name.trim() : ''
+const commandNameOf = (command) => {
+  const raw = typeof command?.name === 'string' && command.name.trim()
+    ? command.name
+    : (typeof command?.invocationName === 'string' ? command.invocationName : '');
+  return raw.trim().replace(/^\//, '');
+};
+
+const isPluginSlotOn = (payload, slot) => Boolean(
+  payload?.slots?.[slot]?.installed && payload?.slots?.[slot]?.enabled,
 );
 
 const isExtensionCommandSource = (source) => (
   source !== 'prompt' && source !== 'skill' && source !== 'builtin'
 );
+
+const normalizeLiveCommand = (command) => {
+  const name = commandNameOf(command);
+  if (!name) return null;
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  const entry = {
+    name,
+    description: command.description || '',
+    source: command.source || 'extension',
+  };
+  if (invocation && invocation !== name) entry.invocationName = invocation;
+  return entry;
+};
 
 /** Live session getCommands() / extensionRunner.registerCommand results. */
 export const readLiveSessionCommands = (piSession) => {
@@ -1059,18 +1114,15 @@ export const readLiveSessionCommands = (piSession) => {
   if (typeof piSession.getCommands === 'function') {
     try {
       const commands = piSession.getCommands();
-      return Array.isArray(commands) ? commands : [];
+      if (Array.isArray(commands) && commands.length > 0) {
+        return commands;
+      }
     } catch {
-      return [];
     }
   }
   const registered = piSession.extensionRunner?.getRegisteredCommands?.();
   if (!Array.isArray(registered)) return [];
-  return registered.map((command) => ({
-    name: command.invocationName || command.name,
-    description: command.description || '',
-    source: command.source || 'extension',
-  }));
+  return registered.map(normalizeLiveCommand).filter(Boolean);
 };
 
 export const toFacadeExtensionCommand = (command) => {
@@ -1114,42 +1166,113 @@ export const mergeLiveExtensionCommands = (listed, live) => {
   return merged;
 };
 
+const commandMatchesName = (command, requested) => {
+  if (!requested) return false;
+  if (commandNameOf(command) === requested) return true;
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  return invocation === requested;
+};
+
 const findLiveSessionCommand = (piSession, name) => (
-  readLiveSessionCommands(piSession).find((item) => commandNameOf(item) === name)
+  readLiveSessionCommands(piSession).find((item) => commandMatchesName(item, name))
 );
 
-const createLocalReply = (emit) => (record, body, userText, assistantText) => {
+const liveCommandInvocation = (command, fallback) => {
+  const invocation = typeof command?.invocationName === 'string'
+    ? command.invocationName.trim().replace(/^\//, '')
+    : '';
+  return invocation || commandNameOf(command) || fallback;
+};
+
+const refreshRecordCommands = async (record) => {
+  if (typeof record?.piSession?.refreshSnapshot !== 'function') return;
+  try {
+    await record.piSession.refreshSnapshot();
+  } catch {
+  }
+};
+
+const appendFacadeUserMessage = (emit, record, body, userText) => {
   const sessionID = record.id;
   const userMessageID = body.messageID || createMessageId();
   const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
-  if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
-    const userPart = {
-      id: createPartId(),
-      sessionID,
-      messageID: userMessageID,
-      type: 'text',
-      text: userText,
-    };
-    const userInfo = {
-      id: userMessageID,
-      sessionID,
-      role: 'user',
-      time: { created: Date.now() },
-      agent: userAgent,
-      ...(body.model ? { model: body.model } : {}),
-    };
-    record.messages.push({ info: userInfo, parts: [userPart] });
-    emit(record.directory, {
-      id: createEventId(),
-      type: 'message.updated',
-      properties: { sessionID, info: userInfo },
-    });
-    emit(record.directory, {
-      id: createEventId(),
-      type: 'message.part.updated',
-      properties: { sessionID, part: userPart, time: Date.now() },
-    });
+  if (record.messages.some((entry) => entry.info.id === userMessageID)) {
+    return userMessageID;
   }
+  const userPart = {
+    id: createPartId(),
+    sessionID,
+    messageID: userMessageID,
+    type: 'text',
+    text: userText,
+  };
+  const userInfo = {
+    id: userMessageID,
+    sessionID,
+    role: 'user',
+    time: { created: Date.now() },
+    agent: userAgent,
+    ...(body.model ? { model: body.model } : {}),
+  };
+  record.messages.push({ info: userInfo, parts: [userPart] });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.updated',
+    properties: { sessionID, info: userInfo },
+  });
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.part.updated',
+    properties: { sessionID, part: userPart, time: Date.now() },
+  });
+  return userMessageID;
+};
+
+const emitFacadeMessage = (emit, record, entry) => {
+  if (!entry?.info) return;
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.updated',
+    properties: { sessionID: record.id, info: entry.info },
+  });
+};
+
+const writePiGoalMarker = (record, active) => {
+  if (!record?.info) return;
+  const existing = record.info.metadata?.pichamber?.piGoal;
+  record.info.metadata = {
+    ...(record.info.metadata || {}),
+    pichamber: {
+      ...(record.info.metadata?.pichamber || {}),
+      piGoal: existing && typeof existing === 'object'
+        ? { ...existing, active }
+        : { active },
+    },
+  };
+};
+
+const placeGoalCommandUserMessage = (emit, record, userMessageID, insertAt) => {
+  const messages = record?.messages;
+  if (!Array.isArray(messages) || !userMessageID) return;
+  let index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
+  if (index < 0) return;
+  const at = Math.min(Math.max(insertAt, 0), messages.length);
+  if (index !== at) {
+    const [goal] = messages.splice(index, 1);
+    messages.splice(Math.min(at, messages.length), 0, goal);
+    index = messages.findIndex((entry) => entry?.info?.id === userMessageID);
+  }
+  stampGoalCommandChronology(messages);
+  for (let i = index; i < messages.length; i += 1) {
+    emitFacadeMessage(emit, record, messages[i]);
+  }
+};
+
+const createLocalReply = (emit) => (record, body, userText, assistantText) => {
+  const sessionID = record.id;
+  const userMessageID = appendFacadeUserMessage(emit, record, body, userText);
 
   const assistantID = createMessageId();
   const assistantInfo = {
@@ -1389,22 +1512,18 @@ export const createPiHost = ({
       const pi = await loadPiSdk();
       return async ({ cwd, modelRuntime: runtime, model, sessionManager, customTools }) => {
         await ensureDirectoryRuntime(cwd);
-        const services = directoryRuntimes.get(cwd)?.services;
-        const created = services && typeof pi.createAgentSessionFromServices === 'function'
-          ? await pi.createAgentSessionFromServices({
-            services,
-            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
-            ...(model ? { model } : {}),
-            ...(customTools ? { customTools } : {}),
-          })
-          : await pi.createAgentSession({
-            cwd,
-            agentDir: resolveAgentDir(),
-            modelRuntime: runtime,
-            ...(model ? { model } : {}),
-            sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
-            ...(customTools ? { customTools } : {}),
-          });
+        // Goal and Plan register one runtime per extension factory and then
+        // call `pi.sendUserMessage`. Reusing directory services makes every
+        // chat in that project share one factory, so /goal and /plan start
+        // on another session. Each user chat gets its own AgentSession.
+        const created = await pi.createAgentSession({
+          cwd,
+          agentDir: resolveAgentDir(),
+          modelRuntime: runtime,
+          ...(model ? { model } : {}),
+          sessionManager: sessionManager || pi.SessionManager.create(cwd, sessionDirForCwd(cwd, home)),
+          ...(customTools ? { customTools } : {}),
+        });
         harvestExtensionsResult(created?.extensionsResult || created, cwd);
         return created?.session || created;
       };
@@ -1584,7 +1703,28 @@ export const createPiHost = ({
         // Keep the last good snapshot. Do not replace a failed replay with [].
       }
     }
+    if (piEvent?.type === 'agent_settled') {
+      syncPiGoalMarker(record);
+    }
     return ocEvents;
+  };
+
+  const syncPiGoalMarker = (record) => {
+    if (!record?.info) return false;
+    const current = record.info.metadata?.pichamber?.piGoal;
+    const wasActive = current === true
+      || (current && typeof current === 'object' && current.active === true);
+    if (!wasActive && current == null) return false;
+    const active = isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record));
+    if (current && typeof current === 'object' && current.active === active) return false;
+    writePiGoalMarker(record, active);
+    persistSessionMetadata(record.sessionManager, record.info.metadata);
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.updated',
+      properties: { info: record.info },
+    });
+    return true;
   };
 
   const sessionIsLive = (record) => (
@@ -1661,6 +1801,7 @@ export const createPiHost = ({
         mode: 'rpc',
       });
       ensureQuestionToolAdapted(record);
+      await refreshRecordCommands(record);
     } catch (error) {
       console.warn(`[pi-host] bindExtensions failed for ${record.id}:`, error?.message || error);
     }
@@ -1705,9 +1846,19 @@ export const createPiHost = ({
     fallbackModel: resolveHostFallbackModel(record),
   });
 
-  const hydrateFacadeMessages = (entries, sessionID, record) => facadeMessagesFromPiEntries(entries, sessionID, {
-    fallbackModel: resolveHostFallbackModel(record),
-  });
+  const hydrateFacadeMessages = (entries, sessionID, record) => {
+    const messages = facadeMessagesFromPiEntries(entries, sessionID, {
+      fallbackModel: resolveHostFallbackModel(record),
+    });
+    return messages.filter((entry) => {
+      if (entry?.info?.role !== 'user') return true;
+      const text = (entry.parts || [])
+        .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
+        .join('')
+        .trim();
+      return !isGoalSystemPreamble(text);
+    });
+  };
 
   const createPersistedSessionManager = async (cwd, { title } = {}) => {
     try {
@@ -1920,28 +2071,54 @@ export const createPiHost = ({
     await bindDesktopExtensionUI(record);
     sessions.set(sessionID, record);
     publishRecordTodos(record, entries);
+    syncPiGoalMarker(record);
     return record;
   };
 
-  const readRecordPlan = (record) => {
-    if (typeof record?.piSession?.getPlanModeState === 'function') {
-      return sessionPlanFromState(record.piSession.getPlanModeState());
-    }
-    const manager = record?.sessionManager;
-    const entries = typeof manager?.getEntries === 'function'
-      ? manager.getEntries()
-      : (typeof manager?.getBranch === 'function' ? manager.getBranch() : []);
-    return sessionPlanFromState(restoreSessionPlanState(entries));
+  const readRecordEntries = (record) => {
+    const manager = record?.sessionManager || record?.piSession?.sessionManager;
+    if (typeof manager?.getEntries === 'function') return manager.getEntries();
+    if (typeof manager?.getBranch === 'function') return manager.getBranch();
+    return [];
   };
 
-  const persistRecordPlanState = (record, next) => {
-    if (typeof record?.piSession?.setPlanModeState === 'function') {
-      record.piSession.setPlanModeState(next);
+  const readRecordDiskEntries = (record) => {
+    const file = typeof record?.sessionFile === 'string' && record.sessionFile
+      ? record.sessionFile
+      : (typeof record?.piSession?.sessionFile === 'string' ? record.piSession.sessionFile : '');
+    if (!file) return [];
+    try {
+      return parseSessionEntriesFromJsonl(fs.readFileSync(file, 'utf8'));
+    } catch {
+      return [];
     }
-    if (typeof record?.sessionManager?.appendCustomEntry === 'function') {
-      record.sessionManager.appendCustomEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+  };
+
+  const readRecordPlan = (record) => {
+    const live = typeof record?.piSession?.getPlanModeState === 'function'
+      ? record.piSession.getPlanModeState()
+      : null;
+    return sessionPlanFromState(resolvePlanModeState(
+      live,
+      readRecordEntries(record),
+      readRecordDiskEntries(record),
+    ));
+  };
+
+  const persistRecordPlanState = async (record, next) => {
+    const manager = record?.sessionManager || record?.piSession?.sessionManager;
+    const write = (fn, ...args) => {
+      const result = fn(...args);
+      return result && typeof result.then === 'function' ? result : undefined;
+    };
+    if (typeof manager?.appendCustomEntry === 'function') {
+      await write(manager.appendCustomEntry.bind(manager), PLAN_MODE_STATE_ENTRY_TYPE, next);
+      return;
+    }
+    if (typeof record?.piSession?.setPlanModeState === 'function') {
+      await write(record.piSession.setPlanModeState.bind(record.piSession), next);
     } else if (typeof record?.piSession?.appendEntry === 'function') {
-      record.piSession.appendEntry(PLAN_MODE_STATE_ENTRY_TYPE, next);
+      await write(record.piSession.appendEntry.bind(record.piSession), PLAN_MODE_STATE_ENTRY_TYPE, next);
     }
   };
 
@@ -2296,7 +2473,10 @@ export const createPiHost = ({
 
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
-    if (existing) return existing;
+    if (existing) {
+      syncPiGoalMarker(existing);
+      return existing;
+    }
     if (mock) {
       throw missingSession(sessionID);
     }
@@ -2393,11 +2573,29 @@ export const createPiHost = ({
     } catch {
       // Reload still succeeded. Keep the last good snapshot instead of [].
     }
+    syncPiGoalMarker(record);
     emit(record.directory, {
       id: createEventId(),
       type: 'session.updated',
       properties: { info: record.info },
     });
+  };
+
+  const ensureLivePluginCommand = async (record, name) => {
+    if (findLiveSessionCommand(record.piSession, name)) return record;
+    await refreshRecordCommands(record);
+    if (findLiveSessionCommand(record.piSession, name)) return record;
+    record.pluginCommandReloads ??= new Set();
+    if (record.pluginCommandReloads.has(name)) return null;
+    const blocked = sessionBlocksPiReload(record);
+    if (blocked) {
+      const error = new Error(blocked);
+      error.status = 409;
+      throw error;
+    }
+    record.pluginCommandReloads.add(name);
+    await reloadLiveRecord(record);
+    return findLiveSessionCommand(record.piSession, name) ? record : null;
   };
 
   const readListMetadata = typeof readListSessionMetadata === 'function'
@@ -2408,9 +2606,13 @@ export const createPiHost = ({
     const id = item?.id || item?.path;
     if (!id) return null;
     // Reuse title / firstMessage / timestamps from SessionManager.list().
-    // Tail-scan only for the last pichamber.metadata (archived / parentID).
+    // Tail-scan the last pichamber.metadata (archived / parentID / Goal mark)
+    // and drop a leftover 🎯 unless goal-state still holds the mutex.
     const metadata = item.path ? readListMetadata(item.path) : undefined;
-    const parentID = readListedParentID(metadata, item.path);
+    const listedMetadata = item.path
+      ? reconcileListedPiGoalMetadata(metadata, item.path)
+      : metadata;
+    const parentID = readListedParentID(listedMetadata, item.path);
     return {
       id,
       projectID: item.cwd || directory || 'pi',
@@ -2421,10 +2623,11 @@ export const createPiHost = ({
       }),
       version: 'pi',
       ...(parentID ? { parentID } : {}),
+      ...(listedMetadata ? { metadata: listedMetadata } : {}),
       time: sessionTimeWithArchived({
         created: item.created ? new Date(item.created).getTime() : Date.now(),
         updated: item.modified ? new Date(item.modified).getTime() : Date.now(),
-      }, metadata),
+      }, listedMetadata),
     };
   };
 
@@ -2433,6 +2636,13 @@ export const createPiHost = ({
     const live = Array.from(sessions.values())
       .filter((record) => !directory || record.directory === directory)
       .map((record) => {
+        const current = record.info?.metadata?.pichamber?.piGoal;
+        if (
+          current === true
+          || (current && typeof current === 'object' && current.active === true)
+        ) {
+          syncPiGoalMarker(record);
+        }
         const listedParent = readListedParentID(record.info?.metadata, record.sessionFile);
         if (record.info?.parentID && !listedParent && isTopLevelUserSessionFile(record.sessionFile)) {
           delete record.info.parentID;
@@ -2526,7 +2736,11 @@ export const createPiHost = ({
         hydrateFacadeMessages(entries, record.id, record),
       );
       const title = typeof manager.getSessionName === 'function' && manager.getSessionName();
-      if (title) record.info.title = title;
+      if (title && !isPlaceholderSessionTitle(title) && !isUnhelpfulSessionTitle(title)) {
+        record.info.title = title;
+      } else if (maybeApplyConversationTitle(record)) {
+        // Prefer /goal objective over a Goal preamble or “继续” session name.
+      }
       const metadata = readPersistedSessionMetadata(entries);
       if (metadata) {
         record.info.metadata = { ...(record.info.metadata || {}), ...metadata };
@@ -2545,6 +2759,7 @@ export const createPiHost = ({
         ...(record.info.time || {}),
         ...(Number.isFinite(updated) ? { updated } : {}),
       }, metadata || record.info.metadata);
+      syncPiGoalMarker(record);
       return true;
     } catch (error) {
       console.warn(`[pi-host] session record refresh failed for ${record.id}:`, error?.message || error);
@@ -3029,6 +3244,7 @@ export const createPiHost = ({
 
       if (sessionID) {
         const record = await ensureRecord(sessionID, directory);
+        record.pluginCommandReloads = undefined;
         await reloadLiveRecord(record);
         const skills = listPiSkills({ home, directory: record.directory });
         const commands = listPiCommands({ home, directory: record.directory });
@@ -3221,14 +3437,47 @@ export const createPiHost = ({
 
       const reply = async (assistantText) => completeLocalReply(record, body, userText, assistantText);
 
-      const dispatchLiveSessionCommand = async () => {
+      const dispatchLiveSessionCommand = async (liveCommand) => {
         if (typeof record.piSession?.prompt !== 'function') {
           const error = new Error(`Command /${name} is not available on this session`);
           error.status = 500;
           throw error;
         }
         ensureQuestionToolAdapted(record);
-        await record.piSession.prompt(userText);
+        const invoke = liveCommandInvocation(liveCommand, name);
+        const promptText = `/${[invoke, argument].filter(Boolean).join(' ')}`;
+        let goalUserID = '';
+        let goalInsertAt = record.messages.length;
+        if (name === goalCommand || name === 'goal') {
+          goalInsertAt = record.messages.length;
+          goalUserID = appendFacadeUserMessage(emit, record, body, userText);
+          record.translator?.setUserMessage?.(goalUserID, {
+            agent: typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi',
+            model: body.model,
+          });
+          writePiGoalMarker(record, true);
+          maybeApplyConversationTitle(record);
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
+        await record.piSession.prompt(promptText);
+        if (goalUserID) {
+          placeGoalCommandUserMessage(emit, record, goalUserID, goalInsertAt);
+          writePiGoalMarker(
+            record,
+            isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record)),
+          );
+          persistSessionMetadata(record.sessionManager, record.info.metadata);
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
+        await refreshRecordCommands(record);
         if (name === 'plan') {
           emitPlanUpdated(record, readRecordPlan(record));
         }
@@ -3307,9 +3556,8 @@ export const createPiHost = ({
           error.status = 404;
           throw error;
         }
-        const liveUsage = findLiveSessionCommand(record.piSession, name);
-        if (liveUsage && isExtensionCommandSource(liveUsage.source)) {
-          return dispatchLiveSessionCommand();
+        if (await ensureLivePluginCommand(record, name)) {
+          return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
         }
         return reply(
           'Grok usage is shown in Work Status and Settings → Providers when the Grok Usage plugin is installed.',
@@ -3325,13 +3573,26 @@ export const createPiHost = ({
           error.status = 400;
           throw error;
         }
+        if (isPlanMutexHeld(readRecordPlan(record))) {
+          const error = new Error('Plan mode is active. Exit Plan before starting a Goal.');
+          error.status = 409;
+          throw error;
+        }
         const liveGoal = findLiveSessionCommand(record.piSession, name);
-        if (!liveGoal || !isExtensionCommandSource(liveGoal.source)) {
+        if (liveGoal) {
+          return dispatchLiveSessionCommand(liveGoal);
+        }
+        if (!isPluginSlotOn(this.getFeaturePlugins(), 'goal')) {
           const error = new Error(`Command /${name} is not available on this session`);
           error.status = 404;
           throw error;
         }
-        return dispatchLiveSessionCommand();
+        if (!await ensureLivePluginCommand(record, name)) {
+          const error = new Error(`Command /${name} is not available on this session`);
+          error.status = 404;
+          throw error;
+        }
+        return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
       }
 
       if (name === 'run') {
@@ -3345,8 +3606,7 @@ export const createPiHost = ({
             '/run needs an agent and a task, for example `/run scout Inspect the README`. Bare /run is the TUI launcher and is not supported on Desktop.',
           );
         }
-        const liveRun = findLiveSessionCommand(record.piSession, name);
-        if (!liveRun || !isExtensionCommandSource(liveRun.source)) {
+        if (!await ensureLivePluginCommand(record, name)) {
           const error = new Error('Command /run is not available on this session');
           error.status = 404;
           throw error;
@@ -3434,9 +3694,24 @@ export const createPiHost = ({
         };
       }
 
+      if (name === 'plan') {
+        const livePlan = findLiveSessionCommand(record.piSession, name);
+        if (livePlan) {
+          return dispatchLiveSessionCommand(livePlan);
+        }
+        if (isPluginSlotOn(this.getFeaturePlugins(), 'plan')) {
+          if (await ensureLivePluginCommand(record, name)) {
+            return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
+          }
+          const error = new Error('Command /plan is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+      }
+
       const liveCommand = findLiveSessionCommand(record.piSession, name);
       if (liveCommand && isExtensionCommandSource(liveCommand.source)) {
-        return dispatchLiveSessionCommand();
+        return dispatchLiveSessionCommand(liveCommand);
       }
 
       const listed = listPiCommands({ home, directory: record.directory });
@@ -3450,7 +3725,7 @@ export const createPiHost = ({
       }
 
       if (liveCommand) {
-        return dispatchLiveSessionCommand();
+        return dispatchLiveSessionCommand(liveCommand);
       }
 
       const error = new Error(`Unknown command: /${name}`);
@@ -3464,28 +3739,41 @@ export const createPiHost = ({
     async runPlanAction(sessionID, body = {}) {
       const record = await ensureRecord(sessionID);
       const { action, model } = parseSessionPlanAction(body);
-      const blocked = sessionBlocksPiReload(record);
+      await refreshRecordCommands(record);
+      // Compaction and resume still need a quiet session (reload). Start/exit
+      // with a live `/plan` only prompt; do not 409 on a stale isStreaming or
+      // leftover busy after Goal/ordinary send already finished.
+      const needsReloadGate = Boolean(record.piSession?.isCompacting)
+        || action === 'resume'
+        || !findLiveSessionCommand(record.piSession, 'plan');
+      const blocked = needsReloadGate ? sessionBlocksPiReload(record) : null;
       if (blocked) {
         const error = new Error(blocked);
         error.status = 409;
         throw error;
       }
 
+      if (action === 'start' && isGoalMutexHeld(readRecordEntries(record), readRecordDiskEntries(record))) {
+        const error = new Error('A Goal is active. Finish or stop it before starting Plan.');
+        error.status = 409;
+        throw error;
+      }
+
       if (action === 'resume') {
-        const current = typeof record.piSession?.getPlanModeState === 'function'
-          ? record.piSession.getPlanModeState()
-          : restoreSessionPlanState(
-            typeof record.sessionManager?.getEntries === 'function'
-              ? record.sessionManager.getEntries()
-              : [],
-          );
+        const current = resolvePlanModeState(
+          typeof record.piSession?.getPlanModeState === 'function'
+            ? record.piSession.getPlanModeState()
+            : null,
+          readRecordEntries(record),
+          readRecordDiskEntries(record),
+        );
         const next = resumeSavedPlanState(current);
         if (!next) {
           const error = new Error('No saved plan to resume');
           error.status = 409;
           throw error;
         }
-        persistRecordPlanState(record, next);
+        await persistRecordPlanState(record, next);
         await this.reload({ sessionID: record.id });
         const reloaded = await ensureRecord(record.id);
         const plan = readRecordPlan(reloaded);
@@ -3501,8 +3789,14 @@ export const createPiHost = ({
         command: 'plan',
         arguments: action === 'exit' ? 'exit' : action,
       });
+      await refreshRecordCommands(record);
       const plan = readRecordPlan(record);
       emitPlanUpdated(record, plan);
+      if (action === 'start' && plan.status === 'off') {
+        const error = new Error('Plan mode did not start');
+        error.status = 500;
+        throw error;
+      }
       return plan;
     },
     listExtensions(directory) {
@@ -3566,7 +3860,7 @@ export const createPiHost = ({
       const spec = typeof source === 'string' ? source.trim() : '';
       await manager.update(spec || undefined);
       const cwd = directory || defaultDirectory;
-      const reload = await this.reloadIdleSessions(cwd);
+      const reload = await this.reloadIdleSessions();
       return {
         extensions: this.listExtensions(cwd),
         packages: await this.listPackagesWithVersions(cwd, { env, fetchImpl }),
@@ -3745,6 +4039,7 @@ export const createPiHost = ({
           continue;
         }
         try {
+          record.pluginCommandReloads = undefined;
           await this.reload({ sessionID: record.id });
           reloaded.push(record.id);
         } catch (error) {

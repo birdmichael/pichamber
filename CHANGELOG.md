@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: Goal and Plan can start on an already-open conversation, not only a new chat. Start Goal after a reply stays on that chat, shows `/goal` above the Goal replies, and names the session from the objective. An empty draft Start Goal still runs to Goal complete. The Goal plugin’s “Goal mode is active…” line is not a chat bubble or a sidebar title. Start Goal while Plan is on explains that Plan mode is active and offers Exit Plan in the dialog. The composer Goal row and sidebar target mark clear after Goal complete, and the sidebar mark also clears when you reopen or restart a chat that is no longer running Goal. Switching away no longer brings back a Recap or follow-up chip from that Goal turn. Agent→Plan toasts, shows a Plan row, and opens the Plan panel on a live chat; an empty draft still waits to start Plan until you send. A new empty chat starts on Agent and does not keep the previous chat’s Plan chip. New session from a project or group + no longer inserts `/` when the composer still had focus.
 - Chat: checking Subagent status or debug on one conversation no longer hides another open chat under that parent or marks the other chat complete.
 
 ## [1.2.5] - 2026-08-28

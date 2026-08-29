@@ -70,6 +70,7 @@ import {
   forkFromMessage as forkFromMessageAction,
   fetchMessagesForSession,
   type ArchiveSessionsOptions,
+  type CreateSessionOptions,
   type DeleteSessionOptions,
   type DeleteSessionsOptions,
   type UnarchiveSessionsOptions,
@@ -86,6 +87,7 @@ import { getAttachedSessionDirectory } from "./session-worktree-contract"
 import { setSessionOpener } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isVSCodeRuntime } from "@/lib/desktop"
+import { clearChatDraft, createChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import {
   CHAT_DRAFT_PROJECT_ID,
   deleteChatDirectory,
@@ -308,6 +310,8 @@ export type NewSessionDraftState = {
   targetFolderId?: string
   target: "chat" | "project"
   preparedChatDirectory?: string | null
+  /** User-initiated New session: start empty, do not restore a leftover `/`. */
+  resetComposer?: boolean
 }
 
 export type ViewportAnchor = {
@@ -390,7 +394,13 @@ export type SessionUIState = {
     options?: SendMessageOptions,
   ) => Promise<void>
 
-  createSession: (title?: string, directoryOverride?: string | null, parentID?: string | null, metadata?: Record<string, unknown>) => Promise<Session | null>
+  createSession: (
+    title?: string,
+    directoryOverride?: string | null,
+    parentID?: string | null,
+    metadata?: Record<string, unknown>,
+    options?: CreateSessionOptions,
+  ) => Promise<Session | null>
   deleteSession: (id: string, options?: DeleteSessionOptions) => Promise<boolean>
   deleteSessions: (ids: string[], options?: DeleteSessionsOptions) => Promise<{ deletedIds: string[]; failedIds: string[] }>
   archiveSession: (id: string) => Promise<boolean>
@@ -996,10 +1006,17 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     persistDraftTarget({ projectId: selectedProject?.id ?? null, directory })
 
-    const planSelected = resolveOpenedDraftPlanSelected(
-      options?.planSelected,
-      get().emptyComposerPlanSelected,
-    )
+    const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
+    const resetComposer = !options?.automatic && !options?.initialPrompt
+    // Drop a leftover new-session `/` (or other typed text) before ChatInput
+    // restores that identity. Automatic boot and initialPrompt keep the draft.
+    if (resetComposer) {
+      const draftDirectory = target === "chat"
+        ? normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
+        : directory
+      const identity = createChatDraftIdentity(getRuntimeKey(), draftDirectory, null)
+      if (identity) clearChatDraft(identity, true)
+    }
     const nextDraft: NewSessionDraftState = {
       draftId: nextDraftId++,
       open: true,
@@ -1017,6 +1034,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       initialPrompt: options?.initialPrompt,
       syntheticParts: options?.syntheticParts,
       targetFolderId: options?.targetFolderId,
+      resetComposer,
     }
 
     set({
@@ -1025,6 +1043,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       },
       currentSessionId: null,
       currentSessionDirectory: null,
+      emptyComposerPlanSelected: planSelected,
       error: null,
     })
 
@@ -1580,16 +1599,18 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
   // ---------------------------------------------------------------------------
   // createSession
   // ---------------------------------------------------------------------------
-  createSession: async (title, directoryOverride, parentID, metadata) => {
+  createSession: async (title, directoryOverride, parentID, metadata, options) => {
     const draft = get().newSessionDraft
     const targetFolderId = draft.targetFolderId
 
     try {
       const dir = directoryOverride ?? opencodeClient.getDirectory()
-      const session = await createSessionAction(title, dir, parentID ?? null, metadata)
+      const session = await createSessionAction(title, dir, parentID ?? null, metadata, options)
       if (!session) return null
 
-      get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
+      if (options?.activate !== false) {
+        get().closeNewSessionDraft({ consumeEmptyComposerPlan: true })
+      }
 
       if (targetFolderId) {
         const scopeKey = directoryOverride || get().lastLoadedDirectory || session.directory

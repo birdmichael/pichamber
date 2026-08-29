@@ -159,7 +159,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <SessionGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
-                                draftOpen={newSessionDraftOpen}
+                                draftOpen={newSessionDraftOpen && !currentSessionId}
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
                             />
@@ -170,7 +170,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <PiGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
-                                draftOpen={newSessionDraftOpen}
+                                draftOpen={newSessionDraftOpen && !currentSessionId}
                                 footerIconButtonClass={footerIconButtonClass}
                                 iconSizeClass={iconSizeClass}
                             />
@@ -248,7 +248,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         <SessionGoalButton
                             sessionId={currentSessionId}
                             directory={directory}
-                            draftOpen={newSessionDraftOpen}
+                            draftOpen={newSessionDraftOpen && !currentSessionId}
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
                             withTooltip
@@ -259,7 +259,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         <PiGoalButton
                             sessionId={currentSessionId}
                             directory={directory}
-                            draftOpen={newSessionDraftOpen}
+                            draftOpen={newSessionDraftOpen && !currentSessionId}
                             footerIconButtonClass={footerIconButtonClass}
                             iconSizeClass={iconSizeClass}
                             withTooltip

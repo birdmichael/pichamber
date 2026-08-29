@@ -179,6 +179,11 @@ const createRemotePiSession = (client, snapshot) => {
     getCommands() {
       return Array.isArray(state.commands) ? state.commands : [];
     },
+    async refreshSnapshot() {
+      const snapshot = await client.call('session.get', { sessionId: state.sessionId });
+      applySnapshot(snapshot);
+      return Array.isArray(state.commands) ? state.commands : [];
+    },
     getToolDefinition(name) {
       return (state.toolNames || []).includes(name) ? { name } : undefined;
     },
@@ -189,11 +194,14 @@ const createRemotePiSession = (client, snapshot) => {
       state.toolNames = asCustomToolList(next).map((tool) => tool.name);
     },
     getPlanModeState() {
-      return state.planModeState;
+      return state.planModeState && typeof state.planModeState === 'object'
+        ? state.planModeState
+        : null;
     },
     setPlanModeState(next) {
+      // Real AgentSession has no setPlanModeState. Persist the custom entry.
       state.planModeState = next;
-      return call('setPlanModeState', [next]);
+      return call('appendCustomEntry', ['plan-mode-state', next], 'sessionManager');
     },
     sessionManager: {
       getEntries() {

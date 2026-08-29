@@ -1,12 +1,17 @@
 import React from 'react';
 
 import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
+import { readPiGoalRouteSessionID } from '@/lib/piGoal';
+import { getRuntimeKey } from '@/lib/runtime-switch';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { readLastActiveSession } from '@/sync/last-session-cache';
 import { refreshFeaturePlugins, usePiPlanPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import {
   canShowPiPlanToggle,
+  isPlanChromeDraft,
   planBuildAvailable,
   resolveFooterPlanSelected,
+  resolvePlanChromeSessionID,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
@@ -17,9 +22,19 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 export function usePiPlanChrome(sessionID?: string | null) {
   const isPiKernel = usePiKernel();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
-  const draftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
+  const storeDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const draftPlanSelected = useSessionUIStore((state) => state.newSessionDraft?.planSelected === true);
-  const resolvedSessionId = sessionID ?? currentSessionId;
+  const routeSessionID = typeof window === 'undefined'
+    ? ''
+    : readPiGoalRouteSessionID(window.location.search);
+  const lastActiveSessionID = readLastActiveSession(getRuntimeKey())?.sessionId ?? '';
+  const resolvedSessionId = resolvePlanChromeSessionID({
+    sessionID,
+    currentSessionID: currentSessionId,
+    routeSessionID,
+    lastActiveSessionID,
+  }) || null;
+  const draftOpen = isPlanChromeDraft(storeDraftOpen, resolvedSessionId);
   const planPluginAvailable = usePiPlanPluginAvailable();
   const plan = useSessionPlan(resolvedSessionId);
   const { phase } = useCurrentSessionActivity();

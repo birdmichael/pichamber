@@ -15,11 +15,35 @@ OpenChamber Session Goal stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
 When Feature Plugins `goal` is installed and enabled, `ComposerFooter` shows
 one `PiGoalButton` in that same cluster. Click opens a modal; a non-empty
 objective submits `/goal <objective>` (or the configured command) through
-`session.command` / `piSession.prompt`, not `promptAsync`. A new-session draft
-mints a real session first. Start does not require a provider/model from the
-config store. Failures (no session, missing live command, send error) render
-inside the modal — Desktop dialogs sit on the top layer, so toasts are not
-visible while it is open. Bare `/goal` is rejected. Disable or uninstall
+`session.command` / `piSession.prompt`, not `promptAsync`. The host also
+appends that `/goal` text as a user bubble and titles an Untitled session
+from the objective. A `PiGoalStatusRow` above the composer shows the
+latest `/goal` objective from the same chat Start Goal targets
+(current session, then URL `?session=`, then last-active) until an
+assistant says Goal complete, a Goal complete tool result lands, or
+`metadata.pichamber.piGoal.active` is false — including when `/goal`
+is last in the transcript. Read-only; not leftover OpenChamber
+Session Goal. Sidebar Goal rows use `metadata.pichamber.piGoal.active`.
+That mark is also cleared when the session is listed or opened and
+`goal-state` is no longer in-flight, so interrupt, an abandoned empty
+draft, or a leftover mark after restart does not keep 🎯.
+Recap and the follow-up chip stay hidden while the latest user turn
+is `/goal`.
+A new-session draft mints a real session first and does not switch the
+open chat onto that id until `/goal` is accepted. If the store, URL
+`?session=`, or last-active session already names a chat, Start Goal
+must use that id even when an auto-draft welcome cleared
+`currentSessionId`. Mint only when all of those are empty. A failed start keeps the
+draft and the modal; retry reuses the minted session instead of creating
+another. Start does not require a provider/model from the config store. The host
+409s `/goal` while that session is already in Plan. Desktop also refuses Start
+Goal while the Plan chip is on — including local draft Plan — and does not mint
+or send `/goal`. The dialog copy matches the host 409, Start stays disabled,
+and Exit Plan switches the chip back to Agent. Failures (no session,
+missing live command, Plan mutex, send error) render inside the modal — Desktop
+dialogs sit on the top layer, so toasts are not visible while it is open.
+Agent→Plan on a draft toasts and shows a Plan row (`Plan starts when you send`).
+A live `/plan start` also opens the Desktop Plan rail. Bare `/goal` is rejected. Disable or uninstall
 hides the button. `ComposerFooter` still hides OpenCode-only
 permission auto-accept, revert, and `/shell`.
 On Pi it also no longer mounts the footer context-usage percent chip;
@@ -74,12 +98,12 @@ dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
 fetch. On a new-session draft, choosing Plan is local composer intent: it does
-not `createSession` or leave the draft. That intent stays on the empty
-composer after you open another session and come back, until you send or
-pick Agent. An already-open session still shows its own stored Agent or Plan.
+not `createSession` or leave the draft. That intent stays on this draft
+until you send or pick Agent. A later New session starts on Agent. An
+already-open session still shows its own stored Agent or Plan.
 Send uses the same Agent materialize path, then `/plan start` on that new
 session if Plan is not already on, then the prompt. An already-open session
-still runs `/plan start` / save / exit on that same session. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
+still runs `/plan start` / save / exit on that same session. If an auto-draft welcome cleared `currentSessionId` while `?session=` or last-active still names a chat, Agent→Plan still `/plan start` on that id instead of storing local draft Plan intent. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`
 and `PiGoalButton` as Desktop (`MobilePillComposer` is the collapsed pill and
 does not host those controls; they appear after expand). The left cluster
 class `composer-mobile-actions` still clamps attach / Goal to a 24px icon
@@ -90,6 +114,11 @@ Leaving Plan while it is on and there is no document uses `/plan exit`. Typing
 listed `/plan` in the composer still sends empty arguments and opens the plugin
 launch card. The slash menu must offer live `/plan` next to `/plan-feature`;
 selecting it completes to `/plan`, not `/plan start`.
+A user-initiated New session (sidebar project/group `+`, File menu, or
+Cmd+N) starts with an empty composer. It does not restore a leftover
+`/` from the previous new-session draft, and the `+` button’s mousedown
+does not insert `/` into a still-focused composer. Automatic boot
+drafts still restore typed text.
 Desktop `/` docks a new-session composer to the bottom of the chat column
 so the menu can use the space above it (a centered welcome only leaves
 ~256px). Docking the whole welcome block is not enough: the title and

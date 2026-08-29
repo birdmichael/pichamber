@@ -44,6 +44,7 @@ import { SessionActivityDuration } from '@/components/session/SessionActivityDur
 import { useSessionMultiSelectStore } from '@/stores/useSessionMultiSelectStore';
 import { useI18n } from '@/lib/i18n';
 import { useShiftKeyHeld } from '@/hooks/useShiftKeyHeld';
+import { sessionHasPiGoalMarker } from '@/lib/piGoal';
 import { getSessionGoal } from '@/lib/sessionGoalMetadata';
 import { sessionGoalStatusColor, sessionGoalStatusLabelKey } from '@/lib/sessionGoalPresentation';
 import { getRuntimeBearerTokenSync } from '@/lib/runtime-auth';
@@ -470,13 +471,22 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   const isMovingToWorktree = useIsSessionWorktreeMovePending(session.id);
   const sessionPermissions = useSessionPermissions(session.id, sessionDirectory ?? undefined, { bootstrap: false });
   const sessionGoal = getSessionGoal(resolvedSession);
-  const sessionGoalGlyph = sessionGoal ? (
+  const piGoalMarked = sessionHasPiGoalMarker(resolvedSession);
+  const sessionGoalGlyph = sessionGoal || piGoalMarked ? (
     <span
       className="inline-flex flex-shrink-0 items-center"
-      title={t(sessionGoalStatusLabelKey[sessionGoal.status] as never)}
-      aria-label={t(sessionGoalStatusLabelKey[sessionGoal.status] as never)}
+      title={sessionGoal
+        ? t(sessionGoalStatusLabelKey[sessionGoal.status] as never)
+        : t('chat.piGoal.row.aria')}
+      aria-label={sessionGoal
+        ? t(sessionGoalStatusLabelKey[sessionGoal.status] as never)
+        : t('chat.piGoal.row.aria')}
     >
-      <Icon name="target" className="h-3 w-3" style={{ color: sessionGoalStatusColor[sessionGoal.status] }} />
+      <Icon
+        name="target"
+        className={cn('h-3 w-3', !sessionGoal && 'text-primary')}
+        style={sessionGoal ? { color: sessionGoalStatusColor[sessionGoal.status] } : undefined}
+      />
     </span>
   ) : null;
   const sessionTitle = resolveSessionDisplayTitle(
@@ -1345,7 +1355,7 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
                             </>
                           )}
                         </span>
-                      ) : (showActivityDuration || sessionGoalGlyph || showInlineBranchMarker) ? (
+                      ) : (showActivityDuration || sessionGoalGlyph || showInlineBranchMarker || sessionCompactUpdatedLabel) ? (
                         <div className="relative ml-1 flex h-4 flex-shrink-0 items-center justify-end">
                           <span className={cn(
                             'inline-flex items-center gap-1 whitespace-nowrap text-right transition-opacity duration-150',
@@ -1368,6 +1378,11 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
                                     className={cn('h-3 w-3', !prIconColor && 'text-muted-foreground/60')}
                                     style={prIconColor ? { color: prIconColor } : undefined}
                                   />
+                                ) : null}
+                                {sessionCompactUpdatedLabel ? (
+                                  <span className="text-[0.72rem] text-muted-foreground/75">
+                                    {sessionCompactUpdatedLabel}
+                                  </span>
                                 ) : null}
                               </>
                             )}

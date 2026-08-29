@@ -9,6 +9,7 @@ import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
 import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
+import { serializeSessionCommands, serializeSessionSnapshot } from './node-kernel-protocol.js';
 import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
 import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
 import { resolvePiAgentDir } from './pi-resources.js';
@@ -611,6 +612,96 @@ const listActiveSessionFiles = (cwd, home) => {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((name) => name.endsWith('.jsonl'));
 };
+
+describe('node kernel session snapshot commands', () => {
+  it('normalizes invocationName onto name for the parent getCommands cache', () => {
+    expect(serializeSessionCommands([
+      { invocationName: 'goal', description: 'Set a goal' },
+      { name: '/plan', source: 'prompt', description: 'Plan' },
+      { name: 'goal', invocationName: 'goal:1', description: 'Set a goal' },
+      { description: 'drop me' },
+    ])).toEqual([
+      { name: 'goal', description: 'Set a goal', source: 'extension' },
+      { name: 'plan', description: 'Plan', source: 'prompt' },
+      { name: 'goal', invocationName: 'goal:1', description: 'Set a goal', source: 'extension' },
+    ]);
+  });
+
+  it('serializes extensionRunner commands when AgentSession has no getCommands()', () => {
+    expect(serializeSessionSnapshot({
+      sessionId: 'ses_runner',
+      extensionRunner: {
+        getRegisteredCommands: () => ([
+          { name: 'goal', invocationName: 'goal', description: 'Set a goal' },
+          { name: 'plan', invocationName: 'plan:1', description: 'Enter or manage Plan mode' },
+        ]),
+      },
+    }).commands).toEqual([
+      { name: 'goal', description: 'Set a goal', source: 'extension' },
+      { name: 'plan', invocationName: 'plan:1', description: 'Enter or manage Plan mode', source: 'extension' },
+    ]);
+  });
+
+  it('serializes plan-mode-state from session entries when getPlanModeState is missing', () => {
+    expect(serializeSessionSnapshot({
+      sessionId: 'ses_plan',
+      sessionManager: {
+        getEntries: () => ([{
+          type: 'custom',
+          customType: 'plan-mode-state',
+          data: { enabled: true, awaitingAction: false },
+        }]),
+      },
+    }).planModeState).toMatchObject({ enabled: true });
+  });
+
+  it('GET/POST plan after start follow child snapshot entries over IPC', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const kernel = createDesktopKernel({ home, cwd });
+    try {
+      await expect(kernel.ready()).resolves.toBe(true);
+      const record = await kernel.host.createSession({ directory: cwd, title: 'Plan ipc' });
+      expect(await kernel.host.getSessionPlan(record.id)).toEqual({ status: 'off', planMarkdown: '' });
+
+      const started = await kernel.host.runPlanAction(record.id, { action: 'start' });
+      expect(started).toEqual({ status: 'active', planMarkdown: '' });
+      expect(await kernel.host.getSessionPlan(record.id)).toEqual({ status: 'active', planMarkdown: '' });
+      expect(record.piSession.getPlanModeState()?.enabled).toBe(true);
+
+      record.piSession.setPlanModeState = () => {
+        throw new Error('must not IPC setPlanModeState');
+      };
+      await record.piSession.sessionManager.appendCustomEntry('plan-mode-state', {
+        enabled: false,
+        savedPlan: { plan: '# Saved over IPC', source: 'plan_mode_complete' },
+      });
+      const resumed = await kernel.host.runPlanAction(record.id, { action: 'resume' });
+      expect(resumed).toMatchObject({
+        status: 'ready',
+        planMarkdown: '# Saved over IPC',
+      });
+    } finally {
+      kernel.dispose();
+    }
+  });
+
+  it('refreshes parent getCommands() from the child session.get snapshot', async () => {
+    const home = tempDir('pi-node-home-');
+    const cwd = tempDir('pi-node-cwd-');
+    const kernel = createDesktopKernel({ home, cwd });
+    try {
+      await expect(kernel.ready()).resolves.toBe(true);
+      const record = await kernel.host.createSession({ directory: cwd });
+      expect(typeof record.piSession.refreshSnapshot).toBe('function');
+      const refreshed = await record.piSession.refreshSnapshot();
+      expect(refreshed.some((command) => command.name === 'plan')).toBe(true);
+      expect(record.piSession.getCommands().some((command) => command.name === 'plan')).toBe(true);
+    } finally {
+      kernel.dispose();
+    }
+  });
+});
 
 describe('node kernel session IPC', () => {
   it('sends sessionFile and sessionID instead of a live SessionManager', () => {

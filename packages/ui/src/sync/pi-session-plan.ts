@@ -61,6 +61,24 @@ const trimmedSessionID = (sessionID?: string | null): string => (
   typeof sessionID === 'string' ? sessionID.trim() : ''
 );
 
+/** Open chat first. Draft Plan intent only when none of these name a session. */
+export const resolvePlanChromeSessionID = (input: {
+  sessionID?: string | null;
+  currentSessionID?: string | null;
+  routeSessionID?: string | null;
+  lastActiveSessionID?: string | null;
+}): string => (
+  trimmedSessionID(input.sessionID)
+  || trimmedSessionID(input.currentSessionID)
+  || trimmedSessionID(input.routeSessionID)
+  || trimmedSessionID(input.lastActiveSessionID)
+);
+
+export const isPlanChromeDraft = (
+  draftOpen: boolean,
+  sessionID?: string | null,
+): boolean => Boolean(draftOpen && !trimmedSessionID(sessionID));
+
 /** Footer chips: Plan slot on, plus a session id or an idle new-session draft. */
 export const canShowPiPlanToggle = (
   available: boolean,
@@ -127,8 +145,8 @@ export const resolveFooterPlanSelected = (input: {
 };
 
 /**
- * Last Agent/Plan choice for the empty composer.
- * Sidebar navigation keeps it; send or an explicit Agent pick consumes it.
+ * Last Agent/Plan choice for this empty composer.
+ * Send or an explicit Agent pick consumes it. A later New session does not inherit it.
  */
 export const resolveEmptyComposerPlanSelected = (input: {
   current: boolean;
@@ -141,11 +159,10 @@ export const resolveEmptyComposerPlanSelected = (input: {
   return input.current;
 };
 
-/** Restore last empty-composer Plan when a new-session draft reopens. */
+/** A new New-session draft is Agent unless the caller asks for Plan. */
 export const resolveOpenedDraftPlanSelected = (
   option: boolean | undefined,
-  emptyComposerPlanSelected: boolean,
-): boolean => option ?? emptyComposerPlanSelected;
+): boolean => option === true;
 
 export const shouldStartPlanAfterDraftMaterialize = (
   draftPlanSelected?: boolean,

@@ -523,6 +523,35 @@ describe('createEventTranslator', () => {
     expect(started[0].properties.info.cost).toBeUndefined();
   });
 
+  it('does not emit the Goal plugin system preamble as a user bubble', () => {
+    const t = translator();
+    const events = t.translate({
+      type: 'message_start',
+      message: {
+        role: 'user',
+        id: 'pi_preamble',
+        content: 'Goal mode is active. Complete this goal fully: say bye',
+      },
+    });
+    expect(events).toEqual([]);
+    expect(t.userMessageID).toBeNull();
+  });
+
+  it('keeps a facade /goal user id when skipping the Goal preamble', () => {
+    const t = translator();
+    t.setUserMessage('msg_goal');
+    const events = t.translate({
+      type: 'message_start',
+      message: {
+        role: 'user',
+        id: 'pi_preamble',
+        content: 'Goal mode is active. Complete this goal fully: say bye',
+      },
+    });
+    expect(events).toEqual([]);
+    expect(t.userMessageID).toBe('msg_goal');
+  });
+
   it('does not echo a second user text part when the facade already recorded the prompt', () => {
     const t = translator();
     t.setUserMessage('msg_user');

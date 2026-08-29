@@ -10,6 +10,8 @@ import {
   facadeMessagesFromPiEntries,
   parseSessionImport,
   reconcileHydratedMessages,
+  restoreGoalCommandPlacement,
+  stampGoalCommandChronology,
   persistFacadeMessages,
   piMessagesFromFacadeEntry,
   readPiCodingAgentVersion,
@@ -770,6 +772,52 @@ describe('session-transfer', () => {
     }];
     expect(reconcileHydratedMessages(live, [])).toEqual(live);
     expect(reconcileHydratedMessages(live, [live[0]])).toEqual(live);
+  });
+
+  it('keeps a live /goal user bubble ahead of Goal-turn assistants after hydrate', () => {
+    const live = [{
+      info: { id: 'msg_ok', role: 'user', time: { created: 1 } },
+      parts: [{ type: 'text', text: 'ok' }],
+    }, {
+      info: { id: 'msg_reply', role: 'assistant', time: { created: 2 } },
+      parts: [{ type: 'text', text: 'ok' }],
+    }, {
+      info: { id: 'msg_goal', role: 'user', time: { created: 20 } },
+      parts: [{ type: 'text', text: '/goal say bye' }],
+    }, {
+      info: { id: 'msg_bye', role: 'assistant', time: { created: 10 } },
+      parts: [{ type: 'text', text: 'Bye' }],
+    }, {
+      info: { id: 'msg_done', role: 'assistant', time: { created: 11 } },
+      parts: [{ type: 'text', text: 'Goal complete' }],
+    }];
+    const hydrated = [live[0], live[1], live[3], live[4], {
+      info: { id: 'pi_goal', role: 'user', time: { created: 99 } },
+      parts: [{ type: 'text', text: '/goal say bye' }],
+    }];
+    const reconciled = reconcileHydratedMessages(live, hydrated);
+    expect(reconciled.map((entry) => entry.info.id)).toEqual([
+      'msg_ok',
+      'msg_reply',
+      'msg_goal',
+      'msg_bye',
+      'msg_done',
+    ]);
+    expect(reconciled[2].info.time.created).toBeGreaterThan(reconciled[1].info.time.created);
+    expect(reconciled[2].info.time.created).toBeLessThan(reconciled[3].info.time.created);
+    expect(reconciled[3].info.time.created).toBeLessThan(reconciled[4].info.time.created);
+    expect(restoreGoalCommandPlacement(live, hydrated).map((entry) => entry.info.id)).toEqual([
+      'msg_ok',
+      'msg_reply',
+      'msg_goal',
+      'msg_bye',
+      'msg_done',
+    ]);
+    const stamped = stampGoalCommandChronology([
+      { info: { id: 'msg_goal', role: 'user', time: { created: 50 } }, parts: [{ type: 'text', text: '/goal say bye' }] },
+      { info: { id: 'msg_done', role: 'assistant', time: { created: 5 } }, parts: [{ type: 'text', text: 'Goal complete' }] },
+    ]);
+    expect(stamped[0].info.time.created).toBeLessThan(stamped[1].info.time.created);
   });
 
   it('pairs read and bash toolCalls with later toolResults on the same assistant', () => {

@@ -10,6 +10,7 @@ import { useSkillsStore } from '@/stores/useSkillsStore';
 import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+import { createChatDraftIdentity, readChatDraft, writeChatDraft } from '@/lib/chatDraftPersistence';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import { applyFeaturePluginsPayload, resetPiFeaturePluginsStore } from './pi-feature-plugins-store';
 
@@ -411,6 +412,30 @@ describe('openNewSessionDraft project binding', () => {
     expect(draft.target).toBe('project');
     expect(draft.selectedProjectId).toBe(projectB.id);
   });
+
+  test('user-initiated new session drops a leftover slash draft', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, '/', []);
+
+    useSessionUIStore.getState().openNewSessionDraft({ selectedProjectId: projectB.id });
+
+    expect(readChatDraft(identity).text).toBe('');
+    expect(useSessionUIStore.getState().newSessionDraft.resetComposer).toBe(true);
+  });
+
+  test('automatic new session keeps the persisted composer draft', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, '/', []);
+
+    useSessionUIStore.getState().openNewSessionDraft({
+      selectedProjectId: projectB.id,
+      automatic: true,
+    });
+
+    expect(readChatDraft(identity).text).toBe('/');
+    expect(useSessionUIStore.getState().newSessionDraft.resetComposer).toBeFalsy();
+    writeChatDraft(identity, '', []);
+  });
 });
 
 describe('setCurrentSession single-project picker', () => {
@@ -489,6 +514,26 @@ describe('createSession draft lifecycle', () => {
     expect(session).toBeNull();
     expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true);
     expect(useSessionUIStore.getState().newSessionDraft.title).toBe('Draft title');
+  });
+
+  test('keeps the draft open when createSession is asked not to activate', async () => {
+    opencodeClient.createSession = async () => ({
+      id: 'ses_goal_mint',
+      directory: '/projects/alpha',
+      time: { created: 1 },
+    });
+
+    const session = await useSessionUIStore.getState().createSession(
+      'Draft title',
+      '/projects/alpha',
+      null,
+      undefined,
+      { activate: false },
+    );
+
+    expect(session?.id).toBe('ses_goal_mint');
+    expect(useSessionUIStore.getState().newSessionDraft.open).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBeNull();
   });
 });
 

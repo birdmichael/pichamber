@@ -13,6 +13,7 @@ import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useDeviceInfo } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
 import { PLAN_MODE_ENABLED_NOTIFY, applyPlanToggleSelect, decidePlanToggleSelect } from '@/sync/pi-session-plan';
@@ -51,6 +52,12 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
     if (decision.kind === 'noop') return;
     if (decision.kind === 'draft-intent') {
       useSessionUIStore.getState().setDraftPlanSelected(decision.planSelected);
+      if (decision.planSelected) {
+        presentPiExtensionUiNotify({
+          message: PLAN_MODE_ENABLED_NOTIFY,
+          level: 'info',
+        });
+      }
       return;
     }
 
@@ -73,7 +80,15 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
           message: PLAN_MODE_ENABLED_NOTIFY,
           level: 'info',
         });
+        const sessionID = chrome.sessionID;
+        const directory = (sessionID
+          ? useSessionUIStore.getState().getDirectoryForSession(sessionID)
+          : null)
+          || useDirectoryStore.getState().currentDirectory;
+        if (directory) useUIStore.getState().openContextPlan(directory);
       }
+    } catch {
+      toast.error(t('chat.piPlan.actionFailed'));
     } finally {
       setPending(false);
     }

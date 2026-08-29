@@ -160,6 +160,8 @@ import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
 import { RevertedMessageDock } from './composer/ui/RevertedMessageDock';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
+import { PiGoalStatusRow } from '@/components/chat/PiGoalStatusRow';
+import { PiPlanStatusRow } from '@/components/chat/PiPlanStatusRow';
 
 // Lazy like in ChatMessage: a static import would pull the @pierre/diffs and
 // Shiki stacks into the eager startup graph for a dialog opened on demand.
@@ -861,6 +863,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         onIdentityChange: () => setInputMode('normal'),
         onDraftRestored: () => composerRef.current?.selectAll(),
     });
+
+    // Sidebar / File-menu New session must not keep a leftover `/` or an open
+    // slash menu from the previous composer identity.
+    React.useEffect(() => {
+        if (!newSessionDraft?.open || !newSessionDraft.resetComposer) return;
+        setOpenAutocomplete(null);
+        setAutocompleteQuery('');
+        dismissedAutocompleteKindRef.current = null;
+        if (messageRef.current) {
+            messageRef.current = '';
+            setMessage('');
+            persistDraftImmediately(chatDraftIdentity, '');
+        }
+    }, [chatDraftIdentity, newSessionDraft?.draftId, newSessionDraft?.open, newSessionDraft?.resetComposer, persistDraftImmediately]);
 
     // Focus textarea when new session draft is opened
     const prevNewSessionDraftOpenRef = React.useRef(newSessionDraftOpen);
@@ -2843,7 +2859,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     directory={currentSessionDirectoryForSync ?? currentDirectory}
                     className="mb-1.5"
                 />
-                ) : null}
+                ) : (
+                <>
+                <PiGoalStatusRow
+                    sessionId={currentSessionId}
+                    directory={currentSessionDirectoryForSync ?? currentDirectory ?? undefined}
+                    className="mb-1.5"
+                />
+                <PiPlanStatusRow className="mb-1.5" />
+                </>
+                )}
                 <SessionSuggestionChip
                     sessionId={currentSessionId}
                     directory={currentSessionDirectoryForSync ?? currentDirectory}

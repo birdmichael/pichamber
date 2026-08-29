@@ -2,7 +2,34 @@
 // Mirrors @narumitw/pi-plan-mode presentation.formatStatus. Do not scrape TUI
 // widgets or read leftover .opencode/plans files.
 
+import { readLatestCustomEntryDataFromFileTail } from './session-metadata.js';
+
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
+export const GOAL_STATE_ENTRY_TYPE = 'goal-state';
+
+export const isGoalSystemPreamble = (text) => (
+  /^Goal mode is active\./i.test(String(text || '').trim())
+);
+
+export const isGoalCommandUserText = (text) => (
+  /^\/goal(?::\d+)?\s+\S/i.test(String(text || '').trim())
+);
+
+export const isUnhelpfulSessionTitle = (title) => {
+  const trimmed = typeof title === 'string' ? title.trim() : '';
+  if (!trimmed) return true;
+  if (isGoalSystemPreamble(trimmed)) return true;
+  return /^(继续|continue)$/i.test(trimmed);
+};
+
+const ACTIVE_GOAL_STATUSES = new Set([
+  'active',
+  'queued',
+  'paused',
+  'blocked',
+  'usage_limited',
+  'budget_limited',
+]);
 const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
 const SESSION_PLAN_ACTIONS = Object.freeze([
   'start',
@@ -111,6 +138,160 @@ export const restoreSessionPlanState = (entries) => {
     savedPlan,
     activeImplementation,
   };
+};
+
+const isPlanModeStateEntry = (entry) => (
+  entry?.type === 'custom' && entry?.customType === PLAN_MODE_STATE_ENTRY_TYPE
+);
+
+const latestPlanModeStateTimestamp = (entries) => {
+  const list = Array.isArray(entries) ? entries : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const entry = list[index];
+    if (!isPlanModeStateEntry(entry)) continue;
+    const raw = entry.timestamp;
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()) {
+      const parsed = Date.parse(raw);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return index + 1;
+  }
+  return 0;
+};
+
+/** Parse a session jsonl file. One bad line must not drop later plan-mode-state. */
+export const parseSessionEntriesFromJsonl = (text) => {
+  if (typeof text !== 'string' || !text) return [];
+  const entries = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) entries.push(parsed);
+    } catch {
+    }
+  }
+  return entries;
+};
+
+const entryTimestamp = (entry, index) => {
+  const raw = entry?.timestamp;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return index + 1;
+};
+
+const latestCustomEntry = (entries, customType) => {
+  const list = Array.isArray(entries) ? entries : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const entry = list[index];
+    if (entry?.type === 'custom' && entry?.customType === customType) {
+      return { entry, timestamp: entryTimestamp(entry, index) };
+    }
+  }
+  return null;
+};
+
+const chooseLatestCustomEntry = (memoryEntries, diskEntries, customType) => {
+  const memory = latestCustomEntry(memoryEntries, customType);
+  const disk = latestCustomEntry(diskEntries, customType);
+  if (disk && memory) return disk.timestamp >= memory.timestamp ? disk.entry : memory.entry;
+  return (disk || memory)?.entry || null;
+};
+
+/** Goal holds workflow:mutex:v1 while goal-state is still in-flight. */
+export const isGoalMutexHeld = (memoryEntries, diskEntries) => {
+  const entry = chooseLatestCustomEntry(memoryEntries, diskEntries, GOAL_STATE_ENTRY_TYPE);
+  const status = entry?.data?.goal?.status;
+  return typeof status === 'string' && ACTIVE_GOAL_STATUSES.has(status);
+};
+
+export const isActivePiGoalMarker = (metadata) => {
+  const current = isRecord(metadata) ? metadata.pichamber?.piGoal : undefined;
+  return current === true
+    || Boolean(current && typeof current === 'object' && current.active === true);
+};
+
+export const withPiGoalActive = (metadata, active) => {
+  const existing = isRecord(metadata) ? metadata.pichamber?.piGoal : undefined;
+  return {
+    ...(isRecord(metadata) ? metadata : {}),
+    pichamber: {
+      ...(isRecord(metadata?.pichamber) ? metadata.pichamber : {}),
+      piGoal: existing && typeof existing === 'object' && !Array.isArray(existing)
+        ? { ...existing, active }
+        : { active },
+    },
+  };
+};
+
+export const isGoalMutexHeldFromFile = (file) => {
+  const data = readLatestCustomEntryDataFromFileTail(file, GOAL_STATE_ENTRY_TYPE);
+  const status = data?.goal?.status;
+  return typeof status === 'string' && ACTIVE_GOAL_STATUSES.has(status);
+};
+
+/** List / restore: show 🎯 only while goal-state still holds the mutex. */
+export const reconcileListedPiGoalMetadata = (metadata, sessionFile) => {
+  if (!isActivePiGoalMarker(metadata)) return metadata;
+  if (typeof sessionFile === 'string' && sessionFile && isGoalMutexHeldFromFile(sessionFile)) {
+    return metadata;
+  }
+  return withPiGoalActive(metadata, false);
+};
+
+/** Plan holds the mutex while the session is in Plan (active or ready). */
+export const isPlanMutexHeld = (plan) => (
+  plan?.status === 'active' || plan?.status === 'ready'
+);
+
+const choosePlanModeEntries = (memoryEntries, diskEntries) => {
+  const memory = Array.isArray(memoryEntries) ? memoryEntries : [];
+  const disk = Array.isArray(diskEntries) ? diskEntries : [];
+  const memoryHas = memory.some(isPlanModeStateEntry);
+  const diskHas = disk.some(isPlanModeStateEntry);
+  if (diskHas && memoryHas) {
+    return latestPlanModeStateTimestamp(disk) >= latestPlanModeStateTimestamp(memory)
+      ? disk
+      : memory;
+  }
+  if (diskHas) return disk;
+  return memory;
+};
+
+/** Prefer the jsonl custom entry. Live getPlanModeState() is only a fallback. */
+export const resolvePlanModeState = (liveState, entries, diskEntries) => {
+  const list = choosePlanModeEntries(entries, diskEntries);
+  const hasEntry = list.some(isPlanModeStateEntry);
+  const restored = restoreSessionPlanState(list);
+  if (hasEntry) return restored;
+  if (liveState && typeof liveState === 'object') {
+    const liveOn = liveState.enabled === true
+      || Boolean(liveState.savedPlan)
+      || Boolean(liveState.activeImplementation);
+    if (liveOn) return liveState;
+  }
+  return restored;
+};
+
+export const readPlanModeStateFromSession = (session) => {
+  let live = null;
+  if (typeof session?.getPlanModeState === 'function') {
+    try {
+      const next = session.getPlanModeState();
+      if (next && typeof next === 'object') live = next;
+    } catch {
+    }
+  }
+  const entries = typeof session?.sessionManager?.getEntries === 'function'
+    ? session.sessionManager.getEntries()
+    : [];
+  return resolvePlanModeState(live, entries);
 };
 
 export const sessionPlanFromState = (state) => {

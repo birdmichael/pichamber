@@ -1,5 +1,7 @@
 import type { Message, Part } from '@opencode-ai/sdk/v2';
 
+import { isPiGoalSystemPreamble } from '@/lib/piGoal';
+
 import { deriveMessageRole } from './messageRole';
 import { filterVisibleParts, isEmptyTextPart, normalizeParts } from './partUtils';
 import { normalizeUserDisplayParts } from './normalizeUserDisplayParts';
@@ -35,6 +37,14 @@ export const isHiddenUserMessage = (
 ): boolean => {
     if (!entry) return false;
     if (!deriveMessageRole(entry.info).isUser) return false;
+
+    const rawText = (entry.parts || [])
+        .map((part) => (part?.type === 'text' && typeof (part as { text?: unknown }).text === 'string'
+            ? (part as { text: string }).text
+            : ''))
+        .join('')
+        .trim();
+    if (isPiGoalSystemPreamble(rawText)) return true;
 
     const directory = directoryCacheKey(options.directory);
     const cached = hiddenByParts.get(entry.parts);

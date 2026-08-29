@@ -1,3 +1,5 @@
+import { readPlanModeStateFromSession } from './session-plan.js';
+
 export const NODE_KERNEL_PROTOCOL = 1;
 
 export const serializeKernelError = (error) => ({
@@ -17,6 +19,45 @@ export const restoreKernelError = (payload) => {
   return error;
 };
 
+export const serializeSessionCommands = (commands) => {
+  if (!Array.isArray(commands)) return [];
+  return commands.flatMap((command) => {
+    const rawName = typeof command?.name === 'string' && command.name.trim()
+      ? command.name
+      : (typeof command?.invocationName === 'string' ? command.invocationName : '');
+    const name = rawName.trim().replace(/^\//, '');
+    if (!name) return [];
+    const invocation = typeof command?.invocationName === 'string' && command.invocationName.trim()
+      ? command.invocationName.trim().replace(/^\//, '')
+      : '';
+    const entry = {
+      name,
+      description: typeof command?.description === 'string' ? command.description : '',
+      source: command?.source || 'extension',
+    };
+    if (invocation && invocation !== name) entry.invocationName = invocation;
+    return [entry];
+  });
+};
+
+/** Real AgentSession has no getCommands(); live names live on extensionRunner. */
+export const listSessionCommands = (session) => {
+  if (typeof session?.getCommands === 'function') {
+    try {
+      const commands = session.getCommands();
+      if (Array.isArray(commands) && commands.length > 0) {
+        return serializeSessionCommands(commands);
+      }
+    } catch {
+    }
+  }
+  const registered = session?.extensionRunner?.getRegisteredCommands?.();
+  if (Array.isArray(registered) && registered.length > 0) {
+    return serializeSessionCommands(registered);
+  }
+  return [];
+};
+
 export const serializeSessionSnapshot = (session, extras = {}) => ({
   sessionId: session?.sessionId || extras.sessionId || '',
   sessionFile: typeof session?.sessionFile === 'string' ? session.sessionFile : extras.sessionFile,
@@ -24,8 +65,8 @@ export const serializeSessionSnapshot = (session, extras = {}) => ({
   isCompacting: Boolean(session?.isCompacting),
   thinkingLevel: typeof session?.thinkingLevel === 'string' ? session.thinkingLevel : 'medium',
   currentModel: session?.currentModel || null,
-  commands: typeof session?.getCommands === 'function' ? session.getCommands() : [],
-  planModeState: typeof session?.getPlanModeState === 'function' ? session.getPlanModeState() : null,
+  commands: listSessionCommands(session),
+  planModeState: readPlanModeStateFromSession(session),
   availableThinkingLevels: typeof session?.getAvailableThinkingLevels === 'function'
     ? session.getAvailableThinkingLevels()
     : [],

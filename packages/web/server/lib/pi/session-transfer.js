@@ -1942,16 +1942,78 @@ const userTextFromFacade = (entry) => {
  * Keep live / optimistic user ids when disk hydrate has the same turn
  * under a Pi-native id. Otherwise one send becomes two bubbles.
  */
+const isGoalCommandFacadeUser = (entry) => (
+  entry?.info?.role === 'user' && /^\/goal(?::\d+)?\s+\S/i.test(userTextFromFacade(entry))
+);
+
+/**
+ * Client transcripts sort by time.created. After hydrate, Pi assistant times
+ * can be earlier than the facade /goal bubble — array order is not enough.
+ */
+export const stampGoalCommandChronology = (messages) => {
+  if (!Array.isArray(messages)) return messages;
+  for (let index = 0; index < messages.length; index += 1) {
+    if (!isGoalCommandFacadeUser(messages[index])) continue;
+    let end = index + 1;
+    while (end < messages.length && !isGoalCommandFacadeUser(messages[end])) end += 1;
+    const previousCreated = messages[index - 1]?.info?.time?.created;
+    const base = (typeof previousCreated === 'number' ? previousCreated : Date.now()) + 1;
+    for (let cursor = index; cursor < end; cursor += 1) {
+      const entry = messages[cursor];
+      if (!entry?.info) continue;
+      entry.info.time = { ...(entry.info.time || {}), created: base + (cursor - index) };
+    }
+  }
+  return messages;
+};
+
+/** Keep the live /goal bubble ahead of Goal-turn assistants after jsonl hydrate. */
+export const restoreGoalCommandPlacement = (live, hydrated) => {
+  const previous = Array.isArray(live) ? live : [];
+  const next = Array.isArray(hydrated) ? [...hydrated] : [];
+  const goals = previous.filter(isGoalCommandFacadeUser);
+  if (goals.length === 0) return stampGoalCommandChronology(next);
+  const taken = new Set();
+  const without = next.filter((entry) => {
+    if (!isGoalCommandFacadeUser(entry)) return true;
+    const text = userTextFromFacade(entry);
+    const match = goals.findIndex((goal, index) => (
+      !taken.has(index)
+      && (goal.info.id === entry.info.id || userTextFromFacade(goal) === text)
+    ));
+    if (match < 0) return true;
+    taken.add(match);
+    return false;
+  });
+  for (const goal of goals) {
+    const liveIndex = previous.findIndex((entry) => entry?.info?.id === goal.info.id);
+    const after = liveIndex >= 0 ? previous[liveIndex + 1] : null;
+    const before = liveIndex > 0 ? previous[liveIndex - 1] : null;
+    let insertAt = without.length;
+    if (after?.info?.id) {
+      const afterIdx = without.findIndex((entry) => entry?.info?.id === after.info.id);
+      if (afterIdx >= 0) insertAt = afterIdx;
+    } else if (before?.info?.id) {
+      const beforeIdx = without.findIndex((entry) => entry?.info?.id === before.info.id);
+      if (beforeIdx >= 0) insertAt = beforeIdx + 1;
+    }
+    without.splice(insertAt, 0, goal);
+  }
+  return stampGoalCommandChronology(without);
+};
+
 export const reconcileHydratedMessages = (live, hydrated) => {
   const next = Array.isArray(hydrated) ? hydrated : [];
   const previous = Array.isArray(live) ? live : [];
   if (previous.length === 0) return next;
   // Disk has not caught up (or has only metadata). Do not wipe the live turn.
-  if (next.length === 0 || next.length < previous.length) return previous;
+  if (next.length === 0 || next.length < previous.length) {
+    return restoreGoalCommandPlacement(previous, previous);
+  }
   const liveUsers = previous.filter((entry) => entry?.info?.role === 'user');
   if (liveUsers.length === 0) return next;
   const used = new Set();
-  return next.map((entry) => {
+  const matched = next.map((entry) => {
     if (entry?.info?.role !== 'user') return entry;
     const text = userTextFromFacade(entry);
     if (!text) return entry;
@@ -1971,6 +2033,7 @@ export const reconcileHydratedMessages = (live, hydrated) => {
       })),
     };
   });
+  return restoreGoalCommandPlacement(previous, matched);
 };
 
 export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) => {

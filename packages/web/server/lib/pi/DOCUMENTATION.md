@@ -377,28 +377,45 @@ While a prompt is pending, the usable card belongs on the asking `question` / `p
 | `/plan tools` | Tools `ctx.ui.select`. |
 
 Desktop chrome uses `/plan start` for the Agent \| Plan footer on an already-open
-session. On a new-session draft, the footer Plan chip is local intent only;
-`/plan start` runs after send materializes that session. Composer `/plan` (listed extension command, empty args) still goes through `session.command` → `session.prompt("/plan")` so the launch card still appears. Do not intercept bare `/plan` as a toast-only start.
+session, including one with history. On a new-session draft, the footer Plan
+chip is local intent only; `/plan start` runs after send materializes that
+session. Composer `/plan` (listed extension command, empty args) still goes
+through `session.command` → `session.prompt("/plan")` so the launch card
+still appears. Do not intercept bare `/plan` as a toast-only start.
+`@narumitw/pi-plan-mode` `/plan start` is not limited to new chats. A saved
+plan still blocks another start. Goal and Plan share `workflow:mutex:v1`.
+Busy/retry sessions still 409.
 
 ## Session plan status
 
 `GET /api/pi/session/:id/plan` returns
 `{ status: off|active|ready|saved|implementing, planMarkdown, title? }`
-from the live `plan-mode-state` custom entry (same mapping as
-`pi-plan-mode` `formatStatus`). It does not scrape TUI widgets or read
-`.opencode/plans`. Fetch failure is an HTTP error, not an empty `off`.
+from the session `plan-mode-state` custom entry (same mapping as
+`pi-plan-mode` `formatStatus`). Real `AgentSession` has no
+`getPlanModeState()`; the Node child snapshot and host read restore
+that entry (and fall back to a live getter only when it is actually
+on). An empty getter must not win over jsonl `enabled: true`.
+Memory `getEntries()` can be stale after a cold open or `/plan start`;
+the host also reads the session jsonl file and prefers a disk
+`plan-mode-state` entry when the snapshot omits it. It does not scrape
+TUI widgets or read `.opencode/plans`. Fetch
+failure is an HTTP error, not an empty `off`.
 
 `POST /api/pi/session/:id/plan` `{ action, model? }`:
 
 | action | Dispatch |
 |---|---|
-| `start` | `session.prompt("/plan start")` |
+| `start` | `session.prompt("/plan start")`, then refresh the snapshot and re-read plan-mode-state from memory and the session jsonl. If both still say `off`, 500 — do not treat an empty `prompt()` stub as success. Disk `enabled: true` is success even when the snapshot entries are stale. |
 | `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
 | `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
 | `exit` | `session.prompt("/plan exit")` — discard only |
-| `resume` | rewrite saved → ready `plan-mode-state`, then `reload({ sessionID })`. Do not send `/plan start` (that errors while a saved plan exists) |
+| `resume` | append saved → ready `plan-mode-state` via `sessionManager.appendCustomEntry`, then `reload({ sessionID })`. Do not IPC `setPlanModeState` (real `AgentSession` has no such method). Do not send `/plan start` (that errors while a saved plan exists) |
 
-Busy/retry sessions return 409. Successful actions emit `pi.plan.updated`.
+`resume` and a missing live `/plan` (reload to attach the command) still
+409 while the session is compacting, streaming, or busy. `start` /
+`exit` / `save` / `implement` with a live `/plan` only prompt — they
+must not 409 on a leftover `isStreaming` or busy flag after a Goal or
+ordinary send already finished. Successful actions emit `pi.plan.updated`.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.
@@ -476,9 +493,17 @@ Resolution order:
    with `expandPromptTemplates` left on (Pi CLI path:
    `expandPromptTemplates` / `_tryExecuteExtensionCommand`). No facade user
    bubble. Live source is `getCommands()` when present, otherwise
-   `extensionRunner.getRegisteredCommands()`.
+   `extensionRunner.getRegisteredCommands()`. Hydrate and `bindExtensions`
+   refresh the Desktop node-kernel command snapshot. Feature Plugin
+   names (`goal`, `plan`, `run`, `xai-usage`) refresh once, then
+   `reload({ sessionID })` once while idle, before 404 — only when that
+   slot is installed+enabled or the name is already live. Busy/retry is
+   409, not a missing-command 404. A prompt-file overlay of the same
+   name still dispatches through `session.prompt`. Empty `getCommands()`
+   after bind is not "plugin missing."
 4. Markdown prompts from `listPiCommands` (`{agentDir}/prompts` and project
    `.pi/prompts`) — expand `$ARGUMENTS` and send as chat via `promptAsync`.
+   `/plan` does not take this path while the Plan slot is on.
 5. Other live `getCommands()` entries (`prompt` / `skill`) — same
    `session.prompt` path as the Pi CLI.
 6. Unknown name — 404 when this route is called. The composer does not
@@ -518,22 +543,29 @@ that project. Settings → Extensions packages lists those configured package na
   file body. `GET /api/config/commands/:name` reads the prompt file when
   one exists so Settings can load the real template.
 - Feature Plugins slash names that must appear before a session exists
-  (Plan slot installed+enabled → `/plan`; Subagents slot
-  installed+enabled → `/run`; Btw slot installed+enabled → `/btw`;
-  Grok Usage slot installed+enabled → `/xai-usage`).
-  `/run` copy is user-facing ("Run a subagent as a one-shot workflow"),
-  not plugin jargon. `/btw` is listed as `source: "extension"` so the
-  slash menu can show it; the composer intercepts the command and forks
-  via the existing session host. It does not go through
-  `POST /api/session/:id/command`. Without the package, `/btw` is not
-  listed.
+  (Goal slot installed+enabled → `/goal`; Plan slot installed+enabled →
+  `/plan`; Subagents slot installed+enabled → `/run`; Btw slot
+  installed+enabled → `/btw`; Grok Usage slot installed+enabled →
+  `/xai-usage`).
+  `/goal` copy is "Run a goal to completion". `/plan` copy is "Enter or
+  manage Plan mode". `/run` copy is user-facing ("Run a subagent as a
+  one-shot workflow"), not plugin jargon. `/btw` is listed as
+  `source: "extension"` so the slash menu can show it; the composer
+  intercepts the command and forks via the existing session host. It
+  does not go through `POST /api/session/:id/command`. Without the
+  package, `/btw` is not listed.
 
 Optional `?session=` hydrates that session if needed, then pins the live
-`getCommands()` list. After Feature Plugins install, idle sessions reload
-through `host.reloadIdleSessions()` /
-`POST /api/session/:id/reload` / `piSession.reload()`. The next list read
-sees whatever the live session `getCommands()` reports. `reload` is never
-merged in. Do not emit `server.connected`.
+command list. Real `AgentSession` has no `getCommands()`; names come from
+`extensionRunner.getRegisteredCommands()` (registration `name` plus
+`invocationName` when Pi suffixes a duplicate). The Node-child parent
+snapshot must serialize that runner list. An empty parent
+`getCommands()` cache is not proof the factory is missing. After Feature
+Plugins install or `POST /api/pi/extensions/update`, reload every idle
+session (`reloadIdleSessions()` with no directory filter). Targeted
+`POST /api/session/:id/reload` clears the ensure-once memo so a later
+command can refresh again. `reload` is never merged in. Do not emit
+`server.connected`.
 
 The OpenCode command shape holds extension entries (`name`, `description`,
 `source`, `agent`). A dedicated `GET /api/pi/commands` is not required.
@@ -544,12 +576,14 @@ the list. OpenCode kernel routes are unchanged.
 
 ## Desktop `pichamber` and `pichamber_web`
 
-`ensureDirectoryRuntime` builds cwd-scoped `createAgentSessionServices`
-once. Later `createFacadeSession` / hydrate / attach reuse
-`createAgentSessionFromServices` with that `resourceLoader`. Extension
-factories (`pi-chrome`, `pi-hermes-memory`, …) run once per project
-directory in the Node child. They do not run again on every chat
-open. `bindExtensions` still emits `session_start` per session.
+`ensureDirectoryRuntime` still warms cwd-scoped services for the
+directory placeholder. User chats do **not** reuse that factory:
+`createFacadeSession` / hydrate / attach call `createAgentSession` so
+each chat has its own Goal and Plan runtime. Those plugins call
+`pi.sendUserMessage` on the factory; a shared factory sent the Goal
+preamble and Plan start to another session while this chat only got
+the `/goal` bubble. `bindExtensions` still emits `session_start` per
+session.
 
 Desktop Electron Pi sessions receive host-owned `defineTool`s as
 `customTools` on both `createAgentSession` and `createAgentSessionFromServices`.
@@ -784,16 +818,54 @@ chat:
 
 1. Empty arguments — 400. Bare `/goal` is the TUI manager and Desktop cannot
    draw it.
-2. Live extension command missing — 404. Do not `promptAsync` the slash as a
-   user bubble.
-3. Live extension command present — `record.piSession.prompt("/goal <objective>")`
-   so `registerCommand` runs.
+2. Live extension command missing after snapshot refresh and one idle
+   session reload — 404. The Goal slot must be on to take that ladder;
+   without the package, missing `/goal` is 404 without reload. Busy is
+   409. Do not `promptAsync` the slash as a user bubble.
+3. Live command present (including a prompt overlay of the same name, or
+   `invocationName` `goal:1` when two factories registered `goal`) —
+   `record.piSession.prompt("/<invocation> <objective>")` so
+   `registerCommand` runs. Also append a facade user message
+   `/goal <objective>` (so the chat shows the user’s goal) and
+   title the session from that text when it is still Untitled.
 
-A new empty session lists `goal` on `GET /api/command?session=` after
-install because that GET hydrates the session and idle sessions were
-reloaded. The composer Goal button may mint a draft session before
-`session.command`. Start failures stay in the modal. Do not require a
-provider/model for this command-only start.
+`@narumitw/pi-goal` starts on any idle session, including one with
+history. Opening a persisted session hydrates, binds Desktop `ctx.ui`,
+then serializes the runner command list onto the parent snapshot. A new
+empty session lists `goal` on `GET /api/command?session=` because that
+GET hydrates the session and the Goal slot also injects a catalog row.
+The composer Goal button may mint a draft session before
+`session.command` with `createSession({ activate: false })` only when
+there is no current session. An already-open chat (including one whose
+welcome still looks empty) must send `/goal` to that id. Do not
+switch the open chat onto a minted id until start succeeds; a failed
+start stays in the modal on the draft (and must not look like success).
+Retry reuses the minted id. Do not require a provider/model for this
+command-only start.
+Replacing an existing goal still uses `ctx.ui.confirm`. Goal and Plan
+cannot both hold the workflow mutex. Desktop refuses Start Goal while
+the Plan chip is on, including local draft Plan, and does not mint.
+The host also 409s `/goal` while Plan is `active`/`ready`, and
+`POST plan start` while a `goal-state` entry is still in-flight, so a
+live Plan chat cannot append `/goal`. Session titles skip the Goal
+plugin preamble (`Goal mode is active.`) and keep `/goal <objective>`.
+The translator does not emit that preamble as a user bubble and does
+not take the user-message slot from it. `/goal` binds the facade user
+id on the translator before `prompt`, so empty-draft Goal replies stay
+parented to `/goal` instead of a hidden preamble. After hydrate, the
+live `/goal` user message stays ahead of the Goal-turn assistants and
+those messages are restamped so `time.created` sorts `/goal` first
+(jsonl must not move it below Goal complete). Disk session names that
+are the preamble or `继续` do not replace an objective title. `/goal`
+sets in-memory `metadata.pichamber.piGoal.active` before send so the
+sidebar can show the target mark, persists it after `prompt`, and
+clears `active` on `agent_settled` when `goal-state` is no longer
+in-flight. Session load, reload, message refresh, the live session list, and the
+disk session list do the same reconcile against `goal-state`: interrupt,
+an abandoned empty draft, or a leftover mark after restart must not
+keep 🎯. List tail-scans `goal-state` only when the persisted mark still
+looks active. `/goal`'s `prompt` returns when the command handler
+queues the Goal follow-up, not when Goal complete arrives.
 
 ## Subagent children
 

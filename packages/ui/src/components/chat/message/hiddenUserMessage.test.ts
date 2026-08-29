@@ -50,6 +50,15 @@ describe('user message visibility', () => {
         })).toBe(false);
     });
 
+    test('hides the Goal plugin system preamble', () => {
+        const entry = userMessage([{
+            type: 'text',
+            text: 'Goal mode is active. Complete this goal fully: say bye',
+        } as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(true);
+        expect(isPendingUserMessagePaint(entry, { planModeEnabled: false })).toBe(false);
+    });
+
     test('keeps a real user prompt visible', () => {
         const entry = userMessage([{ type: 'text', text: 'hello' } as Part]);
         expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);

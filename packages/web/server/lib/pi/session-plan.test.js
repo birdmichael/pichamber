@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isGoalCommandUserText,
+  isGoalMutexHeld,
+  isGoalMutexHeldFromFile,
+  isGoalSystemPreamble,
+  isPlanMutexHeld,
+  reconcileListedPiGoalMetadata,
+  isUnhelpfulSessionTitle,
+  parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
+  resolvePlanModeState,
   restoreSessionPlanState,
   resumeSavedPlanState,
   sessionPlanFromState,
@@ -19,6 +31,13 @@ const stateEntry = (data) => ({
 });
 
 describe('session-plan', () => {
+  it('recognizes Goal preamble, /goal user text, and unhelpful titles', () => {
+    expect(isGoalSystemPreamble('Goal mode is active. Complete this goal fully: say bye')).toBe(true);
+    expect(isGoalCommandUserText('/goal say bye')).toBe(true);
+    expect(isUnhelpfulSessionTitle('继续')).toBe(true);
+    expect(isUnhelpfulSessionTitle('say bye')).toBe(false);
+  });
+
   it('maps live plan-mode-state to off/active/ready/saved/implementing', () => {
     expect(sessionPlanFromState({ enabled: false, awaitingAction: false })).toEqual({
       status: 'off',
@@ -51,6 +70,89 @@ describe('session-plan', () => {
       status: 'implementing',
       planMarkdown: 'Implement this',
     });
+  });
+
+  it('prefers jsonl plan-mode-state when live getPlanModeState is empty', () => {
+    expect(resolvePlanModeState(null, [
+      stateEntry({ enabled: true, awaitingAction: false }),
+    ])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: false }, [
+      stateEntry({ enabled: true }),
+    ])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: true }, [
+      stateEntry({ enabled: false, awaitingAction: false }),
+    ])).toMatchObject({ enabled: false });
+    expect(resolvePlanModeState({ enabled: true }, [])).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState(null, [])).toMatchObject({ enabled: false });
+  });
+
+  it('holds the Goal mutex from the latest goal-state entry', () => {
+    expect(isGoalMutexHeld([], [])).toBe(false);
+    expect(isGoalMutexHeld([{
+      type: 'custom',
+      customType: 'goal-state',
+      data: { goal: { status: 'complete' } },
+    }], [])).toBe(false);
+    expect(isGoalMutexHeld([{
+      type: 'custom',
+      customType: 'goal-state',
+      data: { goal: { status: 'active' } },
+    }], [])).toBe(true);
+    expect(isGoalMutexHeld([], [{
+      type: 'custom',
+      customType: 'goal-state',
+      timestamp: '2026-08-28T16:00:00.000Z',
+      data: { goal: { status: 'active' } },
+    }])).toBe(true);
+    expect(isPlanMutexHeld({ status: 'active' })).toBe(true);
+    expect(isPlanMutexHeld({ status: 'ready' })).toBe(true);
+    expect(isPlanMutexHeld({ status: 'off' })).toBe(false);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-goal-mutex-file-'));
+    const dirty = path.join(dir, 'dirty.jsonl');
+    const live = path.join(dir, 'live.jsonl');
+    fs.writeFileSync(dirty, [
+      JSON.stringify({ type: 'session', id: 'ses_dirty' }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'pichamber.metadata',
+        data: { pichamber: { piGoal: { active: true } } },
+      }),
+      '',
+    ].join('\n'));
+    fs.writeFileSync(live, [
+      JSON.stringify({ type: 'session', id: 'ses_live' }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'pichamber.metadata',
+        data: { pichamber: { piGoal: { active: true } } },
+      }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'goal-state',
+        data: { goal: { status: 'active' } },
+      }),
+      '',
+    ].join('\n'));
+    expect(isGoalMutexHeldFromFile(dirty)).toBe(false);
+    expect(isGoalMutexHeldFromFile(live)).toBe(true);
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: { active: true } } }, dirty))
+      .toEqual({ pichamber: { piGoal: { active: false } } });
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: true } }, dirty))
+      .toEqual({ pichamber: { piGoal: { active: false } } });
+    expect(reconcileListedPiGoalMetadata({ pichamber: { piGoal: { active: true } } }, live))
+      .toEqual({ pichamber: { piGoal: { active: true } } });
+    expect(reconcileListedPiGoalMetadata({ archived: 0 }, dirty)).toEqual({ archived: 0 });
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('prefers disk jsonl plan-mode-state when memory getEntries is stale', () => {
+    const disk = parseSessionEntriesFromJsonl([
+      '{"type":"session","id":"ses_1"}',
+      '{"type":"custom","customType":"plan-mode-state","timestamp":"2026-08-28T16:00:00.000Z","data":{"enabled":true,"awaitingAction":false}}',
+    ].join('\n'));
+    expect(resolvePlanModeState(null, [], disk)).toMatchObject({ enabled: true });
+    expect(resolvePlanModeState({ enabled: false }, [], disk)).toMatchObject({ enabled: true });
+    expect(parseSessionEntriesFromJsonl('{"type":"custom","customType":"plan-mode-state","data":{"enabled":true}}\nnot-json\n')).toHaveLength(1);
   });
 
   it('restores the latest plan-mode-state custom entry', () => {
