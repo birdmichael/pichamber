@@ -1,31 +1,39 @@
 /**
- * Hide the composer Agent chip from the real footer / chip-row width, not a
- * @container ancestor that may still be the window / parent pane.
+ * Hide the composer Agent chip from the real parent-column / footer /
+ * chip-row width, not a @container ancestor that may still be the window.
  *
- * Parent main-window chat uses this same ComposerFooter (ChatInput). At the
- * original 1280 squeeze (parent + Work Status + child tabs) that footer is
- * ~328px, but the chip row can still report a wide overflowing box — so a
- * row-only measure keeps painting a 2-letter `Ag`. Measure the footer too.
+ * Parent main-window ChatInput lives under `[data-parent-chat-column]`. At
+ * the original 1280 squeeze (parent + Work Status + child tabs) that column
+ * is ~328px, but the chip row and even the footer can still report a wide
+ * overflowing box — CSS hide then paints a 2-letter `Ag`. ChatInput measures
+ * that column (ResizeObserver) and ModelControls omits the Agent slot from
+ * the DOM below 576px. When Work Status / child close and the column is
+ * wide again, Agent remounts. CSS hide stays as backup.
  *
  * Child/embedded chat is the same ComposerFooter inside an iframe
  * (`?ocPanel=session-chat`). Nesting `@container model-controls` under
- * `html` can still resolve against that document's root (or a leftover
- * named container on html), so a 315–500px child footer keeps painting
- * `A` / `Agen(`. Measure the chip row and footer in this document.
+ * `html` can still resolve against that document's root, so a 315–500px
+ * child footer keeps painting `A` / `Agen(`. Measure the chip row and
+ * footer in this document for the CSS backup.
  */
 
 import React from 'react';
 
-/** 36rem at the 16px root — hide Agent below this chip-row / footer width. */
+/** 36rem at the 16px root — hide / omit Agent below this column / footer width. */
 export const COMPOSER_AGENT_SLOT_HIDE_BELOW_PX = 576;
 
 export const COMPOSER_AGENT_SLOT_HIDE_CLASS = 'model-controls--hide-agent';
 
 export const COMPOSER_FOOTER_ATTR = 'data-chat-input-footer';
 
+export const PARENT_CHAT_COLUMN_ATTR = 'data-parent-chat-column';
+
+export const PARENT_CHAT_COLUMN_SELECTOR = `[${PARENT_CHAT_COLUMN_ATTR}="true"]`;
+
 export type ComposerAgentSlotMetrics = {
   rowWidth: number;
   footerWidth?: number;
+  parentColumnWidth?: number;
   agentScrollWidth?: number;
   agentClientWidth?: number;
   agentLabelScrollWidth?: number;
@@ -45,13 +53,26 @@ const isOverflowingBox = (scrollWidth?: number, clientWidth?: number): boolean =
 };
 
 /**
- * Hide Agent when the parent/child footer or chip row is below 576px, or
- * when the slot / label overflow-clips (`Ag` / `A` sliver / `Agen(`). A
- * 2-letter `Ag` truncation is a fail — hide the whole slot, not a compact
- * label. A wide parent footer (~1000px) with no overflow stays visible.
+ * Omit the Agent slot from the DOM when the parent chat column is below
+ * 576px. A ~328px squeeze must not mount a clipped `Ag` pill.
+ */
+export function shouldOmitComposerAgentSlot(parentColumnWidth: number | undefined): boolean {
+  return isBelowHideBand(parentColumnWidth);
+}
+
+/**
+ * CSS-hide backup: Agent when the parent column / footer / chip row is
+ * below 576px, or when the slot / label overflow-clips (`Ag` / `A` sliver
+ * / `Agen(`). A 2-letter `Ag` truncation is a fail — hide the whole slot,
+ * not a compact label. A wide parent column (~1000px) with no overflow
+ * stays visible.
  */
 export function shouldHideComposerAgentSlot(metrics: ComposerAgentSlotMetrics): boolean {
-  if (isBelowHideBand(metrics.footerWidth) || isBelowHideBand(metrics.rowWidth)) {
+  if (
+    isBelowHideBand(metrics.parentColumnWidth)
+    || isBelowHideBand(metrics.footerWidth)
+    || isBelowHideBand(metrics.rowWidth)
+  ) {
     return true;
   }
   return isOverflowingBox(metrics.agentScrollWidth, metrics.agentClientWidth)
@@ -61,13 +82,18 @@ export function shouldHideComposerAgentSlot(metrics: ComposerAgentSlotMetrics): 
 export function measureComposerAgentSlot(
   row: HTMLElement,
   footer?: HTMLElement | null,
+  parentColumn?: HTMLElement | null,
 ): ComposerAgentSlotMetrics {
   const slot = row.querySelector<HTMLElement>('.model-controls__agent-slot');
   const label = row.querySelector<HTMLElement>('.model-controls__agent-label');
   const footerEl = footer ?? row.closest?.<HTMLElement>(`[${COMPOSER_FOOTER_ATTR}="true"]`) ?? null;
+  const columnEl = parentColumn
+    ?? row.closest?.<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR)
+    ?? null;
   return {
     rowWidth: row.clientWidth,
     footerWidth: footerEl?.clientWidth,
+    parentColumnWidth: columnEl?.clientWidth,
     agentScrollWidth: slot?.scrollWidth,
     agentClientWidth: slot?.clientWidth,
     agentLabelScrollWidth: label?.scrollWidth,
@@ -78,10 +104,59 @@ export function measureComposerAgentSlot(
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
 
 /**
+ * ChatInput under `[data-parent-chat-column]` observes that column.
+ * Returns whether ModelControls must omit the Agent slot (`null`), not
+ * `display:none` a clipped pill. When the column is wide again, the
+ * caller remounts Agent. CSS hide remains backup.
+ */
+export function useParentChatColumnAgentOmit(
+  hostRef: React.RefObject<HTMLElement | null>,
+  enabled: boolean,
+): boolean {
+  const [omit, setOmit] = React.useState(false);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!enabled) {
+      setOmit(false);
+      return;
+    }
+
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+
+    const column = host.closest<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR);
+    if (!column) {
+      setOmit(false);
+      return;
+    }
+
+    const update = () => {
+      const next = shouldOmitComposerAgentSlot(column.clientWidth);
+      setOmit((prev) => (prev === next ? prev : next));
+    };
+
+    update();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+
+    const observer = new ResizeObserver(update);
+    observer.observe(column);
+    return () => observer.disconnect();
+  }, [enabled, hostRef]);
+
+  return enabled && omit;
+}
+
+/**
  * Observe the composer footer and chip row (parent main window and
  * child/iframe). Returns whether `.model-controls__agent-slot` should be
- * `display: none`. The parent path must observe the footer — a squeezed
- * ~328px column can clip `Ag` while the overflowing chip row stays wide.
+ * `display: none`. CSS backup if DOM omit misses — a squeezed ~328px
+ * column can clip `Ag` while the overflowing chip row stays wide.
  */
 export function useComposerAgentSlotHide(
   rowRef: React.RefObject<HTMLElement | null>,
@@ -103,9 +178,12 @@ export function useComposerAgentSlotHide(
 
     const footer = footerRef?.current
       ?? row.closest<HTMLElement>(`[${COMPOSER_FOOTER_ATTR}="true"]`);
+    const parentColumn = row.closest<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR);
 
     const update = () => {
-      const next = shouldHideComposerAgentSlot(measureComposerAgentSlot(row, footer));
+      const next = shouldHideComposerAgentSlot(
+        measureComposerAgentSlot(row, footer, parentColumn),
+      );
       setHide((prev) => (prev === next ? prev : next));
     };
 
@@ -120,6 +198,9 @@ export function useComposerAgentSlotHide(
     observer.observe(row);
     if (footer) {
       observer.observe(footer);
+    }
+    if (parentColumn) {
+      observer.observe(parentColumn);
     }
     return () => observer.disconnect();
   }, [enabled, rowRef, footerRef]);

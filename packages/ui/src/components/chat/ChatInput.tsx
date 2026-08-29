@@ -159,6 +159,7 @@ import {
 } from './composer/ui/DraftTargetSelectors';
 import { ComposerAutocompletePopups } from './composer/ui/ComposerAutocompletePopups';
 import { ComposerFooter } from './composer/ui/ComposerFooter';
+import { useParentChatColumnAgentOmit } from './composer/ui/composerAgentSlotLayout';
 import { chatHelperPlaceholderKey, shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
@@ -425,6 +426,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
     const agents = getVisibleAgents();
     const isMobile = useUIStore((state) => state.isMobile);
+    // ChatInput in [data-parent-chat-column] omits Agent below 576px (~328px squeeze).
+    const omitParentColumnAgentSlot = useParentChatColumnAgentOmit(composerFormRef, !isMobile);
     const hasHardwareKeyboard = useHardwareKeyboard();
     const { enabled: isTabletLayout } = useTabletLayout();
     const setImagePreviewOpen = useUIStore((state) => state.setImagePreviewOpen);
@@ -3059,6 +3062,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     <ComposerFooter
                         isMobile={isMobile}
                         isVSCode={isVSCode}
+                        omitAgentSlot={omitParentColumnAgentSlot}
                         sessionId={currentSessionId}
                         directory={currentSessionDirectoryForSync ?? currentDirectory}
                         newSessionDraftOpen={newSessionDraftOpen}

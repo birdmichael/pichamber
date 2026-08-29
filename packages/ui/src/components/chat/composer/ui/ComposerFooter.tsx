@@ -73,6 +73,8 @@ export interface ComposerFooterProps {
     onDictationInsert: (text: string) => void;
     onDictationInsertAndSend: (text: string) => void;
     onDictationContentHeightChange: (height: number | null) => void;
+    /** Parent ChatInput measured `[data-parent-chat-column]` < 576px. */
+    omitAgentSlot?: boolean;
 }
 
 export function ComposerFooter(props: ComposerFooterProps) {
@@ -113,14 +115,14 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationInsert,
         onDictationInsertAndSend,
         onDictationContentHeightChange,
+        omitAgentSlot = false,
     } = props;
 
     const footerRef = React.useRef<HTMLDivElement>(null);
     const chipRowRef = React.useRef<HTMLDivElement>(null);
-    // Parent main-window ChatInput uses this footer (~328px when squeezed).
-    // Observe the footer, not only the chip row: a wide overflowing row
-    // would skip the hide and paint a 2-letter `Ag`.
-    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile, footerRef);
+    // CSS hide is backup. Parent ChatInput omits Agent from the DOM when
+    // `[data-parent-chat-column]` is below 576px (~328px squeeze).
+    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile, footerRef) || omitAgentSlot;
 
     return (
         <div
@@ -290,7 +292,10 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
                         )}
                     >
-                        <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
+                        <MemoModelControls
+                            className={cn('flex-1 min-w-0 justify-end')}
+                            omitAgentSlot={omitAgentSlot}
+                        />
                         <MemoComposerDictation
                             radius={chatInputRadius}
                             isMobile={isMobile}

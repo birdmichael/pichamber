@@ -255,10 +255,10 @@ div[data-chat-input-footer="true"] {
   min-width: 0;
 }
 
-/* Measurement hook: hide Agent from the real footer / chip-row width
-   (parent main-window ChatInput and child/iframe). A ~328px parent
-   footer must hide the whole slot — not a compact `Ag` label.
-   @container can still resolve against a wide ancestor. */
+/* CSS backup: hide Agent from the footer / chip-row / parent column.
+   Parent ChatInput omits the Agent slot from the DOM when
+   [data-parent-chat-column] is below 576px (~328px squeeze). A compact
+   `Ag` label is a fail. @container can still resolve against a wide ancestor. */
 .model-controls--hide-agent .model-controls__agent-slot,
 .model-controls--hide-agent .model-controls__agent-trigger {
   display: none;

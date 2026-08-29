@@ -303,12 +303,15 @@ interface ModelControlsProps {
     className?: string;
     mobilePanel?: MobileControlsPanel;
     onMobilePanelChange?: (panel: MobileControlsPanel) => void;
+    /** Parent column < 576px: do not mount the Agent chip (no clipped `Ag`). */
+    omitAgentSlot?: boolean;
 }
 
 export const ModelControls: React.FC<ModelControlsProps> = ({
     className,
     mobilePanel,
     onMobilePanelChange,
+    omitAgentSlot = false,
 }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
@@ -3187,9 +3190,11 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
+                    {omitAgentSlot ? null : (
                     <div className="model-controls__agent-slot min-w-0 overflow-hidden">
                         {renderAgentSelector()}
                     </div>
+                    )}
                     <div className="model-controls__plan-slot">
                         <PiPlanModeToggle />
                     </div>
