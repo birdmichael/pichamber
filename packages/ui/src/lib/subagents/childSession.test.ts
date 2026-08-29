@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 
-import { canOpenSubagentChildSession, openSubagentChildSession } from './childSession';
+import {
+  canOpenSubagentChildSession,
+  openSubagentChildSession,
+  resolveParentDirectoryForChildIdle,
+  resolveSubagentChildDirectory,
+} from './childSession';
 
 describe('canOpenSubagentChildSession', () => {
   test('requires both a session id and a directory', () => {
@@ -77,5 +82,22 @@ describe('openSubagentChildSession', () => {
       },
     })).toBe(false);
     expect(opened).toBe(0);
+  });
+});
+
+describe('resolveSubagentChildDirectory', () => {
+  test('prefers the child directory and falls back to the parent only when missing', () => {
+    expect(resolveSubagentChildDirectory({ directory: '/repo-worktree' }, '/repo')).toBe('/repo-worktree');
+    expect(resolveSubagentChildDirectory('/repo-worktree', '/repo')).toBe('/repo-worktree');
+    expect(resolveSubagentChildDirectory({ directory: null }, '/repo')).toBe('/repo');
+    expect(resolveSubagentChildDirectory(null, null)).toBeNull();
+  });
+});
+
+describe('resolveParentDirectoryForChildIdle', () => {
+  test('rematerializes the parent using the parent directory, not the child cwd', () => {
+    expect(resolveParentDirectoryForChildIdle({ directory: '/repo' })).toBe('/repo');
+    expect(resolveParentDirectoryForChildIdle({ directory: null })).toBeNull();
+    expect(resolveParentDirectoryForChildIdle(undefined)).toBeNull();
   });
 });

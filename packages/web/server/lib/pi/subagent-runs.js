@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,9 +48,9 @@ export const normalizeSubagentRunMode = (value, fallback = 'foreground') => {
   return fallback;
 };
 
-export const readSessionIdFromSessionFile = (filePath) => {
+const readSessionHeaderFromSessionFile = (filePath) => {
   const file = asTrimmedString(filePath);
-  if (!file || !fs.existsSync(file)) return '';
+  if (!file || !fs.existsSync(file)) return { id: '', cwd: '' };
   try {
     const fd = fs.openSync(file, 'r');
     try {
@@ -57,16 +58,23 @@ export const readSessionIdFromSessionFile = (filePath) => {
       const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
       const text = buffer.slice(0, bytes).toString('utf8');
       const firstLine = text.split(/\r?\n/).find((line) => line.trim());
-      if (!firstLine) return '';
+      if (!firstLine) return { id: '', cwd: '' };
       const parsed = JSON.parse(firstLine);
-      return asTrimmedString(parsed?.id);
+      return {
+        id: asTrimmedString(parsed?.id),
+        cwd: asTrimmedString(parsed?.cwd),
+      };
     } finally {
       fs.closeSync(fd);
     }
   } catch {
-    return '';
+    return { id: '', cwd: '' };
   }
 };
+
+export const readSessionIdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).id;
+
+export const readSessionCwdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).cwd;
 
 const sessionPathStem = (value) => {
   const name = path.basename(asTrimmedString(value));
@@ -186,6 +194,7 @@ export const mapStatusToSubagentRun = (status, {
     parentID: asTrimmedString(parentID),
     sessionID: childSessionID || null,
     sessionFile: sessionFile || null,
+    directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(status.cwd || status.directory) || null,
     name: agent,
     role: asTrimmedString(status.role) || agent,
     mode,
@@ -209,9 +218,53 @@ const listAsyncRunDirs = (root) => {
   }
 };
 
+export const listGitWorktreePaths = (projectDir) => {
+  const root = asTrimmedString(projectDir);
+  if (!root) return [];
+  try {
+    const output = execFileSync('git', ['-C', root, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const paths = [];
+    for (const line of output.split(/\r?\n/)) {
+      if (!line.startsWith('worktree ')) continue;
+      const worktree = line.slice('worktree '.length).trim();
+      if (worktree) paths.push(worktree);
+    }
+    return paths;
+  } catch {
+    return [];
+  }
+};
+
+const listRelatedProjectDirs = ({
+  projectDir,
+  extraProjectDirs,
+} = {}) => {
+  const dirs = [];
+  const seen = new Set();
+  const add = (value) => {
+    const resolved = asTrimmedString(value);
+    if (!resolved || seen.has(resolved)) return;
+    seen.add(resolved);
+    dirs.push(resolved);
+  };
+  add(projectDir);
+  for (const extra of Array.isArray(extraProjectDirs) ? extraProjectDirs : []) {
+    add(extra);
+  }
+  for (const worktree of listGitWorktreePaths(projectDir)) {
+    add(worktree);
+  }
+  return dirs;
+};
+
 const listAsyncSubagentRunRoots = ({
   tmpdir = process.env.TMPDIR || os.tmpdir(),
   projectDir,
+  extraProjectDirs,
 } = {}) => {
   const roots = [];
   const seen = new Set();
@@ -222,8 +275,8 @@ const listAsyncSubagentRunRoots = ({
     roots.push(resolved);
   };
 
-  if (projectDir) {
-    add(path.join(projectDir, '.pi', 'subagents', ASYNC_RUNS_DIR));
+  for (const dir of listRelatedProjectDirs({ projectDir, extraProjectDirs })) {
+    add(path.join(dir, '.pi', 'subagents', ASYNC_RUNS_DIR));
   }
 
   try {
@@ -241,10 +294,11 @@ export const listAdapterRunsFromFiles = ({
   parent,
   tmpdir = process.env.TMPDIR || os.tmpdir(),
   projectDir,
+  extraProjectDirs,
 } = {}) => {
   const runs = [];
   const seen = new Set();
-  for (const root of listAsyncSubagentRunRoots({ tmpdir, projectDir })) {
+  for (const root of listAsyncSubagentRunRoots({ tmpdir, projectDir, extraProjectDirs })) {
     for (const asyncDir of listAsyncRunDirs(root)) {
       const status = readJsonFile(path.join(asyncDir, STATUS_FILE));
       if (!status) continue;
@@ -518,6 +572,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     parentID: asTrimmedString(parentID),
     sessionID: childSessionID,
     sessionFile: sessionFile || null,
+    directory: readSessionCwdFromSessionFile(sessionFile) || null,
     name: agent,
     role: asTrimmedString(input.role) || agent,
     mode,
@@ -555,6 +610,7 @@ const mergeRunFields = (existing, run) => ({
     : existing.runId,
   sessionID: run.sessionID || existing.sessionID,
   sessionFile: run.sessionFile || existing.sessionFile,
+  directory: run.directory || existing.directory,
   toolCallId: run.toolCallId || existing.toolCallId,
   name: run.name && run.name !== 'subagent' ? run.name : existing.name,
   role: run.role && run.role !== 'subagent' ? run.role : existing.role,
@@ -615,6 +671,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
           parentID: asTrimmedString(parentID),
           sessionID: readChildSessionIdFromToolFields({ parentID, input: args, sessionFile }),
           sessionFile,
+          directory: readSessionCwdFromSessionFile(sessionFile) || null,
           name: agent,
           role: asTrimmedString(args.role || args.agent || hints.agent) || agent,
           mode,
@@ -673,6 +730,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         sessionFile,
       }),
       sessionFile: sessionFile || null,
+      directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(details.cwd || details.directory) || null,
       name: agent,
       role: asTrimmedString(details.role || details.agent || hints.agent) || agent,
       mode,
@@ -747,6 +805,7 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
     if (match) {
       match.sessionID = match.sessionID || file.sessionID;
       match.sessionFile = match.sessionFile || file.sessionFile;
+      match.directory = match.directory || file.directory;
       match.toolCallId = match.toolCallId || file.toolCallId;
       if (!match.name || match.name === 'subagent') match.name = file.name;
       if (!match.title || match.title === match.name || match.title === 'subagent') {
@@ -784,6 +843,7 @@ export const toPublicSubagentRun = (run) => {
     runId: run.runId,
     parentID: run.parentID || null,
     sessionID,
+    directory: asTrimmedString(run.directory) || null,
     ...(toolCallId ? { toolCallId } : {}),
     name: run.name,
     role: run.role,

@@ -1,6 +1,6 @@
 import { readTaskSessionIdFromOutput, readTaskSessionIdFromRecord } from '@/components/chat/message/parts/taskToolModel';
 
-import { canOpenSubagentChildSession } from './childSession';
+import { canOpenSubagentChildSession, resolveSubagentChildDirectory } from './childSession';
 import { readSubagentChildSessionId } from './subagentTool';
 import type { SubagentRun } from './subagentRuns';
 
@@ -8,6 +8,7 @@ export type WorkStatusSubagentRow = {
   id: string;
   label: string;
   sessionID: string | null;
+  directory: string | null;
   openable: boolean;
   status: 'permission' | 'question' | 'working' | 'blocked' | 'failed' | 'paused' | 'done';
   mode?: 'foreground' | 'background';
@@ -23,13 +24,46 @@ export const resolveWorkStatusSubagentOpen = ({
   effectiveDirectory?: string | null;
 }): { sessionID: string | null; directory: string | null; openable: boolean } => {
   const resolvedSessionID = sessionID?.trim() || null;
-  const resolvedDirectory = directory?.trim() || effectiveDirectory?.trim() || null;
+  const resolvedDirectory = resolveSubagentChildDirectory(directory, effectiveDirectory);
   return {
     sessionID: resolvedSessionID,
     directory: resolvedDirectory,
     openable: canOpenSubagentChildSession(resolvedSessionID, resolvedDirectory),
   };
 };
+
+export const collectSessionBlockers = (
+  states: Array<{
+    permission?: Record<string, unknown[] | undefined>;
+    question?: Record<string, unknown[] | undefined>;
+  }>,
+): { permissions: Record<string, unknown[]>; questions: Record<string, unknown[]> } => {
+  const permissions: Record<string, unknown[]> = {};
+  const questions: Record<string, unknown[]> = {};
+  for (const state of states) {
+    for (const [id, list] of Object.entries(state.permission ?? {})) {
+      if (Array.isArray(list) && list.length > 0) permissions[id] = list;
+    }
+    for (const [id, list] of Object.entries(state.question ?? {})) {
+      if (Array.isArray(list) && list.length > 0) questions[id] = list;
+    }
+  }
+  return { permissions, questions };
+};
+
+export const overlayWorkStatusChildBlockers = (
+  rows: WorkStatusSubagentRow[],
+  blockers: { permissions: Record<string, unknown[]>; questions: Record<string, unknown[]> },
+): WorkStatusSubagentRow[] => rows.map((row) => {
+  if (!row.sessionID) return row;
+  if ((blockers.permissions[row.sessionID]?.length ?? 0) > 0) {
+    return { ...row, status: 'permission' as const };
+  }
+  if ((blockers.questions[row.sessionID]?.length ?? 0) > 0) {
+    return { ...row, status: 'question' as const };
+  }
+  return row;
+});
 
 const asTrimmed = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -128,8 +162,8 @@ export const buildWorkStatusSubagentRows = ({
   const rows = assignTranscriptSessionIds(runs, transcriptIds).map((run) => {
     const opened = resolveWorkStatusSubagentOpen({
       sessionID: run.sessionID,
-      directory,
-      effectiveDirectory,
+      directory: run.directory,
+      effectiveDirectory: directory || effectiveDirectory,
     });
     const status: WorkStatusSubagentRow['status'] = run.state === 'running' || run.state === 'queued'
       ? 'working'
@@ -144,6 +178,7 @@ export const buildWorkStatusSubagentRows = ({
       id: run.runId,
       label: run.title?.trim() || run.name || untitledLabel,
       sessionID: opened.sessionID,
+      directory: opened.directory,
       openable: opened.openable,
       mode: run.mode,
       status,

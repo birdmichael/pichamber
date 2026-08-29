@@ -521,7 +521,7 @@ describe('Pi host subagent runs', () => {
 
     try {
       const listed = await host.listSubagentRuns(parent.id);
-      expect(listed.runs[0]).toMatchObject({ sessionID: 'scout-child', openable: true });
+      expect(listed.runs[0]).toMatchObject({ sessionID: 'scout-child', openable: true, directory: '/tmp/project' });
       const afterAttach = childReads.length;
       expect(afterAttach).toBeGreaterThan(0);
       expect(host.getMessages('scout-child').some((entry) => (

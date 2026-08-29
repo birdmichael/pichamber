@@ -9,9 +9,15 @@ type LoadState =
   | { status: 'ready'; runs: SubagentRun[] }
   | { status: 'error'; runs: SubagentRun[] };
 
+export const subagentRunsRequestHeaders = (directory?: string | null): Record<string, string> => ({
+  Accept: 'application/json',
+  ...(directory?.trim() ? { 'x-opencode-directory': directory.trim() } : {}),
+});
+
 export const useSubagentRuns = (
   sessionId: string | null,
   enabled: boolean,
+  directory?: string | null,
 ): { runs: SubagentRun[]; status: LoadState['status'] } => {
   const [state, setState] = React.useState<LoadState>({ status: 'idle', runs: [] });
 
@@ -29,7 +35,7 @@ export const useSubagentRuns = (
       void runBackgroundNetworkTask(async () => {
         try {
           const response = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/subagent-runs`, {
-            headers: { Accept: 'application/json' },
+            headers: subagentRunsRequestHeaders(directory),
           });
           const parsed = parseSubagentRunsPayload(await response.json().catch(() => null));
           if (cancelled) return;
@@ -69,7 +75,7 @@ export const useSubagentRuns = (
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [enabled, sessionId]);
+  }, [directory, enabled, sessionId]);
 
   return { runs: state.runs, status: state.status };
 };

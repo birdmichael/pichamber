@@ -45,3 +45,15 @@ describe('nestSessionsByParentID', () => {
     expect(childrenByParent.size).toBe(0);
   });
 });
+
+describe('worktree-cwd children with a valid parentID', () => {
+  test('stay nested under the parent even when directories differ', () => {
+    const parent = session('parent', { directory: '/repo' } as Partial<Session>);
+    const child = session('child', { parentID: 'parent', directory: '/repo-worktree' } as Partial<Session> & { parentID?: string | null });
+
+    const { roots, childrenByParent } = nestSessionsByParentID([parent, child]);
+
+    expect(roots.map((item) => item.id)).toEqual(['parent']);
+    expect(childrenByParent.get('parent')?.map((item) => item.id)).toEqual(['child']);
+  });
+});

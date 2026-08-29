@@ -11,7 +11,7 @@ import { toolDisplayStyles } from '@/lib/typography';
 import { WorkerHighlightedCode } from '@/components/code/WorkerHighlightedCode';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useSessionMessageRecords, useEnsureSessionMessages } from '@/sync/sync-context';
+import { useEnsureSessionMessages, useSession, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { ScrollShadow } from '@/components/ui/ScrollShadow';
@@ -72,7 +72,7 @@ import {
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
-import { openSubagentChildSession } from '@/lib/subagents/childSession';
+import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
 import {
     readSubagentCardAgent,
     readSubagentChildSessionId,
@@ -107,6 +107,7 @@ interface ToolPartProps {
     onShowPopup?: (content: ToolPopupContent) => void;
     animateTailText?: boolean;
     runChildSessionId?: string | null;
+    runChildDirectory?: string | null;
 }
 
 const normalizeToolName = (toolName: string | undefined | null): string => {
@@ -1001,9 +1002,11 @@ const TaskToolSummary: React.FC<{
     animateTailText?: boolean;
     isActive?: boolean;
     childReadOnly?: boolean;
-}> = ({ entries, isExpanded, isMobile, output, sessionId, onShowPopup, input, animateTailText = true, isActive = false, childReadOnly = true }) => {
+    childDirectory?: string | null;
+}> = ({ entries, isExpanded, isMobile, output, sessionId, onShowPopup, input, animateTailText = true, isActive = false, childReadOnly = true, childDirectory }) => {
     const { t } = useI18n();
     const currentDirectory = useEffectiveDirectory();
+    const openDirectory = resolveSubagentChildDirectory(childDirectory, currentDirectory);
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
     const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
     const showToolFileIcons = useUIStore((state) => state.showToolFileIcons);
@@ -1026,7 +1029,7 @@ const TaskToolSummary: React.FC<{
         event.stopPropagation();
         openSubagentChildSession({
             sessionID: sessionId,
-            directory: currentDirectory,
+            directory: openDirectory,
             label: agentType.charAt(0).toUpperCase() + agentType.slice(1),
             readOnly: childReadOnly,
             isMobile,
@@ -1686,6 +1689,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     onShowPopup,
     animateTailText = true,
     runChildSessionId,
+    runChildDirectory,
 }) => {
     const { t } = useI18n();
     const state = part.state;
@@ -1903,9 +1907,14 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
     }, [input, isTaskTool, metadata, parsedTaskMetadata.sessionId, partMetadata, runChildSessionId, taskOutputString]);
 
     const childSessionLookupId = hasFinalMetadataTaskSummary ? '' : (taskSessionId ?? '');
+    const childSession = useSession(taskSessionId);
+    const childDirectory = resolveSubagentChildDirectory(
+      { directory: runChildDirectory || (childSession as { directory?: string | null } | undefined)?.directory },
+      currentDirectory,
+    );
 
-    const childSessionMessages = useSessionMessageRecords(childSessionLookupId, currentDirectory);
-    useEnsureSessionMessages(childSessionLookupId, currentDirectory);
+    const childSessionMessages = useSessionMessageRecords(childSessionLookupId, childDirectory ?? currentDirectory);
+    useEnsureSessionMessages(childSessionLookupId, childDirectory ?? currentDirectory);
 
     const childSessionTaskSummaryEntries = React.useMemo<TaskToolSummaryEntry[]>(() => {
         if (!isTaskTool || !taskSessionId) {
@@ -2260,6 +2269,7 @@ const ToolPartContent: React.FC<ToolPartProps> = ({
                     animateTailText={animateTailText}
                     isActive={isActive}
                     childReadOnly={!isPiKernel}
+                    childDirectory={childDirectory}
                 />
             ) : null}
 
@@ -2370,5 +2380,7 @@ export default React.memo(ToolPart, (prev, next) => {
         && prev.alwaysShowActions === next.alwaysShowActions
         && prev.onContentChange === next.onContentChange
         && prev.onShowPopup === next.onShowPopup
-        && prev.animateTailText === next.animateTailText;
+        && prev.animateTailText === next.animateTailText
+        && prev.runChildSessionId === next.runChildSessionId
+        && prev.runChildDirectory === next.runChildDirectory;
 });

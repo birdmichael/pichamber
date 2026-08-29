@@ -129,6 +129,7 @@ import {
   findAdapterRunByChildSessionId,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
+  readSessionCwdFromSessionFile,
   readSessionIdFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
@@ -2542,10 +2543,6 @@ export const createPiHost = ({
   };
 
   const collectSubagentRuns = (parent) => {
-    const fileRuns = listAdapterRunsFromFiles({
-      parent,
-      projectDir: parent.directory,
-    });
     const liveRuns = [
       ...extractRunsFromFacadeMessages(parent.messages, parent.id),
       ...extractRunsFromPiEntries(
@@ -2553,6 +2550,23 @@ export const createPiHost = ({
         parent.id,
       ),
     ];
+    const extraProjectDirs = [];
+    const seenDirs = new Set();
+    const addDir = (value) => {
+      const dir = typeof value === 'string' && value.trim() ? value.trim() : '';
+      if (!dir || seenDirs.has(dir) || dir === parent.directory) return;
+      seenDirs.add(dir);
+      extraProjectDirs.push(dir);
+    };
+    for (const run of liveRuns) {
+      addDir(run.directory);
+      addDir(readSessionCwdFromSessionFile(run.sessionFile));
+    }
+    const fileRuns = listAdapterRunsFromFiles({
+      parent,
+      projectDir: parent.directory,
+      extraProjectDirs,
+    });
     return reconcileParentSubagentRuns(fileRuns, liveRuns);
   };
 
@@ -2595,7 +2609,7 @@ export const createPiHost = ({
               : { sessionID: record.id },
           });
         }
-        return { ...run, sessionID: record.id };
+        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
       if (childId) {
         let record = sessions.get(childId);
@@ -2608,7 +2622,7 @@ export const createPiHost = ({
         }
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
-        return { ...run, sessionID: record.id };
+        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
     } catch (error) {
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);

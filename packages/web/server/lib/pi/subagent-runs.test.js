@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,6 +16,8 @@ import {
   normalizeSubagentRunMode,
   normalizeSubagentRunState,
   parentSessionMatches,
+  listGitWorktreePaths,
+  readSessionCwdFromSessionFile,
   readSessionFileFromText,
   readSessionIdFromSessionFile,
   readWorkflowScriptHints,
@@ -133,8 +136,9 @@ describe('session file and parent matching', () => {
   it('reads the Pi session id from a jsonl header', () => {
     const dir = makeTemp();
     const file = path.join(dir, 'child.jsonl');
-    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-uuid' })}\n`);
+    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-uuid', cwd: '/repo-worktree' })}\n`);
     expect(readSessionIdFromSessionFile(file)).toBe('child-uuid');
+    expect(readSessionCwdFromSessionFile(file)).toBe('/repo-worktree');
   });
 
   it('matches parent by id, session file, or basename', () => {
@@ -211,6 +215,7 @@ describe('listAdapterRunsFromFiles', () => {
     expect(toPublicSubagentRun(runs[0])).toMatchObject({
       openable: true,
       sessionID: 'scout-session',
+      directory: null,
     });
     expect(toPublicSubagentRun({
       ...runs[0],
@@ -237,6 +242,74 @@ describe('listAdapterRunsFromFiles', () => {
     expect(toPublicSubagentRun(run).openable).toBe(false);
   });
 });
+
+describe('child-session directory plumbing', () => {
+  it('exposes jsonl cwd on the public subagent run', () => {
+    const dir = makeTemp();
+    const file = path.join(dir, 'child.jsonl');
+    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-wt', cwd: '/repo-worktree' })}\n`);
+    const publicRun = toPublicSubagentRun({
+      runId: 'run_wt',
+      parentID: 'parent-1',
+      sessionID: 'child-wt',
+      directory: readSessionCwdFromSessionFile(file),
+      name: 'scout',
+      role: 'scout',
+      mode: 'background',
+      state: 'running',
+      title: 'Inspect the worktree',
+    });
+    expect(publicRun).toMatchObject({
+      sessionID: 'child-wt',
+      directory: '/repo-worktree',
+      openable: true,
+    });
+  });
+
+  it('finds a worktree-cwd child when parent is at the repo root', () => {
+    const root = makeTemp('pi-subagent-repo-');
+    execFileSync('git', ['init', '-b', 'main', root], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'config', 'user.email', 't@t.example'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'config', 'user.name', 't'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'commit', '--allow-empty', '-m', 'init'], { stdio: 'ignore' });
+    const worktree = path.join(path.dirname(root), `${path.basename(root)}-wt`);
+    execFileSync('git', ['-C', root, 'worktree', 'add', worktree, '-b', 'child'], { stdio: 'ignore' });
+    tempDirs.push(worktree);
+
+    expect(listGitWorktreePaths(root)).toEqual(expect.arrayContaining([root, worktree]));
+
+    const runDir = path.join(worktree, '.pi', 'subagents', 'async-subagent-runs', 'run_wt');
+    fs.mkdirSync(runDir, { recursive: true });
+    const childFile = path.join(runDir, 'child.jsonl');
+    fs.writeFileSync(childFile, `${JSON.stringify({ type: 'session', id: 'child-wt', cwd: worktree })}\n`);
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_wt',
+      sessionId: 'parent-1',
+      state: 'running',
+      mode: 'async',
+      sessionFile: childFile,
+      steps: [{ agent: 'scout', status: 'running', sessionFile: childFile }],
+    }));
+
+    const isolatedTmp = makeTemp('pi-subagent-empty-tmp-');
+    const runs = listAdapterRunsFromFiles({
+      parent: { id: 'parent-1' },
+      projectDir: root,
+      tmpdir: isolatedTmp,
+    });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'run_wt',
+      sessionID: 'child-wt',
+      directory: worktree,
+    });
+    expect(toPublicSubagentRun(runs[0])).toMatchObject({
+      directory: worktree,
+      openable: true,
+    });
+  });
+});
+
 
 describe('tool-part extraction', () => {
   it('reads a foreground subagent tool call from the parent transcript', () => {
