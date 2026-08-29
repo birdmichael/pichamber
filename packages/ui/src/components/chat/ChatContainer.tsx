@@ -81,6 +81,8 @@ import { PARENT_CHAT_MIN_WIDTH } from '@/lib/surfaces/chatColumnLayout';
 import { useWorkStatusVisibility } from './work-status/useWorkStatusVisibility';
 import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/contextPanelEmbeddedChat';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { hasPendingUserTranscriptPaint, isHiddenUserMessage } from './message/hiddenUserMessage';
 import { normalizeUserDisplayParts } from './message/normalizeUserDisplayParts';
 import { findShellCommandForMessage, isUserShellMarkerMessage } from './lib/shellBridge';
@@ -821,11 +823,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const chatSurfaceMode = useChatSurfaceMode();
     const draftOpen = Boolean(newSessionDraft?.open);
     const pendingComposerTurn = usePendingComposerTurn();
+    const featurePluginsPayload = usePiFeaturePluginsStore((state) => state.payload);
+    const featurePluginsStatus = usePiFeaturePluginsStore((state) => state.status);
     const pendingComposerVisible = Boolean(
         pendingComposerTurn && (
             (draftOpen && pendingComposerTurn.key === pendingComposerDraftKey(newSessionDraft.draftId))
             || (currentSessionId && pendingComposerTurn.key === pendingComposerSessionKey(currentSessionId))
             || (Boolean(currentSessionId) && pendingComposerTurn.key.startsWith('draft:'))
+        ) && !isLeftoverPlanSlashText(
+            pendingComposerTurn.text,
+            featurePluginsPayload,
+            featurePluginsStatus,
         ),
     );
     React.useEffect(() => {

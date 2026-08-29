@@ -33,6 +33,14 @@ describe('pi-plan-locale', () => {
     expect(localizePiPlanSelectTitle(title, tZh)).toBe(zhCnDict['chat.piPlan.readySelect.title']);
     expect(localizePiPlanSelectTitle(title, tZh)).not.toBe(title);
     expect(localizePiPlanSelectTitle('Scope: How wide?', tZh)).toBe('Scope: How wide?');
+    expect(localizePiPlanSelectTitle(
+      'Plan mode\nStatus: Off — visible Plan helpers stay inactive until /plan starts.\nPlan policy will allow: bash, read, ask_user_question, mcp, subagent.',
+      tEn,
+    )).toBe('Plan mode');
+    expect(localizePiPlanSelectTitle(
+      'Choose Plan policy allowlist\nPolicy changes apply only when you start Plan mode\nPlan policy will allow: bash, read.',
+      tEn,
+    )).toBe('Choose Plan policy allowlist');
 
     expect(localizePiPlanSelectOption('Start fresh and implement — Open a new linked session; transfer only the approved plan.', tZh)).toEqual({
       label: zhCnDict['chat.piPlan.readySelect.implementFresh'],

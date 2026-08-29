@@ -23,6 +23,7 @@
 - Chat: on Pi, typing `@agent:build` or `@agent:plan` no longer switches the session agent, and `@` autocomplete no longer lists leftover OpenCode agents.
 - Chat: typing an unknown `/name` and pressing Enter now sends it as a normal message. The empty command popup no longer swallows the first Enter.
 - Chat: on Pi, typing `/run`, `/plan`, or `/goal` by hand now sends as a normal message when that Feature Plugin is off. When the plugin is on, those slashes still run as commands even if the slash list has not loaded yet.
+- Chat: opening New session only drops a leftover `/`, so a real untitled draft stays. A waiting Plan card uses the short heading and scrolls into view.
 - Chat: on Pi, a Subagents Work Status row or transcript card opens that child session in place so you can send follow-ups there. The section stays hidden until the Subagents feature plugin is installed and enabled. Leftover adapter rows without a session id are not listed.
 - The activity bar, title bar, and loading splash now use the Pichamber chamber with Pi’s pixel “pi” on the top face instead of the leftover OpenCode O.
 - Settings: Skills, Skills Catalog, and Commands in the left rail stay clickable and keyboard-focusable without searching first. Choosing a search result (click or Enter) opens that page and focuses the matching field. Provider, agent, and skill rows are no longer announced twice by VoiceOver.

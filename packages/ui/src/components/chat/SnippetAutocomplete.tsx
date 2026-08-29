@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import type { Snippet } from '@/types/snippet';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
+import { shouldDismissAutocompleteOnOutsidePointer } from './composer/submit/autocompleteOutsideClick';
 
 export interface SnippetAutocompleteHandle {
   handleKeyDown: (key: string) => void;
@@ -69,8 +70,10 @@ export const SnippetAutocomplete = React.forwardRef<SnippetAutocompleteHandle, S
 
   React.useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node | null;
-      if (target && containerRef.current && !containerRef.current.contains(target)) onClose();
+      if (!shouldDismissAutocompleteOnOutsidePointer(event.target, containerRef.current)) {
+        return;
+      }
+      onClose();
     };
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);

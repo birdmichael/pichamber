@@ -4,6 +4,7 @@ import {
   clearChatDraft,
   createChatDraftIdentity,
   getChatDraftIdentityKey,
+  isStrayNewSessionSlashDraft,
   readChatDraft,
   subscribeChatDraftDeletion,
   writeChatDraft,
@@ -39,6 +40,14 @@ describe('chatDraftPersistence', () => {
 
     expect(readChatDraft(newSession).text).toBe('new session');
     expect(readChatDraft(namedSession).text).toBe('named session');
+  });
+
+  test('only treats a leftover slash as a stray New session draft', () => {
+    expect(isStrayNewSessionSlashDraft('/')).toBe(true);
+    expect(isStrayNewSessionSlashDraft(' / ')).toBe(true);
+    expect(isStrayNewSessionSlashDraft('pr345-draft-probe')).toBe(false);
+    expect(isStrayNewSessionSlashDraft('/plan')).toBe(false);
+    expect(isStrayNewSessionSlashDraft('')).toBe(false);
   });
 
   test('clears only the matching identity and notifies active composers', () => {

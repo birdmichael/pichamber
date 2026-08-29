@@ -16,3 +16,55 @@ export const parseFeaturePluginSlotActive = (
   const parsed = parseFeaturePluginsPayload(value);
   return isFeaturePluginSlotActive(parsed, slot);
 };
+
+const FEATURE_PLUGIN_SLASH_SLOTS: Record<string, FeaturePluginSlot> = {
+  run: 'subagents',
+  plan: 'plan',
+  goal: 'goal',
+};
+
+/** Live `/plan` `/run` `/goal` — not `/btw`. */
+export const isFeaturePluginSlashName = (cmdName: string): boolean => (
+  FEATURE_PLUGIN_SLASH_SLOTS[cmdName.trim().toLowerCase()] != null
+);
+
+/** Load state for the Feature Plugins store. Idle/loading/failed must not
+ *  turn `/plan` into a chat bubble while the slash menu already listed it. */
+export type FeaturePluginLoadStatus = 'idle' | 'loading' | 'ready' | 'failed';
+
+/**
+ * Whether a composer slash should POST session.command for a Feature Plugin.
+ * `/btw` is excluded (client-owned). When the payload has not finished loading,
+ * route `/plan` `/run` `/goal` as commands so a new-session first send cannot
+ * become a leftover bubble. Once loaded, honour installed+enabled.
+ */
+export const shouldDispatchFeaturePluginSlash = (
+  cmdName: string,
+  payload: FeaturePluginsPayload | null | undefined,
+  status: FeaturePluginLoadStatus = 'idle',
+): boolean => {
+  const slot = FEATURE_PLUGIN_SLASH_SLOTS[cmdName.trim().toLowerCase()];
+  if (!slot) return false;
+  if (status !== 'ready') return true;
+  return isFeaturePluginSlotActive(payload, slot);
+};
+
+/** First slash token is `plan`, matching ChatInput parseSlashCommand. */
+export const isPlanSlashCommandText = (text: string): boolean => {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith('/')) return false;
+  const name = trimmed.slice(1).trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+  return name === 'plan';
+}
+
+/**
+ * Typed `/plan` that will POST session.command. The kernel still prompts
+ * `/plan` as a user turn; hide that leftover bubble. When the Plan slot is
+ * loaded and off, `/plan` is chat and stays visible.
+ */
+export const isLeftoverPlanSlashText = (
+  text: string,
+  payload: FeaturePluginsPayload | null | undefined,
+  status: FeaturePluginLoadStatus = 'idle',
+): boolean => isPlanSlashCommandText(text) && shouldDispatchFeaturePluginSlash('plan', payload, status)
+

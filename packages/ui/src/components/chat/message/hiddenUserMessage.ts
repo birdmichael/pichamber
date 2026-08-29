@@ -1,6 +1,8 @@
 import type { Message, Part } from '@opencode-ai/sdk/v2';
 
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
 import { isPiGoalSystemPreamble } from '@/lib/piGoal';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
 import { deriveMessageRole } from './messageRole';
 import { filterVisibleParts, isEmptyTextPart, normalizeParts } from './partUtils';
@@ -45,6 +47,9 @@ export const isHiddenUserMessage = (
         .join('')
         .trim();
     if (isPiGoalSystemPreamble(rawText)) return true;
+
+    const featurePlugins = usePiFeaturePluginsStore.getState();
+    if (isLeftoverPlanSlashText(rawText, featurePlugins.payload, featurePlugins.status)) return true;
 
     const directory = directoryCacheKey(options.directory);
     const cached = hiddenByParts.get(entry.parts);
