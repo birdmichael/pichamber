@@ -394,9 +394,9 @@ export const createApnsRuntime = (deps) => {
     };
   };
 
-  const sendViaRelay = async (deviceTokens, payload, relay, environment) => {
+  const sendViaRelay = async (deviceTokens, payload, relay, environment, retried = false) => {
     const tokens = deviceTokens.slice(0, 100);
-    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'OpenChamber';
+    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'Pichamber';
     const { privateKey, publicJwk } = await getOrCreateRelayKeypair();
     const ts = Date.now();
     // Sign over the same canonical form the relay verifies: ts.sortedTokens.title.
@@ -429,10 +429,20 @@ export const createApnsRuntime = (deps) => {
       }
       const data = await res.json().catch(() => null);
       const results = Array.isArray(data?.results) ? data.results : [];
+      const unbound = [];
       for (const result of results) {
         if (result && result.drop === true && typeof result.token === 'string') {
           await removeApnsTokenFromAllSessions(result.token);
         }
+        if (result && result.reason === 'unbound' && typeof result.token === 'string') {
+          unbound.push(result.token);
+        }
+      }
+      // After a relay host cutover the local token store is still populated, but the
+      // new relay has no binding until the phone re-registers. Rebind once and retry.
+      if (!retried && unbound.length > 0) {
+        for (const token of unbound) await registerTokenWithRelay(token, 'ios');
+        await sendViaRelay(unbound, payload, relay, environment, true);
       }
     } catch (error) {
       console.warn('[APNs relay] request failed:', error?.message ?? error);
