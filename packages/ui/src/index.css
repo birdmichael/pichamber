@@ -234,12 +234,19 @@ button,
   color: color-mix(in srgb, var(--vscode-input-placeholderForeground, var(--muted-foreground)) 65%, transparent);
 }
 
-/* Match chat footer background to input in WebKit to avoid dual-tone hover/focus */
+/* Match chat footer background to input in WebKit to avoid dual-tone hover/focus.
+   Also the named @container model-controls: query THIS composer row (~328px
+   parent column when squeezed), not html / the window. Child/embedded
+   composers already have a real ~315px pane; the parent did not. */
 div[data-chat-input-footer="true"] {
   background: transparent !important;
   border: none;
   box-shadow: none;
   -webkit-appearance: none;
+  container-type: inline-size;
+  container-name: model-controls;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Scroll shadow (HeroUI) fallback styling to ensure visible gradients without the Tailwind plugin */
@@ -774,7 +781,12 @@ html:not(.dark) .chat-scroll {
    (~20.5rem / 328px). A 16rem slot hide left the chip visible there and
    it clipped (`A` plus a sliver, or `Agen`). The model label may remain
    as a clean ellipsis (`grok-…`). Same container queries apply to the
-   parent composer and the child/embedded composer. */
+   parent composer and the child/embedded composer.
+
+   The named container is the composer footer (`[data-chat-input-footer]`),
+   not html. Nesting `@container model-controls` under html made the
+   parent query the root (~1280px window) so the Agent chip never hid
+   there; the child pane was already a real ~315px container. */
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
   min-width: 0;

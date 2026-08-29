@@ -63,7 +63,21 @@ describe('Desktop composer model chip squeeze', () => {
 
     expect(modelControlsSource).toContain('model-controls__agent-slot');
     expect(modelControlsSource).toContain('model-controls__agent-trigger');
-    expect(modelControlsSource).toContain('@container/model-controls');
+  });
+
+  test('parent composer footer is the model-controls query container', () => {
+    // The hide rules query @container model-controls. That name must live
+    // on THIS composer footer so a ~328px parent column hides Agent. If the
+    // named container is html (or another wide ancestor), the parent sees
+    // ~1280px and never hides — the child pane already had a real ~315px
+    // container, which is why only the parent showed a clipped A sliver.
+    expect(composerFooterSource).toContain('@container/model-controls');
+    expect(composerFooterSource).toContain('data-chat-input-footer="true"');
+    expect(indexCss).toMatch(
+      /div\[data-chat-input-footer="true"\] \{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*model-controls;/,
+    );
+    // ModelControls must not steal the name (nearest ancestor wins).
+    expect(modelControlsSource).not.toContain('@container/model-controls');
   });
 
   test('keeps the send control outside the shrinking chip row', () => {

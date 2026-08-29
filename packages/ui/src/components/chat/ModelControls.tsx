@@ -3164,7 +3164,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const inlineClassName = cn(
-        '@container/model-controls flex items-center min-w-0',
+        'flex items-center min-w-0',
         // Only force full-width + truncation behaviors on true mobile layouts.
         // VS Code also uses "compact" mode, but should keep its right-aligned inline sizing.
         isMobile && 'w-full',

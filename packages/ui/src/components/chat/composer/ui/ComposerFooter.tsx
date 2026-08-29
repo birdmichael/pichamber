@@ -114,7 +114,9 @@ export function ComposerFooter(props: ComposerFooterProps) {
     return (
         <div
             className={cn(
-                'bg-transparent flex-shrink-0 flex flex-col',
+                // Named container for @container model-controls hide rules.
+                // Query this footer (~328px parent column when squeezed), not html.
+                '@container/model-controls min-w-0 w-full bg-transparent flex-shrink-0 flex flex-col',
                 footerPaddingClass,
                 footerGapClass,
             )}
