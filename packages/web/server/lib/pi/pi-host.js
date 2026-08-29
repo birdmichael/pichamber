@@ -113,6 +113,7 @@ import {
   isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
+  restoreSessionPlanState,
   resumeSavedPlanState,
   resolvePlanModeState,
   sessionPlanFromState,
@@ -1179,6 +1180,12 @@ const findLiveSessionCommand = (piSession, name) => (
   readLiveSessionCommands(piSession).find((item) => commandMatchesName(item, name))
 );
 
+const isLeftoverPlanStartStreamError = (error) => {
+  const status = Number(error?.status);
+  if (status === 404 || status === 409 || status === 400) return false;
+  return /already streaming|steer or followUp/i.test(String(error?.message || ''));
+};
+
 const liveCommandInvocation = (command, fallback) => {
   const invocation = typeof command?.invocationName === 'string'
     ? command.invocationName.trim().replace(/^\//, '')
@@ -1323,6 +1330,7 @@ const logSkippedUserExtension = (skip) => {
 
 export const createPiHost = ({
   createSession,
+  createSessionManager,
   createModelRuntime,
   createDirectoryRuntime,
   createPackageManager,
@@ -1861,6 +1869,9 @@ export const createPiHost = ({
   };
 
   const createPersistedSessionManager = async (cwd, { title } = {}) => {
+    if (typeof createSessionManager === 'function') {
+      return createSessionManager(cwd, { title });
+    }
     try {
       const pi = await loadPiSdk();
       if (typeof pi.SessionManager?.create !== 'function') return null;
@@ -1882,33 +1893,128 @@ export const createPiHost = ({
     }
   };
 
-  const createFacadeSession = async ({ directory, title, parentID, metadata, id } = {}) => {
+  const applyLiveSessionDefaults = (piSession) => {
+    try {
+      const defaults = readPiDefaults(home);
+      if (typeof piSession?.setThinkingLevel !== 'function') return;
+      let level = defaults.thinking;
+      if (typeof piSession.getAvailableThinkingLevels === 'function') {
+        const levels = piSession.getAvailableThinkingLevels();
+        if (Array.isArray(levels) && levels.length > 0 && !levels.includes(level)) {
+          level = levels.includes('medium') ? 'medium' : levels[0];
+        }
+      }
+      piSession.setThinkingLevel(level);
+    } catch {
+    }
+  };
+
+  const liveBindings = new Map();
+
+  const hasLivePrompt = (record) => (
+    Boolean(record?.piSession) && typeof record.piSession.prompt === 'function'
+  );
+
+  const publishCreatedRecord = (record) => {
+    sessions.set(record.id, record);
+    sessionTodos.set(record.id, []);
+    emit(record.directory, {
+      id: createSessionId().replace('ses_', 'evt_'),
+      type: 'session.created',
+      properties: { info: record.info },
+    });
+    return record;
+  };
+
+  const markRecordDisposed = (record) => {
+    if (!record) return;
+    record.disposed = true;
+    liveBindings.delete(record.id);
+  };
+
+  const disposedSessionError = (record) => {
+    const error = new Error(`Session not found: ${record.id}`);
+    error.status = 404;
+    return error;
+  };
+
+  const bindLiveRecord = async (record) => {
+    if (record.disposed) throw disposedSessionError(record);
+    if (hasLivePrompt(record)) return record;
+    const cwd = record.directory;
+    await ensureDirectoryRuntime(cwd);
+    if (record.disposed) throw disposedSessionError(record);
+    const factory = await resolveCreateSession();
+    const model = await resolvePreferredModel();
+    const piSession = await invokeSessionFactory(factory, {
+      cwd,
+      directory: cwd,
+      modelRuntime,
+      model,
+      sessionManager: record.sessionManager,
+      sessionFile: record.sessionFile,
+      sessionID: record.id,
+      title: record.info?.title,
+    });
+    if (record.disposed) {
+      try { piSession?.dispose?.(); } catch {}
+      throw disposedSessionError(record);
+    }
+    const liveId = typeof piSession?.sessionId === 'string' && piSession.sessionId.trim()
+      ? piSession.sessionId.trim()
+      : undefined;
+    if (liveId && liveId !== record.id) {
+      console.warn(`[pi-host] live session id ${liveId} != shell id ${record.id}; keeping shell id`);
+    }
+    record.piSession = piSession;
+    if (!record.sessionFile && typeof piSession?.sessionFile === 'string') {
+      record.sessionFile = piSession.sessionFile;
+    }
+    record.translator = createRecordTranslator(record.id, cwd, { piSession });
+    applyLiveSessionDefaults(piSession);
+    attachSession(record);
+    if (record.disposed) {
+      try { record.unsubscribe?.(); } catch {}
+      try { piSession?.dispose?.(); } catch {}
+      throw disposedSessionError(record);
+    }
+    await bindDesktopExtensionUI(record);
+    if (record.disposed) {
+      try { record.extensionUI?.dispose?.(); } catch {}
+      try { record.unsubscribe?.(); } catch {}
+      try { piSession?.dispose?.(); } catch {}
+      throw disposedSessionError(record);
+    }
+    return record;
+  };
+
+  const ensureLiveRecord = async (record) => {
+    if (!record) return record;
+    if (record.disposed) throw disposedSessionError(record);
+    if (hasLivePrompt(record)) return record;
+    const existing = liveBindings.get(record.id);
+    if (existing) return existing;
+    const task = bindLiveRecord(record).catch((error) => {
+      liveBindings.delete(record.id);
+      throw error;
+    });
+    liveBindings.set(record.id, task);
+    return task;
+  };
+
+  const createFacadeSessionLive = async ({ directory, title, parentID, metadata, id } = {}) => {
     const cwd = directory || defaultDirectory;
     await ensureDirectoryRuntime(cwd);
     const factory = await resolveCreateSession();
     const model = await resolvePreferredModel();
     const sessionManager = mock ? null : await createPersistedSessionManager(cwd, { title });
-
     const piSession = await invokeSessionFactory(factory, {
       cwd,
       modelRuntime,
       model,
       sessionManager,
     });
-    try {
-      const defaults = readPiDefaults(home);
-      if (typeof piSession?.setThinkingLevel === "function") {
-        let level = defaults.thinking;
-        if (typeof piSession.getAvailableThinkingLevels === "function") {
-          const levels = piSession.getAvailableThinkingLevels();
-          if (Array.isArray(levels) && levels.length > 0 && !levels.includes(level)) {
-            level = levels.includes("medium") ? "medium" : levels[0];
-          }
-        }
-        piSession.setThinkingLevel(level);
-      }
-    } catch {
-    }
+    applyLiveSessionDefaults(piSession);
     const persistedId = typeof sessionManager?.getSessionId === 'function'
       ? sessionManager.getSessionId()
       : undefined;
@@ -1946,12 +2052,51 @@ export const createPiHost = ({
     };
     attachSession(record);
     await bindDesktopExtensionUI(record);
-    sessions.set(sessionID, record);
-    sessionTodos.set(sessionID, []);
-    emit(cwd, {
-      id: createSessionId().replace('ses_', 'evt_'),
-      type: 'session.created',
-      properties: { info: record.info },
+    return publishCreatedRecord(record);
+  };
+
+  const createFacadeSession = async (input = {}) => {
+    const { directory, title, parentID, metadata } = input;
+    if (mock) return createFacadeSessionLive(input);
+    const cwd = directory || defaultDirectory;
+    const sessionManager = await createPersistedSessionManager(cwd, { title });
+    const sessionID = typeof sessionManager?.getSessionId === 'function'
+      ? sessionManager.getSessionId()
+      : '';
+    if (!sessionManager || !sessionID) {
+      return createFacadeSessionLive(input);
+    }
+    const resolvedParentID = typeof parentID === 'string' && parentID.trim() ? parentID.trim() : undefined;
+    const sessionMetadata = {
+      ...(metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {}),
+      ...(resolvedParentID ? { parentID: resolvedParentID } : {}),
+    };
+    const hasMetadata = Object.keys(sessionMetadata).length > 0;
+    if (hasMetadata) persistSessionMetadata(sessionManager, sessionMetadata);
+    const record = {
+      id: sessionID,
+      directory: cwd,
+      sessionFile: typeof sessionManager.getSessionFile === 'function'
+        ? sessionManager.getSessionFile()
+        : undefined,
+      sessionManager,
+      info: createSessionInfo({
+        id: sessionID,
+        directory: cwd,
+        title,
+        parentID: resolvedParentID || readPersistedParentID(sessionMetadata),
+        metadata: hasMetadata ? sessionMetadata : undefined,
+        projectID: cwd,
+      }),
+      messages: [],
+      status: { type: 'idle' },
+      piSession: null,
+      translator: createRecordTranslator(sessionID, cwd, {}),
+      unsubscribe: null,
+    };
+    publishCreatedRecord(record);
+    void ensureLiveRecord(record).catch((error) => {
+      console.warn(`[pi-host] live bind failed for ${record.id}:`, error?.message || error);
     });
     return record;
   };
@@ -2527,6 +2672,9 @@ export const createPiHost = ({
       error.status = 409;
       throw error;
     }
+    if (!hasLivePrompt(record)) {
+      await ensureLiveRecord(record);
+    }
     record.unsubscribe?.();
     if (typeof record.piSession?.reload === 'function') {
       await runWithUserExtensionNativeGuard(record.directory, async () => {
@@ -2779,6 +2927,11 @@ export const createPiHost = ({
       await ready();
       return createFacadeSession(input);
     },
+    async warmDirectoryRuntime(directory) {
+      const cwd = typeof directory === 'string' && directory.trim() ? directory.trim() : defaultDirectory;
+      await ensureDirectoryRuntime(cwd);
+      return { ok: true, directory: cwd };
+    },
     getSession(sessionID) {
       return getRecord(sessionID);
     },
@@ -2800,6 +2953,7 @@ export const createPiHost = ({
     },
     async deleteSession(sessionID, directory) {
       const record = await ensureRecord(sessionID, directory);
+      markRecordDisposed(record);
       try {
         record.extensionUI?.dispose?.();
         record.unsubscribe?.();
@@ -3084,19 +3238,9 @@ export const createPiHost = ({
     async promptAsync(sessionID, body = {}) {
       const record = await ensureRecord(sessionID);
       const modelRef = resolvePromptModelRef(body.model);
-      if (modelRef) {
-        await this.setSessionModel(sessionID, modelRef);
-      }
       const requestedThinking = typeof body.variant === 'string' ? body.variant.trim()
         : typeof body.thinking === 'string' ? body.thinking.trim()
         : '';
-      if (requestedThinking && THINKING_LEVELS.includes(requestedThinking)) {
-        try {
-          await this.setSessionThinking(sessionID, requestedThinking);
-        } catch {
-          // Keep the session's current thinking when the pin is unsupported.
-        }
-      }
       const text = extractPromptText(body.parts) || (typeof body.text === 'string' ? body.text : '');
       if (!text) {
         const error = new Error('Message must have at least one text part');
@@ -3104,16 +3248,17 @@ export const createPiHost = ({
         throw error;
       }
 
+      // First-send bind can take longer than the user bubble. Mark busy now so
+      // a targeted reload 409s before `piSession` exists or starts streaming.
+      record.status = { type: 'busy' };
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'session.status',
+        properties: { sessionID, status: { type: 'busy' } },
+      });
+
       const userMessageID = body.messageID || createMessageId();
       const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
-      const runtimeModel = resolveHostFallbackModel(record, body.model);
-      if (runtimeModel) {
-        record.translator.setFallbackModel(runtimeModel);
-      }
-      record.translator.setUserMessage(userMessageID, {
-        agent: userAgent,
-        model: runtimeModel || body.model,
-      });
       const userParts = [{
         id: createPartId(),
         sessionID,
@@ -3134,6 +3279,44 @@ export const createPiHost = ({
         agent: userAgent,
         ...(body.model ? { model: body.model } : {}),
       };
+
+      const images = extractPromptImages(body.parts);
+      const promptOptions = {
+        ...(images.length > 0 ? { images } : {}),
+      };
+
+      try {
+        await ensureLiveRecord(record);
+        if (modelRef) {
+          await this.setSessionModel(sessionID, modelRef);
+        }
+        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking)) {
+          try {
+            await this.setSessionThinking(sessionID, requestedThinking);
+          } catch {
+            // Keep the session's current thinking when the pin is unsupported.
+          }
+        }
+      } catch (error) {
+        record.status = { type: 'idle' };
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.error',
+          properties: { sessionID, error: { message: error?.message || String(error) } },
+        });
+        emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
+        throw error;
+      }
+
+      const runtimeModel = resolveHostFallbackModel(record, body.model);
+      if (runtimeModel) {
+        record.translator?.setFallbackModel?.(runtimeModel);
+      }
+      record.translator?.setUserMessage?.(userMessageID, {
+        agent: userAgent,
+        model: runtimeModel || body.model,
+      });
+
       if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
         record.messages.push({ info: userInfo, parts: userParts });
       }
@@ -3157,15 +3340,10 @@ export const createPiHost = ({
         });
       }
 
-      const images = extractPromptImages(body.parts);
-      const promptOptions = {
-        ...(images.length > 0 ? { images } : {}),
-      };
-
-      const isStreaming = Boolean(record.piSession.isStreaming);
       const delivery = body.delivery;
       const run = async () => {
         try {
+          const isStreaming = Boolean(record.piSession?.isStreaming);
           ensureQuestionToolAdapted(record);
           if (isStreaming && delivery === 'steer' && typeof record.piSession.steer === 'function') {
             await record.piSession.steer(text, images);
@@ -3203,7 +3381,7 @@ export const createPiHost = ({
       } catch {
       }
       try {
-        await record.piSession.abort();
+        await record.piSession?.abort?.();
       } catch {
       }
       // Pi abort is a no-op when the kernel is no longer streaming. Always
@@ -3423,7 +3601,7 @@ export const createPiHost = ({
       };
     },
     async runCommand(sessionID, body = {}) {
-      const record = await ensureRecord(sessionID);
+      const record = await ensureLiveRecord(await ensureRecord(sessionID));
       const rawName = typeof body.command === 'string' ? body.command : '';
       const name = rawName.replace(/^\//, '').trim();
       const argument = typeof body.arguments === 'string' ? body.arguments.trim() : '';
@@ -3654,7 +3832,7 @@ export const createPiHost = ({
               if (remaining <= 0) {
                 missingChildReply();
                 try {
-                  await record.piSession.abort();
+                  await record.piSession?.abort?.();
                 } catch {
                 }
                 return;
@@ -3737,12 +3915,12 @@ export const createPiHost = ({
       return readRecordPlan(record);
     },
     async runPlanAction(sessionID, body = {}) {
-      const record = await ensureRecord(sessionID);
+      const record = await ensureLiveRecord(await ensureRecord(sessionID));
       const { action, model } = parseSessionPlanAction(body);
       await refreshRecordCommands(record);
       // Compaction and resume still need a quiet session (reload). Start/exit
       // with a live `/plan` only prompt; do not 409 on a stale isStreaming or
-      // leftover busy after Goal/ordinary send already finished.
+      // leftover busy after Goal, shell bind, or an ordinary send already finished.
       const needsReloadGate = Boolean(record.piSession?.isCompacting)
         || action === 'resume'
         || !findLiveSessionCommand(record.piSession, 'plan');
@@ -3785,10 +3963,37 @@ export const createPiHost = ({
         await this.setSessionModel(sessionID, model);
       }
 
-      await this.runCommand(sessionID, {
-        command: 'plan',
-        arguments: action === 'exit' ? 'exit' : action,
-      });
+      try {
+        await this.runCommand(sessionID, {
+          command: 'plan',
+          arguments: action === 'exit' ? 'exit' : action,
+        });
+      } catch (error) {
+        // Leftover bind streaming can throw from `/plan start`. Persist Plan
+        // so GET is not `off` for the first user prompt. Missing `/plan` 404
+        // and a saved-plan 409 must still reject.
+        if (action === 'start' && isLeftoverPlanStartStreamError(error)) {
+          const current = typeof record.piSession?.getPlanModeState === 'function'
+            ? record.piSession.getPlanModeState()
+            : restoreSessionPlanState(
+              typeof record.sessionManager?.getEntries === 'function'
+                ? record.sessionManager.getEntries()
+                : [],
+            );
+          if (!(current?.savedPlan && !current?.enabled)) {
+            await persistRecordPlanState(record, applyMockPlanCommand(
+              current && typeof current === 'object' ? current : { enabled: false, awaitingAction: false },
+              'start',
+            ));
+            const persisted = readRecordPlan(record);
+            if (persisted.status === 'active') {
+              emitPlanUpdated(record, persisted);
+              return persisted;
+            }
+          }
+        }
+        throw error;
+      }
       await refreshRecordCommands(record);
       const plan = readRecordPlan(record);
       emitPlanUpdated(record, plan);
@@ -4147,7 +4352,7 @@ export const createPiHost = ({
       return readSessionThinking(record.piSession);
     },
     async setSessionThinking(sessionID, level) {
-      const record = await ensureRecord(sessionID);
+      const record = await ensureLiveRecord(await ensureRecord(sessionID));
       if (typeof record.piSession?.setThinkingLevel !== "function") {
         return { applied: false, ...readSessionThinking(record.piSession), thinking: level };
       }
@@ -4167,7 +4372,7 @@ export const createPiHost = ({
       return { applied: true, thinking: next, available: snapshot.available };
     },
     async setSessionModel(sessionID, modelRef) {
-      const record = await ensureRecord(sessionID);
+      const record = await ensureLiveRecord(await ensureRecord(sessionID));
       if (typeof record.piSession?.setModel !== "function") {
         return { applied: false, model: modelRef };
       }
@@ -4223,7 +4428,7 @@ export const createPiHost = ({
       return normalizePiSessionUsage(contextUsage, sessionStats);
     },
     async compactSession(sessionID, instructions) {
-      const record = getRecord(sessionID);
+      const record = await ensureLiveRecord(getRecord(sessionID));
       if (typeof record.piSession?.compact !== "function") {
         const error = new Error("Pi compact is not available on this session");
         error.status = 400;
@@ -4331,6 +4536,7 @@ export const createPiHost = ({
     },
     dispose() {
       for (const record of sessions.values()) {
+        markRecordDisposed(record);
         try {
           record.extensionUI?.dispose?.();
           record.unsubscribe?.();
@@ -4338,6 +4544,7 @@ export const createPiHost = ({
         } catch {
         }
       }
+      liveBindings.clear();
       sessions.clear();
       sessionTodos.clear();
       skippedUserExtensions.clear();

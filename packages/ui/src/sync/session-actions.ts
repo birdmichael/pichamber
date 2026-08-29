@@ -42,6 +42,7 @@ import { normalizePath } from "@/lib/pathNormalization"
 import { mergeMessages } from "./optimistic"
 import { messagesBefore, messagesFrom } from "./message-ordering"
 import { deleteChatDirectory } from "@/lib/chatDirectories"
+import { adoptDraftPlanForSession } from "./pi-session-plan-store"
 
 const MESSAGE_REFETCH_LIMIT = 100
 const SEND_CONFIRMATION_REFETCH_LIMIT = 30
@@ -759,6 +760,13 @@ export async function createSession(
     if (sessionDirectory) {
       registerSessionDirectory(session.id, sessionDirectory)
     }
+    const draft = useSessionUIStore.getState().newSessionDraft
+    // Activate-path only: Goal mint uses activate:false and must not inherit
+    // draft Plan. Adopt before setCurrentSession closes the draft so chrome
+    // never sees sessionID + draft gone + plan off.
+    if (options?.activate !== false && draft?.open && draft.planSelected === true) {
+      adoptDraftPlanForSession(session.id)
+    }
     if (options?.activate !== false) {
       useSessionUIStore.getState().setCurrentSession(session.id, sessionDirectory)
     }
@@ -1361,6 +1369,8 @@ export async function optimisticSend(input: {
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
+  /** Runs after the bubble is visible and before the prompt HTTP call. */
+  beforeSend?: (messageID: string) => Promise<void>
   /** The actual API call — receives the optimistic messageID so the server can use the same ID */
   send: (messageID: string) => Promise<void>
 }): Promise<void> {
@@ -1463,6 +1473,8 @@ export async function optimisticSend(input: {
   })
 
   try {
+    assertRuntimeUnchanged()
+    if (input.beforeSend) await input.beforeSend(messageID)
     assertRuntimeUnchanged()
     await input.send(messageID)
   } catch (error) {

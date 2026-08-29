@@ -379,4 +379,63 @@ describe("applyDirectoryEvent", () => {
     expect(draft.question.ses_1).not.toBe(afterReply)
     expect(draft.question.ses_1).toEqual([])
   })
+
+  test("keeps the first finished assistant completed time", () => {
+    const draft = state({
+      message: {
+        ses_1: [{
+          id: "msg_a",
+          sessionID: "ses_1",
+          role: "assistant",
+          time: { created: 1_000, completed: 1_500 },
+          finish: "stop",
+        } as Message],
+      },
+    })
+
+    applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_a",
+          sessionID: "ses_1",
+          role: "assistant",
+          time: { created: 1_000, completed: 9_000 },
+          finish: "stop",
+        },
+      },
+    } as Event)
+
+    expect((draft.message.ses_1[0]?.time as { completed?: number }).completed).toBe(1_500)
+  })
+
+  test("clears leftover busy when the trailing assistant is already finished", () => {
+    const draft = state({
+      session_status: { ses_1: { type: "busy" } as SessionStatus },
+      message: {
+        ses_1: [{
+          id: "msg_a",
+          sessionID: "ses_1",
+          role: "assistant",
+          time: { created: 1_000, completed: 1_500 },
+          finish: "stop",
+        } as Message],
+      },
+    })
+
+    applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_a",
+          sessionID: "ses_1",
+          role: "assistant",
+          time: { created: 1_000, completed: 1_500 },
+          finish: "stop",
+        },
+      },
+    } as Event)
+
+    expect(draft.session_status.ses_1).toEqual({ type: "idle" })
+  })
 })

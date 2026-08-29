@@ -56,6 +56,7 @@ export const createEventTranslator = ({
   const toolStartTimes = new Map();
   let assistantMessageID = null;
   let assistantCreatedAt = null;
+  let assistantCompletedAt = null;
   let assistantParentID = null;
   let userMessageID = null;
   let agent = 'pi';
@@ -95,6 +96,7 @@ export const createEventTranslator = ({
   const beginAssistantMessage = (messageID) => {
     assistantMessageID = messageID || nextMessageId();
     assistantCreatedAt = now();
+    assistantCompletedAt = null;
     assistantParentID = userMessageID;
     textParts.clear();
     reasoningParts.clear();
@@ -121,6 +123,10 @@ export const createEventTranslator = ({
     const mapped = usageHasRecordedNumbers(recordedUsage)
       ? mapPiUsageToOpenCodeTokens(recordedUsage)
       : null;
+    if (completed && assistantCompletedAt == null) {
+      assistantCompletedAt = now();
+    }
+    const finished = assistantCompletedAt != null;
     return {
       id: assistantMessageID,
       sessionID,
@@ -137,8 +143,8 @@ export const createEventTranslator = ({
       agent,
       path: { cwd, root: cwd },
       ...(mapped ? { cost: mapped.cost, tokens: mapped.tokens } : {}),
-      time: completed ? { created, completed: now() } : { created },
-      ...(completed ? { finish: 'stop' } : {}),
+      time: finished ? { created, completed: assistantCompletedAt } : { created },
+      ...(finished ? { finish: 'stop' } : {}),
     };
   };
 

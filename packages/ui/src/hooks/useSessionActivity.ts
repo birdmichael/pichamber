@@ -19,6 +19,25 @@ const IDLE_RESULT: SessionActivityResult = {
   isCooldown: false,
 };
 
+export type SessionActivityMessage = {
+  role?: string;
+  time?: {
+    created?: number;
+    completed?: number;
+  };
+} | null | undefined;
+
+export const isSettledAssistantMessage = (
+  message: SessionActivityMessage,
+): boolean => (
+  Boolean(
+    message
+    && message.role === 'assistant'
+    && typeof message.time?.completed === 'number'
+    && message.time.completed > 0,
+  )
+);
+
 /**
  * Determines if a session is actively working.
  * Checks session_status and, only when status is missing, falls back to the
@@ -27,45 +46,55 @@ const IDLE_RESULT: SessionActivityResult = {
  * question indicator takes priority, and the send button must stay available so
  * the user can supersede the prompt with a new message).
  */
+export function resolveSessionActivity(input: {
+  sessionId?: string | null;
+  status?: { type?: string } | null;
+  lastMessage?: SessionActivityMessage;
+  hasBlockingPrompt?: boolean;
+}): SessionActivityResult {
+  if (!input.sessionId) return IDLE_RESULT;
+  if (input.hasBlockingPrompt) return IDLE_RESULT;
+
+  const phase: SessionActivityPhase = (input.status?.type ?? 'idle') as SessionActivityPhase;
+  const lastMessage = input.lastMessage ?? null;
+  const hasPendingAssistant = Boolean(
+    lastMessage
+    && lastMessage.role === 'assistant'
+    && typeof lastMessage.time?.completed !== 'number',
+  );
+  // A finished trailing assistant is authoritative. Leftover optimistic
+  // busy after the user bubble is replaced must not keep the header working.
+  if (isSettledAssistantMessage(lastMessage)) return IDLE_RESULT;
+
+  const hasAuthoritativeStatus = input.status !== undefined;
+  const statusWorking = hasAuthoritativeStatus && phase !== 'idle';
+  const isWorking = statusWorking || hasPendingAssistant;
+
+  if (hasAuthoritativeStatus && !statusWorking) return IDLE_RESULT;
+  if (!isWorking) return IDLE_RESULT;
+
+  return {
+    phase: statusWorking ? phase : 'busy',
+    isWorking: true,
+    isBusy: phase === 'busy' || (!statusWorking && hasPendingAssistant),
+    isCooldown: false,
+  };
+}
+
 export function useSessionActivity(sessionId: string | null | undefined, directory?: string): SessionActivityResult {
   const status = useSessionStatus(sessionId ?? '', directory);
   const messages = useSessionMessages(sessionId ?? '', directory);
   const permissions = useSessionPermissions(sessionId ?? '', directory);
   const questions = useSessionQuestions(sessionId ?? '', directory);
 
-  return React.useMemo<SessionActivityResult>(() => {
-    if (!sessionId) return IDLE_RESULT;
-
-    // Permissions or questions pending → idle (the blocking indicator takes
-    // priority and the send button must remain a send, not a stop).
-    if (permissions.length > 0 || questions.length > 0) return IDLE_RESULT;
-
-    const phase: SessionActivityPhase = (status?.type ?? 'idle') as SessionActivityPhase;
-
-    // Only trust the trailing assistant message as a transient fallback while
-    // waiting for session.status/message.updated to settle.
-    const lastMessage = messages[messages.length - 1];
-    const hasPendingAssistant = Boolean(
-      lastMessage
-      && lastMessage.role === 'assistant'
-      && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number',
-    );
-
-    const hasAuthoritativeStatus = status !== undefined;
-    const statusWorking = hasAuthoritativeStatus && phase !== 'idle';
-    const isWorking = statusWorking || hasPendingAssistant;
-
-    if (hasAuthoritativeStatus && !statusWorking) return IDLE_RESULT;
-
-    if (!isWorking) return IDLE_RESULT;
-
-    return {
-      phase: statusWorking ? phase : 'busy',
-      isWorking: true,
-      isBusy: phase === 'busy' || (!statusWorking && hasPendingAssistant),
-      isCooldown: false,
-    };
-  }, [sessionId, status, messages, permissions, questions]);
+  return React.useMemo<SessionActivityResult>(() => (
+    resolveSessionActivity({
+      sessionId,
+      status,
+      lastMessage: messages[messages.length - 1],
+      hasBlockingPrompt: permissions.length > 0 || questions.length > 0,
+    })
+  ), [sessionId, status, messages, permissions, questions]);
 }
 
 export function useCurrentSessionActivity(): SessionActivityResult {

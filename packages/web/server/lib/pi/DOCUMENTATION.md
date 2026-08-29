@@ -124,7 +124,23 @@ subscribes once per Pi session. IPC `createSession` cannot carry a live `Session
 The payload is `cwd`, `sessionFile`, `sessionID`, and optional
 `title` / `model`. When `sessionFile` or `sessionID` is present the
 child `ensureSession`s that jsonl. It does not `SessionManager.create`
-a second Untitled chat. Opening, hydrating, or reloading a live
+a second Untitled chat.
+Parent `POST /api/session` is a shell create: persist the jsonl header,
+emit `session.created`, and return the Pi UUID without waiting for the
+live `AgentSession`. `promptAsync` / `runCommand` / `setSessionModel` /
+`setSessionThinking` / `compactSession` / `runPlanAction` call
+`ensureLiveRecord`, which binds extensions in the Node child (or
+in-process factory) and reuses that id. Reload awaits the in-flight bind
+instead of starting a second AgentSession. Delete and host dispose mark
+the record disposed so a late bind cannot attach. `promptAsync` marks the
+session busy and emits `session.status` before that bind so a targeted
+`reload({ sessionID })` 409s during first-send bind. It still binds
+before inserting the user message so a failed bind does not leave a ghost
+turn and returns the session to idle. `GET` messages/list/session and
+`getSessionUsage` stay live-free on the shell record (`available: false`
+until `piSession.getContextUsage` exists).
+`POST /api/pi/directory-runtime/warm` fire-and-forgets
+`ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /
 409-while-streaming stay the same.
 `OPENCHAMBER_PI_NODE_KERNEL=0` restores the in-process fallback below.
@@ -420,8 +436,13 @@ failure is an HTTP error, not an empty `off`.
 `resume` and a missing live `/plan` (reload to attach the command) still
 409 while the session is compacting, streaming, or busy. `start` /
 `exit` / `save` / `implement` with a live `/plan` only prompt — they
-must not 409 on a leftover `isStreaming` or busy flag after a Goal or
-ordinary send already finished. Successful actions emit `pi.plan.updated`.
+must not 409 on a leftover `isStreaming` or busy flag after a Goal,
+shell bind, or ordinary send already finished. A leftover streaming throw
+from `session.prompt("/plan start")` still persists Plan-enabled state and
+returns `active`, so a just-created session cannot stay `off` for the first
+user prompt. Missing live `/plan` is still 404. A saved-plan 409 still
+rejects. Successful actions emit `pi.plan.updated`. `start` that leaves
+status `off` is a 500.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.
@@ -647,7 +668,8 @@ or the production getter injects it.
 ## Session reload
 
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
-does not 409. A busy or compacting target still 409s. Process-wide
+does not 409. A busy or compacting target still 409s, including a
+first-send bind that already marked the session busy. Process-wide
 `host.reload()` / `POST /api/config/reload` still refuse with 409 while any
 targeted session is compacting. A streaming or stuck-busy turn is aborted and
 settled as interrupted (`session.error` plus one `openchamber:notification`

@@ -2123,13 +2123,20 @@ const AssistantMessageBody = React.memo(({
         visibleParts,
     ]);
 
+    const frozenCompletedAtRef = React.useRef<number | null>(null);
+    if (typeof messageCompletedAt === 'number' && messageCompletedAt > 0 && frozenCompletedAtRef.current == null) {
+        frozenCompletedAtRef.current = messageCompletedAt;
+    }
+    const frozenCompletedAt = frozenCompletedAtRef.current;
+
     const turnDurationText = React.useMemo(() => {
         if (!isLastAssistantInTurn || !hasStopFinish) return undefined;
         const userCreatedAt = turnGroupingContext?.userMessageCreatedAt;
-        if (typeof userCreatedAt !== 'number' || typeof messageCompletedAt !== 'number') return undefined;
-        if (messageCompletedAt <= userCreatedAt) return undefined;
-        return formatTurnDuration(messageCompletedAt - userCreatedAt);
-    }, [isLastAssistantInTurn, hasStopFinish, turnGroupingContext?.userMessageCreatedAt, messageCompletedAt]);
+        const completedAt = frozenCompletedAt ?? messageCompletedAt;
+        if (typeof userCreatedAt !== 'number' || typeof completedAt !== 'number') return undefined;
+        if (completedAt <= userCreatedAt) return undefined;
+        return formatTurnDuration(completedAt - userCreatedAt);
+    }, [frozenCompletedAt, isLastAssistantInTurn, hasStopFinish, turnGroupingContext?.userMessageCreatedAt, messageCompletedAt]);
 
     const footerTimestamp = React.useMemo(() => {
         void locale;

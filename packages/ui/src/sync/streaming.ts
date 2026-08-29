@@ -58,6 +58,15 @@ const findTrailingAssistantMessage = (messages: Message[] | undefined): Message 
   return null
 }
 
+const isSettledAssistant = (message: Message | null): boolean => (
+  Boolean(
+    message
+    && message.role === "assistant"
+    && typeof (message as { time?: { completed?: number } }).time?.completed === "number"
+    && ((message as { time?: { completed?: number } }).time?.completed ?? 0) > 0,
+  )
+)
+
 export function updateStreamingState(state: State, now = Date.now()) {
   countSyncPerformance("streamingFullReconciliations")
   const currentStore = useStreamingStore.getState()
@@ -100,7 +109,7 @@ export function updateStreamingState(state: State, now = Date.now()) {
     // last, the next assistant message has not arrived yet.
     const streamingMsg = findTrailingAssistantMessage(messages)
 
-    if (!streamingMsg) {
+    if (!streamingMsg || isSettledAssistant(streamingMsg)) {
       const prevId = currentStreamingIds.get(sessionID)
       if (prevId) {
         completeStreamingMessage(sessionID, prevId)
@@ -217,7 +226,7 @@ export function updateChangedStreamingSessions(state: State, previous: State, no
 
     const streamingMessage = findTrailingAssistantMessage(state.message[sessionID])
 
-    if (!streamingMessage) {
+    if (!streamingMessage || isSettledAssistant(streamingMessage)) {
       if (previousMessageID) complete(sessionID, previousMessageID)
       continue
     }

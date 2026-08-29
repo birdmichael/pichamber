@@ -481,6 +481,25 @@ describe('createEventTranslator', () => {
     });
   });
 
+  it('freezes assistant completed time after the first message_end', () => {
+    let nowMs = 1_700_000_000_000;
+    const t = translator({ now: () => nowMs });
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    nowMs += 1_200;
+    const ended = t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    expect(ended[0].properties.info.time.completed).toBe(1_700_000_001_200);
+
+    nowMs += 50_000;
+    const later = t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    expect(later[0].properties.info.time.completed).toBe(1_700_000_001_200);
+    const usage = t.translate({ type: 'message_update', message: { usage: { input: 1, output: 1 } } });
+    const updated = usage.find((event) => event.type === 'message.updated');
+    if (updated) {
+      expect(updated.properties.info.time.completed).toBe(1_700_000_001_200);
+    }
+  });
+
   it('stamps a live assistant from fallback/session model instead of leftover pi/pi', () => {
     const t = translator({
       fallbackModel: { providerID: 'example-provider', modelID: 'example-model' },

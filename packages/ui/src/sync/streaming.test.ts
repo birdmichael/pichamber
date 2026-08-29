@@ -76,6 +76,28 @@ describe("updateStreamingState", () => {
     expect(useStreamingStore.getState().streamingMessageIds.get("ses_1")).toBe("msg_assistant_2")
   })
 
+  test("does not keep leftover busy streaming after the trailing assistant completed", () => {
+    const settled = {
+      id: "msg_assistant_1",
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+    } as Message
+
+    updateStreamingState(stateWithMessages([
+      message("msg_user_1", "user"),
+      message("msg_assistant_1", "assistant"),
+    ]))
+    expect(useStreamingStore.getState().streamingMessageIds.get("ses_1")).toBe("msg_assistant_1")
+
+    updateStreamingState(stateWithMessages([
+      message("msg_user_1", "user"),
+      settled,
+    ]))
+
+    expect(useStreamingStore.getState().streamingMessageIds.get("ses_1")).toBeNull()
+    expect(useStreamingStore.getState().messageStreamStates.get("msg_assistant_1")?.phase).toBe("completed")
+  })
+
   test("completes the streaming message when the session becomes idle", () => {
     updateStreamingState(stateWithMessages([
       message("msg_user_1", "user"),

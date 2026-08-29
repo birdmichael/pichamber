@@ -569,6 +569,22 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     })));
   }));
 
+  app.post('/api/pi/directory-runtime/warm', parseJson, handle(async (req, res) => {
+    const directory = typeof req.body?.directory === 'string' && req.body.directory.trim()
+      ? req.body.directory.trim()
+      : resolveDirectory(req);
+    if (!directory) {
+      const error = new Error('directory is required');
+      error.status = 400;
+      throw error;
+    }
+    if (typeof host.warmDirectoryRuntime !== 'function') {
+      json(res, 200, { ok: true, directory });
+      return;
+    }
+    json(res, 200, await host.warmDirectoryRuntime(directory));
+  }));
+
   app.get('/api/pi/feature-plugins', handle(async (_req, res) => {
     json(res, 200, host.getFeaturePlugins());
   }));

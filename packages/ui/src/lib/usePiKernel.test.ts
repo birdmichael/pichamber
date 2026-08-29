@@ -3,6 +3,7 @@ import {
   canOfferOpenCodeSessionStub,
   isMcpFeaturePluginAvailable,
   isProviderQuotaAvailable,
+  isSessionAssistVisibleOnPiKernel,
   isSessionGoalVisibleOnPiKernel,
   resolvePinnedPiAgentName,
   shouldShowOpenCodeAgentPicker,
@@ -59,6 +60,16 @@ describe('isSessionGoalVisibleOnPiKernel', () => {
 
   test('keeps Session Goal visible on OpenCode', () => {
     expect(isSessionGoalVisibleOnPiKernel(false)).toBe(true);
+  });
+});
+
+describe('isSessionAssistVisibleOnPiKernel', () => {
+  test('hides leftover Recap and suggestion on the Pi kernel', () => {
+    expect(isSessionAssistVisibleOnPiKernel(true)).toBe(false);
+  });
+
+  test('keeps leftover Recap and suggestion on OpenCode', () => {
+    expect(isSessionAssistVisibleOnPiKernel(false)).toBe(true);
   });
 });
 

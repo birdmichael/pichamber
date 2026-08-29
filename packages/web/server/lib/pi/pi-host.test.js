@@ -287,6 +287,164 @@ describe('session conversation titles', () => {
 });
 
 describe('createPiHost', () => {
+  it('returns a persisted shell session without waiting for live AgentSession bind', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-session-'));
+    let liveBound = false;
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async () => {
+        liveBound = true;
+        return createInMemoryPiSession();
+      },
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    expect(record.info.title).toBe('Shell');
+    expect(record.id).toBeTruthy();
+    expect(host.getMessages(record.id)).toEqual([]);
+    expect(host.listSessions(dir)).toHaveLength(1);
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'hi' }] });
+    expect(liveBound).toBe(true);
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const testSessionManager = (dir) => ({
+    getSessionId: () => `ses_shell_${path.basename(dir)}`,
+    getSessionFile: () => path.join(dir, 'session.jsonl'),
+    getEntries: () => [],
+  });
+
+  it('does not keep a user message when live bind fails', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-bind-fail-'));
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => testSessionManager(dir),
+      createSession: async () => {
+        throw new Error('bind failed');
+      },
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    await expect(host.promptAsync(record.id, { parts: [{ type: 'text', text: 'hi' }] })).rejects.toThrow('bind failed');
+    expect(host.getMessages(record.id)).toEqual([]);
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reuses an in-flight live bind when reload runs during shell bind', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-reload-'));
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    let factoryCalls = 0;
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => testSessionManager(dir),
+      createSession: async () => {
+        factoryCalls += 1;
+        await gate;
+        const session = createInMemoryPiSession();
+        session.reload = async () => {};
+        return session;
+      },
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    for (let i = 0; i < 50 && factoryCalls === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(factoryCalls).toBe(1);
+    const reloading = host.reload({ sessionID: record.id });
+    expect(factoryCalls).toBe(1);
+    release();
+    await reloading;
+    expect(factoryCalls).toBe(1);
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not attach a live session after the shell record is deleted', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-delete-'));
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => testSessionManager(dir),
+      createSession: async () => {
+        await gate;
+        return createInMemoryPiSession();
+      },
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    const deleting = host.deleteSession(record.id);
+    release();
+    await deleting;
+    expect(() => host.getSession(record.id)).toThrow(/not found/i);
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('applies setSessionModel after a delayed shell bind', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-model-'));
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => testSessionManager(dir),
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{ id: 'claude-sonnet-4-5', provider: 'anthropic' }],
+      }),
+      createSession: async () => {
+        await gate;
+        return createInMemoryPiSession();
+      },
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    const applying = host.setSessionModel(record.id, 'anthropic/claude-sonnet-4-5');
+    release();
+    const result = await applying;
+    expect(result.applied).toBe(true);
+    expect(host.getSession(record.id).piSession.currentModel).toEqual({
+      id: 'claude-sonnet-4-5',
+      provider: 'anthropic',
+    });
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not emit a user message when live bind fails', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-bind-events-'));
+    const events = [];
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => testSessionManager(dir),
+      createSession: async () => {
+        throw new Error('bind failed');
+      },
+      onEvent: (_directory, event) => events.push(event),
+    });
+    const record = await host.createSession({ directory: dir, title: 'Shell' });
+    await expect(host.promptAsync(record.id, { parts: [{ type: 'text', text: 'hi' }] })).rejects.toThrow('bind failed');
+    expect(events.some((event) => event.type === 'message.updated')).toBe(false);
+    host.dispose();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it('creates sessions, lists them, and returns OpenCode-shaped messages after a mock prompt', async () => {
     const events = [];
     const host = createPiHost({
@@ -1239,13 +1397,57 @@ describe('createPiHost', () => {
       }),
     });
     const record = await host.createSession({ directory: '/tmp/project' });
-    expect(host.getSessionUsage(record.id)).toEqual({
+    expect(host.getSessionUsage(record.id)).toEqual({ available: false });
+    await expect.poll(() => host.getSessionUsage(record.id)).toEqual({
       available: true,
       tokens: 2560,
       contextLimit: 128000,
       contextWindow: 128000,
       percent: 2,
     });
+    host.dispose();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it('reload({ sessionID }) 409s while first-send bind is in flight', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-first-send-reload-'));
+    let releaseBind;
+    const bindGate = new Promise((resolve) => {
+      releaseBind = resolve;
+    });
+    let enteredBind;
+    const bindEntered = new Promise((resolve) => {
+      enteredBind = resolve;
+    });
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async () => {
+        enteredBind();
+        await bindGate;
+        return {
+          isStreaming: false,
+          subscribe() { return () => {}; },
+          async prompt() {},
+        };
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    await bindEntered;
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'stream' }] });
+    const deadline = Date.now() + 1000;
+    while (Date.now() < deadline && host.getStatus()[record.id]?.type !== 'busy') {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(host.getStatus()[record.id]).toEqual({ type: 'busy' });
+    await expect(host.reload({ sessionID: record.id })).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for the current response to finish before reloading.',
+    });
+    releaseBind();
+    await prompt;
     host.dispose();
     fs.rmSync(home, { recursive: true, force: true });
   });
@@ -2313,6 +2515,45 @@ describe('session plan status and actions', () => {
     Object.defineProperty(record.piSession, 'isStreaming', { get: () => true });
     record.status = { type: 'busy' };
     expect(await host.runPlanAction(record.id, { action: 'start' })).toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    host.dispose();
+  });
+
+  it('starts Plan on a leftover busy flag after shell bind', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover busy' });
+    record.status = { type: 'busy' };
+    const prompted = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      prompted.push(text);
+      return originalPrompt(text, options);
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).resolves.toEqual({
+      status: 'active',
+      planMarkdown: '',
+    });
+    expect(prompted).toEqual(['/plan start']);
+    host.dispose();
+  });
+
+  it('keeps Plan active when leftover streaming throws from /plan start', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover stream' });
+    record.piSession.prompt = async () => {
+      throw new Error('Already streaming; use steer or followUp');
+    };
+
+    await expect(host.runPlanAction(record.id, { action: 'start' })).resolves.toEqual({
       status: 'active',
       planMarkdown: '',
     });

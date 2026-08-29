@@ -125,6 +125,7 @@ mock.module("@/lib/opencode/client", () => ({
       return mockScopedClient
     },
     getDirectory: () => "/test/project",
+    setDirectory: () => {},
     getSdkClient: () => mockSdk,
     replyToPermission: mock((requestId: string, reply: string, options?: { directory?: string | null }) => {
       replyCalls.push({ method: "permission.reply", params: { requestID: requestId, reply, directory: options?.directory } })
@@ -191,6 +192,7 @@ mock.module("./session-ui-store", () => ({
         return null
       },
       currentSessionId: null,
+      newSessionDraft: { open: false, planSelected: false },
       setCurrentSession: () => {},
       setWorktreeMetadata: () => {},
       setSessionDirectory: (sessionID: string, directory: string) => {
@@ -1084,6 +1086,44 @@ describe("optimisticSend target directory", () => {
     expect(optimisticRemove).not.toBeNull()
     expect((optimisticRemove as unknown as OptimisticRemoveCall).sessionID).toBe("session-race")
     expect(targetStore.getState().session_status["session-race"]?.type).toBe("idle")
+  })
+
+  test("rolls back when beforeSend throws after the optimistic bubble is visible", async () => {
+    const targetStore = createStore({})
+    const childStores = createChildStores([["/target/project", targetStore]])
+    let optimisticAdd: OptimisticAddCall | null = null
+    let optimisticRemove: OptimisticRemoveCall | null = null
+    let sendCalled = false
+
+    const { optimisticSend, setActionRefs, setOptimisticRefs } = await import("./session-actions")
+    setActionRefs(mockSdk as unknown as OpencodeClient, childStores, () => "/target/project")
+    setOptimisticRefs(
+      (input) => {
+        optimisticAdd = input
+      },
+      (input) => {
+        optimisticRemove = input
+      },
+    )
+
+    await expect(optimisticSend({
+      sessionId: "session-new",
+      directory: "/target/project",
+      content: "hello",
+      providerID: "provider",
+      modelID: "model",
+      beforeSend: async () => {
+        throw new Error("goal failed")
+      },
+      send: async () => {
+        sendCalled = true
+      },
+    })).rejects.toThrow("goal failed")
+
+    expect(optimisticAdd).not.toBeNull()
+    expect(sendCalled).toBe(false)
+    expect(optimisticRemove).not.toBeNull()
+    expect(targetStore.getState().session_status["session-new"]?.type).toBe("idle")
   })
 
   test("confirms an ambiguous send failure with a recent message refetch", async () => {

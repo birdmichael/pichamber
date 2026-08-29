@@ -16,7 +16,7 @@ import {
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
 } from '@/sync/pi-session-plan';
-import { refreshSessionPlan, useSessionPlan } from '@/sync/pi-session-plan-store';
+import { refreshSessionPlan, usePendingDraftPlan, useSessionPlan } from '@/sync/pi-session-plan-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
 export function usePiPlanChrome(sessionID?: string | null) {
@@ -35,6 +35,7 @@ export function usePiPlanChrome(sessionID?: string | null) {
     lastActiveSessionID,
   }) || null;
   const draftOpen = isPlanChromeDraft(storeDraftOpen, resolvedSessionId);
+  const pendingDraftPlan = usePendingDraftPlan(resolvedSessionId);
   const planPluginAvailable = usePiPlanPluginAvailable();
   const plan = useSessionPlan(resolvedSessionId);
   const { phase } = useCurrentSessionActivity();
@@ -66,6 +67,7 @@ export function usePiPlanChrome(sessionID?: string | null) {
       sessionID: resolvedSessionId,
       draftOpen,
       draftPlanSelected,
+      pendingDraftPlan,
     }),
     showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
     showViewPlan: available && sessionPlanViewAvailable(plan),

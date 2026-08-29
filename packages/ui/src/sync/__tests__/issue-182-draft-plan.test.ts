@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 const createSessionCalls: Array<string | null | undefined> = []
 const planStarts: Array<{ sessionID: string; action: string }> = []
+const planApplies: Array<{ sessionID: string; status: string }> = []
 const sendMessageCalls: Array<{ id?: string }> = []
 
 mock.module('../pi-session-plan-store', () => ({
@@ -9,15 +10,24 @@ mock.module('../pi-session-plan-store', () => ({
     planStarts.push({ sessionID, action })
     return { status: 'active', planMarkdown: '' }
   }),
-  applySessionPlan: () => undefined,
+  applySessionPlan: (sessionID: string, plan: { status?: string } | null) => {
+    if (plan?.status) planApplies.push({ sessionID, status: plan.status })
+  },
+  adoptDraftPlanForSession: (sessionID: string) => {
+    planApplies.push({ sessionID, status: 'active' })
+  },
+  markPendingDraftPlan: () => undefined,
+  clearPendingDraftPlan: () => undefined,
+  isPendingDraftPlan: () => false,
   refreshSessionPlan: async () => null,
   applySessionPlanEvent: () => null,
   resetPiSessionPlanStore: () => undefined,
   usePiSessionPlanStore: {
-    getState: () => ({ plansBySession: {} }),
+    getState: () => ({ plansBySession: {}, pendingDraftPlanBySession: {} }),
     setState: () => undefined,
   },
   useSessionPlan: () => null,
+  usePendingDraftPlan: () => false,
 }))
 
 const { opencodeClient } = await import('@/lib/opencode/client')
@@ -58,6 +68,7 @@ describe('issue 182 draft Plan send', () => {
   beforeEach(() => {
     createSessionCalls.length = 0
     planStarts.length = 0
+    planApplies.length = 0
     sendMessageCalls.length = 0
 
     const childStore = {
@@ -139,9 +150,18 @@ describe('issue 182 draft Plan send', () => {
     )
 
     expect(createSessionCalls).toHaveLength(1)
+    expect(planApplies[0]).toEqual({ sessionID: 'ses_issue_182', status: 'active' })
     expect(planStarts).toEqual([{ sessionID: 'ses_issue_182', action: 'start' }])
     expect(sendMessageCalls).toHaveLength(1)
     expect(sendMessageCalls[0]?.id).toBe('ses_issue_182')
+    const { resolveFooterPlanSelected } = await import('../pi-session-plan')
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_issue_182',
+      draftOpen: false,
+      draftPlanSelected: true,
+    })).toBe(true)
   })
 
   test('Agent draft send materializes once and does not start plan', async () => {

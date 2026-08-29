@@ -74,6 +74,7 @@ import { headerServicesOpenAriaKey } from '@/components/layout/headerServicesCop
 import {
   getSessionTitleReloadBlockReason,
   isSessionTitleReloadBlocked,
+  isSessionTitleReloadGlyphVisible,
   isSessionTitleReloadInFlightForSession,
   isSessionTitleReloadOutputting,
   isSessionTitleReloadVisible,
@@ -1312,6 +1313,14 @@ export const Header: React.FC<HeaderProps> = ({
     isNewSessionDraftOpen,
     isRenamingSession: isRenamingHeaderSession,
   });
+  const showSessionTitleReloadGlyph = isSessionTitleReloadGlyphVisible({
+    isPiKernel,
+    hasCurrentSession: Boolean(currentSessionId),
+    isNewSessionDraftOpen,
+    isRenamingSession: isRenamingHeaderSession,
+    isReloadInFlight: isPiReloadInFlight,
+    isCompacting: sessionTitleReloadIsCompacting,
+  });
   const sessionTitleReloadBlockReason = getSessionTitleReloadBlockReason({
     statusType: currentSessionStatus?.type,
     isOutputting: sessionTitleReloadIsOutputting,
@@ -2202,7 +2211,7 @@ export const Header: React.FC<HeaderProps> = ({
               // alone, the title is centred and the button must follow.
               showHeaderMetaRow ? 'self-start' : 'self-center',
             )}>
-              {showSessionTitleReload ? (
+              {showSessionTitleReloadGlyph ? (
                 <HeaderIconActionButton
                   title={t(sessionTitleReloadTooltipKey(sessionTitleReloadBlockReason))}
                   ariaLabel={t(sessionTitleReloadAriaKey(sessionTitleReloadBlockReason))}
@@ -2232,6 +2241,15 @@ export const Header: React.FC<HeaderProps> = ({
                   <DropdownMenuContent align="end" className="min-w-[190px]">
                     <DropdownMenuItem onClick={() => { pendingHeaderRenameRef.current = true; }}><Icon name="pencil-ai" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.rename')}</DropdownMenuItem>
                     <DropdownMenuItem onClick={copyCurrentSessionId}><Icon name="file-copy" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.copyId')}</DropdownMenuItem>
+                    {showSessionTitleReload ? (
+                      <DropdownMenuItem
+                        disabled={isSessionTitleReloadDisabled}
+                        onClick={reloadPiKernel}
+                      >
+                        <Icon name="refresh" className="mr-2 size-4" />
+                        {t('header.sessionReload.tooltip')}
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuSeparator />
                     {canShareSession ? (
                       currentSession?.shareUrl ? (

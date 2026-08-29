@@ -14,6 +14,7 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveFooterPlanSelected,
   resolveOpenedDraftPlanSelected,
+  resolvePlanStatusRowHint,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
@@ -21,8 +22,10 @@ import {
 } from './pi-session-plan';
 import { resetPlanReadyRailOpenForTests } from './pi-plan-ready';
 import {
+  adoptDraftPlanForSession,
   applySessionPlan,
   applySessionPlanEvent,
+  isPendingDraftPlan,
   resetPiSessionPlanStore,
   usePiSessionPlanStore,
 } from './pi-session-plan-store';
@@ -103,9 +106,8 @@ describe('plan toggle and build dispatch', () => {
       status: 'off',
       side: 'agent',
     })).toEqual({ kind: 'draft-intent', planSelected: false });
-    expect(shouldStartPlanAfterDraftMaterialize(true, 'off')).toBe(true);
-    expect(shouldStartPlanAfterDraftMaterialize(true, 'active')).toBe(false);
-    expect(shouldStartPlanAfterDraftMaterialize(false, 'off')).toBe(false);
+    expect(shouldStartPlanAfterDraftMaterialize(true)).toBe(true);
+    expect(shouldStartPlanAfterDraftMaterialize(false)).toBe(false);
   });
 
   test('footer can show Plan from draft intent without a session status', () => {
@@ -135,6 +137,41 @@ describe('plan toggle and build dispatch', () => {
       draftOpen: true,
       draftPlanSelected: true,
     })).toBe(false);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_new',
+      draftOpen: false,
+      draftPlanSelected: true,
+    })).toBe(true);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_new',
+      draftOpen: false,
+      draftPlanSelected: false,
+      pendingDraftPlan: true,
+    })).toBe(true);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_new',
+      draftOpen: false,
+      draftPlanSelected: false,
+      pendingDraftPlan: false,
+    })).toBe(false);
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: true,
+    })).toBe('draft');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: false,
+    })).toBe('enabled');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: false,
+      draftOpen: true,
+    })).toBeNull();
   });
 
   test('empty-composer Plan stays on this draft until send or Agent, and a new draft is Agent', () => {
@@ -254,6 +291,7 @@ describe('plan toggle and build dispatch', () => {
     const started = await applyDraftPlanStartAfterMaterialize({
       sessionID: 'ses_new',
       draftPlanSelected: true,
+      currentStatus: 'active',
       startPlan: async (sessionID) => {
         starts.push(sessionID);
         return { status: 'active', planMarkdown: '' };
@@ -296,5 +334,17 @@ describe('pi-session-plan-store', () => {
       status: 'ready',
       planMarkdown: '# Keep',
     });
+  });
+
+  test('adopted first-send Plan survives a later off event', () => {
+    adoptDraftPlanForSession('ses_new');
+    expect(isPendingDraftPlan('ses_new')).toBe(true);
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_new?.status).toBe('active');
+    applySessionPlanEvent({
+      sessionID: 'ses_new',
+      plan: { status: 'off', planMarkdown: '' },
+    });
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_new?.status).toBe('active');
+    expect(isPendingDraftPlan('ses_new')).toBe(true);
   });
 });

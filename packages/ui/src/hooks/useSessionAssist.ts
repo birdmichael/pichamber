@@ -1,6 +1,7 @@
 import React from 'react';
 import { useDirectoryStore, useSession, useSessionStatus } from '@/sync/sync-context';
 import { isPiGoalSessionAssistHidden } from '@/lib/piGoal';
+import { isSessionAssistVisibleOnPiKernel, usePiKernel } from '@/lib/usePiKernel';
 import { getSessionAssist, type SessionAssistPayload } from '@/lib/sessionAssistMetadata';
 import { useUIStore } from '@/stores/useUIStore';
 
@@ -64,9 +65,11 @@ export function useSessionAssistState(sessionId: string, directory?: string): Se
   const lastMessage = useLastMessageSnapshot(sessionId, directory);
   const sessionRecapEnabled = useUIStore((state) => state.sessionRecapEnabled);
   const sessionSuggestionEnabled = useUIStore((state) => state.sessionSuggestionEnabled);
+  const isPiKernel = usePiKernel();
+  const sessionAssistVisible = isSessionAssistVisibleOnPiKernel(isPiKernel);
 
   const isIdle = !status || status.type === 'idle';
-  const payload = getSessionAssist(session);
+  const payload = sessionAssistVisible ? getSessionAssist(session) : null;
   const store = useDirectoryStore(directory);
   const goalAssistHidden = isPiGoalSessionAssistHidden(
     store.getState().message[sessionId],
