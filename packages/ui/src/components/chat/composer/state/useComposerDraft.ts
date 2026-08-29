@@ -144,11 +144,19 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
         confirmedMentionsRef.current = activeMentions;
 
         const signature = draftSignature(draft, activeMentions);
+        const isLiveIdentity = Boolean(
+            currentIdentityRef.current
+            && getChatDraftIdentityKey(currentIdentityRef.current) === key
+        );
+        // Submit clears the draft before the minted session remounts the
+        // composer. Keep the live ref aligned so identity switch cannot write
+        // the sent text back onto New session.
+        if (isLiveIdentity) messageRef.current = draft;
         if (lastPersistedRef.current.get(key) === signature) return;
 
         writeChatDraft(target, draft, activeMentions);
         lastPersistedRef.current.set(key, signature);
-    }, [confirmedMentionsRef]);
+    }, [confirmedMentionsRef, messageRef]);
 
     const clearPending = React.useCallback(() => {
         if (!persistTimerRef.current) return;

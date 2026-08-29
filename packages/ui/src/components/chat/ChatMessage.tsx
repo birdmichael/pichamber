@@ -553,7 +553,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         return { name, token: rawValue } satisfies AgentMentionInfo;
     }, [isUser, normalizedParts]);
 
-    const shouldHideUserMessage = isUser && displayParts.length === 0;
+    const shouldHideUserMessage = isUser && (
+        displayParts.length === 0
+        || isHiddenUserMessage(message, { planModeEnabled, directory: sessionDirectory })
+    );
 
     // Message is considered to have an "open step" if info.finish is not yet present
     const hasOpenStep = typeof messageFinish !== 'string';

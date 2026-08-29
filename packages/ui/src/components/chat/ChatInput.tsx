@@ -32,6 +32,7 @@ import { useBtwPanelState } from './btw/useBtwPanelState';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import {
     createChatDraftIdentity,
+    isStrayNewSessionSlashDraft,
     readChatDraft,
     writeChatDraft,
     type ChatDraftIdentity,
@@ -143,6 +144,11 @@ import {
     findMagicPromptCommand,
     parseSlashCommand,
 } from './composer/submit/slashCommands';
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { resolveDraftPlanStarterClick } from '@/lib/draftStarters';
+import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
+import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
 import {
     shouldDockComposerForDesktopSlashMenu,
@@ -160,6 +166,7 @@ import {
 } from './composer/ui/DraftTargetSelectors';
 import { ComposerAutocompletePopups } from './composer/ui/ComposerAutocompletePopups';
 import { ComposerFooter } from './composer/ui/ComposerFooter';
+import { useParentChatColumnAgentOmit } from './composer/ui/composerAgentSlotLayout';
 import { chatHelperPlaceholderKey, shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
@@ -426,6 +433,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
     const agents = getVisibleAgents();
     const isMobile = useUIStore((state) => state.isMobile);
+    // ChatInput in [data-parent-chat-column] omits Agent below 576px (~328px squeeze).
+    const omitParentColumnAgentSlot = useParentChatColumnAgentOmit(composerFormRef, !isMobile);
     const hasHardwareKeyboard = useHardwareKeyboard();
     const { enabled: isTabletLayout } = useTabletLayout();
     const setImagePreviewOpen = useUIStore((state) => state.setImagePreviewOpen);
@@ -872,13 +881,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     });
 
     // Sidebar / File-menu New session must not keep a leftover `/` or an open
-    // slash menu from the previous composer identity.
+    // slash menu. A restored untitled draft is not leftover slash.
     React.useEffect(() => {
         if (!newSessionDraft?.open || !newSessionDraft.resetComposer) return;
         setOpenAutocomplete(null);
         setAutocompleteQuery('');
         dismissedAutocompleteKindRef.current = null;
-        if (messageRef.current) {
+        if (isStrayNewSessionSlashDraft(messageRef.current)) {
             messageRef.current = '';
             setMessage('');
             persistDraftImmediately(chatDraftIdentity, '');
@@ -1108,6 +1117,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
+        closeAutocomplete();
+
         const capturedSendConfig = queuedOnly ? queuedMessagesToSend[0]?.sendConfig : undefined;
         const providerIdToSend = capturedSendConfig?.providerID ?? currentProviderId;
         const modelIdToSend = capturedSendConfig?.modelID ?? currentModelId;
@@ -1241,7 +1252,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (pendingKey) clearPendingComposerTurn(pendingKey);
             else clearPendingComposerTurn();
         };
-        if (!queuedOnly) startPendingTurn(primaryText);
+        const featurePlugins = usePiFeaturePluginsStore.getState();
+        const skipPendingPlanBubble = isLeftoverPlanSlashText(
+            primaryText,
+            featurePlugins.payload,
+            featurePlugins.status,
+        );
+        if (!queuedOnly && !skipPendingPlanBubble) startPendingTurn(primaryText);
 
         // Clear queue and input
         if (capturedTarget && queuedMessageId) {
@@ -1250,6 +1267,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             clearQueue(capturedTarget);
         }
         if (!queuedOnly) {
+            messageRef.current = '';
             setMessage('');
             confirmedMentionsRef.current.clear();
             // Clear per-session draft on submit
@@ -1398,7 +1416,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         } catch (error) {
             console.warn('[ChatInput] Failed to expand snippets, sending original text:', error);
         }
-        startPendingTurn(primaryText);
+        if (!skipPendingPlanBubble) startPendingTurn(primaryText);
 
         // Collect all attachments for error recovery
         const allAttachments = [
@@ -1566,6 +1584,22 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // instead of through the composer input — the collapsed mobile pill has
         // no mounted textarea to stage it in.
         const draft = (composerRef.current?.getValue() ?? messageRef.current).trim();
+        const planStarter = resolveDraftPlanStarterClick({
+            submitText: text,
+            draftOpen: Boolean(useSessionUIStore.getState().newSessionDraft?.open),
+            composerText: draft,
+        });
+        if (planStarter.kind === 'draft-plan') {
+            useSessionUIStore.getState().setDraftPlanSelected(true);
+            presentPiExtensionUiNotify({
+                message: PLAN_MODE_ENABLED_NOTIFY,
+                level: 'info',
+            });
+            if (planStarter.sendText) {
+                void handleSubmitRef.current({ presetText: planStarter.sendText });
+            }
+            return;
+        }
         // OpenCode recognizes slash commands only when their arguments follow
         // the command on the same line. Skills retain the multiline prompt form.
         const presetText = draft ? `${text}${type === 'command' ? ' ' : '\n'}${draft}` : text;
@@ -3076,6 +3110,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     <ComposerFooter
                         isMobile={isMobile}
                         isVSCode={isVSCode}
+                        omitAgentSlot={omitParentColumnAgentSlot}
                         sessionId={currentSessionId}
                         directory={currentSessionDirectoryForSync ?? currentDirectory}
                         newSessionDraftOpen={newSessionDraftOpen}

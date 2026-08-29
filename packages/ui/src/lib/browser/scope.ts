@@ -113,3 +113,52 @@ export function mergeContextPanelForBrowserScope<T extends BrowserScopedTab>(
     },
   };
 }
+
+/**
+ * Subagent chat tabs follow the parent session, not the project directory.
+ * When a session scope exists, directory-scoped leftover chat tabs stay hidden
+ * so switching conversations cannot keep another parent's child open.
+ */
+export function mergeContextPanelChatScope<T extends BrowserScopedTab>(
+  sessionKey: string,
+  sessionState: BrowserScopedPanelState<T> | undefined,
+  chatScopeKey: string,
+  chatState: BrowserScopedPanelState<T> | undefined,
+): BrowserScopedPanelState<T> | undefined {
+  if (!sessionKey) return undefined;
+  if (!chatScopeKey) return sessionState;
+  if (chatScopeKey === sessionKey || sessionState === chatState) {
+    return sessionState;
+  }
+
+  const sessionTabs = (sessionState?.tabs ?? []).filter((tab) => tab.mode !== 'chat');
+  const chatTabs = (chatState?.tabs ?? []).filter((tab) => tab.mode === 'chat');
+  const tabs = [...sessionTabs, ...chatTabs];
+
+  if (!sessionState && tabs.length === 0) return undefined;
+
+  const base = sessionState ?? {
+    isOpen: false,
+    expanded: false,
+    tabs,
+    activeTabId: null,
+    widthByMode: {},
+    touchedAt: chatState?.touchedAt ?? Date.now(),
+  };
+
+  const sessionTouched = sessionState?.touchedAt ?? 0;
+  const chatTouched = chatState?.touchedAt ?? 0;
+  const requestedActiveTabId = chatTouched >= sessionTouched
+    ? (chatState?.activeTabId ?? sessionState?.activeTabId ?? null)
+    : (sessionState?.activeTabId ?? chatState?.activeTabId ?? null);
+  const activeTabId = requestedActiveTabId && tabs.some((tab) => tab.id === requestedActiveTabId)
+    ? requestedActiveTabId
+    : (chatTabs[chatTabs.length - 1]?.id ?? sessionState?.activeTabId ?? tabs[tabs.length - 1]?.id ?? null);
+
+  return {
+    ...base,
+    isOpen: sessionState?.isOpen || Boolean(chatState?.isOpen && chatTabs.length > 0),
+    tabs,
+    activeTabId,
+  };
+}

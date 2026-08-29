@@ -161,10 +161,12 @@ export const clearPiExtensionUiFocus = (promptId?: string): void => {
 export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | null => {
   const prompt = parsePiExtensionUiPrompt(value);
   if (!prompt) return null;
+  const current = usePiExtensionUiStore.getState().promptsBySession[prompt.sessionID] ?? empty;
+  const alreadyPending = current.some((item) => item.id === prompt.id && item.status === 'pending');
   usePiExtensionUiStore.setState((state) => {
-    const current = state.promptsBySession[prompt.sessionID] ?? empty;
-    const next = upsertPrompt(current, prompt);
-    if (next === current) return state;
+    const existing = state.promptsBySession[prompt.sessionID] ?? empty;
+    const next = upsertPrompt(existing, prompt);
+    if (next === existing) return state;
     return {
       ...state,
       promptsBySession: {
@@ -173,6 +175,9 @@ export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | 
       },
     };
   });
+  if (prompt.status === 'pending' && isBlockingPiExtensionUiKind(prompt.kind) && !alreadyPending) {
+    requestPiExtensionUiFocus(prompt.id);
+  }
   return prompt;
 };
 

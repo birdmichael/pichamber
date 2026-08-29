@@ -23,6 +23,7 @@ import {
   WorkStatusValue,
 } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
+import { useWorkStatusNavigate } from './workStatusNavigate';
 
 type Props = {
   sessionId: string | null;
@@ -138,20 +139,29 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
   const openContextSurface = useUIStore((state) => state.openContextSurface);
   const openContextOverview = useUIStore((state) => state.openContextOverview);
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
+  const onNavigate = useWorkStatusNavigate();
   const openSurface = React.useCallback(
-    (mode: 'git' | 'pr') => { if (directory) openContextSurface(directory, mode); },
-    [directory, openContextSurface],
+    (mode: 'git' | 'pr') => {
+      if (!directory) return;
+      onNavigate?.();
+      openContextSurface(directory, mode);
+    },
+    [directory, onNavigate, openContextSurface],
   );
   // Working-tree diff without a target path: the panel opens on the whole
   // change set rather than picking a file on the user's behalf.
   // Same destination as the header's context readout.
   const openContext = React.useCallback(() => {
-    if (directory) openContextOverview(directory);
-  }, [directory, openContextOverview]);
+    if (!directory) return;
+    onNavigate?.();
+    openContextOverview(directory);
+  }, [directory, onNavigate, openContextOverview]);
 
   const openChanges = React.useCallback(() => {
-    if (directory) openContextPanelTab(directory, { mode: 'diff', diffScope: 'working' });
-  }, [directory, openContextPanelTab]);
+    if (!directory) return;
+    onNavigate?.();
+    openContextPanelTab(directory, { mode: 'diff', diffScope: 'working' });
+  }, [directory, onNavigate, openContextPanelTab]);
 
   // Working-tree changes, from the same git status the Git panel reads.
   //

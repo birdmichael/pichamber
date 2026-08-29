@@ -320,7 +320,7 @@ export const getActiveAssistantContext = (messages: Message[]): ActiveAssistantC
     }
 
     if (!assistantId || !parentId) {
-        return { assistantId, model: null };
+        return { assistantId, model: readLastAssistantModel(messages) };
     }
 
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -339,11 +339,39 @@ export const getActiveAssistantContext = (messages: Message[]): ActiveAssistantC
 
         return {
             assistantId,
-            model: providerId && modelId ? { providerId, modelId } : null,
+            model: providerId && modelId
+                ? { providerId, modelId }
+                : readLastAssistantModel(messages),
         };
     }
 
-    return { assistantId, model: null };
+    return { assistantId, model: readLastAssistantModel(messages) };
+};
+
+const readLastAssistantModel = (messages: Message[]): ActiveAssistantModel | null => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const message = messages[index];
+        if (message?.role !== 'assistant') continue;
+        const candidate = message as Message & {
+            providerID?: unknown;
+            modelID?: unknown;
+            model?: { providerID?: unknown; modelID?: unknown };
+        };
+        const providerId = typeof candidate.model?.providerID === 'string'
+            ? candidate.model.providerID.trim()
+            : typeof candidate.providerID === 'string'
+                ? candidate.providerID.trim()
+                : '';
+        const modelId = typeof candidate.model?.modelID === 'string'
+            ? candidate.model.modelID.trim()
+            : typeof candidate.modelID === 'string'
+                ? candidate.modelID.trim()
+                : '';
+        if (providerId && modelId) {
+            return { providerId, modelId };
+        }
+    }
+    return null;
 };
 
 export function useAssistantStatus(): AssistantStatusSnapshot {

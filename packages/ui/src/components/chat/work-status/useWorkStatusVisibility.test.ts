@@ -2,24 +2,11 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
-type PanelState = {
-  isOpen: boolean;
-  tabs: { id: string; mode: string }[];
-  activeTabId: string | null;
-};
-
-let panelByDirectory: Record<string, PanelState> = {};
 let panelEnabled = true;
-let effectiveDirectory: string | undefined = '/repo';
 
 mock.module('@/stores/useUIStore', () => ({
   useUIStore: (selector: (state: unknown) => unknown) =>
-    selector({ contextPanelByDirectory: panelByDirectory, workStatusPanelEnabled: panelEnabled }),
-  normalizeContextPanelDirectoryKey: (value: string) => value,
-}));
-
-mock.module('@/hooks/useEffectiveDirectory', () => ({
-  useEffectiveDirectory: () => effectiveDirectory,
+    selector({ workStatusPanelEnabled: panelEnabled }),
 }));
 
 const { useWorkStatusVisibility, WORK_STATUS_REQUIRED_ROW_WIDTH: REQUIRED } = await import(
@@ -130,9 +117,7 @@ const renderVisibility = (args: Args, rowWidth: number) => {
 };
 
 beforeEach(() => {
-  panelByDirectory = {};
   panelEnabled = true;
-  effectiveDirectory = '/repo';
   observed = [];
   notify = null;
 });
@@ -222,42 +207,16 @@ describe('useWorkStatusVisibility', () => {
     teardown();
   });
 
-  test('yields to an open context panel while still measuring the row', () => {
-    // Measurement continues so the panel can come back in the same commit that
-    // reveals it. Stopping cost a frame: closing the context panel widened the
-    // chat, and only then did the panel reappear and narrow it again.
-    panelByDirectory = {
-      '/repo': { isOpen: true, tabs: [{ id: 'tab-1', mode: 'git' }], activeTabId: 'tab-1' },
-    };
-    const { result, rowNode, teardown } = renderVisibility(
-      { isMobile: false, isVSCode: false },
-      REQUIRED,
-    );
-    expect(result.visible).toBe(false);
-    expect(observed).toEqual([rowNode]);
-    teardown();
-  });
-
-  test('yields to the open context panel even when the chat reports on no project', () => {
-    // A Chat session carries no repository, so the panel describes no
-    // directory. The context panel is still keyed by the directory the app is
-    // on, and looking it up under the chat's empty one answered "closed".
-    panelByDirectory = {
-      '/repo': { isOpen: true, tabs: [{ id: 'tab-1', mode: 'git' }], activeTabId: 'tab-1' },
-    };
-    const { result, teardown } = renderVisibility({ isMobile: false, isVSCode: false }, REQUIRED);
-    expect(result.visible).toBe(false);
-    teardown();
-  });
-
-  test('ignores an open context panel that has no resolvable tab', () => {
-    // ContextPanel renders nothing in that state, so it displaces nothing.
-    panelByDirectory = { '/repo': { isOpen: true, tabs: [], activeTabId: null } };
+  test('stays visible when a child tab / context panel is open if the chat area is wide enough', () => {
+    // Child chats live under session:<parent> and are merged into the panel.
+    // Hiding this card on an open context panel was the wrong fix: it removed
+    // the only place to switch children. Width is enforced in chatColumnLayout.
     const { result, teardown } = renderVisibility(
       { isMobile: false, isVSCode: false },
       REQUIRED,
     );
     expect(result.visible).toBe(true);
+    expect(result.fits).toBe(true);
     teardown();
   });
 

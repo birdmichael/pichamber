@@ -13,6 +13,7 @@ declare module "bun:test" {
     toThrow(expected?: string | RegExp | (new (...args: never[]) => unknown)): void;
     toContain(expected: unknown): void;
     toBeDefined(): void;
+    toBeUndefined(): void;
     toMatch(expected: string | RegExp): void;
     toMatchObject(expected: unknown): void;
     rejects: {
@@ -21,6 +22,7 @@ declare module "bun:test" {
     toBeGreaterThan(expected: number): void;
     toBeGreaterThanOrEqual(expected: number): void;
     toBeLessThan(expected: number): void;
+    toBeLessThanOrEqual(expected: number): void;
     toHaveLength(expected: number): void;
     toBeInstanceOf(expected: unknown): void;
     not: {

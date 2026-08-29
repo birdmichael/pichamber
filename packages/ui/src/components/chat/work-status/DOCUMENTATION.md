@@ -11,7 +11,8 @@ without a name is unreadable at a glance, which is what an unlabelled stream of
 values degenerates into.
 
 Rows are grouped into **named sections**, one component each, composed in
-order by `WorkStatusPanel`. The separator between them is a
+order by `WorkStatusBody` (shared by `WorkStatusPanel` and
+`MobileWorkStatusHost`). The separator between them is a
 `:not(:first-child)` CSS rule rather than a prop, because every section renders
 conditionally; passing "am I first?" down would mean each one tracking what the
 sections above it decided to render.
@@ -32,9 +33,9 @@ the inline card keeps its lighter, non-blurred fill instead.
 
 `ChatContainer`'s top-level return is a flex row:
 
-- the existing chat column (`data-composer-bound`, `flex-1 min-w-0`), holding
+- the existing chat column (`data-composer-bound`, `min-width: 320px`, `flex-1`), holding
   the viewport, the composer and the timeline dialog;
-- `WorkStatusPanel`, a fixed-width `shrink-0` sibling.
+- `WorkStatusPanel`, a 300px card that may shrink (`max-width: calc(100% - 320px)`) so it cannot eat the parent.
 
 Nothing inside `ChatViewport` changed. The virtualizer sees the column shrink
 exactly as it already does when the context panel opens.
@@ -45,18 +46,30 @@ exactly as it already does when the context panel opens.
 
 - the user switched it off;
 - the runtime is mobile or VS Code;
-- the context panel is open for the directory the app is effectively on —
-  looked up through `useEffectiveDirectory` and `normalizeContextPanelDirectoryKey`,
-  the same key the rail and the panel use. It is deliberately **not** the
-  directory this panel reports about: a managed Chat reports about none, and
-  that empty key answered "closed" for a context panel that was plainly open;
-- the row cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
+- the chat area cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
   `WORK_STATUS_PANEL_WIDTH` of panel.
+
+An open context panel / child tab does **not** hide this card. Child chats are
+stored under `session:<parent>` and merged into the panel; hiding on "context
+open" either missed those tabs or removed the only place to switch children.
+Width is enforced by `lib/surfaces/chatColumnLayout.ts`: the context panel is
+capped so the parent transcript keeps `PARENT_CHAT_MIN_WIDTH` (320px) plus this
+card when it is inline.
 
 Do not remount this card beside the mobile transcript. Hosted `mobile.html`
 and Capacitor wrap the same section components in `MobileWorkStatusHost`
 (`apps/MobileWorkStatusHost.tsx`), opened from the header context ring.
 That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
+
+Mobile Work Status now includes pinned messages, context sources, and the
+equalizer / section-visibility dialog — the same `WorkStatusContents` chrome
+as Desktop (title row so the gear has a home). The 300px card is still not
+mounted. Tapping a row that navigates (git/changes, files/diff, PR, context
+overview, subagent Open, pinned reveal, MCP header) closes the sheet and uses
+existing mobile destinations: workspace `changes` / `files` / `notes` / `mcp`,
+`MobileReviewHost` for PR and per-file diff, and in-place `setCurrentSession`
+for a live child. Desktop context-panel store writes are mapped in
+`routeMobileContextPanel` / MobileApp; there is no second context rail.
 
 `ChatContainer` additionally suppresses it in mini-chat and in expanded-input
 mode. It remains available on a new-session draft and on an existing session

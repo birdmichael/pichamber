@@ -62,6 +62,7 @@ type ContextPanelTabDescriptor = {
   readOnly?: boolean;
   stagedDiff?: boolean;
   diffScope?: PendingDiffScope | null;
+  sessionScope?: string | null;
 };
 
 type ContextPanelDirectoryState = {
@@ -236,7 +237,37 @@ const findContextPanelTabOwner = (
   if (scopeKey !== directory && byDirectory[scopeKey]?.tabs.some((tab) => tab.id === tabID)) {
     return scopeKey;
   }
+  for (const [key, panel] of Object.entries(byDirectory)) {
+    if (key.startsWith('session:') && panel.tabs.some((tab) => tab.id === tabID)) {
+      return key;
+    }
+  }
   return null;
+};
+
+/**
+ * Directory close must also dismiss session-scoped child chats. Those tabs
+ * live on `session:<parentId>`; mergeContextPanelChatScope keeps the panel
+ * open while that scope isOpen, so closing only the project key is a no-op.
+ */
+const collectContextPanelCloseKeys = (
+  byDirectory: Record<string, ContextPanelDirectoryState>,
+  directory: string,
+): string[] => {
+  const keys = new Set<string>([directory]);
+  const panel = byDirectory[directory];
+  const activeTabId = panel?.activeTabId;
+  if (activeTabId) {
+    const owner = findContextPanelTabOwner(byDirectory, directory, activeTabId);
+    if (owner) keys.add(owner);
+  }
+  for (const [key, state] of Object.entries(byDirectory)) {
+    if (!key.startsWith('session:') || !state.isOpen) continue;
+    if (activeTabId && state.tabs.some((tab) => tab.id === activeTabId)) {
+      keys.add(key);
+    }
+  }
+  return [...keys];
 };
 
 const normalizeDirectoryPath = (value: string): string => {
@@ -1342,9 +1373,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
+          const sessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
           const writeKey = tab.mode === 'browser'
             ? readContextBrowserScopeKey(normalizedDirectory)
-            : normalizedDirectory;
+            : tab.mode === 'chat' && sessionScope
+              ? sessionScope
+              : normalizedDirectory;
 
           set((state) => {
             const prev = state.contextPanelByDirectory[writeKey];
@@ -1373,6 +1407,15 @@ export const useUIStore = create<UIStore>()(
                 ...sessionCurrent,
                 isOpen: true,
                 tabs: sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser'),
+                activeTabId: nextWrite.activeTabId,
+                touchedAt: Date.now(),
+              };
+            } else if (tab.mode === 'chat' && writeKey !== normalizedDirectory) {
+              const sessionPrev = byDirectory[normalizedDirectory];
+              const sessionCurrent = touchContextPanelState(sessionPrev);
+              byDirectory[normalizedDirectory] = {
+                ...sessionCurrent,
+                isOpen: true,
                 activeTabId: nextWrite.activeTabId,
                 touchedAt: Date.now(),
               };
@@ -1711,18 +1754,26 @@ export const useUIStore = create<UIStore>()(
           }
 
           set((state) => {
-            const prev = state.contextPanelByDirectory[normalizedDirectory];
-            if (!prev || !prev.isOpen) {
-              return state;
-            }
-
-            const byDirectory = {
-              ...state.contextPanelByDirectory,
-              [normalizedDirectory]: {
+            const keys = collectContextPanelCloseKeys(
+              state.contextPanelByDirectory,
+              normalizedDirectory,
+            );
+            let changed = false;
+            const byDirectory = { ...state.contextPanelByDirectory };
+            for (const key of keys) {
+              const prev = byDirectory[key];
+              if (!prev?.isOpen) {
+                continue;
+              }
+              byDirectory[key] = {
                 ...touchContextPanelState(prev),
                 isOpen: false,
-              },
-            };
+              };
+              changed = true;
+            }
+            if (!changed) {
+              return state;
+            }
 
             return { contextPanelByDirectory: clampContextPanelRoots(byDirectory, 20) };
           });

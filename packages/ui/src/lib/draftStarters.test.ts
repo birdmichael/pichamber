@@ -7,6 +7,8 @@ import {
     getBuiltInStarter,
     isPichamberStarterSlashCommand,
     PICHAMBER_STARTER_SLASH_COMMANDS,
+    resolveDraftPlanStarterClick,
+    shouldOfferLiveCommandAsStarter,
     shouldShowDesktopDraftWelcomeChrome,
 } from './draftStarters';
 
@@ -61,3 +63,48 @@ describe('empty-session welcome chips', () => {
         expect(isPichamberStarterSlashCommand('handoff-review')).toBe(false);
     });
 });
+
+describe('live Plan starter', () => {
+    test('does not offer /plan /run /goal as pin-and-send chips', () => {
+        expect(shouldOfferLiveCommandAsStarter('plan')).toBe(false);
+        expect(shouldOfferLiveCommandAsStarter('run')).toBe(false);
+        expect(shouldOfferLiveCommandAsStarter('goal')).toBe(false);
+        expect(shouldOfferLiveCommandAsStarter('plan-feature')).toBe(false);
+        expect(shouldOfferLiveCommandAsStarter('explore')).toBe(false);
+        expect(shouldOfferLiveCommandAsStarter('simplify-code')).toBe(true);
+    });
+
+    test('a /plan chip on a new-session draft only switches Plan mode', () => {
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan',
+            draftOpen: true,
+            composerText: '',
+        })).toEqual({ kind: 'draft-plan', sendText: null });
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan',
+            draftOpen: true,
+            composerText: '  outline the repo  ',
+        })).toEqual({ kind: 'draft-plan', sendText: 'outline the repo' });
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan',
+            draftOpen: true,
+            composerText: '/plan',
+        })).toEqual({ kind: 'draft-plan', sendText: null });
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan',
+            draftOpen: true,
+            composerText: '/plan outline the repo',
+        })).toEqual({ kind: 'draft-plan', sendText: 'outline the repo' });
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan-feature',
+            draftOpen: true,
+            composerText: '',
+        })).toEqual({ kind: 'submit' });
+        expect(resolveDraftPlanStarterClick({
+            submitText: '/plan',
+            draftOpen: false,
+            composerText: '',
+        })).toEqual({ kind: 'submit' });
+    });
+});
+

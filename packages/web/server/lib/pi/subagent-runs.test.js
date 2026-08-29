@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,13 +11,19 @@ import {
   isSubagentManagementCall,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
+  listNestedSessionRuns,
   mapStatusToSubagentRun,
+  mapStatusToSubagentRuns,
   mergeSubagentRuns,
   normalizeSubagentRunMode,
   normalizeSubagentRunState,
   parentSessionMatches,
+  listGitWorktreePaths,
+  preferSubagentTitle,
+  readSessionCwdFromSessionFile,
   readSessionFileFromText,
   readSessionIdFromSessionFile,
+  readSessionTitleFromSessionFile,
   readWorkflowScriptHints,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
@@ -46,6 +53,7 @@ describe('isSubagentsSlotActive', () => {
 
 describe('normalize helpers', () => {
   it('maps adapter states onto the Work Status contract', () => {
+    expect(normalizeSubagentRunState('queued')).toBe('queued');
     expect(normalizeSubagentRunState('running')).toBe('running');
     expect(normalizeSubagentRunState('complete')).toBe('done');
     expect(normalizeSubagentRunState('paused')).toBe('paused');
@@ -133,8 +141,9 @@ describe('session file and parent matching', () => {
   it('reads the Pi session id from a jsonl header', () => {
     const dir = makeTemp();
     const file = path.join(dir, 'child.jsonl');
-    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-uuid' })}\n`);
+    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-uuid', cwd: '/repo-worktree' })}\n`);
     expect(readSessionIdFromSessionFile(file)).toBe('child-uuid');
+    expect(readSessionCwdFromSessionFile(file)).toBe('/repo-worktree');
   });
 
   it('matches parent by id, session file, or basename', () => {
@@ -211,6 +220,7 @@ describe('listAdapterRunsFromFiles', () => {
     expect(toPublicSubagentRun(runs[0])).toMatchObject({
       openable: true,
       sessionID: 'scout-session',
+      directory: null,
     });
     expect(toPublicSubagentRun({
       ...runs[0],
@@ -234,9 +244,187 @@ describe('listAdapterRunsFromFiles', () => {
       tmpdir,
     });
     expect(run.sessionID).toBeNull();
+    expect(run.state).toBe('queued');
     expect(toPublicSubagentRun(run).openable).toBe(false);
   });
+
+  it('emits one row per child session file in a fan-out workflow', () => {
+    const tmpdir = makeTemp('pi-subagents-tmp-');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_fanout');
+    fs.mkdirSync(runDir, { recursive: true });
+    const childA = path.join(runDir, 'a.jsonl');
+    const childB = path.join(runDir, 'b.jsonl');
+    fs.writeFileSync(childA, `${JSON.stringify({ type: 'session', id: 'child-a' })}\n`);
+    fs.writeFileSync(childB, `${JSON.stringify({ type: 'session', id: 'child-b' })}\n`);
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_fanout',
+      toolCallId: 'call-shared',
+      sessionId: 'parent-1',
+      state: 'complete',
+      mode: 'workflow',
+      currentTool: 'contact_supervisor',
+      currentToolArgs: 'reason=interview_request',
+      steps: [
+        {
+          agent: 'scout',
+          label: 'scout-a',
+          status: 'running',
+          sessionFile: childA,
+          currentTool: 'contact_supervisor',
+          currentToolArgs: 'reason=interview_request',
+        },
+        {
+          agent: 'scout',
+          label: 'scout-b',
+          status: 'completed',
+          sessionFile: childB,
+        },
+      ],
+    }));
+    const runs = listAdapterRunsFromFiles({
+      parent: { id: 'parent-1' },
+      tmpdir,
+    });
+    expect(runs).toHaveLength(2);
+    expect(runs.map((run) => run.sessionID).sort()).toEqual(['child-a', 'child-b']);
+    expect(runs.find((run) => run.sessionID === 'child-a')).toMatchObject({
+      title: 'scout-a',
+      state: 'running',
+      blocker: 'question',
+    });
+    expect(runs.find((run) => run.sessionID === 'child-b')).toMatchObject({
+      title: 'scout-b',
+      state: 'done',
+    });
+    expect(runs.find((run) => run.sessionID === 'child-b').blocker).toBeUndefined();
+  });
 });
+
+describe('child-session directory plumbing', () => {
+  it('exposes jsonl cwd on the public subagent run', () => {
+    const dir = makeTemp();
+    const file = path.join(dir, 'child.jsonl');
+    fs.writeFileSync(file, `${JSON.stringify({ type: 'session', id: 'child-wt', cwd: '/repo-worktree' })}\n`);
+    const publicRun = toPublicSubagentRun({
+      runId: 'run_wt',
+      parentID: 'parent-1',
+      sessionID: 'child-wt',
+      directory: readSessionCwdFromSessionFile(file),
+      name: 'scout',
+      role: 'scout',
+      mode: 'background',
+      state: 'running',
+      title: 'Inspect the worktree',
+    });
+    expect(publicRun).toMatchObject({
+      sessionID: 'child-wt',
+      directory: '/repo-worktree',
+      openable: true,
+    });
+  });
+
+  it('finds a worktree-cwd child when parent is at the repo root', () => {
+    const root = makeTemp('pi-subagent-repo-');
+    execFileSync('git', ['init', '-b', 'main', root], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'config', 'user.email', 't@t.example'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'config', 'user.name', 't'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'commit', '--allow-empty', '-m', 'init'], { stdio: 'ignore' });
+    const worktree = path.join(path.dirname(root), `${path.basename(root)}-wt`);
+    execFileSync('git', ['-C', root, 'worktree', 'add', worktree, '-b', 'child'], { stdio: 'ignore' });
+    tempDirs.push(worktree);
+
+    expect(listGitWorktreePaths(root)).toEqual(expect.arrayContaining([root, worktree]));
+
+    const runDir = path.join(worktree, '.pi', 'subagents', 'async-subagent-runs', 'run_wt');
+    fs.mkdirSync(runDir, { recursive: true });
+    const childFile = path.join(runDir, 'child.jsonl');
+    fs.writeFileSync(childFile, `${JSON.stringify({ type: 'session', id: 'child-wt', cwd: worktree })}\n`);
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_wt',
+      sessionId: 'parent-1',
+      state: 'running',
+      mode: 'async',
+      sessionFile: childFile,
+      steps: [{ agent: 'scout', status: 'running', sessionFile: childFile }],
+    }));
+
+    const isolatedTmp = makeTemp('pi-subagent-empty-tmp-');
+    const runs = listAdapterRunsFromFiles({
+      parent: { id: 'parent-1' },
+      projectDir: root,
+      tmpdir: isolatedTmp,
+    });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'run_wt',
+      sessionID: 'child-wt',
+      directory: worktree,
+    });
+    expect(toPublicSubagentRun(runs[0])).toMatchObject({
+      directory: worktree,
+      openable: true,
+    });
+  });
+
+  it('reads cwd from a nested run-0/session.jsonl under the parent session dir', () => {
+    const sessionDir = makeTemp('pi-nested-sessions-');
+    const parentID = '01a04ce8-3480-7001-8001-pichamber34801';
+    const childId = '01a04ce8-3480-7001-8002-pichamber34802';
+    const childDir = '/tmp/pichamber-348-fixture/child-wt';
+    const childFile = path.join(sessionDir, parentID, 'run_scout', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: childDir,
+    })}\n`);
+    const runs = listNestedSessionRuns({
+      parent: { id: parentID },
+      sessionDir,
+    });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'run_scout',
+      sessionID: childId,
+      sessionFile: childFile,
+      directory: childDir,
+    });
+    expect(toPublicSubagentRun(runs[0])).toMatchObject({
+      sessionID: childId,
+      directory: childDir,
+      openable: true,
+    });
+  });
+
+  it('prefers session_info name over the run-folder basename', () => {
+    const sessionDir = makeTemp('pi-nested-titles-');
+    const parentID = 'parent-title';
+    const childFile = path.join(sessionDir, parentID, 'scout', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, [
+      JSON.stringify({ type: 'session', id: 'child-wt', cwd: '/repo-wt' }),
+      JSON.stringify({ type: 'session_info', name: 'scout-wt' }),
+    ].join('\n'));
+    const siblingFile = path.join(sessionDir, parentID, 'scout_b', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(siblingFile), { recursive: true });
+    fs.writeFileSync(siblingFile, [
+      JSON.stringify({ type: 'session', id: 'child-b', cwd: '/repo-b' }),
+      JSON.stringify({ type: 'session_info', name: 'scout-b' }),
+    ].join('\n'));
+
+    expect(readSessionTitleFromSessionFile(childFile)).toBe('scout-wt');
+    expect(preferSubagentTitle(readSessionTitleFromSessionFile(childFile), 'scout')).toBe('scout-wt');
+    const runs = listNestedSessionRuns({
+      parent: { id: parentID },
+      sessionDir,
+    });
+    const titles = runs.map((run) => toPublicSubagentRun(run).title).sort();
+    expect(titles).toEqual(['scout-b', 'scout-wt']);
+    expect(titles).not.toContain('scout');
+    expect(titles).not.toContain('scout_b');
+  });
+});
+
 
 describe('tool-part extraction', () => {
   it('reads a foreground subagent tool call from the parent transcript', () => {
@@ -593,6 +781,65 @@ describe('reconcileParentSubagentRuns', () => {
     expect(toPublicSubagentRun(reconciled[0]).openable).toBe(true);
   });
 
+  it('keeps adapter running when the parent tool already completed', () => {
+    const reconciled = reconcileParentSubagentRuns([{
+      runId: 'run_live',
+      toolCallId: 'call-shared',
+      name: 'scout',
+      title: 'scout-a',
+      mode: 'background',
+      state: 'running',
+      sessionID: 'child-a',
+      blocker: 'question',
+    }], [{
+      runId: 'call-shared',
+      toolCallId: 'call-shared',
+      name: 'subagent',
+      title: 'subagent',
+      mode: 'background',
+      state: 'done',
+      sessionID: null,
+    }]);
+    expect(reconciled).toEqual([expect.objectContaining({
+      sessionID: 'child-a',
+      state: 'running',
+      blocker: 'question',
+    })]);
+  });
+
+  it('keeps two fan-out children instead of collapsing them onto one tool call', () => {
+    const reconciled = reconcileParentSubagentRuns([
+      {
+        runId: 'run_fanout:child-a',
+        toolCallId: 'call-shared',
+        name: 'scout',
+        title: 'scout-a',
+        mode: 'background',
+        state: 'running',
+        sessionID: 'child-a',
+      },
+      {
+        runId: 'run_fanout:child-b',
+        toolCallId: 'call-shared',
+        name: 'scout',
+        title: 'scout-b',
+        mode: 'background',
+        state: 'done',
+        sessionID: 'child-b',
+      },
+    ], [{
+      runId: 'call-shared',
+      toolCallId: 'call-shared',
+      name: 'subagent',
+      title: 'subagent',
+      mode: 'background',
+      state: 'done',
+      sessionID: null,
+    }]);
+    expect(reconciled).toHaveLength(2);
+    expect(reconciled.map((run) => run.sessionID).sort()).toEqual(['child-a', 'child-b']);
+  });
+
   it('keeps a queued file run without an id as status-only', () => {
     const reconciled = reconcileParentSubagentRuns([{
       runId: 'run_early',
@@ -683,5 +930,29 @@ describe('mapStatusToSubagentRun', () => {
       state: 'complete',
       results: [],
     })).toBeNull();
+  });
+
+  it('prefers a live step over a completed workflow state', () => {
+    expect(mapStatusToSubagentRun({
+      runId: 'run_1',
+      state: 'complete',
+      mode: 'workflow',
+      steps: [{ agent: 'scout', status: 'running' }],
+    })).toMatchObject({ state: 'running' });
+  });
+
+  it('expands multiple session files into separate runs', () => {
+    const mapped = mapStatusToSubagentRuns({
+      runId: 'run_1',
+      toolCallId: 'call-1',
+      state: 'complete',
+      mode: 'workflow',
+      steps: [
+        { agent: 'scout', label: 'a', status: 'running', sessionFile: '/tmp/a.jsonl' },
+        { agent: 'scout', label: 'b', status: 'completed', sessionFile: '/tmp/b.jsonl' },
+      ],
+    });
+    expect(mapped).toHaveLength(2);
+    expect(mapped.map((run) => run.title)).toEqual(['a', 'b']);
   });
 });

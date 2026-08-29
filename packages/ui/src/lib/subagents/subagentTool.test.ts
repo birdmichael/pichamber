@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   isSubagentManagementCall,
   readSubagentCardAgent,
+  readSubagentChildDirectoryFromRuns,
   readSubagentChildSessionId,
   readSubagentChildSessionIdFromRuns,
   shouldOfferSubagentChildOpen,
@@ -93,6 +94,15 @@ describe('card fields', () => {
     ], 'call-disk')).toBe('01a03f76-bfdd');
     expect(readSubagentChildSessionIdFromRuns([
       { runId: 'other', sessionID: 'child' },
+    ], 'call-disk')).toBeNull();
+  });
+
+  test('joins a child directory from adapter runs by toolCallId', () => {
+    expect(readSubagentChildDirectoryFromRuns([
+      { runId: '170eaa63', toolCallId: 'call-disk', directory: '/repo-worktree' },
+    ], 'call-disk')).toBe('/repo-worktree');
+    expect(readSubagentChildDirectoryFromRuns([
+      { runId: 'other', directory: '/repo' },
     ], 'call-disk')).toBeNull();
   });
 });

@@ -303,12 +303,15 @@ interface ModelControlsProps {
     className?: string;
     mobilePanel?: MobileControlsPanel;
     onMobilePanelChange?: (panel: MobileControlsPanel) => void;
+    /** Parent column < 576px: do not mount the Agent chip (no clipped `Ag`). */
+    omitAgentSlot?: boolean;
 }
 
 export const ModelControls: React.FC<ModelControlsProps> = ({
     className,
     mobilePanel,
     onMobilePanelChange,
+    omitAgentSlot = false,
 }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
@@ -416,8 +419,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 } else if (draftThinkingLevels.length > 0) {
                     setPiThinkingLevels(draftThinkingLevels);
                 }
-                const nextThinking = clampPiThinkingLevel(
-                    payload.thinking ?? piThinking,
+                const recorded = parsePiThinkingLevel(payload.thinking);
+                const nextThinking = recorded ?? clampPiThinkingLevel(
+                    piThinking,
                     available.length > 0 ? available : draftThinkingLevels,
                 );
                 if (nextThinking) {
@@ -854,6 +858,33 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         },
         [providers, currentProviderId, currentModelId, setProvider, setModel, currentSessionId, saveAgentModelForSession, saveSessionModelSelection],
     );
+
+    const sessionModelRestoreRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        if (!isPiKernel || !currentSessionId) {
+            sessionModelRestoreRef.current = null;
+            return;
+        }
+        let cancelled = false;
+        void runtimeFetch(`/api/session/${encodeURIComponent(currentSessionId)}/model`, { method: 'GET' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((payload) => {
+                if (cancelled || !payload) return;
+                const providerId = typeof payload.providerID === 'string' ? payload.providerID.trim() : '';
+                const modelId = typeof payload.modelID === 'string' ? payload.modelID.trim() : '';
+                if (!providerId || !modelId) return;
+                const restoreKey = `${currentSessionId}|${providerId}|${modelId}`;
+                if (sessionModelRestoreRef.current === restoreKey) return;
+                const result = tryApplyModelSelection(providerId, modelId);
+                if (result !== 'applied') return;
+                saveSessionModelSelection(currentSessionId, providerId, modelId);
+                sessionModelRestoreRef.current = restoreKey;
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [currentSessionId, isPiKernel, saveSessionModelSelection, tryApplyModelSelection]);
 
     const getModelVariantOptions = React.useCallback((providerId: string, modelId: string) => {
         const provider = providers.find((entry) => entry.id === providerId);
@@ -2959,7 +2990,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
                                     <div className={cn(
-                                        'flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        'model-controls__agent-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
                                         buttonHeight
                                     )}>
                                         {!isReady ? (
@@ -3136,7 +3167,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const inlineClassName = cn(
-        '@container/model-controls flex items-center min-w-0',
+        'flex items-center min-w-0',
         // Only force full-width + truncation behaviors on true mobile layouts.
         // VS Code also uses "compact" mode, but should keep its right-aligned inline sizing.
         isMobile && 'w-full',
@@ -3148,18 +3179,22 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             <div className={inlineClassName}>
                 <div
                     className={cn(
-                        'model-controls__row flex items-center min-w-0 flex-1 justify-end',
+                        'model-controls__row flex items-center min-w-0 flex-1 justify-end m-0',
                         inlineGapClass,
                         isMobile && 'overflow-hidden'
                     )}
                 >
-                    <div className="model-controls__variant-slot shrink-0 overflow-hidden">
+                    <div className="model-controls__variant-slot shrink-0 overflow-hidden m-0">
                         {renderVariantSelector()}
                     </div>
                     <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
-                    {renderAgentSelector()}
+                    {omitAgentSlot ? null : (
+                    <div className="model-controls__agent-slot min-w-0 overflow-hidden">
+                        {renderAgentSelector()}
+                    </div>
+                    )}
                     <div className="model-controls__plan-slot">
                         <PiPlanModeToggle />
                     </div>

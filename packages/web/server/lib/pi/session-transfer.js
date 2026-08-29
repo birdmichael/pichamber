@@ -37,7 +37,7 @@ const parseFacadeModelKey = (value) => {
 
 const looksLikeModelRecord = (value) => {
   if (!isRecord(value)) return false;
-  if (asTrimmedString(value.modelID)) return true;
+  if (asTrimmedString(value.modelID) || asTrimmedString(value.modelId)) return true;
   if (value.role || value.sessionID || value.parts) return false;
   return Boolean(asTrimmedString(value.providerID || value.provider) && asTrimmedString(value.id));
 };
@@ -57,7 +57,7 @@ export const resolveUsableFacadeModel = (...sources) => {
     if (!isRecord(source)) continue;
     const fromFields = asUsableFacadeModel(
       source.providerID || source.provider,
-      source.modelID || (looksLikeModelRecord(source) ? source.id : ''),
+      source.modelID || source.modelId || (looksLikeModelRecord(source) ? source.id : ''),
     );
     if (fromFields) return fromFields;
     if (source.model && source.model !== source) {
@@ -86,6 +86,55 @@ export const lastModelChangeFromMessages = (messages) => {
     }
   }
   return null;
+};
+
+export const lastModelChangeFromEntries = (entries) => {
+  if (!Array.isArray(entries)) return null;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (entry?.type !== 'model_change') continue;
+    const found = resolveUsableFacadeModel(entry);
+    if (found) return found;
+  }
+  return null;
+};
+
+export const lastThinkingLevelChangeFromEntries = (entries) => {
+  if (!Array.isArray(entries)) return null;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (entry?.type !== 'thinking_level_change') continue;
+    const level = asTrimmedString(entry.thinkingLevel || entry.level);
+    if (level) return level;
+  }
+  return null;
+};
+
+const assignReadableRuntime = (piSession, key, value) => {
+  try {
+    piSession[key] = value;
+  } catch {
+    // Real AgentSession thinkingLevel is getter-only. GET paths still
+    // read lastModelChangeFromEntries / lastThinkingLevelChangeFromEntries.
+  }
+};
+
+export const applySessionRuntimeFromEntries = (piSession, entries) => {
+  if (!piSession || !Array.isArray(entries) || entries.length === 0) return piSession;
+  const model = lastModelChangeFromEntries(entries);
+  if (model) {
+    const next = { id: model.modelID, provider: model.providerID };
+    // Do not call setModel: real AgentSession.setModel needs a Model object,
+    // is async, and appends another model_change. A stub {id,provider} also
+    // replaces this.model so getAvailableThinkingLevels collapses to ["off"].
+    assignReadableRuntime(piSession, 'currentModel', next);
+  }
+  const thinking = lastThinkingLevelChangeFromEntries(entries);
+  if (thinking) {
+    // Do not call setThinkingLevel: it clamps to this.model and may persist.
+    assignReadableRuntime(piSession, 'thinkingLevel', thinking);
+  }
+  return piSession;
 };
 
 const toNonNegativeNumber = (value) => {

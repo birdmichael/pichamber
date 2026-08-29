@@ -1,6 +1,6 @@
 import { readTaskSessionIdFromOutput, readTaskSessionIdFromRecord } from '@/components/chat/message/parts/taskToolModel';
 
-import { canOpenSubagentChildSession } from './childSession';
+import { canOpenSubagentChildSession, resolveSubagentChildDirectory } from './childSession';
 import { readSubagentChildSessionId } from './subagentTool';
 import type { SubagentRun } from './subagentRuns';
 
@@ -8,8 +8,9 @@ export type WorkStatusSubagentRow = {
   id: string;
   label: string;
   sessionID: string | null;
+  directory: string | null;
   openable: boolean;
-  status: 'permission' | 'question' | 'working' | 'blocked' | 'failed' | 'paused' | 'done';
+  status: 'permission' | 'question' | 'working' | 'queued' | 'blocked' | 'failed' | 'paused' | 'stopped' | 'done';
   mode?: 'foreground' | 'background';
 };
 
@@ -23,13 +24,46 @@ export const resolveWorkStatusSubagentOpen = ({
   effectiveDirectory?: string | null;
 }): { sessionID: string | null; directory: string | null; openable: boolean } => {
   const resolvedSessionID = sessionID?.trim() || null;
-  const resolvedDirectory = directory?.trim() || effectiveDirectory?.trim() || null;
+  const resolvedDirectory = resolveSubagentChildDirectory(directory, effectiveDirectory);
   return {
     sessionID: resolvedSessionID,
     directory: resolvedDirectory,
     openable: canOpenSubagentChildSession(resolvedSessionID, resolvedDirectory),
   };
 };
+
+export const collectSessionBlockers = (
+  states: Array<{
+    permission?: Record<string, unknown[] | undefined>;
+    question?: Record<string, unknown[] | undefined>;
+  }>,
+): { permissions: Record<string, unknown[]>; questions: Record<string, unknown[]> } => {
+  const permissions: Record<string, unknown[]> = {};
+  const questions: Record<string, unknown[]> = {};
+  for (const state of states) {
+    for (const [id, list] of Object.entries(state.permission ?? {})) {
+      if (Array.isArray(list) && list.length > 0) permissions[id] = list;
+    }
+    for (const [id, list] of Object.entries(state.question ?? {})) {
+      if (Array.isArray(list) && list.length > 0) questions[id] = list;
+    }
+  }
+  return { permissions, questions };
+};
+
+export const overlayWorkStatusChildBlockers = (
+  rows: WorkStatusSubagentRow[],
+  blockers: { permissions: Record<string, unknown[]>; questions: Record<string, unknown[]> },
+): WorkStatusSubagentRow[] => rows.map((row) => {
+  if (!row.sessionID) return row;
+  if ((blockers.permissions[row.sessionID]?.length ?? 0) > 0) {
+    return { ...row, status: 'permission' as const };
+  }
+  if ((blockers.questions[row.sessionID]?.length ?? 0) > 0) {
+    return { ...row, status: 'question' as const };
+  }
+  return row;
+});
 
 const asTrimmed = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -128,22 +162,19 @@ export const buildWorkStatusSubagentRows = ({
   const rows = assignTranscriptSessionIds(runs, transcriptIds).map((run) => {
     const opened = resolveWorkStatusSubagentOpen({
       sessionID: run.sessionID,
-      directory,
-      effectiveDirectory,
+      directory: run.directory,
+      effectiveDirectory: directory || effectiveDirectory,
     });
-    const status: WorkStatusSubagentRow['status'] = run.state === 'running' || run.state === 'queued'
-      ? 'working'
-      : run.state === 'blocked'
-        ? 'blocked'
-        : run.state === 'paused'
-          ? 'paused'
-          : run.state === 'failed' || run.state === 'stopped'
-            ? 'failed'
-            : 'done';
+    const status = run.blocker === 'permission'
+      ? 'permission'
+      : run.blocker === 'question'
+        ? 'question'
+        : mapSubagentRunStateToRowStatus(run.state);
     return {
       id: run.runId,
       label: run.title?.trim() || run.name || untitledLabel,
       sessionID: opened.sessionID,
+      directory: opened.directory,
       openable: opened.openable,
       mode: run.mode,
       status,
@@ -152,7 +183,80 @@ export const buildWorkStatusSubagentRows = ({
   return rows.filter((row) => (
     row.openable
     || row.status === 'working'
+    || row.status === 'queued'
     || row.status === 'blocked'
     || row.status === 'paused'
+    || row.status === 'permission'
+    || row.status === 'question'
   ));
+};
+
+export const mapSubagentRunStateToRowStatus = (
+  state: SubagentRun['state'],
+): WorkStatusSubagentRow['status'] => {
+  if (state === 'queued') return 'queued';
+  if (state === 'running') return 'working';
+  if (state === 'blocked') return 'blocked';
+  if (state === 'paused') return 'paused';
+  if (state === 'failed') return 'failed';
+  if (state === 'stopped') return 'stopped';
+  return 'done';
+};
+
+export const overlayWorkStatusSubagentRow = (
+  row: WorkStatusSubagentRow,
+  overlays: { permission?: boolean; question?: boolean; uiPrompt?: boolean },
+): WorkStatusSubagentRow => {
+  if (overlays.permission) return { ...row, status: 'permission' };
+  if (overlays.question || overlays.uiPrompt) return { ...row, status: 'question' };
+  return row;
+};
+
+export const resolveWorkStatusSubagentLabel = (
+  run: Pick<SubagentRun, 'title' | 'name'>,
+  liveTitle: string | null | undefined,
+  untitledLabel: string,
+): string => {
+  const sessionTitle = liveTitle?.trim() || '';
+  if (sessionTitle) return sessionTitle;
+  const runTitle = run.title?.trim() || '';
+  if (runTitle) return runTitle;
+  return run.name?.trim() || untitledLabel;
+};
+
+export const countExportableWorkStatusRows = (rows: WorkStatusSubagentRow[]): number => (
+  rows.filter((row) => row.openable).length
+);
+
+export type WorkStatusSubagentSummary = {
+  queuedUnopenable: number;
+  openable: number;
+  busy: number;
+  total: number;
+};
+
+export const summarizeWorkStatusSubagentRows = (rows: WorkStatusSubagentRow[]): WorkStatusSubagentSummary => ({
+  queuedUnopenable: rows.filter((row) => !row.openable && row.status === 'queued').length,
+  openable: countExportableWorkStatusRows(rows),
+  busy: rows.filter((row) => (
+    row.status === 'working'
+    || row.status === 'queued'
+    || row.status === 'blocked'
+    || row.status === 'permission'
+    || row.status === 'question'
+  )).length,
+  total: rows.length,
+});
+
+export const formatWorkStatusSubagentSummary = (
+  summary: WorkStatusSubagentSummary,
+  labels: { queued: string; done: string },
+): string | number => {
+  if (summary.queuedUnopenable > 0) {
+    return `${summary.queuedUnopenable} ${labels.queued} · ${summary.openable} ${labels.done}`;
+  }
+  if (summary.busy > 0) {
+    return `${summary.busy}/${summary.total}`;
+  }
+  return summary.total;
 };

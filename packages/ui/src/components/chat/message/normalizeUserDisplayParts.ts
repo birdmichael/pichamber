@@ -1,6 +1,8 @@
 import type { Part } from '@opencode-ai/sdk/v2';
 
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
 import { normalizePath } from '@/lib/pathNormalization';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
 import { extractTextContent, isEmptyTextPart } from './partUtils';
 
@@ -170,6 +172,16 @@ export const normalizeUserDisplayParts = (parts: Part[], options?: {
         .filter((part) => {
             if (isSessionDirectoryChromePart(part, directory)) {
                 return false;
+            }
+            if (part.type === 'text') {
+                const featurePlugins = usePiFeaturePluginsStore.getState();
+                if (isLeftoverPlanSlashText(
+                    extractTextContent(part),
+                    featurePlugins.payload,
+                    featurePlugins.status,
+                )) {
+                    return false;
+                }
             }
             return !isEmptyTextPart(part);
         });

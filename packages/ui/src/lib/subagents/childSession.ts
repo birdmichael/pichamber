@@ -1,5 +1,34 @@
+type DirectorySource = {
+  directory?: string | null;
+};
+
+export const resolveSubagentChildDirectory = (
+  source?: DirectorySource | string | null,
+  fallback?: string | null,
+): string | null => {
+  const fromSource = typeof source === 'string'
+    ? source.trim()
+    : source?.directory?.trim() || '';
+  if (fromSource) return fromSource;
+  const fromFallback = fallback?.trim() || '';
+  return fromFallback || null;
+};
+
+export const resolveParentDirectoryForChildIdle = (
+  parent?: DirectorySource | null,
+): string | null => {
+  const owned = parent?.directory?.trim() || '';
+  return owned || null;
+};
+
+export const contextChatScopeKey = (parentSessionID?: string | null): string => {
+  const id = parentSessionID?.trim() || '';
+  return id ? `session:${id}` : '';
+};
+
 type OpenSubagentChildSessionInput = {
   sessionID?: string | null;
+  parentSessionID?: string | null;
   directory?: string | null;
   label: string;
   readOnly: boolean;
@@ -14,6 +43,7 @@ type OpenSubagentChildSessionInput = {
       dedupeKey: string;
       label: string;
       readOnly?: boolean;
+      sessionScope?: string | null;
     },
   ) => void;
 };
@@ -37,6 +67,7 @@ export const openSubagentChildSession = (input: OpenSubagentChildSessionInput): 
     dedupeKey: `session:${sessionID}`,
     label: input.label,
     readOnly: input.readOnly,
+    sessionScope: contextChatScopeKey(input.parentSessionID),
   });
   return true;
 };

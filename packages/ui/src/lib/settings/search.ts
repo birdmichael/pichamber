@@ -738,7 +738,6 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'agents',
     titleKey: 'settings.agents.page.field.overrideModel',
     keywords: ['model', 'provider'],
-    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.variant',
@@ -746,7 +745,6 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     titleKey: 'settings.agents.page.field.variant',
     descriptionKey: 'settings.agents.page.field.variantTooltip',
     keywords: ['thinking', 'reasoning', 'variant', 'depth'],
-    isAvailable: (ctx) => !ctx.isPiKernel,
   },
   {
     id: 'agents.temperature',

@@ -1,6 +1,21 @@
 import { describe, expect, test } from 'bun:test';
 
-import { canOpenSubagentChildSession, openSubagentChildSession } from './childSession';
+import {
+  canOpenSubagentChildSession,
+  contextChatScopeKey,
+  openSubagentChildSession,
+  resolveParentDirectoryForChildIdle,
+  resolveSubagentChildDirectory,
+} from './childSession';
+
+describe('contextChatScopeKey', () => {
+  test('keys the panel to the parent session', () => {
+    expect(contextChatScopeKey('ses_parent')).toBe('session:ses_parent');
+    expect(contextChatScopeKey('  ses_parent  ')).toBe('session:ses_parent');
+    expect(contextChatScopeKey('')).toBe('');
+    expect(contextChatScopeKey(null)).toBe('');
+  });
+});
 
 describe('canOpenSubagentChildSession', () => {
   test('requires both a session id and a directory', () => {
@@ -19,6 +34,7 @@ describe('openSubagentChildSession', () => {
     };
     const openedOk = openSubagentChildSession({
       sessionID: 'ses_child',
+      parentSessionID: 'ses_parent',
       directory: '/repo',
       label: 'scout',
       readOnly: false,
@@ -37,6 +53,7 @@ describe('openSubagentChildSession', () => {
       dedupeKey: 'session:ses_child',
       label: 'scout',
       readOnly: false,
+      sessionScope: 'session:ses_parent',
     }]);
   });
 
@@ -77,5 +94,22 @@ describe('openSubagentChildSession', () => {
       },
     })).toBe(false);
     expect(opened).toBe(0);
+  });
+});
+
+describe('resolveSubagentChildDirectory', () => {
+  test('prefers the child directory and falls back to the parent only when missing', () => {
+    expect(resolveSubagentChildDirectory({ directory: '/repo-worktree' }, '/repo')).toBe('/repo-worktree');
+    expect(resolveSubagentChildDirectory('/repo-worktree', '/repo')).toBe('/repo-worktree');
+    expect(resolveSubagentChildDirectory({ directory: null }, '/repo')).toBe('/repo');
+    expect(resolveSubagentChildDirectory(null, null)).toBeNull();
+  });
+});
+
+describe('resolveParentDirectoryForChildIdle', () => {
+  test('rematerializes the parent using the parent directory, not the child cwd', () => {
+    expect(resolveParentDirectoryForChildIdle({ directory: '/repo' })).toBe('/repo');
+    expect(resolveParentDirectoryForChildIdle({ directory: null })).toBeNull();
+    expect(resolveParentDirectoryForChildIdle(undefined)).toBeNull();
   });
 });

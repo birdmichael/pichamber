@@ -25,6 +25,10 @@ import { PiPlanModeToggle } from '../../PiPlanModeToggle';
 import { ModelControls } from '../../ModelControls';
 import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
+import {
+    COMPOSER_AGENT_SLOT_HIDE_CLASS,
+    useComposerAgentSlotHide,
+} from './composerAgentSlotLayout';
 import { FocusModeButton } from './FocusModeButton';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
 
@@ -69,6 +73,8 @@ export interface ComposerFooterProps {
     onDictationInsert: (text: string) => void;
     onDictationInsertAndSend: (text: string) => void;
     onDictationContentHeightChange: (height: number | null) => void;
+    /** Parent ChatInput measured `[data-parent-chat-column]` < 576px. */
+    omitAgentSlot?: boolean;
 }
 
 export function ComposerFooter(props: ComposerFooterProps) {
@@ -109,12 +115,25 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationInsert,
         onDictationInsertAndSend,
         onDictationContentHeightChange,
+        omitAgentSlot = false,
     } = props;
+
+    const footerRef = React.useRef<HTMLDivElement>(null);
+    const chipRowRef = React.useRef<HTMLDivElement>(null);
+    // CSS hide is backup. Parent ChatInput omits Agent from the DOM when
+    // `[data-parent-chat-column]` is below 576px (~328px squeeze).
+    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile, footerRef) || omitAgentSlot;
 
     return (
         <div
+            ref={footerRef}
             className={cn(
-                'bg-transparent flex-shrink-0 flex flex-col',
+                // Named container for @container model-controls hide rules.
+                // Query this footer (~328px parent column when squeezed), not html.
+                // Same footer is used in the parent ChatInput and the
+                // child/embedded session-chat iframe.
+                '@container/model-controls min-w-0 w-full bg-transparent flex-shrink-0 flex flex-col',
+                hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
                 footerPaddingClass,
                 footerGapClass,
             )}
@@ -127,7 +146,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
             <PiPlanBuildRow className="w-full justify-end" />
             <div
                 className={cn(
-                    isMobile ? 'flex items-center gap-x-1.5' : cn('flex items-center justify-between', footerGapClass)
+                    isMobile ? 'flex items-center gap-x-1.5' : 'flex min-w-0 w-full items-center justify-between gap-x-2'
                 )}
             >
             {isMobile ? (
@@ -217,7 +236,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                 </>
             ) : (
                 <>
-                    <div className={cn("flex items-center flex-shrink-0", footerGapClass)}>
+                    <div className="flex items-center flex-shrink-0 gap-x-2">
                         <ComposerAttachmentControls
                             isVSCode={isVSCode}
                             footerIconButtonClass={footerIconButtonClass}
@@ -265,8 +284,18 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             withTooltip
                         />
                     </div>
-                    <div className={cn('flex items-center flex-1 justify-end min-w-0', footerGapClass)}>
-                        <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
+                    <div
+                        ref={chipRowRef}
+                        data-composer-chip-row="true"
+                        className={cn(
+                            '@container/model-controls flex items-center flex-1 justify-end min-w-0 gap-x-2 m-0',
+                            hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
+                        )}
+                    >
+                        <MemoModelControls
+                            className={cn('flex-1 min-w-0 justify-end')}
+                            omitAgentSlot={omitAgentSlot}
+                        />
                         <MemoComposerDictation
                             radius={chatInputRadius}
                             isMobile={isMobile}
@@ -278,6 +307,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             onInsertAndSend={onDictationInsertAndSend}
                             onContentHeightChange={onDictationContentHeightChange}
                         />
+                        <div data-composer-send="true" className="shrink-0">
                         <ComposerActionButtons
                             isMobile={isMobile}
                             footerIconButtonClass={footerIconButtonClass}
@@ -292,6 +322,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             onQueueMessage={onQueueMessage}
                             onAbort={onAbort}
                         />
+                        </div>
                     </div>
                 </>
             )}

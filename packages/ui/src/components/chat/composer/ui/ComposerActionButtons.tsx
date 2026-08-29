@@ -64,6 +64,7 @@ export const ComposerActionButtons = React.memo(function ComposerActionButtons(p
                     : 'opacity-30'
             )}
             aria-label={t('chat.chatInput.actions.sendMessageAria')}
+            data-composer-send=""
         >
             <Icon name="send-plane-2" className={cn(sendIconSizeClass)} />
         </button>

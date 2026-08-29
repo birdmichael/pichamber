@@ -66,8 +66,10 @@ export const WorkStatusCollapsibleSection: React.FC<{
   /** An independent header action, such as refreshing this section's data. */
   action?: React.ReactNode;
   defaultExpanded?: boolean;
+  /** Extra action when the header is pressed (mobile MCP → workspace). */
+  onHeaderNavigate?: () => void;
   children: React.ReactNode;
-}> = ({ id, title, icon, iconNode, iconColor, summary, action, defaultExpanded = false, children }) => {
+}> = ({ id, title, icon, iconNode, iconColor, summary, action, defaultExpanded = false, onHeaderNavigate, children }) => {
   const stored = useUIStore(
     React.useCallback((state) => state.workStatusExpandedSections[id], [id]),
   );
@@ -79,7 +81,13 @@ export const WorkStatusCollapsibleSection: React.FC<{
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => setExpandedInStore(id, !expanded)}
+          onClick={() => {
+            if (onHeaderNavigate) {
+              onHeaderNavigate();
+              return;
+            }
+            setExpandedInStore(id, !expanded);
+          }}
           className={cn(
             'group/section flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left',
             // No hover fill anywhere in the panel: at this row density the blocks
@@ -121,6 +129,10 @@ type RowProps = {
   muted?: boolean;
   /** Turns the row into a button; the caller decides what it opens. */
   onClick?: () => void;
+  /** Visible open affordance, e.g. i18n Open / 「打开」. */
+  actionLabel?: string;
+  disabled?: boolean;
+  title?: string;
   ariaLabel?: string;
   className?: string;
 };
@@ -137,6 +149,9 @@ export const WorkStatusRow: React.FC<RowProps> = ({
   value,
   muted,
   onClick,
+  actionLabel,
+  disabled,
+  title,
   ariaLabel,
   className,
 }) => {
@@ -155,21 +170,30 @@ export const WorkStatusRow: React.FC<RowProps> = ({
       {value !== undefined && value !== null ? (
         <span className="flex shrink-0 items-center gap-1.5 text-[13px] tabular-nums">{value}</span>
       ) : null}
-      {onClick ? (
+      {actionLabel ? (
+        <span className="shrink-0 text-xs text-muted-foreground">{actionLabel}</span>
+      ) : onClick ? (
         <Icon name="arrow-right-s" className="size-3.5 shrink-0 text-muted-foreground" />
       ) : null}
     </>
   );
 
-  const shared = cn('flex h-7 w-full items-center gap-2 rounded-md px-1 text-left', className);
+  const shared = cn(
+    'flex h-7 w-full items-center gap-2 rounded-md px-1 text-left',
+    disabled && 'cursor-not-allowed opacity-50',
+    className,
+  );
 
-  if (!onClick) return <div className={shared}>{body}</div>;
+  if (!onClick || disabled) {
+    return <div className={shared} title={title} aria-disabled={disabled || undefined}>{body}</div>;
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
+      title={title}
       className={cn(shared, 'transition-colors hover:text-foreground')}
     >
       {body}

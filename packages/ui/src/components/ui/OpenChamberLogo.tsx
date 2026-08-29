@@ -34,7 +34,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       aria-label={t('openChamberLogo.aria.logo')}
     >
       {isAnimated ? (
-        <style>{`@keyframes oc-logo-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 4px currentColor)}}.oc-logo-glow{animation:oc-logo-glow 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.oc-logo-glow{animation:none}}`}</style>
+        <style>{`@keyframes oc-logo-glow{0%,100%{opacity:0.55;transform:translateZ(0) scale(1)}50%{opacity:1;transform:translateZ(0) scale(1.04)}}.oc-logo-glow{animation:oc-logo-glow 1.8s ease-in-out infinite;transform-origin:center}@media (prefers-reduced-motion:reduce){.oc-logo-glow{animation:none}}`}</style>
       ) : null}
       {PICHAMBER_CUBE_PATHS.map((path) => (
         <path

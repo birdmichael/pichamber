@@ -531,8 +531,10 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     let skipped = 0;
     for (const child of children) {
       try {
-        if (!sessionDirectory) throw new Error('Session directory is required for export');
-        await sync.loadCompleteHistory(child.session.id, sessionDirectory);
+        const childDirectory = (child.session as Session & { directory?: string | null }).directory?.trim()
+          || sessionDirectory;
+        if (!childDirectory) throw new Error('Session directory is required for export');
+        await sync.loadCompleteHistory(child.session.id, childDirectory);
         const childRecords = buildSessionMessageRecordsSnapshot(directoryStore.getState(), child.session.id).list;
         const childTitle = child.session.title || t('sessions.sidebar.session.export.untitledSubagent');
         const childAgent = (child.session as Session & { agent?: string }).agent;

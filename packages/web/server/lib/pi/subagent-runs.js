@@ -1,10 +1,11 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const ASYNC_RUNS_DIR = 'async-subagent-runs';
 const STATUS_FILE = 'status.json';
-const ACTIVE_STATES = new Set(['queued', 'running']);
+const ACTIVE_STATES = new Set(['running']);
 const BLOCKED_STATES = new Set(['blocked', 'paused']);
 const DONE_STATES = new Set(['complete', 'completed', 'done', 'success']);
 const FAILED_STATES = new Set(['failed', 'error', 'rejected']);
@@ -29,12 +30,12 @@ export const isSubagentsSlotActive = (payload) => {
 
 export const normalizeSubagentRunState = (value) => {
   const state = asTrimmedString(value).toLowerCase();
+  if (state === 'queued') return 'queued';
   if (ACTIVE_STATES.has(state)) return 'running';
   if (BLOCKED_STATES.has(state) || state === 'blocked') return state === 'paused' ? 'paused' : 'blocked';
   if (DONE_STATES.has(state)) return 'done';
   if (FAILED_STATES.has(state)) return 'failed';
   if (STOPPED_STATES.has(state)) return 'stopped';
-  if (state === 'queued') return 'queued';
   return state || 'running';
 };
 
@@ -47,9 +48,9 @@ export const normalizeSubagentRunMode = (value, fallback = 'foreground') => {
   return fallback;
 };
 
-export const readSessionIdFromSessionFile = (filePath) => {
+const readSessionHeaderFromSessionFile = (filePath) => {
   const file = asTrimmedString(filePath);
-  if (!file || !fs.existsSync(file)) return '';
+  if (!file || !fs.existsSync(file)) return { id: '', cwd: '' };
   try {
     const fd = fs.openSync(file, 'r');
     try {
@@ -57,15 +58,58 @@ export const readSessionIdFromSessionFile = (filePath) => {
       const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
       const text = buffer.slice(0, bytes).toString('utf8');
       const firstLine = text.split(/\r?\n/).find((line) => line.trim());
-      if (!firstLine) return '';
+      if (!firstLine) return { id: '', cwd: '' };
       const parsed = JSON.parse(firstLine);
-      return asTrimmedString(parsed?.id);
+      return {
+        id: asTrimmedString(parsed?.id),
+        cwd: asTrimmedString(parsed?.cwd),
+      };
     } finally {
       fs.closeSync(fd);
     }
   } catch {
-    return '';
+    return { id: '', cwd: '' };
   }
+};
+
+export const readSessionIdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).id;
+
+export const readSessionCwdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).cwd;
+
+export const preferSubagentTitle = (...candidates) => {
+  for (const value of candidates) {
+    const title = asTrimmedString(value);
+    if (title && title !== 'subagent') return title;
+  }
+  return 'subagent';
+};
+
+/** Prefer session_info.name over a run-folder basename like scout/scout_b. */
+export const readSessionTitleFromSessionFile = (filePath) => {
+  const file = asTrimmedString(filePath);
+  if (!file || !fs.existsSync(file)) return '';
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const buffer = Buffer.alloc(16 * 1024);
+      const bytes = fs.readSync(fd, buffer, 0, buffer.length, 0);
+      const text = buffer.slice(0, bytes).toString('utf8');
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (asTrimmedString(parsed?.type) === 'session_info' && asTrimmedString(parsed?.name)) {
+            return asTrimmedString(parsed.name);
+          }
+        } catch {
+        }
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+  }
+  return '';
 };
 
 const sessionPathStem = (value) => {
@@ -138,6 +182,44 @@ const firstStepLabel = (status) => {
   return '';
 };
 
+const adapterSteps = (status) => (Array.isArray(status?.steps) ? status.steps : []);
+
+export const isLiveRunState = (state) => (
+  state === 'queued' || state === 'running' || state === 'blocked' || state === 'paused'
+);
+
+/**
+ * Workflow `status.json` often stays `complete` after the parent tool detaches
+ * while a child step is still running or waiting on the supervisor.
+ */
+export const readAdapterLifecycleState = (status) => {
+  const stepStates = adapterSteps(status).map((step) => (
+    normalizeSubagentRunState(step?.status || step?.state)
+  ));
+  const live = stepStates.find((state) => isLiveRunState(state));
+  if (live) return live;
+  if (stepStates.includes('failed')) return 'failed';
+  if (stepStates.includes('stopped')) return 'stopped';
+  return normalizeSubagentRunState(status?.state);
+};
+
+const readAdapterBlocker = (source) => {
+  if (!isRecord(source)) return null;
+  const tool = asTrimmedString(source.currentTool).toLowerCase();
+  const args = asTrimmedString(source.currentToolArgs).toLowerCase();
+  if (tool === 'contact_supervisor' || args.includes('interview')) return 'question';
+  if (tool === 'question' || tool.endsWith('_question')) return 'question';
+  return null;
+};
+
+const readStatusBlocker = (status, step) => {
+  if (step) return readAdapterBlocker(step);
+  const liveStep = adapterSteps(status).find((item) => (
+    isLiveRunState(normalizeSubagentRunState(item?.status || item?.state))
+  ));
+  return readAdapterBlocker(liveStep) || readAdapterBlocker(status);
+};
+
 /**
  * Async `workflowScript` launches omit top-level `agent` / `task`. The name
  * lives in `runs.run("disk-scan", { agent: "worker", task: \`…\` })`.
@@ -178,14 +260,16 @@ export const mapStatusToSubagentRun = (status, {
     candidates: [status.childSessionId],
   });
   const agent = firstAgentName(status) || 'subagent';
-  const state = normalizeSubagentRunState(status.state);
+  const state = readAdapterLifecycleState(status);
   const mode = normalizeSubagentRunMode(status.mode, sessionFile ? 'background' : 'foreground');
   if (!mode) return null;
+  const blocker = readStatusBlocker(status);
   return {
     runId,
     parentID: asTrimmedString(parentID),
     sessionID: childSessionID || null,
     sessionFile: sessionFile || null,
+    directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(status.cwd || status.directory) || null,
     name: agent,
     role: asTrimmedString(status.role) || agent,
     mode,
@@ -195,7 +279,66 @@ export const mapStatusToSubagentRun = (status, {
     asyncDir: asTrimmedString(asyncDir) || null,
     startedAt: typeof status.startedAt === 'number' ? status.startedAt : null,
     endedAt: typeof status.endedAt === 'number' ? status.endedAt : null,
+    ...(blocker ? { blocker } : {}),
   };
+};
+
+const mapStepToSubagentRun = (status, step, {
+  parentID,
+  asyncDir,
+  index,
+} = {}) => {
+  const base = mapStatusToSubagentRun(status, { parentID, asyncDir });
+  if (!base || !isRecord(step)) return null;
+  const sessionFile = asTrimmedString(step.sessionFile);
+  const sessionID = resolveChildSessionId({
+    parentID,
+    sessionFile,
+    candidates: [step.childSessionId, step.sessionId, step.sessionID],
+  });
+  const name = asTrimmedString(step.agent) || base.name;
+  const title = asTrimmedString(step.label || step.workflowKey || step.task) || name;
+  const state = normalizeSubagentRunState(step.status || step.state || status.state);
+  const blocker = readStatusBlocker(status, step);
+  const stepRunId = asTrimmedString(step.runId);
+  const next = {
+    ...base,
+    runId: sessionID
+      ? `${base.runId}:${sessionID}`
+      : (stepRunId && stepRunId !== base.runId ? `${base.runId}:${stepRunId}` : `${base.runId}:${index}`),
+    sessionFile: sessionFile || base.sessionFile,
+    sessionID: sessionID || null,
+    name,
+    role: asTrimmedString(step.role) || name,
+    state,
+    title,
+    startedAt: typeof step.startedAt === 'number' ? step.startedAt : base.startedAt,
+    endedAt: typeof step.endedAt === 'number' ? step.endedAt : base.endedAt,
+  };
+  if (blocker) next.blocker = blocker;
+  else delete next.blocker;
+  return next;
+};
+
+/**
+ * One workflow `runId` can fan out to several child session files. Collapse
+ * only when there is a single child (or none yet). Different sessionIDs stay
+ * separate rows so Work Status does not hide a finished sibling.
+ */
+export const mapStatusToSubagentRuns = (status, options = {}) => {
+  const base = mapStatusToSubagentRun(status, options);
+  if (!base) return [];
+  const steps = adapterSteps(status).filter((step) => (
+    asTrimmedString(step?.sessionFile)
+    || isLiveRunState(normalizeSubagentRunState(step?.status || step?.state))
+  ));
+  const childFiles = steps.filter((step) => asTrimmedString(step?.sessionFile));
+  if (childFiles.length <= 1) return [base];
+  return childFiles.map((step, index) => mapStepToSubagentRun(status, step, {
+    parentID: options.parentID,
+    asyncDir: options.asyncDir,
+    index,
+  })).filter(Boolean);
 };
 
 const listAsyncRunDirs = (root) => {
@@ -209,9 +352,53 @@ const listAsyncRunDirs = (root) => {
   }
 };
 
+export const listGitWorktreePaths = (projectDir) => {
+  const root = asTrimmedString(projectDir);
+  if (!root) return [];
+  try {
+    const output = execFileSync('git', ['-C', root, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const paths = [];
+    for (const line of output.split(/\r?\n/)) {
+      if (!line.startsWith('worktree ')) continue;
+      const worktree = line.slice('worktree '.length).trim();
+      if (worktree) paths.push(worktree);
+    }
+    return paths;
+  } catch {
+    return [];
+  }
+};
+
+const listRelatedProjectDirs = ({
+  projectDir,
+  extraProjectDirs,
+} = {}) => {
+  const dirs = [];
+  const seen = new Set();
+  const add = (value) => {
+    const resolved = asTrimmedString(value);
+    if (!resolved || seen.has(resolved)) return;
+    seen.add(resolved);
+    dirs.push(resolved);
+  };
+  add(projectDir);
+  for (const extra of Array.isArray(extraProjectDirs) ? extraProjectDirs : []) {
+    add(extra);
+  }
+  for (const worktree of listGitWorktreePaths(projectDir)) {
+    add(worktree);
+  }
+  return dirs;
+};
+
 const listAsyncSubagentRunRoots = ({
   tmpdir = process.env.TMPDIR || os.tmpdir(),
   projectDir,
+  extraProjectDirs,
 } = {}) => {
   const roots = [];
   const seen = new Set();
@@ -222,8 +409,8 @@ const listAsyncSubagentRunRoots = ({
     roots.push(resolved);
   };
 
-  if (projectDir) {
-    add(path.join(projectDir, '.pi', 'subagents', ASYNC_RUNS_DIR));
+  for (const dir of listRelatedProjectDirs({ projectDir, extraProjectDirs })) {
+    add(path.join(dir, '.pi', 'subagents', ASYNC_RUNS_DIR));
   }
 
   try {
@@ -241,21 +428,121 @@ export const listAdapterRunsFromFiles = ({
   parent,
   tmpdir = process.env.TMPDIR || os.tmpdir(),
   projectDir,
+  extraProjectDirs,
 } = {}) => {
   const runs = [];
   const seen = new Set();
-  for (const root of listAsyncSubagentRunRoots({ tmpdir, projectDir })) {
+  for (const root of listAsyncSubagentRunRoots({ tmpdir, projectDir, extraProjectDirs })) {
     for (const asyncDir of listAsyncRunDirs(root)) {
       const status = readJsonFile(path.join(asyncDir, STATUS_FILE));
       if (!status) continue;
       if (parent && !parentSessionMatches(status.sessionId, parent)) continue;
-      const run = mapStatusToSubagentRun(status, {
+      for (const run of mapStatusToSubagentRuns(status, {
         parentID: parent?.id,
         asyncDir,
+      })) {
+        if (!run || seen.has(run.runId)) continue;
+        seen.add(run.runId);
+        runs.push(run);
+      }
+    }
+  }
+  return runs;
+};
+
+const NESTED_RUN_WALK_MAX_DEPTH = 6;
+const NESTED_RUN_WALK_MAX_FILES = 64;
+
+const walkNestedRunSessionFiles = (root) => {
+  const files = [];
+  const walk = (current, depth) => {
+    if (files.length >= NESTED_RUN_WALK_MAX_FILES || depth > NESTED_RUN_WALK_MAX_DEPTH) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (files.length >= NESTED_RUN_WALK_MAX_FILES) return;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'archive' || entry.name === 'node_modules' || entry.name === '.git') continue;
+        walk(full, depth + 1);
+        continue;
+      }
+      if (entry.isFile() && entry.name === 'session.jsonl') {
+        const runDir = path.basename(path.dirname(full));
+        if (runDir.startsWith('run-')) files.push(full);
+      }
+    }
+  };
+  walk(root, 0);
+  return files;
+};
+
+const inferNestedRunMeta = (file, parentID) => {
+  const named = path.basename(path.dirname(path.dirname(file)));
+  const parent = asTrimmedString(parentID);
+  const runId = named && named !== parent ? named : path.basename(path.dirname(file));
+  const name = runId.startsWith('run_') ? runId.slice('run_'.length) : runId;
+  return { runId, name: name || 'subagent' };
+};
+
+/** Pi stores worktree children as `<parentSessionDir>/<parentId>/<runName>/run-N/session.jsonl`. */
+export const listNestedSessionRuns = ({
+  parent,
+  sessionDir,
+} = {}) => {
+  const parentID = asTrimmedString(parent?.id);
+  if (!parentID) return [];
+  const roots = [];
+  const seenRoots = new Set();
+  const addRoot = (value) => {
+    const dir = asTrimmedString(value);
+    if (!dir || seenRoots.has(dir)) return;
+    seenRoots.add(dir);
+    if (fs.existsSync(dir)) roots.push(dir);
+  };
+  if (parent?.sessionFile) {
+    addRoot(path.join(path.dirname(parent.sessionFile), parentID));
+  }
+  if (sessionDir) {
+    addRoot(path.join(sessionDir, parentID));
+  }
+
+  const runs = [];
+  const seen = new Set();
+  for (const root of roots) {
+    for (const file of walkNestedRunSessionFiles(root)) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const header = readSessionHeaderFromSessionFile(file);
+      const childId = asChildSessionId(header.id, parentID);
+      if (!childId) continue;
+      const { runId, name } = inferNestedRunMeta(file, parentID);
+      let startedAt = null;
+      try {
+        const mtime = fs.statSync(file).mtimeMs;
+        if (Number.isFinite(mtime)) startedAt = mtime;
+      } catch {
+      }
+      runs.push({
+        runId,
+        parentID,
+        sessionID: childId,
+        sessionFile: file,
+        directory: header.cwd || null,
+        name,
+        role: name,
+        mode: 'background',
+        state: 'done',
+        title: preferSubagentTitle(readSessionTitleFromSessionFile(file), name),
+        toolCallId: null,
+        asyncDir: null,
+        startedAt,
+        endedAt: null,
       });
-      if (!run || seen.has(run.runId)) continue;
-      seen.add(run.runId);
-      runs.push(run);
     }
   }
   return runs;
@@ -454,15 +741,14 @@ const readChildSessionIdFromToolFields = ({
   ],
 });
 
-const isLiveRunState = (state) => (
-  state === 'queued' || state === 'running' || state === 'blocked' || state === 'paused'
-);
-
-const sameSubagentRun = (left, right) => (
-  Boolean(left?.runId && left.runId === right?.runId)
-  || Boolean(left?.toolCallId && left.toolCallId === right?.toolCallId)
-  || Boolean(left?.sessionID && left.sessionID === right?.sessionID)
-);
+const sameSubagentRun = (left, right) => {
+  const leftSession = asTrimmedString(left?.sessionID);
+  const rightSession = asTrimmedString(right?.sessionID);
+  if (leftSession && rightSession && leftSession !== rightSession) return false;
+  return Boolean(left?.runId && left.runId === right?.runId)
+    || Boolean(left?.toolCallId && left.toolCallId === right?.toolCallId)
+    || Boolean(leftSession && leftSession === rightSession);
+};
 
 export const extractSubagentRunFromToolPart = (part, parentID) => {
   if (!isRecord(part) || asTrimmedString(part.tool).toLowerCase() !== 'subagent') return null;
@@ -518,6 +804,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     parentID: asTrimmedString(parentID),
     sessionID: childSessionID,
     sessionFile: sessionFile || null,
+    directory: readSessionCwdFromSessionFile(sessionFile) || null,
     name: agent,
     role: asTrimmedString(input.role) || agent,
     mode,
@@ -530,18 +817,29 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   };
 };
 
+const compatibleStoredRun = (existing, run) => {
+  const existingSession = asTrimmedString(existing?.sessionID);
+  const runSession = asTrimmedString(run?.sessionID);
+  if (existingSession && runSession && existingSession !== runSession) return false;
+  return true;
+};
+
 const findStoredRunId = (byId, run) => {
-  if (byId.has(run.runId)) return run.runId;
+  if (byId.has(run.runId) && compatibleStoredRun(byId.get(run.runId), run)) return run.runId;
   const toolCallId = asTrimmedString(run.toolCallId);
-  if (toolCallId && byId.has(toolCallId)) return toolCallId;
+  if (toolCallId && byId.has(toolCallId) && compatibleStoredRun(byId.get(toolCallId), run)) {
+    return toolCallId;
+  }
   if (toolCallId) {
     for (const [id, existing] of byId) {
+      if (!compatibleStoredRun(existing, run)) continue;
       if (asTrimmedString(existing.toolCallId) === toolCallId || existing.runId === toolCallId) {
         return id;
       }
     }
   }
   for (const [id, existing] of byId) {
+    if (!compatibleStoredRun(existing, run)) continue;
     if (asTrimmedString(existing.toolCallId) === run.runId) return id;
   }
   return '';
@@ -555,12 +853,14 @@ const mergeRunFields = (existing, run) => ({
     : existing.runId,
   sessionID: run.sessionID || existing.sessionID,
   sessionFile: run.sessionFile || existing.sessionFile,
+  directory: run.directory || existing.directory,
   toolCallId: run.toolCallId || existing.toolCallId,
   name: run.name && run.name !== 'subagent' ? run.name : existing.name,
   role: run.role && run.role !== 'subagent' ? run.role : existing.role,
   title: run.title && run.title !== run.name && run.title !== 'subagent'
     ? run.title
     : (existing.title && existing.title !== 'subagent' ? existing.title : run.title || existing.title),
+  blocker: run.blocker || existing.blocker,
 });
 
 const upsertSubagentRun = (byId, run) => {
@@ -615,6 +915,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
           parentID: asTrimmedString(parentID),
           sessionID: readChildSessionIdFromToolFields({ parentID, input: args, sessionFile }),
           sessionFile,
+          directory: readSessionCwdFromSessionFile(sessionFile) || null,
           name: agent,
           role: asTrimmedString(args.role || args.agent || hints.agent) || agent,
           mode,
@@ -673,6 +974,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         sessionFile,
       }),
       sessionFile: sessionFile || null,
+      directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(details.cwd || details.directory) || null,
       name: agent,
       role: asTrimmedString(details.role || details.agent || hints.agent) || agent,
       mode,
@@ -747,6 +1049,7 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
     if (match) {
       match.sessionID = match.sessionID || file.sessionID;
       match.sessionFile = match.sessionFile || file.sessionFile;
+      match.directory = match.directory || file.directory;
       match.toolCallId = match.toolCallId || file.toolCallId;
       if (!match.name || match.name === 'subagent') match.name = file.name;
       if (!match.title || match.title === match.name || match.title === 'subagent') {
@@ -755,9 +1058,8 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
       if (file.mode) match.mode = file.mode;
       // Adapter status.json is the child lifecycle. The parent tool often
       // completes as soon as the async workflow detaches.
-      if (file.state && (isLiveRunState(match.state) || !isLiveRunState(file.state))) {
-        match.state = file.state;
-      }
+      if (file.state) match.state = file.state;
+      if (file.blocker) match.blocker = file.blocker;
       continue;
     }
     const childId = asChildSessionId(file.sessionID, file.parentID);
@@ -780,10 +1082,12 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
 export const toPublicSubagentRun = (run) => {
   const sessionID = asChildSessionId(run.sessionID, run.parentID);
   const toolCallId = asTrimmedString(run.toolCallId);
+  const blocker = asTrimmedString(run.blocker);
   return {
     runId: run.runId,
     parentID: run.parentID || null,
     sessionID,
+    directory: asTrimmedString(run.directory) || null,
     ...(toolCallId ? { toolCallId } : {}),
     name: run.name,
     role: run.role,
@@ -791,6 +1095,7 @@ export const toPublicSubagentRun = (run) => {
     state: run.state,
     title: run.title,
     openable: Boolean(sessionID),
+    ...(blocker === 'question' || blocker === 'permission' ? { blocker } : {}),
   };
 };
 

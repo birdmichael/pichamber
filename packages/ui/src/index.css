@@ -234,12 +234,34 @@ button,
   color: color-mix(in srgb, var(--vscode-input-placeholderForeground, var(--muted-foreground)) 65%, transparent);
 }
 
-/* Match chat footer background to input in WebKit to avoid dual-tone hover/focus */
+/* Match chat footer background to input in WebKit to avoid dual-tone hover/focus.
+   Named @container model-controls on the parent footer, the child/embedded
+   footer (same ComposerFooter in the session-chat iframe), and the chip row.
+   Query this row, not html / the parent window. */
 div[data-chat-input-footer="true"] {
   background: transparent !important;
   border: none;
   box-shadow: none;
   -webkit-appearance: none;
+  container-type: inline-size;
+  container-name: model-controls;
+  min-width: 0;
+  width: 100%;
+}
+
+[data-composer-chip-row="true"] {
+  container-type: inline-size;
+  container-name: model-controls;
+  min-width: 0;
+}
+
+/* CSS backup: hide Agent from the footer / chip-row / parent column.
+   Parent ChatInput omits the Agent slot from the DOM when
+   [data-parent-chat-column] is below 576px (~328px squeeze). A compact
+   `Ag` label is a fail. @container can still resolve against a wide ancestor. */
+.model-controls--hide-agent .model-controls__agent-slot,
+.model-controls--hide-agent .model-controls__agent-trigger {
+  display: none;
 }
 
 /* Scroll shadow (HeroUI) fallback styling to ensure visible gradients without the Tailwind plugin */
@@ -761,100 +783,173 @@ html:not(.dark) .chat-scroll {
    (several letters + ellipsis — never a single glyph). The provider glyph
    hides on that squeeze so the name can use the slot. Agent/Plan yields
    next so chips cannot overlap. Icon-only is last resort only. Leftover
-   OpenCode agent still hides first. Do not hardcode a provider/model name. */
-@container model-controls (max-width: 22rem) {
-  :root:not(.vscode-runtime) .model-controls__agent-label {
-    display: none;
-  }
+   OpenCode agent still hides first. Do not hardcode a provider/model name.
+
+   Container-query subjects must be descendants of the named container.
+   Do not start the inner selector at :root — that never matches, and the
+   row then overflow-clips mid-glyph (`grok-4.(`, a bare `A`). Nest the
+   query under html so the subject is the chip, and ellipsize the label
+   itself.
+
+   Hide the entire Agent chip (the slot, not just the word) when the
+   model-controls container is at or below ~36rem / 576px, or when the
+   measure hook adds `.model-controls--hide-agent`. That covers a
+   ~328px parent footer (1280 isolate + Work Status + child tabs) and
+   a ~315–500px child/embedded footer. A 2-letter `Ag` truncation is a
+   fail — hide the chip. A wide parent (~1000px) stays above 36rem and
+   keeps Agent. The model label may remain as a clean ellipsis (`grok-…`).
+
+   Hide the thinking *label* at the 22rem squeeze so High/Medium cannot
+   paint over the icon. Keep a real row gap and shrink-0 / zero negative
+   margin on the chip row so an icon-only thinking chip cannot sit on
+   the preceding toolbar icon. If that squeeze is still too tight, hide
+   the whole thinking chip (slot, not just the word).
+
+   The named container is the composer footer and chip row
+   (`[data-chat-input-footer]`, `[data-composer-chip-row]`), not html.
+   The Agent slot hide query is not nested under html so a child iframe
+   cannot inherit the parent/window as the named container. The measure
+   hook (footer + chip row) is the reliable hide for the parent
+   main-window ChatInput and the child/embedded composer. */
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
+  min-width: 0;
+  column-gap: 0.75rem;
+  margin: 0;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
-  overflow: hidden;
-}
-
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
   min-width: 5.5rem;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .model-controls__model-trigger {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot .model-controls__model-trigger {
   max-width: 100%;
 }
 
-@container model-controls (max-width: 22rem) {
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
-    column-gap: 0.375rem;
-  }
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-slot,
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
+  flex-shrink: 0;
+  margin: 0;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
-  flex-shrink: 0;
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-trigger {
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-label {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__variant-label {
   flex-shrink: 0;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-trigger {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-trigger {
   min-width: 0;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label {
   min-width: 5ch;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__agent-slot {
+  min-width: 0;
+  overflow: hidden;
+}
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__agent-label {
+  /* Full "Agent" or hide the slot — never a 2-letter `Ag` ellipsis. */
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__plan-slot {
   min-width: 0;
   flex-shrink: 1;
   overflow: hidden;
 }
 
-:root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
+html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .marquee-text {
+  display: block;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@container model-controls (max-width: 14rem) {
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-icon {
-    display: none;
-  }
-
-  :root:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-slot {
-    min-width: 3.25rem;
-  }
-}
-
-@container model-controls (max-width: 8rem) {
-  :root:not(.vscode-runtime) .model-controls__variant-label {
+/* Top-level named query so the nearest model-controls container is the
+   composer footer / chip row in THIS document (parent or child iframe),
+   not html. Do not start the subject at html — that never matches a
+   descendant of the footer. The measure hook still hides Agent if this
+   query misses (parent ~328px footer / overflowing chip row). */
+@container model-controls (max-width: 36rem) {
+  .model-controls__agent-slot,
+  .model-controls__agent-trigger {
     display: none;
   }
 }
 
-@container model-controls (max-width: 6rem) {
-  :root:not(.vscode-runtime) .model-controls__model-label {
-    display: none;
+html:not(.vscode-runtime) {
+  @container model-controls (max-width: 22rem) {
+    .model-controls__agent-label {
+      display: none;
+    }
+
+    .model-controls__variant-label,
+    .model-controls__variant-slot,
+    .model-controls__variant-trigger {
+      display: none;
+    }
+
+    .model-controls__row {
+      column-gap: 0.75rem;
+    }
+  }
+
+  @container model-controls (max-width: 14rem) {
+    &:not(.mobile-pointer) .model-controls__model-icon {
+      display: none;
+    }
+
+    &:not(.mobile-pointer) .model-controls__model-slot {
+      min-width: 3.25rem;
+    }
+  }
+
+  @container model-controls (max-width: 8rem) {
+    .model-controls__variant-label {
+      display: none;
+    }
+  }
+
+  @container model-controls (max-width: 6rem) {
+    .model-controls__model-label {
+      display: none;
+    }
   }
 }
 
 /* VS Code side panel: tighter thresholds since the panel is narrow and labels are smaller. */
-@container model-controls (max-width: 11rem) {
-  :root.vscode-runtime .model-controls__agent-label {
-    display: none;
+html.vscode-runtime {
+  @container model-controls (max-width: 11rem) {
+    .model-controls__agent-label {
+      display: none;
+    }
   }
-}
 
-@container model-controls (max-width: 9rem) {
-  :root.vscode-runtime .model-controls__variant-label {
-    display: none;
+  @container model-controls (max-width: 9rem) {
+    .model-controls__variant-label {
+      display: none;
+    }
   }
-}
 
-@container model-controls (max-width: 10rem) {
-  :root.vscode-runtime .model-controls__model-label {
-    display: none;
+  @container model-controls (max-width: 10rem) {
+    .model-controls__model-label {
+      display: none;
+    }
   }
 }
 
@@ -1723,44 +1818,15 @@ input[aria-label="Terminal input"] {
 
 @keyframes border-glow-pulse {
   0%, 100% {
-    border-color: var(--interactive-border);
-    outline-color: transparent;
-  }
-  12.5% {
-    border-color: color-mix(in srgb, var(--primary) 22%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 8%, transparent);
-  }
-  25% {
-    border-color: color-mix(in srgb, var(--primary) 40%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 16%, transparent);
-  }
-  37.5% {
-    border-color: color-mix(in srgb, var(--primary) 62%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 26%, transparent);
+    opacity: 0.72;
   }
   50% {
-    border-color: color-mix(in srgb, var(--primary) 78%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 34%, transparent);
-  }
-  62.5% {
-    border-color: color-mix(in srgb, var(--primary) 62%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 26%, transparent);
-  }
-  75% {
-    border-color: color-mix(in srgb, var(--primary) 40%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 16%, transparent);
-  }
-  87.5% {
-    border-color: color-mix(in srgb, var(--primary) 22%, var(--interactive-border));
-    outline-color: color-mix(in srgb, var(--primary) 8%, transparent);
+    opacity: 1;
   }
 }
 
 .animate-border-glow-pulse {
-  outline: 1px solid transparent;
-  outline-offset: 1px;
-  will-change: border-color, outline-color;
-  animation: border-glow-pulse 3.8s linear infinite;
+  animation: border-glow-pulse 3.8s ease-in-out infinite;
 }
 
 @keyframes marquee-scroll {
@@ -1826,7 +1892,8 @@ input[aria-label="Terminal input"] {
     display: none;
   }
 
-  .animate-busy-pulse {
+  .animate-busy-pulse,
+  .animate-border-glow-pulse {
     animation: none;
   }
 

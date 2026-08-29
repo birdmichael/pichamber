@@ -137,8 +137,12 @@ Why: only navigation tools use the compact static path; all other tools need obs
 
 ## Quick map of files in this folder
 
-- Text: `AssistantTextPart.tsx`, `UserTextPart.tsx`. Collapsed user prompts
-  clamp two wrapped lines. Do not put line-clamp on an un-inlined markdown
+- Text: `AssistantTextPart.tsx`, `UserTextPart.tsx`. The main parent-column
+  user bubble wraps (`USER_TEXT_PARENT_WRAP_CLASS`). Do not apply
+  `line-clamp-1` or a compact one-line clamp there — a narrow column beside
+  Work Status and a child tab is not a compact row. Compact rows (navigator,
+  docks) may use `line-clamp-2` via `getUserTextClampClass({ compact: true })`.
+  If a collapsed clamp is applied, do not put it on an un-inlined markdown
   tree — `[data-md-block]` uses `display:contents`, so inner paragraphs must
   be inlined the same way collapsed code already is. The user-bubble flex
   item needs `min-w-0` so the `max-w-[85%]` cap can shrink and wrap.

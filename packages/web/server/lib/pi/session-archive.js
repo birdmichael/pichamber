@@ -109,7 +109,7 @@ export const readSessionIdFromJsonlHeader = (file) => {
   }
 };
 
-const walkSessionJsonlFiles = (dir, {
+export const walkSessionJsonlFiles = (dir, {
   skipDirnames = NESTED_SESSION_SKIP_DIRNAMES,
   maxDepth = NESTED_SESSION_WALK_MAX_DEPTH,
   maxFiles = NESTED_SESSION_WALK_MAX_FILES,

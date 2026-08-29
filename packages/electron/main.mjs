@@ -12,6 +12,11 @@ import { promisify } from 'node:util';
 import updaterPkg from 'electron-updater';
 import { ElectronSshManager } from './ssh-manager.mjs';
 import { createTrayController } from './tray.mjs';
+import {
+  bindWindowBackgroundThrottling,
+  createHiddenWindowTrayRepeater,
+  isWindowPaintingAtFullRate,
+} from './background-throttling.mjs';
 import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
@@ -306,6 +311,8 @@ const state = {
   sshLogs: new Map(),
   trayController: null,
   trayFocusListener: null,
+  lastTraySnapshot: null,
+  hiddenTrayRepeater: null,
   lastFocusedWindowId: null,
   keepAwakeBlockerId: null,
 };
@@ -416,6 +423,14 @@ const prepareForQuit = ({ installingUpdate = false } = {}) => {
   state.installingUpdate = installingUpdate;
   state.quitConfirmationPending = false;
 
+  if (state.hiddenTrayRepeater) {
+    try {
+      state.hiddenTrayRepeater.dispose();
+    } catch {
+    }
+    state.hiddenTrayRepeater = null;
+  }
+  state.lastTraySnapshot = null;
   if (state.trayController) {
     try {
       state.trayController.destroy();
@@ -2538,7 +2553,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
         `--openchamber-relay-host-id=${rendererRuntimeConfig.relayHostId || ''}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
-      backgroundThrottling: false,
+      backgroundThrottling: true,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
@@ -2565,6 +2580,9 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
   });
   browserWindow.on('blur', () => {
     state.focusedWindowIds.delete(browserWindow.id);
+  });
+  bindWindowBackgroundThrottling(browserWindow, {
+    onChange: () => state.hiddenTrayRepeater?.sync(),
   });
 
   // Traffic lights disappear during dock-restore animation when using
@@ -2939,7 +2957,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
         `--openchamber-tray-enabled=${trayEnabled ? '1' : '0'}`,
       ],
       preload: isDev ? path.join(__dirname, 'preload.mjs') : path.join(app.getAppPath(), 'preload.mjs'),
-      backgroundThrottling: false,
+      backgroundThrottling: true,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
@@ -2953,6 +2971,9 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
   browserWindow.__ocMiniChat = true;
   browserWindow.__ocMiniChatSessionId = sessionWindowKey;
   browserWindow.__ocPinned = false;
+  bindWindowBackgroundThrottling(browserWindow, {
+    onChange: () => state.hiddenTrayRepeater?.sync(),
+  });
 
   if (sessionWindowKey) {
     state.miniChatWindowsBySession.set(sessionWindowKey, browserWindow);
@@ -4229,13 +4250,15 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       return null;
 
     case 'desktop_tray_update':
+      state.lastTraySnapshot = args && typeof args === 'object' ? args : {};
       if (state.trayController) {
         try {
-          state.trayController.update(args || {});
+          state.trayController.update(state.lastTraySnapshot);
         } catch (error) {
           log.warn('[electron] tray update failed', error);
         }
       }
+      state.hiddenTrayRepeater?.sync();
       // Dock badge: count of chats with unseen activity (0 = cleared, also when
       // the user disabled the badge). setBadgeCount drives the macOS dock badge.
       try {
@@ -5361,7 +5384,23 @@ const setupTray = () => {
     });
     // Seed an empty snapshot so the icon appears immediately; the renderer
     // pushes the real state once the sync stores are mounted.
-    state.trayController.update({ sessions: [], approvals: [] });
+    state.lastTraySnapshot = { sessions: [], approvals: [] };
+    state.trayController.update(state.lastTraySnapshot);
+    if (!state.hiddenTrayRepeater) {
+      state.hiddenTrayRepeater = createHiddenWindowTrayRepeater({
+        getLastSnapshot: () => state.lastTraySnapshot,
+        applySnapshot: (snapshot) => {
+          if (!state.trayController) return;
+          try {
+            state.trayController.update(snapshot);
+          } catch (error) {
+            log.warn('[electron] hidden tray snapshot apply failed', error);
+          }
+        },
+        isAnyWindowPainting: () => BrowserWindow.getAllWindows().some((win) => isWindowPaintingAtFullRate(win)),
+      });
+    }
+    state.hiddenTrayRepeater.sync();
     if (!state.trayFocusListener) {
       state.trayFocusListener = (_event, browserWindow) => {
         if (browserWindow && !browserWindow.isDestroyed()) {
@@ -5373,6 +5412,10 @@ const setupTray = () => {
   } catch (error) {
     log.warn('[electron] failed to set up tray', error);
     state.trayController = null;
+    if (state.hiddenTrayRepeater) {
+      state.hiddenTrayRepeater.dispose();
+      state.hiddenTrayRepeater = null;
+    }
   }
 };
 

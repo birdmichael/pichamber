@@ -1,24 +1,31 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
-import { useAllLiveSessions, useAllSessionStatuses, useDirectorySync, useSessionMessageRecords } from '@/sync/sync-context';
+import { useAllLiveSessions, useAllSessionStatuses, useChildStoreManager, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
 import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusValue } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
-import type { State } from '@/sync/types';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useSubagentRuns } from '@/hooks/useSubagentRuns';
-import { openSubagentChildSession } from '@/lib/subagents/childSession';
+import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
 import {
   buildWorkStatusSubagentRows,
+  collectSessionBlockers,
   collectTranscriptSubagentSessionIds,
+  overlayWorkStatusChildBlockers,
+  overlayWorkStatusSubagentRow,
+  resolveWorkStatusSubagentLabel,
   resolveWorkStatusSubagentOpen,
+  formatWorkStatusSubagentSummary,
+  summarizeWorkStatusSubagentRows,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
+import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
+import { useWorkStatusNavigate } from './workStatusNavigate';
 
 type Props = {
   sessionId: string | null;
@@ -46,7 +53,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
 
   const liveSessions = useAllLiveSessions();
   const statuses = useAllSessionStatuses();
-  const { runs } = useSubagentRuns(sessionId, isPiKernel && subagentsSlotActive);
+  const { runs } = useSubagentRuns(sessionId, isPiKernel && subagentsSlotActive, directory ?? effectiveDirectory);
   const parentMessages = useSessionMessageRecords(
     sessionId ?? '',
     directory ?? effectiveDirectory ?? undefined,
@@ -59,41 +66,92 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     [isPiKernel, liveSessions, sessionId],
   );
 
-  const permissions = useDirectorySync(React.useCallback((state: State) => state.permission, []));
-  const questions = useDirectorySync(React.useCallback((state: State) => state.question, []));
+  const childStores = useChildStoreManager();
+  const blockerCacheRef = React.useRef<ReturnType<typeof collectSessionBlockers> | null>(null);
+  const getBlockerSnapshot = React.useCallback(() => {
+    const next = collectSessionBlockers(Array.from(childStores.children.values(), (store) => store.getState()));
+    const current = blockerCacheRef.current;
+    if (
+      current
+      && current.permissions === next.permissions
+      && current.questions === next.questions
+    ) {
+      return current;
+    }
+    if (
+      current
+      && Object.keys(current.permissions).length === Object.keys(next.permissions).length
+      && Object.keys(current.questions).length === Object.keys(next.questions).length
+      && Object.keys(next.permissions).every((id) => current.permissions[id] === next.permissions[id])
+      && Object.keys(next.questions).every((id) => current.questions[id] === next.questions[id])
+    ) {
+      return current;
+    }
+    blockerCacheRef.current = next;
+    return next;
+  }, [childStores]);
+  const subscribeBlockers = React.useCallback((notify: () => void) => {
+    const unsubPermissions = childStores.subscribeAllSelected((state) => state.permission, notify);
+    const unsubQuestions = childStores.subscribeAllSelected((state) => state.question, notify);
+    return () => {
+      unsubPermissions();
+      unsubQuestions();
+    };
+  }, [childStores]);
+  const blockers = React.useSyncExternalStore(subscribeBlockers, getBlockerSnapshot, getBlockerSnapshot);
+  const promptsBySession = usePiExtensionUiStore((state) => state.promptsBySession);
 
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const setSectionExpanded = useUIStore((state) => state.setWorkStatusSectionExpanded);
+  const onNavigate = useWorkStatusNavigate();
 
   const rows = React.useMemo<ChildRow[]>(() => {
     if (isPiKernel) {
-      return buildWorkStatusSubagentRows({
+      return overlayWorkStatusChildBlockers(buildWorkStatusSubagentRows({
         runs,
         transcriptIds: collectTranscriptSubagentSessionIds(parentMessages),
         directory,
         effectiveDirectory,
         untitledLabel: t('chat.workStatus.subagent.untitled'),
-      });
+      }).map((row) => {
+        const liveTitle = liveSessions.find((session) => session.id === row.sessionID)?.title;
+        return {
+          ...row,
+          label: resolveWorkStatusSubagentLabel(
+            { title: row.label, name: row.label },
+            liveTitle,
+            t('chat.workStatus.subagent.untitled'),
+          ),
+        };
+      }), blockers).map((row) => overlayWorkStatusSubagentRow(row, {
+        uiPrompt: Boolean(row.sessionID && (promptsBySession[row.sessionID] ?? []).some((prompt) => prompt.status === 'pending')),
+      }));
     }
     return openCodeChildren.map((child) => {
-      const blocked = (permissions[child.id]?.length ?? 0) > 0;
-      const asked = (questions[child.id]?.length ?? 0) > 0;
+      const childDirectory = resolveSubagentChildDirectory(child, directory || effectiveDirectory);
+      const blocked = (blockers.permissions[child.id]?.length ?? 0) > 0;
+      const asked = (blockers.questions[child.id]?.length ?? 0) > 0;
       const busy = statuses[child.id]?.type === 'busy';
       const opened = resolveWorkStatusSubagentOpen({
         sessionID: child.id,
-        directory,
-        effectiveDirectory,
+        directory: childDirectory,
+        effectiveDirectory: directory || effectiveDirectory,
       });
       return {
         id: child.id,
-        label: child.title?.trim() || t('chat.workStatus.subagent.untitled'),
+        label: resolveWorkStatusSubagentLabel(
+        { title: child.title ?? '', name: '' },
+        child.title,
+        t('chat.workStatus.subagent.untitled'),
+      ),
         sessionID: opened.sessionID,
+        directory: opened.directory,
         openable: opened.openable,
         status: blocked ? 'permission' : asked ? 'question' : busy ? 'working' : 'done',
       };
     });
-  }, [directory, effectiveDirectory, isPiKernel, openCodeChildren, parentMessages, permissions, questions, runs, statuses, t]);
+  }, [blockers, directory, effectiveDirectory, isPiKernel, liveSessions, openCodeChildren, parentMessages, promptsBySession, runs, statuses, t]);
 
   const hadChildren = React.useRef(rows.length > 0);
   React.useEffect(() => {
@@ -104,9 +162,10 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
 
   const openChildSession = React.useCallback((row: ChildRow) => {
     if (!row.openable) return;
-    openSubagentChildSession({
+    const opened = openSubagentChildSession({
       sessionID: row.sessionID,
-      directory: directory?.trim() || effectiveDirectory,
+      parentSessionID: sessionId,
+      directory: resolveSubagentChildDirectory(row, directory || effectiveDirectory),
       label: row.label,
       readOnly: !isPiKernel,
       isMobile,
@@ -115,14 +174,18 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       setCurrentSession,
       openContextPanelTab,
     });
-  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, setCurrentSession]);
+    if (opened) onNavigate?.();
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, onNavigate, openContextPanelTab, sessionId, setCurrentSession]);
 
   useReportWorkStatusPresence('subagents', rows.length > 0);
 
   if (isPiKernel && !subagentsSlotActive) return null;
   if (rows.length === 0) return null;
 
-  const busyChildren = rows.filter((row) => row.status === 'working' || row.status === 'blocked').length;
+  const summary = formatWorkStatusSubagentSummary(summarizeWorkStatusSubagentRows(rows), {
+    queued: t('chat.workStatus.subagent.queued'),
+    done: t('chat.workStatus.subagent.done'),
+  });
 
   return (
     <WorkStatusCollapsibleSection
@@ -130,13 +193,16 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       title={t('chat.workStatus.section.subagents')}
       icon="ai-agent"
       defaultExpanded
-      summary={busyChildren > 0 ? `${busyChildren}/${rows.length}` : rows.length}
+      summary={summary}
     >
       <div className="max-h-56 overflow-y-auto">
         {rows.map((row) => (
           <WorkStatusRow
             key={row.id}
             onClick={row.openable ? () => openChildSession(row) : undefined}
+            actionLabel={row.openable ? t('chat.workStatus.action.open') : undefined}
+            disabled={!row.openable}
+            title={row.openable ? undefined : t('chat.workStatus.subagent.unopenableTooltip')}
             ariaLabel={row.openable
               ? t('chat.workStatus.action.openSubagent', { name: row.label })
               : row.label}
@@ -155,6 +221,10 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
               <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
             ) : row.status === 'failed' ? (
               <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+            ) : row.status === 'queued' ? (
+              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
+            ) : row.status === 'stopped' ? (
+              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
             ) : row.status === 'working' ? (
               <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
             ) : (

@@ -96,8 +96,10 @@ import {
 import {
   findSessionJsonlById,
   isUnderSessionArchiveDir,
+  readSessionIdFromJsonlHeader,
   relocateSessionFileForArchiveState,
   sessionArchiveDir,
+  walkSessionJsonlFiles,
 } from './session-archive.js';
 import { includeArchivedSessions } from './session-list-query.js';
 import { createExtensionUIController } from './extension-ui.js';
@@ -129,7 +131,11 @@ import {
   findAdapterRunByChildSessionId,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
+  listNestedSessionRuns,
+  preferSubagentTitle,
+  readSessionCwdFromSessionFile,
   readSessionIdFromSessionFile,
+  readSessionTitleFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
 } from './subagent-runs.js';
@@ -139,6 +145,9 @@ import {
   cloneImportedMessages,
   facadeFilePartFromUnknown,
   facadeMessagesFromPiEntries,
+  applySessionRuntimeFromEntries,
+  lastModelChangeFromEntries,
+  lastThinkingLevelChangeFromEntries,
   lastModelChangeFromMessages,
   parseSessionImport,
   persistFacadeMessages,
@@ -863,6 +872,75 @@ const readSessionThinking = (piSession) => {
   };
 };
 
+const isNarrowThinkingAvailable = (available) => (
+  !Array.isArray(available)
+  || available.length === 0
+  || (available.length === 1 && available[0] === 'off')
+);
+
+const parseThinkingLevelList = (value) => {
+  if (!Array.isArray(value)) return [];
+  const next = [];
+  const seen = new Set();
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const level = item.trim();
+    if (!THINKING_LEVELS.includes(level) || seen.has(level)) continue;
+    seen.add(level);
+    next.push(level);
+  }
+  return next;
+};
+
+const findRuntimeModel = (available, ref) => {
+  if (!ref || !Array.isArray(available)) return null;
+  const providerID = typeof ref.providerID === 'string' ? ref.providerID.trim()
+    : (typeof ref.provider === 'string' ? ref.provider.trim() : '');
+  const modelID = typeof ref.modelID === 'string' ? ref.modelID.trim()
+    : (typeof ref.id === 'string' ? ref.id.trim() : '');
+  if (!modelID && !providerID) return null;
+  const raw = providerID && modelID ? `${providerID}/${modelID}` : modelID;
+  return available.find((item) => (
+    item.id === raw
+    || (item.id === modelID && (!providerID || item.provider === providerID))
+  )) || null;
+};
+
+let supportedThinkingLevelsFn;
+
+const loadSupportedThinkingLevels = async () => {
+  if (supportedThinkingLevelsFn !== undefined) return supportedThinkingLevelsFn;
+  try {
+    const compat = await import('@earendil-works/pi-ai/compat');
+    supportedThinkingLevelsFn = typeof compat.getSupportedThinkingLevels === 'function'
+      ? compat.getSupportedThinkingLevels
+      : null;
+  } catch {
+    supportedThinkingLevelsFn = null;
+  }
+  return supportedThinkingLevelsFn;
+};
+
+const readThinkingLevelsFromModel = async (model) => {
+  if (!model || typeof model !== 'object') return [];
+  const fromSdk = await loadSupportedThinkingLevels();
+  if (fromSdk) {
+    try {
+      const levels = parseThinkingLevelList(fromSdk(model));
+      if (!isNarrowThinkingAvailable(levels)) return levels;
+    } catch {
+    }
+  }
+  return parseThinkingLevelList(model.thinkingLevels || model.availableThinkingLevels);
+};
+
+const widenThinkingAvailable = (live, catalog) => {
+  const catalogLevels = parseThinkingLevelList(catalog);
+  if (catalogLevels.length === 0) return parseThinkingLevelList(live);
+  if (isNarrowThinkingAvailable(live) && catalogLevels.length > 0) return catalogLevels;
+  return parseThinkingLevelList(live);
+};
+
 const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
 
 const readPiModelInput = (model) => {
@@ -1470,15 +1548,46 @@ export const createPiHost = ({
   const listPersistedSessionItems = async (cwd, { includeArchived = false } = {}) => {
     const sessionDir = sessionDirForCwd(cwd, home);
     const items = [];
+    const seenPaths = new Set();
+    const addItems = (batch) => {
+      for (const item of batch || []) {
+        if (!item?.path || seenPaths.has(item.path)) continue;
+        seenPaths.add(item.path);
+        items.push(item);
+      }
+    };
     try {
-      items.push(...(await listSessionsInDir(cwd, sessionDir) || []));
+      addItems(await listSessionsInDir(cwd, sessionDir) || []);
     } catch {
       // Active-dir list failed: keep going. Do not pretend the directory is empty
       // if archive/ or live sessions still have rows.
     }
+    try {
+      for (const file of walkSessionJsonlFiles(sessionDir)) {
+        if (isTopLevelUserSessionFile(file) || seenPaths.has(file)) continue;
+        const id = readSessionIdFromJsonlHeader(file);
+        if (!id) continue;
+        let stat;
+        try {
+          stat = fs.statSync(file);
+        } catch {
+          continue;
+        }
+        addItems([{
+          id,
+          path: file,
+          cwd,
+          created: stat.birthtime || stat.mtime,
+          modified: stat.mtime,
+          firstMessage: firstUserTextFromSessionFile(file),
+        }]);
+      }
+    } catch {
+      // Nested walk failed: keep SessionManager.list rows.
+    }
     if (includeArchived) {
       try {
-        items.push(...(await listSessionsInDir(cwd, sessionArchiveDir(sessionDir)) || []));
+        addItems(await listSessionsInDir(cwd, sessionArchiveDir(sessionDir)) || []);
       } catch {
         // Archive-dir list failed: keep active rows.
       }
@@ -1545,22 +1654,23 @@ export const createPiHost = ({
   };
 
   const ensureModelRuntime = async () => {
-    if (modelRuntime || mock) return modelRuntime;
+    if (modelRuntime) return modelRuntime;
+    if (typeof createModelRuntime === 'function') {
+      modelRuntime = await createModelRuntime();
+      return modelRuntime;
+    }
+    if (mock) return modelRuntime;
     if (modelRuntimeError) throw modelRuntimeError;
     try {
       hydrateKnownModelCapabilities({ home, directory: defaultDirectory });
-      if (typeof createModelRuntime === 'function') {
-        modelRuntime = await createModelRuntime();
-      } else {
-        const pi = await loadPiSdk();
-        const agentDir = resolveAgentDir();
-        modelRuntime = await pi.ModelRuntime.create({
-          allowModelNetwork: false,
-          authPath: resolvePiAuthPath(home),
-          modelsPath: resolvePiModelsPath(home),
-          agentDir,
-        });
-      }
+      const pi = await loadPiSdk();
+      const agentDir = resolveAgentDir();
+      modelRuntime = await pi.ModelRuntime.create({
+        allowModelNetwork: false,
+        authPath: resolvePiAuthPath(home),
+        modelsPath: resolvePiModelsPath(home),
+        agentDir,
+      });
     } catch (error) {
       modelRuntimeError = error;
       throw error;
@@ -1844,6 +1954,7 @@ export const createPiHost = ({
   const resolveHostFallbackModel = (record, extra) => resolveUsableFacadeModel(
     extra,
     record?.piSession?.currentModel,
+    lastModelChangeFromEntries(record?.entries),
     lastModelChangeFromMessages(record?.messages),
     readPiDefaults(home).model,
   );
@@ -2175,6 +2286,7 @@ export const createPiHost = ({
       piSession = createInMemoryPiSession({ sessionId: sessionID });
     }
     const entries = transcriptEntriesForHydrate({ file, manager });
+    applySessionRuntimeFromEntries(piSession, entries);
     const storedName = (typeof manager.getSessionName === 'function' && manager.getSessionName())
       || persisted?.name;
     const title = resolveListedSessionTitle({
@@ -2203,7 +2315,7 @@ export const createPiHost = ({
           updated: Number.isFinite(updated) ? updated : Date.now(),
         }, metadata),
       },
-      messages: hydrateFacadeMessages(entries, sessionID, { piSession }),
+      messages: hydrateFacadeMessages(entries, sessionID, { piSession, entries }),
       status: { type: 'idle' },
       piSession,
       translator: createRecordTranslator(sessionID, cwd, { piSession }),
@@ -2391,6 +2503,11 @@ export const createPiHost = ({
       : readSessionIdFromSessionFile(resolvedFile);
     const existing = (hintedId && sessions.get(hintedId)) || findRecordBySessionFile(resolvedFile);
     if (existing) {
+      const existingFile = typeof existing.sessionFile === 'string' ? existing.sessionFile : '';
+      const alreadyLinked = typeof existing.info?.parentID === 'string' ? existing.info.parentID.trim() : '';
+      if (existingFile && existingFile !== resolvedFile && alreadyLinked && alreadyLinked !== parentID) {
+        return existing;
+      }
       applySubagentParentLink(existing, parentID, metadata);
       refreshChildMessagesFromFile(existing, { publish: true });
       return existing;
@@ -2408,6 +2525,7 @@ export const createPiHost = ({
     }
     const fileEntries = transcriptEntriesForHydrate({ file: resolvedFile, manager });
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
+      || readSessionCwdFromSessionFile(resolvedFile)
       || directory
       || defaultDirectory;
     const resolvedId = (typeof manager?.getSessionId === 'function' && manager.getSessionId())
@@ -2421,6 +2539,11 @@ export const createPiHost = ({
     }
     const alreadyAttached = sessions.get(resolvedId);
     if (alreadyAttached) {
+      const existingFile = typeof alreadyAttached.sessionFile === 'string' ? alreadyAttached.sessionFile : '';
+      const alreadyLinked = typeof alreadyAttached.info?.parentID === 'string' ? alreadyAttached.info.parentID.trim() : '';
+      if (existingFile && existingFile !== resolvedFile && alreadyLinked && alreadyLinked !== parentID) {
+        return alreadyAttached;
+      }
       applySubagentParentLink(alreadyAttached, parentID, metadata);
       refreshChildMessagesFromFile(alreadyAttached, { publish: true });
       return alreadyAttached;
@@ -2443,6 +2566,7 @@ export const createPiHost = ({
       piSession = createInMemoryPiSession({ sessionId: resolvedId });
     }
     const entries = fileEntries;
+    applySessionRuntimeFromEntries(piSession, entries);
     const persistedMetadata = readPersistedSessionMetadata(entries);
     const listedParentID = isTopLevelUserSessionFile(resolvedFile)
       ? readListedParentID(persistedMetadata, resolvedFile)
@@ -2455,9 +2579,11 @@ export const createPiHost = ({
       info: createSessionInfo({
         id: resolvedId,
         directory: cwd,
-        title: title
-          || (typeof manager?.getSessionName === 'function' && manager.getSessionName())
-          || 'Subagent',
+        title: preferSubagentTitle(
+          typeof manager?.getSessionName === 'function' ? manager.getSessionName() : '',
+          title,
+          'Subagent',
+        ),
         parentID: listedParentID,
         metadata: {
           ...(persistedMetadata || {}),
@@ -2465,7 +2591,7 @@ export const createPiHost = ({
         },
         projectID: cwd,
       }),
-      messages: hydrateFacadeMessages(entries, resolvedId, { piSession }),
+      messages: hydrateFacadeMessages(entries, resolvedId, { piSession, entries }),
       status: { type: 'idle' },
       sessionFileStamp: statSessionFile(resolvedFile),
       piSession,
@@ -2541,17 +2667,95 @@ export const createPiHost = ({
     }
   };
 
+  const hydratedParentID = (record) => {
+    const info = record?.info;
+    if (!info) return '';
+    if (typeof info.parentID === 'string' && info.parentID.trim()) return info.parentID.trim();
+    if (typeof info.metadata?.parentID === 'string' && info.metadata.parentID.trim()) {
+      return info.metadata.parentID.trim();
+    }
+    const nested = info.metadata?.pichamber?.subagentRun?.parentSessionID;
+    return typeof nested === 'string' && nested.trim() ? nested.trim() : '';
+  };
+
+  const recordMatchesDirectory = (record, directory) => {
+    if (!directory) return true;
+    if (record.directory === directory) return true;
+    const parentID = hydratedParentID(record);
+    if (!parentID) return false;
+    const parent = sessions.get(parentID);
+    return Boolean(parent && parent.directory === directory);
+  };
+
+  const collectAttachedChildRuns = (parent) => {
+    const runs = [];
+    for (const record of sessions.values()) {
+      if (!record || record.id === parent.id) continue;
+      if (isTopLevelUserSessionFile(record.sessionFile)) continue;
+      if (hydratedParentID(record) !== parent.id) continue;
+      const sameDirectory = record.directory === parent.directory;
+      if (sameDirectory && !record.sessionFile && !record.subagentRun) continue;
+      const existing = record.subagentRun;
+      runs.push({
+        runId: existing?.runId || record.id,
+        parentID: parent.id,
+        sessionID: record.id,
+        sessionFile: record.sessionFile || null,
+        directory: record.directory || existing?.directory || null,
+        name: existing?.name || 'subagent',
+        role: existing?.role || existing?.name || 'subagent',
+        mode: existing?.mode || 'background',
+        state: existing?.state || (record.status?.type === 'busy' ? 'running' : 'done'),
+        title: preferSubagentTitle(record.info?.title, existing?.title, existing?.name),
+        toolCallId: existing?.toolCallId || null,
+        asyncDir: existing?.asyncDir || null,
+        startedAt: existing?.startedAt || record.info?.time?.created || null,
+        endedAt: existing?.endedAt || null,
+      });
+    }
+    return runs;
+  };
+
   const collectSubagentRuns = (parent) => {
-    const fileRuns = listAdapterRunsFromFiles({
-      parent,
-      projectDir: parent.directory,
-    });
     const liveRuns = [
       ...extractRunsFromFacadeMessages(parent.messages, parent.id),
       ...extractRunsFromPiEntries(
         typeof parent.sessionManager?.getEntries === 'function' ? parent.sessionManager.getEntries() : [],
         parent.id,
       ),
+    ];
+    const extraProjectDirs = [];
+    const seenDirs = new Set();
+    const addDir = (value) => {
+      const dir = typeof value === 'string' && value.trim() ? value.trim() : '';
+      if (!dir || seenDirs.has(dir) || dir === parent.directory) return;
+      seenDirs.add(dir);
+      extraProjectDirs.push(dir);
+    };
+    for (const run of liveRuns) {
+      addDir(run.directory);
+      addDir(readSessionCwdFromSessionFile(run.sessionFile));
+    }
+    const attachedRuns = collectAttachedChildRuns(parent);
+    for (const run of attachedRuns) {
+      addDir(run.directory);
+    }
+    const nestedRuns = listNestedSessionRuns({
+      parent,
+      sessionDir: sessionDirForCwd(parent.directory, home),
+    });
+    for (const run of nestedRuns) {
+      addDir(run.directory);
+      addDir(readSessionCwdFromSessionFile(run.sessionFile));
+    }
+    const fileRuns = [
+      ...listAdapterRunsFromFiles({
+        parent,
+        projectDir: parent.directory,
+        extraProjectDirs,
+      }),
+      ...nestedRuns,
+      ...attachedRuns,
     ];
     return reconcileParentSubagentRuns(fileRuns, liveRuns);
   };
@@ -2572,12 +2776,16 @@ export const createPiHost = ({
       },
     };
     try {
-      if (run.sessionFile) {
+      if (run.sessionFile && fs.existsSync(run.sessionFile)) {
         const record = await attachSessionFromFile(run.sessionFile, {
           sessionID: run.sessionID || undefined,
-          directory: parent.directory,
+          directory: run.directory || parent.directory,
           parentID: parent.id,
-          title: run.title || run.name,
+          title: preferSubagentTitle(
+            readSessionTitleFromSessionFile(run.sessionFile),
+            run.title,
+            run.name,
+          ),
           metadata: extraMetadata,
         });
         record.subagentRun = run;
@@ -2595,8 +2803,16 @@ export const createPiHost = ({
               : { sessionID: record.id },
           });
         }
-        return { ...run, sessionID: record.id };
+        return {
+          ...run,
+          sessionID: record.id,
+          directory: record.directory || run.directory || null,
+          title: preferSubagentTitle(record.info?.title, run.title, run.name),
+        };
       }
+      // A completed adapter can leave a stale sessionFile after its temporary
+      // child workspace has been cleaned up. Fall back to the child id without
+      // repeatedly attempting to hydrate the missing file.
       if (childId) {
         let record = sessions.get(childId);
         if (!record) {
@@ -2608,9 +2824,12 @@ export const createPiHost = ({
         }
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
-        return { ...run, sessionID: record.id };
+        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
     } catch (error) {
+      if (run.sessionFile && !fs.existsSync(run.sessionFile)) {
+        return { ...run, sessionID: childId || run.sessionID || null };
+      }
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
     }
     return run;
@@ -2782,7 +3001,7 @@ export const createPiHost = ({
   const collectSessionInfos = async (directory, query) => {
     const includeArchived = !query || includeArchivedSessions(query.archived);
     const live = Array.from(sessions.values())
-      .filter((record) => !directory || record.directory === directory)
+      .filter((record) => recordMatchesDirectory(record, directory))
       .map((record) => {
         const current = record.info?.metadata?.pichamber?.piGoal;
         if (
@@ -2939,7 +3158,7 @@ export const createPiHost = ({
       return ensureRecord(sessionID, directory);
     },
     listSessions(directory) {
-      const items = Array.from(sessions.values()).filter((record) => !directory || record.directory === directory);
+      const items = Array.from(sessions.values()).filter((record) => recordMatchesDirectory(record, directory));
       for (const record of items) {
         if (maybeApplyConversationTitle(record)) {
           emit(record.directory, {
@@ -4342,25 +4561,86 @@ export const createPiHost = ({
       record.info.time.updated = Date.now();
       return record;
     },
-    getSessionThinking(sessionID) {
-      const record = sessions.get(sessionID);
-      if (!record) {
-        const error = new Error('Session not found');
-        error.status = 404;
-        throw error;
+    async getSessionThinking(sessionID) {
+      const record = await ensureRecord(sessionID);
+      const entries = typeof record.sessionManager?.getEntries === 'function'
+        ? record.sessionManager.getEntries()
+        : [];
+      applySessionRuntimeFromEntries(record.piSession, entries);
+      const snapshot = readSessionThinking(record.piSession);
+      const fromEntries = lastThinkingLevelChangeFromEntries(entries);
+      let available = snapshot.available;
+      try {
+        const runtime = await ensureModelRuntime();
+        const models = runtime && typeof runtime.getAvailable === 'function'
+          ? await runtime.getAvailable()
+          : [];
+        const catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
+        const catalog = await readThinkingLevelsFromModel(catalogModel);
+        if (catalog.length > 0) available = catalog;
+        else available = widenThinkingAvailable(available, catalog);
+      } catch {
       }
-      return readSessionThinking(record.piSession);
+      return {
+        ...snapshot,
+        available,
+        thinking: fromEntries || snapshot.thinking,
+      };
+    },
+    async getSessionModel(sessionID) {
+      const record = await ensureRecord(sessionID);
+      const entries = typeof record.sessionManager?.getEntries === 'function'
+        ? record.sessionManager.getEntries()
+        : [];
+      applySessionRuntimeFromEntries(record.piSession, entries);
+      const usable = resolveUsableFacadeModel(
+        lastModelChangeFromEntries(entries),
+        record.piSession?.currentModel,
+        lastModelChangeFromMessages(record.messages),
+      );
+      if (!usable) {
+        return { model: null, providerID: null, modelID: null };
+      }
+      return {
+        model: `${usable.providerID}/${usable.modelID}`,
+        providerID: usable.providerID,
+        modelID: usable.modelID,
+      };
     },
     async setSessionThinking(sessionID, level) {
       const record = await ensureLiveRecord(await ensureRecord(sessionID));
       if (typeof record.piSession?.setThinkingLevel !== "function") {
         return { applied: false, ...readSessionThinking(record.piSession), thinking: level };
       }
+      const entries = typeof record.sessionManager?.getEntries === 'function'
+        ? record.sessionManager.getEntries()
+        : [];
+      applySessionRuntimeFromEntries(record.piSession, entries);
       const snapshot = readSessionThinking(record.piSession);
+      let available = snapshot.available;
+      let catalogModel = null;
+      if (isNarrowThinkingAvailable(available)) {
+        try {
+          const runtime = await ensureModelRuntime();
+          const models = runtime && typeof runtime.getAvailable === 'function'
+            ? await runtime.getAvailable()
+            : [];
+          catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
+          available = widenThinkingAvailable(available, await readThinkingLevelsFromModel(catalogModel));
+          if (catalogModel && typeof record.piSession.setModel === 'function') {
+            try {
+              const applied = record.piSession.setModel(catalogModel);
+              if (applied && typeof applied.then === 'function') await applied;
+            } catch {
+            }
+          }
+        } catch {
+        }
+      }
       let next = THINKING_LEVELS.includes(level) ? level : null;
-      if (snapshot.available.length > 0) {
-        if (!next || !snapshot.available.includes(next)) {
-          next = snapshot.available.includes("medium") ? "medium" : snapshot.available[0];
+      if (available.length > 0) {
+        if (!next || !available.includes(next)) {
+          next = available.includes("medium") ? "medium" : available[0];
         }
       }
       if (!next) {
@@ -4369,7 +4649,7 @@ export const createPiHost = ({
         throw error;
       }
       record.piSession.setThinkingLevel(next);
-      return { applied: true, thinking: next, available: snapshot.available };
+      return { applied: true, thinking: next, available };
     },
     async setSessionModel(sessionID, modelRef) {
       const record = await ensureLiveRecord(await ensureRecord(sessionID));

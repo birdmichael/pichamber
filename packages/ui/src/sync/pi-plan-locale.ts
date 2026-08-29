@@ -79,12 +79,27 @@ export const isPlanReadyDecisionPrompt = (prompt: {
   });
 };
 
+const PLAN_POLICY_ALLOWLIST_DUMP = /plan policy will allow:/i;
+
+/** First line of a Plan select title. Drops the tool-allowlist dump. */
+export const displayPiPlanSelectTitle = (title: string): string => {
+  const lines = title.split(/\n/);
+  const heading = (lines[0] ?? '').trim();
+  if (!heading) return title.trim();
+  return heading;
+};
+
 export const localizePiPlanSelectTitle = (
   title: string,
   t: (key: I18nKey) => string,
-): string => (
-  isPlanReadyDecisionTitle(title) ? t('chat.piPlan.readySelect.title') : title
-);
+): string => {
+  if (isPlanReadyDecisionTitle(title)) return t('chat.piPlan.readySelect.title');
+  const heading = displayPiPlanSelectTitle(title);
+  if (PLAN_POLICY_ALLOWLIST_DUMP.test(title) || PLAN_POLICY_ALLOWLIST_DUMP.test(heading)) {
+    return heading;
+  }
+  return heading === title.trim() ? title : heading;
+};
 
 export const localizePiPlanSelectOption = (
   option: string,

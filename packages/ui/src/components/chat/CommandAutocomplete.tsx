@@ -12,6 +12,7 @@ import { isVSCodeRuntime } from '@/lib/desktop';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { refreshFeaturePlugins, usePiBtwPluginAvailable, usePiPlanPluginAvailable, usePiSubagentsPluginAvailable } from '@/sync/pi-feature-plugins-store';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
+import { shouldDismissAutocompleteOnOutsidePointer } from './composer/submit/autocompleteOutsideClick';
 import { commandHasPiSlashPrefix, commandMatchesPiSlashQuery, commandMatchesSearch, ensureLiveFeatureSlashCommands, filterPiSlashCommands, mergeCommandAutocompleteItems, resolveCommandAutocompleteKey, resolveCommandAutocompleteKeyboardHintKey, resolveSlashMenuDescription } from './commandAutocompleteItems';
 import {
   DESKTOP_SLASH_DESCRIPTION_CLASS,
@@ -122,11 +123,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
 
   React.useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node | null;
-      if (!target || !containerRef.current) {
-        return;
-      }
-      if (containerRef.current.contains(target)) {
+      if (!shouldDismissAutocompleteOnOutsidePointer(event.target, containerRef.current)) {
         return;
       }
       onClose();

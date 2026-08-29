@@ -131,8 +131,6 @@ describe('settings search', () => {
       'agents.create',
       'agents.name',
       'agents.mode',
-      'agents.model',
-      'agents.variant',
       'agents.temperature',
       'agents.top-p',
       'agents.system-prompt',
@@ -164,7 +162,6 @@ describe('settings search', () => {
 
       expect(openCodeResults.some((result) => result.id === id)).toBe(true);
       expect(piResults.some((result) => leftoverAgentIds.includes(result.id as typeof leftoverAgentIds[number]))).toBe(false);
-      expect(piResults.some((result) => result.page === 'agents')).toBe(false);
     }
   });
 
@@ -183,7 +180,8 @@ describe('settings search', () => {
       getPageTitle,
     });
 
-    expect(piResults.some((result) => result.page === 'agents')).toBe(false);
+    expect(piResults.some((result) => result.page === 'agents')).toBe(true);
+    expect(piResults.some((result) => result.id === 'agents.model')).toBe(true);
     expect(piResults.some((result) => result.id === 'feature-plugins.plan')).toBe(true);
     expect(piResults.some((result) => result.id === 'feature-plugins.subagents')).toBe(true);
     expect(piResults.some((result) => result.id === 'sessions.default-model')).toBe(true);

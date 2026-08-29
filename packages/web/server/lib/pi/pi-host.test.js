@@ -2214,7 +2214,7 @@ describe('session thinking levels', () => {
     record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
     record.piSession.thinkingLevel = 'medium';
 
-    expect(host.getSessionThinking(record.id)).toEqual({
+    expect(await host.getSessionThinking(record.id)).toEqual({
       thinking: 'medium',
       available: ['low', 'medium', 'high'],
     });
@@ -2226,6 +2226,56 @@ describe('session thinking levels', () => {
       available: ['low', 'medium', 'high'],
     });
     expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+
+  it('widens child thinking levels from the jsonl model catalog when live only lists off', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'gpt-5.6-terra',
+          provider: 'bmlab',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Child think' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'bmlab', modelId: 'gpt-5.6-terra' });
+    record.sessionManager.appendEntry({ type: 'thinking_level_change', thinkingLevel: 'off' });
+    record.piSession.getAvailableThinkingLevels = () => ['off'];
+
+    expect(await host.getSessionThinking(record.id)).toEqual({
+      thinking: 'off',
+      available: ['low', 'medium', 'high', 'xhigh', 'max'],
+    });
+
+    const applied = await host.setSessionThinking(record.id, 'high');
+    expect(applied).toEqual({
+      applied: true,
+      thinking: 'high',
+      available: ['low', 'medium', 'high', 'xhigh', 'max'],
+    });
+    host.dispose();
+  });
+
+  it('reads model and thinking from jsonl entries when currentModel is missing', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Child runtime' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'cc', modelId: 'claude-opus-5' });
+    record.sessionManager.appendEntry({ type: 'thinking_level_change', thinkingLevel: 'high' });
+    record.piSession.currentModel = null;
+    record.piSession.thinkingLevel = undefined;
+
+    expect(await host.getSessionModel(record.id)).toEqual({
+      model: 'cc/claude-opus-5',
+      providerID: 'cc',
+      modelID: 'claude-opus-5',
+    });
+    expect(await host.getSessionThinking(record.id)).toMatchObject({ thinking: 'high' });
     host.dispose();
   });
 });

@@ -113,8 +113,7 @@ export const SETTINGS_PAGE_METADATA: readonly SettingsPageMeta[] = [
     title: 'Agents',
     group: 'opencode',
     kind: 'split',
-    keywords: ['agent', 'agents', 'prompts', 'tools', 'permissions'],
-    isAvailable: (ctx) => !ctx.isPiKernel,
+    keywords: ['agent', 'agents', 'prompts', 'tools', 'permissions', 'model', 'variant'],
   },
   {
     slug: 'behavior',

@@ -79,9 +79,12 @@ import {
     usePendingComposerTurn,
 } from '@/sync/pending-composer-turn';
 import { WorkStatusPanel } from './work-status/WorkStatusPanel';
+import { PARENT_CHAT_MIN_WIDTH } from '@/lib/surfaces/chatColumnLayout';
 import { useWorkStatusVisibility } from './work-status/useWorkStatusVisibility';
 import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/contextPanelEmbeddedChat';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
+import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { hasPendingUserTranscriptPaint, isHiddenUserMessage } from './message/hiddenUserMessage';
 import { normalizeUserDisplayParts } from './message/normalizeUserDisplayParts';
 import { findShellCommandForMessage, isUserShellMarkerMessage } from './lib/shellBridge';
@@ -833,11 +836,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const chatSurfaceMode = useChatSurfaceMode();
     const draftOpen = Boolean(newSessionDraft?.open);
     const pendingComposerTurn = usePendingComposerTurn();
+    const featurePluginsPayload = usePiFeaturePluginsStore((state) => state.payload);
+    const featurePluginsStatus = usePiFeaturePluginsStore((state) => state.status);
     const pendingComposerVisible = Boolean(
         pendingComposerTurn && (
             (draftOpen && pendingComposerTurn.key === pendingComposerDraftKey(newSessionDraft.draftId))
             || (currentSessionId && pendingComposerTurn.key === pendingComposerSessionKey(currentSessionId))
             || (Boolean(currentSessionId) && pendingComposerTurn.key.startsWith('draft:'))
+        ) && !isLeftoverPlanSlashText(
+            pendingComposerTurn.text,
+            featurePluginsPayload,
+            featurePluginsStatus,
         ),
     );
     React.useEffect(() => {
@@ -864,9 +873,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const isDesktopExpandedInput = isExpandedInput;
     const useCompactDraftLayout = isMobile || isVSCode || chatSurfaceMode === 'mini-chat';
     // Work-status panel: a borderless column to the right of the transcript.
-    // It yields to the context panel and to a narrow chat; `rowRef` goes on the
-    // row that holds both columns, so its width never depends on the panel's
-    // own visibility.
+    // It stays open beside a child tab; the context panel / card shrink so the
+    // parent column can keep PARENT_CHAT_MIN_WIDTH. `rowRef` goes on the row
+    // that holds both columns, so its width never depends on the panel's own
+    // visibility.
     const { rowRef: workStatusRowRef, visible: workStatusVisible, fits: workStatusFits } = useWorkStatusVisibility({
         isMobile,
         isVSCode,
@@ -1276,7 +1286,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 			// the fullscreen composer's position:fixed visual-viewport pinning in
 			// mobile browsers (see ChatInput's composerFormRef effect).
 			<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
-				<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col bg-background">
+				<div data-composer-bound data-parent-chat-column="true" className="relative flex min-w-0 flex-1 flex-col bg-background" style={{ minWidth: PARENT_CHAT_MIN_WIDTH }}>
 					{pendingComposerVisible ? (
 						<div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-6">
 							<div className="flex justify-end">
@@ -1408,7 +1418,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 			// No transform here — same fixed-positioning constraint as the draft
 			// branch above.
 			<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
-				<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col bg-background">
+				<div data-composer-bound data-parent-chat-column="true" className="relative flex min-w-0 flex-1 flex-col bg-background" style={{ minWidth: PARENT_CHAT_MIN_WIDTH }}>
 					{returnToParentButton}
 					{useCompactDraftLayout && !isDesktopExpandedInput ? (
 						<DraftWelcome sessionDirectory={effectiveSessionDirectory} />
@@ -1456,8 +1466,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
 	return (
 		<div ref={workStatusRowRef} className="flex h-full min-h-0 bg-background">
-		<div data-composer-bound className="relative flex min-w-0 flex-1 flex-col h-full bg-background">
+		<div data-composer-bound data-parent-chat-column="true" className="relative flex min-w-0 flex-1 flex-col h-full bg-background" style={{ minWidth: PARENT_CHAT_MIN_WIDTH }}>
 			{returnToParentButton}
+			{returnToParentButton ? <div className="h-11 shrink-0" aria-hidden /> : null}
 			<ChatViewport
 				currentSessionId={currentSessionId}
                 currentSessionKey={currentSessionKey ?? currentSessionId}

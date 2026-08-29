@@ -1,5 +1,6 @@
 import type { IconName } from "@/components/icon/icons";
 import type { I18nKey } from "@/lib/i18n";
+import { isFeaturePluginSlashName, isPlanSlashCommandText } from "@/lib/featurePlugins/slotStatus";
 
 // A draft starter is a reference to an existing command or skill, pinned to the
 // onboarding/draft welcome screen as a one-click chip. Scope (global vs project)
@@ -123,3 +124,30 @@ export const sanitizeStarterRefs = (value: unknown): DraftStarterRef[] => {
     }
     return out;
 };
+
+/** Live `/plan` `/run` `/goal` already have composer chrome. Do not pin them as send-on-click starters. */
+export const shouldOfferLiveCommandAsStarter = (name: string): boolean => {
+    if (getBuiltInStarter(name)) return false;
+    return !isFeaturePluginSlashName(name);
+};
+
+/**
+ * A pinned `/plan` chip on a new-session draft must match the footer Plan chip:
+ * switch mode, do not mint a session until send.
+ */
+export const resolveDraftPlanStarterClick = (input: {
+    submitText: string;
+    draftOpen: boolean;
+    composerText: string;
+}): { kind: 'draft-plan'; sendText: string | null } | { kind: 'submit' } => {
+    if (!input.draftOpen || !isPlanSlashCommandText(input.submitText)) {
+        return { kind: 'submit' };
+    }
+    const trimmed = input.composerText.trim();
+    if (isPlanSlashCommandText(trimmed)) {
+        const rest = trimmed.replace(/^\/\s*plan\b/i, '').trim();
+        return { kind: 'draft-plan', sendText: rest || null };
+    }
+    return { kind: 'draft-plan', sendText: trimmed || null };
+};
+

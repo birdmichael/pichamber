@@ -17,7 +17,7 @@ import type { Session, Part, Message, TextPart } from "@opencode-ai/sdk/v2/clien
 import type { AttachedFile, SessionContextUsage, SessionWorktreeAttachment } from "@/stores/types/sessionTypes"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient } from "@/lib/opencode/client"
-import { isFeaturePluginSlotActive } from "@/lib/featurePlugins/slotStatus"
+import { shouldDispatchFeaturePluginSlash } from "@/lib/featurePlugins/slotStatus"
 import { runtimeFetch } from "@/lib/runtime-fetch"
 import { useConfigStore } from "@/stores/useConfigStore"
 import { useProjectsStore } from "@/stores/useProjectsStore"
@@ -87,7 +87,7 @@ import { getAttachedSessionDirectory } from "./session-worktree-contract"
 import { setSessionOpener } from "./session-navigation"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isVSCodeRuntime } from "@/lib/desktop"
-import { clearChatDraft, createChatDraftIdentity } from "@/lib/chatDraftPersistence"
+import { clearChatDraft, createChatDraftIdentity, isStrayNewSessionSlashDraft, readChatDraft } from "@/lib/chatDraftPersistence"
 import { warmDirectoryRuntime } from "@/lib/directoryRuntimeWarm"
 import {
   clearPendingComposerTurn,
@@ -176,10 +176,13 @@ export function routeMessage(params: {
     }).then(() => undefined)
   }
 
-  // Slash commands — fire and forget, SSE delivers messages and status
-  if (params.content.startsWith("/")) {
-    const [head, ...tail] = params.content.split(" ")
-    const cmdName = head.slice(1)
+  // Slash commands — fire and forget, SSE delivers messages and status.
+  // Match ChatInput parseSlashCommand: trim, first whitespace-separated token,
+  // lowercase. A pasted `/plan\n` must not become cmdName `plan\n` (chat).
+  const trimmedSlashContent = params.content.trim()
+  if (trimmedSlashContent.startsWith("/")) {
+    const [head, ...tail] = trimmedSlashContent.split(/\s+/)
+    const cmdName = head.slice(1).toLowerCase()
 
     const dirState = getDirectoryState(requestDirectory)
     const syncCommands = dirState?.command ?? []
@@ -193,15 +196,16 @@ export function routeMessage(params: {
     // AgentSession.prompt expands `/skill:name` to the skill body.
     // Unknown `/name` also falls through to sendMessage (product: may be chat).
     // Feature-plugin slashes are registered on GET /api/command before a
-    // session exists. When that slot is on, route them through session.command
-    // even if the directory/store lists have not caught up yet — /run must not
-    // become a dead chat bubble (#109). When the slot is off, typed /run,
-    // /plan, and /goal fall through as chat, same as an unknown /name.
-    const featurePlugins = usePiFeaturePluginsStore.getState().payload
-    const isFeaturePluginSlash =
-      (cmdName === 'run' && isFeaturePluginSlotActive(featurePlugins, 'subagents'))
-      || (cmdName === 'plan' && isFeaturePluginSlotActive(featurePlugins, 'plan'))
-      || (cmdName === 'goal' && isFeaturePluginSlotActive(featurePlugins, 'goal'))
+    // session exists. Route /plan /run /goal through session.command when the
+    // slot is on, and also while the payload has not loaded — a new-session
+    // first send must not become a leftover `/plan` bubble. When the slot is
+    // loaded and off, typed /plan /run /goal fall through as chat.
+    const featurePluginsState = usePiFeaturePluginsStore.getState()
+    const isFeaturePluginSlash = shouldDispatchFeaturePluginSlash(
+      cmdName,
+      featurePluginsState.payload,
+      featurePluginsState.status,
+    )
     // `/btw` is a Feature Plugin command. When the slot is on, ChatInput
     // intercepts it for the fork panel. Never POST session.command — unknown
     // names stay chat, and a missed intercept must not hit the plugin TUI.
@@ -1045,14 +1049,16 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
     const resetComposer = !options?.automatic && !options?.initialPrompt
-    // Drop a leftover new-session `/` (or other typed text) before ChatInput
-    // restores that identity. Automatic boot and initialPrompt keep the draft.
+    // Drop only a leftover new-session `/`. A real untitled draft must survive
+    // leaving this composer and clicking New session again.
     if (resetComposer) {
       const draftDirectory = target === "chat"
         ? normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
         : directory
       const identity = createChatDraftIdentity(getRuntimeKey(), draftDirectory, null)
-      if (identity) clearChatDraft(identity, true)
+      if (identity && isStrayNewSessionSlashDraft(readChatDraft(identity).text)) {
+        clearChatDraft(identity, true)
+      }
     }
     const nextDraft: NewSessionDraftState = {
       draftId: nextDraftId++,

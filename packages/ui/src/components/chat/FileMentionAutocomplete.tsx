@@ -16,6 +16,7 @@ import { getComposerMentionableAgents } from '@/lib/messages/agentMentions';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useUIStore } from '@/stores/useUIStore';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
+import { shouldDismissAutocompleteOnOutsidePointer } from './composer/submit/autocompleteOutsideClick';
 
 type FileInfo = ProjectFileSearchHit;
 type AgentInfo = {
@@ -132,11 +133,7 @@ export const FileMentionAutocomplete = React.forwardRef<FileMentionHandle, FileM
 
   React.useEffect(() => {
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node | null;
-      if (!target || !containerRef.current) {
-        return;
-      }
-      if (containerRef.current.contains(target)) {
+      if (!shouldDismissAutocompleteOnOutsidePointer(event.target, containerRef.current)) {
         return;
       }
       onClose();
