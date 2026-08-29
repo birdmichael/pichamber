@@ -238,13 +238,20 @@ export const createPushRuntime = (deps) => {
       }
     }
 
+    if (subscriptionsByEndpoint.size === 0) {
+      console.info('[Push] web-push fanout skipped: no subscriptions');
+    }
+
     await Promise.all(Array.from(subscriptionsByEndpoint.values()).map(async (sub) => {
       if (requireNoSse) {
         // Mobile PWA subscriptions follow the same presence model as native push: suppress only
         // when an interactive (desktop/web) client is visible. The phone PWA's own foreground is
         // handled in the service worker (focused-client check), so it won't double-notify.
         // Non-mobile (desktop/web) subscriptions keep the existing any-visible gate.
-        const suppressed = isMobilePlatform(sub.platform) ? isAnyInteractiveClientVisible() : isAnyUiVisible();
+        const bypassInteractiveGate = options.bypassInteractiveGate === true;
+        const suppressed = isMobilePlatform(sub.platform)
+          ? (!bypassInteractiveGate && isAnyInteractiveClientVisible())
+          : isAnyUiVisible();
         if (suppressed) return;
       }
       await sendPushToSubscription(sub, payload);

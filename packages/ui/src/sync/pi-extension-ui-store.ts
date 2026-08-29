@@ -66,6 +66,7 @@ type PiExtensionUiState = {
   promptsBySession: Record<string, PiExtensionUiPrompt[]>;
   notifies: PiExtensionUiNotifyItem[];
   editorStash: EditorStash | null;
+  focusPromptId: string | null;
 };
 
 let notifySeq = 0;
@@ -119,11 +120,42 @@ export const usePiExtensionUiStore = create<PiExtensionUiState>(() => ({
   promptsBySession: {},
   notifies: [],
   editorStash: null,
+  focusPromptId: null,
 }));
+
+let focusClearTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const resetPiExtensionUiStore = (): void => {
   recentNotifyAt.clear();
-  usePiExtensionUiStore.setState({ promptsBySession: {}, notifies: [], editorStash: null });
+  if (focusClearTimer) {
+    clearTimeout(focusClearTimer);
+    focusClearTimer = null;
+  }
+  usePiExtensionUiStore.setState({
+    promptsBySession: {},
+    notifies: [],
+    editorStash: null,
+    focusPromptId: null,
+  });
+};
+
+export const requestPiExtensionUiFocus = (promptId: string): void => {
+  if (!promptId) return;
+  if (focusClearTimer) {
+    clearTimeout(focusClearTimer);
+    focusClearTimer = null;
+  }
+  usePiExtensionUiStore.setState({ focusPromptId: promptId });
+  focusClearTimer = setTimeout(() => {
+    focusClearTimer = null;
+    clearPiExtensionUiFocus(promptId);
+  }, 2000);
+};
+
+export const clearPiExtensionUiFocus = (promptId?: string): void => {
+  const current = usePiExtensionUiStore.getState().focusPromptId;
+  if (promptId && current !== promptId) return;
+  usePiExtensionUiStore.setState({ focusPromptId: null });
 };
 
 export const applyPiExtensionUiPrompt = (value: unknown): PiExtensionUiPrompt | null => {
@@ -215,21 +247,41 @@ export const usePiExtensionUiPrompts = (sessionID: string | null | undefined): P
   usePiExtensionUiStore((state) => (sessionID ? state.promptsBySession[sessionID] ?? empty : empty))
 );
 
+export const countPendingPiExtensionUiPrompts = (
+  promptsBySession: Record<string, PiExtensionUiPrompt[] | undefined>,
+  sessionIds: readonly string[],
+): number => {
+  let count = 0;
+  for (const sessionID of sessionIds) {
+    for (const prompt of promptsBySession[sessionID] ?? empty) {
+      if (prompt.status === 'pending' && isBlockingPiExtensionUiKind(prompt.kind)) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+};
+
 export const useHasPendingPiExtensionUiPrompt = (sessionID: string | null | undefined): boolean => (
   usePiExtensionUiStore((state) => {
     if (!sessionID) return false;
-    return (state.promptsBySession[sessionID] ?? empty).some((prompt) => (
-      prompt.status === 'pending' && isBlockingPiExtensionUiKind(prompt.kind)
-    ));
+    return countPendingPiExtensionUiPrompts(state.promptsBySession, [sessionID]) > 0;
   })
 );
 
-/** Bottom-dock cards: pending select/input/editor that are not bound to a question-tool turn. */
+export const usePendingPiExtensionUiPromptCount = (sessionIds: readonly string[]): number => (
+  usePiExtensionUiStore((state) => countPendingPiExtensionUiPrompts(state.promptsBySession, sessionIds))
+);
+
+/** Bottom-dock cards: the current pending select/input/editor (one live ask). */
 export const selectTranscriptPiExtensionUiPrompts = (
   prompts: PiExtensionUiPrompt[],
-): PiExtensionUiPrompt[] => prompts.filter((prompt) => (
-  prompt.kind !== 'confirm' && prompt.status === 'pending'
-));
+): PiExtensionUiPrompt[] => {
+  const pending = prompts.filter((prompt) => (
+    prompt.kind !== 'confirm' && prompt.status === 'pending'
+  ));
+  return pending.length > 0 ? [pending[pending.length - 1]!] : [];
+};
 
 export const selectPendingConfirmPrompt = (
   prompts: PiExtensionUiPrompt[],

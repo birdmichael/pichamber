@@ -24,9 +24,28 @@ const sessionIdle = (sessionId) => ({
   properties: { sessionID: sessionId },
 });
 
+const piUiAsked = (sessionId, prompt = {}) => ({
+  type: 'pi.ui.asked',
+  properties: {
+    sessionID: sessionId,
+    directory: '/tmp/demo',
+    prompt: {
+      id: 'pui_1',
+      sessionID: sessionId,
+      kind: 'select',
+      title: 'Pick a path',
+      message: 'Secret option text',
+      options: ['Keep going', 'Stop'],
+      status: 'pending',
+      ...prompt,
+    },
+  },
+});
+
 const createRuntime = ({
   settings = {},
   sessionById = {},
+  isAnyInteractiveClientVisible = () => false,
 } = {}) => {
   const emitDesktopNotification = vi.fn(() => true);
   const broadcastUiNotification = vi.fn();
@@ -74,7 +93,7 @@ const createRuntime = ({
     broadcastUiNotification,
     sendPushToAllUiSessions,
     sendApnsToAllUiSessions,
-    isAnyInteractiveClientVisible: () => false,
+    isAnyInteractiveClientVisible,
     buildOpenCodeUrl: (path) => path,
     getOpenCodeAuthHeaders: () => ({}),
   });
@@ -84,6 +103,7 @@ const createRuntime = ({
     emitDesktopNotification,
     broadcastUiNotification,
     sendPushToAllUiSessions,
+    sendApnsToAllUiSessions,
   };
 };
 
@@ -218,6 +238,155 @@ describe('notification trigger ready fanout', () => {
     expect(emitDesktopNotification).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'error',
       sessionId: 'ses_1',
+    }));
+  });
+});
+
+describe('pi.ui question push',
+() => {
+  it('fans out APNs on pi.ui.asked even when an interactive client is visible',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions, emitDesktopNotification } = createRuntime({
+      isAnyInteractiveClientVisible: () => true,
+    });
+
+    await runtime.maybeSendPushForTrigger(piUiAsked('ses_1'));
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).toHaveBeenCalledTimes(1);
+    const apnsPayload = sendApnsToAllUiSessions.mock.calls[0][0];
+    expect(apnsPayload).toEqual(expect.objectContaining({
+      title: 'Agent needs your input',
+      body: 'Demo session',
+      tag: 'question-pui_1',
+      data: {
+        sessionId: 'ses_1',
+        url: '/?session=ses_1',
+        deeplink: 'pichamber://session/ses_1?prompt=pui_1&kind=select',
+        promptId: 'pui_1',
+        kind: 'select',
+      },
+    }));
+    expect(apnsPayload.category).toBeUndefined();
+    expect(JSON.stringify(apnsPayload)).not.toContain('Pick a path');
+    expect(JSON.stringify(apnsPayload)).not.toContain('Secret option text');
+    expect(JSON.stringify(apnsPayload)).not.toContain('Keep going');
+    expect(emitDesktopNotification).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'question',
+      title: 'Input needed',
+      body: 'Demo session',
+      sessionId: 'ses_1',
+      tag: 'question-pui_1',
+    }));
+    expect(JSON.stringify(emitDesktopNotification.mock.calls[0][0])).not.toContain('Secret option text');
+    expect(JSON.stringify(emitDesktopNotification.mock.calls[0][0])).not.toContain('Pick a path');
+  });
+
+  it('does not send ready APNs while an interactive client is visible',
+  async () => {
+    const { runtime, sendApnsToAllUiSessions } = createRuntime({
+      isAnyInteractiveClientVisible: () => true,
+    });
+
+    await runtime.maybeSendPushForTrigger(sessionIdle('ses_1'));
+
+    expect(sendApnsToAllUiSessions).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending pi.ui.asked push when the prompt settles',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions } = createRuntime();
+
+    await runtime.maybeSendPushForTrigger(piUiAsked('ses_1'));
+    await runtime.maybeSendPushForTrigger({
+      type: 'pi.ui.settled',
+      properties: {
+        sessionID: 'ses_1',
+        prompt: { id: 'pui_1', status: 'replied' },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).not.toHaveBeenCalled();
+  });
+
+  it('does not push for pi.ui.notify',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions, emitDesktopNotification } = createRuntime();
+
+    await runtime.maybeSendPushForTrigger({
+      type: 'pi.ui.notify',
+      properties: { sessionID: 'ses_1', message: 'Plan started', level: 'info' },
+    });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).not.toHaveBeenCalled();
+    expect(emitDesktopNotification).not.toHaveBeenCalled();
+  });
+
+  it('honours notifyOnQuestion=false for pi.ui.asked',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions } = createRuntime({
+      settings: { notifyOnQuestion: false },
+    });
+
+    await runtime.maybeSendPushForTrigger(piUiAsked('ses_1'));
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).not.toHaveBeenCalled();
+  });
+
+  it('unwraps a nested bus payload and still fans out while Desktop is visible',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions } = createRuntime({
+      isAnyInteractiveClientVisible: () => true,
+    });
+
+    await runtime.maybeSendPushForTrigger({ payload: piUiAsked('ses_1') });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).toHaveBeenCalledTimes(1);
+    expect(sendApnsToAllUiSessions.mock.calls[0][0]).toEqual(expect.objectContaining({
+      title: 'Agent needs your input',
+      tag: 'question-pui_1',
+    }));
+  });
+
+  it('does not cancel another pending prompt when one settles on the same session',
+  async () => {
+    vi.useFakeTimers();
+    const { runtime, sendApnsToAllUiSessions } = createRuntime();
+
+    await runtime.maybeSendPushForTrigger(piUiAsked('ses_1', { id: 'pui_1' }));
+    await runtime.maybeSendPushForTrigger(piUiAsked('ses_1', {
+      id: 'pui_2',
+      kind: 'confirm',
+      title: 'Overwrite?',
+    }));
+    await runtime.maybeSendPushForTrigger({
+      type: 'pi.ui.settled',
+      properties: {
+        sessionID: 'ses_1',
+        prompt: { id: 'pui_1', status: 'replied' },
+      },
+    });
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(sendApnsToAllUiSessions).toHaveBeenCalledTimes(1);
+    expect(sendApnsToAllUiSessions.mock.calls[0][0]).toEqual(expect.objectContaining({
+      tag: 'question-pui_2',
+      category: 'pi.ui.confirm',
+      data: expect.objectContaining({
+        promptId: 'pui_2',
+        kind: 'confirm',
+        url: '/?session=ses_1',
+        deeplink: 'pichamber://session/ses_1?prompt=pui_2&kind=confirm',
+      }),
     }));
   });
 });

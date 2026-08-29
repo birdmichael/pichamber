@@ -261,4 +261,73 @@ describe('session runtime', () => {
     expect(runtime.interruptBusySessionsAfterRestart()).toEqual({ sessionIds: [] });
     expect(events).toEqual([]);
   });
+
+  it('marks attention for a waiting pi.ui.asked while the session stays busy', () => {
+    const events = [];
+    const runtime = createSessionRuntime({
+      writeSseEvent() {
+        throw new Error('SSE fallback should not be used when broadcastEvent is provided');
+      },
+      getNotificationClients: () => new Set(),
+      broadcastEvent: (payload) => {
+        events.push(payload);
+      },
+    });
+    runtimes.push(runtime);
+
+    runtime.processOpenCodeSsePayload({
+      type: 'session.status',
+      properties: {
+        sessionID: 'session-ask',
+        status: { type: 'busy' },
+      },
+    });
+    runtime.processOpenCodeSsePayload({
+      type: 'pi.ui.asked',
+      properties: {
+        sessionID: 'session-ask',
+        prompt: { id: 'pui_1', kind: 'select', status: 'pending' },
+      },
+    });
+
+    expect(runtime.getSessionAttentionState('session-ask')).toEqual(expect.objectContaining({
+      needsAttention: true,
+      isViewed: false,
+      status: 'busy',
+    }));
+    expect(events).toContainEqual({
+      type: 'openchamber:session-status',
+      properties: expect.objectContaining({
+        sessionID: 'session-ask',
+        status: 'busy',
+        needsAttention: true,
+      }),
+    });
+  });
+
+  it('does not mark attention for a waiting prompt the current client is viewing', () => {
+    const runtime = createSessionRuntime({
+      writeSseEvent() {},
+      getNotificationClients: () => new Set(),
+      broadcastEvent() {},
+    });
+    runtimes.push(runtime);
+
+    runtime.markSessionViewed('session-viewed', 'client-1');
+    runtime.processOpenCodeSsePayload({
+      type: 'question.asked',
+      properties: { sessionID: 'session-viewed' },
+    });
+
+    expect(runtime.getSessionAttentionState('session-viewed')).toEqual(expect.objectContaining({
+      needsAttention: false,
+      isViewed: true,
+    }));
+
+    runtime.markSessionUnviewed('session-viewed', 'client-1');
+    expect(runtime.getSessionAttentionState('session-viewed')).toEqual(expect.objectContaining({
+      needsAttention: true,
+      isViewed: false,
+    }));
+  });
 });

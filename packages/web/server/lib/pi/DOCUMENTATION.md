@@ -368,7 +368,7 @@ unbound sessions stay `ui_unavailable`.
 | `custom` | No TUI factory. Installed Pi `question` is remapped onto `select` + `editor` (see Question tool). Other `custom()` callers get an in-chat editor, not silent `undefined` |
 | TUI-only (widgets, terminal input) | No-op (`createNoopUiExtras`) |
 
-The Node-kernel child cannot receive `uiContext` over IPC (`bindExtensions` sends `{ mode: "rpc" }` only). `wrapSession` always installs a local stub: the same IPC proxies for `select` / `confirm` / `input` / `editor` / `notify`, plus `createNoopUiExtras()` for TUI helpers (`setToolsExpanded`, `getToolsExpanded`, `setWidget`, `setStatus`, …). `hasUI` is true because those methods exist; missing noops abort `pi-subagents` before the child gets a turn. Do not invent new parentRequest channels for TUI widgets.
+The Node-kernel child cannot receive `uiContext` over IPC (`bindExtensions` sends `{ mode: "rpc" }` only). `wrapSession` always installs a local stub: the same IPC proxies for `select` / `confirm` / `input` / `editor` / `notify`, plus `createNoopUiExtras()` for TUI helpers (`setToolsExpanded`, `getToolsExpanded`, `setWidget`, `setStatus`, …). `hasUI` is true because those methods exist; missing noops abort `pi-subagents` before the child gets a turn. Do not invent new parentRequest channels for TUI widgets. Node-child IPC carries the Pi SDK string second argument for `input` (placeholder) and `editor` (prefill, including `""`) as its own field, separate from abort/timeout `opts`. `serializeUiOpts` still serializes AbortSignal as `{ aborted }` only; a string must not go through it.
 
 Answers resolve the waiting promise on that session. Cancel settles **that prompt only** (`undefined` / `false`). It does not abort the Desktop window or the Pi session. Composer **Stop** calls `host.abort()`, which cancels every waiting `ctx.ui` prompt on that session **and** force-publishes `session.idle` even when Pi `abort()` is a no-op (the turn already finished or never emitted `agent_settled`).
 
@@ -376,7 +376,7 @@ Answers resolve the waiting promise on that session. Cancel settles **that promp
 
 Pichamber-owned. Do not use OpenCode `/api/question` or `sdk.question.reply`.
 
-- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`
+- Events: `pi.ui.asked`, `pi.ui.settled`, `pi.ui.notify`. `asked` fans out a content-free native question push (`question-<promptId>`); `settled` cancels a pending debounce; `notify` does not push.
 - `GET /api/pi/ui?session=` — pending prompts. Opening a session hydrates this list into the transcript; fetch failure must not clear local cards. A session with no messages still shows a pending select card (do not replace it with the empty-chat welcome).
 - `pi.ui.notify` is the user-visible confirmation for `/plan start` (and for a launch-menu Start). It is a short auto-dismiss toast, not a question card or OK confirm. The settled card title may still say "Status: Off". Routine Hermes `Session backfill complete` does not publish; failed backfill still does.
 - `POST /api/pi/ui/:id/reply` `{ sessionID, value }`
@@ -408,7 +408,7 @@ While a prompt is pending, the usable card belongs on the asking `question` / `p
 | Invocation | Host result |
 |---|---|
 | `/plan start` | Enter Plan + `ctx.ui.notify`. `GET /api/pi/ui` stays `[]`. Not a question-card probe. |
-| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. |
+| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. `ask()` only subscribes abort when `addEventListener` is a function (Node-child IPC can pass `{ aborted }` without EventTarget). A new ask cancels earlier pending cards so a late `/plan` does not stack on a confirm. |
 | `/plan tools` | Tools `ctx.ui.select`. |
 
 Desktop chrome uses `/plan start` for the Agent \| Plan footer on an already-open

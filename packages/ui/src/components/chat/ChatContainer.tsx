@@ -16,7 +16,7 @@ import { PermissionCard } from './PermissionCard';
 import { QuestionCard } from './QuestionCard';
 import { PiExtensionPromptCard } from './PiExtensionPromptCard';
 import { PiExtensionConfirmDialog } from './PiExtensionConfirmDialog';
-import { boundQuestionPromptIds } from '@/components/chat/message/parts/questionToolItems';
+import { boundQuestionPromptIds, messagesWithLiveQuestionParts } from '@/components/chat/message/parts/questionToolItems';
 import { hasActiveQuestionToolInCurrentTurn, recoverPendingQuestionWithRetry } from '@/sync/question-recovery';
 import { listPiExtensionUiPrompts } from '@/sync/pi-extension-ui';
 import {
@@ -27,6 +27,7 @@ import {
     usePiExtensionUiPrompts,
 } from '@/sync/pi-extension-ui-store';
 import { sessionTranscriptHasChrome } from './sessionTranscriptChrome';
+import { composerInstanceKey } from './composer/state/composerInstanceKey';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { StatusRowContainer } from './StatusRowContainer';
 import { SessionRecapNote } from '@/components/chat/SessionRecapSpacer';
@@ -62,6 +63,7 @@ import {
     useScopedBlockingQuestions,
     useParentSession,
     useSession,
+    useDirectorySync,
 } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { usePlanDetection } from '@/hooks/usePlanDetection';
@@ -248,11 +250,18 @@ const ChatViewport = React.memo(({
 }: ChatViewportProps) => {
     const { t } = useI18n();
     const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
+    const livePartsByMessageId = useDirectorySync(
+        React.useCallback((state) => state.part, []),
+        directory,
+    );
     const transcriptPiPrompts = React.useMemo(() => {
-        const boundIds = boundQuestionPromptIds(piExtensionPrompts, renderedMessages);
+        const boundIds = boundQuestionPromptIds(
+            piExtensionPrompts,
+            messagesWithLiveQuestionParts(renderedMessages, livePartsByMessageId),
+        );
         return selectTranscriptPiExtensionUiPrompts(piExtensionPrompts)
             .filter((prompt) => !boundIds.has(prompt.id));
-    }, [piExtensionPrompts, renderedMessages]);
+    }, [livePartsByMessageId, piExtensionPrompts, renderedMessages]);
     const pendingPiConfirm = React.useMemo(
         () => selectPendingConfirmPrompt(piExtensionPrompts),
         [piExtensionPrompts],
@@ -618,6 +627,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
     const setCurrentSession = useSessionUIStore((s) => s.setCurrentSession);
     const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
+    const composerMountKey = composerInstanceKey({
+        sessionId: currentSessionId,
+        draftId: newSessionDraft?.open ? newSessionDraft.draftId : null,
+    });
 
     // Sync actions
     const sync = useSync();
@@ -1293,7 +1306,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 									: 'flex-1 items-center justify-center bg-background px-0 pb-[6vh]'
 						)}
 					>
-                          {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                          {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 					</div>
 					{workStatusOverlayMountable ? (
 						<WorkStatusPanel
@@ -1339,7 +1352,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 						</div>
 					</div>
 					<div className="relative z-10 bg-background">
-						{promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+						{promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 					</div>
 				</div>
 			);
@@ -1393,7 +1406,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 							: 'bg-background'
 					)}
 				>
-                    {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                    {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 				</div>
             </div>
         );
@@ -1422,6 +1435,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 					>
 						{promptReadOnly ? <ReadOnlyPromptBanner /> : (
 							<ChatInput
+								key={composerMountKey}
 								active={active}
 								scrollToBottom={scrollToBottomOnSend}
 								emptySessionWelcome
@@ -1503,7 +1517,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         onClick={navigation.resumeToLatest}
                     />
                 )}
-                {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
             </div>
 
             {/* Inside the chat column, not beside it: as a row sibling it took

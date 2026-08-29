@@ -27,6 +27,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionPermissions, useSessionQuestionCount } from '@/sync/sync-context';
+import { usePendingPiExtensionUiPromptCount } from '@/sync/pi-extension-ui-store';
 import { useSync } from '@/sync/use-sync';
 import { useViewportStore, viewportSessionKey } from '@/sync/viewport-store';
 import { DraggableSessionRow } from './sessionFolderDnd';
@@ -504,10 +505,16 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
     () => selectQuestionBadgeSessionScopes(node, isExpanded, sessionDirectory),
     [isExpanded, node, sessionDirectory],
   );
-  const pendingQuestionCount = useSessionQuestionCount(questionBadgeSessionScopes);
+  const pendingOpenCodeQuestionCount = useSessionQuestionCount(questionBadgeSessionScopes);
+  const pendingPiSessionIds = React.useMemo(
+    () => questionBadgeSessionScopes.flatMap((scope) => [...scope.sessionIDs]),
+    [questionBadgeSessionScopes],
+  );
+  const pendingPiQuestionCount = usePendingPiExtensionUiPromptCount(pendingPiSessionIds);
+  const pendingQuestionCount = pendingOpenCodeQuestionCount + pendingPiQuestionCount;
   const isSubtaskSession = Boolean((resolvedSession as Session & { parentID?: string | null }).parentID);
   const unseenCount = useSessionUnseenCount(session.id);
-  const needsAttention = unseenCount > 0 && (!isSubtaskSession || notifyOnSubtasks);
+  const needsAttention = (unseenCount > 0 || pendingPiQuestionCount > 0) && (!isSubtaskSession || notifyOnSubtasks);
   const sessionTimestamp = resolvedSession.time?.updated || resolvedSession.time?.created || Date.now();
   const sessionUpdatedLabel = formatSessionDateLabel(sessionTimestamp);
   const sessionCompactUpdatedLabel = formatSessionCompactDateLabel(sessionTimestamp);

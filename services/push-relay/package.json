@@ -1,0 +1,10 @@
+{
+  "name": "pichamber-push-relay",
+  "private": true,
+  "type": "module",
+  "description": "Central APNs push relay for Pichamber Desktop. Holds the project .p8; clients only sign.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test server.test.mjs"
+  }
+}

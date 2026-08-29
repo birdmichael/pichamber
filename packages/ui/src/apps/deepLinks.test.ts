@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { parseDeepLink } from './deepLinks';
+import { buildDeepLink, intentFromPushAction, parseDeepLink } from './deepLinks';
 
 describe('deep link vocabulary', () => {
   test('parses pichamber:// session and settings routes', () => {
@@ -50,5 +50,57 @@ describe('deep link vocabulary', () => {
     expect(parseDeepLink('https://example.com/session/abc')).toBeNull();
     expect(parseDeepLink('pichamber://session')).toBeNull();
     expect(parseDeepLink('pichamber://unknown')).toBeNull();
+  });
+
+  test('parses prompt focus on a session link and ignores URL action=', () => {
+    expect(parseDeepLink('pichamber://session/ses_1?prompt=pui_1')).toEqual({
+      type: 'session',
+      sessionId: 'ses_1',
+      promptId: 'pui_1',
+    });
+    expect(parseDeepLink('pichamber://session/ses_1?prompt=pui_1&action=confirm')).toEqual({
+      type: 'session',
+      sessionId: 'ses_1',
+      promptId: 'pui_1',
+    });
+    expect(buildDeepLink({
+      type: 'session',
+      sessionId: 'ses_1',
+      promptId: 'pui_1',
+    })).toBe('pichamber://session/ses_1?prompt=pui_1');
+  });
+
+  test('maps a confirm notification action onto the session intent', () => {
+    expect(intentFromPushAction({
+      actionId: 'confirm',
+      notification: {
+        data: {
+          sessionId: 'ses_1',
+          promptId: 'pui_1',
+          kind: 'confirm',
+          url: '/?session=ses_1',
+          deeplink: 'pichamber://session/ses_1?prompt=pui_1&kind=confirm',
+        },
+      },
+    })).toEqual({
+      type: 'session',
+      sessionId: 'ses_1',
+      promptId: 'pui_1',
+      action: 'confirm',
+    });
+    expect(intentFromPushAction({
+      actionId: 'tap',
+      notification: {
+        data: {
+          sessionId: 'ses_1',
+          promptId: 'pui_1',
+          deeplink: 'pichamber://session/ses_1?prompt=pui_1&action=confirm',
+        },
+      },
+    })).toEqual({
+      type: 'session',
+      sessionId: 'ses_1',
+      promptId: 'pui_1',
+    });
   });
 });

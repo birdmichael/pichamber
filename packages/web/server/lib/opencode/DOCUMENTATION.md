@@ -99,7 +99,7 @@ This module provides OpenCode server integration utilities for the web server ru
 ## Public exports (session-runtime.js)
 - `createSessionRuntime({ writeSseEvent, getNotificationClients, broadcastEvent? })`: creates runtime-owned state machine and APIs for session status.
 - Returned API:
-  - `processOpenCodeSsePayload(payload)`
+  - `processOpenCodeSsePayload(payload)` — session.status plus waiting `question.asked` / `pi.ui.asked` (sets `needsAttention` when no client is viewing, even while status stays `busy`) and `pi.ui.settled` / question reply-or-reject (clears the pending-question latch; unviewing a still-waiting session marks attention again)
   - `getSessionActivitySnapshot()`
   - `getActiveSessionCount()`
   - `getSessionStateSnapshot()`
@@ -410,11 +410,13 @@ an authoritative loopback callback URL even when OpenChamber binds port `0`.
 
 ## Public exports (watcher.js)
 - `createOpenCodeWatcherRuntime(dependencies)`: creates global event watcher runtime backed by the shared upstream SSE reader.
+- `startGlobalWatcherAfterKernelReady(ensureStarted)`: starts that watcher after Pi or OpenCode bootstrap. The Pi kernel path must call this — `bootstrapOpenCodeAtStartup` used to return before `ensureGlobalWatcherStarted()`, so `pi.ui.asked` never reached push/`needsAttention`.
 - Returned API:
   - `start()`
   - `stop()`
 - Behavior:
-  - Waits for OpenCode readiness before attaching the watcher.
+  - An in-process Pi bus (`globalEventHub`) subscribes immediately and does not wait for leftover OpenCode.
+  - Without a hub, waits for OpenCode readiness before attaching the watcher.
   - In production wiring, subscribes to the shared global message-stream hub instead of opening its own `/global/event` connection.
   - Can still create its own `/global/event` reader when no shared hub is provided, which keeps module tests and isolated reuse simple.
   - Reuses event-stream parsing, `Last-Event-ID`, stall timeout, and reconnect behavior.

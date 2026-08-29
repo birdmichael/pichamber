@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createExtensionUIController, createNoopUiExtras, EXTENSION_UI_EVENTS } from './extension-ui.js';
+import { createExtensionUIController, createNoopUiExtras, EXTENSION_UI_EVENTS, subscribeAbortSignal } from './extension-ui.js';
 
 const createController = () => {
   const events = [];
@@ -34,19 +34,19 @@ describe('Desktop ExtensionUIContext', () => {
     expect(events.some((item) => String(item.event.type).startsWith('question.'))).toBe(false);
   });
 
-  it('cancels only the waiting prompt and returns the SDK cancel value', async () => {
+  it('keeps only the latest ask live so a late /plan does not stack', async () => {
     const { controller } = createController();
-    const select = controller.context.select('Pick one', ['A', 'B']);
-    const confirm = controller.context.confirm('Replace goal?', 'The current goal will be replaced.');
-    const [first] = controller.list();
-
-    expect(controller.cancel(first.id)).toBe(true);
-    await expect(select).resolves.toBeUndefined();
+    const select = controller.context.select('Should we continue?', ['Yes', 'No']);
+    const plan = controller.context.select('Plan mode\nStatus: Off…', [
+      'Start Plan mode',
+      'Choose tools, then start…',
+    ]);
     expect(controller.list()).toHaveLength(1);
+    expect(controller.list()[0].title).toContain('Plan mode');
+    await expect(select).resolves.toBeUndefined();
 
-    const [second] = controller.list();
-    expect(controller.cancel(second.id)).toBe(true);
-    await expect(confirm).resolves.toBe(false);
+    expect(controller.reply(controller.list()[0].id, 'Start Plan mode')).toBe(true);
+    await expect(plan).resolves.toBe('Start Plan mode');
     expect(controller.list()).toEqual([]);
   });
 
@@ -83,19 +83,19 @@ describe('Desktop ExtensionUIContext', () => {
     const { controller, events } = createController();
 
     const confirm = controller.context.confirm('Replace goal?', 'Keep the current goal?');
+    expect(controller.list().map((prompt) => prompt.kind)).toEqual(['confirm']);
+    controller.reply(controller.list()[0].id, true);
+    await expect(confirm).resolves.toBe(true);
+
     const input = controller.context.input('Token', 'paste token');
+    expect(controller.list().map((prompt) => prompt.kind)).toEqual(['input']);
+    controller.reply(controller.list()[0].id, 'secret-token');
+    await expect(input).resolves.toBe('secret-token');
+
     const editor = controller.context.editor('Describe the other approach', '');
     controller.context.notify('Plan mode enabled.', 'info');
-
-    const prompts = controller.list();
-    expect(prompts.map((prompt) => prompt.kind)).toEqual(['confirm', 'input', 'editor']);
-
-    controller.reply(prompts[0].id, true);
-    controller.reply(prompts[1].id, 'secret-token');
-    controller.reply(prompts[2].id, 'Use a queue');
-
-    await expect(confirm).resolves.toBe(true);
-    await expect(input).resolves.toBe('secret-token');
+    expect(controller.list().map((prompt) => prompt.kind)).toEqual(['editor']);
+    controller.reply(controller.list()[0].id, 'Use a queue');
     await expect(editor).resolves.toBe('Use a queue');
 
     const notify = events.find((item) => item.event.type === EXTENSION_UI_EVENTS.notify);
@@ -126,6 +126,41 @@ describe('Desktop ExtensionUIContext', () => {
     const timedOut = controller.context.confirm('Timeout', 'Wait', { timeout: 5 });
     await expect(timedOut).resolves.toBe(false);
     expect(controller.list()).toEqual([]);
+  });
+
+  it('does not throw when session.command hands a serialized non-EventTarget signal', async () => {
+    const { controller } = createController();
+    const pending = controller.context.select('Plan mode\nStatus: Off…', [
+      'Start Plan mode',
+    ], { signal: { aborted: false } });
+    const [prompt] = controller.list();
+    expect(prompt.kind).toBe('select');
+    expect(controller.reply(prompt.id, 'Start Plan mode')).toBe(true);
+    await expect(pending).resolves.toBe('Start Plan mode');
+  });
+
+  it('honors aborted on a serialized signal without addEventListener', async () => {
+    const { controller } = createController();
+    await expect(controller.context.select('Already aborted', ['A'], {
+      signal: { aborted: true },
+    })).resolves.toBeUndefined();
+    expect(controller.list()).toEqual([]);
+  });
+
+  it('subscribeAbortSignal ignores a non-EventTarget and still cancels a real AbortSignal', async () => {
+    const ignored = [];
+    const unsubscribeFake = subscribeAbortSignal({ aborted: false }, () => ignored.push('fake'));
+    unsubscribeFake();
+    expect(ignored).toEqual([]);
+
+    const abort = new AbortController();
+    let cancelled = false;
+    const unsubscribe = subscribeAbortSignal(abort.signal, () => {
+      cancelled = true;
+    });
+    abort.abort();
+    expect(cancelled).toBe(true);
+    unsubscribe();
   });
 
   it('dispose cancels every waiting prompt', async () => {

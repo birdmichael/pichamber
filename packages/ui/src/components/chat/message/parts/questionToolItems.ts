@@ -212,17 +212,41 @@ export const matchPendingQuestionPrompt = <T extends PendingQuestionPromptLike>(
   return pending.length === 1 ? pending[0] ?? null : null;
 };
 
+export const messagesWithLiveQuestionParts = <T extends {
+  info?: { id?: string };
+  parts?: readonly QuestionToolPartLike[];
+}>(
+  messages: readonly T[],
+  livePartsByMessageId?: Record<string, readonly QuestionToolPartLike[] | undefined>,
+): Array<{ parts?: readonly QuestionToolPartLike[] }> => {
+  if (!livePartsByMessageId) return [...messages];
+  return messages.map((message) => {
+    const liveParts = message.info?.id ? livePartsByMessageId[message.info.id] : undefined;
+    return { parts: liveParts ?? message.parts };
+  });
+};
+
 export const boundQuestionPromptIds = (
   prompts: readonly PendingQuestionPromptLike[],
   messages: readonly { parts?: readonly QuestionToolPartLike[] }[],
 ): Set<string> => {
   const ids = new Set<string>();
+  let activeQuestionTools = 0;
   for (const message of messages) {
     for (const part of message.parts ?? []) {
       if (part.type !== 'tool' || !isQuestionToolName(part.tool)) continue;
+      if (isActiveQuestionToolStatus(part.state?.status)) activeQuestionTools += 1;
       const match = matchPendingQuestionPrompt(prompts, part);
       if (match) ids.add(match.id);
     }
+  }
+  const pending = prompts.filter((prompt) => (
+    prompt.status === 'pending'
+    && (prompt.kind === 'select' || prompt.kind === 'input' || prompt.kind === 'editor')
+  ));
+  if (ids.size === 0 && pending.length === 1 && activeQuestionTools >= 1) {
+    const only = pending[0];
+    if (only) ids.add(only.id);
   }
   return ids;
 };

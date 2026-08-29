@@ -7,7 +7,7 @@ This module provides notification message preparation utilities for the web serv
 - `packages/web/server/lib/notifications/index.js`: public entrypoint imported by `packages/web/server/index.js`.
 - `packages/web/server/lib/notifications/routes.js`: route registration for push, visibility, and session status/attention endpoints.
 - `packages/web/server/lib/notifications/push-runtime.js`: push subscription persistence, VAPID initialization, and UI visibility runtime.
-- `packages/web/server/lib/notifications/apns-runtime.js`: native iOS APNs device-token persistence + delivery. Two modes: **relay** (default — sign + POST tokens + generic text to the central Cloudflare relay `https://api.openchamber.dev/v1/push/send`, which holds the single project APNs key) and **direct** (fallback — sign ES256 JWT with Node crypto + HTTP/2, when `OPENCHAMBER_PUSH_RELAY_DISABLED=true`). Each server has an auto-generated ECDSA P-256 keypair (`getOrCreateRelayKeypair`, persisted in settings); it binds tokens on the relay (`/v1/push/register-token`) and signs every relay request, so the relay only delivers to tokens bound to that server. APNs is the native app's sole notification channel (no local notifications) and is NOT gated on UI visibility — iOS suppresses the foreground banner instead. Mobile push carries only generic text (scenario title + session name) — see `APNS.md`.
+- `packages/web/server/lib/notifications/apns-runtime.js`: native iOS APNs device-token persistence + delivery. Two modes: **relay** (default — sign + POST tokens + generic text to `https://pichamber.bmlab.top/v1/push/send`, which holds the single project APNs key) and **direct** (fallback — sign ES256 JWT with Node crypto + HTTP/2, when `OPENCHAMBER_PUSH_RELAY_DISABLED=true`). Each server has an auto-generated ECDSA P-256 keypair (`getOrCreateRelayKeypair`, persisted in settings); it binds tokens on the relay (`/v1/push/register-token`) and signs every relay request, so the relay only delivers to tokens bound to that server. APNs is the native app's sole notification channel (no local notifications) and is NOT gated on UI visibility — iOS suppresses the foreground banner instead. Mobile push carries only generic text (scenario title + session name) — see `APNS.md`.
 - `packages/web/server/lib/notifications/emitter-runtime.js`: desktop/stdout + UI SSE notification emission runtime.
 - `packages/web/server/lib/notifications/runtime.js`: trigger runtime for OpenCode event-driven notification fanout.
 - `packages/web/server/lib/notifications/template-runtime.js`: notification template variables and session text/title enrichment runtime. Zen-model helpers are retained as compatibility stubs only.
@@ -45,12 +45,14 @@ This module provides notification message preparation utilities for the web serv
 - Returned API:
   - `maybeSendPushForTrigger(payload)`
 - Owns:
-  - completion/error/question/permission trigger routing; permission suppression consults the authoritative permission-auto-accept runtime
+  - completion/error/question/permission trigger routing; Pi `pi.ui.asked` / `pi.ui.settled` use the question path (not OpenCode `/api/question`), with debounce keyed by prompt id so settling one pending `ctx.ui` prompt does not cancel another; permission suppression consults the authoritative permission-auto-accept runtime
   - ready/completion fanout only on `session.idle` (Pi `agent_settled`) or `session.error`, never on intermediate assistant `message.updated` `finish: 'stop'` / `message_end` hops
   - session parent cache for subtask suppression
   - template resolution and fallback behavior
   - native notification fanout and web push payload fanout
-  - push suppression while any fresh UI visibility heartbeat reports a focused client
+  - ready/error/goal APNs suppression while any fresh UI visibility heartbeat reports a focused interactive (desktop/web) client; blocking question/permission/`pi.ui.asked` pushes always fan out to native APNs so a focused Mac window cannot swallow a waiting prompt
+  - `console.info('[Push] fanout start', …)` at the start of every fanout, plus skip reasons (`notifyOnQuestion=false`, no web-push subscriptions, `[APNs] skipped: no tokens`) so a silent no-op is observable
+  - Pi kernel bootstrap starts the same global watcher (Pi bus is already `globalMessageStreamHub`) so `pi.ui.asked` reaches this fanout without waiting for leftover OpenCode
 
 ### Push runtime API (push-runtime.js)
 - `createPushRuntime(dependencies)`: creates runtime for web push and UI visibility state.
@@ -71,7 +73,7 @@ This module provides notification message preparation utilities for the web serv
   - `addOrUpdateApnsToken(uiSessionToken, deviceToken, userAgent, platform, environment)` — also binds a newly-seen token on the relay (signed `/v1/push/register-token`). `environment` is the APNs environment the token was minted for (`sandbox` for Xcode/dev-signed installs, `production` otherwise — reported by the client at registration); delivery groups tokens by it.
   - `removeApnsToken(uiSessionToken, deviceToken)`
   - `removeApnsTokenFromAllSessions(deviceToken)`
-  - `sendApnsToAllUiSessions(payload)` — signs + sends to all registered tokens (no UI-visibility gate; iOS suppresses the foreground banner). No-ops with a single warning when APNs is unconfigured. Drops tokens on `410` / `BadDeviceToken` / `Unregistered`.
+  - `sendApnsToAllUiSessions(payload)` — signs + sends to all registered tokens (no UI-visibility gate; iOS suppresses the foreground banner). Logs `[APNs] skipped: no tokens` when the path ran and no device tokens were registered, so a box without APNs still proves fanout entered. No-ops with a single warning when APNs is unconfigured. Drops tokens on `410` / `BadDeviceToken` / `Unregistered`.
   - `resolveApnsConfig()`
 - Configuration (env first, then `settings.apnsConfig`): `OPENCHAMBER_APNS_KEY_ID`, `OPENCHAMBER_APNS_TEAM_ID`, `OPENCHAMBER_APNS_P8` (PEM contents; literal `\n` accepted) or `OPENCHAMBER_APNS_P8_PATH`, `OPENCHAMBER_APNS_BUNDLE_ID` (default `com.pichamber.app`), `OPENCHAMBER_APNS_ENVIRONMENT` (optional override forcing every send to `sandbox` or `production`; when unset, each token is delivered to the environment it registered with, defaulting to `production` for tokens without one).
 

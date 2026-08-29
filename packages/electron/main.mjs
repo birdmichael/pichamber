@@ -45,6 +45,7 @@ import {
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
+import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
 
 const execFileAsync = promisify(execFile);
@@ -5658,6 +5659,12 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Independent of window creation: macOS Open at login can return here.
+  registerSystemPowerMonitorListeners({
+    powerMonitor,
+    emit: emitToAllWindows,
+  });
+
   if (isBackgroundStart) {
     const { localOrigin, bootOutcome, apiBaseUrl, clientToken, requestHeaders } = await resolveInitialUrl();
     state.localOrigin = localOrigin;
@@ -5692,12 +5699,6 @@ app.whenReady().then(async () => {
   if (initial.length > 0) handleDeepLinks(initial);
 
   await activateMainWindow(initialUrl, localOrigin, bootOutcome, { apiBaseUrl, clientToken, requestHeaders });
-
-  // Notify renderer on OS wake-from-sleep so the SSE event pipeline can
-  // reconnect immediately instead of waiting for the heartbeat watchdog.
-  powerMonitor.on('resume', () => {
-    emitToAllWindows('openchamber:system-resume', { timestamp: Date.now() });
-  });
 }).catch((error) => {
   log.error('[electron] startup failed:', error);
   app.exit(1);

@@ -53,9 +53,11 @@ import {
 import {
   applyPiExtensionUiNotify,
   applyPiExtensionUiPrompt,
+  clearPiExtensionUiFocus,
   consumePiExtensionUiEditorStash,
   consumePiExtensionUiNotify,
   piExtensionUiNotifyToastOptions,
+  requestPiExtensionUiFocus,
   presentPiExtensionUiNotify,
   reconcilePiExtensionUiPrompts,
   resetPiExtensionUiStore,
@@ -380,5 +382,14 @@ describe('pi extension UI store', () => {
     expect(consumePiExtensionUiEditorStash('ses_other')).toBeNull();
     expect(consumePiExtensionUiEditorStash('ses_1')).toBe('Only the host module');
     expect(consumePiExtensionUiEditorStash('ses_1')).toBeNull();
+  });
+
+  test('stores a one-shot prompt focus id from a notification deep link', () => {
+    requestPiExtensionUiFocus('pui_1');
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBe('pui_1');
+    clearPiExtensionUiFocus('pui_other');
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBe('pui_1');
+    clearPiExtensionUiFocus('pui_1');
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBeNull();
   });
 });

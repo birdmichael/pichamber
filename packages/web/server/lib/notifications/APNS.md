@@ -13,29 +13,45 @@ registered them — so a leaked device token alone can't be used to push.
    `POST /v1/push/register-token`, signed with its auto-generated ECDSA P-256 key
    (`getOrCreateRelayKeypair`, persisted in settings like the VAPID keys). The relay records
    `token → serverId` where `serverId = SHA-256(publicKey)`.
-3. On a trigger (ready/error/question/permission), the server composes **generic, content-free**
+3. On a trigger (ready/error/question/permission, including Pi `pi.ui.asked`), the server composes **generic, content-free**
    text — a fixed scenario title ("Agent response is ready" / "Agent needs your input" / "Agent
    needs permission" / "Agent hit an error") + the **session name** as the body, no model/project/
    message content — plus a **`badge`** count (see below) — and POSTs `{ tokens, title, body,
    badge, env, data:{sessionId}, publicKeyJwk, ts, sig }` to `POST /v1/push/send`
    (`apns-runtime.js` → `sendViaRelay`). It does **not** gate on UI visibility (see below).
-4. The **relay** (`openchamber-website/apps/api`, Cloudflare Worker) verifies the signature +
+4. The **relay** (`services/push-relay` on `pichamber.bmlab.top`) verifies the signature +
    `ts` freshness, derives `serverId`, and only delivers to tokens bound to that server. It holds
-   the single project APNs `.p8` key, signs an ES256 JWT with `crypto.subtle`, and sends each
+   the single project APNs `.p8` key, signs an ES256 JWT, and sends each
    token to APNs over HTTP/2, returning per-token results; the server drops tokens flagged `drop`
-   (410 / BadDeviceToken). The relay stores no secret — only `token → serverId` hashes.
+   (410 / BadDeviceToken / Unregistered / DeviceTokenNotForTopic). The relay stores no Apple secret
+   in git — only `token → serverId` on the host.
 5. Tapping a push deep-links to its session via the forwarded `sessionId`.
 
 ## Foreground suppression
 
-APNs is **not** gated on UI visibility. A backgrounded WKWebView can't reliably report "hidden"
-before iOS suspends it, so a server-side visibility gate dropped background push for short
-responses. Instead the server always sends, and **iOS** suppresses the foreground banner
+Ready/error/goal APNs is gated on **interactive** (desktop/web/vscode) visibility: if the Mac
+window is focused, those pushes stay off the phone. Blocking question/permission/`pi.ui.asked`
+pushes **always** fan out to APNs so walking away from a still-open Desktop window cannot leave
+a waiting prompt silent. Electron reports lock-screen/sleep as hidden (`openchamber:system-presence`)
+because macOS lock is not a document blur. `resume` emits SSE reconnect only;
+presence `visible: true` is `unlock-screen`. The Desktop renderer now listens
+for that event and reports hidden; a 20s visible heartbeat cannot undo lock
+until unlock-screen.
+
+The phone's own foreground is **not** gated on the server. A backgrounded WKWebView can't reliably
+report "hidden" before iOS suspends it. **iOS** suppresses the foreground banner
 (`PushNotifications.presentationOptions: []` in `capacitor.config`) — so there is no notification
-while the app is active, with no race. APNs is the native app's **only** channel; local
+while the native app is active, with no race. APNs is the native app's **only** channel; local
 notifications were removed (a WKWebView can't tell foreground from background — `document.hasFocus()`
-is unreliable — so they leaked while the app was open). Cloudflare is touched only when a native
+is unreliable — so they leaked while the app was open). The push relay is touched only when a native
 app with notifications on has a registered token and a trigger fires.
+
+Shared web-push `data.url` stays same-origin (`/?session=`). Native carries `data.deeplink` as
+`pichamber://session/…`. Confirm prompts send `category: pi.ui.confirm` on the APNs/relay payload
+and also attach that category in the Notification Service Extension from opaque `kind` (root,
+nested `data`, or `kind=` on the deep-link URL — not prompt text). iOS Confirm requires unlock and
+opens the app (`authenticationRequired` + `foreground`); Cancel also opens the app. The reply uses
+`POST /api/pi/ui/:id/reply|cancel`.
 
 ## App-icon badge
 
@@ -68,7 +84,7 @@ device token of a server sees the same badge.
 ## Modes
 
 - **Relay (default):** server has no Apple key; `OPENCHAMBER_PUSH_RELAY_URL` defaults to
-  `https://api.openchamber.dev/v1/push/send` (register URL is derived as `…/register-token`).
+  `https://pichamber.bmlab.top/v1/push/send` (register URL is derived as `…/register-token`).
 - **Direct (fallback):** set `OPENCHAMBER_PUSH_RELAY_DISABLED=true` + `OPENCHAMBER_APNS_KEY_ID/
   TEAM_ID/P8` to sign+send from the server itself (HTTP/2 + ES256 JWT); no relay binding needed.
 
@@ -84,16 +100,16 @@ Server (`apns-runtime.js`):
 - Direct fallback: `OPENCHAMBER_APNS_KEY_ID`, `OPENCHAMBER_APNS_TEAM_ID`, `OPENCHAMBER_APNS_P8`
   (or `_P8_PATH`), `OPENCHAMBER_APNS_BUNDLE_ID`, `OPENCHAMBER_PUSH_RELAY_DISABLED=true`.
 
-Relay (Cloudflare Worker secrets via `wrangler secret put` / GitHub Actions): `APNS_P8`,
-`APNS_KEY_ID`, `APNS_TEAM_ID`, optional `APNS_BUNDLE_ID` / `APNS_DEFAULT_ENV`. The `push_tokens`
-binding table is created by `migrations/0002_push_tokens.sql` (applied on deploy).
+Relay host (`services/push-relay` on `bmlab`, public `https://pichamber.bmlab.top`): `APNS_KEY_ID`,
+`APNS_TEAM_ID`, `APNS_BUNDLE_ID`, and `AuthKey.p8` on disk under `/opt/pichamber-push/secrets/`
+(never commit). Token bindings live in `/opt/pichamber-push/data/push-tokens.json`.
 
 ## Apple setup (one-time)
 
 1. Apple **Keys** (not Certificates) → create an **APNs Auth Key** (`.p8`) → Key ID + Team ID;
    enable **Push Notifications** on App ID `com.pichamber.app`.
-2. In the **openchamber-website** repo → Actions secrets: `APNS_P8` (PEM), `APNS_KEY_ID`,
-   `APNS_TEAM_ID`. Push to `main` → relay deploys, secrets sync, D1 migrations apply.
+2. Copy the `.p8` to `/opt/pichamber-push/secrets/AuthKey.p8` on `bmlab` and set
+   `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_BUNDLE_ID=com.pichamber.app` in `push.env`.
 3. Xcode: confirm the Push Notifications capability; Clean Build Folder; run on device.
 
 ## Security posture
@@ -105,7 +121,7 @@ binding table is created by `migrations/0002_push_tokens.sql` (applied on deploy
 - `serverId` self-certifies (`SHA-256(publicKey)`), so the relay holds no secret; a D1 leak
   exposes only `token → serverId` hashes. The signed `ts` (±5 min window) blocks replay.
 - Residual: trust-on-first-bind (whoever registers a token first owns it) — acceptable, since
-  registering already requires possessing the token. Cloudflare rate limiting is defence-in-depth.
+  registering already requires possessing the token. NPM/OpenResty rate limiting is defence-in-depth.
 
 ## Data confidentiality (what the relay / Apple can see)
 
@@ -117,7 +133,7 @@ to APNs). The request **signature is authentication, not encryption** — the re
 Who can read the alert text:
 
 - **Network hops:** nothing (TLS).
-- **The relay (Cloudflare):** the generic title + body (session name), the device token, and
+- **The relay (`pichamber.bmlab.top`):** the generic title + body (session name), the device token, and
   `sessionId`. It stores only `token → serverId` hashes (no text, no payload).
 - **Apple APNs:** the alert text too — APNs always reads the alert payload of an `alert` push.
 - **The device:** displays it.

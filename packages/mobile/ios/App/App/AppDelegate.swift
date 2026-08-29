@@ -9,17 +9,17 @@ import WidgetKit
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        registerPiUiNotificationCategories()
         return true
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+        // Moving to inactive: interruption, or the user is quitting toward background.
+        // Pause ongoing tasks, disable timers, and invalidate graphics callbacks.
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
+        // Release shared resources, save data, and invalidate timers for a later restore.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     }
 
@@ -58,6 +58,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
+    private func registerPiUiNotificationCategories() {
+        let confirm = UNNotificationAction(
+            identifier: "confirm",
+            title: "Confirm",
+            options: [.authenticationRequired, .foreground]
+        )
+        let cancel = UNNotificationAction(
+            identifier: "cancel",
+            title: "Cancel",
+            options: [.destructive, .foreground]
+        )
+        let category = UNNotificationCategory(
+            identifier: "pi.ui.confirm",
+            actions: [confirm, cancel],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([category])
     }
 
 }

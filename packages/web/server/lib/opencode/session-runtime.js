@@ -56,6 +56,7 @@ export const createSessionRuntime = ({ writeSseEvent, getNotificationClients, br
         lastStatusChangeAt: Date.now(),
         viewedByClients: new Set(),
         status: 'idle',
+        pendingQuestion: false,
       };
       sessionAttentionStates.set(sessionId, state);
     }
@@ -231,10 +232,78 @@ export const createSessionRuntime = ({ writeSseEvent, getNotificationClients, br
     }
   };
 
+  const broadcastSessionAttention = (sessionId) => {
+    const attentionState = sessionAttentionStates.get(sessionId);
+    const sessionState = sessionStates.get(sessionId);
+    const syntheticPayload = {
+      type: 'openchamber:session-status',
+      properties: {
+        sessionID: sessionId,
+        status: sessionState?.status ?? attentionState?.status ?? 'idle',
+        timestamp: Date.now(),
+        metadata: sessionState?.metadata ?? {},
+        needsAttention: attentionState?.needsAttention ?? false,
+      },
+    };
+
+    if (typeof broadcastEvent === 'function') {
+      broadcastEvent(syntheticPayload);
+      return;
+    }
+    const clients = getNotificationClients();
+    for (const res of clients) {
+      try {
+        writeSseEvent(res, syntheticPayload);
+      } catch {
+      }
+    }
+  };
+
+  const extractEventSessionId = (payload) => {
+    const properties = payload?.properties && typeof payload.properties === 'object'
+      ? payload.properties
+      : {};
+    const sessionId = typeof properties.sessionID === 'string'
+      ? properties.sessionID.trim()
+      : (typeof properties.sessionId === 'string' ? properties.sessionId.trim() : '');
+    return sessionId || null;
+  };
+
+  const unwrapEventPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (typeof payload.type === 'string') return payload;
+    const nested = payload.payload;
+    if (nested && typeof nested === 'object' && typeof nested.type === 'string') {
+      return nested;
+    }
+    return payload;
+  };
+
+  const markWaitingPromptAttention = (sessionId) => {
+    const state = getOrCreateAttentionState(sessionId);
+    if (!state) return;
+    state.pendingQuestion = true;
+    state.lastStatusChangeAt = Date.now();
+    if (state.viewedByClients.size > 0 || state.needsAttention) return;
+    state.needsAttention = true;
+    broadcastSessionAttention(sessionId);
+  };
+
+  const clearPendingQuestion = (sessionId) => {
+    const state = sessionAttentionStates.get(sessionId);
+    if (!state) return;
+    state.pendingQuestion = false;
+    state.lastStatusChangeAt = Date.now();
+  };
+
   const markSessionUnviewed = (sessionId, clientId) => {
     const state = sessionAttentionStates.get(sessionId);
     if (!state) return;
     state.viewedByClients.delete(clientId);
+    if (state.viewedByClients.size === 0 && state.pendingQuestion && !state.needsAttention) {
+      state.needsAttention = true;
+      broadcastSessionAttention(sessionId);
+    }
   };
 
   const markUserMessageSent = (sessionId) => {
@@ -354,7 +423,16 @@ export const createSessionRuntime = ({ writeSseEvent, getNotificationClients, br
   const cleanupInterval = setInterval(cleanupOldSessionStates, SESSION_STATE_CLEANUP_INTERVAL_MS);
 
   const processOpenCodeSsePayload = (payload) => {
-    const update = extractSessionStatusUpdate(payload);
+    const event = unwrapEventPayload(payload);
+    const type = event && typeof event === 'object' ? event.type : undefined;
+    const waitingSessionId = extractEventSessionId(event);
+    if ((type === 'question.asked' || type === 'pi.ui.asked') && waitingSessionId) {
+      markWaitingPromptAttention(waitingSessionId);
+    } else if ((type === 'pi.ui.settled' || type === 'question.replied' || type === 'question.rejected') && waitingSessionId) {
+      clearPendingQuestion(waitingSessionId);
+    }
+
+    const update = extractSessionStatusUpdate(event);
     if (!update) return;
 
     if (update.type === 'busy' || update.type === 'retry') {

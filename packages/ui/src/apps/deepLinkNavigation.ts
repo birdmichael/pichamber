@@ -1,9 +1,28 @@
 import React from 'react';
 
 import { isCapacitorApp } from '@/lib/platform';
+import { cancelPiExtensionUi, isPiExtensionUiNotFoundError, replyPiExtensionUi } from '@/sync/pi-extension-ui';
+import { requestPiExtensionUiFocus } from '@/sync/pi-extension-ui-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
-import { parseDeepLink, type DeepLinkIntent, type SessionsFilter, type ViewTarget } from './deepLinks';
+import { intentFromPushAction, parseDeepLink, type DeepLinkIntent, type SessionsFilter, type ViewTarget } from './deepLinks';
+
+const settlePiUiFromNotification = async (
+  sessionId: string,
+  promptId: string,
+  action: 'confirm' | 'cancel',
+): Promise<void> => {
+  try {
+    if (action === 'confirm') {
+      await replyPiExtensionUi(sessionId, promptId, true);
+      return;
+    }
+    await cancelPiExtensionUi(sessionId, promptId);
+  } catch (error) {
+    if (isPiExtensionUiNotFoundError(error)) return;
+    // Transport/auth failure: the in-app card/dialog is the retry surface.
+  }
+};
 
 /**
  * Navigation layer for {@link DeepLinkIntent}s — the only place that knows how to *apply* a
@@ -37,6 +56,12 @@ const execute = (intent: DeepLinkIntent): boolean => {
   switch (intent.type) {
     case 'session':
       void useSessionUIStore.getState().setCurrentSession(intent.sessionId, intent.directory ?? null);
+      if (intent.promptId) {
+        requestPiExtensionUiFocus(intent.promptId);
+      }
+      if (intent.promptId && (intent.action === 'confirm' || intent.action === 'cancel')) {
+        void settlePiUiFromNotification(intent.sessionId, intent.promptId, intent.action);
+      }
       return true;
 
     case 'new-session': {
@@ -165,18 +190,8 @@ export const useDeepLinkSource = (options: { ready: boolean }): void => {
       .then(async ({ PushNotifications }) => {
         if (disposed) return;
         const handle = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-          const data = action?.notification?.data as Record<string, unknown> | undefined;
-          // Prefer an explicit deep link in the payload (richest); fall back to a bare
-          // sessionId for backwards compatibility with existing push senders.
-          const url = typeof data?.url === 'string' ? data.url : typeof data?.deeplink === 'string' ? data.deeplink : undefined;
-          if (url) {
-            applyDeepLinkUrl(url);
-            return;
-          }
-          const sessionId = typeof data?.sessionId === 'string' ? data.sessionId : undefined;
-          if (sessionId) {
-            applyDeepLinkIntent({ type: 'session', sessionId });
-          }
+          const intent = intentFromPushAction(action);
+          if (intent) applyDeepLinkIntent(intent);
         });
         if (disposed) {
           void handle.remove();

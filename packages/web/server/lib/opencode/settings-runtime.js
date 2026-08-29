@@ -10,8 +10,22 @@ import {
 const DEFAULT_NOTIFICATION_TEMPLATES = {
   completion: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
   error: { title: 'Tool error', message: '{last_message}' },
-  question: { title: 'Input needed', message: '{last_message}' },
+  question: { title: 'Input needed', message: '{session_name}' },
   subtask: { title: '{agent_name} is ready', message: '{model_name} completed the task' },
+};
+
+const SHIPPED_QUESTION_TEMPLATE_TITLES = new Set(['Input needed', '{agent_name} needs input']);
+const SHIPPED_QUESTION_TEMPLATE_MESSAGE = '{last_message}';
+
+const migrateShippedQuestionTemplate = (entry, base) => {
+  const title = typeof entry?.title === 'string' ? entry.title : base.title;
+  let message = typeof entry?.message === 'string' ? entry.message : base.message;
+  let migrated = !entry || typeof entry.title !== 'string' || typeof entry.message !== 'string';
+  if (SHIPPED_QUESTION_TEMPLATE_TITLES.has(title) && message === SHIPPED_QUESTION_TEMPLATE_MESSAGE) {
+    message = base.message;
+    migrated = true;
+  }
+  return { title, message, migrated };
 };
 
 const ensureNotificationTemplateShape = (templates) => {
@@ -22,6 +36,12 @@ const ensureNotificationTemplateShape = (templates) => {
   for (const event of Object.keys(DEFAULT_NOTIFICATION_TEMPLATES)) {
     const currentEntry = input[event];
     const base = DEFAULT_NOTIFICATION_TEMPLATES[event];
+    if (event === 'question') {
+      const migrated = migrateShippedQuestionTemplate(currentEntry, base);
+      if (migrated.migrated) changed = true;
+      next[event] = { title: migrated.title, message: migrated.message };
+      continue;
+    }
     const currentTitle = typeof currentEntry?.title === 'string' ? currentEntry.title : base.title;
     const currentMessage = typeof currentEntry?.message === 'string' ? currentEntry.message : base.message;
     if (!currentEntry || typeof currentEntry.title !== 'string' || typeof currentEntry.message !== 'string') {

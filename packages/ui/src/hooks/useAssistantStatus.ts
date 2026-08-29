@@ -3,13 +3,14 @@ import type { Message, Part, ReasoningPart, TextPart, ToolPart } from '@opencode
 
 import type { MessageStreamPhase } from '@/stores/types/sessionTypes';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { useHasPendingPiExtensionUiPrompt } from '@/sync/pi-extension-ui-store';
 import { useDirectorySync, useSessionMessages, useSessionPermissions, useSessionQuestions, useSessionStatus } from '@/sync/sync-context';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
 import { useCurrentSessionActivity } from './useSessionActivity';
 
 type AssistantActivity = 'idle' | 'streaming' | 'tooling' | 'cooldown' | 'permission';
 
-interface WorkingSummary {
+export interface WorkingSummary {
     activity: AssistantActivity;
     hasWorkingContext: boolean;
     hasActiveTools: boolean;
@@ -77,6 +78,8 @@ const DEFAULT_WORKING: WorkingSummary = {
 const EMPTY_PARTS: Part[] = [];
 const STATUS_SIGNATURE_SEPARATOR = '\u0000';
 const EDITING_TOOLS = new Set(['edit', 'write', 'multiedit', 'apply_patch']);
+/** Busy-line copy while a question card or Desktop `ctx.ui` prompt is waiting. */
+export const ASKING_A_QUESTION_STATUS = 'asking a question';
 const TOOL_STATUS_PHRASES: Record<string, string> = {
     read: 'reading file',
     write: 'writing file',
@@ -94,7 +97,7 @@ const TOOL_STATUS_PHRASES: Record<string, string> = {
     todowrite: 'updating todos',
     todoread: 'reading todos',
     skill: 'learning skill',
-    question: 'asking question',
+    question: ASKING_A_QUESTION_STATUS,
     plan_enter: 'switching to planning',
     plan_exit: 'switching to building',
 };
@@ -125,6 +128,49 @@ type ParsedStatusResult = {
 const getToolStatusPhrase = (toolName: string): string => {
     return TOOL_STATUS_PHRASES[toolName] ?? `using ${toolName}`;
 };
+
+/**
+ * Keep the existing StatusRow / work-status busy line visible while a
+ * question card or Pi `ctx.ui` prompt is waiting. The card itself is not a
+ * substitute for that line.
+ */
+export function overlayBlockingPromptStatus(
+    base: WorkingSummary,
+    flags: {
+        hasPendingOpenCodeQuestion: boolean;
+        hasPendingPiPrompt: boolean;
+        hasPendingPermission: boolean;
+    },
+): WorkingSummary {
+    const hasPendingQuestion = flags.hasPendingOpenCodeQuestion || flags.hasPendingPiPrompt;
+    if (!hasPendingQuestion && !flags.hasPendingPermission) {
+        return base;
+    }
+
+    if (hasPendingQuestion) {
+        return {
+            ...base,
+            activity: 'tooling',
+            statusText: ASKING_A_QUESTION_STATUS,
+            isWorking: true,
+            hasWorkingContext: true,
+            hasActiveTools: true,
+            isGenericStatus: false,
+            canAbort: false,
+            activePartType: 'tool',
+            activeToolName: 'question',
+            retryInfo: null,
+        };
+    }
+
+    return {
+        ...base,
+        statusText: 'waiting for permission',
+        isWaitingForPermission: true,
+        canAbort: false,
+        retryInfo: null,
+    };
+}
 
 const hashString = (value: string): number => {
     let hash = 0;
@@ -354,6 +400,7 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
 
     const sessionPermissionRequests = useSessionPermissions(currentSessionId ?? '', currentSessionDirectory ?? undefined);
     const sessionQuestionRequests = useSessionQuestions(currentSessionId ?? '', currentSessionDirectory ?? undefined);
+    const hasPendingPiPrompt = useHasPendingPiExtensionUiPrompt(currentSessionId);
 
     const sessionAbortRecord = useSessionUIStore(
         React.useCallback((state) => {
@@ -454,35 +501,12 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
             return baseWorking;
         }
 
-        const hasPendingPermission = sessionPermissionRequests.length > 0;
-        const hasPendingQuestion = sessionQuestionRequests.length > 0;
-
-        if (!hasPendingPermission && !hasPendingQuestion) {
-            return baseWorking;
-        }
-
-        if (hasPendingQuestion) {
-            return {
-                ...baseWorking,
-                statusText: null,
-                isWorking: false,
-                hasWorkingContext: false,
-                hasActiveTools: false,
-                canAbort: false,
-                activePartType: undefined,
-                activeToolName: undefined,
-                retryInfo: null,
-            };
-        }
-
-        return {
-            ...baseWorking,
-            statusText: 'waiting for permission',
-            isWaitingForPermission: true,
-            canAbort: false,
-            retryInfo: null,
-        };
-    }, [baseWorking, sessionPermissionRequests, sessionQuestionRequests]);
+        return overlayBlockingPromptStatus(baseWorking, {
+            hasPendingOpenCodeQuestion: sessionQuestionRequests.length > 0,
+            hasPendingPiPrompt,
+            hasPendingPermission: sessionPermissionRequests.length > 0,
+        });
+    }, [baseWorking, hasPendingPiPrompt, sessionPermissionRequests, sessionQuestionRequests]);
 
     return {
         activeModel: activeAssistant.model,

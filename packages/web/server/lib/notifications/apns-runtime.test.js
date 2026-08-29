@@ -272,6 +272,17 @@ describe('apns runtime direct fallback (relay disabled)', () => {
     expect(targeted).toEqual(['tokenDirect']);
   });
 
+  it('logs when a box has no APNs tokens so the fanout path is observable', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const runtime = createApnsRuntime(makeDeps());
+      await runtime.sendApnsToAllUiSessions({ title: 'Agent needs your input', body: 'Demo' });
+      expect(info).toHaveBeenCalledWith('[APNs] skipped: no tokens');
+    } finally {
+      info.mockRestore();
+    }
+  });
+
   it('signApnsJwt produces a 3-part ES256 token with the expected header/claims', () => {
     const runtime = createApnsRuntime(makeDeps());
     const parts = runtime.signApnsJwt(APNS_CONFIG).split('.');

@@ -1,0 +1,24 @@
+services:
+  pichamber-push:
+    build: .
+    image: pichamber-push:local
+    container_name: pichamber-push
+    restart: unless-stopped
+    env_file:
+      - /opt/pichamber-push/secrets/push.env
+    environment:
+      APNS_P8_PATH: /secrets/AuthKey.p8
+      DATA_DIR: /data
+      PORT: "8080"
+    volumes:
+      - /opt/pichamber-push/data:/data
+      - /opt/pichamber-push/secrets/AuthKey.p8:/secrets/AuthKey.p8:ro
+    networks:
+      - edge
+    expose:
+      - "8080"
+
+networks:
+  edge:
+    external: true
+    name: edge

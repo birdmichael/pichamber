@@ -551,6 +551,7 @@ export const NotificationSettings: React.FC = () => {
                   onChange={setNotifyOnQuestion}
                   label={t('settings.notifications.page.events.questionLabel')}
                   ariaLabel={t('settings.notifications.page.events.questionAria')}
+                  info={t('settings.notifications.page.events.questionHint')}
                 />
               </div>
             </SettingsSection>

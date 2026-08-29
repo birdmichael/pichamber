@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { Message } from '@opencode-ai/sdk/v2';
 
-import { getActiveAssistantContext } from './useAssistantStatus';
+import {
+    ASKING_A_QUESTION_STATUS,
+    getActiveAssistantContext,
+    overlayBlockingPromptStatus,
+    type WorkingSummary,
+} from './useAssistantStatus';
 
 const userMessage = (id: string, providerID: string, modelID: string): Message => ({
     id,
@@ -78,5 +83,58 @@ describe('getActiveAssistantContext', () => {
                 modelId: 'claude-opus-5',
             },
         });
+    });
+});
+
+const idleWorking = (): WorkingSummary => ({
+    activity: 'idle',
+    hasWorkingContext: false,
+    hasActiveTools: false,
+    isWorking: false,
+    isStreaming: false,
+    isCooldown: false,
+    lifecyclePhase: null,
+    statusText: null,
+    isGenericStatus: true,
+    isWaitingForPermission: false,
+    canAbort: false,
+    compactionDeadline: null,
+    wasAborted: false,
+    abortActive: false,
+    lastCompletionId: null,
+    isComplete: false,
+    retryInfo: null,
+});
+
+describe('overlayBlockingPromptStatus', () => {
+    test('uses the asking-a-question phrase while a Pi prompt is pending', () => {
+        expect(ASKING_A_QUESTION_STATUS).toBe('asking a question');
+        const next = overlayBlockingPromptStatus(idleWorking(), {
+            hasPendingOpenCodeQuestion: false,
+            hasPendingPiPrompt: true,
+            hasPendingPermission: false,
+        });
+        expect(next.statusText).toBe(ASKING_A_QUESTION_STATUS);
+        expect(next.isWorking).toBe(true);
+    });
+
+    test('keeps the busy line for an OpenCode question card instead of hiding it', () => {
+        const next = overlayBlockingPromptStatus(idleWorking(), {
+            hasPendingOpenCodeQuestion: true,
+            hasPendingPiPrompt: false,
+            hasPendingPermission: false,
+        });
+        expect(next.statusText).toBe(ASKING_A_QUESTION_STATUS);
+        expect(next.isWorking).toBe(true);
+    });
+
+    test('does not drop the line when both a card and a permission wait', () => {
+        const next = overlayBlockingPromptStatus(idleWorking(), {
+            hasPendingOpenCodeQuestion: false,
+            hasPendingPiPrompt: true,
+            hasPendingPermission: true,
+        });
+        expect(next.statusText).toBe(ASKING_A_QUESTION_STATUS);
+        expect(next.isWorking).toBe(true);
     });
 });

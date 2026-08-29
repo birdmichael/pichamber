@@ -2,8 +2,8 @@
 //
 // Device tokens are persisted per UI session (mirrors push-runtime.js). Delivery has two
 // modes, chosen at send time:
-//   - Relay (default): POST tokens + generic text to the central Cloudflare relay, which
-//     holds the single project APNs key and signs+sends — so users configure nothing.
+//   - Relay (default): POST tokens + generic text to https://pichamber.bmlab.top/v1/push/send,
+//     which holds the single project APNs key and signs+sends — so users configure nothing.
 //   - Direct (fallback): sign an ES256 JWT with Node crypto and send over HTTP/2 ourselves,
 //     for self-hosters who set OPENCHAMBER_APNS_* and OPENCHAMBER_PUSH_RELAY_DISABLED=true.
 // Wired into the same trigger fanout as web push (see runtime.js); the relay carries only
@@ -20,7 +20,7 @@ const APNS_HOST_SANDBOX = 'https://api.sandbox.push.apple.com';
 // APNs rejects auth tokens older than 1h; refresh well inside that window.
 const JWT_TTL_MS = 50 * 60 * 1000;
 const DEFAULT_BUNDLE_ID = 'com.pichamber.app';
-const DEFAULT_RELAY_URL = 'https://api.openchamber.dev/v1/push/send';
+const DEFAULT_RELAY_URL = 'https://pichamber.bmlab.top/v1/push/send';
 const MAX_TOKENS_PER_SESSION = 10;
 // APNs reasons that mean the token is permanently invalid → drop it.
 const DEAD_TOKEN_REASONS = new Set(['BadDeviceToken', 'Unregistered', 'DeviceTokenNotForTopic']);
@@ -312,6 +312,9 @@ export const createApnsRuntime = (deps) => {
         // widgets (attention count + unread dot) from the push, even when the app is closed.
         // No extra network call — just an extra key on the push we already send.
         'mutable-content': 1,
+        ...(typeof payload?.category === 'string' && payload.category
+          ? { category: payload.category }
+          : {}),
       },
       ...data,
     });
@@ -374,7 +377,7 @@ export const createApnsRuntime = (deps) => {
       req.end(body);
     });
 
-  // Relay mode (default): the single APNs key lives in the central Cloudflare relay, not on
+  // Relay mode (default): the single APNs key lives on pichamber.bmlab.top, not on
   // each user's server — so users configure nothing. The server just POSTs device tokens +
   // generic text; the relay signs + sends and reports which tokens to drop. Direct mode (below)
   // is the fallback for self-hosters who set OPENCHAMBER_APNS_* and disable the relay.
@@ -391,9 +394,9 @@ export const createApnsRuntime = (deps) => {
     };
   };
 
-  const sendViaRelay = async (deviceTokens, payload, relay, environment) => {
+  const sendViaRelay = async (deviceTokens, payload, relay, environment, retried = false) => {
     const tokens = deviceTokens.slice(0, 100);
-    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'OpenChamber';
+    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'Pichamber';
     const { privateKey, publicJwk } = await getOrCreateRelayKeypair();
     const ts = Date.now();
     // Sign over the same canonical form the relay verifies: ts.sortedTokens.title.
@@ -405,6 +408,9 @@ export const createApnsRuntime = (deps) => {
       badge: Number.isFinite(payload?.badge) && payload.badge >= 0 ? Math.trunc(payload.badge) : undefined,
       collapseId: typeof payload?.tag === 'string' ? payload.tag.slice(0, 64) : undefined,
       env: environment,
+      ...(typeof payload?.category === 'string' && payload.category
+        ? { category: payload.category }
+        : {}),
       data: payload?.data && typeof payload.data === 'object' ? payload.data : undefined,
       publicKeyJwk: relayPublicJwk(publicJwk),
       ts,
@@ -416,16 +422,27 @@ export const createApnsRuntime = (deps) => {
         headers: { 'content-type': 'application/json' },
         body: requestBody,
       });
+      console.info(`[APNs relay] send host=${new URL(relay.url).host} n=${tokens.length} env=${environment} status=${res.status}`);
       if (!res.ok) {
         console.warn(`[APNs relay] send failed status=${res.status}`);
         return;
       }
       const data = await res.json().catch(() => null);
       const results = Array.isArray(data?.results) ? data.results : [];
+      const unbound = [];
       for (const result of results) {
         if (result && result.drop === true && typeof result.token === 'string') {
           await removeApnsTokenFromAllSessions(result.token);
         }
+        if (result && result.reason === 'unbound' && typeof result.token === 'string') {
+          unbound.push(result.token);
+        }
+      }
+      // After a relay host cutover the local token store is still populated, but the
+      // new relay has no binding until the phone re-registers. Rebind once and retry.
+      if (!retried && unbound.length > 0) {
+        for (const token of unbound) await registerTokenWithRelay(token, 'ios');
+        await sendViaRelay(unbound, payload, relay, environment, true);
       }
     } catch (error) {
       console.warn('[APNs relay] request failed:', error?.message ?? error);
@@ -506,7 +523,10 @@ export const createApnsRuntime = (deps) => {
         tokensByEnvironment.set(entry.environment, group);
       }
     }
-    if (seen.size === 0) return;
+    if (seen.size === 0) {
+      console.info('[APNs] skipped: no tokens');
+      return;
+    }
 
     const relay = resolveRelayConfig();
     if (relay) {

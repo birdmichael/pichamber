@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createGlobalMessageStreamHub } from '../event-stream/global-hub.js';
-import { createOpenCodeWatcherRuntime } from './watcher.js';
+import { createOpenCodeWatcherRuntime, startGlobalWatcherAfterKernelReady } from './watcher.js';
+import { createSseBus } from '../pi/sse-bus.js';
 
 function createSseResponse({ blocks = [], signal, holdOpen = false }) {
   const encoder = new TextEncoder();
@@ -191,6 +192,56 @@ describe('createOpenCodeWatcherRuntime', () => {
         },
       },
     ]);
+  });
+
+  it('subscribes to an in-process Pi bus without waiting for OpenCode', async () => {
+    const payloads = [];
+    let waited = false;
+    const bus = createSseBus();
+    const watcher = createOpenCodeWatcherRuntime({
+      waitForOpenCodePort: async () => {
+        waited = true;
+        throw new Error('Pi kernel must not wait for OpenCode');
+      },
+      buildOpenCodeUrl: () => 'http://127.0.0.1:1/unused',
+      getOpenCodeAuthHeaders: () => ({}),
+      globalEventHub: bus,
+      onPayload(payload) {
+        payloads.push(payload);
+      },
+    });
+
+    await watcher.start();
+    bus.publish('/tmp/project', {
+      type: 'pi.ui.asked',
+      properties: {
+        sessionID: 'ses_1',
+        prompt: { id: 'pui_1', kind: 'select', status: 'pending' },
+      },
+    });
+
+    expect(waited).toBe(false);
+    expect(payloads).toEqual([
+      expect.objectContaining({
+        type: 'pi.ui.asked',
+        properties: expect.objectContaining({ sessionID: 'ses_1' }),
+      }),
+    ]);
+    watcher.stop();
+  });
+
+  it('starts the watcher after Pi kernel ready even when OpenCode never comes up', async () => {
+    const calls = [];
+    await startGlobalWatcherAfterKernelReady(async () => {
+      calls.push('started');
+    });
+    expect(calls).toEqual(['started']);
+
+    const warnings = [];
+    await startGlobalWatcherAfterKernelReady(async () => {
+      throw new Error('hub subscribe failed');
+    }, { warn: (message) => warnings.push(message) });
+    expect(warnings).toEqual(['Global event watcher startup failed: hub subscribe failed']);
   });
 
   it('does not stop a shared global event hub when the watcher stops', async () => {

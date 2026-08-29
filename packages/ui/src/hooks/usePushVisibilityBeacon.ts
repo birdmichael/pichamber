@@ -1,9 +1,37 @@
 import React from 'react';
-import { isWebRuntime } from '@/lib/desktop';
+import { isDesktopShell, isWebRuntime } from '@/lib/desktop';
 import { getClientPlatform, isCapacitorApp } from '@/lib/platform';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 
-const HEARTBEAT_MS = 20000;
+export const HEARTBEAT_MS = 20000;
+
+/** Electron lock/unlock is not a browser visibilitychange. Desktop must beacon. */
+export const shouldReportPushVisibility = (input: {
+  isWeb: boolean;
+  isCapacitor: boolean;
+  isDesktop: boolean;
+}): boolean => input.isWeb || input.isCapacitor || input.isDesktop;
+
+/** macOS lock/sleep is not a document blur. Latch hidden until unlock-screen. */
+export const createSystemPresenceLatch = () => {
+  let systemHidden = false;
+  return {
+    apply(visible: boolean | undefined): 'hidden' | 'report' | 'noop' {
+      if (visible === false) {
+        systemHidden = true;
+        return 'hidden';
+      }
+      if (visible === true) {
+        systemHidden = false;
+        return 'report';
+      }
+      return 'noop';
+    },
+    allowsVisibleHeartbeat(): boolean {
+      return !systemHidden;
+    },
+  };
+};
 
 const resolveVisibilityState = (): 'visible' | 'hidden' => {
   if (typeof document === 'undefined') return 'visible';
@@ -11,7 +39,11 @@ const resolveVisibilityState = (): 'visible' | 'hidden' => {
 };
 
 const sendVisibility = (visible: boolean) => {
-  if (!isWebRuntime() && !isCapacitorApp()) {
+  if (!shouldReportPushVisibility({
+    isWeb: isWebRuntime(),
+    isCapacitor: isCapacitorApp(),
+    isDesktop: isDesktopShell(),
+  })) {
     return;
   }
 
@@ -28,7 +60,14 @@ const sendVisibility = (visible: boolean) => {
 export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true;
   React.useEffect(() => {
-    if (!enabled || (!isWebRuntime() && !isCapacitorApp()) || typeof window === 'undefined') {
+    if (!enabled || typeof window === 'undefined') {
+      return;
+    }
+    if (!shouldReportPushVisibility({
+      isWeb: isWebRuntime(),
+      isCapacitor: isCapacitorApp(),
+      isDesktop: isDesktopShell(),
+    })) {
       return;
     }
 
@@ -79,11 +118,18 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
       return;
     }
 
+    const presenceLatch = createSystemPresenceLatch();
+
     const report = () => {
+      if (!presenceLatch.allowsVisibleHeartbeat()) {
+        sendVisibility(false);
+        return;
+      }
       sendVisibility(resolveVisibilityState() === 'visible');
     };
 
     const reportVisibleOnly = () => {
+      if (!presenceLatch.allowsVisibleHeartbeat()) return;
       if (resolveVisibilityState() === 'visible') {
         sendVisibility(true);
       }
@@ -97,11 +143,24 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
 
     const interval = window.setInterval(reportVisibleOnly, HEARTBEAT_MS);
 
+    const onSystemPresence = (event: Event) => {
+      const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
+      const outcome = presenceLatch.apply(detail?.visible);
+      if (outcome === 'hidden') {
+        sendVisibility(false);
+        return;
+      }
+      if (outcome === 'report') {
+        report();
+      }
+    };
+
     document.addEventListener('visibilitychange', report);
     window.addEventListener('pagehide', reportPageHidden);
     window.addEventListener('pageshow', report);
     window.addEventListener('focus', report);
     window.addEventListener('blur', report);
+    window.addEventListener('openchamber:system-presence', onSystemPresence);
 
     return () => {
       window.clearInterval(interval);
@@ -110,6 +169,7 @@ export const usePushVisibilityBeacon = (options?: { enabled?: boolean }) => {
       window.removeEventListener('pageshow', report);
       window.removeEventListener('focus', report);
       window.removeEventListener('blur', report);
+      window.removeEventListener('openchamber:system-presence', onSystemPresence);
     };
   }, [enabled]);
 };
