@@ -77,6 +77,7 @@ import { getRegisteredRuntimeAPIs } from "@/contexts/runtimeAPIRegistry"
 import { isFilesystemError } from "@/lib/api/files-errors"
 import { listGlobalSessionPages } from "@/stores/globalSessions"
 import { areRequestArraysReferentiallyEqual, collectScopedBlockingRequests } from "./scoped-blocking-requests"
+import { resolveParentDirectoryForChildIdle } from "@/lib/subagents/childSession"
 import { EMPTY_USER_MESSAGE_HISTORY_SNAPSHOT, buildUserMessageHistorySnapshot, type UserMessageHistorySnapshot } from "./user-message-history"
 import {
   EMPTY_SESSION_MESSAGE_LOAD_STATE,
@@ -1675,7 +1676,12 @@ export function handleEvent(
         ? (idleSession as Session & { parentID?: string | null }).parentID
         : null
       if (parentID) {
-        enqueueSessionMaterialization(resolvedDirectory, parentID, childStores, { reason: "child-session-idle" })
+        const parentSession = sessionState.session.find((s) => s.id === parentID)
+          ?? getAllSyncSessions().find((s) => s.id === parentID)
+        const parentDirectory = resolveParentDirectoryForChildIdle(parentSession)
+        if (parentDirectory) {
+          enqueueSessionMaterialization(parentDirectory, parentID, childStores, { reason: "child-session-idle" })
+        }
       }
     }
   }

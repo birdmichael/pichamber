@@ -1,3 +1,27 @@
+
+type DirectorySource = {
+  directory?: string | null;
+};
+
+export const resolveSubagentChildDirectory = (
+  source?: DirectorySource | string | null,
+  fallback?: string | null,
+): string | null => {
+  const fromSource = typeof source === 'string'
+    ? source.trim()
+    : source?.directory?.trim() || '';
+  if (fromSource) return fromSource;
+  const fromFallback = fallback?.trim() || '';
+  return fromFallback || null;
+};
+
+export const resolveParentDirectoryForChildIdle = (
+  parent?: DirectorySource | null,
+): string | null => {
+  const owned = parent?.directory?.trim() || '';
+  return owned || null;
+};
+
 type OpenSubagentChildSessionInput = {
   sessionID?: string | null;
   directory?: string | null;

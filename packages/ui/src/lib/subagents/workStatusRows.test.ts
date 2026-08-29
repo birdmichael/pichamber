@@ -4,6 +4,7 @@ import {
   assignTranscriptSessionIds,
   buildWorkStatusSubagentRows,
   collectTranscriptSubagentSessionIds,
+  overlayWorkStatusChildBlockers,
   resolveWorkStatusSubagentOpen,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
@@ -12,6 +13,7 @@ const run = (overrides: Partial<SubagentRun> = {}): SubagentRun => ({
   runId: 'run_1',
   parentID: 'ses_parent',
   sessionID: null,
+  directory: null,
   name: 'subagent',
   role: 'subagent',
   mode: 'foreground',
@@ -32,6 +34,11 @@ describe('resolveWorkStatusSubagentOpen', () => {
       sessionID: null,
       directory: '/repo',
     })).toEqual({ sessionID: null, directory: '/repo', openable: false });
+    expect(resolveWorkStatusSubagentOpen({
+      sessionID: 'child-1',
+      directory: '/repo-worktree',
+      effectiveDirectory: '/repo',
+    })).toEqual({ sessionID: 'child-1', directory: '/repo-worktree', openable: true });
   });
 });
 
@@ -103,6 +110,7 @@ describe('buildWorkStatusSubagentRows', () => {
       id: 'run_1',
       label: 'List the README filename',
       sessionID: 'child-1',
+      directory: '/repo',
       openable: true,
       mode: 'foreground',
       status: 'done',
@@ -136,9 +144,44 @@ describe('buildWorkStatusSubagentRows', () => {
       id: 'call_1',
       label: 'List the README filename',
       sessionID: 'child-1',
+      directory: '/repo',
       openable: true,
       mode: 'foreground',
       status: 'done',
     }]);
+  });
+
+  test('opens a worktree-cwd child with the child directory, not the parent', () => {
+    const rows = buildWorkStatusSubagentRows({
+      runs: [run({
+        sessionID: 'child-wt',
+        directory: '/repo-worktree',
+        openable: true,
+      })],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(rows[0]?.directory).toBe('/repo-worktree');
+    expect(rows[0]?.openable).toBe(true);
+  });
+
+  test('overlays a permission blocker from the child store without rewriting run state mapping', () => {
+    const rows = overlayWorkStatusChildBlockers(
+      [{
+        id: 'run_1',
+        label: 'scout',
+        sessionID: 'child-wt',
+        directory: '/repo-worktree',
+        openable: true,
+        mode: 'background',
+        status: 'working',
+      }],
+      {
+        permissions: { 'child-wt': [{ id: 'perm_1' }] },
+        questions: {},
+      },
+    );
+    expect(rows[0]?.status).toBe('permission');
   });
 });

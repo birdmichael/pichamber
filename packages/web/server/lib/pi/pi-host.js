@@ -129,6 +129,8 @@ import {
   findAdapterRunByChildSessionId,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
+  listNestedSessionRuns,
+  readSessionCwdFromSessionFile,
   readSessionIdFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
@@ -2391,6 +2393,11 @@ export const createPiHost = ({
       : readSessionIdFromSessionFile(resolvedFile);
     const existing = (hintedId && sessions.get(hintedId)) || findRecordBySessionFile(resolvedFile);
     if (existing) {
+      const existingFile = typeof existing.sessionFile === 'string' ? existing.sessionFile : '';
+      const alreadyLinked = typeof existing.info?.parentID === 'string' ? existing.info.parentID.trim() : '';
+      if (existingFile && existingFile !== resolvedFile && alreadyLinked && alreadyLinked !== parentID) {
+        return existing;
+      }
       applySubagentParentLink(existing, parentID, metadata);
       refreshChildMessagesFromFile(existing, { publish: true });
       return existing;
@@ -2408,6 +2415,7 @@ export const createPiHost = ({
     }
     const fileEntries = transcriptEntriesForHydrate({ file: resolvedFile, manager });
     const cwd = (typeof manager?.getCwd === 'function' && manager.getCwd())
+      || readSessionCwdFromSessionFile(resolvedFile)
       || directory
       || defaultDirectory;
     const resolvedId = (typeof manager?.getSessionId === 'function' && manager.getSessionId())
@@ -2421,6 +2429,11 @@ export const createPiHost = ({
     }
     const alreadyAttached = sessions.get(resolvedId);
     if (alreadyAttached) {
+      const existingFile = typeof alreadyAttached.sessionFile === 'string' ? alreadyAttached.sessionFile : '';
+      const alreadyLinked = typeof alreadyAttached.info?.parentID === 'string' ? alreadyAttached.info.parentID.trim() : '';
+      if (existingFile && existingFile !== resolvedFile && alreadyLinked && alreadyLinked !== parentID) {
+        return alreadyAttached;
+      }
       applySubagentParentLink(alreadyAttached, parentID, metadata);
       refreshChildMessagesFromFile(alreadyAttached, { publish: true });
       return alreadyAttached;
@@ -2541,17 +2554,95 @@ export const createPiHost = ({
     }
   };
 
+  const hydratedParentID = (record) => {
+    const info = record?.info;
+    if (!info) return '';
+    if (typeof info.parentID === 'string' && info.parentID.trim()) return info.parentID.trim();
+    if (typeof info.metadata?.parentID === 'string' && info.metadata.parentID.trim()) {
+      return info.metadata.parentID.trim();
+    }
+    const nested = info.metadata?.pichamber?.subagentRun?.parentSessionID;
+    return typeof nested === 'string' && nested.trim() ? nested.trim() : '';
+  };
+
+  const recordMatchesDirectory = (record, directory) => {
+    if (!directory) return true;
+    if (record.directory === directory) return true;
+    const parentID = hydratedParentID(record);
+    if (!parentID) return false;
+    const parent = sessions.get(parentID);
+    return Boolean(parent && parent.directory === directory);
+  };
+
+  const collectAttachedChildRuns = (parent) => {
+    const runs = [];
+    for (const record of sessions.values()) {
+      if (!record || record.id === parent.id) continue;
+      if (isTopLevelUserSessionFile(record.sessionFile)) continue;
+      if (hydratedParentID(record) !== parent.id) continue;
+      const sameDirectory = record.directory === parent.directory;
+      if (sameDirectory && !record.sessionFile && !record.subagentRun) continue;
+      const existing = record.subagentRun;
+      runs.push({
+        runId: existing?.runId || record.id,
+        parentID: parent.id,
+        sessionID: record.id,
+        sessionFile: record.sessionFile || null,
+        directory: record.directory || existing?.directory || null,
+        name: existing?.name || 'subagent',
+        role: existing?.role || existing?.name || 'subagent',
+        mode: existing?.mode || 'background',
+        state: existing?.state || (record.status?.type === 'busy' ? 'running' : 'done'),
+        title: existing?.title || record.info?.title || existing?.name || 'subagent',
+        toolCallId: existing?.toolCallId || null,
+        asyncDir: existing?.asyncDir || null,
+        startedAt: existing?.startedAt || record.info?.time?.created || null,
+        endedAt: existing?.endedAt || null,
+      });
+    }
+    return runs;
+  };
+
   const collectSubagentRuns = (parent) => {
-    const fileRuns = listAdapterRunsFromFiles({
-      parent,
-      projectDir: parent.directory,
-    });
     const liveRuns = [
       ...extractRunsFromFacadeMessages(parent.messages, parent.id),
       ...extractRunsFromPiEntries(
         typeof parent.sessionManager?.getEntries === 'function' ? parent.sessionManager.getEntries() : [],
         parent.id,
       ),
+    ];
+    const extraProjectDirs = [];
+    const seenDirs = new Set();
+    const addDir = (value) => {
+      const dir = typeof value === 'string' && value.trim() ? value.trim() : '';
+      if (!dir || seenDirs.has(dir) || dir === parent.directory) return;
+      seenDirs.add(dir);
+      extraProjectDirs.push(dir);
+    };
+    for (const run of liveRuns) {
+      addDir(run.directory);
+      addDir(readSessionCwdFromSessionFile(run.sessionFile));
+    }
+    const attachedRuns = collectAttachedChildRuns(parent);
+    for (const run of attachedRuns) {
+      addDir(run.directory);
+    }
+    const nestedRuns = listNestedSessionRuns({
+      parent,
+      sessionDir: sessionDirForCwd(parent.directory, home),
+    });
+    for (const run of nestedRuns) {
+      addDir(run.directory);
+      addDir(readSessionCwdFromSessionFile(run.sessionFile));
+    }
+    const fileRuns = [
+      ...listAdapterRunsFromFiles({
+        parent,
+        projectDir: parent.directory,
+        extraProjectDirs,
+      }),
+      ...nestedRuns,
+      ...attachedRuns,
     ];
     return reconcileParentSubagentRuns(fileRuns, liveRuns);
   };
@@ -2575,7 +2666,7 @@ export const createPiHost = ({
       if (run.sessionFile) {
         const record = await attachSessionFromFile(run.sessionFile, {
           sessionID: run.sessionID || undefined,
-          directory: parent.directory,
+          directory: run.directory || parent.directory,
           parentID: parent.id,
           title: run.title || run.name,
           metadata: extraMetadata,
@@ -2595,7 +2686,7 @@ export const createPiHost = ({
               : { sessionID: record.id },
           });
         }
-        return { ...run, sessionID: record.id };
+        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
       if (childId) {
         let record = sessions.get(childId);
@@ -2608,7 +2699,7 @@ export const createPiHost = ({
         }
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
-        return { ...run, sessionID: record.id };
+        return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
     } catch (error) {
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
@@ -2782,7 +2873,7 @@ export const createPiHost = ({
   const collectSessionInfos = async (directory, query) => {
     const includeArchived = !query || includeArchivedSessions(query.archived);
     const live = Array.from(sessions.values())
-      .filter((record) => !directory || record.directory === directory)
+      .filter((record) => recordMatchesDirectory(record, directory))
       .map((record) => {
         const current = record.info?.metadata?.pichamber?.piGoal;
         if (
@@ -2939,7 +3030,7 @@ export const createPiHost = ({
       return ensureRecord(sessionID, directory);
     },
     listSessions(directory) {
-      const items = Array.from(sessions.values()).filter((record) => !directory || record.directory === directory);
+      const items = Array.from(sessions.values()).filter((record) => recordMatchesDirectory(record, directory));
       for (const record of items) {
         if (maybeApplyConversationTitle(record)) {
           emit(record.directory, {

@@ -149,6 +149,8 @@ export const useSessionGrouping = (args: Args) => {
       const groupedNodes = new Map<string, SessionNode[]>();
       const archivedKey = '__archived__';
 
+      // Applied only to roots. A child with a valid parentID in this list stays
+      // nested under that parent even when child.directory is a worktree.
       const getGroupKey = (session: Session) => {
         if (session.time?.archived) return archivedKey;
         // VS Code groups by open workspace, not by worktree: every non-archived

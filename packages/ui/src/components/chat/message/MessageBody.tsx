@@ -28,6 +28,7 @@ import type { ContentChangeReason } from '@/hooks/useChatAutoFollow';
 
 import { MarkdownImageGallery, SimpleMarkdownRenderer } from '../MarkdownRenderer';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { useSession } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { flattenAssistantTextParts, suggestPlanTitleFromText } from '@/lib/messages/messageText';
 import { MULTIRUN_EXECUTION_FORK_PROMPT_META_TEXT } from '@/lib/messages/executionMeta';
@@ -69,8 +70,8 @@ import {
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
-import { openSubagentChildSession } from '@/lib/subagents/childSession';
-import { readSubagentChildSessionIdFromRuns, shouldRenderOpenCodeSubtaskChrome } from '@/lib/subagents/subagentTool';
+import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
+import { readSubagentChildDirectoryFromRuns, readSubagentChildSessionIdFromRuns, shouldRenderOpenCodeSubtaskChrome } from '@/lib/subagents/subagentTool';
 import { useSubagentRuns } from '@/hooks/useSubagentRuns';
 import { useProviderLogo } from '@/hooks/useProviderLogo';
 import { getAgentColor } from '@/lib/agentColors';
@@ -218,6 +219,9 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
     const isPiKernel = usePiKernel();
     const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
     const { t } = useI18n();
+    const taskSessionID = typeof part.taskSessionID === 'string' ? part.taskSessionID.trim() : '';
+    const childSession = useSession(taskSessionID);
+    const childDirectory = resolveSubagentChildDirectory(childSession, effectiveDirectory);
     if (!shouldRenderOpenCodeSubtaskChrome({ isPiKernel, subagentsSlotActive })) {
         return null;
     }
@@ -226,7 +230,6 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
     const command = typeof part.command === 'string' ? part.command.trim() : '';
     const agent = typeof part.agent === 'string' ? part.agent.trim() : '';
     const prompt = typeof part.prompt === 'string' ? part.prompt.trim() : '';
-    const taskSessionID = typeof part.taskSessionID === 'string' ? part.taskSessionID.trim() : '';
     const model = normalizeSubtaskModel(part.model);
 
     return (
@@ -281,7 +284,7 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
                         onClick={() => {
                             openSubagentChildSession({
                                 sessionID: taskSessionID,
-                                directory: effectiveDirectory,
+                                directory: childDirectory,
                                 label: description || agent || t('contextPanel.mode.chat'),
                                 readOnly: !isPiKernel,
                                 isMobile,
@@ -1130,7 +1133,12 @@ const AssistantMessageBody = React.memo(({
 
     const isPiKernel = usePiKernel();
     const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
-    const { runs: subagentRuns } = useSubagentRuns(sessionId ?? null, Boolean(isPiKernel && subagentsSlotActive && sessionId));
+    const parentDirectory = useEffectiveDirectory();
+    const { runs: subagentRuns } = useSubagentRuns(
+      sessionId ?? null,
+      Boolean(isPiKernel && subagentsSlotActive && sessionId),
+      parentDirectory,
+    );
     const isTouchContext = Boolean(hasTouchInput ?? isMobile);
     const alwaysShowMessageActions = Boolean(alwaysShowActions ?? isMobile);
     const { src: footerLogoSrc, onError: handleFooterLogoError, hasLogo: footerHasLogo } = useProviderLogo(footerProviderID ?? null);
@@ -1280,7 +1288,7 @@ const AssistantMessageBody = React.memo(({
     const getDirectoryForSession = useSessionUIStore((state) => state.getDirectoryForSession);
     const openMultiRunLauncherWithPrompt = useUIStore((state) => state.openMultiRunLauncherWithPrompt);
     const projects = useProjectsStore((state) => state.projects);
-    const effectiveDirectory = useEffectiveDirectory();
+    const effectiveDirectory = parentDirectory;
     const isReviewSessionView = reviewTransferDirection === 'review-to-original';
     const effectiveReviewTransferDirection = (!isMobile && !isVSCode) ? reviewTransferDirection : null;
     const reviewTransferAction = React.useMemo(() => {
@@ -2039,6 +2047,7 @@ const AssistantMessageBody = React.memo(({
                                     onShowPopup={onShowPopup}
                                     animateTailText={animatedToolIdsLookup.has(toolPart.id)}
                                     runChildSessionId={readSubagentChildSessionIdFromRuns(subagentRuns, toolPart.callID)}
+                                    runChildDirectory={readSubagentChildDirectoryFromRuns(subagentRuns, toolPart.callID)}
                                 />
                             </ToolRevealOnMount>
                         </FadeInOnReveal>
