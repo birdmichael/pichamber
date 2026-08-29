@@ -19,7 +19,7 @@ describe('empty existing session welcome chrome', () => {
   });
 
   test('ChatContainer empty session mounts DraftWelcome, chips via ChatInput, and Work Status', () => {
-    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome)';
+    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)';
     const emptyStateReturn = chatContainerSource.indexOf(emptyBusyGuard);
     expect(emptyStateReturn).toBeGreaterThan(-1);
     const emptyStateBlock = chatContainerSource.slice(emptyStateReturn, emptyStateReturn + 2400);

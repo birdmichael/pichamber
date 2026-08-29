@@ -125,6 +125,7 @@ mock.module("@/lib/opencode/client", () => ({
       return mockScopedClient
     },
     getDirectory: () => "/test/project",
+    setDirectory: () => {},
     getSdkClient: () => mockSdk,
     replyToPermission: mock((requestId: string, reply: string, options?: { directory?: string | null }) => {
       replyCalls.push({ method: "permission.reply", params: { requestID: requestId, reply, directory: options?.directory } })
@@ -191,6 +192,7 @@ mock.module("./session-ui-store", () => ({
         return null
       },
       currentSessionId: null,
+      newSessionDraft: { open: false, planSelected: false },
       setCurrentSession: () => {},
       setWorktreeMetadata: () => {},
       setSessionDirectory: (sessionID: string, directory: string) => {

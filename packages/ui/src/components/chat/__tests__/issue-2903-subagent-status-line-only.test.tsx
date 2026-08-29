@@ -227,11 +227,11 @@ describe('issue #2903 busy embedded subagent status-line-only', () => {
   });
 
   test('empty+busy branch skips empty state so StatusRowContainer can stand alone', () => {
-    expect(chatContainerSource).toContain('if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome)');
+    expect(chatContainerSource).toContain('if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)');
     expect(chatContainerSource).toContain('<ChatEmptyState');
     expect(chatContainerSource).toContain('<StatusRowContainer />');
 
-    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome)';
+    const emptyBusyGuard = 'if (sessionMessages.length === 0 && !sessionIsWorking && !hasTranscriptChrome && !pendingComposerVisible)';
     const emptyStateReturn = chatContainerSource.indexOf(emptyBusyGuard);
     expect(emptyStateReturn).toBeGreaterThan(-1);
     const emptyStateBlock = chatContainerSource.slice(
