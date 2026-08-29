@@ -430,7 +430,7 @@ export const ContextPanel: React.FC = () => {
   const { t } = useI18n();
   const effectiveDirectory = useEffectiveDirectory() ?? '';
   const directoryKey = useContextPanelDirectoryKey();
-  const { panelState } = useMergedContextPanel(directoryKey);
+  const { panelState, chatScopeKey } = useMergedContextPanel(directoryKey);
   const closeContextPanel = useUIStore((state) => state.closeContextPanel);
   const closeContextPanelTab = useUIStore((state) => state.closeContextPanelTab);
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
@@ -651,8 +651,13 @@ export const ContextPanel: React.FC = () => {
     if (!directoryKey) {
       return;
     }
+    // Child chats live on session:<parentId>. Closing only the project
+    // directory leaves mergeContextPanelChatScope isOpen (X was a no-op).
     closeContextPanel(directoryKey);
-  }, [closeContextPanel, directoryKey]);
+    if (chatScopeKey && chatScopeKey !== directoryKey) {
+      closeContextPanel(chatScopeKey);
+    }
+  }, [chatScopeKey, closeContextPanel, directoryKey]);
 
   const handleToggleExpanded = React.useCallback(() => {
     if (!directoryKey) {

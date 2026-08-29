@@ -3187,7 +3187,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
-                    <div className="model-controls__agent-slot min-w-0">
+                    <div className="model-controls__agent-slot min-w-0 overflow-hidden">
                         {renderAgentSelector()}
                     </div>
                     <div className="model-controls__plan-slot">
