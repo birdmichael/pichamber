@@ -17,6 +17,7 @@ import {
     getBuiltInStarter,
     normalizeStarterLabel,
     sameStarter,
+    shouldOfferLiveCommandAsStarter,
     starterKey,
     type DraftStarterRef,
     type DraftStarterType,
@@ -148,7 +149,7 @@ export function useDraftStarters(): UseDraftStartersResult {
             items.push({ type: 'command', name: b.name, label: t(b.labelKey), icon: b.icon, section: 'built-in', scope: 'user' });
         }
         for (const c of commands) {
-            if (c.isBuiltIn || c.source === 'skill' || getBuiltInStarter(c.name)) continue;
+            if (c.isBuiltIn || c.source === 'skill' || !shouldOfferLiveCommandAsStarter(c.name)) continue;
             items.push({ type: 'command', name: c.name, label: normalizeStarterLabel(c.name), icon: COMMAND_FALLBACK_ICON, section: 'command', scope: c.scope === 'project' ? 'project' : 'user' });
         }
         for (const sk of skills) {

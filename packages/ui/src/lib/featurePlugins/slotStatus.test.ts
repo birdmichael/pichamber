@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import {
   isFeaturePluginSlotActive,
+  isFeaturePluginSlashName,
   isLeftoverPlanSlashText,
   isPlanSlashCommandText,
   parseFeaturePluginSlotActive,
@@ -75,6 +76,16 @@ describe('isLeftoverPlanSlashText', () => {
   test('keeps typed /plan as chat when the Plan slot is loaded and off', () => {
     const payload = emptyFeaturePluginsPayload();
     expect(isLeftoverPlanSlashText('/plan', payload, 'ready')).toBe(false);
+  });
+});
+
+describe('isFeaturePluginSlashName', () => {
+  test('matches live plan/run/goal and ignores /btw and builtins', () => {
+    expect(isFeaturePluginSlashName('plan')).toBe(true);
+    expect(isFeaturePluginSlashName('RUN')).toBe(true);
+    expect(isFeaturePluginSlashName(' goal ')).toBe(true);
+    expect(isFeaturePluginSlashName('btw')).toBe(false);
+    expect(isFeaturePluginSlashName('plan-feature')).toBe(false);
   });
 });
 

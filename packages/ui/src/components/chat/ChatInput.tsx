@@ -144,6 +144,9 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { resolveDraftPlanStarterClick } from '@/lib/draftStarters';
+import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
+import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
 import {
@@ -1107,6 +1110,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
+        closeAutocomplete();
+
         const capturedSendConfig = queuedOnly ? queuedMessagesToSend[0]?.sendConfig : undefined;
         const providerIdToSend = capturedSendConfig?.providerID ?? currentProviderId;
         const modelIdToSend = capturedSendConfig?.modelID ?? currentModelId;
@@ -1571,6 +1576,22 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         // instead of through the composer input — the collapsed mobile pill has
         // no mounted textarea to stage it in.
         const draft = (composerRef.current?.getValue() ?? messageRef.current).trim();
+        const planStarter = resolveDraftPlanStarterClick({
+            submitText: text,
+            draftOpen: Boolean(useSessionUIStore.getState().newSessionDraft?.open),
+            composerText: draft,
+        });
+        if (planStarter.kind === 'draft-plan') {
+            useSessionUIStore.getState().setDraftPlanSelected(true);
+            presentPiExtensionUiNotify({
+                message: PLAN_MODE_ENABLED_NOTIFY,
+                level: 'info',
+            });
+            if (planStarter.sendText) {
+                void handleSubmitRef.current({ presetText: planStarter.sendText });
+            }
+            return;
+        }
         // OpenCode recognizes slash commands only when their arguments follow
         // the command on the same line. Skills retain the multiline prompt form.
         const presetText = draft ? `${text}${type === 'command' ? ' ' : '\n'}${draft}` : text;

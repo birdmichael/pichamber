@@ -23,6 +23,11 @@ const FEATURE_PLUGIN_SLASH_SLOTS: Record<string, FeaturePluginSlot> = {
   goal: 'goal',
 };
 
+/** Live `/plan` `/run` `/goal` — not `/btw`. */
+export const isFeaturePluginSlashName = (cmdName: string): boolean => (
+  FEATURE_PLUGIN_SLASH_SLOTS[cmdName.trim().toLowerCase()] != null
+);
+
 /** Load state for the Feature Plugins store. Idle/loading/failed must not
  *  turn `/plan` into a chat bubble while the slash menu already listed it. */
 export type FeaturePluginLoadStatus = 'idle' | 'loading' | 'ready' | 'failed';
