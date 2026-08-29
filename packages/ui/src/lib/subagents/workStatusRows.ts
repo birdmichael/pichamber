@@ -247,3 +247,16 @@ export const summarizeWorkStatusSubagentRows = (rows: WorkStatusSubagentRow[]): 
   )).length,
   total: rows.length,
 });
+
+export const formatWorkStatusSubagentSummary = (
+  summary: WorkStatusSubagentSummary,
+  labels: { queued: string; done: string },
+): string | number => {
+  if (summary.queuedUnopenable > 0) {
+    return `${summary.queuedUnopenable} ${labels.queued} · ${summary.openable} ${labels.done}`;
+  }
+  if (summary.busy > 0) {
+    return `${summary.busy}/${summary.total}`;
+  }
+  return summary.total;
+};

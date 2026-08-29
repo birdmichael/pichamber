@@ -32,9 +32,9 @@ the inline card keeps its lighter, non-blurred fill instead.
 
 `ChatContainer`'s top-level return is a flex row:
 
-- the existing chat column (`data-composer-bound`, `flex-1 min-w-0`), holding
+- the existing chat column (`data-composer-bound`, `min-width: 320px`, `flex-1`), holding
   the viewport, the composer and the timeline dialog;
-- `WorkStatusPanel`, a fixed-width `shrink-0` sibling.
+- `WorkStatusPanel`, a 300px card that may shrink (`max-width: calc(100% - 320px)`) so it cannot eat the parent.
 
 Nothing inside `ChatViewport` changed. The virtualizer sees the column shrink
 exactly as it already does when the context panel opens.
@@ -45,13 +45,15 @@ exactly as it already does when the context panel opens.
 
 - the user switched it off;
 - the runtime is mobile or VS Code;
-- the context panel is open for the directory the app is effectively on —
-  looked up through `useEffectiveDirectory` and `normalizeContextPanelDirectoryKey`,
-  the same key the rail and the panel use. It is deliberately **not** the
-  directory this panel reports about: a managed Chat reports about none, and
-  that empty key answered "closed" for a context panel that was plainly open;
-- the row cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
+- the chat area cannot fit `WORK_STATUS_MIN_CHAT_WIDTH` of transcript alongside
   `WORK_STATUS_PANEL_WIDTH` of panel.
+
+An open context panel / child tab does **not** hide this card. Child chats are
+stored under `session:<parent>` and merged into the panel; hiding on "context
+open" either missed those tabs or removed the only place to switch children.
+Width is enforced by `lib/surfaces/chatColumnLayout.ts`: the context panel is
+capped so the parent transcript keeps `PARENT_CHAT_MIN_WIDTH` (320px) plus this
+card when it is inline.
 
 Do not remount this card beside the mobile transcript. Hosted `mobile.html`
 and Capacitor wrap the same section components in `MobileWorkStatusHost`

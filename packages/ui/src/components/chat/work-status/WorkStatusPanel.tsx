@@ -7,6 +7,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
+import { PARENT_CHAT_MIN_WIDTH } from '@/lib/surfaces/chatColumnLayout';
 import { WorkStatusGoalRow } from './WorkStatusGoalRow';
 import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
 import { WorkStatusUsageSection } from './WorkStatusUsageSection';
@@ -42,11 +43,9 @@ type Props = {
 /**
  * Matches the context panel's own width animation exactly.
  *
- * The two are siblings of the transcript, and opening the context panel hides
- * this one. With an instant unmount the chat first jumped wider (this panel
- * gone) and then eased narrower (the context panel expanding) — two opposite
- * width changes in a row, which reads as a flutter. Collapsing on the same
- * curve and duration makes the chat's width move once, in one direction.
+ * Both sit beside the transcript. Shrinking this card and the context panel
+ * on the same curve keeps the parent column from jumping when a child tab
+ * opens.
  */
 const PANEL_TRANSITION_MS = 200;
 const PANEL_TRANSITION_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -191,7 +190,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         // overflowing the chat.
         // A left margin as well as a right one: flush against the transcript
         // the card's own shadow had no room and was clipped down that edge.
-        'relative my-4 flex shrink-0 flex-col self-start overflow-hidden',
+        'relative my-4 flex min-w-0 shrink flex-col self-start overflow-hidden',
         'max-h-[calc(100%-2rem)]',
         interactive ? 'ml-2 mr-4' : 'ml-0 mr-0',
         // Out of the flow entirely, anchored to the chat column's top-right so
@@ -222,6 +221,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         // collapsing it would animate a dimension nothing depends on. It fades
         // and lifts instead, like the dropdown it reads as.
         width: overlay || interactive ? WORK_STATUS_PANEL_WIDTH : 0,
+        maxWidth: overlay ? undefined : `calc(100% - ${PARENT_CHAT_MIN_WIDTH}px)`,
         opacity: interactive ? 1 : 0,
         transform: visible
           ? 'translateY(0) scale(1)'

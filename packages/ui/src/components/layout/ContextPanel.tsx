@@ -49,29 +49,31 @@ import {
   type EmbeddedSessionRuntimeBootstrap,
 } from './contextPanelEmbeddedChat';
 import { getContextSurfaceWidthFraction } from '@/lib/surfaces/registry';
+import {
+  clampContextPanelLayoutWidth,
+  reservedMainWidthForContextPanel,
+  WORK_STATUS_REQUIRED_ROW_WIDTH,
+} from '@/lib/surfaces/chatColumnLayout';
 import { isContextPanelExpandedForMode } from '@/lib/surfaces/planRail';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
 const CONTEXT_PANEL_MAX_WIDTH = 1400;
 const CONTEXT_PANEL_DEFAULT_WIDTH = 600;
-const CHAT_COLUMN_MIN_WIDTH = 280;
 const RESIZE_FOLLOW_INTERVAL_MS = 100;
 const CONTEXT_TAB_LABEL_MAX_CHARS = 24;
 type TranslateFn = ReturnType<typeof useI18n>['t'];
 const EMPTY_SESSION_TITLE_MAP = new Map<string, string>();
 
-const clampWidth = (width: number, availableWidth?: number | null): number => {
-  if (!Number.isFinite(width)) {
-    return CONTEXT_PANEL_DEFAULT_WIDTH;
-  }
-
-  const maxForChat = availableWidth && availableWidth > 0
-    ? Math.max(200, availableWidth - CHAT_COLUMN_MIN_WIDTH)
-    : CONTEXT_PANEL_MAX_WIDTH;
-  const minWidth = Math.min(CONTEXT_PANEL_MIN_WIDTH, maxForChat);
-  return Math.min(CONTEXT_PANEL_MAX_WIDTH, maxForChat, Math.max(minWidth, Math.round(width)));
-};
+const clampWidth = (
+  width: number,
+  availableWidth?: number | null,
+  workStatusInline = false,
+): number => clampContextPanelLayoutWidth(width, availableWidth, {
+  workStatusInline,
+  minWidth: CONTEXT_PANEL_MIN_WIDTH,
+  maxWidth: CONTEXT_PANEL_MAX_WIDTH,
+});
 
 const getAvailablePanelWidth = (panel: HTMLElement | null): number | null => {
   const parentWidth = panel?.parentElement?.clientWidth;
@@ -451,6 +453,7 @@ export const ContextPanel: React.FC = () => {
   const openNewContextBrowserTab = useUIStore((state) => state.openNewContextBrowserTab);
   const faviconByOrigin = useBrowserFaviconStore((state) => state.byOrigin);
   const allowPromptingSubagentSessions = useUIStore((state) => state.allowPromptingSubagentSessions);
+  const workStatusPanelEnabled = useUIStore((state) => state.workStatusPanelEnabled);
   const { themeMode, setThemeMode, lightThemeId, darkThemeId, currentTheme } = useThemeSystem();
 
   const tabs = React.useMemo(() => panelState?.tabs ?? [], [panelState?.tabs]);
@@ -458,12 +461,21 @@ export const ContextPanel: React.FC = () => {
   const isOpen = Boolean(panelState?.isOpen && activeTab);
   const isExpanded = Boolean(isOpen && isContextPanelExpandedForMode(activeTab?.mode, Boolean(panelState?.expanded)));
   const [availablePanelAreaWidth, setAvailablePanelAreaWidth] = React.useState<number | null>(null);
+  // Assume the card is inline until the chat-area width is known so the first
+  // paint already reserves it. Hiding Work Status is not the layout fix.
+  const workStatusInline = workStatusPanelEnabled
+    && (availablePanelAreaWidth == null || availablePanelAreaWidth >= WORK_STATUS_REQUIRED_ROW_WIDTH);
+  const reservedForChat = reservedMainWidthForContextPanel(workStatusInline);
   const activeModeForWidth = activeTab?.mode ?? null;
   const manualWidth = activeModeForWidth ? panelState?.widthByMode?.[activeModeForWidth] : undefined;
   const widthFraction = activeModeForWidth ? getContextSurfaceWidthFraction(activeModeForWidth) : 0.5;
   const widthFallbackBase = availablePanelAreaWidth
-    ?? (typeof window !== 'undefined' ? window.innerWidth : CONTEXT_PANEL_DEFAULT_WIDTH * 2);
-  const width = clampWidth(manualWidth ?? Math.round(widthFraction * widthFallbackBase), availablePanelAreaWidth);
+    ?? (typeof window !== 'undefined' ? Math.max(0, window.innerWidth - 280) : CONTEXT_PANEL_DEFAULT_WIDTH * 2);
+  const width = clampWidth(
+    manualWidth ?? Math.round(widthFraction * widthFallbackBase),
+    availablePanelAreaWidth ?? widthFallbackBase,
+    workStatusInline,
+  );
   const chatSessionIDs = React.useMemo(() => {
     const ids: string[] = [];
     for (const tab of tabs) {
@@ -544,8 +556,8 @@ export const ContextPanel: React.FC = () => {
 
   const clampWidthForDrag = React.useCallback((nextWidth: number) => {
     const available = resizeAvailableWidthRef.current;
-    return clampWidth(nextWidth, available);
-  }, []);
+    return clampWidth(nextWidth, available, workStatusInline);
+  }, [workStatusInline]);
 
   const handleResizeStart = React.useCallback((event: React.PointerEvent) => {
     if (!isOpen || isExpanded || !directoryKey) {
@@ -1057,6 +1069,7 @@ export const ContextPanel: React.FC = () => {
   const panelStyle: React.CSSProperties = !isOpen
     ? {
         ['--oc-context-panel-width' as string]: `${width}px`,
+        ['--oc-chat-reserved' as string]: `${reservedForChat}px`,
         width: 0,
         maxWidth: '100%',
         overflowX: 'clip',
@@ -1070,10 +1083,11 @@ export const ContextPanel: React.FC = () => {
           maxWidth: '100%',
         }
       : {
-          width: 'min(var(--oc-context-panel-width), 100%)',
-          maxWidth: '100%',
+          width: 'min(var(--oc-context-panel-width), calc(100% - var(--oc-chat-reserved)))',
+          maxWidth: 'calc(100% - var(--oc-chat-reserved))',
           overflowX: 'clip',
           ['--oc-context-panel-width' as string]: `${width}px`,
+          ['--oc-chat-reserved' as string]: `${reservedForChat}px`,
         };
 
   return (
@@ -1089,7 +1103,7 @@ export const ContextPanel: React.FC = () => {
         // animates and the panel grows leftwards from its docked position.
         isExpanded
           ? 'absolute inset-y-0 right-0 z-20 min-w-0'
-          : 'relative h-full flex-shrink-0',
+          : 'relative h-full min-w-0 shrink',
         !isOpen && 'pointer-events-none',
         'will-change-[width] motion-reduce:transition-none',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'
@@ -1121,7 +1135,7 @@ export const ContextPanel: React.FC = () => {
       )}
       <div
         className={cn(
-          'relative z-10 flex h-full min-h-0 shrink-0 flex-col duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+          'relative z-10 flex h-full min-h-0 min-w-0 w-full flex-col duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
           // Width animates in sync with the panel (surface switches, resize
           // release); during the drag itself nothing resizes — only the ghost
           // guide line moves.
@@ -1133,7 +1147,7 @@ export const ContextPanel: React.FC = () => {
         style={{
           width: isExpanded
             ? (availablePanelAreaWidth !== null ? `${availablePanelAreaWidth}px` : '100%')
-            : 'var(--oc-context-panel-width)',
+            : '100%',
         }}
         aria-hidden={!isOpen}
       >

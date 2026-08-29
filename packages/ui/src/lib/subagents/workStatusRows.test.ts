@@ -9,6 +9,7 @@ import {
   resolveWorkStatusSubagentLabel,
   resolveWorkStatusSubagentOpen,
   countExportableWorkStatusRows,
+  formatWorkStatusSubagentSummary,
   summarizeWorkStatusSubagentRows,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
@@ -275,5 +276,6 @@ describe('exportable work status rows', () => {
     expect(summary.queuedUnopenable).toBe(1);
     expect(summary.openable).toBe(3);
     expect(summary.total).toBe(4);
+    expect(formatWorkStatusSubagentSummary(summary, { queued: 'queued', done: 'done' })).toBe('1 queued · 3 done');
   });
 });

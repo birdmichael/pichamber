@@ -20,6 +20,7 @@ import {
   overlayWorkStatusSubagentRow,
   resolveWorkStatusSubagentLabel,
   resolveWorkStatusSubagentOpen,
+  formatWorkStatusSubagentSummary,
   summarizeWorkStatusSubagentRows,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
@@ -178,12 +179,10 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   if (isPiKernel && !subagentsSlotActive) return null;
   if (rows.length === 0) return null;
 
-  const summaryInfo = summarizeWorkStatusSubagentRows(rows);
-  const summary = summaryInfo.queuedUnopenable > 0
-    ? `${summaryInfo.queuedUnopenable} ${t('chat.workStatus.subagent.queued')} · ${summaryInfo.openable} ${t('chat.workStatus.subagent.done')}`
-    : summaryInfo.busy > 0
-      ? `${summaryInfo.busy}/${summaryInfo.total}`
-      : summaryInfo.total;
+  const summary = formatWorkStatusSubagentSummary(summarizeWorkStatusSubagentRows(rows), {
+    queued: t('chat.workStatus.subagent.queued'),
+    done: t('chat.workStatus.subagent.done'),
+  });
 
   return (
     <WorkStatusCollapsibleSection
