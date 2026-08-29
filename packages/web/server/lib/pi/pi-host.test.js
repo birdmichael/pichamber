@@ -1397,6 +1397,8 @@ describe('createPiHost', () => {
       }),
     });
     const record = await host.createSession({ directory: '/tmp/project' });
+    expect(host.getSessionUsage(record.id)).toEqual({ available: false });
+    await host.reload({ sessionID: record.id });
     expect(host.getSessionUsage(record.id)).toEqual({
       available: true,
       tokens: 2560,
@@ -1404,6 +1406,49 @@ describe('createPiHost', () => {
       contextWindow: 128000,
       percent: 2,
     });
+    host.dispose();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it('reload({ sessionID }) 409s while first-send bind is in flight', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-first-send-reload-'));
+    let releaseBind;
+    const bindGate = new Promise((resolve) => {
+      releaseBind = resolve;
+    });
+    let enteredBind;
+    const bindEntered = new Promise((resolve) => {
+      enteredBind = resolve;
+    });
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({ getAvailable: async () => [] }),
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async () => {
+        enteredBind();
+        await bindGate;
+        return {
+          isStreaming: false,
+          subscribe() { return () => {}; },
+          async prompt() {},
+        };
+      },
+    });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    await bindEntered;
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'stream' }] });
+    const deadline = Date.now() + 1000;
+    while (Date.now() < deadline && host.getStatus()[record.id]?.type !== 'busy') {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(host.getStatus()[record.id]).toEqual({ type: 'busy' });
+    await expect(host.reload({ sessionID: record.id })).rejects.toMatchObject({
+      status: 409,
+      message: 'Wait for the current response to finish before reloading.',
+    });
+    releaseBind();
+    await prompt;
     host.dispose();
     fs.rmSync(home, { recursive: true, force: true });
   });

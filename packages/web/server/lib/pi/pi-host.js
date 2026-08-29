@@ -3248,6 +3248,15 @@ export const createPiHost = ({
         throw error;
       }
 
+      // First-send bind can take longer than the user bubble. Mark busy now so
+      // a targeted reload 409s before `piSession` exists or starts streaming.
+      record.status = { type: 'busy' };
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'session.status',
+        properties: { sessionID, status: { type: 'busy' } },
+      });
+
       const userMessageID = body.messageID || createMessageId();
       const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
       const userParts = [{

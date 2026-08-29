@@ -132,9 +132,13 @@ live `AgentSession`. `promptAsync` / `runCommand` / `setSessionModel` /
 `ensureLiveRecord`, which binds extensions in the Node child (or
 in-process factory) and reuses that id. Reload awaits the in-flight bind
 instead of starting a second AgentSession. Delete and host dispose mark
-the record disposed so a late bind cannot attach. `promptAsync` binds
+the record disposed so a late bind cannot attach. `promptAsync` marks the
+session busy and emits `session.status` before that bind so a targeted
+`reload({ sessionID })` 409s during first-send bind. It still binds
 before inserting the user message so a failed bind does not leave a ghost
-turn. `GET` messages/list/session stay live-free on the shell record.
+turn and returns the session to idle. `GET` messages/list/session and
+`getSessionUsage` stay live-free on the shell record (`available: false`
+until `piSession.getContextUsage` exists).
 `POST /api/pi/directory-runtime/warm` fire-and-forgets
 `ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /
@@ -664,7 +668,8 @@ or the production getter injects it.
 ## Session reload
 
 `host.reload({ sessionID })` reloads only that live session. A busy sibling
-does not 409. A busy or compacting target still 409s. Process-wide
+does not 409. A busy or compacting target still 409s, including a
+first-send bind that already marked the session busy. Process-wide
 `host.reload()` / `POST /api/config/reload` still refuse with 409 while any
 targeted session is compacting. A streaming or stuck-busy turn is aborted and
 settled as interrupted (`session.error` plus one `openchamber:notification`
