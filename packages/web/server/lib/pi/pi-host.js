@@ -1180,6 +1180,12 @@ const findLiveSessionCommand = (piSession, name) => (
   readLiveSessionCommands(piSession).find((item) => commandMatchesName(item, name))
 );
 
+const isLeftoverPlanStartStreamError = (error) => {
+  const status = Number(error?.status);
+  if (status === 404 || status === 409 || status === 400) return false;
+  return /already streaming|steer or followUp/i.test(String(error?.message || ''));
+};
+
 const liveCommandInvocation = (command, fallback) => {
   const invocation = typeof command?.invocationName === 'string'
     ? command.invocationName.trim().replace(/^\//, '')
@@ -3948,36 +3954,34 @@ export const createPiHost = ({
         await this.setSessionModel(sessionID, model);
       }
 
-      if (action === 'start') {
-        const current = typeof record.piSession?.getPlanModeState === 'function'
-          ? record.piSession.getPlanModeState()
-          : restoreSessionPlanState(
-            typeof record.sessionManager?.getEntries === 'function'
-              ? record.sessionManager.getEntries()
-              : [],
-          );
-        // Persist Plan before `/plan start` so a leftover bind stream or a
-        // late custom-entry write cannot leave GET /plan `off` for the first
-        // user prompt. A saved plan still 409s from the plugin command.
-        if (!(current?.savedPlan && !current?.enabled)) {
-          await persistRecordPlanState(record, applyMockPlanCommand(
-            current && typeof current === 'object' ? current : { enabled: false, awaitingAction: false },
-            'start',
-          ));
-          emitPlanUpdated(record, readRecordPlan(record));
-        }
-      }
-
       try {
         await this.runCommand(sessionID, {
           command: 'plan',
           arguments: action === 'exit' ? 'exit' : action,
         });
       } catch (error) {
-        // Leftover bind streaming can throw after persist-first start.
-        // A saved-plan 409 must still reject.
-        if (action === 'start' && readRecordPlan(record).status === 'active') {
-          return readRecordPlan(record);
+        // Leftover bind streaming can throw from `/plan start`. Persist Plan
+        // so GET is not `off` for the first user prompt. Missing `/plan` 404
+        // and a saved-plan 409 must still reject.
+        if (action === 'start' && isLeftoverPlanStartStreamError(error)) {
+          const current = typeof record.piSession?.getPlanModeState === 'function'
+            ? record.piSession.getPlanModeState()
+            : restoreSessionPlanState(
+              typeof record.sessionManager?.getEntries === 'function'
+                ? record.sessionManager.getEntries()
+                : [],
+            );
+          if (!(current?.savedPlan && !current?.enabled)) {
+            await persistRecordPlanState(record, applyMockPlanCommand(
+              current && typeof current === 'object' ? current : { enabled: false, awaitingAction: false },
+              'start',
+            ));
+            const persisted = readRecordPlan(record);
+            if (persisted.status === 'active') {
+              emitPlanUpdated(record, persisted);
+              return persisted;
+            }
+          }
         }
         throw error;
       }

@@ -433,11 +433,12 @@ failure is an HTTP error, not an empty `off`.
 409 while the session is compacting, streaming, or busy. `start` /
 `exit` / `save` / `implement` with a live `/plan` only prompt — they
 must not 409 on a leftover `isStreaming` or busy flag after a Goal,
-shell bind, or ordinary send already finished. `start` persists
-Plan-enabled state before `session.prompt("/plan start")` so a
-just-created session cannot stay `off` for the first user prompt. A leftover
-streaming throw after that persist still returns `active`. Successful
-actions emit `pi.plan.updated`. `start` that leaves status `off` is a 500.
+shell bind, or ordinary send already finished. A leftover streaming throw
+from `session.prompt("/plan start")` still persists Plan-enabled state and
+returns `active`, so a just-created session cannot stay `off` for the first
+user prompt. Missing live `/plan` is still 404. A saved-plan 409 still
+rejects. Successful actions emit `pi.plan.updated`. `start` that leaves
+status `off` is a 500.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.
