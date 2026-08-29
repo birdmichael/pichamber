@@ -65,7 +65,7 @@ import {
 } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { usePlanDetection } from '@/hooks/usePlanDetection';
-import { isSettledAssistantMessage } from '@/hooks/useSessionActivity';
+import { resolveSessionActivity } from '@/hooks/useSessionActivity';
 import { useI18n } from '@/lib/i18n';
 import { isMobileSurfaceRuntime } from '@/lib/runtimeSurface';
 import { isVSCodeRuntime } from '@/lib/desktop';
@@ -738,25 +738,16 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }, [active, currentSessionId, isPiKernel]);
 
     const sessionIsWorking = React.useMemo(() => {
-        if (!currentSessionId || sessionPermissions.length > 0 || sessionQuestions.length > 0 || hasPendingPiExtensionUi) {
+        if (!currentSessionId || hasPendingPiExtensionUi) {
             return false;
         }
-
-        const statusType = sessionStatusForCurrent.type ?? 'idle';
-        if (statusType === 'busy' || statusType === 'retry') {
-            return true;
-        }
-
-        const lastMessage = sessionMessages[sessionMessages.length - 1]?.info as Message | undefined;
-        if (isSettledAssistantMessage(lastMessage)) {
-            return false;
-        }
-        return Boolean(
-            lastMessage
-            && lastMessage.role === 'assistant'
-            && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number',
-        );
-    }, [currentSessionId, hasPendingPiExtensionUi, sessionMessages, sessionPermissions.length, sessionQuestions.length, sessionStatusForCurrent.type]);
+        return resolveSessionActivity({
+            sessionId: currentSessionId,
+            status: sessionStatusForCurrent,
+            lastMessage: sessionMessages[sessionMessages.length - 1]?.info,
+            hasBlockingPrompt: sessionPermissions.length > 0 || sessionQuestions.length > 0,
+        }).isWorking;
+    }, [currentSessionId, hasPendingPiExtensionUi, sessionMessages, sessionPermissions.length, sessionQuestions.length, sessionStatusForCurrent]);
     const hasOverlayChrome = sessionTranscriptHasChrome({
         messageCount: 0,
         sessionIsWorking: false,

@@ -19,8 +19,16 @@ const IDLE_RESULT: SessionActivityResult = {
   isCooldown: false,
 };
 
+export type SessionActivityMessage = {
+  role?: string;
+  time?: {
+    created?: number;
+    completed?: number;
+  };
+} | null | undefined;
+
 export const isSettledAssistantMessage = (
-  message: { role?: string; time?: { completed?: number } } | null | undefined,
+  message: SessionActivityMessage,
 ): boolean => (
   Boolean(
     message
@@ -41,7 +49,7 @@ export const isSettledAssistantMessage = (
 export function resolveSessionActivity(input: {
   sessionId?: string | null;
   status?: { type?: string } | null;
-  lastMessage?: { role?: string; time?: { completed?: number } } | null;
+  lastMessage?: SessionActivityMessage;
   hasBlockingPrompt?: boolean;
 }): SessionActivityResult {
   if (!input.sessionId) return IDLE_RESULT;
@@ -83,7 +91,7 @@ export function useSessionActivity(sessionId: string | null | undefined, directo
     resolveSessionActivity({
       sessionId,
       status,
-      lastMessage: messages[messages.length - 1] as { role?: string; time?: { completed?: number } } | undefined,
+      lastMessage: messages[messages.length - 1],
       hasBlockingPrompt: permissions.length > 0 || questions.length > 0,
     })
   ), [sessionId, status, messages, permissions, questions]);
