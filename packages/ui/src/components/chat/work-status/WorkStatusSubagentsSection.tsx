@@ -25,6 +25,7 @@ import {
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
 import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
+import { useWorkStatusNavigate } from './workStatusNavigate';
 
 type Props = {
   sessionId: string | null;
@@ -103,6 +104,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const setSectionExpanded = useUIStore((state) => state.setWorkStatusSectionExpanded);
+  const onNavigate = useWorkStatusNavigate();
 
   const rows = React.useMemo<ChildRow[]>(() => {
     if (isPiKernel) {
@@ -160,7 +162,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
 
   const openChildSession = React.useCallback((row: ChildRow) => {
     if (!row.openable) return;
-    openSubagentChildSession({
+    const opened = openSubagentChildSession({
       sessionID: row.sessionID,
       parentSessionID: sessionId,
       directory: resolveSubagentChildDirectory(row, directory || effectiveDirectory),
@@ -172,7 +174,8 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       setCurrentSession,
       openContextPanelTab,
     });
-  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, sessionId, setCurrentSession]);
+    if (opened) onNavigate?.();
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, onNavigate, openContextPanelTab, sessionId, setCurrentSession]);
 
   useReportWorkStatusPresence('subagents', rows.length > 0);
 

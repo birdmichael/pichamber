@@ -1,6 +1,8 @@
 import { WALKTHROUGH_MIN_WIDTH } from '@/lib/surfaces/registry';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 
+import type { MobileWorkspaceTab } from './mobileWorkspaceTabs';
+
 const MOBILE_REVIEW_MODES = ['pr', 'diff', 'walkthrough'] as const;
 
 export type MobileReviewMode = (typeof MOBILE_REVIEW_MODES)[number];
@@ -83,3 +85,42 @@ export const closeMobileReviewOverlay = (
   useUIStore.getState().closeContextPanel(key);
   return true;
 };
+
+export type MobileContextPanelRoute =
+  | { type: 'workspace'; tab: MobileWorkspaceTab }
+  | { type: 'review' }
+  | { type: 'none' };
+
+/**
+ * Map a Desktop context-panel tab onto the mobile workspace / review host.
+ *
+ * Work Status rows still write `openContextSurface` / `openContextPanelTab` /
+ * `openContextOverview`. Mobile never mounts ContextPanel, so MobileApp
+ * listens and opens the existing drawer instead of a second rail.
+ */
+export const routeMobileContextPanel = (
+  tab: { mode: string; targetPath?: string | null } | null | undefined,
+): MobileContextPanelRoute => {
+  if (!tab) return { type: 'none' };
+  switch (tab.mode) {
+    case 'git':
+      return { type: 'workspace', tab: 'changes' };
+    case 'diff':
+      return tab.targetPath ? { type: 'review' } : { type: 'workspace', tab: 'changes' };
+    case 'file':
+      return { type: 'workspace', tab: 'files' };
+    case 'context':
+    case 'notes':
+      return { type: 'workspace', tab: 'notes' };
+    case 'plan':
+      return { type: 'workspace', tab: 'plan' };
+    case 'terminal':
+      return { type: 'workspace', tab: 'terminal' };
+    case 'pr':
+    case 'walkthrough':
+      return { type: 'review' };
+    default:
+      return { type: 'none' };
+  }
+};
+

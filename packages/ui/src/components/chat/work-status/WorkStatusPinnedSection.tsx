@@ -7,6 +7,7 @@ import { getContextObligatoryMessages } from '@/lib/contextObligatoryMessages';
 import { setContextObligatoryMessage } from '@/sync/session-actions';
 import { WorkStatusRow, WorkStatusSection } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
+import { useWorkStatusNavigate } from './workStatusNavigate';
 import type { State } from '@/sync/types';
 
 type Props = {
@@ -25,6 +26,7 @@ export const WorkStatusPinnedSection: React.FC<Props> = ({ sessionId, directory 
   const session = useSession(sessionId ?? '', directory ?? undefined);
   const parts = useDirectorySync(React.useCallback((state: State) => state.part, []));
   const [busyId, setBusyId] = React.useState<string | null>(null);
+  const onNavigate = useWorkStatusNavigate();
 
   const pinned = React.useMemo(() => {
     const entries = getContextObligatoryMessages(session);
@@ -75,7 +77,8 @@ export const WorkStatusPinnedSection: React.FC<Props> = ({ sessionId, directory 
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
     window.location.hash = target;
-  }, []);
+    onNavigate?.();
+  }, [onNavigate]);
 
   useReportWorkStatusPresence('pinned', pinned.length > 0);
 

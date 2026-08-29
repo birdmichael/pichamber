@@ -1,29 +1,15 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import { ScrollShadow } from '@/components/ui/ScrollShadow';
-import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/stores/useUIStore';
-import { useMcpFeaturePluginActive, usePiKernel } from '@/lib/usePiKernel';
-import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { WORK_STATUS_PANEL_WIDTH } from './useWorkStatusVisibility';
 import { PARENT_CHAT_MIN_WIDTH } from '@/lib/surfaces/chatColumnLayout';
-import { WorkStatusGoalRow } from './WorkStatusGoalRow';
-import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
-import { WorkStatusUsageSection } from './WorkStatusUsageSection';
-import { WorkStatusSubagentsSection } from './WorkStatusSubagentsSection';
-import { WorkStatusTasksSection } from './WorkStatusTasksSection';
-import { WorkStatusMcpSection } from './WorkStatusMcpSection';
-import { WorkStatusPinnedSection } from './WorkStatusPinnedSection';
-import { WorkStatusContextSection } from './WorkStatusContextSection';
-import { WorkStatusSectionsDialog } from './WorkStatusSectionsDialog';
+import { WorkStatusContents } from './WorkStatusContents';
 import {
-  areAllWorkStatusSectionsHidden,
   getWorkStatusPanelPresentation,
-  isWorkStatusSectionVisible,
 } from './sections';
-import { WorkStatusPresenceProvider } from './presence';
-import { Icon } from '@/components/icon/Icon';
+import { useWorkStatusSectionVisibility } from './useWorkStatusSectionVisibility';
+import { isWorkStatusDismissExemptTarget } from './workStatusDismiss';
 
 type Props = {
   /** Null on a new-session draft: repository readouts still apply. */
@@ -69,25 +55,10 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   const { t } = useI18n();
   const setScrollTop = useUIStore((state) => state.setWorkStatusScrollTop);
   const setOverlayOpen = useUIStore((state) => state.setWorkStatusOverlayOpen);
-  const hiddenSections = useUIStore((state) => state.workStatusHiddenSections);
-  const isPiKernel = usePiKernel();
-  const isMcpFeaturePluginActive = useMcpFeaturePluginActive();
-  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
-  const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
-  const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
-  const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive, xaiSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive, xaiSlotActive],
-  );
-  const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
+  const { allSectionsHidden } = useWorkStatusSectionVisibility();
   // Starts optimistic: sections report after their first commit, and rendering
   // nothing on the way in would make the card flash out and back on arrival.
   const [renderedSections, setRenderedSections] = React.useState(1);
-  const sectionVisible = React.useCallback(
-    (sectionId: Parameters<typeof isWorkStatusSectionVisible>[1]) =>
-      isWorkStatusSectionVisible(hiddenSections, sectionId, sectionContext),
-    [hiddenSections, sectionContext],
-  );
   const frameRef = React.useRef<number | null>(null);
 
   // Restoring the offset has to happen the moment the scroller attaches, and
@@ -104,8 +75,7 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
   // re-enable sections. The previous `renderedSections > 0` guard is preserved
   // for the transient "no data yet" state so the panel doesn't flash a bare
   // bordered card on first mount.
-  const allSectionsHidden = areAllWorkStatusSectionsHidden(hiddenSections, sectionContext);
-  const { interactive, showEmptyState } = getWorkStatusPanelPresentation({
+  const { interactive } = getWorkStatusPanelPresentation({
     visible,
     contentMounted,
     renderedSections,
@@ -158,9 +128,8 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
       if (overlayRef.current?.contains(target)) return;
-      // The header toggle closes it on its own; letting this fire too would
-      // close and immediately reopen.
-      if (target?.closest('[data-work-status-toggle]')) return;
+      // Sections / Goal dialogs portal to document.body.
+      if (isWorkStatusDismissExemptTarget(target)) return;
       setOverlayOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -237,58 +206,16 @@ export const WorkStatusPanel: React.FC<Props> = ({ sessionId, directory, visible
         pointerEvents: interactive ? undefined : 'none',
       }}
     >
-      <div className="flex h-7 shrink-0 items-center px-3 pr-8">
-        <h2 className="text-xs font-normal text-muted-foreground">{t('chat.workStatus.ariaLabel')}</h2>
-      </div>
-      <button
-        type="button"
-        aria-label={t('chat.workStatus.sections.open')}
-        onClick={() => setSectionsDialogOpen(true)}
-        className="absolute right-2 top-1.5 z-10 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <Icon name="equalizer-2" className="size-4" />
-      </button>
-
-      {contentMounted ? (
-      <WorkStatusPresenceProvider onChange={setRenderedSections}>
-      <ScrollShadow
-        ref={restore}
+      <WorkStatusContents
+        sessionId={sessionId}
+        directory={directory}
+        repositoryEnabled={repositoryEnabled}
+        contentMounted={contentMounted}
+        visible={visible}
+        restoreScroll={restore}
         onScroll={handleScroll}
-        size={24}
-        className="oc-hide-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
-      >
-        {sectionVisible('tasks') ? <WorkStatusTasksSection sessionId={sessionId} directory={directory} /> : null}
-        <WorkStatusPrimaryGroup
-          sessionId={sessionId}
-          directory={directory}
-          showSession={sectionVisible('session')}
-          showRepository={repositoryEnabled && sectionVisible('repository')}
-          goalRow={<WorkStatusGoalRow sessionId={sessionId} directory={directory} />}
-        />
-        {sectionVisible('usage') ? <WorkStatusUsageSection /> : null}
-        {sectionVisible('subagents') ? <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} /> : null}
-        {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} /> : null}
-        {sectionVisible('pinned') ? <WorkStatusPinnedSection sessionId={sessionId} directory={directory} /> : null}
-        {sectionVisible('contextSources') ? <WorkStatusContextSection sessionId={sessionId} directory={directory} /> : null}
-      </ScrollShadow>
-      </WorkStatusPresenceProvider>
-      ) : null}
-
-      {showEmptyState ? (
-        <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
-          <span className="text-sm text-muted-foreground">{t('chat.workStatus.sections.allHidden')}</span>
-          <Button
-            variant="link"
-            size="xs"
-            onClick={() => setSectionsDialogOpen(true)}
-            className="mt-2 normal-case text-muted-foreground hover:text-foreground"
-          >
-            {t('chat.workStatus.sections.open')}
-          </Button>
-        </div>
-      ) : null}
-
-      <WorkStatusSectionsDialog open={sectionsDialogOpen} onOpenChange={setSectionsDialogOpen} />
+        onPresenceChange={setRenderedSections}
+      />
     </aside>
   );
 };
