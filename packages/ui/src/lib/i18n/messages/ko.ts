@@ -3194,6 +3194,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.subagent.blocked': '차단됨',
   'chat.workStatus.subagent.failed': '실패',
   'chat.workStatus.subagent.paused': '일시 중지',
+  'chat.workStatus.subagent.queued': '대기 중',
+  'chat.workStatus.subagent.stopped': '중지됨',
   'chat.workStatus.subagent.namedForeground': '{name} · 포그라운드',
   'chat.workStatus.subagent.namedBackground': '{name} · 백그라운드',
   'chat.workStatus.section.contextBreakdown': '컨텍스트 소스',

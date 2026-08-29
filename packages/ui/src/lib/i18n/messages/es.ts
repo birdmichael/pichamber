@@ -3195,6 +3195,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.subagent.blocked': 'bloqueado',
   'chat.workStatus.subagent.failed': 'falló',
   'chat.workStatus.subagent.paused': 'en pausa',
+  'chat.workStatus.subagent.queued': 'en cola',
+  'chat.workStatus.subagent.stopped': 'detenido',
   'chat.workStatus.subagent.namedForeground': '{name} · Primer plano',
   'chat.workStatus.subagent.namedBackground': '{name} · Segundo plano',
   'chat.workStatus.section.contextBreakdown': 'Fuentes de contexto',

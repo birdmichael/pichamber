@@ -10,7 +10,9 @@
 // hydrate ignore that parent so the conversation stays a root. Do not invent
 // a second session store.
 // Session list tail-scans the last pichamber.metadata; it does not full-read
-// jsonl again just to find archived / parentID / Goal mark. A leftover
+// jsonl again just to find archived / parentID / Goal mark. When that latest
+// entry dropped parentID (written once near the start of a long child
+// transcript), a bounded head scan still nests. A leftover
 // piGoal.active is listed inactive unless the latest goal-state still holds
 // the mutex (see reconcileListedPiGoalMetadata). Archived files also move to
 // a sibling `archive/` so archived=false never opens them.
@@ -55,6 +57,7 @@ export const readPersistedSessionMetadataFromFile = (file) => {
 // List hot path: scan from the end for the last pichamber.metadata and stop.
 // Do not full-read jsonl just to count messages or rebuild allMessagesText.
 export const LIST_METADATA_TAIL_CHUNK_SIZE = 8 * 1024;
+export const LIST_METADATA_HEAD_CHUNK_SIZE = 32 * 1024;
 
 const defaultListMetadataIo = {
   openSync: (file, flags) => fs.openSync(file, flags),
@@ -138,6 +141,46 @@ export const readPersistedSessionMetadataFromFileTail = (file, options = {}) => 
   readLatestCustomEntryDataFromFileTail(file, PICHAMBER_METADATA_CUSTOM_TYPE, options)
 );
 
+// parentID is written once near the start of adapter child jsonl. A later
+// 8KB tail window of a long transcript will not see it. Head-scan a bounded
+// prefix so list/nest still finds the parent without full-reading the file.
+export const readPersistedSessionMetadataFromFileHead = (file, options = {}) => {
+  if (typeof file !== 'string' || !file) return undefined;
+  const io = options.io && typeof options.io === 'object'
+    ? { ...defaultListMetadataIo, ...options.io }
+    : defaultListMetadataIo;
+  const requestedChunk = Number(options.chunkSize);
+  const chunkSize = Number.isFinite(requestedChunk) && requestedChunk > 0
+    ? Math.floor(requestedChunk)
+    : LIST_METADATA_HEAD_CHUNK_SIZE;
+  let fd;
+  try {
+    fd = io.openSync(file, 'r');
+  } catch {
+    return undefined;
+  }
+  try {
+    const fileSize = Number(io.fstatSync(fd)?.size) || 0;
+    if (fileSize <= 0) return undefined;
+    const length = Math.min(chunkSize, fileSize);
+    const buffer = Buffer.allocUnsafe(length);
+    const bytesRead = io.readSync(fd, buffer, 0, length, 0);
+    const lines = buffer.toString('utf8', 0, bytesRead).split(/\r?\n/);
+    for (const line of lines) {
+      const data = parsePersistedSessionMetadataLine(line);
+      if (data) return data;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    try {
+      io.closeSync(fd);
+    } catch {
+    }
+  }
+};
+
 export const readPersistedParentID = (metadata) => {
   if (!isRecord(metadata)) return undefined;
   const parentID = typeof metadata.parentID === 'string' ? metadata.parentID.trim() : '';
@@ -170,9 +213,14 @@ const hasAdapterSubagentRunMarker = (metadata) => {
 // A `subagentRun` marker on that same top-level file is a stolen attach —
 // ignore it so the conversation stays a root.
 export const readListedParentID = (metadata, sessionFile) => {
-  const parentID = readPersistedParentID(metadata);
+  const fromMeta = readPersistedParentID(metadata);
+  const head = !fromMeta && typeof sessionFile === 'string' && sessionFile
+    ? readPersistedSessionMetadataFromFileHead(sessionFile)
+    : undefined;
+  const parentID = fromMeta || readPersistedParentID(head);
   if (!parentID) return undefined;
-  if (isTopLevelUserSessionFile(sessionFile) && hasAdapterSubagentRunMarker(metadata)) {
+  const markerSource = metadata || head;
+  if (isTopLevelUserSessionFile(sessionFile) && hasAdapterSubagentRunMarker(markerSource)) {
     return undefined;
   }
   return parentID;

@@ -3192,6 +3192,8 @@ export const dict = {
   'chat.workStatus.subagent.blocked': 'bloqué',
   'chat.workStatus.subagent.failed': 'échec',
   'chat.workStatus.subagent.paused': 'en pause',
+  'chat.workStatus.subagent.queued': 'en file d\'attente',
+  'chat.workStatus.subagent.stopped': 'arrêté',
   'chat.workStatus.subagent.namedForeground': '{name} · Premier plan',
   'chat.workStatus.subagent.namedBackground': '{name} · Arrière-plan',
   'chat.workStatus.section.contextBreakdown': 'Sources de contexte',

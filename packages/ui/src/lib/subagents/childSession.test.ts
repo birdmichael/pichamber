@@ -2,10 +2,20 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   canOpenSubagentChildSession,
+  contextChatScopeKey,
   openSubagentChildSession,
   resolveParentDirectoryForChildIdle,
   resolveSubagentChildDirectory,
 } from './childSession';
+
+describe('contextChatScopeKey', () => {
+  test('keys the panel to the parent session', () => {
+    expect(contextChatScopeKey('ses_parent')).toBe('session:ses_parent');
+    expect(contextChatScopeKey('  ses_parent  ')).toBe('session:ses_parent');
+    expect(contextChatScopeKey('')).toBe('');
+    expect(contextChatScopeKey(null)).toBe('');
+  });
+});
 
 describe('canOpenSubagentChildSession', () => {
   test('requires both a session id and a directory', () => {
@@ -24,6 +34,7 @@ describe('openSubagentChildSession', () => {
     };
     const openedOk = openSubagentChildSession({
       sessionID: 'ses_child',
+      parentSessionID: 'ses_parent',
       directory: '/repo',
       label: 'scout',
       readOnly: false,
@@ -42,6 +53,7 @@ describe('openSubagentChildSession', () => {
       dedupeKey: 'session:ses_child',
       label: 'scout',
       readOnly: false,
+      sessionScope: 'session:ses_parent',
     }]);
   });
 

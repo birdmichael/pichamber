@@ -1,11 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { writeFeaturePlugins } from './feature-plugins.js';
 import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
-import { readPersistedSessionMetadataFromFile } from './session-metadata.js';
+import {
+  PICHAMBER_METADATA_CUSTOM_TYPE,
+  readPersistedSessionMetadataFromFile,
+} from './session-metadata.js';
 import { applySessionListQuery } from './session-list-query.js';
 
 const tempHomes = [];
@@ -324,6 +327,50 @@ describe('Pi host subagent runs', () => {
     })]);
     expect(await host.listSessionChildren(parent.id)).toEqual([]);
     expect(host.listSessions('/tmp/project').map((record) => record.id)).toEqual(before);
+  });
+
+  it('does not retry attaching a cleaned-up status session file', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const tmpdir = path.join(home, 'tmp');
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    const runId = 'run_cleaned_up';
+    const missingSessionFile = path.join(tmpdir, 'removed', 'session.jsonl');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', runId);
+    fs.mkdirSync(runDir, { recursive: true });
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId,
+      sessionId: parent.id,
+      state: 'running',
+      mode: 'async',
+      sessionFile: missingSessionFile,
+    }));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(await host.listSubagentRuns(parent.id)).toEqual({
+        runs: [expect.objectContaining({
+          runId,
+          state: 'running',
+          sessionID: null,
+          openable: false,
+        })],
+      });
+      expect(warning).not.toHaveBeenCalled();
+    } finally {
+      warning.mockRestore();
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
   });
 
   it('does not mint an empty chat for a finished tool-call that never got a child id', async () => {
@@ -1009,5 +1056,84 @@ describe('Pi host subagent runs', () => {
       openable: true,
     })]);
     host.dispose();
+  });
+
+  it('lists a nested child jsonl for an unhydrated parent without status.json', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = path.join(home, 'tmp');
+    const parentId = '01a04836-e9bb-7f89-b60b-5b9346813f73';
+    const childId = 'nested-unhydrated-child';
+    const sessionDir = sessionDirForCwd('/tmp/project', home);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    const parentFile = path.join(sessionDir, `2026-08-28T11-52-33-467Z_${parentId}.jsonl`);
+    fs.writeFileSync(parentFile, `${JSON.stringify({
+      type: 'session',
+      id: parentId,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'message',
+      id: 'msg_parent',
+      timestamp: '2026-08-28T11:52:33.467Z',
+      message: { role: 'user', content: [{ type: 'text', text: 'Parent prompt' }] },
+    })}\n`);
+    const childFile = path.join(sessionDir, parentId, 'run_scout', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'custom',
+      customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+      data: { parentID: parentId },
+    })}\n${JSON.stringify({
+      type: 'message',
+      id: 'msg_child',
+      timestamp: '2026-08-28T11:53:00.000Z',
+      message: { role: 'user', content: [{ type: 'text', text: 'Inspect without status.json' }] },
+    })}\n`);
+
+    try {
+      const host = createPiHost({
+        home,
+        defaultDirectory: '/tmp/project',
+        createModelRuntime: async () => ({ getAvailable: async () => [] }),
+        createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+        createSession: async ({ sessionManager } = {}) => createInMemoryPiSession({
+          sessionId: typeof sessionManager?.getSessionId === 'function'
+            ? sessionManager.getSessionId()
+            : undefined,
+        }),
+        async listPersistedSessionsInDir() {
+          const stat = fs.statSync(parentFile);
+          return [{
+            id: parentId,
+            path: parentFile,
+            cwd: '/tmp/project',
+            created: stat.birthtime || stat.mtime,
+            modified: stat.mtime,
+            firstMessage: 'Parent prompt',
+          }];
+        },
+      });
+
+      expect(host.listSessions('/tmp/project')).toEqual([]);
+      const listed = await host.listSessionInfos('/tmp/project');
+      expect(listed.find((info) => info.id === parentId)).toMatchObject({
+        id: parentId,
+      });
+      expect(listed.find((info) => info.id === parentId)?.parentID).toBeUndefined();
+      expect(listed.find((info) => info.id === childId)).toMatchObject({
+        id: childId,
+        parentID: parentId,
+      });
+      expect(listed.some((info) => info.parentID === parentId && info.id !== childId)).toBe(false);
+      host.dispose();
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+    }
   });
 });

@@ -62,6 +62,7 @@ type ContextPanelTabDescriptor = {
   readOnly?: boolean;
   stagedDiff?: boolean;
   diffScope?: PendingDiffScope | null;
+  sessionScope?: string | null;
 };
 
 type ContextPanelDirectoryState = {
@@ -235,6 +236,11 @@ const findContextPanelTabOwner = (
   const scopeKey = readContextBrowserScopeKey(directory);
   if (scopeKey !== directory && byDirectory[scopeKey]?.tabs.some((tab) => tab.id === tabID)) {
     return scopeKey;
+  }
+  for (const [key, panel] of Object.entries(byDirectory)) {
+    if (key.startsWith('session:') && panel.tabs.some((tab) => tab.id === tabID)) {
+      return key;
+    }
   }
   return null;
 };
@@ -1342,9 +1348,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
+          const sessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
           const writeKey = tab.mode === 'browser'
             ? readContextBrowserScopeKey(normalizedDirectory)
-            : normalizedDirectory;
+            : tab.mode === 'chat' && sessionScope
+              ? sessionScope
+              : normalizedDirectory;
 
           set((state) => {
             const prev = state.contextPanelByDirectory[writeKey];
@@ -1373,6 +1382,15 @@ export const useUIStore = create<UIStore>()(
                 ...sessionCurrent,
                 isOpen: true,
                 tabs: sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser'),
+                activeTabId: nextWrite.activeTabId,
+                touchedAt: Date.now(),
+              };
+            } else if (tab.mode === 'chat' && writeKey !== normalizedDirectory) {
+              const sessionPrev = byDirectory[normalizedDirectory];
+              const sessionCurrent = touchContextPanelState(sessionPrev);
+              byDirectory[normalizedDirectory] = {
+                ...sessionCurrent,
+                isOpen: true,
                 activeTabId: nextWrite.activeTabId,
                 touchedAt: Date.now(),
               };

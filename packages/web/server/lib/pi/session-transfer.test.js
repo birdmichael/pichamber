@@ -15,6 +15,9 @@ import {
   persistFacadeMessages,
   piMessagesFromFacadeEntry,
   readPiCodingAgentVersion,
+  applySessionRuntimeFromEntries,
+  lastModelChangeFromEntries,
+  lastThinkingLevelChangeFromEntries,
   resolveUsableFacadeModel,
   transcriptEntriesForHydrate,
 } from './session-transfer.js';
@@ -661,6 +664,39 @@ describe('session-transfer', () => {
       modelID: 'example-model',
       model: { providerID: 'example-provider', modelID: 'example-model' },
     });
+    expect(resolveUsableFacadeModel({ provider: 'cc', modelId: 'claude-opus-5' })).toEqual({
+      providerID: 'cc',
+      modelID: 'claude-opus-5',
+      model: { providerID: 'cc', modelID: 'claude-opus-5' },
+    });
+  });
+
+  it('applies jsonl model_change and thinking_level_change onto a live session', () => {
+    const entries = [
+      { type: 'model_change', provider: 'cc', modelId: 'claude-opus-5' },
+      { type: 'thinking_level_change', thinkingLevel: 'high' },
+      { type: 'message', id: 'msg_1' },
+    ];
+    expect(lastModelChangeFromEntries(entries)).toEqual({
+      providerID: 'cc',
+      modelID: 'claude-opus-5',
+      model: { providerID: 'cc', modelID: 'claude-opus-5' },
+    });
+    expect(lastThinkingLevelChangeFromEntries(entries)).toBe('high');
+
+    const applied = {};
+    const piSession = {
+      setModel(next) {
+        applied.model = next;
+      },
+      setThinkingLevel(level) {
+        applied.thinking = level;
+      },
+    };
+    applySessionRuntimeFromEntries(piSession, entries);
+    expect(applied).toEqual({});
+    expect(piSession.currentModel).toEqual({ id: 'claude-opus-5', provider: 'cc' });
+    expect(piSession.thinkingLevel).toBe('high');
   });
 
   it('maps Pi session entries onto facade messages', () => {

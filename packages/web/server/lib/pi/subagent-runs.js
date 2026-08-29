@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const ASYNC_RUNS_DIR = 'async-subagent-runs';
 const STATUS_FILE = 'status.json';
-const ACTIVE_STATES = new Set(['queued', 'running']);
+const ACTIVE_STATES = new Set(['running']);
 const BLOCKED_STATES = new Set(['blocked', 'paused']);
 const DONE_STATES = new Set(['complete', 'completed', 'done', 'success']);
 const FAILED_STATES = new Set(['failed', 'error', 'rejected']);
@@ -30,12 +30,12 @@ export const isSubagentsSlotActive = (payload) => {
 
 export const normalizeSubagentRunState = (value) => {
   const state = asTrimmedString(value).toLowerCase();
+  if (state === 'queued') return 'queued';
   if (ACTIVE_STATES.has(state)) return 'running';
   if (BLOCKED_STATES.has(state) || state === 'blocked') return state === 'paused' ? 'paused' : 'blocked';
   if (DONE_STATES.has(state)) return 'done';
   if (FAILED_STATES.has(state)) return 'failed';
   if (STOPPED_STATES.has(state)) return 'stopped';
-  if (state === 'queued') return 'queued';
   return state || 'running';
 };
 
@@ -146,6 +146,44 @@ const firstStepLabel = (status) => {
   return '';
 };
 
+const adapterSteps = (status) => (Array.isArray(status?.steps) ? status.steps : []);
+
+export const isLiveRunState = (state) => (
+  state === 'queued' || state === 'running' || state === 'blocked' || state === 'paused'
+);
+
+/**
+ * Workflow `status.json` often stays `complete` after the parent tool detaches
+ * while a child step is still running or waiting on the supervisor.
+ */
+export const readAdapterLifecycleState = (status) => {
+  const stepStates = adapterSteps(status).map((step) => (
+    normalizeSubagentRunState(step?.status || step?.state)
+  ));
+  const live = stepStates.find((state) => isLiveRunState(state));
+  if (live) return live;
+  if (stepStates.includes('failed')) return 'failed';
+  if (stepStates.includes('stopped')) return 'stopped';
+  return normalizeSubagentRunState(status?.state);
+};
+
+const readAdapterBlocker = (source) => {
+  if (!isRecord(source)) return null;
+  const tool = asTrimmedString(source.currentTool).toLowerCase();
+  const args = asTrimmedString(source.currentToolArgs).toLowerCase();
+  if (tool === 'contact_supervisor' || args.includes('interview')) return 'question';
+  if (tool === 'question' || tool.endsWith('_question')) return 'question';
+  return null;
+};
+
+const readStatusBlocker = (status, step) => {
+  if (step) return readAdapterBlocker(step);
+  const liveStep = adapterSteps(status).find((item) => (
+    isLiveRunState(normalizeSubagentRunState(item?.status || item?.state))
+  ));
+  return readAdapterBlocker(liveStep) || readAdapterBlocker(status);
+};
+
 /**
  * Async `workflowScript` launches omit top-level `agent` / `task`. The name
  * lives in `runs.run("disk-scan", { agent: "worker", task: \`…\` })`.
@@ -186,9 +224,10 @@ export const mapStatusToSubagentRun = (status, {
     candidates: [status.childSessionId],
   });
   const agent = firstAgentName(status) || 'subagent';
-  const state = normalizeSubagentRunState(status.state);
+  const state = readAdapterLifecycleState(status);
   const mode = normalizeSubagentRunMode(status.mode, sessionFile ? 'background' : 'foreground');
   if (!mode) return null;
+  const blocker = readStatusBlocker(status);
   return {
     runId,
     parentID: asTrimmedString(parentID),
@@ -204,7 +243,66 @@ export const mapStatusToSubagentRun = (status, {
     asyncDir: asTrimmedString(asyncDir) || null,
     startedAt: typeof status.startedAt === 'number' ? status.startedAt : null,
     endedAt: typeof status.endedAt === 'number' ? status.endedAt : null,
+    ...(blocker ? { blocker } : {}),
   };
+};
+
+const mapStepToSubagentRun = (status, step, {
+  parentID,
+  asyncDir,
+  index,
+} = {}) => {
+  const base = mapStatusToSubagentRun(status, { parentID, asyncDir });
+  if (!base || !isRecord(step)) return null;
+  const sessionFile = asTrimmedString(step.sessionFile);
+  const sessionID = resolveChildSessionId({
+    parentID,
+    sessionFile,
+    candidates: [step.childSessionId, step.sessionId, step.sessionID],
+  });
+  const name = asTrimmedString(step.agent) || base.name;
+  const title = asTrimmedString(step.label || step.workflowKey || step.task) || name;
+  const state = normalizeSubagentRunState(step.status || step.state || status.state);
+  const blocker = readStatusBlocker(status, step);
+  const stepRunId = asTrimmedString(step.runId);
+  const next = {
+    ...base,
+    runId: sessionID
+      ? `${base.runId}:${sessionID}`
+      : (stepRunId && stepRunId !== base.runId ? `${base.runId}:${stepRunId}` : `${base.runId}:${index}`),
+    sessionFile: sessionFile || base.sessionFile,
+    sessionID: sessionID || null,
+    name,
+    role: asTrimmedString(step.role) || name,
+    state,
+    title,
+    startedAt: typeof step.startedAt === 'number' ? step.startedAt : base.startedAt,
+    endedAt: typeof step.endedAt === 'number' ? step.endedAt : base.endedAt,
+  };
+  if (blocker) next.blocker = blocker;
+  else delete next.blocker;
+  return next;
+};
+
+/**
+ * One workflow `runId` can fan out to several child session files. Collapse
+ * only when there is a single child (or none yet). Different sessionIDs stay
+ * separate rows so Work Status does not hide a finished sibling.
+ */
+export const mapStatusToSubagentRuns = (status, options = {}) => {
+  const base = mapStatusToSubagentRun(status, options);
+  if (!base) return [];
+  const steps = adapterSteps(status).filter((step) => (
+    asTrimmedString(step?.sessionFile)
+    || isLiveRunState(normalizeSubagentRunState(step?.status || step?.state))
+  ));
+  const childFiles = steps.filter((step) => asTrimmedString(step?.sessionFile));
+  if (childFiles.length <= 1) return [base];
+  return childFiles.map((step, index) => mapStepToSubagentRun(status, step, {
+    parentID: options.parentID,
+    asyncDir: options.asyncDir,
+    index,
+  })).filter(Boolean);
 };
 
 const listAsyncRunDirs = (root) => {
@@ -303,13 +401,14 @@ export const listAdapterRunsFromFiles = ({
       const status = readJsonFile(path.join(asyncDir, STATUS_FILE));
       if (!status) continue;
       if (parent && !parentSessionMatches(status.sessionId, parent)) continue;
-      const run = mapStatusToSubagentRun(status, {
+      for (const run of mapStatusToSubagentRuns(status, {
         parentID: parent?.id,
         asyncDir,
-      });
-      if (!run || seen.has(run.runId)) continue;
-      seen.add(run.runId);
-      runs.push(run);
+      })) {
+        if (!run || seen.has(run.runId)) continue;
+        seen.add(run.runId);
+        runs.push(run);
+      }
     }
   }
   return runs;
@@ -606,15 +705,14 @@ const readChildSessionIdFromToolFields = ({
   ],
 });
 
-const isLiveRunState = (state) => (
-  state === 'queued' || state === 'running' || state === 'blocked' || state === 'paused'
-);
-
-const sameSubagentRun = (left, right) => (
-  Boolean(left?.runId && left.runId === right?.runId)
-  || Boolean(left?.toolCallId && left.toolCallId === right?.toolCallId)
-  || Boolean(left?.sessionID && left.sessionID === right?.sessionID)
-);
+const sameSubagentRun = (left, right) => {
+  const leftSession = asTrimmedString(left?.sessionID);
+  const rightSession = asTrimmedString(right?.sessionID);
+  if (leftSession && rightSession && leftSession !== rightSession) return false;
+  return Boolean(left?.runId && left.runId === right?.runId)
+    || Boolean(left?.toolCallId && left.toolCallId === right?.toolCallId)
+    || Boolean(leftSession && leftSession === rightSession);
+};
 
 export const extractSubagentRunFromToolPart = (part, parentID) => {
   if (!isRecord(part) || asTrimmedString(part.tool).toLowerCase() !== 'subagent') return null;
@@ -683,18 +781,29 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
   };
 };
 
+const compatibleStoredRun = (existing, run) => {
+  const existingSession = asTrimmedString(existing?.sessionID);
+  const runSession = asTrimmedString(run?.sessionID);
+  if (existingSession && runSession && existingSession !== runSession) return false;
+  return true;
+};
+
 const findStoredRunId = (byId, run) => {
-  if (byId.has(run.runId)) return run.runId;
+  if (byId.has(run.runId) && compatibleStoredRun(byId.get(run.runId), run)) return run.runId;
   const toolCallId = asTrimmedString(run.toolCallId);
-  if (toolCallId && byId.has(toolCallId)) return toolCallId;
+  if (toolCallId && byId.has(toolCallId) && compatibleStoredRun(byId.get(toolCallId), run)) {
+    return toolCallId;
+  }
   if (toolCallId) {
     for (const [id, existing] of byId) {
+      if (!compatibleStoredRun(existing, run)) continue;
       if (asTrimmedString(existing.toolCallId) === toolCallId || existing.runId === toolCallId) {
         return id;
       }
     }
   }
   for (const [id, existing] of byId) {
+    if (!compatibleStoredRun(existing, run)) continue;
     if (asTrimmedString(existing.toolCallId) === run.runId) return id;
   }
   return '';
@@ -715,6 +824,7 @@ const mergeRunFields = (existing, run) => ({
   title: run.title && run.title !== run.name && run.title !== 'subagent'
     ? run.title
     : (existing.title && existing.title !== 'subagent' ? existing.title : run.title || existing.title),
+  blocker: run.blocker || existing.blocker,
 });
 
 const upsertSubagentRun = (byId, run) => {
@@ -912,9 +1022,8 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
       if (file.mode) match.mode = file.mode;
       // Adapter status.json is the child lifecycle. The parent tool often
       // completes as soon as the async workflow detaches.
-      if (file.state && (isLiveRunState(match.state) || !isLiveRunState(file.state))) {
-        match.state = file.state;
-      }
+      if (file.state) match.state = file.state;
+      if (file.blocker) match.blocker = file.blocker;
       continue;
     }
     const childId = asChildSessionId(file.sessionID, file.parentID);
@@ -937,6 +1046,7 @@ export const reconcileParentSubagentRuns = (fileRuns, liveRuns) => {
 export const toPublicSubagentRun = (run) => {
   const sessionID = asChildSessionId(run.sessionID, run.parentID);
   const toolCallId = asTrimmedString(run.toolCallId);
+  const blocker = asTrimmedString(run.blocker);
   return {
     runId: run.runId,
     parentID: run.parentID || null,
@@ -949,6 +1059,7 @@ export const toPublicSubagentRun = (run) => {
     state: run.state,
     title: run.title,
     openable: Boolean(sessionID),
+    ...(blocker === 'question' || blocker === 'permission' ? { blocker } : {}),
   };
 };
 

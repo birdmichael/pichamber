@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
 import {
   isBrowserTabIdentity,
+  mergeContextPanelChatScope,
   mergeContextPanelForBrowserScope,
   openedProjectPathSet,
   resolveBrowserScopeKey,
@@ -153,5 +154,47 @@ describe('mergeContextPanelForBrowserScope', () => {
 
     const merged = mergeContextPanelForBrowserScope(CHAT_A, session, CHAT_DRAFT_PROJECT_ID, scope);
     expect(merged?.tabs.filter((tab) => tab.id === browserTab.id)).toHaveLength(1);
+  });
+});
+
+describe('mergeContextPanelChatScope', () => {
+  const fileTab = { id: 'file:/repo/a.ts', mode: 'file' };
+  const parentAChat = { id: 'session:child-a', mode: 'chat' };
+  const parentBChat = { id: 'session:child-b', mode: 'chat' };
+
+  test('hides another parent leftover chat when the current session has its own scope', () => {
+    const directory = {
+      isOpen: true,
+      expanded: false,
+      tabs: [fileTab, parentAChat],
+      activeTabId: parentAChat.id,
+      widthByMode: {},
+      touchedAt: 1,
+    };
+    const sessionScope = {
+      isOpen: true,
+      expanded: false,
+      tabs: [parentBChat],
+      activeTabId: parentBChat.id,
+      widthByMode: {},
+      touchedAt: 2,
+    };
+
+    const merged = mergeContextPanelChatScope(PROJECT_A, directory, 'session:ses_b', sessionScope);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual([fileTab.id, parentBChat.id]);
+    expect(merged?.activeTabId).toBe(parentBChat.id);
+    expect(merged?.isOpen).toBe(true);
+  });
+
+  test('keeps directory leftover chats when there is no session scope', () => {
+    const directory = {
+      isOpen: true,
+      expanded: false,
+      tabs: [fileTab, parentAChat],
+      activeTabId: parentAChat.id,
+      widthByMode: {},
+      touchedAt: 1,
+    };
+    expect(mergeContextPanelChatScope(PROJECT_A, directory, '', undefined)).toBe(directory);
   });
 });
