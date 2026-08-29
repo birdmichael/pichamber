@@ -42,6 +42,11 @@ describe('OpenChamberLogo', () => {
   test('animates the inner glyph when requested', () => {
     const markup = renderLogo({ isAnimated: true });
     expect(markup).toContain('oc-logo-glow');
+    expect(markup).toContain('opacity');
+    expect(markup).toContain('transform');
+    expect(markup).not.toContain('filter');
+    expect(markup).not.toContain('drop-shadow');
+    expect(markup).not.toContain('border-color');
     expect(renderLogo()).not.toContain('oc-logo-glow');
   });
 });

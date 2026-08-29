@@ -148,7 +148,7 @@ The package supports macOS, Windows, and Linux desktop features. Linux AppImage 
 
 On Windows and Linux, the General setting persisted as `desktopMinimizeToTrayEnabled` keeps the app running in the tray when the main window is **closed**. Minimize — the in-app control, the native title-bar button, and the taskbar — always performs a normal window minimize, so the taskbar entry stays available.
 
-The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart; while disabled, Desktop does not create the native tray controller or start the renderer subscriptions, polling, leftover OpenCode quota refresh, or IPC updates that feed it. On Pi the tray never fetches `/api/quota/*`.
+The macOS menu bar item is enabled by default and can be disabled in General settings. The setting applies after restart; while disabled, Desktop does not create the native tray controller or start the renderer subscriptions, polling, leftover OpenCode quota refresh, or IPC updates that feed it. On Pi the tray never fetches `/api/quota/*`. When the tray is on, live busy/idle still arrives from renderer events. The 5s status poll and 45s global session refresh sleep unless a session is working. A hidden or unfocused window restores Chromium `backgroundThrottling`; main re-applies the last tray snapshot on a slow interval so menu-bar counts do not require a fully awake renderer.
 
 ## Bundled kernel (Pi)
 
@@ -233,6 +233,7 @@ Development builds use a separate user data directory named `Pichamber Dev`, so 
 
 - Keep desktop-specific code in this package. Do not move OpenCode feature backend logic into Electron.
 - Desktop windows set `acceptFirstMouse` so the first click on an unfocused window reaches the UI instead of only focusing the window.
+- Keep `backgroundThrottling` true unless the window is focused and visible. Do not force every BrowserWindow awake for the menu bar.
 - Use hidden Windows process launches for background helpers. Avoid visible console flashes.
 - Keep `@pichamber/web`, `bun-pty`, `node-pty`, and native modules external in `bundle-main.mjs`; bundling them can break Electron startup.
 - Rebuild native modules after dependency or Electron version changes.
