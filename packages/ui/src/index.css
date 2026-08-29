@@ -767,7 +767,14 @@ html:not(.dark) .chat-scroll {
    Do not start the inner selector at :root — that never matches, and the
    row then overflow-clips mid-glyph (`grok-4.(`, a bare `A`). Nest the
    query under html so the subject is the chip, and ellipsize the label
-   itself. Hide a chip that cannot keep a readable label. */
+   itself.
+
+   Hide the entire Agent chip (the slot, not just the word) when the
+   model-controls container is at or below the live parent/child squeeze
+   (~20.5rem / 328px). A 16rem slot hide left the chip visible there and
+   it clipped (`A` plus a sliver, or `Agen`). The model label may remain
+   as a clean ellipsis (`grok-…`). Same container queries apply to the
+   parent composer and the child/embedded composer. */
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
   min-width: 0;
@@ -836,7 +843,10 @@ html:not(.vscode-runtime) {
     }
   }
 
-  @container model-controls (max-width: 16rem) {
+  /* Whole Agent chip — not just the label. 20.5rem / 328px is the live
+     parent + child composer squeeze; below this the chip cannot stay
+     readable and must go away instead of clipping mid-glyph. */
+  @container model-controls (max-width: 20.5rem) {
     .model-controls__agent-slot,
     .model-controls__agent-trigger {
       display: none;

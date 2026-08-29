@@ -40,15 +40,30 @@ describe('Desktop composer model chip squeeze', () => {
     );
   });
 
-  test('hides the Agent chip when its label cannot stay readable', () => {
+  test('hides the entire Agent chip at the live 328px / 20.5rem squeeze', () => {
+    // Label-only hide is not enough: at the live parent/child squeeze the
+    // leftover chip still paints `A` plus a sliver or `Agen`. Hide the slot.
     expect(indexCss).toMatch(
       /@container model-controls \(max-width: 22rem\)[\s\S]*?\.model-controls__agent-label \{\s*display:\s*none;/,
     );
-    expect(indexCss).toMatch(
-      /@container model-controls \(max-width: 16rem\)[\s\S]*?\.model-controls__agent-slot/,
+
+    const slotHide = indexCss.match(
+      /@container model-controls \(max-width: ([\d.]+)rem\) \{\s*\.model-controls__agent-slot/,
     );
+    expect(slotHide).toBeTruthy();
+    const hideRem = Number(slotHide![1]);
+    const hidePx = hideRem * 16;
+    // 20.5rem / 328px is the live squeeze. The slot (not just the word)
+    // must be gone at that width for both parent and child composers.
+    expect(hideRem).toBeGreaterThanOrEqual(20.5);
+    expect(hidePx).toBeGreaterThanOrEqual(328);
+    expect(indexCss).toMatch(
+      /@container model-controls \(max-width: 20\.5rem\)\s*\{[\s\S]*?\.model-controls__agent-slot[\s\S]*?display:\s*none;/,
+    );
+
     expect(modelControlsSource).toContain('model-controls__agent-slot');
     expect(modelControlsSource).toContain('model-controls__agent-trigger');
+    expect(modelControlsSource).toContain('@container/model-controls');
   });
 
   test('keeps the send control outside the shrinking chip row', () => {
