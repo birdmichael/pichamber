@@ -20,7 +20,7 @@ const APNS_HOST_SANDBOX = 'https://api.sandbox.push.apple.com';
 // APNs rejects auth tokens older than 1h; refresh well inside that window.
 const JWT_TTL_MS = 50 * 60 * 1000;
 const DEFAULT_BUNDLE_ID = 'com.pichamber.app';
-const DEFAULT_RELAY_URL = 'https://api.openchamber.dev/v1/push/send';
+const DEFAULT_RELAY_URL = 'https://pichamber.bmlab.top/v1/push/send';
 const MAX_TOKENS_PER_SESSION = 10;
 // APNs reasons that mean the token is permanently invalid → drop it.
 const DEAD_TOKEN_REASONS = new Set(['BadDeviceToken', 'Unregistered', 'DeviceTokenNotForTopic']);
@@ -377,7 +377,7 @@ export const createApnsRuntime = (deps) => {
       req.end(body);
     });
 
-  // Relay mode (default): the single APNs key lives in the central Cloudflare relay, not on
+  // Relay mode (default): the single APNs key lives in the central Pichamber relay, not on
   // each user's server — so users configure nothing. The server just POSTs device tokens +
   // generic text; the relay signs + sends and reports which tokens to drop. Direct mode (below)
   // is the fallback for self-hosters who set OPENCHAMBER_APNS_* and disable the relay.
