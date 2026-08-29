@@ -321,13 +321,26 @@ omit times still mark `completed`/`error` so the UI cannot keep counting.
 
 `GET /api/session/:id/thinking` returns `{ thinking, available }` from the
 live session: `thinkingLevel` plus `getAvailableThinkingLevels()`.
-`PATCH` still clamps an unsupported pick onto that list (`medium`, else
-the first available). The composer thinking chip renders `available`,
-not the full seven-level catalog. A new-session draft with no session id
-uses models.dev `reasoning_options` for the selected model id (same
-slug lookup as vision). Missing/empty catalog effort hides the control —
-do not invent seven levels. Live `available` wins once a session exists.
-Do not invent vendor `thinkingLevelMap` from `/v1/models`.
+Hydrate and this GET apply the child's latest jsonl
+`thinking_level_change` before reading. A hydrated child often reports
+only `off` because `AgentSession.getAvailableThinkingLevels()` reads the
+internal model, not jsonl `model_change`. When live `available` is empty
+or only `off`, widen from that jsonl model's `ModelRuntime` /
+`getSupportedThinkingLevels` (or the model's own `thinkingLevels`).
+`PATCH` still clamps an unsupported pick onto that widened list
+(`medium`, else the first available). Do not call `setModel` on GET —
+real `setModel` appends another `model_change`.
+The composer thinking chip renders `available`, not the full seven-level
+catalog. A new-session draft with no session id uses models.dev
+`reasoning_options` for the selected model id (same slug lookup as
+vision). Missing/empty catalog effort hides the control — do not invent
+seven levels. Live `available` wins once a session exists. Do not invent
+vendor `thinkingLevelMap` from `/v1/models`.
+
+`GET /api/session/:id/model` returns `{ model, providerID, modelID }` from
+the live session after applying the latest jsonl `model_change`
+(`provider` / `modelId`). A leftover facade `pi`/`pi` pair is not usable
+and becomes `{ model: null, providerID: null, modelID: null }`.
 
 `promptAsync` applies `body.variant` or `body.thinking` through
 `setSessionThinking` when the value is a known Pi level. An unsupported
@@ -794,7 +807,13 @@ Clone/fork `parentID` is `{ parentID }` on `pichamber.metadata`. Hydrate,
 disk list, and sidebar Refresh read it onto `info.parentID`. Adapter
 children persist that same field when the Subagents slot is on so a cold
 `GET /api/session` still nests them. `pichamber.subagentRun.parentSessionID`
-is only a fallback when the top-level field is missing.
+is only a fallback when the top-level field is missing. List tail-scans
+the last metadata; when that latest entry dropped `parentID` (written
+once near the start of a long child transcript), a bounded head scan of
+the same file still nests. `SessionManager.list()`
+stays non-recursive. After that list, the host walks nested
+`session.jsonl` under the cwd session dir so an unhydrated parent still
+discovers a foreground child that never wrote `status.json`.
 
 ## MCP adapter
 
@@ -925,8 +944,14 @@ When the slot is on:
   `toolCallId` is the parent `subagent` tool call so the transcript card
   can open a child that never wrote `sessionId` on the tool payload
   (async `workflowScript` runs). Collapse the parent `call-*` tool id and
-  the adapter workflow `runId` into one fleet row; copy `status.json`
-  child `sessionFile`, agent/label, and terminal state onto that row.
+  the adapter workflow `runId` into one fleet row when they share one
+  child. A workflow that fans out to several `steps[].sessionFile` values
+  keeps one row per child; different `sessionID`s are not the same run.
+  Copy `status.json` child `sessionFile`, agent/label, and lifecycle
+  onto that row. Workflow top-level `state: complete` does not win over a
+  still-running or queued step. `queued` stays queued. Adapter
+  `currentTool: contact_supervisor` (interview) is `blocker: "question"`
+  so Work Status can show the ask without waiting for `ctx.ui`.
   An async `workflow` launch is `mode: "background"` (Work Status 「后台」)
   — that is the adapter contract, not a missing child. Name the row from
   `steps[].agent` / `runs.run("label", { agent })`, not the generic
@@ -954,7 +979,9 @@ When the slot is on:
 - A run with a child session file is attached as a facade session: stable Pi
   id, `GET /api/session/:id` + `/message`, and `prompt` / steer on that child.
   Attach also hydrates when only `sessionID` exists (`ensureRecord`); it
-  does not mint an empty chat. Lookup by id walks nested herdr/subagent
+  does not mint an empty chat. A stale adapter `sessionFile` whose temporary
+  child has already been cleaned up is skipped; a usable child id still falls
+  back to normal hydration without retrying the missing file. Lookup by id walks nested herdr/subagent
   jsonl (`{parentBasename}/{runId}/run-N/session.jsonl`) and matches the
   header id — those files are not top-level and are often named
   `session.jsonl`. `SessionManager.list()` stays non-recursive. Attach

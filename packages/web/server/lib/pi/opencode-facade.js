@@ -1005,7 +1005,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/session/:sessionID/thinking', handle(async (req, res) => {
-    json(res, 200, host.getSessionThinking(req.params.sessionID));
+    json(res, 200, await host.getSessionThinking(req.params.sessionID));
+  }));
+
+  app.get('/api/session/:sessionID/model', handle(async (req, res) => {
+    json(res, 200, await host.getSessionModel(req.params.sessionID));
   }));
 
   app.patch('/api/session/:sessionID/thinking', parseJson, handle(async (req, res) => {

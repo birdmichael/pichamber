@@ -84,6 +84,7 @@ export const AgentsPage: React.FC = () => {
   const isPiNativeReadOnly = isPiKernel && !isNewAgent && (
     (selectedAgent ? isAgentBuiltIn(selectedAgent) : false) || selectedAgentName === PI_NATIVE_AGENT_NAME
   );
+  const fieldsReadOnly = isPiNativeReadOnly || isPiKernel;
   useSelectPiAgentWhenUnset(isPiKernel);
 
 
@@ -291,7 +292,7 @@ export const AgentsPage: React.FC = () => {
       title={isNewAgent ? t('settings.agents.page.title.new') : selectedAgentName}
       description={isNewAgent
         ? t('settings.agents.page.subtitle.new')
-        : isPiNativeReadOnly
+        : isPiKernel
           ? t('settings.agents.page.subtitle.piNative')
           : t('settings.agents.page.subtitle.edit')}
       showSaveStatus={false}
@@ -348,7 +349,7 @@ export const AgentsPage: React.FC = () => {
             placeholder={t('settings.agents.page.field.descriptionPlaceholder')}
             rows={2}
             className="w-full resize-none min-h-[60px] bg-transparent"
-            disabled={isPiNativeReadOnly}
+            disabled={fieldsReadOnly}
           />
         </SettingsStackedField>
 
@@ -362,9 +363,9 @@ export const AgentsPage: React.FC = () => {
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'primary', label: t('settings.agents.page.mode.primary'), disabled: isPiNativeReadOnly },
-              { value: 'subagent', label: t('settings.agents.page.mode.subagent'), disabled: isPiNativeReadOnly },
-              { value: 'all', label: t('settings.agents.page.mode.all'), disabled: isPiNativeReadOnly },
+              { value: 'primary', label: t('settings.agents.page.mode.primary'), disabled: fieldsReadOnly },
+              { value: 'subagent', label: t('settings.agents.page.mode.subagent'), disabled: fieldsReadOnly },
+              { value: 'all', label: t('settings.agents.page.mode.all'), disabled: fieldsReadOnly },
             ]}
           />
         </SettingsStackedField>
@@ -381,7 +382,7 @@ export const AgentsPage: React.FC = () => {
           <ModelSelector
             providerId={parseModelIdentifier(model)?.providerId ?? ''}
             modelId={parseModelIdentifier(model)?.modelId ?? ''}
-            disabled={isPiNativeReadOnly}
+            disabled={fieldsReadOnly}
             onChange={(providerId: string, modelId: string) => {
               if (providerId && modelId) {
                 setModel(`${providerId}/${modelId}`);
@@ -409,7 +410,7 @@ export const AgentsPage: React.FC = () => {
             <Select
               value={selectedVariantValue}
               onValueChange={(value) => setVariant(value === '__default' ? '' : value)}
-              disabled={isPiNativeReadOnly}
+              disabled={fieldsReadOnly}
             >
               <SelectTrigger size={SETTINGS_SELECT_SIZE} className={SETTINGS_SELECT_ROW_TRIGGER_CLASS}>
                 <SelectValue placeholder={t('settings.agents.page.field.variantPlaceholder')}>
@@ -429,10 +430,10 @@ export const AgentsPage: React.FC = () => {
                 value={variant}
                 onChange={(event) => setVariant(event.target.value)}
                 placeholder={t('settings.agents.page.field.variantPlaceholder')}
-                disabled={isPiNativeReadOnly || (!model && !variant)}
+                disabled={fieldsReadOnly || (!model && !variant)}
                 className="h-8 w-40 rounded-md px-3"
               />
-              {variant && !isPiNativeReadOnly && (
+              {variant && !fieldsReadOnly && (
                 <Button
                   size="sm"
                   type="button"
@@ -471,9 +472,9 @@ export const AgentsPage: React.FC = () => {
             placeholder="—"
             emptyLabel="—"
             className="w-16"
-            disabled={isPiNativeReadOnly}
+            disabled={fieldsReadOnly}
           />
-          {temperature !== undefined && !isPiNativeReadOnly && (
+          {temperature !== undefined && !fieldsReadOnly && (
             <Button
               size="sm"
               type="button"
@@ -510,9 +511,9 @@ export const AgentsPage: React.FC = () => {
             placeholder="—"
             emptyLabel="—"
             className="w-16"
-            disabled={isPiNativeReadOnly}
+            disabled={fieldsReadOnly}
           />
-          {topP !== undefined && !isPiNativeReadOnly && (
+          {topP !== undefined && !fieldsReadOnly && (
             <Button
               size="sm"
               type="button"
@@ -538,7 +539,7 @@ export const AgentsPage: React.FC = () => {
           placeholder={t('settings.agents.page.field.systemPromptPlaceholder')}
           rows={8}
           className="w-full font-mono typography-meta min-h-[120px] max-h-[60vh] bg-transparent resize-y"
-          disabled={isPiNativeReadOnly}
+          disabled={fieldsReadOnly}
         />
       </SettingsSection>
 

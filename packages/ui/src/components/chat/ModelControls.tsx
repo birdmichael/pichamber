@@ -416,8 +416,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 } else if (draftThinkingLevels.length > 0) {
                     setPiThinkingLevels(draftThinkingLevels);
                 }
-                const nextThinking = clampPiThinkingLevel(
-                    payload.thinking ?? piThinking,
+                const recorded = parsePiThinkingLevel(payload.thinking);
+                const nextThinking = recorded ?? clampPiThinkingLevel(
+                    piThinking,
                     available.length > 0 ? available : draftThinkingLevels,
                 );
                 if (nextThinking) {
@@ -854,6 +855,33 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         },
         [providers, currentProviderId, currentModelId, setProvider, setModel, currentSessionId, saveAgentModelForSession, saveSessionModelSelection],
     );
+
+    const sessionModelRestoreRef = React.useRef<string | null>(null);
+    React.useEffect(() => {
+        if (!isPiKernel || !currentSessionId) {
+            sessionModelRestoreRef.current = null;
+            return;
+        }
+        let cancelled = false;
+        void runtimeFetch(`/api/session/${encodeURIComponent(currentSessionId)}/model`, { method: 'GET' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((payload) => {
+                if (cancelled || !payload) return;
+                const providerId = typeof payload.providerID === 'string' ? payload.providerID.trim() : '';
+                const modelId = typeof payload.modelID === 'string' ? payload.modelID.trim() : '';
+                if (!providerId || !modelId) return;
+                const restoreKey = `${currentSessionId}|${providerId}|${modelId}`;
+                if (sessionModelRestoreRef.current === restoreKey) return;
+                const result = tryApplyModelSelection(providerId, modelId);
+                if (result !== 'applied') return;
+                saveSessionModelSelection(currentSessionId, providerId, modelId);
+                sessionModelRestoreRef.current = restoreKey;
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [currentSessionId, isPiKernel, saveSessionModelSelection, tryApplyModelSelection]);
 
     const getModelVariantOptions = React.useCallback((providerId: string, modelId: string) => {
         const provider = providers.find((entry) => entry.id === providerId);

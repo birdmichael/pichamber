@@ -13,6 +13,7 @@ import {
   listAdapterRunsFromFiles,
   listNestedSessionRuns,
   mapStatusToSubagentRun,
+  mapStatusToSubagentRuns,
   mergeSubagentRuns,
   normalizeSubagentRunMode,
   normalizeSubagentRunState,
@@ -50,6 +51,7 @@ describe('isSubagentsSlotActive', () => {
 
 describe('normalize helpers', () => {
   it('maps adapter states onto the Work Status contract', () => {
+    expect(normalizeSubagentRunState('queued')).toBe('queued');
     expect(normalizeSubagentRunState('running')).toBe('running');
     expect(normalizeSubagentRunState('complete')).toBe('done');
     expect(normalizeSubagentRunState('paused')).toBe('paused');
@@ -240,7 +242,59 @@ describe('listAdapterRunsFromFiles', () => {
       tmpdir,
     });
     expect(run.sessionID).toBeNull();
+    expect(run.state).toBe('queued');
     expect(toPublicSubagentRun(run).openable).toBe(false);
+  });
+
+  it('emits one row per child session file in a fan-out workflow', () => {
+    const tmpdir = makeTemp('pi-subagents-tmp-');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_fanout');
+    fs.mkdirSync(runDir, { recursive: true });
+    const childA = path.join(runDir, 'a.jsonl');
+    const childB = path.join(runDir, 'b.jsonl');
+    fs.writeFileSync(childA, `${JSON.stringify({ type: 'session', id: 'child-a' })}\n`);
+    fs.writeFileSync(childB, `${JSON.stringify({ type: 'session', id: 'child-b' })}\n`);
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_fanout',
+      toolCallId: 'call-shared',
+      sessionId: 'parent-1',
+      state: 'complete',
+      mode: 'workflow',
+      currentTool: 'contact_supervisor',
+      currentToolArgs: 'reason=interview_request',
+      steps: [
+        {
+          agent: 'scout',
+          label: 'scout-a',
+          status: 'running',
+          sessionFile: childA,
+          currentTool: 'contact_supervisor',
+          currentToolArgs: 'reason=interview_request',
+        },
+        {
+          agent: 'scout',
+          label: 'scout-b',
+          status: 'completed',
+          sessionFile: childB,
+        },
+      ],
+    }));
+    const runs = listAdapterRunsFromFiles({
+      parent: { id: 'parent-1' },
+      tmpdir,
+    });
+    expect(runs).toHaveLength(2);
+    expect(runs.map((run) => run.sessionID).sort()).toEqual(['child-a', 'child-b']);
+    expect(runs.find((run) => run.sessionID === 'child-a')).toMatchObject({
+      title: 'scout-a',
+      state: 'running',
+      blocker: 'question',
+    });
+    expect(runs.find((run) => run.sessionID === 'child-b')).toMatchObject({
+      title: 'scout-b',
+      state: 'done',
+    });
+    expect(runs.find((run) => run.sessionID === 'child-b').blocker).toBeUndefined();
   });
 });
 
@@ -697,6 +751,65 @@ describe('reconcileParentSubagentRuns', () => {
     expect(toPublicSubagentRun(reconciled[0]).openable).toBe(true);
   });
 
+  it('keeps adapter running when the parent tool already completed', () => {
+    const reconciled = reconcileParentSubagentRuns([{
+      runId: 'run_live',
+      toolCallId: 'call-shared',
+      name: 'scout',
+      title: 'scout-a',
+      mode: 'background',
+      state: 'running',
+      sessionID: 'child-a',
+      blocker: 'question',
+    }], [{
+      runId: 'call-shared',
+      toolCallId: 'call-shared',
+      name: 'subagent',
+      title: 'subagent',
+      mode: 'background',
+      state: 'done',
+      sessionID: null,
+    }]);
+    expect(reconciled).toEqual([expect.objectContaining({
+      sessionID: 'child-a',
+      state: 'running',
+      blocker: 'question',
+    })]);
+  });
+
+  it('keeps two fan-out children instead of collapsing them onto one tool call', () => {
+    const reconciled = reconcileParentSubagentRuns([
+      {
+        runId: 'run_fanout:child-a',
+        toolCallId: 'call-shared',
+        name: 'scout',
+        title: 'scout-a',
+        mode: 'background',
+        state: 'running',
+        sessionID: 'child-a',
+      },
+      {
+        runId: 'run_fanout:child-b',
+        toolCallId: 'call-shared',
+        name: 'scout',
+        title: 'scout-b',
+        mode: 'background',
+        state: 'done',
+        sessionID: 'child-b',
+      },
+    ], [{
+      runId: 'call-shared',
+      toolCallId: 'call-shared',
+      name: 'subagent',
+      title: 'subagent',
+      mode: 'background',
+      state: 'done',
+      sessionID: null,
+    }]);
+    expect(reconciled).toHaveLength(2);
+    expect(reconciled.map((run) => run.sessionID).sort()).toEqual(['child-a', 'child-b']);
+  });
+
   it('keeps a queued file run without an id as status-only', () => {
     const reconciled = reconcileParentSubagentRuns([{
       runId: 'run_early',
@@ -787,5 +900,29 @@ describe('mapStatusToSubagentRun', () => {
       state: 'complete',
       results: [],
     })).toBeNull();
+  });
+
+  it('prefers a live step over a completed workflow state', () => {
+    expect(mapStatusToSubagentRun({
+      runId: 'run_1',
+      state: 'complete',
+      mode: 'workflow',
+      steps: [{ agent: 'scout', status: 'running' }],
+    })).toMatchObject({ state: 'running' });
+  });
+
+  it('expands multiple session files into separate runs', () => {
+    const mapped = mapStatusToSubagentRuns({
+      runId: 'run_1',
+      toolCallId: 'call-1',
+      state: 'complete',
+      mode: 'workflow',
+      steps: [
+        { agent: 'scout', label: 'a', status: 'running', sessionFile: '/tmp/a.jsonl' },
+        { agent: 'scout', label: 'b', status: 'completed', sessionFile: '/tmp/b.jsonl' },
+      ],
+    });
+    expect(mapped).toHaveLength(2);
+    expect(mapped.map((run) => run.title)).toEqual(['a', 'b']);
   });
 });

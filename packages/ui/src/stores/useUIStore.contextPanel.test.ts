@@ -33,6 +33,30 @@ describe('useUIStore context panel tabs', () => {
     expect(tabs).toHaveLength(1);
     expect(tabs[0]?.readOnly).toBe(false);
   });
+
+  test('stores a parent-scoped chat tab on the session key, not the project directory', () => {
+    const directory = '/repo';
+
+    useUIStore.getState().openContextPanelTab(directory, {
+      mode: 'chat',
+      dedupeKey: 'session:child-a',
+      label: 'scout A',
+      sessionScope: 'session:parent-a',
+    });
+    useUIStore.getState().openContextPanelTab(directory, {
+      mode: 'chat',
+      dedupeKey: 'session:child-b',
+      label: 'scout B',
+      sessionScope: 'session:parent-b',
+    });
+
+    const byDirectory = useUIStore.getState().contextPanelByDirectory;
+    expect(byDirectory['session:parent-a']?.tabs.map((tab) => tab.id)).toEqual(['chat:session:child-a']);
+    expect(byDirectory['session:parent-b']?.tabs.map((tab) => tab.id)).toEqual(['chat:session:child-b']);
+    expect(byDirectory[directory]?.tabs.some((tab) => tab.mode === 'chat')).toBe(false);
+    expect(byDirectory[directory]?.isOpen).toBe(true);
+    expect(byDirectory[directory]?.activeTabId).toBe('chat:session:child-b');
+  });
 });
 
 describe('useUIStore openContextSurface', () => {

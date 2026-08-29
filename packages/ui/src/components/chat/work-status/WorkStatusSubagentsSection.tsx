@@ -17,9 +17,11 @@ import {
   collectSessionBlockers,
   collectTranscriptSubagentSessionIds,
   overlayWorkStatusChildBlockers,
+  overlayWorkStatusSubagentRow,
   resolveWorkStatusSubagentOpen,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
+import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
 
 type Props = {
   sessionId: string | null;
@@ -93,6 +95,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     };
   }, [childStores]);
   const blockers = React.useSyncExternalStore(subscribeBlockers, getBlockerSnapshot, getBlockerSnapshot);
+  const promptsBySession = usePiExtensionUiStore((state) => state.promptsBySession);
 
   const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
@@ -106,7 +109,9 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
         directory,
         effectiveDirectory,
         untitledLabel: t('chat.workStatus.subagent.untitled'),
-      }), blockers);
+      }), blockers).map((row) => overlayWorkStatusSubagentRow(row, {
+        uiPrompt: Boolean(row.sessionID && (promptsBySession[row.sessionID] ?? []).some((prompt) => prompt.status === 'pending')),
+      }));
     }
     return openCodeChildren.map((child) => {
       const childDirectory = resolveSubagentChildDirectory(child, directory || effectiveDirectory);
@@ -127,7 +132,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
         status: blocked ? 'permission' : asked ? 'question' : busy ? 'working' : 'done',
       };
     });
-  }, [blockers, directory, effectiveDirectory, isPiKernel, openCodeChildren, parentMessages, runs, statuses, t]);
+  }, [blockers, directory, effectiveDirectory, isPiKernel, openCodeChildren, parentMessages, promptsBySession, runs, statuses, t]);
 
   const hadChildren = React.useRef(rows.length > 0);
   React.useEffect(() => {
@@ -140,6 +145,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     if (!row.openable) return;
     openSubagentChildSession({
       sessionID: row.sessionID,
+      parentSessionID: sessionId,
       directory: resolveSubagentChildDirectory(row, directory || effectiveDirectory),
       label: row.label,
       readOnly: !isPiKernel,
@@ -149,14 +155,20 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       setCurrentSession,
       openContextPanelTab,
     });
-  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, setCurrentSession]);
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, openContextPanelTab, sessionId, setCurrentSession]);
 
   useReportWorkStatusPresence('subagents', rows.length > 0);
 
   if (isPiKernel && !subagentsSlotActive) return null;
   if (rows.length === 0) return null;
 
-  const busyChildren = rows.filter((row) => row.status === 'working' || row.status === 'blocked').length;
+  const busyChildren = rows.filter((row) => (
+    row.status === 'working'
+    || row.status === 'queued'
+    || row.status === 'blocked'
+    || row.status === 'permission'
+    || row.status === 'question'
+  )).length;
 
   return (
     <WorkStatusCollapsibleSection
@@ -189,6 +201,10 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
               <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
             ) : row.status === 'failed' ? (
               <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+            ) : row.status === 'queued' ? (
+              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
+            ) : row.status === 'stopped' ? (
+              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
             ) : row.status === 'working' ? (
               <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
             ) : (

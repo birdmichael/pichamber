@@ -10,7 +10,7 @@ export type WorkStatusSubagentRow = {
   sessionID: string | null;
   directory: string | null;
   openable: boolean;
-  status: 'permission' | 'question' | 'working' | 'blocked' | 'failed' | 'paused' | 'done';
+  status: 'permission' | 'question' | 'working' | 'queued' | 'blocked' | 'failed' | 'paused' | 'stopped' | 'done';
   mode?: 'foreground' | 'background';
 };
 
@@ -165,15 +165,11 @@ export const buildWorkStatusSubagentRows = ({
       directory: run.directory,
       effectiveDirectory: directory || effectiveDirectory,
     });
-    const status: WorkStatusSubagentRow['status'] = run.state === 'running' || run.state === 'queued'
-      ? 'working'
-      : run.state === 'blocked'
-        ? 'blocked'
-        : run.state === 'paused'
-          ? 'paused'
-          : run.state === 'failed' || run.state === 'stopped'
-            ? 'failed'
-            : 'done';
+    const status = run.blocker === 'permission'
+      ? 'permission'
+      : run.blocker === 'question'
+        ? 'question'
+        : mapSubagentRunStateToRowStatus(run.state);
     return {
       id: run.runId,
       label: run.title?.trim() || run.name || untitledLabel,
@@ -187,7 +183,31 @@ export const buildWorkStatusSubagentRows = ({
   return rows.filter((row) => (
     row.openable
     || row.status === 'working'
+    || row.status === 'queued'
     || row.status === 'blocked'
     || row.status === 'paused'
+    || row.status === 'permission'
+    || row.status === 'question'
   ));
+};
+
+export const mapSubagentRunStateToRowStatus = (
+  state: SubagentRun['state'],
+): WorkStatusSubagentRow['status'] => {
+  if (state === 'queued') return 'queued';
+  if (state === 'running') return 'working';
+  if (state === 'blocked') return 'blocked';
+  if (state === 'paused') return 'paused';
+  if (state === 'failed') return 'failed';
+  if (state === 'stopped') return 'stopped';
+  return 'done';
+};
+
+export const overlayWorkStatusSubagentRow = (
+  row: WorkStatusSubagentRow,
+  overlays: { permission?: boolean; question?: boolean; uiPrompt?: boolean },
+): WorkStatusSubagentRow => {
+  if (overlays.permission) return { ...row, status: 'permission' };
+  if (overlays.question || overlays.uiPrompt) return { ...row, status: 'question' };
+  return row;
 };

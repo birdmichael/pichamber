@@ -5,6 +5,7 @@ import {
   buildWorkStatusSubagentRows,
   collectTranscriptSubagentSessionIds,
   overlayWorkStatusChildBlockers,
+  overlayWorkStatusSubagentRow,
   resolveWorkStatusSubagentOpen,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
@@ -127,6 +128,52 @@ describe('buildWorkStatusSubagentRows', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.openable).toBe(false);
     expect(rows[0]?.sessionID).toBeNull();
+    expect(rows[0]?.status).toBe('queued');
+  });
+
+  test('does not map queued to working or stopped to failed', () => {
+    const queued = buildWorkStatusSubagentRows({
+      runs: [run({ state: 'queued' })],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    const stopped = buildWorkStatusSubagentRows({
+      runs: [run({ state: 'stopped', sessionID: 'child-1', openable: true })],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(queued[0]?.status).toBe('queued');
+    expect(stopped[0]?.status).toBe('stopped');
+  });
+
+  test('maps an adapter interview blocker onto the question row', () => {
+    const [row] = buildWorkStatusSubagentRows({
+      runs: [run({
+        state: 'running',
+        sessionID: 'child-1',
+        openable: true,
+        blocker: 'question',
+      })],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(row?.status).toBe('question');
+  });
+
+  test('overlays child permission and question onto a Pi run row', () => {
+    const [row] = buildWorkStatusSubagentRows({
+      runs: [run({ state: 'running', sessionID: 'child-1', openable: true })],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(overlayWorkStatusSubagentRow(row, { permission: true }).status).toBe('permission');
+    expect(overlayWorkStatusSubagentRow(row, { question: true }).status).toBe('question');
+    expect(overlayWorkStatusSubagentRow(row, { uiPrompt: true }).status).toBe('question');
+    expect(overlayWorkStatusSubagentRow(row, {}).status).toBe('working');
   });
 
   test('drops terminal ghost rows that have no child session id', () => {

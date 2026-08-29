@@ -214,6 +214,7 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
     const [expanded, setExpanded] = React.useState(false);
     const effectiveDirectory = useEffectiveDirectory();
     const { isMobile } = useDeviceInfo();
+    const parentSessionID = useSessionUIStore((state) => state.currentSessionId);
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
     const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
     const isPiKernel = usePiKernel();
@@ -284,6 +285,7 @@ const UserSubtaskPart: React.FC<{ part: SubtaskPartLike }> = ({ part }) => {
                         onClick={() => {
                             openSubagentChildSession({
                                 sessionID: taskSessionID,
+                                parentSessionID,
                                 directory: childDirectory,
                                 label: description || agent || t('contextPanel.mode.chat'),
                                 readOnly: !isPiKernel,

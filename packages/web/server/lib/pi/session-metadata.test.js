@@ -12,8 +12,10 @@ import {
   readPersistedParentID,
   isTopLevelUserSessionFile,
   readPersistedSessionMetadata,
+  LIST_METADATA_HEAD_CHUNK_SIZE,
   LIST_METADATA_TAIL_CHUNK_SIZE,
   readPersistedSessionMetadataFromFile,
+  readPersistedSessionMetadataFromFileHead,
   readPersistedSessionMetadataFromFileTail,
   readLatestCustomEntryDataFromFileTail,
   sessionTimeWithArchived,
@@ -196,6 +198,37 @@ describe('Pi session metadata persistence', () => {
       pichamber: { piGoal: { active: true } },
     });
     expect(readLatestCustomEntryDataFromFileTail(file, 'missing-type')).toBeUndefined();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('head-scans parentID when a later tail metadata entry dropped it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-metadata-head-'));
+    const file = path.join(dir, 'session.jsonl');
+    const pad = `${'x'.repeat(256 * 1024)}`;
+    fs.writeFileSync(file, [
+      JSON.stringify({ type: 'session', id: 'child_long' }),
+      JSON.stringify({
+        type: 'custom',
+        customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+        data: { parentID: 'parent_root' },
+      }),
+      JSON.stringify({
+        type: 'message',
+        message: { role: 'assistant', content: [{ type: 'text', text: pad }] },
+      }),
+      JSON.stringify({
+        type: 'custom',
+        customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+        data: { archived: 0 },
+      }),
+      '',
+    ].join('\n'));
+    const size = fs.statSync(file).size;
+    expect(size).toBeGreaterThan(LIST_METADATA_TAIL_CHUNK_SIZE * 2);
+    expect(readPersistedSessionMetadataFromFileTail(file)).toEqual({ archived: 0 });
+    expect(readPersistedSessionMetadataFromFileHead(file)?.parentID).toBe('parent_root');
+    expect(readListedParentID({ archived: 0 }, file)).toBe('parent_root');
+    expect(LIST_METADATA_HEAD_CHUNK_SIZE).toBe(32 * 1024);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

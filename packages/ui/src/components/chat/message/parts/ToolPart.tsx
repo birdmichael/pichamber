@@ -1007,6 +1007,7 @@ const TaskToolSummary: React.FC<{
     const { t } = useI18n();
     const currentDirectory = useEffectiveDirectory();
     const openDirectory = resolveSubagentChildDirectory(childDirectory, currentDirectory);
+    const parentSessionID = useSessionUIStore((state) => state.currentSessionId);
     const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
     const openContextPanelTab = useUIStore((state) => state.openContextPanelTab);
     const showToolFileIcons = useUIStore((state) => state.showToolFileIcons);
@@ -1029,6 +1030,7 @@ const TaskToolSummary: React.FC<{
         event.stopPropagation();
         openSubagentChildSession({
             sessionID: sessionId,
+            parentSessionID,
             directory: openDirectory,
             label: agentType.charAt(0).toUpperCase() + agentType.slice(1),
             readOnly: childReadOnly,

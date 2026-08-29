@@ -1,4 +1,3 @@
-
 type DirectorySource = {
   directory?: string | null;
 };
@@ -22,8 +21,14 @@ export const resolveParentDirectoryForChildIdle = (
   return owned || null;
 };
 
+export const contextChatScopeKey = (parentSessionID?: string | null): string => {
+  const id = parentSessionID?.trim() || '';
+  return id ? `session:${id}` : '';
+};
+
 type OpenSubagentChildSessionInput = {
   sessionID?: string | null;
+  parentSessionID?: string | null;
   directory?: string | null;
   label: string;
   readOnly: boolean;
@@ -38,6 +43,7 @@ type OpenSubagentChildSessionInput = {
       dedupeKey: string;
       label: string;
       readOnly?: boolean;
+      sessionScope?: string | null;
     },
   ) => void;
 };
@@ -61,6 +67,7 @@ export const openSubagentChildSession = (input: OpenSubagentChildSessionInput): 
     dedupeKey: `session:${sessionID}`,
     label: input.label,
     readOnly: input.readOnly,
+    sessionScope: contextChatScopeKey(input.parentSessionID),
   });
   return true;
 };

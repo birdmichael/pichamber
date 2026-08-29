@@ -57,4 +57,26 @@ describe('getActiveAssistantContext', () => {
             model: null,
         });
     });
+
+    test('uses the last assistant model when the parent user has no model', () => {
+        const user = {
+            id: 'user_1',
+            role: 'user',
+            sessionID: 'ses_1',
+            time: { created: 1 },
+        } as Message;
+        const assistant = {
+            ...assistantMessage('assistant_1', user.id),
+            providerID: 'cc',
+            modelID: 'claude-opus-5',
+        } as Message;
+
+        expect(getActiveAssistantContext([user, assistant])).toEqual({
+            assistantId: assistant.id,
+            model: {
+                providerId: 'cc',
+                modelId: 'claude-opus-5',
+            },
+        });
+    });
 });
