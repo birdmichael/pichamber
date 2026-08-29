@@ -48,7 +48,7 @@ describe('Desktop composer model chip squeeze', () => {
     );
 
     const slotHide = indexCss.match(
-      /@container model-controls \(max-width: ([\d.]+)rem\) \{\s*\.model-controls__agent-slot/,
+      /@container model-controls \(max-width: ([\d.]+)rem\) \{[\s\S]*?\.model-controls__agent-slot/,
     );
     expect(slotHide).toBeTruthy();
     const hideRem = Number(slotHide![1]);
@@ -114,7 +114,7 @@ describe('Desktop composer model chip squeeze', () => {
     expect(composerFooterSource).toContain('@container/model-controls');
     expect(composerFooterSource).toContain('data-chat-input-footer="true"');
     expect(indexCss).toMatch(
-      /div\[data-chat-input-footer="true"\] \{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*model-controls;/,
+      /div\[data-chat-input-footer="true"\][\s\S]*?\[data-composer-chip-row="true"\][\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*model-controls;/,
     );
     // ModelControls must not steal the name (nearest ancestor wins).
     expect(modelControlsSource).not.toContain('@container/model-controls');

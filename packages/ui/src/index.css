@@ -235,9 +235,9 @@ button,
 }
 
 /* Match chat footer background to input in WebKit to avoid dual-tone hover/focus.
-   Also the named @container model-controls: query THIS composer row (~328px
-   parent column when squeezed), not html / the window. Child/embedded
-   composers already have a real ~315px pane; the parent did not. */
+   Named @container model-controls on the parent footer, the child/embedded
+   footer (same ComposerFooter in the session-chat iframe), and the chip row.
+   Query this row, not html / the parent window. */
 div[data-chat-input-footer="true"] {
   background: transparent !important;
   border: none;
@@ -247,6 +247,19 @@ div[data-chat-input-footer="true"] {
   container-name: model-controls;
   min-width: 0;
   width: 100%;
+}
+
+[data-composer-chip-row="true"] {
+  container-type: inline-size;
+  container-name: model-controls;
+  min-width: 0;
+}
+
+/* Measurement hook: hide Agent from the real chip-row width (parent and
+   child/iframe). @container can still resolve against a wide ancestor. */
+.model-controls--hide-agent .model-controls__agent-slot,
+.model-controls--hide-agent .model-controls__agent-trigger {
+  display: none;
 }
 
 /* Scroll shadow (HeroUI) fallback styling to ensure visible gradients without the Tailwind plugin */
@@ -777,12 +790,11 @@ html:not(.dark) .chat-scroll {
    itself.
 
    Hide the entire Agent chip (the slot, not just the word) when the
-   model-controls container is at or below ~36rem / 576px. That covers
-   a ~500px child footer (intermediate: sidebar 280 + parent ~475) where
-   27rem / 432px still painted `Ager`. A wide parent (~1000px) stays
+   model-controls container is at or below ~36rem / 576px, or when the
+   measure hook adds `.model-controls--hide-agent`. That covers a
+   ~315–500px child/embedded footer. A wide parent (~1000px) stays
    above 36rem and keeps Agent. The model label may remain as a clean
-   ellipsis (`grok-…`). Same container queries apply to the parent
-   composer and the child/embedded composer.
+   ellipsis (`grok-…`).
 
    Hide the thinking *label* at the 22rem squeeze so High/Medium cannot
    paint over the icon. Keep a real row gap and shrink-0 / zero negative
@@ -790,10 +802,11 @@ html:not(.dark) .chat-scroll {
    the preceding toolbar icon. If that squeeze is still too tight, hide
    the whole thinking chip (slot, not just the word).
 
-   The named container is the composer footer (`[data-chat-input-footer]`),
-   not html. Nesting `@container model-controls` under html made the
-   parent query the root (~1280px window) so the Agent chip never hid
-   there; the child pane was already a real ~315px container. */
+   The named container is the composer footer and chip row
+   (`[data-chat-input-footer]`, `[data-composer-chip-row]`), not html.
+   The Agent slot hide query is not nested under html so a child iframe
+   cannot inherit the parent/window as the named container. The measure
+   hook is the reliable hide for parent and child composers. */
 
 html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__row {
   min-width: 0;
@@ -863,6 +876,16 @@ html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .m
   white-space: nowrap;
 }
 
+/* Top-level named query so the nearest model-controls container is the
+   composer footer / chip row in THIS document (parent or child iframe),
+   not html. The measure hook still hides Agent if this query misses. */
+@container model-controls (max-width: 36rem) {
+  html:not(.vscode-runtime) .model-controls__agent-slot,
+  html:not(.vscode-runtime) .model-controls__agent-trigger {
+    display: none;
+  }
+}
+
 html:not(.vscode-runtime) {
   @container model-controls (max-width: 22rem) {
     .model-controls__agent-label {
@@ -877,16 +900,6 @@ html:not(.vscode-runtime) {
 
     .model-controls__row {
       column-gap: 0.75rem;
-    }
-  }
-
-  /* Whole Agent chip — not just the label. 36rem / 576px covers a
-     ~500px child footer where 27rem still painted `Ager`. Wide parent
-     (~1000px) stays above this and keeps Agent. */
-  @container model-controls (max-width: 36rem) {
-    .model-controls__agent-slot,
-    .model-controls__agent-trigger {
-      display: none;
     }
   }
 

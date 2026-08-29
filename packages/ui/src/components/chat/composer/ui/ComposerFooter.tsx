@@ -25,6 +25,10 @@ import { PiPlanModeToggle } from '../../PiPlanModeToggle';
 import { ModelControls } from '../../ModelControls';
 import { ComposerActionButtons } from './ComposerActionButtons';
 import { ComposerAttachmentControls } from './ComposerAttachmentControls';
+import {
+    COMPOSER_AGENT_SLOT_HIDE_CLASS,
+    useComposerAgentSlotHide,
+} from './composerAgentSlotLayout';
 import { FocusModeButton } from './FocusModeButton';
 import { PermissionAutoAcceptButton } from './PermissionAutoAcceptButton';
 
@@ -111,12 +115,17 @@ export function ComposerFooter(props: ComposerFooterProps) {
         onDictationContentHeightChange,
     } = props;
 
+    const chipRowRef = React.useRef<HTMLDivElement>(null);
+    const hideAgentSlot = useComposerAgentSlotHide(chipRowRef, !isMobile);
+
     return (
         <div
             className={cn(
                 // Named container for @container model-controls hide rules.
                 // Query this footer (~328px parent column when squeezed), not html.
+                // Same footer is used in the child/embedded session-chat iframe.
                 '@container/model-controls min-w-0 w-full bg-transparent flex-shrink-0 flex flex-col',
+                hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
                 footerPaddingClass,
                 footerGapClass,
             )}
@@ -268,8 +277,12 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         />
                     </div>
                     <div
+                        ref={chipRowRef}
                         data-composer-chip-row="true"
-                        className="flex items-center flex-1 justify-end min-w-0 gap-x-2 m-0"
+                        className={cn(
+                            '@container/model-controls flex items-center flex-1 justify-end min-w-0 gap-x-2 m-0',
+                            hideAgentSlot && COMPOSER_AGENT_SLOT_HIDE_CLASS,
+                        )}
                     >
                         <MemoModelControls className={cn('flex-1 min-w-0 justify-end')} />
                         <MemoComposerDictation
