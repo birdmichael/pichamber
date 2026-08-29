@@ -56,7 +56,8 @@ provider/model catalog row, then the published table for that model id.
 They do not use a fuzzy other-provider leftover or max-output tokens.
 While a QuestionCard or pending Desktop `ctx.ui` input card is waiting, the
 composer does not autofocus and does not steal keystrokes from that
-textarea. A Pi `question` select card treats `Type something.` as Other
+textarea. The existing StatusRow busy line stays visible and uses
+`asking a question` — the card does not replace that line. A Pi `question` select card treats `Type something.` as Other
 and uses the same textarea.
 On Desktop (not VS Code), the thinking-level and model chips keep their
 runtime labels when a right-hand panel narrows the composer. Session-width
@@ -245,9 +246,13 @@ and the send path reading the same grammar.
 - `state/useComposerDraft.ts` — a draft belongs to a (runtime, directory,
   session) identity. Writes are debounced while typing but forced at every edge
   where the page may stop running, because a pending timer is not a saved
-  draft. Two orderings are load-bearing: the debounced write is skipped once
-  while a draft is being restored, and a deleted draft's empty signature is
-  recorded before a queued write could resurrect it.
+  draft. The flush identity is the text owner, updated only after restore, so
+  an unmount during A→B cannot write A's text onto B. Two other orderings are
+  load-bearing: the debounced write is skipped once while a draft is being
+  restored, and a deleted draft's empty signature is recorded before a queued
+  write could resurrect it. `ChatContainer` remounts `ChatInput` with
+  `composerInstanceKey` so the live `message` state is per session (or per
+  new-session draft), not one global composer.
 - `state/useDraftTarget.ts` — the draft can target a directory that does not
   exist yet (a worktree being created). It must survive not appearing in the
   branch list, or the selector snaps back to the project root mid-creation.

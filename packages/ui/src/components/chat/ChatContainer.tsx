@@ -27,6 +27,7 @@ import {
     usePiExtensionUiPrompts,
 } from '@/sync/pi-extension-ui-store';
 import { sessionTranscriptHasChrome } from './sessionTranscriptChrome';
+import { composerInstanceKey } from './composer/state/composerInstanceKey';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { StatusRowContainer } from './StatusRowContainer';
 import { SessionRecapNote } from '@/components/chat/SessionRecapSpacer';
@@ -623,6 +624,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
     const setCurrentSession = useSessionUIStore((s) => s.setCurrentSession);
     const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
+    const composerMountKey = composerInstanceKey({
+        sessionId: currentSessionId,
+        draftId: newSessionDraft?.open ? newSessionDraft.draftId : null,
+    });
 
     // Sync actions
     const sync = useSync();
@@ -1291,7 +1296,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 									: 'flex-1 items-center justify-center bg-background px-0 pb-[6vh]'
 						)}
 					>
-                          {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                          {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 					</div>
 					{workStatusOverlayMountable ? (
 						<WorkStatusPanel
@@ -1337,7 +1342,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 						</div>
 					</div>
 					<div className="relative z-10 bg-background">
-						{promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+						{promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 					</div>
 				</div>
 			);
@@ -1391,7 +1396,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 							: 'bg-background'
 					)}
 				>
-                    {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                    {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
 				</div>
             </div>
         );
@@ -1420,6 +1425,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 					>
 						{promptReadOnly ? <ReadOnlyPromptBanner /> : (
 							<ChatInput
+								key={composerMountKey}
 								active={active}
 								scrollToBottom={scrollToBottomOnSend}
 								emptySessionWelcome
@@ -1500,7 +1506,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         onClick={navigation.resumeToLatest}
                     />
                 )}
-                {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput active={active} scrollToBottom={scrollToBottomOnSend} />}
+                {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
             </div>
 
             {/* Inside the chat column, not beside it: as a row sibling it took

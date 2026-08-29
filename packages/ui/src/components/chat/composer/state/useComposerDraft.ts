@@ -21,6 +21,47 @@ import {
     type ChatDraftIdentity,
 } from '@/lib/chatDraftPersistence';
 
+export type ComposerIdentitySwitchResult = {
+    changed: boolean;
+    text: string;
+    confirmedMentions: Set<string>;
+};
+
+/**
+ * Save the outgoing composer text under `previous` and restore `next`.
+ * A no-op when the identity key is unchanged, so a remount with the same
+ * session does not rewrite the live draft onto itself.
+ */
+export function applyComposerIdentitySwitch(options: {
+    previous: ChatDraftIdentity | null;
+    next: ChatDraftIdentity | null;
+    currentText: string;
+    currentMentions?: Iterable<string>;
+    persistEnabled: boolean;
+}): ComposerIdentitySwitchResult {
+    const previousKey = options.previous ? getChatDraftIdentityKey(options.previous) : null;
+    const nextKey = options.next ? getChatDraftIdentityKey(options.next) : null;
+    if (previousKey === nextKey) {
+        return {
+            changed: false,
+            text: options.currentText,
+            confirmedMentions: new Set(options.currentMentions ?? []),
+        };
+    }
+
+    if (!options.persistEnabled) {
+        return { changed: true, text: '', confirmedMentions: new Set() };
+    }
+
+    const activeMentions = new Set<string>();
+    for (const mention of options.currentMentions ?? []) {
+        if (options.currentText.includes(`@${mention}`)) activeMentions.add(mention);
+    }
+    writeChatDraft(options.previous, options.currentText, activeMentions);
+    const restored = readChatDraft(options.next);
+    return { changed: true, text: restored.text, confirmedMentions: restored.confirmedMentions };
+}
+
 const PERSIST_DEBOUNCE_MS = 500;
 
 /**
@@ -80,16 +121,15 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
     const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipNextPersistRef = React.useRef(false);
     const lastPersistedRef = React.useRef<Map<string, string>>(new Map());
+    // Owns the text in `messageRef`. Updated only after a switch restores the
+    // incoming draft, so unmount/visibility flush cannot write the outgoing
+    // text onto the incoming session.
     const currentIdentityRef = React.useRef<ChatDraftIdentity | null>(initialDraft.identity);
 
     // Callbacks reach the effects through a ref so a caller passing inline
     // functions does not re-run the persistence effects on every render.
     const callbacksRef = React.useRef({ onIdentityChange, onDraftRestored });
     callbacksRef.current = { onIdentityChange, onDraftRestored };
-
-    React.useEffect(() => {
-        currentIdentityRef.current = identity;
-    }, [identity]);
 
     const persistNow = React.useCallback((target: ChatDraftIdentity | null, draft: string) => {
         if (!target) return;
@@ -138,9 +178,17 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
     const previousIdentityRef = React.useRef<ChatDraftIdentity | null>(initialDraft.identity);
     React.useEffect(() => {
         const previous = previousIdentityRef.current;
-        const previousKey = previous ? getChatDraftIdentityKey(previous) : null;
-        const currentKey = identity ? getChatDraftIdentityKey(identity) : null;
-        if (previousKey === currentKey) return;
+        const switched = applyComposerIdentitySwitch({
+            previous,
+            next: identity,
+            currentText: messageRef.current,
+            currentMentions: confirmedMentionsRef.current,
+            persistEnabled,
+        });
+        if (!switched.changed) {
+            currentIdentityRef.current = identity;
+            return;
+        }
 
         previousIdentityRef.current = identity;
         callbacksRef.current.onIdentityChange?.();
@@ -149,20 +197,26 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
         // debounced effect must not immediately write it back out.
         skipNextPersistRef.current = true;
 
-        if (!persistEnabled) {
-            setMessage('');
-            confirmedMentionsRef.current = new Set();
-            return;
+        if (previous && persistEnabled) {
+            lastPersistedRef.current.set(
+                getChatDraftIdentityKey(previous),
+                draftSignature(messageRef.current, confirmedMentionsRef.current),
+            );
         }
-
-        persistNow(previous, messageRef.current);
-        const restored = readChatDraft(identity);
-        setMessage(restored.text);
-        confirmedMentionsRef.current = restored.confirmedMentions;
-        if (restored.text) {
+        messageRef.current = switched.text;
+        setMessage(switched.text);
+        confirmedMentionsRef.current = switched.confirmedMentions;
+        currentIdentityRef.current = identity;
+        if (identity && persistEnabled) {
+            lastPersistedRef.current.set(
+                getChatDraftIdentityKey(identity),
+                draftSignature(switched.text, switched.confirmedMentions),
+            );
+        }
+        if (switched.text) {
             requestAnimationFrame(() => callbacksRef.current.onDraftRestored?.());
         }
-    }, [clearPending, confirmedMentionsRef, identity, messageRef, persistEnabled, persistNow, setMessage]);
+    }, [clearPending, confirmedMentionsRef, identity, messageRef, persistEnabled, setMessage]);
 
     // A draft deleted elsewhere (session deleted, drafts cleared) clears the
     // composer if it is the one on screen.
