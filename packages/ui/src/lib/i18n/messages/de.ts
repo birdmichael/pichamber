@@ -3203,6 +3203,8 @@ export const dict = {
   'chat.workStatus.action.openGit': 'Git-Panel öffnen',
   'chat.workStatus.action.openPr': 'Pull Request öffnen',
   'chat.workStatus.action.openSubagent': '{name} öffnen',
+  'chat.workStatus.action.open': 'Öffnen',
+  'chat.workStatus.subagent.unopenableTooltip': 'Keine Sitzung zum Öffnen',
   'chat.workStatus.section.usage': 'Nutzung',
   'chat.workStatus.goal.open': 'Ziel verwalten',
   'chat.workStatus.goal.pause': 'Pausieren',

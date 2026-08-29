@@ -6,7 +6,11 @@ import {
   collectTranscriptSubagentSessionIds,
   overlayWorkStatusChildBlockers,
   overlayWorkStatusSubagentRow,
+  resolveWorkStatusSubagentLabel,
   resolveWorkStatusSubagentOpen,
+  countExportableWorkStatusRows,
+  formatWorkStatusSubagentSummary,
+  summarizeWorkStatusSubagentRows,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
 
@@ -230,5 +234,48 @@ describe('buildWorkStatusSubagentRows', () => {
       },
     );
     expect(rows[0]?.status).toBe('permission');
+  });
+});
+
+describe('resolveWorkStatusSubagentLabel', () => {
+  test('prefers session.title over a run-folder basename', () => {
+    expect(resolveWorkStatusSubagentLabel(
+      { title: 'scout', name: 'scout' },
+      'scout-wt',
+      'Subagent',
+    )).toBe('scout-wt');
+    expect(resolveWorkStatusSubagentLabel(
+      { title: 'scout_b', name: 'scout' },
+      'scout-b',
+      'Subagent',
+    )).toBe('scout-b');
+    expect(resolveWorkStatusSubagentLabel(
+      { title: 'long-scout', name: 'scout' },
+      null,
+      'Subagent',
+    )).toBe('long-scout');
+  });
+});
+
+describe('exportable work status rows', () => {
+  test('does not count an unopenable queued adapter row as exportable', () => {
+    const rows = buildWorkStatusSubagentRows({
+      runs: [
+        run({ runId: 'child-1', sessionID: 'ses_1', openable: true, state: 'done', title: 'scout-wt' }),
+        run({ runId: 'child-2', sessionID: 'ses_2', openable: true, state: 'done', title: 'scout-b' }),
+        run({ runId: 'child-3', sessionID: 'ses_3', openable: true, state: 'done', title: 'long-scout' }),
+        run({ runId: 'ghost', sessionID: null, openable: false, state: 'queued', title: 'scout' }),
+      ],
+      transcriptIds: [],
+      directory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(rows).toHaveLength(4);
+    expect(countExportableWorkStatusRows(rows)).toBe(3);
+    const summary = summarizeWorkStatusSubagentRows(rows);
+    expect(summary.queuedUnopenable).toBe(1);
+    expect(summary.openable).toBe(3);
+    expect(summary.total).toBe(4);
+    expect(formatWorkStatusSubagentSummary(summary, { queued: 'queued', done: 'done' })).toBe('1 queued · 3 done');
   });
 });

@@ -303,12 +303,15 @@ interface ModelControlsProps {
     className?: string;
     mobilePanel?: MobileControlsPanel;
     onMobilePanelChange?: (panel: MobileControlsPanel) => void;
+    /** Parent column < 576px: do not mount the Agent chip (no clipped `Ag`). */
+    omitAgentSlot?: boolean;
 }
 
 export const ModelControls: React.FC<ModelControlsProps> = ({
     className,
     mobilePanel,
     onMobilePanelChange,
+    omitAgentSlot = false,
 }) => {
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
@@ -2987,7 +2990,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                             <TooltipTrigger asChild>
                                 <DropdownMenuTrigger asChild>
                                     <div className={cn(
-                                        'flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
+                                        'model-controls__agent-trigger flex items-center gap-1.5 transition-colors cursor-pointer hover:bg-transparent hover:opacity-70 min-w-0',
                                         buttonHeight
                                     )}>
                                         {!isReady ? (
@@ -3164,7 +3167,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const inlineClassName = cn(
-        '@container/model-controls flex items-center min-w-0',
+        'flex items-center min-w-0',
         // Only force full-width + truncation behaviors on true mobile layouts.
         // VS Code also uses "compact" mode, but should keep its right-aligned inline sizing.
         isMobile && 'w-full',
@@ -3176,18 +3179,22 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             <div className={inlineClassName}>
                 <div
                     className={cn(
-                        'model-controls__row flex items-center min-w-0 flex-1 justify-end',
+                        'model-controls__row flex items-center min-w-0 flex-1 justify-end m-0',
                         inlineGapClass,
                         isMobile && 'overflow-hidden'
                     )}
                 >
-                    <div className="model-controls__variant-slot shrink-0 overflow-hidden">
+                    <div className="model-controls__variant-slot shrink-0 overflow-hidden m-0">
                         {renderVariantSelector()}
                     </div>
                     <div className="model-controls__model-slot overflow-hidden">
                         {renderModelSelector()}
                     </div>
-                    {renderAgentSelector()}
+                    {omitAgentSlot ? null : (
+                    <div className="model-controls__agent-slot min-w-0 overflow-hidden">
+                        {renderAgentSelector()}
+                    </div>
+                    )}
                     <div className="model-controls__plan-slot">
                         <PiPlanModeToggle />
                     </div>

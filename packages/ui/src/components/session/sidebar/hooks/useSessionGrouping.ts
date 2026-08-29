@@ -16,6 +16,7 @@ import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { getWorktreeFirstSeenAt } from '../worktreeFirstSeen';
 import { shouldRenderSidebarWorktreeGroup } from '../visibleWorkspaceGroups';
 import { isHiddenBtwSession } from '@/lib/sessionBtwMetadata';
+import { filterSessionNodesForSearch as filterSearchableSessionNodes } from '../sessionSearch';
 
 type Args = {
   homeDirectory: string | null;
@@ -80,25 +81,9 @@ export const useSessionGrouping = (args: Args) => {
   }, [t]);
 
   const filterSessionNodesForSearch = React.useCallback(
-    (nodes: SessionNode[], query: string): SessionNode[] => {
-      if (!query) {
-        return nodes;
-      }
-
-      return nodes.flatMap((node) => {
-        const nodeMatches = buildSessionSearchText(node.session).includes(query);
-        if (nodeMatches) {
-          return [node];
-        }
-
-        const filteredChildren = filterSessionNodesForSearch(node.children, query);
-        if (filteredChildren.length === 0) {
-          return [];
-        }
-
-        return [{ ...node, children: filteredChildren }];
-      });
-    },
+    (nodes: SessionNode[], query: string): SessionNode[] => (
+      filterSearchableSessionNodes(nodes, query, buildSessionSearchText)
+    ),
     [buildSessionSearchText],
   );
 

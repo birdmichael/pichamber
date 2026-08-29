@@ -197,4 +197,28 @@ describe('mergeContextPanelChatScope', () => {
     };
     expect(mergeContextPanelChatScope(PROJECT_A, directory, '', undefined)).toBe(directory);
   });
+
+  test('focuses a newly opened child tab even when the directory still points at another surface', () => {
+    const directory = {
+      isOpen: true,
+      expanded: false,
+      tabs: [fileTab],
+      activeTabId: fileTab.id,
+      widthByMode: {},
+      touchedAt: 1,
+    };
+    const sessionScope = {
+      isOpen: true,
+      expanded: false,
+      tabs: [parentAChat, parentBChat],
+      activeTabId: parentBChat.id,
+      widthByMode: {},
+      touchedAt: 2,
+    };
+
+    const merged = mergeContextPanelChatScope(PROJECT_A, directory, 'session:ses_a', sessionScope);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual([fileTab.id, parentAChat.id, parentBChat.id]);
+    expect(merged?.activeTabId).toBe(parentBChat.id);
+    expect(merged?.isOpen).toBe(true);
+  });
 });

@@ -32,9 +32,8 @@ describe('MobileWorkStatusHost', () => {
     expect(hostSource).not.toContain("from '@/components/chat/work-status/WorkStatusPanel'");
     expect(metadataSource).toContain('MobileWorkStatusHost');
     expect(metadataSource).not.toContain('UsageProviderCards');
-    expect(visibilitySource).toContain('const layoutAllows = !isMobile && !isVSCode && !contextPanelOpen');
-    expect(visibilitySource).toContain('useEffectiveDirectory');
-    expect(visibilitySource).toContain('normalizeContextPanelDirectoryKey');
+    expect(visibilitySource).toContain('const layoutAllows = !isMobile && !isVSCode');
+    expect(visibilitySource).toContain('WORK_STATUS_REQUIRED_ROW_WIDTH');
     expect(chatContainerSource).toContain('workStatusPanelMountable = !isMobile');
     expect(chatContainerSource).toContain('isManagedChatContext');
     expect(chatContainerSource).toContain('repositoryEnabled={!isManagedChatContext}');

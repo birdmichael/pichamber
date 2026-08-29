@@ -15,7 +15,13 @@ import {
 } from '@/lib/messages/inlineMessageLinks';
 import { prepareUserMarkdownContent, SKILL_TOKEN_PATTERN } from './userTextPartContent';
 import { extractTerminalContexts } from '@/lib/messages/terminalContext';
-import { USER_TEXT_COLLAPSED_CLASS, USER_TEXT_EXPANDED_CLASS, isUserTextOverflowing } from '../userBubbleLayout';
+import {
+    USER_TEXT_COLLAPSED_CLASS,
+    USER_TEXT_EXPANDED_CLASS,
+    USER_TEXT_PARENT_WRAP_CLASS,
+    getUserTextClampClass,
+    isUserTextOverflowing,
+} from '../userBubbleLayout';
 
 type PartWithText = Part & { text?: string; content?: string; value?: string };
 
@@ -47,6 +53,9 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
     const { t } = useI18n();
     const normalizedRenderingMode = normalizeUserMessageRenderingMode(userMessageRenderingMode);
     const isCollapsed = collapsibleUserMessages && !isExpanded;
+    // Main parent column: wrap. Compact clamp is not applied here.
+    const parentClampClass = getUserTextClampClass({ collapsed: isCollapsed, compact: false });
+    const useCollapsedClamp = Boolean(parentClampClass);
     const textRef = React.useRef<HTMLDivElement>(null);
     const skillByName = React.useMemo(() => new Map(skills.map((skill) => [skill.name, skill])), [skills]);
 
@@ -244,9 +253,10 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
             <div
                 className={cn(
                     "min-w-0 break-words font-sans typography-markdown-body",
+                    USER_TEXT_PARENT_WRAP_CLASS,
                     isExpanded && ["pb-3 pr-7", USER_TEXT_EXPANDED_CLASS],
                     normalizedRenderingMode === 'plain' && 'whitespace-pre-wrap',
-                    isCollapsed && ["line-clamp-2", USER_TEXT_COLLAPSED_CLASS],
+                    useCollapsedClamp && [parentClampClass, USER_TEXT_COLLAPSED_CLASS],
                     collapsibleUserMessages && isTruncated && !isExpanded && "cursor-pointer"
                 )}
                 ref={textRef}
@@ -257,7 +267,7 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
                         content={processedMarkdownContent}
                         className={cn(
                             "[&_.markdown-content>*:first-child]:mt-0 [&_.markdown-content>*:last-child]:mb-0",
-                            isCollapsed && [
+                            useCollapsedClamp && [
                                 "[&_.markdown-content>*]:my-0",
                                 "[&_p]:inline",
                                 "[&_[data-component='markdown-code']]:my-0",

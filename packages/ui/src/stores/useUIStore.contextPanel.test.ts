@@ -57,6 +57,69 @@ describe('useUIStore context panel tabs', () => {
     expect(byDirectory[directory]?.isOpen).toBe(true);
     expect(byDirectory[directory]?.activeTabId).toBe('chat:session:child-b');
   });
+
+  test('opening a worktree child focuses the parent-scoped chat tab', () => {
+    useUIStore.getState().openContextPanelTab('/repo', { mode: 'file', targetPath: '/repo/a.ts' });
+    useUIStore.getState().openContextPanelTab('/repo-worktree', {
+      mode: 'chat',
+      dedupeKey: 'session:child-b',
+      label: 'scout-b',
+      sessionScope: 'session:parent-a',
+    });
+
+    const scope = useUIStore.getState().contextPanelByDirectory['session:parent-a'];
+    expect(scope?.tabs.map((tab) => tab.id)).toEqual(['chat:session:child-b']);
+    expect(scope?.activeTabId).toBe('chat:session:child-b');
+    expect(scope?.isOpen).toBe(true);
+  });
+});
+
+describe('useUIStore closeContextPanel dismisses session-scoped child chats', () => {
+  test('X / closeContextPanel closes the parent-scoped child panel, not only the project key', () => {
+    const directory = '/repo';
+
+    useUIStore.getState().openContextPanelTab(directory, {
+      mode: 'chat',
+      dedupeKey: 'session:child-a',
+      label: 'scout A',
+      sessionScope: 'session:parent-a',
+    });
+    useUIStore.getState().openContextPanelTab(directory, {
+      mode: 'chat',
+      dedupeKey: 'session:child-b',
+      label: 'scout B',
+      sessionScope: 'session:parent-a',
+    });
+
+    expect(useUIStore.getState().contextPanelByDirectory['session:parent-a']?.isOpen).toBe(true);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.isOpen).toBe(true);
+
+    useUIStore.getState().closeContextPanel(directory);
+
+    const byDirectory = useUIStore.getState().contextPanelByDirectory;
+    expect(byDirectory[directory]?.isOpen).toBe(false);
+    expect(byDirectory['session:parent-a']?.isOpen).toBe(false);
+    // Tabs stay so Work Status can reopen them; the panel itself is dismissed.
+    expect(byDirectory['session:parent-a']?.tabs.map((tab) => tab.id)).toEqual([
+      'chat:session:child-a',
+      'chat:session:child-b',
+    ]);
+  });
+
+  test('closeContextPanel on the session key alone dismisses the child panel', () => {
+    const directory = '/repo';
+    useUIStore.getState().openContextPanelTab(directory, {
+      mode: 'chat',
+      dedupeKey: 'session:child-a',
+      label: 'scout A',
+      sessionScope: 'session:parent-a',
+    });
+
+    useUIStore.getState().closeContextPanel('session:parent-a');
+
+    expect(useUIStore.getState().contextPanelByDirectory['session:parent-a']?.isOpen).toBe(false);
+  });
+
 });
 
 describe('useUIStore openContextSurface', () => {

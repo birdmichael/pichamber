@@ -725,6 +725,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
 
   const {
     buildGroupSearchText,
+    buildSessionSearchText,
     filterSessionNodesForSearch,
     buildGroupedSessions,
   } = useSessionGrouping({
@@ -1393,6 +1394,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     hasSessionSearchQuery,
     normalizedSessionSearchQuery,
     filterSessionNodesForSearch,
+    buildSessionSearchText,
     buildGroupSearchText,
     foldersMap,
   });

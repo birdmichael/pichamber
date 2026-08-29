@@ -211,3 +211,52 @@ export const overlayWorkStatusSubagentRow = (
   if (overlays.question || overlays.uiPrompt) return { ...row, status: 'question' };
   return row;
 };
+
+export const resolveWorkStatusSubagentLabel = (
+  run: Pick<SubagentRun, 'title' | 'name'>,
+  liveTitle: string | null | undefined,
+  untitledLabel: string,
+): string => {
+  const sessionTitle = liveTitle?.trim() || '';
+  if (sessionTitle) return sessionTitle;
+  const runTitle = run.title?.trim() || '';
+  if (runTitle) return runTitle;
+  return run.name?.trim() || untitledLabel;
+};
+
+export const countExportableWorkStatusRows = (rows: WorkStatusSubagentRow[]): number => (
+  rows.filter((row) => row.openable).length
+);
+
+export type WorkStatusSubagentSummary = {
+  queuedUnopenable: number;
+  openable: number;
+  busy: number;
+  total: number;
+};
+
+export const summarizeWorkStatusSubagentRows = (rows: WorkStatusSubagentRow[]): WorkStatusSubagentSummary => ({
+  queuedUnopenable: rows.filter((row) => !row.openable && row.status === 'queued').length,
+  openable: countExportableWorkStatusRows(rows),
+  busy: rows.filter((row) => (
+    row.status === 'working'
+    || row.status === 'queued'
+    || row.status === 'blocked'
+    || row.status === 'permission'
+    || row.status === 'question'
+  )).length,
+  total: rows.length,
+});
+
+export const formatWorkStatusSubagentSummary = (
+  summary: WorkStatusSubagentSummary,
+  labels: { queued: string; done: string },
+): string | number => {
+  if (summary.queuedUnopenable > 0) {
+    return `${summary.queuedUnopenable} ${labels.queued} · ${summary.openable} ${labels.done}`;
+  }
+  if (summary.busy > 0) {
+    return `${summary.busy}/${summary.total}`;
+  }
+  return summary.total;
+};

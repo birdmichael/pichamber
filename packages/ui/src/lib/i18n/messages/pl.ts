@@ -3222,6 +3222,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.action.openGit': 'Otwórz panel Git',
   'chat.workStatus.action.openPr': 'Otwórz pull request',
   'chat.workStatus.action.openSubagent': 'Otwórz {name}',
+  'chat.workStatus.action.open': 'Otwórz',
+  'chat.workStatus.subagent.unopenableTooltip': 'Brak sesji do otwarcia',
   'chat.workStatus.section.usage': 'Zużycie',
   'chat.workStatus.goal.open': 'Zarządzaj celem',
   'chat.workStatus.goal.pause': 'Wstrzymaj',

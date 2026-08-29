@@ -64,7 +64,11 @@ rails keep thinking plus the full model name. Walkthrough and similarly
 narrow rails (~0.6) still show thinking and a readable model name
 (ellipsis of a few letters is fine; a single glyph is not). The provider
 glyph hides on that squeeze so the name can use the slot; Agent/Plan
-yields next. The model name is the runtime display string — do not
+yields next. Parent `ChatInput` under `[data-parent-chat-column]`
+measures that column (ResizeObserver) and `ModelControls` omits the
+Agent slot from the DOM below 576px (~328px parent + Work Status +
+child squeeze) instead of painting a clipped `Ag` pill. CSS hide stays
+backup. When the column is wide again, Agent remounts. The model name is the runtime display string — do not
 hardcode a provider, and do not move the chip into `/`. Labels collapse
 to icons only as a last resort, and the chip tooltip/aria-label keeps the
 same words. The leftover OpenCode agent label still hides first.

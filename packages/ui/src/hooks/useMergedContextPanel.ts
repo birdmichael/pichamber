@@ -51,5 +51,5 @@ export const useMergedContextPanel = (directoryKey: string) => {
     [chatScopeKey, chatState, directoryKey, scopeKey, scopeState, sessionState],
   );
 
-  return { scopeKey, panelState };
+  return { scopeKey, chatScopeKey, panelState };
 };
