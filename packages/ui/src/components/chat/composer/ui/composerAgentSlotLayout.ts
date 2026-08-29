@@ -26,6 +26,8 @@ export const COMPOSER_AGENT_SLOT_HIDE_CLASS = 'model-controls--hide-agent';
 
 export const COMPOSER_FOOTER_ATTR = 'data-chat-input-footer';
 
+export const COMPOSER_FOOTER_SELECTOR = `[${COMPOSER_FOOTER_ATTR}="true"]`;
+
 export const PARENT_CHAT_COLUMN_ATTR = 'data-parent-chat-column';
 
 export const PARENT_CHAT_COLUMN_SELECTOR = `[${PARENT_CHAT_COLUMN_ATTR}="true"]`;
@@ -54,10 +56,22 @@ const isOverflowingBox = (scrollWidth?: number, clientWidth?: number): boolean =
 
 /**
  * Omit the Agent slot from the DOM when the parent chat column is below
- * 576px. A ~328px squeeze must not mount a clipped `Ag` pill.
+ * 576px. A ~328px squeeze must not mount a clipped `Ag` pill. If the
+ * column lookup missed, a squeezed footer is enough — the chip row can
+ * still report a wide overflowing box.
  */
-export function shouldOmitComposerAgentSlot(parentColumnWidth: number | undefined): boolean {
-  return isBelowHideBand(parentColumnWidth);
+export function shouldOmitComposerAgentSlot(
+  parentColumnWidth: number | undefined,
+  footerWidth?: number,
+): boolean {
+  if (isBelowHideBand(parentColumnWidth)) {
+    return true;
+  }
+  const columnMeasured = typeof parentColumnWidth === 'number' && parentColumnWidth > 0;
+  if (columnMeasured) {
+    return false;
+  }
+  return isBelowHideBand(footerWidth);
 }
 
 /**
@@ -86,7 +100,7 @@ export function measureComposerAgentSlot(
 ): ComposerAgentSlotMetrics {
   const slot = row.querySelector<HTMLElement>('.model-controls__agent-slot');
   const label = row.querySelector<HTMLElement>('.model-controls__agent-label');
-  const footerEl = footer ?? row.closest?.<HTMLElement>(`[${COMPOSER_FOOTER_ATTR}="true"]`) ?? null;
+  const footerEl = footer ?? row.closest?.<HTMLElement>(COMPOSER_FOOTER_SELECTOR) ?? null;
   const columnEl = parentColumn
     ?? row.closest?.<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR)
     ?? null;
@@ -102,6 +116,80 @@ export function measureComposerAgentSlot(
 }
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
+/**
+ * Observe the parent chat column (and squeezed footer as backup) until the
+ * composer host exists. `composerFormRef` is often still null on the first
+ * layout effect — the ref object identity never changes, so returning early
+ * would leave omit stuck false and paint a clipped `Ag`.
+ */
+export function observeParentChatColumnAgentOmit(
+  hostRef: React.RefObject<HTMLElement | null>,
+  setOmit: (next: boolean) => void,
+): () => void {
+  let cancelled = false;
+  let rafId = 0;
+  let observer: ResizeObserver | undefined;
+  let onResize: (() => void) | undefined;
+
+  const stopListening = () => {
+    observer?.disconnect();
+    observer = undefined;
+    if (onResize) {
+      window.removeEventListener('resize', onResize);
+      onResize = undefined;
+    }
+  };
+
+  const attach = () => {
+    if (cancelled) {
+      return;
+    }
+
+    const host = hostRef.current;
+    if (!host) {
+      rafId = requestAnimationFrame(attach);
+      return;
+    }
+
+    const column = host.closest<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR)
+      ?? document.querySelector<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR);
+    const footer = host.closest<HTMLElement>(COMPOSER_FOOTER_SELECTOR)
+      ?? document.querySelector<HTMLElement>(COMPOSER_FOOTER_SELECTOR);
+
+    const update = () => {
+      setOmit(shouldOmitComposerAgentSlot(column?.clientWidth, footer?.clientWidth));
+    };
+
+    update();
+
+    if (!column && !footer) {
+      return;
+    }
+
+    if (typeof ResizeObserver === 'undefined') {
+      onResize = update;
+      window.addEventListener('resize', update);
+      return;
+    }
+
+    observer = new ResizeObserver(update);
+    if (column) {
+      observer.observe(column);
+    }
+    if (footer) {
+      observer.observe(footer);
+    }
+  };
+
+  attach();
+
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(rafId);
+    stopListening();
+  };
+}
 
 /**
  * ChatInput under `[data-parent-chat-column]` observes that column.
@@ -121,32 +209,9 @@ export function useParentChatColumnAgentOmit(
       return;
     }
 
-    const host = hostRef.current;
-    if (!host) {
-      return;
-    }
-
-    const column = host.closest<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR);
-    if (!column) {
-      setOmit(false);
-      return;
-    }
-
-    const update = () => {
-      const next = shouldOmitComposerAgentSlot(column.clientWidth);
+    return observeParentChatColumnAgentOmit(hostRef, (next) => {
       setOmit((prev) => (prev === next ? prev : next));
-    };
-
-    update();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', update);
-      return () => window.removeEventListener('resize', update);
-    }
-
-    const observer = new ResizeObserver(update);
-    observer.observe(column);
-    return () => observer.disconnect();
+    });
   }, [enabled, hostRef]);
 
   return enabled && omit;
@@ -177,7 +242,7 @@ export function useComposerAgentSlotHide(
     }
 
     const footer = footerRef?.current
-      ?? row.closest<HTMLElement>(`[${COMPOSER_FOOTER_ATTR}="true"]`);
+      ?? row.closest<HTMLElement>(COMPOSER_FOOTER_SELECTOR);
     const parentColumn = row.closest<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR);
 
     const update = () => {

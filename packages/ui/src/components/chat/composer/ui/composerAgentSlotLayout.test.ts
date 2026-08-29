@@ -7,14 +7,17 @@ import { describe, expect, test } from 'bun:test';
 import {
   COMPOSER_AGENT_SLOT_HIDE_BELOW_PX,
   COMPOSER_AGENT_SLOT_HIDE_CLASS,
+  COMPOSER_FOOTER_SELECTOR,
   PARENT_CHAT_COLUMN_SELECTOR,
   measureComposerAgentSlot,
+  observeParentChatColumnAgentOmit,
   shouldHideComposerAgentSlot,
   shouldOmitComposerAgentSlot,
 } from './composerAgentSlotLayout';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const composerFooterSource = readFileSync(join(__dirname, './ComposerFooter.tsx'), 'utf-8');
+const layoutSource = readFileSync(join(__dirname, './composerAgentSlotLayout.ts'), 'utf-8');
 const indexCss = readFileSync(join(__dirname, '../../../../index.css'), 'utf-8');
 const appSource = readFileSync(join(__dirname, '../../../../App.tsx'), 'utf-8');
 const chatInputSource = readFileSync(join(__dirname, '../../ChatInput.tsx'), 'utf-8');
@@ -41,6 +44,14 @@ describe('shouldOmitComposerAgentSlot', () => {
     expect(shouldOmitComposerAgentSlot(1000)).toBe(false);
     expect(shouldOmitComposerAgentSlot(0)).toBe(false);
     expect(shouldOmitComposerAgentSlot(undefined)).toBe(false);
+  });
+
+  test('omits Agent from a squeezed footer when the column lookup missed', () => {
+    expect(shouldOmitComposerAgentSlot(undefined, 328)).toBe(true);
+    expect(shouldOmitComposerAgentSlot(0, 575)).toBe(true);
+    expect(shouldOmitComposerAgentSlot(undefined, 576)).toBe(false);
+    // A measured wide column wins over a squeezed overflowing footer.
+    expect(shouldOmitComposerAgentSlot(1000, 328)).toBe(false);
   });
 });
 
@@ -155,6 +166,83 @@ describe('measureComposerAgentSlot', () => {
   });
 });
 
+describe('observeParentChatColumnAgentOmit', () => {
+  test('omit becomes true when the column is 328px after a late-mounted host', () => {
+    const rafQueue: FrameRequestCallback[] = [];
+    const originalRaf = globalThis.requestAnimationFrame;
+    const originalCaf = globalThis.cancelAnimationFrame;
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
+
+    globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    }) as typeof requestAnimationFrame;
+    globalThis.cancelAnimationFrame = ((id: number) => {
+      rafQueue[id - 1] = () => undefined;
+    }) as typeof cancelAnimationFrame;
+
+    const column = { clientWidth: 328 };
+    const footer = { clientWidth: 800 };
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        querySelector: (selector: string) => {
+          if (selector === PARENT_CHAT_COLUMN_SELECTOR) return column;
+          if (selector === COMPOSER_FOOTER_SELECTOR) return footer;
+          return null;
+        },
+      },
+    });
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      writable: true,
+      value: class {
+        observe() { /* column width is already 328; update() runs before observe */ }
+        disconnect() { /* noop */ }
+        unobserve() { /* noop */ }
+      },
+    });
+
+    const flushRaf = () => {
+      const queued = rafQueue.splice(0);
+      for (const cb of queued) {
+        cb(0);
+      }
+    };
+
+    const hostRef: { current: HTMLElement | null } = { current: null };
+    let omit = false;
+    const stop = observeParentChatColumnAgentOmit(hostRef, (next) => {
+      omit = next;
+    });
+
+    try {
+      // First effect: host is still null, so omit stays false.
+      expect(omit).toBe(false);
+      flushRaf();
+      expect(omit).toBe(false);
+
+      // Ref attaches after the first effect. closest can miss if the host is
+      // not under the column yet; document.querySelector finds the 328px column.
+      hostRef.current = {
+        closest: () => null,
+      } as unknown as HTMLElement;
+      flushRaf();
+      expect(omit).toBe(true);
+    } finally {
+      stop();
+      globalThis.requestAnimationFrame = originalRaf;
+      globalThis.cancelAnimationFrame = originalCaf;
+      if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+      else Reflect.deleteProperty(globalThis, 'document');
+      if (originalResizeObserver) Object.defineProperty(globalThis, 'ResizeObserver', originalResizeObserver);
+      else Reflect.deleteProperty(globalThis, 'ResizeObserver');
+    }
+  });
+});
+
 describe('parent main-window composer Agent hide wiring', () => {
   test('parent ChatInput reads [data-parent-chat-column] and omits Agent from the DOM', () => {
     expect(chatContainerSource).toContain('data-parent-chat-column="true"');
@@ -163,6 +251,10 @@ describe('parent main-window composer Agent hide wiring', () => {
     expect(chatInputSource).toContain('useParentChatColumnAgentOmit');
     expect(chatInputSource).toContain('composerFormRef');
     expect(chatInputSource).toContain('[data-parent-chat-column]');
+    expect(layoutSource).toContain('observeParentChatColumnAgentOmit');
+    expect(layoutSource).toContain('requestAnimationFrame');
+    expect(layoutSource).toContain("document.querySelector<HTMLElement>(PARENT_CHAT_COLUMN_SELECTOR)");
+    expect(layoutSource).toContain('COMPOSER_FOOTER_SELECTOR');
     expect(chatInputSource).toContain('omitAgentSlot={omitParentColumnAgentSlot}');
     expect(composerFooterSource).toContain('omitAgentSlot={omitAgentSlot}');
     expect(composerFooterSource).toContain('useComposerAgentSlotHide');
