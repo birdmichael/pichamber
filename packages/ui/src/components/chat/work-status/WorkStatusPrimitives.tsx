@@ -66,8 +66,10 @@ export const WorkStatusCollapsibleSection: React.FC<{
   /** An independent header action, such as refreshing this section's data. */
   action?: React.ReactNode;
   defaultExpanded?: boolean;
+  /** Extra action when the header is pressed (mobile MCP → workspace). */
+  onHeaderNavigate?: () => void;
   children: React.ReactNode;
-}> = ({ id, title, icon, iconNode, iconColor, summary, action, defaultExpanded = false, children }) => {
+}> = ({ id, title, icon, iconNode, iconColor, summary, action, defaultExpanded = false, onHeaderNavigate, children }) => {
   const stored = useUIStore(
     React.useCallback((state) => state.workStatusExpandedSections[id], [id]),
   );
@@ -79,7 +81,13 @@ export const WorkStatusCollapsibleSection: React.FC<{
         <button
           type="button"
           aria-expanded={expanded}
-          onClick={() => setExpandedInStore(id, !expanded)}
+          onClick={() => {
+            if (onHeaderNavigate) {
+              onHeaderNavigate();
+              return;
+            }
+            setExpandedInStore(id, !expanded);
+          }}
           className={cn(
             'group/section flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 text-left',
             // No hover fill anywhere in the panel: at this row density the blocks

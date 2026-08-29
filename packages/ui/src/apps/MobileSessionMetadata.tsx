@@ -1,12 +1,17 @@
 import React from 'react';
 
 import { computeContextUsage } from '@/components/chat/work-status/contextUsage';
+import {
+  isWorkStatusDismissExemptTarget,
+  shouldCloseWorkStatusSheetOnNavigate,
+} from '@/components/chat/work-status/workStatusDismiss';
 import { isChatDirectoryPath } from '@/lib/chatDirectories';
 import { useTabletLayout } from '@/lib/device';
 import { useI18n } from '@/lib/i18n';
 import { clampPercent, resolveUsageTone } from '@/lib/quota';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSessionMessages } from '@/sync/sync-context';
 
@@ -70,6 +75,7 @@ const SessionMetadataOverlay: React.FC<{
 }> = ({ open, onClose, anchorRef, sessionId, directory, repositoryEnabled = true }) => {
   const { t } = useI18n();
   const panelRef = React.useRef<HTMLDivElement>(null);
+  const [sectionsDialogOpen, setSectionsDialogOpen] = React.useState(false);
   const [shouldRender, setShouldRender] = React.useState(open);
   const [isExiting, setIsExiting] = React.useState(false);
   // Tablet: a phone-width sheet stretched across the whole chat column looks
@@ -116,6 +122,7 @@ const SessionMetadataOverlay: React.FC<{
       setIsExiting(false);
       return;
     }
+    setSectionsDialogOpen(false);
 
     if (!shouldRender) return;
     setIsExiting(true);
@@ -145,6 +152,7 @@ const SessionMetadataOverlay: React.FC<{
         return;
       }
       if (panelRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      if (isWorkStatusDismissExemptTarget(target, { sectionsDialogOpen })) return;
       onClose();
     };
 
@@ -154,7 +162,40 @@ const SessionMetadataOverlay: React.FC<{
       document.removeEventListener('pointerdown', closeIfOutside, true);
       document.removeEventListener('wheel', closeIfOutside, true);
     };
-  }, [anchorRef, onClose, open]);
+  }, [anchorRef, onClose, open, sectionsDialogOpen]);
+
+  // Row Open writes Desktop context-panel state or setCurrentSession. Close
+  // the sheet so those destinations are not covered by pointer-events-auto.
+  React.useEffect(() => {
+    if (!open) return;
+    const sessionIdWhenOpened = useSessionUIStore.getState().currentSessionId;
+    const directoryKey = directory ? normalizeContextPanelDirectoryKey(directory) : '';
+    const panelWasOpen = Boolean(
+      directoryKey && useUIStore.getState().contextPanelByDirectory[directoryKey]?.isOpen,
+    );
+    const maybeClose = () => {
+      const panelIsOpen = Boolean(
+        directoryKey && useUIStore.getState().contextPanelByDirectory[directoryKey]?.isOpen,
+      );
+      if (shouldCloseWorkStatusSheetOnNavigate({
+        sessionIdWhenOpened,
+        currentSessionId: useSessionUIStore.getState().currentSessionId,
+        panelWasOpen,
+        panelIsOpen,
+      })) {
+        onClose();
+      }
+    };
+    const unsubUI = useUIStore.subscribe(maybeClose);
+    const unsubSession = useSessionUIStore.subscribe(maybeClose);
+    const onHash = () => onClose();
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      unsubUI();
+      unsubSession();
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, [directory, onClose, open]);
 
   if (!shouldRender) return null;
 
@@ -165,7 +206,7 @@ const SessionMetadataOverlay: React.FC<{
         role="dialog"
         aria-label={t('chat.workStatus.ariaLabel')}
         className={cn(
-          'overflow-y-auto overscroll-contain rounded-[20px] border border-border/70 bg-[var(--surface-elevated)] p-2 shadow-[0_12px_32px_rgb(0_0_0_/_0.2)] will-change-transform',
+          'relative flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-[20px] border border-border/70 bg-[var(--surface-elevated)] shadow-[0_12px_32px_rgb(0_0_0_/_0.2)] will-change-transform',
           isPopover ? 'absolute origin-top-left' : 'mx-3 mt-2',
           isExiting ? 'pointer-events-none' : 'pointer-events-auto',
         )}
@@ -181,7 +222,13 @@ const SessionMetadataOverlay: React.FC<{
             : null),
         }}
       >
-        <MobileWorkStatusHost sessionId={sessionId} directory={directory} repositoryEnabled={repositoryEnabled} />
+        <MobileWorkStatusHost
+          sessionId={sessionId}
+          directory={directory}
+          repositoryEnabled={repositoryEnabled}
+          onSectionsDialogOpenChange={setSectionsDialogOpen}
+          onNavigate={onClose}
+        />
       </div>
       <style>{`
         @keyframes session-metadata-in {

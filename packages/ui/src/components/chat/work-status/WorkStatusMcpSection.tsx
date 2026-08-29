@@ -1,13 +1,17 @@
 import React from 'react';
-import { useI18n } from '@/lib/i18n';
-import { Switch } from '@/components/ui/switch';
-import { isMcpStatusActive, useMcpStore } from '@/stores/useMcpStore';
-import { McpIcon } from '@/components/icons/McpIcon';
-import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { toast } from 'sonner';
+
+import { useMobileAppActions } from '@/apps/mobileAppContext';
+import { McpIcon } from '@/components/icons/McpIcon';
 import { startMcpAuthorization } from '@/components/sections/mcp/startMcpAuthorization';
-import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusRowAction } from './WorkStatusPrimitives';
+import { Switch } from '@/components/ui/switch';
+import { runBackgroundNetworkTask } from '@/lib/background-network';
+import { useI18n } from '@/lib/i18n';
+import { isMcpStatusActive, useMcpStore } from '@/stores/useMcpStore';
+
 import { useReportWorkStatusPresence } from './presenceContext';
+import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusRowAction } from './WorkStatusPrimitives';
+import { useWorkStatusNavigate } from './workStatusNavigate';
 
 type Props = {
   directory: string | null;
@@ -19,6 +23,8 @@ type Props = {
  */
 export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
   const { t } = useI18n();
+  const mobileActions = useMobileAppActions();
+  const onNavigate = useWorkStatusNavigate();
 
   const mcpStatus = useMcpStore(
     React.useCallback((state) => state.getStatusForDirectory(directory), [directory]),
@@ -94,6 +100,10 @@ export const WorkStatusMcpSection: React.FC<Props> = ({ directory }) => {
       title={t('chat.workStatus.section.mcp')}
       iconNode={<McpIcon className="size-4 shrink-0 text-muted-foreground" />}
       summary={`${mcpConnected}/${mcpServers.length}`}
+      onHeaderNavigate={mobileActions ? () => {
+        onNavigate?.();
+        mobileActions.openMcp();
+      } : undefined}
     >
       {mcpServers.map(([name, entry]) => {
         const needsAuth = entry?.status === 'needs_auth' || entry?.status === 'needs_client_registration';

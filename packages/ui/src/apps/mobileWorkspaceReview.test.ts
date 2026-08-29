@@ -12,6 +12,7 @@ import {
   MOBILE_GIT_PR_SURFACE_MODE,
   resolveMobileGitFileDiffHost,
   resolveMobileReviewMode,
+  routeMobileContextPanel,
 } from './mobileWorkspaceReview';
 
 const pluginsOff = {
@@ -99,5 +100,18 @@ describe('mobile Phase 2 review from Git', () => {
     expect(listVisibleMobileWorkspaceTabs(pluginsOff)).toEqual([...MOBILE_WORKSPACE_ALWAYS_TABS]);
     expect(listVisibleMobileWorkspaceTabs(pluginsOff).includes('browser' as never)).toBe(false);
     expect(MOBILE_WORKSPACE_ALWAYS_TABS.includes('browser' as never)).toBe(false);
+  });
+});
+
+describe('routeMobileContextPanel', () => {
+  test('maps Work Status destinations onto the existing workspace and review hosts', () => {
+    expect(routeMobileContextPanel({ mode: 'git' })).toEqual({ type: 'workspace', tab: 'changes' });
+    expect(routeMobileContextPanel({ mode: 'diff' })).toEqual({ type: 'workspace', tab: 'changes' });
+    expect(routeMobileContextPanel({ mode: 'diff', targetPath: 'src/app.ts' })).toEqual({ type: 'review' });
+    expect(routeMobileContextPanel({ mode: 'file' })).toEqual({ type: 'workspace', tab: 'files' });
+    expect(routeMobileContextPanel({ mode: 'context' })).toEqual({ type: 'workspace', tab: 'notes' });
+    expect(routeMobileContextPanel({ mode: 'pr' })).toEqual({ type: 'review' });
+    expect(routeMobileContextPanel({ mode: 'plan' })).toEqual({ type: 'workspace', tab: 'plan' });
+    expect(routeMobileContextPanel(null)).toEqual({ type: 'none' });
   });
 });

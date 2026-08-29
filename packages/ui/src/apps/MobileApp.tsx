@@ -46,7 +46,7 @@ import {
   partitionWorktreesByRegisteredProject,
   worktreeMapsEqual,
 } from '@/lib/worktrees/worktreeManager';
-import { useUIStore } from '@/stores/useUIStore';
+import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
 import { useUpdateStore } from '@/stores/useUpdateStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { SyncProvider } from '@/sync/sync-context';
@@ -61,7 +61,7 @@ import { MobileSessionsSheet } from './MobileSessionsSheet';
 import { MobileFullscreenSurface } from './MobileFullscreenSurface';
 import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
 import { MobileWorkspaceDrawer, type MobileWorkspaceTab } from './MobileWorkspaceDrawer';
-import { closeMobileReviewOverlay } from './mobileWorkspaceReview';
+import { closeMobileReviewOverlay, routeMobileContextPanel } from './mobileWorkspaceReview';
 import { DedicatedMobileAppProvider, type MobileAppActions } from './mobileAppContext';
 import { MOBILE_TOASTER_CLASS, MOBILE_TOASTER_SAFE_AREA_OFFSET } from './mobileToasterSafeArea';
 import { autoConnectLastInstance, getAutoConnectTargetLabel, logMobileConnectEvent, reprobeActiveConnection, type AutoConnectOutcome } from './mobileConnections';
@@ -183,6 +183,12 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
     setWorkspaceOpen(true);
   }, []);
 
+  const openMcpSurface = React.useCallback(() => {
+    if (!mcpSettingsAvailable) return;
+    setWorkspaceTab('mcp');
+    setWorkspaceOpen(true);
+  }, [mcpSettingsAvailable]);
+
   const leftResize = useIpadSidebarResize('left', 'openchamber.ipad.leftSidebarWidth', IPAD_LEFT_SIDEBAR_WIDTH);
   const rightResize = useIpadSidebarResize(
     'right',
@@ -243,9 +249,10 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
         openChangesSurface(diffPath ? { path: diffPath, staged: staged === true } : null);
       },
       openFiles: () => openFilesSurface(),
+      openMcp: () => openMcpSurface(),
       openSettings: () => openSettingsSurface('nav'),
     }),
-    [openChangesSurface, openFilesSurface, openSettingsSurface],
+    [openChangesSurface, openFilesSurface, openMcpSurface, openSettingsSurface],
   );
 
   // Expose the shell's panel-opening actions to the deep-link layer so pichamber:// URLs
@@ -263,9 +270,7 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
           return;
         }
         if (target === 'mcp') {
-          if (!mcpSettingsAvailable) return;
-          setWorkspaceTab('mcp');
-          setWorkspaceOpen(true);
+          openMcpSurface();
           return;
         }
         openSurface(target);
@@ -278,9 +283,55 @@ const MobileShell: React.FC<{ onActiveConnectionDeleted: () => void }> = ({ onAc
         openSettingsSurface(section ? 'page-content' : 'nav');
       },
     }),
-    [isTabletLayout, mcpSettingsAvailable, openChangesSurface, openFilesSurface, openSettingsSurface, openSurface, setSettingsPage],
+    [isTabletLayout, openChangesSurface, openFilesSurface, openMcpSurface, openSettingsSurface, openSurface, setSettingsPage],
   );
   useDeepLinkHandlers(deepLinkHandlers);
+
+  const directoryKey = effectiveDirectory ? normalizeContextPanelDirectoryKey(effectiveDirectory) : '';
+  const contextPanel = useUIStore((state) => (
+    directoryKey ? state.contextPanelByDirectory[directoryKey] : undefined
+  ));
+  const closeContextPanel = useUIStore((state) => state.closeContextPanel);
+  const routedPanelRef = React.useRef<{ key: string; tabId: string | null } | null>(null);
+
+  // Work Status (and Git) still write Desktop context-panel actions. Host the
+  // matching workspace tab or MobileReviewHost instead of a second rail.
+  React.useEffect(() => {
+    if (!directoryKey || !contextPanel?.isOpen) {
+      if (!contextPanel?.isOpen) routedPanelRef.current = null;
+      return;
+    }
+    const activeId = contextPanel.activeTabId;
+    const prev = routedPanelRef.current;
+    if (prev && prev.key === directoryKey && prev.tabId === activeId) return;
+    routedPanelRef.current = { key: directoryKey, tabId: activeId };
+    const active = contextPanel.tabs.find((tab) => tab.id === activeId) ?? null;
+    const route = routeMobileContextPanel(active);
+    if (route.type === 'none') return;
+    if (route.type === 'review') {
+      setWorkspaceOpen(true);
+      return;
+    }
+    if (route.tab === 'changes') {
+      openChangesSurface(null);
+      if (active?.mode === 'git' || (active?.mode === 'diff' && !active.targetPath)) {
+        closeContextPanel(directoryKey);
+      }
+      return;
+    }
+    if (route.tab === 'files') {
+      openFilesSurface();
+      closeContextPanel(directoryKey);
+      return;
+    }
+    if (route.tab === 'mcp') {
+      openMcpSurface();
+      return;
+    }
+    setWorkspaceTab(route.tab);
+    setWorkspaceOpen(true);
+    closeContextPanel(directoryKey);
+  }, [closeContextPanel, contextPanel, directoryKey, openChangesSurface, openFilesSurface, openMcpSurface]);
 
   // Edge swipes on the chat: left edge opens the sessions drawer (the
   // persistent sidebar on a tablet), right edge the workspace drawer.

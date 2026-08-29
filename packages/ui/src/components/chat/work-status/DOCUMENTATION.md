@@ -11,7 +11,8 @@ without a name is unreadable at a glance, which is what an unlabelled stream of
 values degenerates into.
 
 Rows are grouped into **named sections**, one component each, composed in
-order by `WorkStatusPanel`. The separator between them is a
+order by `WorkStatusBody` (shared by `WorkStatusPanel` and
+`MobileWorkStatusHost`). The separator between them is a
 `:not(:first-child)` CSS rule rather than a prop, because every section renders
 conditionally; passing "am I first?" down would mean each one tracking what the
 sections above it decided to render.
@@ -59,6 +60,16 @@ Do not remount this card beside the mobile transcript. Hosted `mobile.html`
 and Capacitor wrap the same section components in `MobileWorkStatusHost`
 (`apps/MobileWorkStatusHost.tsx`), opened from the header context ring.
 That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
+
+Mobile Work Status now includes pinned messages, context sources, and the
+equalizer / section-visibility dialog — the same `WorkStatusContents` chrome
+as Desktop (title row so the gear has a home). The 300px card is still not
+mounted. Tapping a row that navigates (git/changes, files/diff, PR, context
+overview, subagent Open, pinned reveal, MCP header) closes the sheet and uses
+existing mobile destinations: workspace `changes` / `files` / `notes` / `mcp`,
+`MobileReviewHost` for PR and per-file diff, and in-place `setCurrentSession`
+for a live child. Desktop context-panel store writes are mapped in
+`routeMobileContextPanel` / MobileApp; there is no second context rail.
 
 `ChatContainer` additionally suppresses it in mini-chat and in expanded-input
 mode. It remains available on a new-session draft and on an existing session

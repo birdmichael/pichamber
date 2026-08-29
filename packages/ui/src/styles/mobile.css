@@ -52,6 +52,12 @@
     min-width: 36px;
   }
 
+  /* Work Status rows stay h-7 like Desktop so stacked hit targets do not overlap. */
+  :root.mobile-pointer:not(.desktop-runtime) [data-work-status-host] button {
+    min-height: 0;
+    min-width: 0;
+  }
+
   /* Composer footer icon buttons (attach / Goal / leftover auto-accept): hug
      the icon so the group stays tight. The container only renders in the
      mobile JSX, so no pointer/runtime gating is needed; !important overrides
