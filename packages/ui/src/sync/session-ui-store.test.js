@@ -383,6 +383,20 @@ describe('openNewSessionDraft project binding', () => {
     expect(draft.directoryOverride).toBeNull();
   });
 
+  test('keeps a real untitled draft when reopening New session', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, 'pr345-draft-probe', []);
+    useSessionUIStore.getState().openNewSessionDraft({ directoryOverride: projectB.path });
+    expect(readChatDraft(identity).text).toBe('pr345-draft-probe');
+  });
+
+  test('still drops a leftover slash untitled draft', () => {
+    const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
+    writeChatDraft(identity, '/', []);
+    useSessionUIStore.getState().openNewSessionDraft({ directoryOverride: projectB.path });
+    expect(readChatDraft(identity).text).toBe('');
+  });
+
   test('does not inherit the current directory for an implicit chat draft', () => {
     useDirectoryStore.getState().setDirectory('/external/worktree', { showOverlay: false });
 
@@ -777,7 +791,7 @@ describe('routeMessage skill invocation', () => {
     expect(sendMessageCalls).toHaveLength(0);
   });
 
-  test('sends typed /run as chat when Feature Plugins have not loaded', async () => {
+  test('routes /plan /run /goal through session.command when Feature Plugins have not loaded', async () => {
     await routeMessage({
       sessionId: 'session-run',
       directory: '/skills/project',
@@ -785,10 +799,22 @@ describe('routeMessage skill invocation', () => {
       providerID: 'provider-a',
       modelID: 'model-a',
     });
+    await routeMessage({
+      sessionId: 'session-plan',
+      directory: '/chats/new',
+      content: '/plan',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
 
-    expect(sendMessageCalls).toHaveLength(1);
-    expect(sendMessageCalls[0].text).toBe('/run scout 只回复一个词：ok');
-    expect(sendCommandCalls).toHaveLength(0);
+    expect(sendCommandCalls.map((call) => ({
+      command: call.command,
+      arguments: call.arguments,
+    }))).toEqual([
+      { command: 'run', arguments: 'scout 只回复一个词：ok' },
+      { command: 'plan', arguments: '' },
+    ]);
+    expect(sendMessageCalls).toHaveLength(0);
   });
 
   test('still routes a live-listed /run through session.command when Subagents is off', async () => {
@@ -945,6 +971,21 @@ describe('routeMessage skill invocation', () => {
     expect(sendMessageCalls).toHaveLength(1);
     expect(sendMessageCalls[0].text).toBe('/skill:grill-with-docs focus on auth');
     expect(sendCommandCalls).toHaveLength(0);
+  });
+
+  test('routes a pasted /plan with trailing newline through session.command', async () => {
+    await routeMessage({
+      sessionId: 'session-plan-paste',
+      directory: '/chats/new',
+      content: '/plan\n',
+      providerID: 'provider-a',
+      modelID: 'model-a',
+    });
+
+    expect(sendCommandCalls).toEqual([
+      expect.objectContaining({ command: 'plan', arguments: '' }),
+    ]);
+    expect(sendMessageCalls).toHaveLength(0);
   });
 });
 

@@ -31,6 +31,7 @@ import { useBtwPanelState } from './btw/useBtwPanelState';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import {
     createChatDraftIdentity,
+    isStrayNewSessionSlashDraft,
     readChatDraft,
     writeChatDraft,
     type ChatDraftIdentity,
@@ -874,13 +875,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     });
 
     // Sidebar / File-menu New session must not keep a leftover `/` or an open
-    // slash menu from the previous composer identity.
+    // slash menu. A restored untitled draft is not leftover slash.
     React.useEffect(() => {
         if (!newSessionDraft?.open || !newSessionDraft.resetComposer) return;
         setOpenAutocomplete(null);
         setAutocompleteQuery('');
         dismissedAutocompleteKindRef.current = null;
-        if (messageRef.current) {
+        if (isStrayNewSessionSlashDraft(messageRef.current)) {
             messageRef.current = '';
             setMessage('');
             persistDraftImmediately(chatDraftIdentity, '');

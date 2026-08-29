@@ -136,6 +136,27 @@ describe('plan-question option helpers', () => {
 });
 
 describe('pi extension UI store', () => {
+  test('scrolls a newly pending select into view', () => {
+    applyPiExtensionUiPrompt({
+      id: 'pui_new',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Plan mode',
+      options: ['Start Plan mode'],
+      status: 'pending',
+    });
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBe('pui_new');
+    applyPiExtensionUiPrompt({
+      id: 'pui_new',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Plan mode',
+      options: ['Start Plan mode'],
+      status: 'pending',
+    });
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBe('pui_new');
+  });
+
   test('upserts asked/settled prompts without touching OpenCode question state', () => {
     applyPiExtensionUiPrompt({
       id: 'pui_1',
@@ -187,6 +208,26 @@ describe('pi extension UI store', () => {
     });
     const prompts = usePiExtensionUiStore.getState().promptsBySession.ses_1 ?? [];
     expect(selectTranscriptPiExtensionUiPrompts(prompts).map((prompt) => prompt.id)).toEqual(['pui_pending']);
+  });
+
+  test('keeps only the latest pending dock card live', () => {
+    applyPiExtensionUiPrompt({
+      id: 'pui_confirm_q',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Should we continue?',
+      status: 'pending',
+    });
+    applyPiExtensionUiPrompt({
+      id: 'pui_plan',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Plan mode',
+      status: 'pending',
+    });
+    const prompts = usePiExtensionUiStore.getState().promptsBySession.ses_1 ?? [];
+    expect(selectTranscriptPiExtensionUiPrompts(prompts).map((prompt) => prompt.id)).toEqual(['pui_plan']);
+    expect(usePiExtensionUiStore.getState().focusPromptId).toBe('pui_plan');
   });
 
   test('keeps confirm prompts out of the transcript list', () => {

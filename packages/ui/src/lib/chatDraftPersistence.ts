@@ -119,6 +119,12 @@ export const clearChatDraft = (identity: ChatDraftIdentity, notify = false): voi
   if (notify) deletionListeners.forEach((listener) => listener(identity));
 };
 
+/** Sidebar New session used to insert a leftover `/`. Only that stray slash
+ *  should be wiped — a real untitled draft must survive leaving and returning. */
+export const isStrayNewSessionSlashDraft = (text: string): boolean => (
+  text.trim() === '/'
+);
+
 export const subscribeChatDraftDeletion = (listener: (identity: ChatDraftIdentity) => void): (() => void) => {
   deletionListeners.add(listener);
   return () => deletionListeners.delete(listener);
