@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import type { Part } from '@opencode-ai/sdk/v2/client';
 
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import {
@@ -230,6 +231,18 @@ describe('Pi Goal start command', () => {
         msg_tool: [{ type: 'tool', state: { output: 'Goal complete: said bye' } }],
       },
     )).toBe(false);
+    expect(isPiGoalComposerRowActive(
+      [
+        { id: 'msg_goal', role: 'user' },
+        { id: 'msg_pending', role: 'assistant' },
+      ],
+      {
+        msg_goal: [{ type: 'text', text: '/goal say bye' }],
+        msg_pending: [{ type: 'tool', state: { status: 'pending' } }],
+      },
+    )).toBe(true);
+    const storeParts: Record<string, Part[]> = {};
+    expect(isPiGoalComposerRowActive([], storeParts)).toBe(false);
     expect(isPiGoalComposerRowActive(
       [
         { id: 'msg_goal', role: 'user' },

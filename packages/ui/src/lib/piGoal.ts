@@ -106,27 +106,38 @@ const objectiveFromUserText = (text: string): string | null => {
   return match?.[1]?.trim() || null;
 };
 
-const textFromParts = (parts: Array<{ type?: string; text?: string }> | null | undefined): string => (
+/** Loose enough for store `Part[]` (pending tools have no `output`) and tests. */
+type PiGoalPartLike = {
+  type?: string;
+  text?: string;
+  output?: unknown;
+  state?: unknown;
+};
+
+type PiGoalPartsByMessage = Record<string, PiGoalPartLike[] | undefined> | null | undefined;
+
+const textFromParts = (parts: readonly PiGoalPartLike[] | null | undefined): string => (
   (parts || [])
     .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
     .join('')
     .trim()
 );
 
-const toolOutputFromPart = (part: {
-  type?: string;
-  output?: unknown;
-  state?: { output?: unknown };
-} | null | undefined): string => {
+const outputFromUnknown = (value: unknown): string => (
+  typeof value === 'string' ? value : ''
+);
+
+const toolOutputFromPart = (part: PiGoalPartLike | null | undefined): string => {
   if (part?.type !== 'tool') return '';
-  const output = part.state && typeof part.state === 'object'
-    ? part.state.output
-    : part.output;
-  return typeof output === 'string' ? output : '';
+  const state = part.state;
+  if (state && typeof state === 'object' && 'output' in state) {
+    return outputFromUnknown(state.output);
+  }
+  return outputFromUnknown(part.output);
 };
 
 const completeTextFromParts = (
-  parts: Array<{ type?: string; text?: string; output?: unknown; state?: { output?: unknown } }> | null | undefined,
+  parts: readonly PiGoalPartLike[] | null | undefined,
 ): string => (
   (parts || [])
     .map((part) => {
@@ -157,7 +168,7 @@ export function readPiGoalObjectiveFromMessages(
 
 export function readPiGoalObjectiveFromSession(
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+  partsByMessageID: PiGoalPartsByMessage,
 ): string | null {
   if (!Array.isArray(messages)) return null;
   const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
@@ -172,7 +183,7 @@ export function readPiGoalObjectiveFromSession(
 
 const lastGoalUserIndex = (
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  parts: Record<string, Array<{ type?: string; text?: string }>>,
+  parts: Record<string, PiGoalPartLike[] | undefined>,
 ): number => {
   if (!Array.isArray(messages)) return -1;
   let lastGoalIndex = -1;
@@ -186,7 +197,7 @@ const lastGoalUserIndex = (
 
 const hasGoalCompleteText = (
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  parts: Record<string, Array<{ type?: string; text?: string }>>,
+  parts: Record<string, PiGoalPartLike[] | undefined>,
 ): boolean => {
   if (!Array.isArray(messages)) return false;
   return messages.some((message) => (
@@ -208,7 +219,7 @@ const isExplicitInactivePiGoalMarker = (session: { metadata?: unknown } | null |
 
 export function isPiGoalComposerRowActive(
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  partsByMessageID: Record<string, Array<{ type?: string; text?: string; output?: unknown; state?: { output?: unknown } }>> | null | undefined,
+  partsByMessageID: PiGoalPartsByMessage,
   session?: { metadata?: unknown } | null,
 ): boolean {
   if (!readPiGoalObjectiveFromSession(messages, partsByMessageID)) return false;
@@ -230,7 +241,7 @@ export function isPiGoalComposerRowActive(
 /** Hide leftover OpenChamber recap/suggestion after a /goal turn. */
 export function isPiGoalSessionAssistHidden(
   messages: Array<{ id?: string; role?: string }> | null | undefined,
-  partsByMessageID: Record<string, Array<{ type?: string; text?: string }>> | null | undefined,
+  partsByMessageID: PiGoalPartsByMessage,
 ): boolean {
   if (!Array.isArray(messages)) return false;
   const parts = partsByMessageID && typeof partsByMessageID === 'object' ? partsByMessageID : {};
