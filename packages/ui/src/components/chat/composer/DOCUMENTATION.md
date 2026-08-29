@@ -98,9 +98,13 @@ dropdown — not a fake OpenCode agent, not two chips, and not Build/Plan. The
 trigger shows the current side only. The control shows on an idle empty session
 or new-session draft (status defaults to `off`) and does not wait for a plan
 fetch. On a new-session draft, choosing Plan is local composer intent: it does
-not `createSession` or leave the draft. That intent stays on this draft
-until you send or pick Agent. A later New session starts on Agent. An
-already-open session still shows its own stored Agent or Plan.
+not `createSession` or leave the draft. Agent→Plan on a draft toasts and shows
+a Plan row (`Plan starts when you send.`). That intent stays on this draft
+until you send or pick Agent, including after you open another session and come
+back. A later New session starts on Agent. The Desktop chip stays on Plan after
+first-send materialize until `/plan start` is authoritative; a later
+`GET /plan` `off` must not revert it. An already-open session still shows its
+own stored Agent or Plan.
 Send uses the same Agent materialize path, then `/plan start` on that new
 session if Plan is not already on, then the prompt. An already-open session
 still runs `/plan start` / save / exit on that same session. If an auto-draft welcome cleared `currentSessionId` while `?session=` or last-active still names a chat, Agent→Plan still `/plan start` on that id instead of storing local draft Plan intent. The `ComposerFooter` `isMobile` branch mounts the same `PiPlanModeToggle`

@@ -14,6 +14,7 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveFooterPlanSelected,
   resolveOpenedDraftPlanSelected,
+  resolvePlanStatusRowHint,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
@@ -135,6 +136,25 @@ describe('plan toggle and build dispatch', () => {
       draftOpen: true,
       draftPlanSelected: true,
     })).toBe(false);
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_new',
+      draftOpen: false,
+      draftPlanSelected: true,
+    })).toBe(true);
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: true,
+    })).toBe('draft');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: false,
+    })).toBe('enabled');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: false,
+      draftOpen: true,
+    })).toBeNull();
   });
 
   test('empty-composer Plan stays on this draft until send or Agent, and a new draft is Agent', () => {

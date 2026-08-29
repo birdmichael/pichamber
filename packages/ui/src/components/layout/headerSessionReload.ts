@@ -34,6 +34,23 @@ export function isSessionTitleReloadVisible(input: {
     && !input.isRenamingSession;
 }
 
+/**
+ * Title-adjacent ⟳. Desktop reads this as a working spinner. Show it only
+ * while reload/compaction is actually running. Idle sessions keep Reload in
+ * the session overflow menu instead.
+ */
+export function isSessionTitleReloadGlyphVisible(input: {
+  isPiKernel: boolean;
+  hasCurrentSession: boolean;
+  isNewSessionDraftOpen: boolean;
+  isRenamingSession: boolean;
+  isReloadInFlight?: boolean;
+  isCompacting?: boolean;
+}): boolean {
+  return isSessionTitleReloadVisible(input)
+    && (input.isReloadInFlight === true || input.isCompacting === true);
+}
+
 export function isSessionTitleReloadBlockedByStatus(statusType: string | null | undefined): boolean {
   return statusType === 'busy' || statusType === 'retry';
 }

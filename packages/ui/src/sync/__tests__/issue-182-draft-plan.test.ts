@@ -147,6 +147,14 @@ describe('issue 182 draft Plan send', () => {
     expect(planStarts).toEqual([{ sessionID: 'ses_issue_182', action: 'start' }])
     expect(sendMessageCalls).toHaveLength(1)
     expect(sendMessageCalls[0]?.id).toBe('ses_issue_182')
+    const { resolveFooterPlanSelected } = await import('../pi-session-plan')
+    expect(resolveFooterPlanSelected({
+      available: true,
+      status: 'off',
+      sessionID: 'ses_issue_182',
+      draftOpen: false,
+      draftPlanSelected: true,
+    })).toBe(true)
   })
 
   test('Agent draft send materializes once and does not start plan', async () => {

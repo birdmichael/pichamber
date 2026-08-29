@@ -4,6 +4,7 @@ import { Icon } from '@/components/icon/Icon';
 import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { resolvePlanStatusRowHint } from '@/sync/pi-session-plan';
 
 interface PiPlanStatusRowProps {
   className?: string;
@@ -14,10 +15,14 @@ export const PiPlanStatusRow: React.FC<PiPlanStatusRowProps> = React.memo(({
 }) => {
   const { t } = useI18n();
   const chrome = usePiPlanChrome();
+  const hintKind = resolvePlanStatusRowHint({
+    footerPlanSelected: chrome.footerPlanSelected,
+    draftOpen: chrome.draftOpen,
+  });
 
-  if (!chrome.showToggle || !chrome.footerPlanSelected) return null;
+  if (!chrome.showToggle || !hintKind) return null;
 
-  const hint = chrome.draftOpen
+  const hint = hintKind === 'draft'
     ? t('chat.piPlan.draftHint')
     : t('chat.piPlan.enabledNotify');
 

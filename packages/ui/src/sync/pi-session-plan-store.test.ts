@@ -39,4 +39,12 @@ describe('pi session plan store', () => {
 
     expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('active');
   });
+
+  test('does not let a later GET off overwrite optimistic Plan after apply', async () => {
+    applySessionPlan('ses_plan', { status: 'active', planMarkdown: '' });
+    const refresh = refreshSessionPlan('ses_plan');
+    pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
+    await refresh;
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('active');
+  });
 });

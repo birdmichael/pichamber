@@ -141,7 +141,19 @@ export const resolveFooterPlanSelected = (input: {
 }): boolean => {
   if (!input.available) return false;
   if (isFooterPlanSelected(input.status)) return true;
-  return Boolean(input.draftOpen && !trimmedSessionID(input.sessionID) && input.draftPlanSelected);
+  // Keep the Desktop Agent/Plan chip on Plan from the draft pick through
+  // first-send materialize. A session id arriving must not drop that intent
+  // before `/plan start` is authoritative.
+  return Boolean(input.draftPlanSelected);
+};
+
+/** Composer Plan row: draft hint until send, then the enabled notify. */
+export const resolvePlanStatusRowHint = (input: {
+  footerPlanSelected: boolean;
+  draftOpen: boolean;
+}): 'draft' | 'enabled' | null => {
+  if (!input.footerPlanSelected) return null;
+  return input.draftOpen ? 'draft' : 'enabled';
 };
 
 /**

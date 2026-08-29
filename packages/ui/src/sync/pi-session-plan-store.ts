@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { maybeOpenPlanRailOnReady, notePlanReadyCycle } from './pi-plan-ready';
 import {
   fetchSessionPlan,
+  isFooterPlanSelected,
   parseSessionPlan,
   runSessionPlanAction,
   type SessionPlan,
@@ -48,6 +49,12 @@ export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan
   const startedRevision = planRevisionBySession[sessionID] ?? 0;
   const plan = await fetchSessionPlan(sessionID);
   if ((planRevisionBySession[sessionID] ?? 0) !== startedRevision) return plan;
+  const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  // A GET that still says off must not wipe optimistic / just-started Plan.
+  // Explicit exit still goes through dispatchSessionPlanAction → applySessionPlan.
+  if (current && isFooterPlanSelected(current.status) && plan?.status === 'off') {
+    return current;
+  }
   applySessionPlan(sessionID, plan);
   return plan;
 };

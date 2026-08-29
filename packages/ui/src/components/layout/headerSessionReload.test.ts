@@ -7,6 +7,7 @@ import {
   getSessionTitleReloadBlockReason,
   isSessionTitleReloadBlocked,
   isSessionTitleReloadBlockedByStatus,
+  isSessionTitleReloadGlyphVisible,
   isSessionTitleReloadInFlightForSession,
   isSessionTitleReloadOutputting,
   isSessionTitleReloadVisible,
@@ -44,6 +45,35 @@ describe('isSessionTitleReloadVisible', () => {
 
   test('hides while the session title is being renamed', () => {
     expect(isSessionTitleReloadVisible({ ...visible, isRenamingSession: true })).toBe(false);
+  });
+});
+
+describe('isSessionTitleReloadGlyphVisible', () => {
+  const visible = {
+    isPiKernel: true,
+    hasCurrentSession: true,
+    isNewSessionDraftOpen: false,
+    isRenamingSession: false,
+  };
+
+  test('hides the title ⟳ when the session is idle', () => {
+    expect(isSessionTitleReloadGlyphVisible(visible)).toBe(false);
+    expect(isSessionTitleReloadGlyphVisible({
+      ...visible,
+      isReloadInFlight: false,
+      isCompacting: false,
+    })).toBe(false);
+  });
+
+  test('shows the title spinner only while reload or compaction is running', () => {
+    expect(isSessionTitleReloadGlyphVisible({
+      ...visible,
+      isReloadInFlight: true,
+    })).toBe(true);
+    expect(isSessionTitleReloadGlyphVisible({
+      ...visible,
+      isCompacting: true,
+    })).toBe(true);
   });
 });
 

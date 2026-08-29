@@ -18,6 +18,14 @@ const modelControlsSource = readFileSync(
   join(__dirname, '../../ModelControls.tsx'),
   'utf-8',
 );
+const chatInputSource = readFileSync(
+  join(__dirname, '../../ChatInput.tsx'),
+  'utf-8',
+);
+const headerSource = readFileSync(
+  join(__dirname, '../../../layout/Header.tsx'),
+  'utf-8',
+);
 
 const ICON_SLOT_WIDTH = /width:\s*1\.5rem\s*!important/;
 
@@ -47,5 +55,18 @@ describe('mobile composer Agent/Plan chip width', () => {
     expect(footerSource).toContain('<PiPlanModeToggle');
     expect(modelControlsSource).toContain('<PiPlanModeToggle');
     expect(modelControlsSource).not.toContain('composer-mobile-actions');
+  });
+
+  test('Desktop Plan chip toasts and mounts the Plan starts-when-you-send row', () => {
+    expect(toggleSource).toContain('PLAN_MODE_ENABLED_NOTIFY');
+    expect(toggleSource).toContain("decision.kind === 'draft-intent'");
+    expect(toggleSource).toContain('presentPiExtensionUiNotify');
+    expect(chatInputSource).toContain('<PiPlanStatusRow');
+  });
+
+  test('header title ⟳ is the reload glyph, hidden when idle', () => {
+    expect(headerSource).toContain('isSessionTitleReloadGlyphVisible');
+    expect(headerSource).toContain('showSessionTitleReloadGlyph');
+    expect(headerSource).toContain('header.sessionReload.tooltip');
   });
 });
