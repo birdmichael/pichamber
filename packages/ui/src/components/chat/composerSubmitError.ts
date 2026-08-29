@@ -19,7 +19,11 @@ export const classifyComposerSubmitError = (error: unknown): {
   ) {
     return { kind: 'unknown-command', raw };
   }
-  if (lower.includes('session.command failed')) {
+  if (
+    lower.includes('session.command failed')
+    || lower.includes('menu action failed')
+    || lower.includes('addeventlistener is not a function')
+  ) {
     return { kind: 'command-failed', raw };
   }
   return { kind: 'raw', raw };

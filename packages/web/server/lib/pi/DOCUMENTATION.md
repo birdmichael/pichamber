@@ -395,7 +395,7 @@ While a prompt is pending, the usable card belongs on the asking `question` / `p
 | Invocation | Host result |
 |---|---|
 | `/plan start` | Enter Plan + `ctx.ui.notify`. `GET /api/pi/ui` stays `[]`. Not a question-card probe. |
-| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. |
+| bare `/plan` | Launch `ctx.ui.select` (Start / tools / Settings / How it works). Immediate UI proof that bind works. `ask()` only subscribes abort when `addEventListener` is a function (Node-child IPC can pass `{ aborted }` without EventTarget). A new ask cancels earlier pending cards so a late `/plan` does not stack on a confirm. |
 | `/plan tools` | Tools `ctx.ui.select`. |
 
 Desktop chrome uses `/plan start` for the Agent \| Plan footer on an already-open

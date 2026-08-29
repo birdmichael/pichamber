@@ -268,12 +268,15 @@ export const usePendingPiExtensionUiPromptCount = (sessionIds: readonly string[]
   usePiExtensionUiStore((state) => countPendingPiExtensionUiPrompts(state.promptsBySession, sessionIds))
 );
 
-/** Bottom-dock cards: pending select/input/editor that are not bound to a question-tool turn. */
+/** Bottom-dock cards: the current pending select/input/editor (one live ask). */
 export const selectTranscriptPiExtensionUiPrompts = (
   prompts: PiExtensionUiPrompt[],
-): PiExtensionUiPrompt[] => prompts.filter((prompt) => (
-  prompt.kind !== 'confirm' && prompt.status === 'pending'
-));
+): PiExtensionUiPrompt[] => {
+  const pending = prompts.filter((prompt) => (
+    prompt.kind !== 'confirm' && prompt.status === 'pending'
+  ));
+  return pending.length > 0 ? [pending[pending.length - 1]!] : [];
+};
 
 export const selectPendingConfirmPrompt = (
   prompts: PiExtensionUiPrompt[],

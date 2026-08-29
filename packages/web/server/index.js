@@ -76,7 +76,7 @@ import { createOpenCodeResolutionRuntime } from './lib/opencode/opencode-resolut
 import { resolveOpenCodeUpgradeCapability } from './lib/opencode/upgrade-capability.js';
 import { createBootstrapRuntime } from './lib/opencode/bootstrap-runtime.js';
 import { createSessionRuntime } from './lib/opencode/session-runtime.js';
-import { createOpenCodeWatcherRuntime } from './lib/opencode/watcher.js';
+import { createOpenCodeWatcherRuntime, startGlobalWatcherAfterKernelReady } from './lib/opencode/watcher.js';
 import { createSessionAssistRuntime } from './lib/session-assist/runtime.js';
 import { createSessionGoalRuntime } from './lib/session-goal/runtime.js';
 import { createContextObligatoryRuntime } from './lib/context-obligatory/runtime.js';
@@ -1337,6 +1337,9 @@ const bootstrapOpenCodeAtStartup = async (...args) => {
         + `${failure?.recovery || ''}`.trim(),
       );
     }
+    // Pi bus is already globalMessageStreamHub. Watcher start() subscribes
+    // onPayload → push + needsAttention. Do not return before that attach.
+    void startGlobalWatcherAfterKernelReady(ensureGlobalWatcherStarted);
     return;
   }
   await openCodeLifecycleRuntime.bootstrapOpenCodeAtStartup(...args);
@@ -1346,10 +1349,8 @@ const bootstrapOpenCodeAtStartup = async (...args) => {
   }
   // The global watcher used to start only for desktop notifications; the
   // session-assist runtime also rides its event hub, so it now starts
-  // unconditionally once OpenCode is up.
-  void ensureGlobalWatcherStarted().catch((error) => {
-    console.warn(`Global event watcher startup failed: ${error?.message || error}`);
-  });
+  // unconditionally once OpenCode is up. Same helper as the Pi kernel path.
+  void startGlobalWatcherAfterKernelReady(ensureGlobalWatcherStarted);
 };
 const killProcessOnPort = (...args) => openCodeLifecycleRuntime.killProcessOnPort(...args);
 const waitForPortRelease = (...args) => openCodeLifecycleRuntime.waitForPortRelease(...args);

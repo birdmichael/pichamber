@@ -1,5 +1,17 @@
 import { createNoopUiExtras } from './extension-ui.js';
 
+/** AbortSignal cannot cross the Node-child IPC boundary as an EventTarget. */
+export const serializeUiOpts = (opts) => {
+  if (!opts || typeof opts !== 'object') return undefined;
+  const next = {};
+  if (opts.multiple === true) next.multiple = true;
+  if (Number.isFinite(opts.timeout) && opts.timeout > 0) next.timeout = opts.timeout;
+  if (opts.signal && typeof opts.signal === 'object') {
+    next.signal = { aborted: opts.signal.aborted === true };
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
 const createNodeKernelChildUi = ({ parentRequest, sessionId } = {}) => {
   const request = typeof parentRequest === 'function'
     ? parentRequest
@@ -11,7 +23,7 @@ const createNodeKernelChildUi = ({ parentRequest, sessionId } = {}) => {
         sessionId,
         title,
         options,
-        opts,
+        opts: serializeUiOpts(opts),
       });
     },
     async confirm(title, message) {
@@ -25,14 +37,14 @@ const createNodeKernelChildUi = ({ parentRequest, sessionId } = {}) => {
       return request('ui.input', {
         sessionId,
         title,
-        opts,
+        opts: serializeUiOpts(opts),
       });
     },
     async editor(title, opts) {
       return request('ui.editor', {
         sessionId,
         title,
-        opts,
+        opts: serializeUiOpts(opts),
       });
     },
     notify(message, level) {

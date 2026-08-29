@@ -13,6 +13,9 @@ describe('classifyComposerSubmitError', () => {
     expect(classifyComposerSubmitError(
       new Error('session.command failed (500): plan plugin crashed'),
     ).kind).toBe('command-failed');
+    expect(classifyComposerSubmitError(
+      new Error('Menu action failed: opts?.signal?.addEventListener is not a function'),
+    ).kind).toBe('command-failed');
   });
 
   test('keeps runtime-changed and raw messages', () => {

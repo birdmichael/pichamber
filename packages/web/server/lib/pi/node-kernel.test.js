@@ -10,7 +10,7 @@ import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
 import { createNodeKernelClient, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
 import { serializeSessionCommands, serializeSessionSnapshot } from './node-kernel-protocol.js';
-import { bindNodeKernelChildUiContext } from './node-kernel-ui.js';
+import { bindNodeKernelChildUiContext, serializeUiOpts } from './node-kernel-ui.js';
 import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
 import { resolvePiAgentDir } from './pi-resources.js';
 
@@ -444,6 +444,19 @@ describe('node kernel ctx.ui stub', () => {
     });
     const childSource = fs.readFileSync(new URL('./node-kernel-child.js', import.meta.url), 'utf8');
     expect(childSource.includes('bindNodeKernelChildUiContext')).toBe(true);
+  });
+
+  it('serializes AbortSignal to aborted-only so IPC cannot invent addEventListener', () => {
+    expect(serializeUiOpts({
+      multiple: true,
+      signal: new AbortController().signal,
+    })).toEqual({
+      multiple: true,
+      signal: { aborted: false },
+    });
+    const abort = new AbortController();
+    abort.abort();
+    expect(serializeUiOpts({ signal: abort.signal })).toEqual({ signal: { aborted: true } });
   });
 });
 

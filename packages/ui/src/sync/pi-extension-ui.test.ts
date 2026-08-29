@@ -191,6 +191,25 @@ describe('pi extension UI store', () => {
     expect(selectTranscriptPiExtensionUiPrompts(prompts).map((prompt) => prompt.id)).toEqual(['pui_pending']);
   });
 
+  test('keeps only the latest pending dock card live', () => {
+    applyPiExtensionUiPrompt({
+      id: 'pui_confirm_q',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Should we continue?',
+      status: 'pending',
+    });
+    applyPiExtensionUiPrompt({
+      id: 'pui_plan',
+      sessionID: 'ses_1',
+      kind: 'select',
+      title: 'Plan mode',
+      status: 'pending',
+    });
+    const prompts = usePiExtensionUiStore.getState().promptsBySession.ses_1 ?? [];
+    expect(selectTranscriptPiExtensionUiPrompts(prompts).map((prompt) => prompt.id)).toEqual(['pui_plan']);
+  });
+
   test('keeps confirm prompts out of the transcript list', () => {
     applyPiExtensionUiPrompt({
       id: 'pui_2',

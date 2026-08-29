@@ -34,7 +34,10 @@ export const createOpenCodeWatcherRuntime = (deps) => {
       return;
     }
 
-    await waitForOpenCodePort();
+    // An in-process Pi bus is already the hub. Do not wait for leftover OpenCode.
+    if (!globalEventHub) {
+      await waitForOpenCodePort();
+    }
 
     abortController = new AbortController();
     const signal = abortController.signal;
@@ -113,3 +116,12 @@ export const createOpenCodeWatcherRuntime = (deps) => {
     stop,
   };
 };
+
+/** Pi kernel bootstrap must start the same fanout watcher as OpenCode. */
+export const startGlobalWatcherAfterKernelReady = (ensureStarted, { warn = console.warn } = {}) => (
+  Promise.resolve()
+    .then(() => ensureStarted())
+    .catch((error) => {
+      warn(`Global event watcher startup failed: ${error?.message || error}`);
+    })
+);

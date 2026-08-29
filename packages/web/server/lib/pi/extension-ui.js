@@ -10,6 +10,26 @@ const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '
 
 const SESSION_BACKFILL_COMPLETE = /Session backfill complete:/i;
 
+/** IPC can turn AbortSignal into `{ aborted }` without EventTarget methods. */
+export const subscribeAbortSignal = (signal, onAbort) => {
+  if (!signal || typeof signal !== 'object') {
+    return () => {};
+  }
+  if (signal.aborted) {
+    onAbort();
+    return () => {};
+  }
+  if (typeof signal.addEventListener !== 'function') {
+    return () => {};
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
+  return () => {
+    if (typeof signal.removeEventListener === 'function') {
+      signal.removeEventListener('abort', onAbort);
+    }
+  };
+};
+
 /** Hermes startup indexing status. Keep real backfill failures visible. */
 export const isRoutineSessionBackfillNotify = (message) => (
   SESSION_BACKFILL_COMPLETE.test(asTrimmedString(message))
@@ -109,6 +129,13 @@ export const createExtensionUIController = ({
       return Promise.resolve(cancelValue);
     }
 
+    // One live ask: a later ctx.ui prompt replaces earlier pending cards
+    // (a late /plan must not stack on a confirm that already replaced it).
+    for (const existingId of Array.from(pending.keys())) {
+      const existing = pending.get(existingId);
+      settle(existingId, 'cancelled', existing?.cancelValue);
+    }
+
     const id = createId('pui');
     const prompt = {
       id,
@@ -126,9 +153,10 @@ export const createExtensionUIController = ({
 
     return new Promise((resolve) => {
       let timeoutId;
+      let unsubscribeAbort = () => {};
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId);
-        opts?.signal?.removeEventListener('abort', onAbort);
+        unsubscribeAbort();
       };
       const onAbort = () => {
         settle(id, 'cancelled', cancelValue);
@@ -141,7 +169,7 @@ export const createExtensionUIController = ({
         prompt,
       });
 
-      opts?.signal?.addEventListener('abort', onAbort, { once: true });
+      unsubscribeAbort = subscribeAbortSignal(opts?.signal, onAbort);
       if (Number.isFinite(opts?.timeout) && opts.timeout > 0) {
         timeoutId = setTimeout(() => {
           settle(id, 'cancelled', cancelValue);

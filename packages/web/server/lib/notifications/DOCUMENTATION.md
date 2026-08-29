@@ -51,7 +51,8 @@ This module provides notification message preparation utilities for the web serv
   - template resolution and fallback behavior
   - native notification fanout and web push payload fanout
   - ready/error/goal APNs suppression while any fresh UI visibility heartbeat reports a focused interactive (desktop/web) client; blocking question/permission/`pi.ui.asked` pushes always fan out to native APNs so a focused Mac window cannot swallow a waiting prompt
-  - `console.info('[Push] fanout start', …)` at the start of every fanout, plus skip reasons (`notifyOnQuestion=false`, no web-push subscriptions) so a silent no-op is observable
+  - `console.info('[Push] fanout start', …)` at the start of every fanout, plus skip reasons (`notifyOnQuestion=false`, no web-push subscriptions, `[APNs] skipped: no tokens`) so a silent no-op is observable
+  - Pi kernel bootstrap starts the same global watcher (Pi bus is already `globalMessageStreamHub`) so `pi.ui.asked` reaches this fanout without waiting for leftover OpenCode
 
 ### Push runtime API (push-runtime.js)
 - `createPushRuntime(dependencies)`: creates runtime for web push and UI visibility state.
