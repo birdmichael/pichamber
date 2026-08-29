@@ -315,6 +315,104 @@ export const listAdapterRunsFromFiles = ({
   return runs;
 };
 
+const NESTED_RUN_WALK_MAX_DEPTH = 6;
+const NESTED_RUN_WALK_MAX_FILES = 64;
+
+const walkNestedRunSessionFiles = (root) => {
+  const files = [];
+  const walk = (current, depth) => {
+    if (files.length >= NESTED_RUN_WALK_MAX_FILES || depth > NESTED_RUN_WALK_MAX_DEPTH) return;
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (files.length >= NESTED_RUN_WALK_MAX_FILES) return;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'archive' || entry.name === 'node_modules' || entry.name === '.git') continue;
+        walk(full, depth + 1);
+        continue;
+      }
+      if (entry.isFile() && entry.name === 'session.jsonl') {
+        const runDir = path.basename(path.dirname(full));
+        if (runDir.startsWith('run-')) files.push(full);
+      }
+    }
+  };
+  walk(root, 0);
+  return files;
+};
+
+const inferNestedRunMeta = (file, parentID) => {
+  const named = path.basename(path.dirname(path.dirname(file)));
+  const parent = asTrimmedString(parentID);
+  const runId = named && named !== parent ? named : path.basename(path.dirname(file));
+  const name = runId.startsWith('run_') ? runId.slice('run_'.length) : runId;
+  return { runId, name: name || 'subagent' };
+};
+
+/** Pi stores worktree children as `<parentSessionDir>/<parentId>/<runName>/run-N/session.jsonl`. */
+export const listNestedSessionRuns = ({
+  parent,
+  sessionDir,
+} = {}) => {
+  const parentID = asTrimmedString(parent?.id);
+  if (!parentID) return [];
+  const roots = [];
+  const seenRoots = new Set();
+  const addRoot = (value) => {
+    const dir = asTrimmedString(value);
+    if (!dir || seenRoots.has(dir)) return;
+    seenRoots.add(dir);
+    if (fs.existsSync(dir)) roots.push(dir);
+  };
+  if (parent?.sessionFile) {
+    addRoot(path.join(path.dirname(parent.sessionFile), parentID));
+  }
+  if (sessionDir) {
+    addRoot(path.join(sessionDir, parentID));
+  }
+
+  const runs = [];
+  const seen = new Set();
+  for (const root of roots) {
+    for (const file of walkNestedRunSessionFiles(root)) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const header = readSessionHeaderFromSessionFile(file);
+      const childId = asChildSessionId(header.id, parentID);
+      if (!childId) continue;
+      const { runId, name } = inferNestedRunMeta(file, parentID);
+      let startedAt = null;
+      try {
+        const mtime = fs.statSync(file).mtimeMs;
+        if (Number.isFinite(mtime)) startedAt = mtime;
+      } catch {
+      }
+      runs.push({
+        runId,
+        parentID,
+        sessionID: childId,
+        sessionFile: file,
+        directory: header.cwd || null,
+        name,
+        role: name,
+        mode: 'background',
+        state: 'done',
+        title: name,
+        toolCallId: null,
+        asyncDir: null,
+        startedAt,
+        endedAt: null,
+      });
+    }
+  }
+  return runs;
+};
+
 const parseJsonValue = (value) => {
   if (isRecord(value)) return value;
   const text = asTrimmedString(value);

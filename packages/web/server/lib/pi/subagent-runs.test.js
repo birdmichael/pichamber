@@ -11,6 +11,7 @@ import {
   isSubagentManagementCall,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
+  listNestedSessionRuns,
   mapStatusToSubagentRun,
   mergeSubagentRuns,
   normalizeSubagentRunMode,
@@ -305,6 +306,36 @@ describe('child-session directory plumbing', () => {
     });
     expect(toPublicSubagentRun(runs[0])).toMatchObject({
       directory: worktree,
+      openable: true,
+    });
+  });
+
+  it('reads cwd from a nested run-0/session.jsonl under the parent session dir', () => {
+    const sessionDir = makeTemp('pi-nested-sessions-');
+    const parentID = '01a04ce8-3480-7001-8001-pichamber34801';
+    const childId = '01a04ce8-3480-7001-8002-pichamber34802';
+    const childDir = '/tmp/pichamber-348-fixture/child-wt';
+    const childFile = path.join(sessionDir, parentID, 'run_scout', 'run-0', 'session.jsonl');
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: childDir,
+    })}\n`);
+    const runs = listNestedSessionRuns({
+      parent: { id: parentID },
+      sessionDir,
+    });
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      runId: 'run_scout',
+      sessionID: childId,
+      sessionFile: childFile,
+      directory: childDir,
+    });
+    expect(toPublicSubagentRun(runs[0])).toMatchObject({
+      sessionID: childId,
+      directory: childDir,
       openable: true,
     });
   });

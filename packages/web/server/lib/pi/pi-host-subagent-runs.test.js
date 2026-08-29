@@ -929,4 +929,85 @@ describe('Pi host subagent runs', () => {
       host.dispose();
     }
   });
+
+  it('lists a worktree-cwd child under the parent directory when parentID is already set', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parentDir = '/tmp/pichamber-348-fixture/parent';
+    const childDir = '/tmp/pichamber-348-fixture/child-wt';
+    const parent = await host.createSession({ directory: parentDir, title: 'Parent' });
+    const child = await host.createSession({
+      directory: childDir,
+      title: 'Scout',
+      parentID: parent.id,
+    });
+    const listed = host.listSessions(parentDir);
+    expect(listed.map((record) => record.id)).toEqual(expect.arrayContaining([parent.id, child.id]));
+    expect(listed.find((record) => record.id === child.id)).toMatchObject({
+      directory: childDir,
+      info: expect.objectContaining({ parentID: parent.id }),
+    });
+    const infos = await host.listSessionInfos(parentDir);
+    expect(infos.find((info) => info.id === child.id)).toMatchObject({
+      id: child.id,
+      parentID: parent.id,
+      directory: childDir,
+    });
+    host.dispose();
+  });
+
+  it('does not list an unrelated worktree session under the parent directory', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parentDir = '/tmp/pichamber-348-fixture/parent';
+    const parent = await host.createSession({ directory: parentDir, title: 'Parent' });
+    const unrelated = await host.createSession({
+      directory: '/tmp/pichamber-348-fixture/other-wt',
+      title: 'Other worktree',
+    });
+    const listed = host.listSessions(parentDir);
+    expect(listed.map((record) => record.id)).toEqual([parent.id]);
+    expect(listed.map((record) => record.id)).not.toContain(unrelated.id);
+    const infos = await host.listSessionInfos(parentDir);
+    expect(infos.map((info) => info.id)).toEqual([parent.id]);
+    host.dispose();
+  });
+
+  it('lists a nested run-0/session.jsonl child with the worktree cwd', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const parentDir = '/tmp/pichamber-348-fixture/parent';
+    const childDir = '/tmp/pichamber-348-fixture/child-wt';
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: parentDir, title: 'Parent' });
+    const childId = '01a04ce8-3480-7001-8002-pichamber34802';
+    const childFile = path.join(
+      sessionDirForCwd(parentDir, home),
+      `${parent.id}`,
+      'run_scout',
+      'run-0',
+      'session.jsonl',
+    );
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: childDir,
+    })}\n${JSON.stringify({
+      type: 'message',
+      id: 'msg_user',
+      timestamp: new Date().toISOString(),
+      message: { role: 'user', content: [{ type: 'text', text: 'Scout the worktree' }] },
+    })}\n`);
+    expect(parent.messages).toEqual([]);
+    const listed = await host.listSubagentRuns(parent.id);
+    expect(listed.runs).toEqual([expect.objectContaining({
+      sessionID: childId,
+      directory: childDir,
+      openable: true,
+    })]);
+    host.dispose();
+  });
 });
