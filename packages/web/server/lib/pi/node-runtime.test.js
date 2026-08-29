@@ -19,6 +19,14 @@ import {
 } from './node-runtime.js';
 import { resolveKernelName } from './kernel.js';
 
+const writeDecoyNode = () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-decoy-node-'));
+  const decoy = path.join(root, 'node');
+  fs.writeFileSync(decoy, '#!/bin/sh\nexit 0\n');
+  fs.chmodSync(decoy, 0o755);
+  return { root, decoy };
+};
+
 describe('shouldUseNodeKernel', () => {
   it('defaults to the Node child on Electron and stays in-process otherwise', () => {
     expect(shouldUseNodeKernel({ versions: { electron: '43.0.0' } })).toBe(true);
@@ -69,14 +77,20 @@ describe('resolvePiNodeRuntime', () => {
   });
 
   it('does not treat the Electron execPath as Node', () => {
+    const { root, decoy } = writeDecoyNode();
+    const electronPath = '/Applications/Pichamber.app/Contents/MacOS/Pichamber';
     const resolved = resolvePiNodeRuntime({
-      execPath: '/Applications/Pichamber.app/Contents/MacOS/Pichamber',
+      execPath: electronPath,
       versions: { electron: '43.0.0' },
       env: { PATH: '' },
       resourcesPath: '/missing-resources',
+      wellKnownPaths: [decoy],
     });
     expect(resolved.ok).toBe(false);
+    expect(resolved.command).not.toBe(electronPath);
+    expect(resolved.command).not.toBe(path.resolve(decoy));
     expect(resolved.recovery).toMatch(/PICHAMBER_NODE_BINARY/);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
   it('prepends the loader Node onto PATH so install uses the same binary', () => {
@@ -100,6 +114,20 @@ describe('resolvePiNodeRuntime', () => {
     });
     expect(resolved).toMatchObject({ ok: true, source: 'bundled', command: path.resolve(bundled) });
     fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('still uses a well-known Node when PATH is present but incomplete', () => {
+    const { root, decoy } = writeDecoyNode();
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-empty-path-'));
+    const resolved = resolvePiNodeRuntime({
+      versions: { electron: '43.0.0' },
+      env: { PATH: emptyDir },
+      resourcesPath: '/missing-resources',
+      wellKnownPaths: [decoy],
+    });
+    expect(resolved).toMatchObject({ ok: true, source: 'system', command: path.resolve(decoy) });
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 
   it('treats an empty SDK hello as not ready', () => {
@@ -195,13 +223,30 @@ describe('resolvePiNodeRuntime', () => {
 
 describe('missing Node recovery', () => {
   it('does not invent a half-up kernel command', () => {
+    const { root, decoy } = writeDecoyNode();
     const resolved = resolvePiNodeRuntime({
       nodeBinary: path.join(os.tmpdir(), `missing-node-${Date.now()}`),
       versions: { electron: '43.0.0' },
       env: { PATH: '' },
+      wellKnownPaths: [decoy],
     });
     expect(resolved.ok).toBe(false);
     expect(fs.existsSync(resolved.command || '')).toBe(false);
+    expect(resolved.command).not.toBe(path.resolve(decoy));
     expect(resolved.recovery).toMatch(/reload Pi/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('does not fall through to PATH Node when nodeBinary is missing', () => {
+    const { root, decoy } = writeDecoyNode();
+    const resolved = resolvePiNodeRuntime({
+      nodeBinary: path.join(os.tmpdir(), `missing-node-${Date.now()}`),
+      versions: { electron: '43.0.0' },
+      env: { PATH: path.dirname(decoy) },
+    });
+    expect(resolved.ok).toBe(false);
+    expect(resolved.command).not.toBe(path.resolve(decoy));
+    expect(resolved.recovery).toMatch(/PICHAMBER_NODE_BINARY/);
+    fs.rmSync(root, { recursive: true, force: true });
   });
 });

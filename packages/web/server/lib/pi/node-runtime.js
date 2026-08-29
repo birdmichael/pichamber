@@ -287,6 +287,13 @@ const acceptNodeBinary = (candidate, { allowCurrentElectron = false, versions = 
   return '';
 };
 
+const missingNodeResult = () => ({
+  ok: false,
+  code: PI_NODE_UNAVAILABLE_CODE,
+  message: 'Desktop could not find a Node.js binary to load user Pi extensions.',
+  recovery: missingNodeRecovery(),
+});
+
 export const resolvePiNodeRuntime = ({
   env = process.env,
   versions = process.versions,
@@ -294,6 +301,7 @@ export const resolvePiNodeRuntime = ({
   platform = process.platform,
   resourcesPath,
   nodeBinary,
+  wellKnownPaths,
 } = {}) => {
   const explicit = [
     nodeBinary,
@@ -320,6 +328,12 @@ export const resolvePiNodeRuntime = ({
     }
   }
 
+  // A caller-supplied nodeBinary is authoritative. A missing or unusable
+  // path must not fall through to PATH or a CI/host well-known Node.
+  if (asText(nodeBinary)) {
+    return missingNodeResult();
+  }
+
   for (const candidate of bundledNodeCandidates({ env, resourcesPath, platform })) {
     const resolved = acceptNodeBinary(candidate, { versions });
     if (resolved) {
@@ -332,6 +346,7 @@ export const resolvePiNodeRuntime = ({
     }
   }
 
+  const pathValue = asText(env?.PATH || env?.Path);
   const systemNode = searchPathForNode({ env, platform });
   if (systemNode) {
     return {
@@ -341,15 +356,20 @@ export const resolvePiNodeRuntime = ({
       recovery: '',
     };
   }
-  for (const candidate of wellKnownNodePaths({ platform })) {
-    const resolved = acceptNodeBinary(candidate, { versions });
-    if (resolved) {
-      return {
-        ok: true,
-        command: resolved,
-        source: 'system',
-        recovery: '',
-      };
+  // Well-known locations recover an incomplete PATH (macOS GUI apps).
+  // An explicit empty PATH is a closed search and must not invent Node.
+  if (pathValue) {
+    const known = Array.isArray(wellKnownPaths) ? wellKnownPaths : wellKnownNodePaths({ platform });
+    for (const candidate of known) {
+      const resolved = acceptNodeBinary(candidate, { versions });
+      if (resolved) {
+        return {
+          ok: true,
+          command: resolved,
+          source: 'system',
+          recovery: '',
+        };
+      }
     }
   }
 
@@ -365,12 +385,7 @@ export const resolvePiNodeRuntime = ({
     }
   }
 
-  return {
-    ok: false,
-    code: PI_NODE_UNAVAILABLE_CODE,
-    message: 'Desktop could not find a Node.js binary to load user Pi extensions.',
-    recovery: missingNodeRecovery(),
-  };
+  return missingNodeResult();
 };
 
 export const childPathEnvForNode = (nodeBinary, env = process.env) => {
