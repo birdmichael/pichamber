@@ -225,6 +225,10 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
   it('22: missing Node is a clear error plus recovery, not a half-up kernel', async () => {
     const home = tempDir('pi-node-home-');
     const cwd = tempDir('pi-node-cwd-');
+    const decoyDir = tempDir('pi-decoy-node-');
+    const decoy = path.join(decoyDir, 'node');
+    fs.writeFileSync(decoy, '#!/bin/sh\nexit 0\n');
+    fs.chmodSync(decoy, 0o755);
     const kernel = createPiKernel({
       mock: true,
       useNodeKernel: true,
@@ -233,6 +237,7 @@ describe('P1b node kernel (cases 19-22, 24-27)', () => {
       defaultDirectory: cwd,
       versions: { electron: '43.0.0', modules: '88' },
       env: { PATH: '' },
+      wellKnownPaths: [decoy],
     });
     try {
       await expect(kernel.ready()).resolves.toBe(false);

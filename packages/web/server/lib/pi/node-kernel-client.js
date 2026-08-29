@@ -276,6 +276,7 @@ export const createNodeKernelClient = ({
   platform = process.platform,
   resourcesPath,
   nodeBinary,
+  wellKnownPaths,
   childScript,
   spawnImpl = spawn,
   home = os.homedir(),
@@ -295,6 +296,7 @@ export const createNodeKernelClient = ({
     platform,
     resourcesPath,
     nodeBinary,
+    wellKnownPaths,
   });
   const script = resolveNodeKernelChildScript({ childScript });
   let child = null;
@@ -631,6 +633,7 @@ export const createNodeKernelHost = (options = {}) => {
     platform: options.platform || process.platform,
     resourcesPath: options.resourcesPath,
     nodeBinary: options.nodeBinary,
+    wellKnownPaths: options.wellKnownPaths,
   });
 
   const emitInterrupted = (sessionIds, onEvent) => {

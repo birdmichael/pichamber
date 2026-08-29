@@ -52,10 +52,16 @@ binary. User `.node` files are not `dlopen`'d in Electron.
 
 Node resolution: `PICHAMBER_NODE_BINARY` / `OPENCHAMBER_NODE_BINARY`,
 then the packaged `resources/node` binary (`PICHAMBER_BUNDLED_NODE`),
-then PATH `node` (never `pi` / Electron / Bun), then the current
-`process.execPath` only when it is actually Node. Desktop therefore
-prefers the app-bundled Node over an incompatible PATH Node. Feature
-Plugin install prepends that same Node onto the child's `PATH`.
+then PATH `node` (never `pi` / Electron / Bun), then well-known
+system locations (`/opt/homebrew/bin/node`, `/usr/local/bin/node`,
+`/usr/bin/node`, `/bin/node`) only when PATH is non-empty, then the
+current `process.execPath` only when it is actually Node. An explicit
+`nodeBinary` option that is missing or not Node fails closed — it does
+not fall through to PATH or a host well-known Node. Empty PATH does
+not invent a system Node. Electron `execPath` is never treated as
+Node. Desktop therefore prefers the app-bundled Node over an
+incompatible PATH Node. Feature Plugin install prepends that same
+Node onto the child's `PATH`.
 `packages/electron/scripts/prepare-node.mjs` stages a Node that can
 `import` the app-bundled `@earendil-works/pi-coding-agent` and that
 still runs after being copied into `resources/node` (official
