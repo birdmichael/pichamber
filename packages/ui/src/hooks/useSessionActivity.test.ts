@@ -6,7 +6,7 @@ import {
 } from './useSessionActivity';
 
 describe('resolveSessionActivity', () => {
-  test('treats a leftover busy flag as idle when the trailing assistant is finished', () => {
+  test('keeps busy while status is busy even if the trailing assistant is finished', () => {
     expect(isSettledAssistantMessage({
       role: 'assistant',
       time: { completed: 1_500 },
@@ -15,6 +15,18 @@ describe('resolveSessionActivity', () => {
     expect(resolveSessionActivity({
       sessionId: 'ses_1',
       status: { type: 'busy' },
+      lastMessage: { role: 'assistant', time: { completed: 1_500 } },
+    })).toMatchObject({
+      phase: 'busy',
+      isWorking: true,
+      isBusy: true,
+    });
+  });
+
+  test('idles a settled assistant when status is already idle', () => {
+    expect(resolveSessionActivity({
+      sessionId: 'ses_1',
+      status: { type: 'idle' },
       lastMessage: { role: 'assistant', time: { completed: 1_500 } },
     })).toEqual({
       phase: 'idle',

@@ -143,11 +143,18 @@ export const serializeNodeKernelCreateSessionInput = (input = {}) => {
   };
 };
 
+export const mergeRemoteSessionSnapshot = (state, next, { promptInFlight = false } = {}) => {
+  if (!next || typeof next !== 'object') return state;
+  Object.assign(state, next);
+  if (promptInFlight) state.isStreaming = true;
+  return state;
+};
+
 const createRemotePiSession = (client, snapshot) => {
   const state = { ...snapshot };
+  let promptInFlight = 0;
   const applySnapshot = (next) => {
-    if (!next || typeof next !== 'object') return;
-    Object.assign(state, next);
+    mergeRemoteSessionSnapshot(state, next, { promptInFlight: promptInFlight > 0 });
   };
   const call = async (name, args = [], target) => {
     const reply = await client.call('session.method', {
@@ -227,11 +234,13 @@ const createRemotePiSession = (client, snapshot) => {
       },
     },
     async prompt(text, options) {
+      promptInFlight += 1;
       state.isStreaming = true;
       try {
         return await call('prompt', [text, options]);
       } finally {
-        state.isStreaming = false;
+        promptInFlight -= 1;
+        if (promptInFlight === 0) state.isStreaming = false;
       }
     },
     steer(text, images) {

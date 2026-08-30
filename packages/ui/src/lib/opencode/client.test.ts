@@ -193,3 +193,38 @@ describe('opencodeClient prompt retry behavior', () => {
     expect(promptAsyncCalls).toHaveLength(0);
   });
 });
+
+describe('opencodeClient prompt_async delivery', () => {
+  test('puts followUp on the prompt_async body the SDK would otherwise drop', async () => {
+    promptAsyncResults.push({ response: new Response(null, { status: 200 }) });
+    await opencodeClient.sendMessage({
+      id: 'ses_1',
+      providerID: 'anthropic',
+      modelID: 'claude-sonnet',
+      text: 'FOLLOWUP-OK',
+      delivery: 'followUp',
+    });
+    expect(promptAsyncCalls.length).toBe(1);
+    expect(promptAsyncCalls[0][0]).toMatchObject({
+      delivery: 'followUp',
+      $body_delivery: 'followUp',
+      sessionID: 'ses_1',
+    });
+  });
+
+  test('puts steer on the prompt_async body', async () => {
+    promptAsyncResults.push({ response: new Response(null, { status: 200 }) });
+    await opencodeClient.sendMessage({
+      id: 'ses_1',
+      providerID: 'anthropic',
+      modelID: 'claude-sonnet',
+      text: 'STEER-OK',
+      delivery: 'steer',
+    });
+    expect(promptAsyncCalls[0][0]).toMatchObject({
+      delivery: 'steer',
+      $body_delivery: 'steer',
+    });
+  });
+});
+

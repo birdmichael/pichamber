@@ -139,6 +139,15 @@ before inserting the user message so a failed bind does not leave a ghost
 turn and returns the session to idle. `GET` messages/list/session and
 `getSessionUsage` stay live-free on the shell record (`available: false`
 until `piSession.getContextUsage` exists).
+`promptAsync` `delivery` is `steer` | `followUp` | `follow_up` | `queue`.
+Busy is the session that was already live (`isStreaming` / compacting) or
+already `busy`/`retry` *before this call marked busy*. Do not treat this
+call's own status busy as a live turn — that would steer the first idle
+send. Busy + `followUp` → `session.followUp`. Busy + `steer` or no
+delivery → `session.steer`. Never `prompt()` while that turn is live (Pi
+throws "Already streaming" / "Specify streamingBehavior"). Idle send is
+always `prompt()`. The OpenCode SDK `session.promptAsync` allowlist drops
+`delivery`; the client must also send `$body_delivery`.
 `POST /api/pi/directory-runtime/warm` fire-and-forgets
 `ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /

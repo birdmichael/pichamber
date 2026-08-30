@@ -138,6 +138,7 @@ import {
     toServerFileUrl,
 } from './composer/attachments/filePaths';
 import { buildOutgoingMessage } from './composer/submit/buildOutgoingMessage';
+import { resolveBusyComposerSend, resolveSubmitDelivery } from './composer/submit/busySend';
 import {
     buildCommandVariables,
     canRunCommand,
@@ -998,7 +999,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     // Add message to queue instead of sending
     const handleQueueMessage = React.useCallback(() => {
-        if (isPiKernel && sessionPhase !== 'idle') {
+        if (isPiKernel) {
             void handleSubmitRef.current({ delivery: 'followUp' });
             return;
         }
@@ -1036,7 +1037,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!isMobile) {
             composerRef.current?.focus();
         }
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inlineDraftTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, consumeDrafts, currentProviderId, currentModelId, currentAgentName, currentVariant, isPiKernel, sessionPhase]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inlineDraftTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, consumeDrafts, currentProviderId, currentModelId, currentAgentName, currentVariant, isPiKernel]);
 
     const handleQueuedMessageEdit = React.useCallback((content: string) => {
         setMessage(content);
@@ -1077,10 +1078,12 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const handleSubmit = async (options?: SubmitOptions) => {
         const queuedOnly = options?.queuedOnly ?? false;
         const queuedMessageId = options?.queuedMessageId;
-        const requestedDelivery = options?.delivery === 'steer' || options?.delivery === 'followUp'
-            ? options.delivery
-            : (isPiKernel && sessionPhase !== 'idle' && !queuedOnly ? 'steer' : undefined);
-        const delivery = requestedDelivery && sessionPhase !== 'idle' ? requestedDelivery : undefined;
+        const delivery = resolveSubmitDelivery({
+            requested: options?.delivery,
+            isPiKernel,
+            sessionPhase,
+            queuedOnly,
+        });
         const capturedTarget = messageQueueTarget;
         // Snapshot the draft and current-session identity before the first
         // async gap so a later sidebar selection cannot reroute the send.
@@ -1569,14 +1572,19 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const handlePrimaryAction = React.useCallback(() => {
         const inputSnapshot = getCurrentInputSnapshot();
         const canQueue = !isBtwActive && inputMode === 'normal' && inputSnapshot.hasContent && currentSessionId && (currentSessionPhase !== 'idle' || autoReviewRunning);
-        if (followUpBehavior === 'queue' && canQueue) {
+        const send = resolveBusyComposerSend({
+            followUpBehavior,
+            isPiKernel,
+            canQueue,
+        });
+        if (send.action === 'followUp' || send.action === 'localQueue') {
             handleQueueMessage();
-        } else if (followUpBehavior === 'steer' && canQueue) {
+        } else if (send.action === 'steer') {
             void handleSubmitRef.current({ delivery: 'steer' });
         } else {
             void handleSubmitRef.current();
         }
-    }, [inputMode, getCurrentInputSnapshot, currentSessionId, currentSessionPhase, autoReviewRunning, followUpBehavior, handleQueueMessage, isBtwActive]);
+    }, [inputMode, getCurrentInputSnapshot, currentSessionId, currentSessionPhase, autoReviewRunning, followUpBehavior, handleQueueMessage, isBtwActive, isPiKernel]);
 
     // Draft welcome presets: submit immediately.
     const submitPresetPrompt = React.useCallback((text: string, type: 'command' | 'skill') => {
@@ -1819,19 +1827,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             // session (or an active auto-review run).
             const canQueue = !isBtwActive && inputMode === 'normal' && hasContent && currentSessionId && (currentSessionPhase !== 'idle' || autoReviewRunning);
 
-            if (followUpBehavior === 'queue') {
-                if (isCtrlEnter || !canQueue) {
-                    handleSubmit();
-                } else {
-                    handleQueueMessage();
-                }
+            const send = resolveBusyComposerSend({
+                followUpBehavior,
+                isPiKernel,
+                canQueue,
+                isCtrlEnter,
+            });
+            if (send.action === 'followUp' || send.action === 'localQueue') {
+                handleQueueMessage();
+            } else if (send.action === 'steer') {
+                handleSubmit({ delivery: 'steer' });
             } else {
-                // steer: Enter steers into the running turn, Ctrl+Enter sends now.
-                if (isCtrlEnter || !canQueue) {
-                    handleSubmit();
-                } else {
-                    handleSubmit({ delivery: 'steer' });
-                }
+                handleSubmit();
             }
         }
     };

@@ -878,7 +878,10 @@ class OpencodeService {
         agent: params.agent,
         variant: params.variant,
         messageID: messageId,
-        ...(params.delivery ? { delivery: params.delivery } : {}),
+        // SDK session.promptAsync allowlists body keys and drops `delivery`.
+        // `$body_delivery` is the hey-api extra-body escape so Pi steer/followUp
+        // actually reaches prompt_async.
+        ...(params.delivery ? { delivery: params.delivery, $body_delivery: params.delivery } : {}),
         ...(params.format ? { format: params.format } : {}),
         parts,
       });
