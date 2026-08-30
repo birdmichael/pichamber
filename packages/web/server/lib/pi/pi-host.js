@@ -24,6 +24,7 @@ import {
   getPiProviderSources,
   hydrateKnownModelCapabilities,
   listPiProviderPublicConfigs,
+  resolvePiBuiltinCatalogIds,
   withoutUnconnectedBuiltinCatalogProviders,
   upsertPiProviderConfig,
   deletePiProviderConfig,
@@ -3438,9 +3439,14 @@ export const createPiHost = ({
         const available = runtime && typeof runtime.getAvailable === 'function'
           ? await runtime.getAvailable()
           : [];
+        const builtinIds = await resolvePiBuiltinCatalogIds();
         const providers = withoutUnconnectedBuiltinCatalogProviders(mapPiModelsToProviders(available, {
           configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
-        }));
+        }), {
+          home,
+          directory: defaultDirectory,
+          builtinIds,
+        });
         const first = providers[0];
         const firstModel = first ? Object.keys(first.models)[0] : undefined;
         return {

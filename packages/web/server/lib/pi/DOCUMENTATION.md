@@ -265,7 +265,11 @@ with `PI_BUILTIN_CATALOG_PROVIDERS` (`xai`) so Add can list xAI before
 login. `connected` is provider ids that already have models — a catalog
 stub with empty `models` stays off that list. `GET /api/config/providers`
 is the live connected list only: it must not keep a model-less xAI stub
-in the sidebar. Mock kernel still returns only `pi-mock`.
+in the sidebar, and it must not list a Pi builtin catalog provider
+(`getBuiltinProviders()`, including `anthropic`) unless `auth.json` or
+user/project `models.json` has that provider. Env-only availability after
+Disconnect does not recreate the row. Mock kernel still returns only
+`pi-mock`.
 `getPiAuthMethods` always reports `xai` as SuperGrok / X Premium OAuth
 first, API key second — connected or not.
 

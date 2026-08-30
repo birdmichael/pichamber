@@ -98,7 +98,32 @@ export const shouldAutoSelectCustomProvider = (
   && unconnectedCount === 0
   && candidateProviderId === '';
 
-/** Sidebar / connected list: hide the model-less xAI catalog stub. */
+export type ProviderFileSources = {
+  auth?: { exists?: boolean };
+  user?: { exists?: boolean };
+  project?: { exists?: boolean };
+};
+
+export const providerHasFileSource = (sources?: ProviderFileSources | null): boolean =>
+  Boolean(sources?.auth?.exists || sources?.user?.exists || sources?.project?.exists);
+
+/** Pi bundled catalog ids the sidebar must not resurrect from a cached payload. */
+export const PI_BUILTIN_SIDEBAR_CATALOG_IDS: readonly string[] = ['xai', 'anthropic'];
+
+/** Sidebar / connected list: hide Pi builtins that have no file source. */
 export const selectSidebarProviders = <T extends { id: string; models?: unknown }>(
   providers: readonly T[],
-): T[] => providers.filter((provider) => provider.id !== 'xai' || providerHasConnectedModels(provider));
+  options?: {
+    sourcesById?: Record<string, ProviderFileSources | undefined>;
+    builtinCatalogIds?: readonly string[];
+  },
+): T[] => {
+  const builtinIds = new Set(options?.builtinCatalogIds ?? PI_BUILTIN_SIDEBAR_CATALOG_IDS);
+  const sourcesById = options?.sourcesById;
+  return providers.filter((provider) => {
+    if (!builtinIds.has(provider.id)) return true;
+    const sources = sourcesById?.[provider.id];
+    if (sources) return providerHasFileSource(sources);
+    return provider.id !== 'xai' || providerHasConnectedModels(provider);
+  });
+};
