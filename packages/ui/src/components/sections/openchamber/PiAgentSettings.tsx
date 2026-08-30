@@ -19,6 +19,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { toast } from '@/components/ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  canUpdatePiFromStatus,
   parsePiUpgradeStatus,
   type PiUpgradeStatus,
 } from './piAgentUpdate';
@@ -243,6 +244,23 @@ export const PiAgentSettings: React.FC = () => {
             >
               {upgradeStatus.currentVersion}
             </span>
+            {canUpdatePiFromStatus(upgradeStatus) ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    data-pi-update-available=""
+                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
+                    aria-label={t('settings.openchamber.piAgent.field.updateAvailableHint')}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--primary)]" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>
+                  {t('settings.openchamber.piAgent.field.updateAvailableHint')}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
             <SettingsInfoHint>{t('settings.openchamber.piAgent.field.versionInfo')}</SettingsInfoHint>
           </div>
         ) : null}

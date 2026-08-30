@@ -1125,6 +1125,7 @@ export const settingsDict = {
   "settings.openchamber.piAgent.field.version": "Версія Pi",
   "settings.openchamber.piAgent.field.currentVersionAria": "Поточна версія Pi {version}",
   "settings.openchamber.piAgent.field.versionInfo": "Це @earendil-works/pi-coding-agent, вбудований у Pichamber. Desktop не запускає pi з вашого PATH. Оновлення програми перевіряйте на сторінці «Про програму».",
+  "settings.openchamber.piAgent.field.updateAvailableHint": "Можна оновити до останньої версії",
   "settings.openchamber.piAgent.actions.update": "Оновити",
   "settings.openchamber.piAgent.actions.updateAria": "Оновити Pi",
   "settings.openchamber.piAgent.actions.updateToVersion": "Оновити до {version}",

@@ -54,6 +54,30 @@ describe('piAgentUpdate', () => {
     expect(canUpdatePiFromStatus(unknownLatest)).toBe(false);
     expect(isPiUpToDate(unknownLatest)).toBe(false);
   });
+
+  test('canUpdatePiFromStatus is true only when available, latest, and current are all present', () => {
+    expect(canUpdatePiFromStatus({
+      available: true,
+      currentVersion: '0.84.2',
+      latestVersion: '0.90.0',
+    })).toBe(true);
+    expect(canUpdatePiFromStatus({
+      available: false,
+      currentVersion: '0.84.2',
+      latestVersion: '0.90.0',
+    })).toBe(false);
+    expect(canUpdatePiFromStatus({
+      available: true,
+      currentVersion: '0.84.2',
+      latestVersion: null,
+    })).toBe(false);
+    expect(canUpdatePiFromStatus({
+      available: true,
+      currentVersion: null,
+      latestVersion: '0.90.0',
+    })).toBe(false);
+    expect(canUpdatePiFromStatus(null)).toBe(false);
+  });
 });
 
 describe('PiAgentSettings version display', () => {
@@ -77,6 +101,10 @@ describe('PiAgentSettings version display', () => {
     expect(source).not.toContain('updateToVersion');
     expect(source).not.toContain('data-settings-item="sessions.pi-update"');
     expect(source).not.toContain('sessions.pi-update-notifications');
+    expect(source).toContain('canUpdatePiFromStatus');
+    expect(source).toContain('data-pi-update-available');
+    expect(source).toContain('updateAvailableHint');
+    expect(source).toContain('bg-[var(--primary)]');
     expect(source).toContain('justify-start');
     expect(source).not.toContain('justify-between');
     expect(source).not.toContain('justify-end');
