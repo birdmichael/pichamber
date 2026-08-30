@@ -671,6 +671,52 @@ describe('sendMessage draft snapshot (issues #2222 / #2315)', () => {
   });
 });
 
+describe('routeMessage delivery', () => {
+  test('forwards followUp delivery to sendMessage instead of dropping it', async () => {
+    const calls = [];
+    const originalSendMessage = opencodeClient.sendMessage;
+    const childStore = {
+      getState: () => ({ session: [], message: {}, part: {}, session_status: {} }),
+      setState: () => {},
+    };
+    setActionRefs(opencodeClient, {
+      children: new Map(),
+      ensureChild: () => childStore,
+      getChild: () => childStore,
+    }, () => '/repo');
+    setOptimisticRefs(() => {}, () => {});
+    useConfigStore.setState({ isConnected: true });
+    opencodeClient.sendMessage = async (params) => {
+      calls.push(params);
+      return 'msg';
+    };
+    try {
+      await routeMessage({
+        sessionId: 'ses_busy',
+        directory: '/repo',
+        content: 'FOLLOWUP-OK',
+        providerID: 'provider-a',
+        modelID: 'model-a',
+        delivery: 'followUp',
+      });
+      await routeMessage({
+        sessionId: 'ses_busy',
+        directory: '/repo',
+        content: 'STEER-OK',
+        providerID: 'provider-a',
+        modelID: 'model-a',
+        delivery: 'steer',
+      });
+    } finally {
+      opencodeClient.sendMessage = originalSendMessage;
+    }
+    expect(calls.map((call) => ({ text: call.text, delivery: call.delivery }))).toEqual([
+      { text: 'FOLLOWUP-OK', delivery: 'followUp' },
+      { text: 'STEER-OK', delivery: 'steer' },
+    ]);
+  });
+});
+
 describe('routeMessage skill invocation', () => {
   // OpenCode registers every skill as a command (source: "skill"), so a skill
   // selected from the slash menu must be dispatched via session.command so its

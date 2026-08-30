@@ -409,7 +409,7 @@ describe("applyDirectoryEvent", () => {
     expect((draft.message.ses_1[0]?.time as { completed?: number }).completed).toBe(1_500)
   })
 
-  test("clears leftover busy when the trailing assistant is already finished", () => {
+  test("does not idle a busy session just because the trailing assistant finished", () => {
     const draft = state({
       session_status: { ses_1: { type: "busy" } as SessionStatus },
       message: {
@@ -436,6 +436,6 @@ describe("applyDirectoryEvent", () => {
       },
     } as Event)
 
-    expect(draft.session_status.ses_1).toEqual({ type: "idle" })
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
   })
 })

@@ -62,12 +62,13 @@ export function resolveSessionActivity(input: {
     && lastMessage.role === 'assistant'
     && typeof lastMessage.time?.completed !== 'number',
   );
-  // A finished trailing assistant is authoritative. Leftover optimistic
-  // busy after the user bubble is replaced must not keep the header working.
-  if (isSettledAssistantMessage(lastMessage)) return IDLE_RESULT;
-
   const hasAuthoritativeStatus = input.status !== undefined;
   const statusWorking = hasAuthoritativeStatus && phase !== 'idle';
+  // Pi finishes the assistant message before tools run. A settled trailing
+  // assistant is not proof the turn is idle — trust live session.status so
+  // busy Enter can still steer / followUp.
+  if (isSettledAssistantMessage(lastMessage) && !statusWorking) return IDLE_RESULT;
+
   const isWorking = statusWorking || hasPendingAssistant;
 
   if (hasAuthoritativeStatus && !statusWorking) return IDLE_RESULT;

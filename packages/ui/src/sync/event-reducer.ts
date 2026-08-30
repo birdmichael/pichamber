@@ -119,23 +119,6 @@ function areJsonEquivalent(left: unknown, right: unknown): boolean {
   }
 }
 
-const isSettledAssistantMessage = (message: Message | undefined): boolean => (
-  Boolean(
-    message
-    && message.role === "assistant"
-    && typeof (message as { time?: { completed?: number } }).time?.completed === "number"
-    && ((message as { time?: { completed?: number } }).time?.completed ?? 0) > 0,
-  )
-)
-
-const idleLeftoverBusyAfterSettledAssistant = (draft: State, sessionID: string): void => {
-  const messages = draft.message[sessionID]
-  const last = messages?.[messages.length - 1]
-  if (!isSettledAssistantMessage(last)) return
-  if (draft.session_status[sessionID]?.type !== "busy") return
-  draft.session_status[sessionID] = { type: "idle" }
-}
-
 export function preserveFrozenAssistantCompletion<T extends Message>(existing: T | undefined, next: T): T {
   if (next.role !== "assistant" || !existing || existing.role !== "assistant") return next
   const frozen = (existing.time as { completed?: number } | undefined)?.completed
@@ -386,7 +369,6 @@ export function applyDirectoryEvent(
       const messages = draft.message[info.sessionID]
       if (!messages) {
         draft.message[info.sessionID] = [info]
-        idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
         return true
       }
       if (info.role === "user" && findMessageIndex(messages, info.id) < 0) {
@@ -409,9 +391,7 @@ export function applyDirectoryEvent(
         const unchanged = areMessageUpdateFieldsEqual(existing, nextInfo)
         if (unchanged) {
           syncDebug.reducer.messageUpdatedUnchanged(info.sessionID, info.id, info.role, (info as { finish?: unknown }).finish, (info.time as { completed?: number })?.completed)
-          const statusBefore = draft.session_status[info.sessionID]
-          idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
-          return draft.session_status[info.sessionID] !== statusBefore
+          return false
         }
         const next = [...messages]
         if (compareMessagesChronologically(existing, nextInfo) === 0) {
@@ -426,7 +406,6 @@ export function applyDirectoryEvent(
         insertMessageChronologically(next, info)
         draft.message[info.sessionID] = next
       }
-      idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
       return true
     }
 

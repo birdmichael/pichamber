@@ -588,6 +588,24 @@ export const resolveListedSessionTitle = (item) => {
   return 'New session';
 };
 
+/**
+ * Busy prompt_async must call AgentSession.steer / followUp, never prompt().
+ * Pi finishes the assistant message before tools run, so isStreaming on a
+ * snapshot can be stale while record.status is still busy.
+ */
+export const resolvePromptDelivery = ({ delivery, isStreaming, statusType } = {}) => {
+  const busy = Boolean(isStreaming) || statusType === 'busy' || statusType === 'retry';
+  const kind = delivery === 'followUp' || delivery === 'follow_up' || delivery === 'queue'
+    ? 'followUp'
+    : delivery === 'steer'
+      ? 'steer'
+      : null;
+  if (kind === 'followUp') return busy ? 'followUp' : 'prompt';
+  if (kind === 'steer') return busy ? 'steer' : 'prompt';
+  if (busy) return 'steer';
+  return 'prompt';
+};
+
 export const resolvePromptModelRef = (model) => {
   if (typeof model === 'string' && model.trim()) return model.trim();
   if (!model || typeof model !== 'object') return '';
@@ -3474,6 +3492,12 @@ export const createPiHost = ({
         throw error;
       }
 
+      // Capture liveness *before* this call marks busy. This invocation's own
+      // status busy must not steer/followUp an idle first send.
+      const alreadyLive = sessionIsLive(record)
+        || record.status?.type === 'busy'
+        || record.status?.type === 'retry';
+
       // First-send bind can take longer than the user bubble. Mark busy now so
       // a targeted reload 409s before `piSession` exists or starts streaming.
       record.status = { type: 'busy' };
@@ -3568,19 +3592,32 @@ export const createPiHost = ({
 
       const delivery = body.delivery;
       const run = async () => {
+        let queuedIntoLiveTurn = false;
         try {
-          const isStreaming = Boolean(record.piSession?.isStreaming);
+          const isStreaming = Boolean(record.piSession?.isStreaming) || alreadyLive;
           ensureQuestionToolAdapted(record);
-          if (isStreaming && delivery === 'steer' && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text, images);
+          const action = resolvePromptDelivery({
+            delivery,
+            isStreaming,
+            statusType: alreadyLive ? 'busy' : 'idle',
+          });
+          const imageArg = images.length > 0 ? images : undefined;
+          if (action === 'steer' && typeof record.piSession.steer === 'function') {
+            await record.piSession.steer(text, imageArg);
+            queuedIntoLiveTurn = true;
             return;
           }
-          if (isStreaming && (delivery === 'followUp' || delivery === 'follow_up') && typeof record.piSession.followUp === 'function') {
-            await record.piSession.followUp(text, images);
+          if (action === 'followUp' && typeof record.piSession.followUp === 'function') {
+            await record.piSession.followUp(text, imageArg);
+            queuedIntoLiveTurn = true;
             return;
           }
-          if (isStreaming && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text, images);
+          if (action !== 'prompt' && typeof record.piSession.prompt === 'function') {
+            await record.piSession.prompt(text, {
+              ...promptOptions,
+              streamingBehavior: action === 'followUp' ? 'followUp' : 'steer',
+            });
+            queuedIntoLiveTurn = true;
             return;
           }
           await record.piSession.prompt(text, promptOptions);
@@ -3593,7 +3630,7 @@ export const createPiHost = ({
           });
           emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
         } finally {
-          settleRecordIfStuck(record);
+          if (!queuedIntoLiveTurn) settleRecordIfStuck(record);
         }
       };
 

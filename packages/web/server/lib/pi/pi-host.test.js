@@ -19,6 +19,7 @@ import {
   mergeLiveExtensionCommands,
   normalizePiSessionUsage,
   readLiveSessionCommands,
+  resolvePromptDelivery,
   resolvePromptModelRef,
   titleFromUserText,
 } from './pi-host.js';
@@ -2679,3 +2680,109 @@ describe('session plan status and actions', () => {
   });
 });
 
+describe('resolvePromptDelivery', () => {
+  it('uses prompt for an idle send even with followUp delivery', () => {
+    expect(resolvePromptDelivery({ delivery: 'followUp', isStreaming: false, statusType: 'idle' })).toBe('prompt');
+    expect(resolvePromptDelivery({ delivery: 'steer', isStreaming: false })).toBe('prompt');
+    expect(resolvePromptDelivery({})).toBe('prompt');
+  });
+
+  it('maps busy followUp/steer and defaults busy with no delivery to steer', () => {
+    expect(resolvePromptDelivery({ delivery: 'followUp', isStreaming: true })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'follow_up', statusType: 'busy' })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'queue', statusType: 'retry' })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'steer', isStreaming: false, statusType: 'busy' })).toBe('steer');
+    expect(resolvePromptDelivery({ isStreaming: false, statusType: 'busy' })).toBe('steer');
+  });
+});
+
+describe('promptAsync busy delivery', () => {
+  const wait = () => new Promise((resolve) => setTimeout(resolve, 40));
+
+  it('idle first send still calls prompt, not steer', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Idle send' });
+    const promptCalls = [];
+    const steerCalls = [];
+    const followUpCalls = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      promptCalls.push(text);
+      return originalPrompt(text, options);
+    };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'hello' }] });
+    await wait();
+    expect(promptCalls).toEqual(['hello']);
+    expect(steerCalls).toEqual([]);
+    expect(followUpCalls).toEqual([]);
+    host.dispose();
+  });
+
+  it('busy followUp calls session.followUp even when isStreaming is stale false', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Follow-up' });
+    const promptCalls = [];
+    const followUpCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, {
+      delivery: 'followUp',
+      parts: [{ type: 'text', text: 'FOLLOWUP-OK' }],
+    });
+    await wait();
+    expect(followUpCalls).toEqual(['FOLLOWUP-OK']);
+    expect(promptCalls).toEqual([]);
+    expect(steerCalls).toEqual([]);
+    host.dispose();
+  });
+
+  it('busy steer calls session.steer instead of prompt', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Steer' });
+    const promptCalls = [];
+    const followUpCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, {
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'STEER-OK' }],
+    });
+    await wait();
+    expect(steerCalls).toEqual(['STEER-OK']);
+    expect(promptCalls).toEqual([]);
+    expect(followUpCalls).toEqual([]);
+    host.dispose();
+  });
+
+  it('busy send with no delivery does not call prompt when prompt would throw', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Default steer' });
+    const promptCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'course correct' }] });
+    await wait();
+    expect(steerCalls).toEqual(['course correct']);
+    expect(promptCalls).toEqual([]);
+    host.dispose();
+  });
+});
