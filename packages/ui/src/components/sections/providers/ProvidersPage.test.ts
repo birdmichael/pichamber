@@ -47,6 +47,27 @@ describe('ProvidersPage available provider loading', () => {
       { id: 'xai', models: {} },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ]).map((provider) => provider.id)).toEqual(['bmlab']);
+    expect(selectSidebarProviders([
+      { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
+      { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
+    ]).map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+    expect(selectSidebarProviders([
+      { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
+      { id: 'xai', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+      { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
+    ], {
+      sourcesById: {
+        anthropic: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
+        xai: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
+      },
+    }).map((provider) => provider.id)).toEqual(['bmlab']);
+    expect(selectSidebarProviders([
+      { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
+    ], {
+      sourcesById: {
+        anthropic: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
+      },
+    }).map((provider) => provider.id)).toEqual(['anthropic']);
     expect(shouldAutoSelectCustomProvider(true, false, 0, '')).toBe(true);
     expect(shouldAutoSelectCustomProvider(true, false, 0, '', true)).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, true, 0, '')).toBe(false);

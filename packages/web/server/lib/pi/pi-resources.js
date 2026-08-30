@@ -339,6 +339,40 @@ export const PI_BUILTIN_CATALOG_PROVIDERS = [
   { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
 ];
 
+const defaultBuiltinCatalogIds = () => new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
+
+let cachedPiBuiltinCatalogIds = null;
+
+/** Pi bundled provider ids from `@earendil-works/pi-ai`, plus the xAI Add stub. */
+export const resolvePiBuiltinCatalogIds = async () => {
+  if (cachedPiBuiltinCatalogIds) return cachedPiBuiltinCatalogIds;
+  const ids = defaultBuiltinCatalogIds();
+  try {
+    const mod = await import('@earendil-works/pi-ai/providers/all');
+    const fromPi = typeof mod.getBuiltinProviders === 'function' ? mod.getBuiltinProviders() : [];
+    for (const id of fromPi) {
+      if (typeof id === 'string' && id.trim()) ids.add(id.trim());
+    }
+  } catch {
+    // Unit tests without pi-ai still hide Anthropic; production uses Pi's list.
+    ids.add('anthropic');
+  }
+  cachedPiBuiltinCatalogIds = ids;
+  return ids;
+};
+
+export const providerHasFileSource = (sources) => Boolean(
+  sources?.auth?.exists || sources?.user?.exists || sources?.project?.exists,
+);
+
+const resolveFilterSources = (providerId, { home, directory, sources } = {}) => {
+  if (sources && typeof sources === 'object') return sources;
+  if (home === undefined && directory === undefined) {
+    return { auth: { exists: false }, user: { exists: false }, project: { exists: false } };
+  }
+  return getPiProviderSources(providerId, { home, directory }).sources;
+};
+
 /** Catalog entries Settings can Add even when ModelRuntime has not connected them yet. */
 export const mergeBuiltinPiCatalogProviders = (providers) => {
   const list = Array.isArray(providers) ? [...providers] : [];
@@ -358,14 +392,20 @@ export const mergeBuiltinPiCatalogProviders = (providers) => {
   return list;
 };
 
-const builtinCatalogIds = new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
-
-/** Live connected list: do not keep a model-less builtin stub in the sidebar. */
-export const withoutUnconnectedBuiltinCatalogProviders = (providers) => (
-  (Array.isArray(providers) ? providers : []).filter((provider) => (
-    !builtinCatalogIds.has(provider?.id) || providerHasCatalogModels(provider)
-  ))
-);
+/** Live connected list: hide Pi builtin catalog rows that have no file source. */
+export const withoutUnconnectedBuiltinCatalogProviders = (providers, options = {}) => {
+  const list = Array.isArray(providers) ? providers : [];
+  const builtinIds = options.builtinIds instanceof Set
+    ? options.builtinIds
+    : new Set([
+      ...defaultBuiltinCatalogIds(),
+      ...(Array.isArray(options.builtinIds) ? options.builtinIds : []),
+    ]);
+  return list.filter((provider) => {
+    if (!builtinIds.has(provider?.id)) return true;
+    return providerHasFileSource(resolveFilterSources(provider.id, options));
+  });
+};
 
 export const providerHasCatalogModels = (provider) => {
   if (!provider || typeof provider !== 'object') return false;

@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { writePiPrompt } from './pi-resources.js';
+import { writePiPrompt, writePiProviderAuth } from './pi-resources.js';
 import {
   createSettingsJsonPackageManager,
   writeFeaturePlugins,
@@ -173,6 +173,40 @@ describe('mapPiModelsToProviders', () => {
     );
     expect(kept[0].models['grok-4.6'].input).toEqual(['text', 'image']);
     expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(true);
+  });
+});
+
+describe('getProviders catalog filter', () => {
+  it('omits env-only Pi builtins and drops them again after Disconnect', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-providers-filter-'));
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSession: async () => createInMemoryPiSession(),
+      createModelRuntime: async () => ({
+        getAvailable: async () => [
+          { id: 'claude-sonnet-4-5', name: 'Sonnet', provider: 'anthropic' },
+          { id: 'fast', name: 'Fast', provider: 'bmlab' },
+        ],
+      }),
+    });
+    try {
+      const empty = await host.getProviders();
+      expect(empty.providers.map((provider) => provider.id)).toEqual(['bmlab']);
+
+      writePiProviderAuth('anthropic', { type: 'api', key: 'sk-test-do-not-leak' }, { home: dir });
+      const connected = await host.getProviders();
+      expect(connected.providers.map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+
+      host.removeProviderAuth('anthropic');
+      const afterDisconnect = await host.getProviders();
+      expect(afterDisconnect.providers.map((provider) => provider.id)).toEqual(['bmlab']);
+    } finally {
+      host.dispose();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

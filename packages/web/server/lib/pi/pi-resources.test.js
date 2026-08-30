@@ -15,6 +15,8 @@ import {
   getPiAuthMethods,
   mergeBuiltinPiCatalogProviders,
   toPiProviderListPayload,
+  providerHasFileSource,
+  resolvePiBuiltinCatalogIds,
   withoutUnconnectedBuiltinCatalogProviders,
   getPiProviderSources,
   listPiProviderPublicConfigs,
@@ -375,6 +377,32 @@ description: >
     ])).toEqual([
       { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } },
     ]);
+    const catalogIds = new Set(['xai', 'anthropic']);
+    const anthropicWithModels = {
+      id: 'anthropic',
+      name: 'Anthropic',
+      source: 'pi',
+      env: [],
+      models: {
+        'claude-sonnet-4-5': { id: 'claude-sonnet-4-5', name: 'Sonnet' },
+      },
+    };
+    const custom = { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } };
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropicWithModels, custom],
+      { home, builtinIds: catalogIds },
+    )).toEqual([custom]);
+    writePiProviderAuth('anthropic', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropicWithModels, custom],
+      { home, builtinIds: catalogIds },
+    ).map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+    expect(providerHasFileSource(getPiProviderSources('anthropic', { home }).sources)).toBe(true);
+    removePiProviderAuth('anthropic', { home });
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropicWithModels, custom],
+      { home, builtinIds: catalogIds },
+    ).map((provider) => provider.id)).toEqual(['bmlab']);
     expect(toPiProviderListPayload({
       providers: [],
       default: {},
@@ -397,6 +425,54 @@ description: >
       default: { xai: 'grok-4.6' },
       connected: ['xai'],
     });
+  });
+
+  it('hides Pi builtin catalog providers unless auth.json or models.json has them', async () => {
+    const home = makeTemp();
+    const project = path.join(home, 'project');
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    fs.mkdirSync(path.join(project, '.pi'), { recursive: true });
+    const builtinIds = new Set(['xai', 'anthropic']);
+    const anthropic = {
+      id: 'anthropic',
+      name: 'Anthropic',
+      models: { 'claude-sonnet-4-5': { id: 'claude-sonnet-4-5' } },
+    };
+    const xai = { id: 'xai', name: 'xAI', models: { 'grok-4.6': { id: 'grok-4.6' } } };
+    const custom = { id: 'bmlab', name: 'bmlab', models: { fast: { id: 'fast' } } };
+
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropic, xai, custom],
+      { home, directory: project, builtinIds },
+    ).map((provider) => provider.id)).toEqual(['bmlab']);
+
+    writePiProviderAuth('anthropic', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropic, xai, custom],
+      { home, directory: project, builtinIds },
+    ).map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+
+    removePiProviderAuth('anthropic', { home });
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'models.json'), JSON.stringify({
+      providers: { anthropic: { baseUrl: 'https://api.anthropic.com', models: [{ id: 'claude-sonnet-4-5' }] } },
+    }));
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropic, custom],
+      { home, directory: project, builtinIds },
+    ).map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+
+    fs.writeFileSync(path.join(home, '.pi', 'agent', 'models.json'), JSON.stringify({ providers: {} }));
+    fs.writeFileSync(path.join(project, '.pi', 'models.json'), JSON.stringify({
+      providers: { anthropic: { models: [{ id: 'claude-sonnet-4-5' }] } },
+    }));
+    expect(withoutUnconnectedBuiltinCatalogProviders(
+      [anthropic, custom],
+      { home, directory: project, builtinIds },
+    ).map((provider) => provider.id)).toEqual(['anthropic', 'bmlab']);
+
+    const ids = await resolvePiBuiltinCatalogIds();
+    expect(ids.has('xai')).toBe(true);
+    expect(ids.has('anthropic')).toBe(true);
   });
 
   it('writes Pi auth.json as api_key with 0600 and never returns the key', () => {

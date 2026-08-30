@@ -47,13 +47,12 @@ export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
   const settingsDirectory = useSettingsDirectory();
-  const providers = selectSidebarProviders(
-    useConfigStore((state) => selectProvidersForDirectory(state, settingsDirectory)),
-  );
+  const listedProviders = useConfigStore((state) => selectProvidersForDirectory(state, settingsDirectory));
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
   const activeProjectId = useProjectsStore((s) => s.activeProjectId);
   const [sourcesByProvider, setSourcesByProvider] = React.useState<Record<string, ProviderSources>>({});
+  const providers = selectSidebarProviders(listedProviders, { sourcesById: sourcesByProvider });
   const directory = React.useMemo(() => {
     if (settingsDirectory) return settingsDirectory;
     // tie refresh to active project changes (directory is stored in the client)
@@ -70,7 +69,7 @@ export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect
   }, [loadProviders, settingsDirectory]);
 
   React.useEffect(() => {
-    if (providers.length === 0) {
+    if (listedProviders.length === 0) {
       setSourcesByProvider({});
       return;
     }
@@ -78,7 +77,7 @@ export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect
     let cancelled = false;
 
     const loadAllSources = async () => {
-      const tasks = providers.map(async (provider) => {
+      const tasks = listedProviders.map(async (provider) => {
         try {
           const query = directory ? `?directory=${encodeURIComponent(directory)}` : '';
           // OpenChamber-only metadata endpoint: the SDK exposes provider data but
@@ -115,7 +114,7 @@ export const ProvidersSidebar: React.FC<ProvidersSidebarProps> = ({ onItemSelect
     return () => {
       cancelled = true;
     };
-  }, [directory, providers]);
+  }, [directory, listedProviders]);
 
   const bgClass = 'bg-background';
 

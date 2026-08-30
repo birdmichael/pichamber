@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
+
 ## [1.2.6] - 2026-08-30
 
 - **Mobile:** when an agent asks a question, the phone is notified even if Desktop is still open. Tapping the notification opens that chat on the waiting card. On iPhone, Confirm prompts unlock the phone and open the app to answer. Locking the Mac no longer hides waiting-question or finished-session alerts. Settings → Notifications explains that a waiting prompt still reaches the phone while Desktop is focused. The default question banner uses the session name, not the prompt text.
