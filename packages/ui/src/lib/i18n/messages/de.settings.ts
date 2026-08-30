@@ -1095,6 +1095,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.version': 'Pi-Version',
   'settings.openchamber.piAgent.field.currentVersionAria': 'Aktuelle Pi-Version {version}',
   'settings.openchamber.piAgent.field.versionInfo': 'Das ist das in Pichamber enthaltene @earendil-works/pi-coding-agent. Desktop startet nicht das pi aus deinem PATH. App-Updates prüfst du unter Info.',
+  'settings.openchamber.piAgent.field.updateAvailableHint': 'Aktualisierung auf die neueste Version verfügbar',
   'settings.openchamber.piAgent.actions.update': 'Aktualisieren',
   'settings.openchamber.piAgent.actions.updateAria': 'Pi aktualisieren',
   'settings.openchamber.piAgent.actions.updateToVersion': 'Auf {version} aktualisieren',

@@ -1125,6 +1125,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.version': 'Pi 버전',
   'settings.openchamber.piAgent.field.currentVersionAria': '현재 Pi 버전 {version}',
   'settings.openchamber.piAgent.field.versionInfo': 'Pichamber에 포함된 @earendil-works/pi-coding-agent입니다. Desktop은 PATH의 pi를 실행하지 않습니다. 앱 업데이트는 About에서 확인하세요.',
+  'settings.openchamber.piAgent.field.updateAvailableHint': '최신 버전으로 업그레이드할 수 있습니다',
   'settings.openchamber.piAgent.actions.update': '업데이트',
   'settings.openchamber.piAgent.actions.updateAria': 'Pi 업데이트',
   'settings.openchamber.piAgent.actions.updateToVersion': '{version}으로 업데이트',

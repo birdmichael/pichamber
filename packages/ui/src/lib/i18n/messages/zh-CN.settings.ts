@@ -1125,6 +1125,7 @@ export const settingsDict = {
   'settings.openchamber.piAgent.field.version': 'Pi 版本',
   'settings.openchamber.piAgent.field.currentVersionAria': '当前 Pi 版本 {version}',
   'settings.openchamber.piAgent.field.versionInfo': '这是 Pichamber 自带的 @earendil-works/pi-coding-agent。Desktop 不会运行你 PATH 上的 pi。应用更新请到关于页检查。',
+  'settings.openchamber.piAgent.field.updateAvailableHint': '可升级到最新版本',
   'settings.openchamber.piAgent.actions.update': '更新',
   'settings.openchamber.piAgent.actions.updateAria': '更新 Pi',
   'settings.openchamber.piAgent.actions.updateToVersion': '更新到 {version}',
