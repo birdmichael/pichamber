@@ -463,7 +463,10 @@ from `session.prompt("/plan start")` still persists Plan-enabled state and
 returns `active`, so a just-created session cannot stay `off` for the first
 user prompt. Missing live `/plan` is still 404. A saved-plan 409 still
 rejects. Successful actions emit `pi.plan.updated`. `start` that leaves
-status `off` is a 500.
+status `off` is a 500. The parent translator also emits `pi.plan.updated`
+on successful `plan_mode_complete` `tool_execution_end` with
+`details.plan` (same extra-event pattern as `todo.updated`). Do not wait
+for a later `/plan` command or a remount GET.
 Desktop chrome (Agent \| Plan, View Plan rail, Build) and the hosted/Capacitor
 mobile workspace Plan tab are gated on the Pi kernel **and** Feature Plugins
 `plan` installed+enabled. Missing/disabled hides those surfaces.

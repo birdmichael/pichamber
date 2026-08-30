@@ -6,6 +6,7 @@ import { readLatestCustomEntryDataFromFileTail } from './session-metadata.js';
 
 export const PLAN_MODE_STATE_ENTRY_TYPE = 'plan-mode-state';
 export const GOAL_STATE_ENTRY_TYPE = 'goal-state';
+export const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
 
 export const isGoalSystemPreamble = (text) => (
   /^Goal mode is active\./i.test(String(text || '').trim())
@@ -30,7 +31,6 @@ const ACTIVE_GOAL_STATUSES = new Set([
   'usage_limited',
   'budget_limited',
 ]);
-const PLAN_MODE_COMPLETE_TOOL_NAME = 'plan_mode_complete';
 const SESSION_PLAN_ACTIONS = Object.freeze([
   'start',
   'save',

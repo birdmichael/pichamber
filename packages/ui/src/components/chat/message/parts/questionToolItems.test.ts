@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   boundQuestionPromptIds,
-  messagesWithLiveQuestionParts,
   isActiveQuestionToolStatus,
   isQuestionToolName,
   matchPendingQuestionPrompt,
@@ -35,6 +34,23 @@ describe('parseQuestionToolOutput', () => {
       { question: '', answer: 'only the host module' },
     ]);
     expect(parseQuestionToolOutput('User cancelled the selection')).toEqual([]);
+  });
+
+  test('parses pi-plan-mode JSON answers and cancelled payloads', () => {
+    expect(parseQuestionToolOutput(JSON.stringify({
+      cancelled: false,
+      answers: [
+        { id: 'reach', header: 'Reachability', question: 'How should Xiaoyi reach the host?', answer: 'Dev server' },
+      ],
+    }))).toEqual([{
+      question: 'How should Xiaoyi reach the host?',
+      answer: 'Dev server',
+    }]);
+    expect(parseQuestionToolOutput(JSON.stringify({
+      cancelled: true,
+      reason: 'cancelled',
+      message: 'User cancelled the Plan-mode question prompt.',
+    }))).toEqual([]);
   });
 });
 
@@ -112,6 +128,61 @@ describe('questionItemsFromToolPart', () => {
     }]);
   });
 
+  test('keeps a cancelled plan_mode_question JSON result on the asking turn', () => {
+    expect(questionItemsFromToolPart({
+      tool: 'plan_mode_question',
+      state: {
+        status: 'completed',
+        input: {
+          questions: [{
+            id: 'reach',
+            header: 'Reachability',
+            question: 'How should Xiaoyi reach the host?',
+            options: [{ label: 'Tunnel', description: 'local HTTPS' }],
+          }],
+        },
+        output: JSON.stringify({
+          cancelled: true,
+          reason: 'cancelled',
+          message: 'User cancelled the Plan-mode question prompt.',
+        }),
+        metadata: { cancelled: true, reason: 'cancelled' },
+      },
+    })).toEqual([{
+      question: 'How should Xiaoyi reach the host?',
+      answer: '',
+      cancelled: true,
+      options: [{ label: 'Tunnel', description: 'local HTTPS' }],
+    }]);
+  });
+
+  test('materializes plan_mode_question JSON answers on the asking turn', () => {
+    expect(questionItemsFromToolPart({
+      tool: 'plan_mode_question',
+      state: {
+        status: 'completed',
+        input: {
+          questions: [{
+            question: 'How should Xiaoyi reach the host?',
+            options: [{ label: 'Dev server' }],
+          }],
+        },
+        output: JSON.stringify({
+          cancelled: false,
+          answers: [{
+            question: 'How should Xiaoyi reach the host?',
+            answer: 'Dev server',
+          }],
+        }),
+      },
+    })).toEqual([{
+      question: 'How should Xiaoyi reach the host?',
+      answer: 'Dev server',
+      cancelled: false,
+      options: [{ label: 'Dev server' }],
+    }]);
+  });
+
   test('shows the pending Pi question text before an answer arrives', () => {
     expect(questionItemsFromToolPart({
       tool: 'plan_mode_question',
@@ -180,33 +251,50 @@ describe('matchPendingQuestionPrompt', () => {
     }])]).toEqual(['pui_q']);
   });
 
-  test('binds using live parts when the rendered message snapshot is still empty', () => {
+  test('does not bind a pending prompt until the rendered snapshot has the asking tool', () => {
     const prompts = [
       { id: 'pui_q', title: 'Should we continue?', kind: 'select', status: 'pending' },
     ];
-    const rendered = [{
+    expect([...boundQuestionPromptIds(prompts, [{
       info: { id: 'msg_1' },
       parts: [],
-    }];
-    const liveParts = {
-      msg_1: [{
-        type: 'tool',
-        tool: 'question',
-        state: {
-          status: 'running',
-          input: { question: 'Should we continue?', options: ['Yes', 'No'] },
-        },
-      }],
-    };
-    expect([...boundQuestionPromptIds(prompts, rendered)]).toEqual([]);
-    expect([...boundQuestionPromptIds(prompts, messagesWithLiveQuestionParts(rendered, liveParts))])
-      .toEqual(['pui_q']);
+    }])]).toEqual([]);
   });
 
   test('treats pending and running as active question-tool statuses', () => {
     expect(isActiveQuestionToolStatus('pending')).toBe(true);
     expect(isActiveQuestionToolStatus('running')).toBe(true);
     expect(isActiveQuestionToolStatus('completed')).toBe(false);
+  });
+
+  test('does not bind a later plan-ready select onto a settled plan_mode_question', () => {
+    const settled = {
+      type: 'tool',
+      tool: 'plan_mode_question',
+      state: {
+        status: 'completed',
+        input: {
+          questions: [{ question: 'How should Xiaoyi reach the host?', options: ['Tunnel'] }],
+        },
+        output: JSON.stringify({ cancelled: true, reason: 'cancelled' }),
+      },
+    };
+    const running = {
+      type: 'tool',
+      tool: 'plan_mode_question',
+      state: {
+        status: 'running',
+        input: {
+          questions: [{ question: 'How should Xiaoyi reach the host?', options: ['Tunnel'] }],
+        },
+      },
+    };
+    const prompts = [
+      { id: 'pui_ready', title: 'Proposed plan ready. What next?', kind: 'select', status: 'pending' },
+    ];
+    expect(matchPendingQuestionPrompt(prompts, settled)).toBeNull();
+    expect(matchPendingQuestionPrompt(prompts, running)?.id).toBe('pui_ready');
+    expect([...boundQuestionPromptIds(prompts, [{ parts: [settled] }])]).toEqual([]);
   });
 });
 

@@ -8,6 +8,7 @@ import {
   consumePiExtensionUiEditorStash,
   usePiExtensionUiStore,
 } from './pi-extension-ui-store';
+import { isPlanReadyDecisionPrompt } from './pi-plan-locale';
 import { maybeOpenPlanRailOnReady } from './pi-plan-ready';
 import { refreshSessionPlan, usePiSessionPlanStore } from './pi-session-plan-store';
 
@@ -51,6 +52,11 @@ export const handlePiExtensionUiEvent = (payload: { type?: unknown; properties?:
         prompt,
         directoryHint: prompt.directory,
       });
+      // /plan start opens an empty rail. plan_mode_complete writes jsonl
+      // before this select; GET fills markdown without waiting for remount.
+      if (isPlanReadyDecisionPrompt(prompt)) {
+        void refreshSessionPlan(prompt.sessionID);
+      }
     }
     if (payload.type === 'pi.ui.settled') void refreshSessionPlan(prompt.sessionID);
   } else if (payload.type === 'pi.ui.settled' && typeof properties?.sessionID === 'string') {

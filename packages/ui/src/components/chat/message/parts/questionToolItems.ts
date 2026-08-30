@@ -72,6 +72,38 @@ const answersFromUnknown = (value: unknown): string[] => {
   return [];
 };
 
+type PlanModeQuestionJson = {
+  cancelled: boolean;
+  answers: Array<{ question: string; answer: string }>;
+};
+
+const parsePlanModeQuestionJson = (output: string): PlanModeQuestionJson | null => {
+  const trimmed = output.trim();
+  if (!trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    if (record.cancelled !== true && record.cancelled !== false && !Array.isArray(record.answers)) {
+      return null;
+    }
+    const answers: Array<{ question: string; answer: string }> = [];
+    if (Array.isArray(record.answers)) {
+      for (const item of record.answers) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const row = item as Record<string, unknown>;
+        const question = asTrimmedString(row.question || row.header);
+        const answer = asTrimmedString(row.answer);
+        if (!question && !answer) continue;
+        answers.push({ question, answer });
+      }
+    }
+    return { cancelled: record.cancelled === true, answers };
+  } catch {
+    return null;
+  }
+};
+
 export const parseQuestionToolOutput = (output: unknown): Array<{ question: string; answer: string }> => {
   const text = String(output ?? '');
   const opencode = text.match(/User has answered your questions:\s*(.+?)(?:\.\s*You can now|$)/s);
@@ -89,6 +121,9 @@ export const parseQuestionToolOutput = (output: unknown): Array<{ question: stri
   const trimmed = text.trim();
   if (/^User cancelled the selection/i.test(trimmed)) return [];
 
+  const planMode = parsePlanModeQuestionJson(trimmed);
+  if (planMode) return planMode.cancelled ? [] : planMode.answers;
+
   const selected = trimmed.match(/^User selected:\s*(?:\d+\.\s*)?([\s\S]+)$/i);
   if (selected?.[1]?.trim()) return [{ question: '', answer: selected[1].trim() }];
 
@@ -98,11 +133,18 @@ export const parseQuestionToolOutput = (output: unknown): Array<{ question: stri
   return [];
 };
 
-const isCancelledQuestionState = (status: string, error: string, output: string): boolean => (
+const isCancelledQuestionState = (
+  status: string,
+  error: string,
+  output: string,
+  metadata?: Record<string, unknown>,
+): boolean => (
   status === 'error'
   || status === 'cancelled'
+  || metadata?.cancelled === true
   || /dismissed|cancelled|canceled|ignored/i.test(error)
   || /^User cancelled the selection/i.test(output.trim())
+  || parsePlanModeQuestionJson(output)?.cancelled === true
 );
 
 const questionsFromInput = (
@@ -134,7 +176,7 @@ export const questionItemsFromToolPart = (part: QuestionToolPartLike): QuestionT
   const output = typeof part.state?.output === 'string' ? part.state.output : '';
   const error = typeof part.state?.error === 'string' ? part.state.error : '';
   const status = asTrimmedString(part.state?.status);
-  const cancelled = isCancelledQuestionState(status, error, output);
+  const cancelled = isCancelledQuestionState(status, error, output, metadata);
   const parsed = parseQuestionToolOutput(output);
   const questions = questionsFromInput(input);
   const metaQuestion = asTrimmedString(metadata.question);
@@ -198,6 +240,7 @@ export const matchPendingQuestionPrompt = <T extends PendingQuestionPromptLike>(
   part: QuestionToolPartLike,
 ): T | null => {
   if (!isQuestionToolName(part.tool)) return null;
+  if (!isActiveQuestionToolStatus(part.state?.status)) return null;
   const pending = prompts.filter((prompt) => (
     prompt.status === 'pending'
     && (prompt.kind === 'select' || prompt.kind === 'input' || prompt.kind === 'editor')
@@ -210,20 +253,6 @@ export const matchPendingQuestionPrompt = <T extends PendingQuestionPromptLike>(
     if (titled) return titled;
   }
   return pending.length === 1 ? pending[0] ?? null : null;
-};
-
-export const messagesWithLiveQuestionParts = <T extends {
-  info?: { id?: string };
-  parts?: readonly QuestionToolPartLike[];
-}>(
-  messages: readonly T[],
-  livePartsByMessageId?: Record<string, readonly QuestionToolPartLike[] | undefined>,
-): Array<{ parts?: readonly QuestionToolPartLike[] }> => {
-  if (!livePartsByMessageId) return [...messages];
-  return messages.map((message) => {
-    const liveParts = message.info?.id ? livePartsByMessageId[message.info.id] : undefined;
-    return { parts: liveParts ?? message.parts };
-  });
 };
 
 export const boundQuestionPromptIds = (

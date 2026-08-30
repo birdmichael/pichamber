@@ -16,7 +16,7 @@ import { PermissionCard } from './PermissionCard';
 import { QuestionCard } from './QuestionCard';
 import { PiExtensionPromptCard } from './PiExtensionPromptCard';
 import { PiExtensionConfirmDialog } from './PiExtensionConfirmDialog';
-import { boundQuestionPromptIds, messagesWithLiveQuestionParts } from '@/components/chat/message/parts/questionToolItems';
+import { boundQuestionPromptIds } from '@/components/chat/message/parts/questionToolItems';
 import { hasActiveQuestionToolInCurrentTurn, recoverPendingQuestionWithRetry } from '@/sync/question-recovery';
 import { listPiExtensionUiPrompts } from '@/sync/pi-extension-ui';
 import {
@@ -63,7 +63,6 @@ import {
     useScopedBlockingQuestions,
     useParentSession,
     useSession,
-    useDirectorySync,
 } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { usePlanDetection } from '@/hooks/usePlanDetection';
@@ -250,18 +249,14 @@ const ChatViewport = React.memo(({
 }: ChatViewportProps) => {
     const { t } = useI18n();
     const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
-    const livePartsByMessageId = useDirectorySync(
-        React.useCallback((state) => state.part, []),
-        directory,
-    );
     const transcriptPiPrompts = React.useMemo(() => {
-        const boundIds = boundQuestionPromptIds(
-            piExtensionPrompts,
-            messagesWithLiveQuestionParts(renderedMessages, livePartsByMessageId),
-        );
+        // Bind only when the rendered snapshot already has the asking tool.
+        // Live `state.part` can be ahead of MessageList; hiding the dock then
+        // leaves a pending select with no visible card and blocks send.
+        const boundIds = boundQuestionPromptIds(piExtensionPrompts, renderedMessages);
         return selectTranscriptPiExtensionUiPrompts(piExtensionPrompts)
             .filter((prompt) => !boundIds.has(prompt.id));
-    }, [livePartsByMessageId, piExtensionPrompts, renderedMessages]);
+    }, [piExtensionPrompts, renderedMessages]);
     const pendingPiConfirm = React.useMemo(
         () => selectPendingConfirmPrompt(piExtensionPrompts),
         [piExtensionPrompts],

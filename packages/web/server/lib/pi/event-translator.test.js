@@ -448,6 +448,77 @@ describe('createEventTranslator', () => {
     expect(skipped.map((event) => event.type)).toEqual(['message.part.updated']);
   });
 
+  it('emits pi.plan.updated on plan_mode_complete tool_execution_end', () => {
+    const t = translator();
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      args: { plan: '# Ship it\n\nDo the work.' },
+    });
+    const end = t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      args: { plan: '# Ship it\n\nDo the work.' },
+      result: {
+        content: [{ type: 'text', text: '**Proposed Plan**\n\n# Ship it\n\nDo the work.' }],
+        details: {
+          version: 1,
+          source: 'plan_mode_complete',
+          plan: '# Ship it\n\nDo the work.',
+        },
+      },
+      isError: false,
+    });
+    expect(end.map((event) => event.type)).toEqual(['message.part.updated', 'pi.plan.updated']);
+    expect(end[1].properties).toMatchObject({
+      sessionID: 'ses_1',
+      plan: {
+        status: 'ready',
+        planMarkdown: '# Ship it\n\nDo the work.',
+        title: 'Ship it',
+      },
+    });
+  });
+
+  it('does not emit pi.plan.updated for a failed or empty plan_mode_complete', () => {
+    const failedTranslator = translator();
+    failedTranslator.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    failedTranslator.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_plan_err',
+      toolName: 'plan_mode_complete',
+      args: { plan: '# Nope' },
+    });
+    const failed = failedTranslator.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_plan_err',
+      toolName: 'plan_mode_complete',
+      result: { content: [{ type: 'text', text: 'boom' }] },
+      isError: true,
+    });
+    expect(failed.map((event) => event.type)).toEqual(['message.part.updated']);
+
+    const emptyTranslator = translator();
+    emptyTranslator.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    emptyTranslator.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_plan_empty',
+      toolName: 'plan_mode_complete',
+      args: { plan: '' },
+    });
+    const empty = emptyTranslator.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_plan_empty',
+      toolName: 'plan_mode_complete',
+      result: { details: { version: 1, source: 'plan_mode_complete', plan: '   ' } },
+      isError: false,
+    });
+    expect(empty.map((event) => event.type)).toEqual(['message.part.updated']);
+  });
+
 
   it('attaches parentID, agent, model, and stable time to assistant info', () => {
     const t = translator();

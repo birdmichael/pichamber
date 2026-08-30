@@ -10,7 +10,12 @@ import {
   isTaskDetails,
   mapTasksToOpenCodeTodos,
 } from './session-todo.js';
-import { isGoalSystemPreamble } from './session-plan.js';
+import {
+  isGoalSystemPreamble,
+  normalizePlanMarkdown,
+  PLAN_MODE_COMPLETE_TOOL_NAME,
+  sessionPlanFromState,
+} from './session-plan.js';
 
 export { mapPiUsageToOpenCodeTokens, resolveUsableFacadeModel } from './session-transfer.js';
 
@@ -511,6 +516,19 @@ export const createEventTranslator = ({
           events.push(event('todo.updated', {
             sessionID,
             todos: mapTasksToOpenCodeTodos(piEvent.result.details.tasks),
+          }));
+        }
+        const latestPlan = !piEvent.isError && (piEvent.toolName || 'tool') === PLAN_MODE_COMPLETE_TOOL_NAME
+          ? normalizePlanMarkdown(piEvent.result?.details?.plan)
+          : '';
+        if (latestPlan) {
+          events.push(event('pi.plan.updated', {
+            sessionID,
+            plan: sessionPlanFromState({
+              enabled: true,
+              latestPlan,
+              awaitingAction: true,
+            }),
           }));
         }
         return events;

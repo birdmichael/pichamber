@@ -7,8 +7,14 @@ type MessageRecord = {
 
 const RECOVERY_DELAYS_MS = [0, 500, 1500] as const
 
+const isQuestionToolName = (name: unknown): boolean => {
+  const tool = typeof name === "string" ? name.trim().toLowerCase() : ""
+  // Same names as questionToolItems.isQuestionToolName.
+  return tool === "question" || tool === "plan_mode_question"
+}
+
 const isActiveQuestionTool = (part: Part): boolean => {
-  if (part.type !== "tool" || part.tool !== "question") return false
+  if (part.type !== "tool" || !isQuestionToolName(part.tool)) return false
   const status = (part as ToolPart).state.status
   return status === "pending" || status === "running"
 }

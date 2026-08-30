@@ -7,12 +7,15 @@ const message = (role: "user" | "assistant", parts: Part[] = []) => ({
   parts,
 })
 
-const questionTool = (status: "pending" | "running" | "completed"): Part => ({
-  id: `tool-${status}`,
+const questionTool = (
+  status: "pending" | "running" | "completed",
+  tool: "question" | "plan_mode_question" = "question",
+): Part => ({
+  id: `tool-${tool}-${status}`,
   sessionID: "ses_1",
   messageID: "assistant-1",
   type: "tool",
-  tool: "question",
+  tool,
   state: { status, input: {}, output: "", title: "", metadata: {}, time: { start: 1, end: status === "completed" ? 2 : undefined } },
 } as Part)
 
@@ -20,10 +23,17 @@ describe("hasActiveQuestionToolInCurrentTurn", () => {
   test("detects a pending or running question in the current turn", () => {
     expect(hasActiveQuestionToolInCurrentTurn([message("user"), message("assistant", [questionTool("pending")])])).toBe(true)
     expect(hasActiveQuestionToolInCurrentTurn([message("user"), message("assistant", [questionTool("running")])])).toBe(true)
+    expect(hasActiveQuestionToolInCurrentTurn([
+      message("user"),
+      message("assistant", [questionTool("running", "plan_mode_question")]),
+    ])).toBe(true)
   })
 
   test("ignores completed questions and active questions from an older turn", () => {
     expect(hasActiveQuestionToolInCurrentTurn([message("assistant", [questionTool("completed")])])).toBe(false)
+    expect(hasActiveQuestionToolInCurrentTurn([
+      message("assistant", [questionTool("completed", "plan_mode_question")]),
+    ])).toBe(false)
     expect(hasActiveQuestionToolInCurrentTurn([
       message("assistant", [questionTool("running")]),
       message("user"),
