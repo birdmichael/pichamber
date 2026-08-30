@@ -6,6 +6,9 @@ import path from 'node:path';
 import {
   PLAN_MODE_STATE_ENTRY_TYPE,
   applyMockPlanCommand,
+  isPlanReadySelectPrompt,
+  optionForPlanReadyAction,
+  settlePlanReadyPrompt,
   isGoalCommandUserText,
   isGoalMutexHeld,
   isGoalMutexHeldFromFile,
@@ -238,5 +241,49 @@ describe('session-plan', () => {
     expect(sessionPlanViewAvailable({ status: 'off', planMarkdown: '' })).toBe(false);
     expect(sessionPlanViewAvailable({ status: 'ready', planMarkdown: '# Plan' })).toBe(true);
     expect(titleFromPlanMarkdown('')).toBeUndefined();
+  });
+
+  it('maps a plan-ready select option onto View Plan rail actions', () => {
+    const options = [
+      'Implement here',
+      'Start fresh and implement',
+      'Save for later',
+      'Discard plan and exit',
+    ];
+    expect(optionForPlanReadyAction(options, 'implement')).toBe('Implement here');
+    expect(optionForPlanReadyAction(options, 'save')).toBe('Save for later');
+    expect(optionForPlanReadyAction(options, 'exit')).toBe('Discard plan and exit');
+    expect(optionForPlanReadyAction(['1. Implement here — keep this chat'], 'implement'))
+      .toBe('1. Implement here — keep this chat');
+    expect(isPlanReadySelectPrompt({
+      kind: 'select',
+      status: 'pending',
+      title: 'Proposed plan ready. What next?',
+      options,
+    })).toBe(true);
+    expect(isPlanReadySelectPrompt({
+      kind: 'select',
+      status: 'pending',
+      title: 'Plan mode',
+      options: ['Start plan mode'],
+    })).toBe(false);
+
+    const replies = [];
+    expect(settlePlanReadyPrompt(
+      [{
+        id: 'pui_ready',
+        kind: 'select',
+        status: 'pending',
+        title: 'Proposed plan ready. What next?',
+        options,
+      }],
+      (id, value) => {
+        replies.push([id, value]);
+        return true;
+      },
+      'implement',
+    )).toBe(true);
+    expect(replies).toEqual([['pui_ready', 'Implement here']]);
+    expect(settlePlanReadyPrompt([], () => true, 'implement')).toBe(false);
   });
 });

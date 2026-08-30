@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 import { maybeOpenPlanRailOnReady, notePlanReadyCycle } from './pi-plan-ready';
+import { isPlanReadyDecisionPrompt, planReadyOptionForAction } from './pi-plan-locale';
+import { replyPiExtensionUi } from './pi-extension-ui';
+import { usePiExtensionUiStore } from './pi-extension-ui-store';
 import {
   fetchSessionPlan,
   isFooterPlanSelected,
@@ -103,11 +106,49 @@ export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan
   return plan;
 };
 
+const answerPendingPlanReadyPrompt = async (
+  sessionID: string,
+  action: SessionPlanAction,
+): Promise<boolean> => {
+  if (action !== 'implement' && action !== 'save' && action !== 'exit') return false;
+  const prompts = usePiExtensionUiStore.getState().promptsBySession[sessionID] ?? [];
+  for (let index = prompts.length - 1; index >= 0; index -= 1) {
+    const prompt = prompts[index];
+    if (!prompt || !isPlanReadyDecisionPrompt(prompt)) continue;
+    const option = planReadyOptionForAction(prompt.options, action);
+    if (!option) continue;
+    await replyPiExtensionUi(sessionID, prompt.id, option);
+    return true;
+  }
+  return false;
+};
+
 export const dispatchSessionPlanAction = async (
   sessionID: string,
   action: SessionPlanAction,
   options: { model?: string } = {},
 ): Promise<SessionPlan | null> => {
+  try {
+    if (await answerPendingPlanReadyPrompt(sessionID, action)) {
+      if (action === 'exit') clearPendingDraftPlan(sessionID);
+      if (action === 'implement') {
+        const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+        if (current && (current.status === 'ready' || current.status === 'saved')) {
+          const next = {
+            status: 'implementing' as const,
+            planMarkdown: current.planMarkdown,
+            ...(current.title ? { title: current.title } : {}),
+          };
+          applySessionPlan(sessionID, next);
+          return next;
+        }
+      }
+      const plan = await refreshSessionPlan(sessionID);
+      return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? plan;
+    }
+  } catch {
+    // Prompt already gone: fall through to POST /plan <action>.
+  }
   const plan = await runSessionPlanAction(sessionID, action, options);
   if (action === 'start') {
     if (plan && isFooterPlanSelected(plan.status)) {

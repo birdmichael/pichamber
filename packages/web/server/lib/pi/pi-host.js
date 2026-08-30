@@ -116,6 +116,7 @@ import {
   isUnhelpfulSessionTitle,
   parseSessionEntriesFromJsonl,
   parseSessionPlanAction,
+  settlePlanReadyPrompt,
   restoreSessionPlanState,
   resumeSavedPlanState,
   resolvePlanModeState,
@@ -4186,6 +4187,22 @@ export const createPiHost = ({
 
       if (action === 'implement' && model) {
         await this.setSessionModel(sessionID, model);
+      }
+
+      // View Plan Build/Save/Discard must settle the live plan-ready select.
+      // Prompting `/plan implement` while that menu is open leaves the card
+      // unchanged (a second Build). Answering "Implement here" is the plugin
+      // path and starts implementation in this session.
+      if (settlePlanReadyPrompt(
+        record.extensionUI?.list?.() || [],
+        (id, value) => record.extensionUI?.reply?.(id, value),
+        action,
+      )) {
+        await new Promise((resolve) => setImmediate(resolve));
+        await refreshRecordCommands(record);
+        const plan = readRecordPlan(record);
+        emitPlanUpdated(record, plan);
+        return plan;
       }
 
       try {

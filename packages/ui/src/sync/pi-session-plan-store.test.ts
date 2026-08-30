@@ -3,9 +3,15 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 let pendingFetch: {
   resolve: (plan: { status: string; planMarkdown: string }) => void;
 } | null = null;
+const uiReplies: Array<{ url: string; body: string }> = [];
 
 mock.module('@/lib/runtime-fetch', () => ({
-  runtimeFetch: mock(async () => {
+  runtimeFetch: mock(async (url: string, init?: { body?: string }) => {
+    const href = String(url);
+    if (href.includes('/api/pi/ui/')) {
+      uiReplies.push({ url: href, body: String(init?.body || '') });
+      return { ok: true, status: 200, json: async () => true };
+    }
     const plan = await new Promise<{ status: string; planMarkdown: string }>((resolve) => {
       pendingFetch = { resolve };
     });
@@ -19,14 +25,18 @@ mock.module('@/lib/runtime-fetch', () => ({
 const {
   adoptDraftPlanForSession,
   applySessionPlan,
+  dispatchSessionPlanAction,
   refreshSessionPlan,
   resetPiSessionPlanStore,
   usePiSessionPlanStore,
 } = await import('./pi-session-plan-store');
+const { applyPiExtensionUiPrompt, resetPiExtensionUiStore } = await import('./pi-extension-ui-store');
 
 afterEach(() => {
   resetPiSessionPlanStore();
+  resetPiExtensionUiStore();
   pendingFetch = null;
+  uiReplies.length = 0;
 });
 
 describe('pi session plan store', () => {
@@ -55,5 +65,26 @@ describe('pi session plan store', () => {
     pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
     await refresh;
     expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('active');
+  });
+
+  test('Build answers the pending plan-ready select instead of posting /plan implement', async () => {
+    applySessionPlan('ses_plan', { status: 'ready', planMarkdown: '# Ready' });
+    applyPiExtensionUiPrompt({
+      id: 'pui_ready',
+      sessionID: 'ses_plan',
+      kind: 'select',
+      title: 'Proposed plan ready. What next?',
+      options: ['Implement here', 'Start fresh and implement'],
+      status: 'pending',
+    });
+
+    const next = await dispatchSessionPlanAction('ses_plan', 'implement');
+
+    expect(next).toEqual({ status: 'implementing', planMarkdown: '# Ready' });
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('implementing');
+    expect(uiReplies).toHaveLength(1);
+    expect(uiReplies[0]?.url).toContain('/api/pi/ui/pui_ready/reply');
+    expect(uiReplies[0]?.body).toContain('Implement here');
+    expect(pendingFetch).toBeNull();
   });
 });

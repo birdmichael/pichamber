@@ -406,6 +406,58 @@ export const parseSessionPlanAction = (body) => {
   return model && action === 'implement' ? { action, model } : { action };
 };
 
+const PLAN_READY_SELECT_TITLE = /proposed plan ready/i;
+const PLAN_READY_RAIL_ACTIONS = new Set(['implement', 'save', 'exit']);
+const PLAN_READY_OPTION_BY_ACTION = Object.freeze({
+  implement: 'implement here',
+  save: 'save for later',
+  exit: 'discard plan and exit',
+});
+
+const normalizePlanReadyOptionLabel = (option) => (
+  String(option ?? '')
+    .replace(/^\d+\.\s*/, '')
+    .split(/\s+[—–]\s+/)[0]
+    ?.trim()
+    .replace(/…/g, '...')
+    .replace(/\s+/g, ' ')
+    .toLowerCase() || ''
+);
+
+/** Match a ctx.ui.select option to a View Plan rail action. */
+export const optionForPlanReadyAction = (options, action) => {
+  const wanted = PLAN_READY_OPTION_BY_ACTION[action];
+  if (!wanted || !Array.isArray(options)) return null;
+  for (const option of options) {
+    if (normalizePlanReadyOptionLabel(option) === wanted) return String(option);
+  }
+  return null;
+};
+
+export const isPlanReadySelectPrompt = (prompt) => {
+  if (!prompt || prompt.kind !== 'select') return false;
+  if (prompt.status && prompt.status !== 'pending') return false;
+  if (PLAN_READY_SELECT_TITLE.test(String(prompt.title || ''))) return true;
+  return Boolean(optionForPlanReadyAction(prompt.options, 'implement'));
+};
+
+/**
+ * Rail Build/Save/Discard must answer the live plan-ready select. Sending
+ * `/plan implement` while that menu is open leaves the card unchanged.
+ */
+export const settlePlanReadyPrompt = (prompts, reply, action) => {
+  if (!PLAN_READY_RAIL_ACTIONS.has(action) || typeof reply !== 'function') return false;
+  const list = Array.isArray(prompts) ? prompts : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const prompt = list[index];
+    if (!isPlanReadySelectPrompt(prompt)) continue;
+    const option = optionForPlanReadyAction(prompt.options, action);
+    if (!option || typeof prompt.id !== 'string' || !prompt.id.trim()) continue;
+    return reply(prompt.id, option) !== false;
+  }
+  return false;
+};
+
 export const sessionPlanHasMarkdown = (plan) => (
   Boolean(plan)
   && (plan.status === 'ready' || plan.status === 'saved' || plan.status === 'implementing')

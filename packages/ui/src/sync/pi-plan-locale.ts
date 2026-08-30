@@ -79,6 +79,26 @@ export const isPlanReadyDecisionPrompt = (prompt: {
   });
 };
 
+export type PlanReadyRailAction = 'implement' | 'save' | 'exit';
+
+const PLAN_READY_OPTION_BY_ACTION: Record<PlanReadyRailAction, string> = {
+  implement: 'implement here',
+  save: 'save for later',
+  exit: 'discard plan and exit',
+};
+
+/** Raw ctx.ui option for a View Plan rail action, or null if that card is absent. */
+export const planReadyOptionForAction = (
+  options: readonly string[] | undefined,
+  action: PlanReadyRailAction,
+): string | null => {
+  const wanted = PLAN_READY_OPTION_BY_ACTION[action];
+  for (const option of options ?? []) {
+    if (normalizeOptionLabel(displaySelectOption(option).label) === wanted) return option;
+  }
+  return null;
+};
+
 const PLAN_POLICY_ALLOWLIST_DUMP = /plan policy will allow:/i;
 
 /** First line of a Plan select title. Drops the tool-allowlist dump. */

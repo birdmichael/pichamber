@@ -449,9 +449,9 @@ failure is an HTTP error, not an empty `off`.
 | action | Dispatch |
 |---|---|
 | `start` | `session.prompt("/plan start")`, then refresh the snapshot and re-read plan-mode-state from memory and the session jsonl. If both still say `off`, 500 — do not treat an empty `prompt()` stub as success. Disk `enabled: true` is success even when the snapshot entries are stale. |
-| `save` | `session.prompt("/plan save")` — leave Plan when a ready plan exists |
-| `implement` | optional `setSessionModel`, then `session.prompt("/plan implement")` in this session |
-| `exit` | `session.prompt("/plan exit")` — discard only |
+| `save` | If a pending plan-ready `ctx.ui.select` is open, reply `Save for later`. Otherwise `session.prompt("/plan save")` — leave Plan when a ready plan exists |
+| `implement` | optional `setSessionModel`. If a pending plan-ready `ctx.ui.select` is open, reply `Implement here` (same path as the in-chat card) and do not prompt `/plan implement`. Otherwise `session.prompt("/plan implement")` in this session |
+| `exit` | If that plan-ready select is open, reply `Discard plan and exit`. Otherwise `session.prompt("/plan exit")` — discard only |
 | `resume` | append saved → ready `plan-mode-state` via `sessionManager.appendCustomEntry`, then `reload({ sessionID })`. Do not IPC `setPlanModeState` (real `AgentSession` has no such method). Do not send `/plan start` (that errors while a saved plan exists) |
 
 `resume` and a missing live `/plan` (reload to attach the command) still

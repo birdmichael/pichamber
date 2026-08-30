@@ -2394,6 +2394,40 @@ describe('session plan status and actions', () => {
     host.dispose();
   });
 
+  it('answers a pending plan-ready select instead of prompting /plan implement', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Plan ready card' });
+    record.piSession.setPlanModeState({
+      enabled: true,
+      latestPlan: '# Ready plan\n\nDo the work.',
+      awaitingAction: true,
+    });
+    const prompted = [];
+    record.piSession.prompt = async (text) => {
+      prompted.push(text);
+    };
+    const replies = [];
+    record.extensionUI = {
+      list: () => [{
+        id: 'pui_ready',
+        kind: 'select',
+        status: 'pending',
+        title: 'Proposed plan ready. What next?',
+        options: ['Implement here', 'Start fresh and implement', 'Save for later'],
+      }],
+      reply: (id, value) => {
+        replies.push([id, value]);
+        return true;
+      },
+    };
+
+    const plan = await host.runPlanAction(record.id, { action: 'implement' });
+    expect(replies).toEqual([['pui_ready', 'Implement here']]);
+    expect(prompted).toEqual([]);
+    expect(plan.status).toBe('ready');
+    host.dispose();
+  });
+
   it('resumes a saved plan without sending /plan start', async () => {
     const host = createPiHost({
       mock: true,
