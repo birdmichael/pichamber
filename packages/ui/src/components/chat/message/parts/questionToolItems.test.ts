@@ -256,7 +256,6 @@ describe('matchPendingQuestionPrompt', () => {
       { id: 'pui_q', title: 'Should we continue?', kind: 'select', status: 'pending' },
     ];
     expect([...boundQuestionPromptIds(prompts, [{
-      info: { id: 'msg_1' },
       parts: [],
     }])]).toEqual([]);
   });
