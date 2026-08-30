@@ -292,17 +292,13 @@ jobs:
           existing_dir="${RUNNER_TEMP}/existing-latest-mac"
           output="${RUNNER_TEMP}/latest-mac.yml"
           mkdir -p "$existing_dir"
-          existing_args=()
+          merge_args=(--incoming "$incoming" --output "$output" --version "$VERSION")
           if gh release view "v${VERSION}" --repo "$GH_REPO" --json assets --jq '.assets[].name' \
             | grep -qx 'latest-mac.yml'; then
             gh release download "v${VERSION}" --repo "$GH_REPO" --pattern 'latest-mac.yml' --dir "$existing_dir"
-            existing_args=(--existing "${existing_dir}/latest-mac.yml")
+            merge_args+=(--existing "$existing_dir/latest-mac.yml")
           fi
-          node packages/electron/scripts/merge-latest-mac-yml.mjs \
-            --incoming "$incoming" \
-            --output "$output" \
-            --version "$VERSION" \
-            "${existing_args[@]}"
+          node packages/electron/scripts/merge-latest-mac-yml.mjs "${merge_args[@]}"
 
       - name: Upload latest-mac.yml to release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
