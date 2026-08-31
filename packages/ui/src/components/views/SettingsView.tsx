@@ -974,7 +974,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                         type="button"
                         data-settings-nav={page.slug}
                         onPointerDown={(event) => {
-                          if (!shouldOpenSettingsNavOnPointerDown(event)) {
+                          if (!shouldOpenSettingsNavOnPointerDown(event, { isMobile })) {
                             return;
                           }
                           event.currentTarget.dataset.settingsNavArmed = '1';
