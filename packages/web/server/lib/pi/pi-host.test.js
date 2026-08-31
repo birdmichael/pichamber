@@ -2748,6 +2748,17 @@ describe('promptAsync busy delivery', () => {
     host.dispose();
   });
 
+  it('leftover status=busy without a live turn still inserts the user prompt', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover busy' });
+    record.status = { type: 'busy' };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'INSERT-OK' }] });
+    expect(host.getMessages(record.id).some((entry) => (
+      entry.parts?.some((part) => part.text === 'INSERT-OK')
+    ))).toBe(true);
+    host.dispose();
+  });
+
   it('busy followUp calls session.followUp even when isStreaming is stale false', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Follow-up' });
@@ -2755,6 +2766,7 @@ describe('promptAsync busy delivery', () => {
     const followUpCalls = [];
     const steerCalls = [];
     record.status = { type: 'busy' };
+    record.turnActive = true;
     record.piSession.prompt = async (text) => {
       promptCalls.push(text);
       throw new Error('Already streaming; use steer or followUp');
@@ -2779,6 +2791,7 @@ describe('promptAsync busy delivery', () => {
     const followUpCalls = [];
     const steerCalls = [];
     record.status = { type: 'busy' };
+    record.turnActive = true;
     record.piSession.prompt = async (text) => {
       promptCalls.push(text);
       throw new Error('Already streaming; use steer or followUp');
@@ -2802,6 +2815,7 @@ describe('promptAsync busy delivery', () => {
     const promptCalls = [];
     const steerCalls = [];
     record.status = { type: 'busy' };
+    record.turnActive = true;
     record.piSession.prompt = async (text) => {
       promptCalls.push(text);
       throw new Error('Already streaming; use steer or followUp');

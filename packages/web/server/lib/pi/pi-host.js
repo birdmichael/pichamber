@@ -3563,10 +3563,9 @@ export const createPiHost = ({
 
       // Capture liveness *before* this call marks busy. This invocation's own
       // status busy must not steer/followUp an idle first send.
-      const alreadyLive = sessionIsLive(record)
-        || record.turnActive === true
-        || record.status?.type === 'busy'
-        || record.status?.type === 'retry';
+      // Only the child run / this host turn is "live". Leftover status=busy
+      // (adapter jsonl attach, false-idle) must not skip the user insert.
+      const alreadyLive = sessionIsLive(record) || record.turnActive === true;
 
       // First-send bind can take longer than the user bubble. Mark busy now so
       // a targeted reload 409s before `piSession` exists or starts streaming.
@@ -3651,7 +3650,9 @@ export const createPiHost = ({
         record.translator?.setFallbackModel?.(runtimeModel);
       }
 
-      const skipInsert = alreadyLive;
+      const skipInsert = alreadyLive
+        || body.delivery === 'steer'
+        || body.delivery === 'followUp';
       if (!skipInsert) {
         record.translator?.setUserMessage?.(userMessageID, {
           agent: userAgent,
