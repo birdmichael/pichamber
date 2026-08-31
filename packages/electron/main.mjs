@@ -46,6 +46,7 @@ import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
+import { beginLinuxNativeDialogConstrain } from './linux-native-dialog-bounds.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
 
 const execFileAsync = promisify(execFile);
@@ -5263,6 +5264,10 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
     throw new Error('IPC not available for this origin');
   }
   const browserWindow = BrowserWindow.fromWebContents(event.sender);
+  const linuxDialogConstrain = await beginLinuxNativeDialogConstrain({
+    browserWindow,
+    electronScreen: screen,
+  });
   let result;
   try {
   result = await dialog.showOpenDialog(browserWindow || undefined, {
@@ -5287,6 +5292,7 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
     ].filter(Boolean),
   });
   } finally {
+    linuxDialogConstrain.stop();
     restoreRendererKeyboardFocus(browserWindow);
   }
   if (result.canceled) return null;

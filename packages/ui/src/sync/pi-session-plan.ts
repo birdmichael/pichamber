@@ -164,7 +164,7 @@ export const resolvePlanStatusRowHint = (input: {
 export const planBuildBusyDisabled = (input: {
   busy: boolean;
   hasPendingPlanReadySelect: boolean;
-}): boolean => Boolean(input.busy) && !Boolean(input.hasPendingPlanReadySelect);
+}): boolean => input.busy && !input.hasPendingPlanReadySelect;
 
 /**
  * Last Agent/Plan choice for this empty composer.

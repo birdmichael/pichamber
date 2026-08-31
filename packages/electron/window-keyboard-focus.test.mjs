@@ -12,5 +12,7 @@ test('native dialogs and desktop_focus_window restore renderer keyboard focus', 
   const dialogHandler = source.slice(source.indexOf("ipcMain.handle('openchamber:dialog:open'"));
   const handlerBody = dialogHandler.slice(0, dialogHandler.indexOf("ipcMain.handle('openchamber:file:grant-existing'"));
   assert.match(handlerBody, /try \{/);
-  assert.match(handlerBody, /finally \{\s*restoreRendererKeyboardFocus\(browserWindow\);/s);
+  assert.match(source, /beginLinuxNativeDialogConstrain/);
+  assert.match(handlerBody, /linuxDialogConstrain\.stop\(\)/);
+  assert.match(handlerBody, /finally \{[\s\S]*restoreRendererKeyboardFocus\(browserWindow\);/s);
 });
