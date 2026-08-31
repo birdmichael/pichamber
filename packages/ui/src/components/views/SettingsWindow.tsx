@@ -32,6 +32,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
       open={open}
       onOpenChange={(next, eventDetails) => {
         if (shouldBlockSettingsDismiss(next, eventDetails)) {
+          // Base UI still applies the close unless cancel() is called, which
+          // leaves ending-style overlays that eat the next gear click (#378).
+          eventDetails?.cancel?.();
           if (!next && eventDetails?.reason === 'escape-key') {
             notifySettingsEscapeForm();
           }
