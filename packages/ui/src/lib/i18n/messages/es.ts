@@ -2195,7 +2195,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.piPlan.implementingNotify": "Implementando el plan aprobado. Se pueden modificar archivos.",
   "chat.piPlan.draftHint": "Plan empezará al enviar.",
   "chat.piPlan.row.aria": "Modo Plan",
-  "chat.piPlan.readySelect.title": "El plan está listo. ¿Qué sigue? Implementar aquí conserva esta conversación de planificación. Empezar de cero transfiere solo el plan aprobado a una sesión nueva. Tras implementar: el plan sigue activo hasta /plan exit.",
+  "chat.piPlan.readySelect.title": "El plan está listo. ¿Qué sigue? Implementar aquí continúa en esta sesión como Agente. Empezar de cero transfiere solo el plan aprobado a una sesión nueva.",
   "chat.piPlan.readySelect.implementHere": "Implementar aquí",
   "chat.piPlan.readySelect.implementHereDescription": "Continuar en esta sesión con la conversación de planificación.",
   "chat.piPlan.readySelect.implementFresh": "Empezar de cero e implementar",

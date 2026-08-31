@@ -2187,7 +2187,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.implementingNotify': '正在實作已核准的計畫。可能會修改檔案。',
   'chat.piPlan.draftHint': '送出後才會開始 Plan。',
   'chat.piPlan.row.aria': 'Plan 模式',
-  'chat.piPlan.readySelect.title': '計畫已就緒。接下來怎麼做？在此實作會保留這次規劃對話。全新開始只會把已核准的計畫轉到新工作階段。實作之後：計畫保持有效，直到 /plan exit。',
+  'chat.piPlan.readySelect.title': '計畫已就緒。接下來怎麼做？在此實作會在目前工作階段以智能體繼續。全新開始只會把已核准的計畫轉到新工作階段。',
   'chat.piPlan.readySelect.implementHere': '在此實作',
   'chat.piPlan.readySelect.implementHereDescription': '在目前工作階段繼續，並保留規劃對話。',
   'chat.piPlan.readySelect.implementFresh': '全新開始並實作',

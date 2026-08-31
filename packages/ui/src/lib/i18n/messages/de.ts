@@ -2036,7 +2036,7 @@ export const dict = {
   'chat.piPlan.implementingNotify': 'Der genehmigte Plan wird umgesetzt. Dateien können geändert werden.',
   'chat.piPlan.draftHint': 'Plan startet, wenn Sie senden.',
   'chat.piPlan.row.aria': 'Plan-Modus',
-  'chat.piPlan.readySelect.title': 'Der Plan ist bereit. Was als Nächstes? Hier umsetzen behält dieses Planungsgespräch. Neu starten überträgt nur den genehmigten Plan in eine neue Sitzung. Nach dem Umsetzen: Der Plan bleibt aktiv bis /plan exit.',
+  'chat.piPlan.readySelect.title': 'Der Plan ist bereit. Was als Nächstes? Hier umsetzen setzt in dieser Sitzung als Agent fort. Neu starten überträgt nur den genehmigten Plan in eine neue Sitzung.',
   'chat.piPlan.readySelect.implementHere': 'Hier umsetzen',
   'chat.piPlan.readySelect.implementHereDescription': 'In dieser Sitzung mit dem Planungsgespräch fortfahren.',
   'chat.piPlan.readySelect.implementFresh': 'Neu starten und umsetzen',

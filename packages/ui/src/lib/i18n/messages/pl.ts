@@ -948,7 +948,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.implementingNotify': 'Wdrażanie zatwierdzonego planu. Pliki mogą zostać zmodyfikowane.',
   'chat.piPlan.draftHint': 'Plan zacznie się po wysłaniu.',
   'chat.piPlan.row.aria': 'Tryb Plan',
-  'chat.piPlan.readySelect.title': 'Plan jest gotowy. Co dalej? Wdrożenie tutaj zachowa tę rozmowę planistyczną. Nowy start przeniesie tylko zatwierdzony plan do nowej sesji. Po wdrożeniu: plan pozostaje aktywny do /plan exit.',
+  'chat.piPlan.readySelect.title': 'Plan jest gotowy. Co dalej? Wdrożenie tutaj kontynuuje tę sesję jako Agent. Nowy start przeniesie tylko zatwierdzony plan do nowej sesji.',
   'chat.piPlan.readySelect.implementHere': 'Wdróż tutaj',
   'chat.piPlan.readySelect.implementHereDescription': 'Kontynuuj w tej sesji z rozmową planistyczną.',
   'chat.piPlan.readySelect.implementFresh': 'Zacznij od nowa i wdróż',

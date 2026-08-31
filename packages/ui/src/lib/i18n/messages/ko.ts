@@ -2219,7 +2219,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.implementingNotify': '승인된 플랜을 구현하는 중입니다. 파일이 수정될 수 있습니다.',
   'chat.piPlan.draftHint': '보내면 Plan이 시작됩니다.',
   'chat.piPlan.row.aria': 'Plan 모드',
-  'chat.piPlan.readySelect.title': '플랜이 준비되었습니다. 다음에 어떻게 할까요? 여기서 구현하면 이 계획 대화가 유지됩니다. 새로 시작하면 승인된 플랜만 새 세션으로 옮겨집니다. 구현 후: /plan exit 전까지 플랜이 활성 상태로 유지됩니다.',
+  'chat.piPlan.readySelect.title': '플랜이 준비되었습니다. 다음에 어떻게 할까요? 여기서 구현하면 이 세션에서 에이전트로 이어집니다. 새로 시작하면 승인된 플랜만 새 세션으로 옮겨집니다.',
   'chat.piPlan.readySelect.implementHere': '여기서 구현',
   'chat.piPlan.readySelect.implementHereDescription': '이 세션에서 계획 대화를 이어갑니다.',
   'chat.piPlan.readySelect.implementFresh': '새로 시작해서 구현',

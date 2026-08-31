@@ -2217,7 +2217,7 @@ export const dict = {
   'chat.piPlan.implementingNotify': 'Implementing the approved plan. Files may be modified.',
   'chat.piPlan.draftHint': 'Plan starts when you send.',
   'chat.piPlan.row.aria': 'Plan mode',
-  'chat.piPlan.readySelect.title': 'Proposed plan ready. What next? Implement here keeps this planning conversation. Start fresh transfers only the approved plan to a new session. After Implement: Keep plan active until /plan exit.',
+  'chat.piPlan.readySelect.title': 'Proposed plan ready. What next? Implement here continues in this session as Agent. Start fresh transfers only the approved plan to a new session.',
   'chat.piPlan.readySelect.implementHere': 'Implement here',
   'chat.piPlan.readySelect.implementHereDescription': 'Continue in this session with the planning conversation.',
   'chat.piPlan.readySelect.implementFresh': 'Start fresh and implement',

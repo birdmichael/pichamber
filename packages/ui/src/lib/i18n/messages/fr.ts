@@ -3098,7 +3098,7 @@ export const dict = {
   'chat.piPlan.implementingNotify': 'Mise en œuvre du plan approuvé. Les fichiers peuvent être modifiés.',
   'chat.piPlan.draftHint': 'Plan commencera à l’envoi.',
   'chat.piPlan.row.aria': 'Mode Plan',
-  'chat.piPlan.readySelect.title': 'Le plan est prêt. Et ensuite ? Implémenter ici conserve cette conversation de planification. Recommencer à zéro transfère uniquement le plan approuvé vers une nouvelle session. Après l’implémentation : le plan reste actif jusqu’à /plan exit.',
+  'chat.piPlan.readySelect.title': 'Le plan est prêt. Et ensuite ? Implémenter ici continue dans cette session en tant qu’Agent. Recommencer à zéro transfère uniquement le plan approuvé vers une nouvelle session.',
   'chat.piPlan.readySelect.implementHere': 'Implémenter ici',
   'chat.piPlan.readySelect.implementHereDescription': 'Continuer dans cette session avec la conversation de planification.',
   'chat.piPlan.readySelect.implementFresh': 'Recommencer à zéro et implémenter',

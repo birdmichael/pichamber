@@ -2213,7 +2213,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.implementingNotify': '承認済みのプランを実装しています。ファイルが変更されることがあります。',
   'chat.piPlan.draftHint': '送信すると Plan が始まります。',
   'chat.piPlan.row.aria': 'Plan モード',
-  'chat.piPlan.readySelect.title': 'プランの準備ができました。次はどうしますか？ここで実装すると、この計画の会話が残ります。新規に始めると、承認済みプランだけが新しいセッションに移ります。実装後：/plan exit までプランは有効なままです。',
+  'chat.piPlan.readySelect.title': 'プランの準備ができました。次はどうしますか？ここで実装すると、このセッションでエージェントとして続きます。新規に始めると、承認済みプランだけが新しいセッションに移ります。',
   'chat.piPlan.readySelect.implementHere': 'ここで実装',
   'chat.piPlan.readySelect.implementHereDescription': 'このセッションで計画の会話を続けます。',
   'chat.piPlan.readySelect.implementFresh': '新規に始めて実装',
