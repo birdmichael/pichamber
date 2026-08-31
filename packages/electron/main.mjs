@@ -46,6 +46,7 @@ import {
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
+import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-text-file.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
 import { beginLinuxNativeDialogConstrain } from './linux-native-dialog-bounds.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
@@ -4185,23 +4186,28 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       };
     }
 
-    case 'desktop_save_markdown_file': {
+    case 'desktop_save_markdown_file':
+    case 'desktop_save_text_file': {
       const defaultPath = typeof args.defaultFileName === 'string' ? args.defaultFileName.trim() : '';
       if (!defaultPath) {
         throw new Error('Default file name is required');
       }
 
       const content = typeof args.content === 'string' ? args.content : '';
+      const filters = command === 'desktop_save_markdown_file'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : normalizeSaveDialogFilters(args.filters);
       const result = await dialog.showSaveDialog(browserWindow || undefined, {
         defaultPath,
-        filters: [{ name: 'Markdown', extensions: ['md'] }],
+        ...(filters.length > 0 ? { filters } : {}),
       });
-      if (result.canceled || !result.filePath) {
+      const filePath = resolveSaveDialogWritePath(result);
+      if (!filePath) {
         return null;
       }
 
-      await fsp.writeFile(result.filePath, content, 'utf8');
-      return result.filePath;
+      await fsp.writeFile(filePath, content, 'utf8');
+      return filePath;
     }
 
     case 'desktop_save_image': {

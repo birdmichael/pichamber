@@ -948,11 +948,20 @@ export const revealDesktopPath = async (path: string): Promise<boolean> => {
   }
 };
 
+export type DesktopSaveFileFilter = {
+  name: string;
+  extensions: string[];
+};
+
+export const canSaveDesktopTextFile = (): boolean => (
+  hasDesktopInvoke() && isDesktopLocalOriginActive()
+);
+
 export const saveDesktopMarkdownFile = async (
   defaultFileName: string,
   content: string,
 ): Promise<string | null> => {
-  if (!hasDesktopInvoke() || !isDesktopLocalOriginActive()) {
+  if (!canSaveDesktopTextFile()) {
     return null;
   }
 
@@ -971,6 +980,28 @@ export const saveDesktopMarkdownFile = async (
     console.warn('Failed to save markdown file', error);
     return null;
   }
+};
+
+export const saveDesktopTextFile = async (
+  defaultFileName: string,
+  content: string,
+  filters?: DesktopSaveFileFilter[],
+): Promise<string | null> => {
+  if (!canSaveDesktopTextFile()) {
+    return null;
+  }
+
+  const trimmedFileName = defaultFileName?.trim();
+  if (!trimmedFileName) {
+    return null;
+  }
+
+  const result = await invokeDesktop<string>('desktop_save_text_file', {
+    defaultFileName: trimmedFileName,
+    content,
+    filters,
+  });
+  return typeof result === 'string' && result.trim().length > 0 ? result : null;
 };
 
 export const saveDesktopImageFile = async (
