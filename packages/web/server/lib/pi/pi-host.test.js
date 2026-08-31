@@ -1341,6 +1341,29 @@ describe('createPiHost', () => {
     }
   });
 
+  it('installs a feature plugin when the package manager only exposes install', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-install-'));
+    const installed = [];
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          install: async (source) => {
+            installed.push(source);
+          },
+        }),
+      });
+      const result = await host.installFeaturePlugin('xai', { source: 'npm:pi-xai-oauth' });
+      expect(installed).toEqual(['npm:pi-xai-oauth']);
+      expect(result.slots.xai.source).toBe('npm:pi-xai-oauth');
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('setDefaults persists thinking for session settings', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-defaults-'));
     try {

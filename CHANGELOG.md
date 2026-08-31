@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Settings:** Feature Plugin install (including `pi-xai-oauth`) no longer 500s. The Node-kernel package manager now exposes `installAndPersist`, matching Pi's PackageManager.
 - **Chat / Desktop:** after Plan **Build** implement settles, the composer leaves disabled **building…**. Idle is `agent_settled` (live turn), not leftover `implementing` or adapter busy. Switching chats or Reload Pi no longer resurrects it.
 - **Desktop:** Git, Changes, and Diff empty copy no longer tells you to initialize or open a repository. Those panels have no such control. They now say Git status is available when this folder is already a Git repository.
 - **Desktop:** sidebar session search matches titles in chats as well as project lists. Extra characters that are not a substring drop the row: `renam` still finds `renamed-scan`; `renamzzz` does not.

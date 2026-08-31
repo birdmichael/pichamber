@@ -4737,7 +4737,17 @@ export const createPiHost = ({
         throw error;
       }
       const manager = await this.resolveFeaturePackageManager();
-      await manager.installAndPersist(source);
+      const persist = typeof manager.installAndPersist === 'function'
+        ? manager.installAndPersist.bind(manager)
+        : typeof manager.install === 'function'
+          ? manager.install.bind(manager)
+          : null;
+      if (!persist) {
+        const error = new Error('Pi package install is unavailable');
+        error.status = 503;
+        throw error;
+      }
+      await persist(source);
       const next = writeFeaturePlugins(home, { [slot]: { source } });
       const reload = await this.reloadIdleSessions();
       return {
