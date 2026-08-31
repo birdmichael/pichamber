@@ -18,15 +18,17 @@ const sliceBetween = (source: string, start: string, end: string): string => {
 describe('Git and Changes not-repo empty copy', () => {
   test('desktop Git empty state has no init or open-repo control', () => {
     const gitView = read('GitView.tsx');
-    const notGitReturn = sliceBetween(
-      gitView,
-      "{t('gitView.empty.notGitRepository')}",
-      "{t('gitView.empty.worktreeFeaturesUnavailable')}",
-    );
+    expect(gitView).toContain('NestedRepoResolutionStates');
+    expect(gitView).toContain("t('gitView.empty.worktreeFeaturesUnavailable')");
 
-    expect(gitView).toContain("t('gitView.empty.notGitRepositoryDescription')");
-    expect(notGitReturn).not.toMatch(/<Button\b/);
-    expect(notGitReturn).not.toMatch(/onClick|git init|initializeGit|openRepository/i);
+    const resolution = read('git/NestedRepoResolutionStates.tsx');
+    const notGit = sliceBetween(
+      resolution,
+      "t('gitView.empty.notGitRepository')",
+      'emptyStateFooter',
+    );
+    expect(resolution).toContain("t('gitView.empty.notGitRepositoryDescription')");
+    expect(notGit).not.toMatch(/git init|initializeGit|openRepository/i);
   });
 
   test('Changes empty state reuses the same copy and has no init control', () => {

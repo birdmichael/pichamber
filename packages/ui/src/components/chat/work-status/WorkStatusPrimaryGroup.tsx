@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useGitStore } from '@/stores/useGitStore';
+import { useNestedGitDirectory } from '@/hooks/useNestedGitDirectory';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { useFreshestPrVisualSummaryForBranch } from '@/stores/useGitHubPrStatusStore';
@@ -56,34 +57,42 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
   const fetchStatus = useGitStore((state) => state.fetchStatus);
   const clearDiffCache = useGitStore((state) => state.clearDiffCache);
 
+  // The repository the readouts describe. Same resolution as the Git tab: the
+  // session directory itself when it is a repository, otherwise the nested
+  // repository selected (or auto-selected) for it, so a session in a plain
+  // folder of repositories still reports the branch and changes the Git tab
+  // shows. Navigation below stays keyed on `directory` — context-panel tabs
+  // are per project root.
+  const { gitDirectory } = useNestedGitDirectory(directory, { enabled: showRepository });
+
   const gitStatus = useGitStore(
     React.useCallback(
-      (state) => (directory ? state.directories.get(directory)?.status ?? null : null),
-      [directory],
+      (state) => (gitDirectory ? state.directories.get(gitDirectory)?.status ?? null : null),
+      [gitDirectory],
     ),
   );
 
   // Warm the shared git cache through the background-network gate so the panel
   // never competes with the chat's own bootstrap traffic for sockets.
   React.useEffect(() => {
-    if (!showRepository || !directory || !git) return;
-    void runBackgroundNetworkTask(() => ensureStatus(directory, git));
-  }, [directory, git, ensureStatus, showRepository]);
+    if (!showRepository || !gitDirectory || !git) return;
+    void runBackgroundNetworkTask(() => ensureStatus(gitDirectory, git));
+  }, [gitDirectory, git, ensureStatus, showRepository]);
 
   // Own the live invalidation for the repository readout. The desktop
   // composer's changed-files row no longer renders, so this panel must not
   // depend on ChatInput (or an opened Git surface) to refresh the shared cache
   // on its behalf.
   React.useEffect(() => {
-    if (!showRepository || !directory || !git) return;
+    if (!showRepository || !gitDirectory || !git) return;
     return sessionEvents.onGitRefreshHint((hint) => {
-      if (normalizePath(hint.directory) !== normalizePath(directory)) return;
+      if (normalizePath(hint.directory) !== normalizePath(gitDirectory)) return;
       if (hint.paths?.length) {
-        clearDiffCache(directory, hint.paths);
+        clearDiffCache(gitDirectory, hint.paths);
       }
-      void fetchStatus(directory, git, { silent: true });
+      void fetchStatus(gitDirectory, git, { silent: true });
     });
-  }, [clearDiffCache, directory, fetchStatus, git, showRepository]);
+  }, [clearDiffCache, gitDirectory, fetchStatus, git, showRepository]);
 
   const branch = gitStatus?.current?.trim() || null;
 
@@ -108,7 +117,13 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
   // Read-only: PR watching is owned by the background tracker. Starting a watch
   // here would multiply GitHub requests per open session, which is exactly the
   // fan-out the PR-status concurrency gate exists to prevent.
-  const prSummary = useFreshestPrVisualSummaryForBranch(directory, branch);
+  const nestedRepoLabel = React.useMemo(() => {
+    if (!directory || !gitDirectory || gitDirectory === directory) return null;
+    const rootPrefix = `${directory}/`;
+    return gitDirectory.startsWith(rootPrefix) ? gitDirectory.slice(rootPrefix.length) : gitDirectory;
+  }, [directory, gitDirectory]);
+
+  const prSummary = useFreshestPrVisualSummaryForBranch(gitDirectory, branch);
 
   // `getCurrentModel` is an imperative getter: its reference never changes, so
   // calling it in render subscribes to nothing. Subscribe to the selected model
@@ -265,6 +280,16 @@ export const WorkStatusPrimaryGroup: React.FC<Props> = ({ sessionId, directory, 
                     ? <WorkStatusValue tone="muted">{`↓${gitStatus?.behind}`}</WorkStatusValue> : null}
                 </>
               ) : undefined}
+            />
+          ) : null}
+
+          {nestedRepoLabel ? (
+            <WorkStatusRow
+              icon="folder"
+              onClick={directory ? () => openSurface('git') : undefined}
+              ariaLabel={t('chat.workStatus.action.openGit')}
+              label={nestedRepoLabel}
+              muted
             />
           ) : null}
 

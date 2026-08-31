@@ -37,6 +37,7 @@ import type {
   RevertCommitResponse,
   ResetToCommitResponse,
 } from './api/types';
+import { normalizePath } from './pathNormalization';
 import { runtimeFetch } from './runtime-fetch';
 import { getRuntimeUrlResolver } from './runtime-url';
 import { getRuntimeKey } from './runtime-switch';
@@ -116,6 +117,35 @@ export async function checkIsGitRepository(directory: string): Promise<boolean> 
       gitRepoInFlight.delete(key);
     }
   }
+}
+
+export class GitDirectoriesUnsupportedError extends Error {
+  constructor() {
+    super('Nested git repository discovery is not supported by this runtime');
+    this.name = 'GitDirectoriesUnsupportedError';
+  }
+}
+
+export async function listGitDirectories(root: string): Promise<string[]> {
+  const response = await runtimeFetch('/api/fs/git-dirs', { query: { path: root } });
+  if (response.status === 501) {
+    throw new GitDirectoriesUnsupportedError();
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to list git directories: ${response.statusText}`);
+  }
+  // SAFETY: the route is ours (`GET /api/fs/git-dirs`) and answers this exact
+  // shape on every 2xx; a malformed body fails the array check below.
+  const data = await response.json() as { repositories?: Array<{ path?: string | null }> };
+  if (!Array.isArray(data?.repositories)) {
+    throw new Error('Unexpected git directories response');
+  }
+  // The server joins paths with the platform separator; every other git
+  // directory key in the UI is normalized, so match that here or a Windows
+  // repository never equals its own selection or root prefix.
+  return data.repositories
+    .map((entry) => normalizePath(entry?.path ?? null))
+    .filter((path): path is string => path !== null);
 }
 
 export async function getGitStatus(directory: string, options?: { mode?: 'light' }): Promise<GitStatus> {
