@@ -174,6 +174,28 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
 
   const explorerRootDirectory = dialogHomeDirectory || homeDirectory;
 
+  // insertText / some IME paths update the native value without a React
+  // change event. Read the DOM while the field is focused so `~/` + `/`
+  // becomes `/` instead of sticking as `~//`.
+  React.useEffect(() => {
+    if (!open || isCloneMode) {
+      return;
+    }
+    const sync = () => {
+      const el = inputRef.current;
+      if (!el) {
+        return;
+      }
+      const next = normalizeDirectoryExplorerQuery(normalizeSeparators(el.value));
+      if (el.value !== next) {
+        el.value = next;
+      }
+      setQuery((current) => (current === next ? current : next));
+    };
+    const id = window.setInterval(sync, 50);
+    return () => window.clearInterval(id);
+  }, [open, isCloneMode]);
+
   const addedProjectPaths = React.useMemo(() => new Set(
     projects
       .map((project) => normalizeDirectoryPath(project.path))
