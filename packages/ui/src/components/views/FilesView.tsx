@@ -46,7 +46,13 @@ import { useFileSearchStore } from '@/stores/useFileSearchStore';
 import { useDeviceInfo } from '@/lib/device';
 import { cn, getModifierLabel, getRevealLabelKey, hasModifier } from '@/lib/utils';
 import { getLanguageFromExtension, getImageMimeType, isBinaryFile, isDrawioFile, isImageFile, isPdfFile, isSvgFile, looksLikeBinaryText } from '@/lib/toolHelpers';
-import { shouldAllowFileDraftSave, shouldScheduleFileAutosave } from '@/lib/fileEditorAutosave';
+import {
+  formatFileEditorTabName,
+  getFileEditorSaveChromeState,
+  shouldAllowFileDraftSave,
+  shouldScheduleFileAutosave,
+  shouldShowPersistentFileEditorSaveChrome,
+} from '@/lib/fileEditorAutosave';
 import { getRuntimeUrlResolver } from '@/lib/runtime-url';
 import { acquireRuntimeUrlAuthToken, refreshRuntimeUrlAuthToken, subscribeRuntimeUrlAuthToken } from '@/lib/runtime-auth';
 import { getRuntimeApiBaseUrl } from '@/lib/runtime-switch';
@@ -3170,6 +3176,87 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     );
   }, [currentTheme.metadata.variant, pierreTheme, wrapLines]);
 
+  const saveChromeState = getFileEditorSaveChromeState({
+    isDirty,
+    isSaving,
+    autoSaveStatus,
+  });
+  const showPersistentSaveChrome = shouldShowPersistentFileEditorSaveChrome({
+    isMobile,
+    expandedEditorToolbar: settingsExpandedEditorToolbar,
+  });
+  const showEditorOnlyFileHeader = !showEditorTabsRow && !isMobile && Boolean(selectedFile);
+
+  const renderDirtyMarker = (visible: boolean) => (
+    visible ? (
+      <span
+        data-testid="file-editor-dirty-marker"
+        className="shrink-0 typography-ui-label leading-none text-muted-foreground"
+        aria-label={t('filesView.unsaved.title')}
+        title={t('filesView.unsaved.title')}
+      >
+        •
+      </span>
+    ) : null
+  );
+
+  const renderSaveStatusChrome = () => {
+    if (!canEdit || !isEditingFile) {
+      return null;
+    }
+    if (saveChromeState === 'saving') {
+      return (
+        <span
+          data-testid="file-editor-save-chrome"
+          data-state="saving"
+          className="flex items-center gap-1 px-1 text-muted-foreground typography-meta"
+        >
+          <Icon name="loader-4" className="size-3.5 animate-spin" />
+          {t('filesView.editor.saving')}
+        </span>
+      );
+    }
+    if (saveChromeState === 'saved') {
+      return (
+        <span
+          data-testid="file-editor-save-chrome"
+          data-state="saved"
+          className="flex items-center gap-1 px-1 text-[color:var(--status-success)] typography-meta"
+        >
+          <Icon name="check" className="size-3.5" />
+          {t('filesView.editor.saved')}
+        </span>
+      );
+    }
+    if (saveChromeState === 'dirty') {
+      const shortcut = `${getModifierLabel()}+S`;
+      const label = t(autoSaveEnabled ? 'filesView.editor.saveNowTitle' : 'filesView.editor.saveNowManualTitle', { shortcut });
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void saveDraft()}
+                className="h-6 gap-1 px-1.5 text-muted-foreground opacity-80 hover:bg-transparent hover:opacity-100 focus-visible:bg-transparent active:bg-transparent"
+                title={label}
+                aria-label={t('filesView.editor.saveAria', { shortcut })}
+                data-testid="file-editor-save-chrome"
+                data-state="dirty"
+              >
+                <Icon name="save-3" className="size-4" />
+                <span className="typography-meta">{t('filesView.editor.save')}</span>
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>{label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return null;
+  };
+
   const renderFloatingFileControls = ({
     exitFullscreenOnly = false,
     layout = 'floating',
@@ -3198,28 +3285,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       <div className={wrapperCls}>
         {canEdit && isEditingFile && (
           <>
-            {isSaving ? (
-              <span className="flex items-center gap-1 px-1 text-muted-foreground typography-meta">
-                <Icon name="loader-4" className="size-3.5 animate-spin" />
-                {t('filesView.editor.saving')}
-              </span>
-            ) : autoSaveEnabled && autoSaveStatus === 'saved' && !isDirty ? (
-              <span className="flex items-center gap-1 px-1 text-[color:var(--status-success)] typography-meta">
-                <Icon name="check" className="size-3.5" />
-                {t('filesView.editor.saved')}
-              </span>
-            ) : isDirty ? withTooltip(t(autoSaveEnabled ? 'filesView.editor.saveNowTitle' : 'filesView.editor.saveNowManualTitle', { shortcut: `${getModifierLabel()}+S` }),
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void saveDraft()}
-                className="h-6 gap-1 px-1 text-muted-foreground opacity-80 hover:bg-transparent hover:opacity-100 focus-visible:bg-transparent active:bg-transparent"
-                title={t(autoSaveEnabled ? 'filesView.editor.saveNowTitle' : 'filesView.editor.saveNowManualTitle', { shortcut: `${getModifierLabel()}+S` })}
-                aria-label={t('filesView.editor.saveAria', { shortcut: `${getModifierLabel()}+S` })}
-              >
-                <Icon name="save-3" className="size-4" />
-              </Button>
-            ) : null}
+            {(layout === 'docked' || exitFullscreenOnly) ? renderSaveStatusChrome() : null}
             {withTooltip(autoSaveEnabled ? t('filesView.editor.autoSaveOn') : t('filesView.editor.manualSave'),
               <Button
                 variant="ghost"
@@ -3609,10 +3675,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className={cn('flex flex-col flex-shrink-0', showEditorTabsRow && 'border-b border-border/40')}>
+      <div className={cn('flex flex-col flex-shrink-0', (showEditorTabsRow || showEditorOnlyFileHeader) && 'border-b border-border/40')}>
         {/* Row 1: Tabs */}
         {showEditorTabsRow ? (
-        <div className="flex min-w-0 items-center px-3 py-1.5">
+        <div className="flex min-w-0 items-center gap-2 px-3 py-1.5">
           {isMobile && showMobilePageContent && (
             <button
               type="button"
@@ -3634,7 +3700,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                     aria-label={t('filesView.editor.openFilesAria')}
                   >
                     <FileTypeIcon filePath={selectedFile.path} extension={selectedFile.extension} className="size-3.5 flex-shrink-0" />
-                    <ScrollingFileName name={selectedFile.name} />
+                    <ScrollingFileName name={formatFileEditorTabName(selectedFile.name, isDirty)} />
                     <Icon name="arrow-down-s" className="size-4 flex-shrink-0 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
@@ -3661,7 +3727,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                       >
                         <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                           <FileTypeIcon filePath={file.path} extension={file.extension} className="size-3.5 flex-shrink-0" />
-                          <ScrollingFileName name={file.name} />
+                          <ScrollingFileName name={formatFileEditorTabName(file.name, isActive && isDirty)} />
                         </span>
                         <button
                           type="button"
@@ -3725,7 +3791,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                           }}
                           className="max-w-[12rem] truncate text-left"
                         >
-                          {file.name}
+                          {formatFileEditorTabName(file.name, isActive && isDirty)}
                         </button>
                         <button
                           type="button"
@@ -3750,6 +3816,30 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
               <div className="typography-ui-label font-medium truncate">{t('filesView.editor.selectFile')}</div>
             )
           )}
+          {showPersistentSaveChrome && selectedFile ? (
+            <div className="ml-auto flex min-w-0 shrink-0 items-center">
+              {renderSaveStatusChrome()}
+            </div>
+          ) : null}
+        </div>
+        ) : selectedFile && !isMobile ? (
+        <div
+          className="flex min-w-0 items-center gap-2 px-3 py-1.5"
+          data-testid="file-editor-filename-header"
+        >
+          <FileTypeIcon filePath={selectedFile.path} extension={selectedFile.extension} className="size-3.5 flex-shrink-0" />
+          <span
+            className="min-w-0 truncate typography-ui-label font-medium"
+            title={selectedFile.name}
+          >
+            {selectedFile.name}
+          </span>
+          {renderDirtyMarker(isDirty)}
+          {showPersistentSaveChrome ? (
+            <div className="ml-auto flex min-w-0 shrink-0 items-center">
+              {renderSaveStatusChrome()}
+            </div>
+          ) : null}
         </div>
         ) : null}
 
@@ -3760,11 +3850,14 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
             {/* Mobile hosts already show the file name in their own header;
                 a truncated duplicate here just eats toolbar width. */}
             {displaySelectedPath && !isMobile ? (
-              <span
-                className="min-w-0 flex-1 truncate typography-meta text-muted-foreground"
-                title={displaySelectedPath}
-              >
-                {displaySelectedPath}
+              <span className="flex min-w-0 flex-1 items-center gap-1">
+                <span
+                  className="min-w-0 truncate typography-meta text-muted-foreground"
+                  title={displaySelectedPath}
+                >
+                  {displaySelectedPath}
+                </span>
+                {renderDirtyMarker(isDirty)}
               </span>
             ) : null}
             <div className="ml-auto min-w-0 shrink-0 overflow-x-auto">

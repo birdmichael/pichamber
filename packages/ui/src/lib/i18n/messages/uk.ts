@@ -1383,6 +1383,7 @@ export const dict: Record<I18nKey, string> = {
   "filesView.editor.saveNowTitle": "Зберегти зараз ({shortcut}) - автоматично зберігає через 1,5 с",
   "filesView.editor.saveNowManualTitle": "Зберегти зараз ({shortcut})",
   "filesView.editor.saveAria": "Зберегти ({shortcut})",
+  "filesView.editor.save": "Зберегти",
   "filesView.editor.openInDesktopApp": "Відкрити в десктопному застосунку",
   "filesView.editor.refreshApps": "Оновити застосунки",
   "filesView.editor.disableLineWrap": "Вимкнути перенос рядків",

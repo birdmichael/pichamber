@@ -1417,6 +1417,7 @@ export const dict = {
   'filesView.editor.saveNowTitle': 'Save now ({shortcut}) - auto-saves after 1.5s',
   'filesView.editor.saveNowManualTitle': 'Save now ({shortcut})',
   'filesView.editor.saveAria': 'Save ({shortcut})',
+  'filesView.editor.save': 'Save',
   'filesView.editor.openInDesktopApp': 'Open in desktop app',
   'filesView.editor.refreshApps': 'Refresh Apps',
   'filesView.editor.disableLineWrap': 'Disable line wrap',

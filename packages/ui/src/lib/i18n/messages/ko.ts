@@ -1419,6 +1419,7 @@ export const dict: Record<I18nKey, string> = {
   'filesView.editor.saveNowTitle': '지금 저장({shortcut}) · 1.5초 후 자동 저장',
   'filesView.editor.saveNowManualTitle': '지금 저장({shortcut})',
   'filesView.editor.saveAria': '저장 ({shortcut})',
+  'filesView.editor.save': '저장',
   'filesView.editor.openInDesktopApp': '데스크톱 앱에서 열기',
   'filesView.editor.refreshApps': '앱 새로고침',
   'filesView.editor.disableLineWrap': '줄 바꿈 끄기',

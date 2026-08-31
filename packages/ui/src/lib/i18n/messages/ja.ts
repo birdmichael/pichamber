@@ -1413,6 +1413,7 @@ export const dict: Record<I18nKey, string> = {
   'filesView.editor.saveNowTitle': '今すぐ保存（{shortcut}）- 1.5秒後に自動保存',
   'filesView.editor.saveNowManualTitle': '今すぐ保存（{shortcut}）',
   'filesView.editor.saveAria': '保存（{shortcut}）',
+  'filesView.editor.save': '保存',
   'filesView.editor.openInDesktopApp': 'デスクトップアプリで開く',
   'filesView.editor.refreshApps': 'アプリを更新',
   'filesView.editor.disableLineWrap': '行の折り返しを無効にする',
