@@ -536,7 +536,12 @@ export const useKeyboardShortcuts = () => {
         // Typing a digit in a textarea/input/composer must stay text, never a
         // surface or session switch: the default prefix is a bare modifier, so
         // this fires on plain ctrl/cmd+1 while the composer has focus.
-        if (isEditableEventTarget(e.target)) return;
+        // preventDefault so CodeMirror does not also treat the chord as a command
+        // and so the digit is not inserted.
+        if (isEditableEventTarget(e.target)) {
+          e.preventDefault();
+          return;
+        }
         const state = useUIStore.getState();
         if (state.isMobile || !panelDirectoryKey) {
           return;

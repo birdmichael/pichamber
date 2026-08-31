@@ -32,9 +32,40 @@ test('detects an open select popup', () => {
 class StubHTMLElement {
   tagName: string;
   isContentEditable: boolean;
-  constructor(tagName: string, isContentEditable = false) {
+  className: string;
+  parentElement: StubHTMLElement | null;
+  private contentEditableAttr: string | null;
+
+  constructor(
+    tagName: string,
+    isContentEditable = false,
+    options: { className?: string; parent?: StubHTMLElement | null; contentEditable?: string | null } = {},
+  ) {
     this.tagName = tagName;
     this.isContentEditable = isContentEditable;
+    this.className = options.className ?? '';
+    this.parentElement = options.parent ?? null;
+    this.contentEditableAttr = options.contentEditable ?? (isContentEditable ? 'true' : null);
+  }
+
+  closest(selector: string): StubHTMLElement | null {
+    const parts = selector.split(',').map((part) => part.trim());
+    let node: StubHTMLElement | null = this;
+    while (node) {
+      if (parts.some((part) => node!.matchesPart(part))) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  private matchesPart(selector: string): boolean {
+    if (selector.startsWith('.')) {
+      return this.className.split(/\s+/).includes(selector.slice(1));
+    }
+    if (selector === '[contenteditable="true"]') {
+      return this.contentEditableAttr === 'true';
+    }
+    return this.tagName.toLowerCase() === selector.toLowerCase();
   }
 }
 
@@ -56,6 +87,16 @@ test('does not treat a plain element or non-element target as editable', () => {
   expect(isEditableEventTarget(element('BUTTON'))).toBe(false);
   expect(isEditableEventTarget(null)).toBe(false);
   expect(isEditableEventTarget({} as EventTarget)).toBe(false);
+});
+
+test('treats a nested span inside a contenteditable or CodeMirror parent as editable', () => {
+  const editableParent = new StubHTMLElement('DIV', true, { contentEditable: 'true' });
+  const nestedInEditable = new StubHTMLElement('SPAN', false, { parent: editableParent });
+  expect(isEditableEventTarget(nestedInEditable as unknown as HTMLElement)).toBe(true);
+
+  const cmContent = new StubHTMLElement('DIV', false, { className: 'cm-content' });
+  const cmLine = new StubHTMLElement('SPAN', false, { className: 'cm-line', parent: cmContent });
+  expect(isEditableEventTarget(cmLine as unknown as HTMLElement)).toBe(true);
 });
 
 afterAll(() => {
