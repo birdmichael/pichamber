@@ -332,6 +332,11 @@ export type NewSessionDraftState = {
   preparedChatDirectory?: string | null
   /** User-initiated New session: start empty; drop leftover `/` on project drafts. */
   resetComposer?: boolean
+  /**
+   * Chat→project New session: show an empty live composer without writing empty
+   * over the destination project's stored untitled draft.
+   */
+  emptyIncomingComposer?: boolean
 }
 
 export type ViewportAnchor = {
@@ -1051,6 +1056,16 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
     const resetComposer = !options?.automatic && !options?.initialPrompt
+    const previousDraft = get().newSessionDraft
+    // Leaving a projectless chats draft for an inherited project New session
+    // must not restore leftover `~` storage into the live composer. Keep the
+    // destination project's stored untitled draft intact for a later reopen.
+    const emptyIncomingComposer = Boolean(
+      resetComposer
+      && target === "project"
+      && previousDraft.open
+      && previousDraft.target === "chat"
+    )
     // User-initiated New session starts empty. Project drafts still keep a real
     // untitled prompt (only a leftover `/` is dropped). Projectless chats used
     // to share the `~` identity with the previous session and restored it.
@@ -1099,6 +1114,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       syntheticParts: options?.syntheticParts,
       targetFolderId: options?.targetFolderId,
       resetComposer,
+      emptyIncomingComposer: emptyIncomingComposer || undefined,
     }
 
     set({

@@ -288,10 +288,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const initialDraftIdentityRef = React.useRef<ChatDraftIdentity | null>(null);
     const initialDraftSnapshotRef = React.useRef<ChatDraftSnapshot>({ text: '', confirmedMentions: new Set() });
     const [message, setMessage] = React.useState(() => {
-        const sessionId = useSessionUIStore.getState().currentSessionId;
+        const sessionState = useSessionUIStore.getState();
+        const sessionId = sessionState.currentSessionId;
         const identity = resolveChatDraftIdentity(sessionId);
-        const snapshot = readChatDraft(identity);
         initialDraftIdentityRef.current = identity;
+        // Chat→project New session: do not mount with leftover destination text.
+        if (!sessionId && sessionState.newSessionDraft?.open && sessionState.newSessionDraft.emptyIncomingComposer) {
+            initialDraftSnapshotRef.current = { text: '', confirmedMentions: new Set() };
+            return '';
+        }
+        const snapshot = readChatDraft(identity);
         initialDraftSnapshotRef.current = snapshot;
         if (snapshot.text) {
             initialDraftRef.current = snapshot.text;
@@ -867,6 +873,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     // Draft persistence: identity switching, debounced writes and the
     // flush-on-hide edges live in the hook.
+    const emptyIncomingComposer = Boolean(newSessionDraft?.open && newSessionDraft.emptyIncomingComposer);
     const { persistNow: persistDraftImmediately } = useComposerDraft({
         message,
         messageRef,
@@ -880,6 +887,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         },
         onIdentityChange: () => setInputMode('normal'),
         onDraftRestored: () => composerRef.current?.selectAll(),
+        emptyIncomingComposer,
     });
 
     // Sidebar / File-menu New session must not keep a leftover `/` or an open
