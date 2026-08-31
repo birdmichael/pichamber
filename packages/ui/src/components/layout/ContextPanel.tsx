@@ -722,6 +722,16 @@ export const ContextPanel: React.FC = () => {
       return;
     }
 
+    // Markdown preview find owns Escape while the bar is open (same as X).
+    // Capture here would close the Files panel first (issue #414).
+    const eventTarget = event.target;
+    if (eventTarget instanceof Element && eventTarget.closest('[data-md-preview-find]')) {
+      return;
+    }
+    if (event.currentTarget.querySelector('[data-md-preview-find]')) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     handleClose();

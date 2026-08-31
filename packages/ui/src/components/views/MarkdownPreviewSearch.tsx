@@ -295,16 +295,41 @@ export const MarkdownPreviewSearch: React.FC<MarkdownPreviewSearchProps> = ({
       }
     } else if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       close();
     }
   }, [close, goToNext, goToPrevious]);
+
+  // ContextPanel captures Escape on the panel and closes Files (issue #414).
+  // Listen on window in the capture phase so Escape closes only the find bar
+  // (same as X) and never the Files panel. Clean up on unmount or close.
+  React.useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+    };
+    window.addEventListener('keydown', handleWindowKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeyDown, { capture: true });
+    };
+  }, [open, close]);
 
   if (!open) {
     return null;
   }
 
   return (
-    <div className={cn('absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg border border-border/60 bg-[var(--surface-elevated)] px-1.5 py-1 shadow-lg', className)}>
+    <div
+      data-md-preview-find
+      className={cn('absolute right-3 top-3 z-10 flex items-center gap-1 rounded-lg border border-border/60 bg-[var(--surface-elevated)] px-1.5 py-1 shadow-lg', className)}
+    >
       <Icon name="search" className="ml-0.5 size-3.5 text-muted-foreground" />
       <Input
         ref={inputRef}
