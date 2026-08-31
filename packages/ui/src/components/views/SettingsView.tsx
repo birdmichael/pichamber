@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn, getModifierLabel } from '@/lib/utils';
+import { shouldOpenSettingsNavOnPointerDown } from './settingsNavOpen';
 import { useUIStore } from '@/stores/useUIStore';
 import { useSettingsDirectory } from '@/hooks/useSettingsDirectory';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -885,7 +886,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
             collapse off-screen buttons to a 0×0 AX/hit rect). */}
         <nav
           aria-label={t('settings.view.home.title')}
-          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden touch-pan-y"
         >
           <div className="flex flex-col gap-0.5 px-4 pt-4 pb-2">
             {hasSearchQuery ? (
@@ -973,7 +974,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                         type="button"
                         data-settings-nav={page.slug}
                         onPointerDown={(event) => {
-                          if (event.button !== 0) {
+                          if (!shouldOpenSettingsNavOnPointerDown(event)) {
                             return;
                           }
                           event.currentTarget.dataset.settingsNavArmed = '1';
