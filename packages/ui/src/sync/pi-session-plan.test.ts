@@ -14,6 +14,7 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveFooterPlanSelected,
   resolveOpenedDraftPlanSelected,
+  planBuildBusyDisabled,
   resolvePlanStatusRowHint,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
@@ -172,6 +173,19 @@ describe('plan toggle and build dispatch', () => {
       footerPlanSelected: false,
       draftOpen: true,
     })).toBeNull();
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: false,
+      implemented: true,
+    })).toBe('implementing');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: false,
+      draftOpen: false,
+      implementing: true,
+    })).toBe('implementing');
+    expect(planBuildBusyDisabled({ busy: true, hasPendingPlanReadySelect: true })).toBe(false);
+    expect(planBuildBusyDisabled({ busy: true, hasPendingPlanReadySelect: false })).toBe(true);
+    expect(planBuildBusyDisabled({ busy: false, hasPendingPlanReadySelect: false })).toBe(false);
   });
 
   test('empty-composer Plan stays on this draft until send or Agent, and a new draft is Agent', () => {

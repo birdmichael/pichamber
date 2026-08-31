@@ -2192,6 +2192,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.piPlan.discardCancel": "Manter plano",
   "chat.piPlan.discardConfirmAria": "Confirmação para descartar o plano",
   "chat.piPlan.enabledNotify": "Modo Plano ativado. Vou explorar e planejar, sem modificar arquivos.",
+  "chat.piPlan.implementingNotify": "Implementando o plano aprovado. Arquivos podem ser modificados.",
   "chat.piPlan.draftHint": "O Plan começa quando você enviar.",
   "chat.piPlan.row.aria": "Modo Plan",
   "chat.piPlan.readySelect.title": "O plano está pronto. E agora? Implementar aqui mantém esta conversa de planejamento. Começar do zero transfere só o plano aprovado para uma nova sessão. Depois de implementar: o plano permanece ativo até /plan exit.",

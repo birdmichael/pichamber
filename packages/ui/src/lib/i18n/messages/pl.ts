@@ -945,6 +945,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.discardCancel': 'Zachowaj plan',
   'chat.piPlan.discardConfirmAria': 'Potwierdzenie odrzucenia planu',
   'chat.piPlan.enabledNotify': 'Włączono tryb Plan. Będę badać i planować, ale nie zmienię plików.',
+  'chat.piPlan.implementingNotify': 'Wdrażanie zatwierdzonego planu. Pliki mogą zostać zmodyfikowane.',
   'chat.piPlan.draftHint': 'Plan zacznie się po wysłaniu.',
   'chat.piPlan.row.aria': 'Tryb Plan',
   'chat.piPlan.readySelect.title': 'Plan jest gotowy. Co dalej? Wdrożenie tutaj zachowa tę rozmowę planistyczną. Nowy start przeniesie tylko zatwierdzony plan do nowej sesji. Po wdrożeniu: plan pozostaje aktywny do /plan exit.',

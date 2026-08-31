@@ -2214,6 +2214,7 @@ export const dict = {
   'chat.piPlan.discardCancel': 'Keep plan',
   'chat.piPlan.discardConfirmAria': 'Discard plan confirmation',
   'chat.piPlan.enabledNotify': 'Plan mode enabled. I will explore and plan, but not modify files.',
+  'chat.piPlan.implementingNotify': 'Implementing the approved plan. Files may be modified.',
   'chat.piPlan.draftHint': 'Plan starts when you send.',
   'chat.piPlan.row.aria': 'Plan mode',
   'chat.piPlan.readySelect.title': 'Proposed plan ready. What next? Implement here keeps this planning conversation. Start fresh transfers only the approved plan to a new session. After Implement: Keep plan active until /plan exit.',

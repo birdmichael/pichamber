@@ -712,8 +712,13 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
               onKeyDown={(event) => {
                 event.stopPropagation();
                 if (event.key === 'Escape') {
+                  event.preventDefault();
                   handleCancelEdit();
                   return;
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleSaveEdit(renameDraft);
                 }
               }}
             />

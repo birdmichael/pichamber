@@ -152,10 +152,19 @@ export const resolveFooterPlanSelected = (input: {
 export const resolvePlanStatusRowHint = (input: {
   footerPlanSelected: boolean;
   draftOpen: boolean;
-}): 'draft' | 'enabled' | null => {
+  implementing?: boolean;
+  implemented?: boolean;
+}): 'draft' | 'enabled' | 'implementing' | null => {
+  if (input.implementing || input.implemented) return 'implementing';
   if (!input.footerPlanSelected) return null;
   return input.draftOpen ? 'draft' : 'enabled';
 };
+
+/** Keep Build clickable while the plan-ready select is waiting, even if the session is busy. */
+export const planBuildBusyDisabled = (input: {
+  busy: boolean;
+  hasPendingPlanReadySelect: boolean;
+}): boolean => input.busy && !input.hasPendingPlanReadySelect;
 
 /**
  * Last Agent/Plan choice for this empty composer.

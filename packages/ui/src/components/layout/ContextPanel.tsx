@@ -55,6 +55,11 @@ import {
   WORK_STATUS_REQUIRED_ROW_WIDTH,
 } from '@/lib/surfaces/chatColumnLayout';
 import { isContextPanelExpandedForMode } from '@/lib/surfaces/planRail';
+import {
+  EDITOR_PANE_MIN_WIDTH,
+  EDITOR_SPLIT_HANDLE_WIDTH,
+  clampEditorTreeWidth,
+} from '@/lib/surfaces/editorSplit';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -242,14 +247,12 @@ const browserFaviconFor = (url: string, faviconByOrigin: Record<string, string>)
   }
 };
 
-const EDITOR_TREE_MIN_WIDTH = 200;
-const EDITOR_TREE_MAX_WIDTH = 480;
-
 // The editor surface's file-tree column: docked on the right, resizable from
 // its left edge, and animated open/closed like the app sidebars.
-const EditorTreeColumn: React.FC<{ visible: boolean }> = ({ visible }) => {
+const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ visible, panelWidth }) => {
   const { t } = useI18n();
-  const width = useUIStore((state) => state.contextEditorTreeWidth);
+  const storedWidth = useUIStore((state) => state.contextEditorTreeWidth);
+  const width = clampEditorTreeWidth(storedWidth, panelWidth);
   const setWidth = useUIStore((state) => state.setContextEditorTreeWidth);
   const [isResizing, setIsResizing] = React.useState(false);
   const startXRef = React.useRef(0);
@@ -259,8 +262,8 @@ const EditorTreeColumn: React.FC<{ visible: boolean }> = ({ visible }) => {
   const columnRef = React.useRef<HTMLDivElement | null>(null);
 
   const clampTreeWidth = React.useCallback((value: number) => {
-    return Math.min(EDITOR_TREE_MAX_WIDTH, Math.max(EDITOR_TREE_MIN_WIDTH, Math.round(value)));
-  }, []);
+    return clampEditorTreeWidth(value, panelWidth);
+  }, [panelWidth]);
 
   const applyLiveTreeWidth = React.useCallback((nextWidth: number) => {
     const column = columnRef.current;
@@ -323,13 +326,13 @@ const EditorTreeColumn: React.FC<{ visible: boolean }> = ({ visible }) => {
     <div
       ref={columnRef}
       className={cn(
-        'relative h-full flex-shrink-0 overflow-hidden border-l border-border bg-background will-change-[width] motion-reduce:transition-none',
+        'relative h-full shrink-0 border-l border-border bg-background will-change-[width] motion-reduce:transition-none',
         !visible && 'border-l-0',
       )}
       style={{
         width: `${isResizing ? (liveWidthRef.current ?? appliedWidth) : appliedWidth}px`,
         ['--oc-editor-tree-width' as string]: `${isResizing ? (liveWidthRef.current ?? width) : width}px`,
-        overflowX: 'clip',
+        overflowX: 'visible',
         transitionProperty: isResizing ? 'none' : 'width',
         transitionDuration: '200ms',
         transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
@@ -339,9 +342,10 @@ const EditorTreeColumn: React.FC<{ visible: boolean }> = ({ visible }) => {
       {visible && (
         <div
           className={cn(
-            'absolute left-0 top-0 z-20 h-full w-[3px] cursor-col-resize transition-colors hover:bg-[var(--interactive-border)]/80',
+            'absolute left-0 top-0 z-20 h-full cursor-col-resize transition-colors hover:bg-[var(--interactive-border)]/80',
             isResizing && 'bg-[var(--interactive-border)]'
           )}
+          style={{ width: EDITOR_SPLIT_HANDLE_WIDTH, marginLeft: -EDITOR_SPLIT_HANDLE_WIDTH / 2 }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerEnd}
@@ -1160,7 +1164,7 @@ export const ContextPanel: React.FC = () => {
       <div className={cn('relative min-h-0 flex-1 overflow-hidden', isResizing && 'pointer-events-none')}>
         {hasFileTabs ? (
           <div className={cn('absolute inset-0 flex', isFileTabActive ? 'flex' : 'hidden')}>
-            <div className="h-full min-w-0 flex-1">
+            <div className="h-full min-w-0 flex-1" style={{ minWidth: EDITOR_PANE_MIN_WIDTH }}>
               {hasOpenEditorFile ? (
                 <React.Suspense fallback={null}><FilesView mode="editor-only" /></React.Suspense>
               ) : (
@@ -1171,7 +1175,7 @@ export const ContextPanel: React.FC = () => {
                 </div>
               )}
             </div>
-            <EditorTreeColumn visible={contextEditorTreeVisible} />
+            <EditorTreeColumn visible={contextEditorTreeVisible} panelWidth={width} />
           </div>
         ) : null}
         {activeChatTab && activeChatSessionID && activeChatSrc ? (

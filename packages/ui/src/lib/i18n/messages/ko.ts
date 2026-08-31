@@ -2216,6 +2216,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.discardCancel': '플랜 유지',
   'chat.piPlan.discardConfirmAria': '플랜 폐기 확인',
   'chat.piPlan.enabledNotify': '플랜 모드가 켜졌습니다. 탐색하고 계획하지만 파일은 수정하지 않습니다.',
+  'chat.piPlan.implementingNotify': '승인된 플랜을 구현하는 중입니다. 파일이 수정될 수 있습니다.',
   'chat.piPlan.draftHint': '보내면 Plan이 시작됩니다.',
   'chat.piPlan.row.aria': 'Plan 모드',
   'chat.piPlan.readySelect.title': '플랜이 준비되었습니다. 다음에 어떻게 할까요? 여기서 구현하면 이 계획 대화가 유지됩니다. 새로 시작하면 승인된 플랜만 새 세션으로 옮겨집니다. 구현 후: /plan exit 전까지 플랜이 활성 상태로 유지됩니다.',

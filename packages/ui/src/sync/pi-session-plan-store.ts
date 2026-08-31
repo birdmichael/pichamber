@@ -16,9 +16,14 @@ import {
 type PiSessionPlanState = {
   plansBySession: Record<string, SessionPlan>;
   pendingDraftPlanBySession: Record<string, true>;
+  implementedBySession: Record<string, true>;
 };
 
-const empty: PiSessionPlanState = { plansBySession: {}, pendingDraftPlanBySession: {} };
+const empty: PiSessionPlanState = {
+  plansBySession: {},
+  pendingDraftPlanBySession: {},
+  implementedBySession: {},
+};
 
 export const usePiSessionPlanStore = create<PiSessionPlanState>(() => empty);
 
@@ -57,6 +62,34 @@ export const clearPendingDraftPlan = (sessionID: string): void => {
   });
 };
 
+export const markPlanImplemented = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  usePiSessionPlanStore.setState((state) => ({
+    implementedBySession: {
+      ...state.implementedBySession,
+      [id]: true,
+    },
+  }));
+};
+
+export const clearPlanImplemented = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  usePiSessionPlanStore.setState((state) => {
+    if (!state.implementedBySession[id]) return state;
+    const implementedBySession = { ...state.implementedBySession };
+    delete implementedBySession[id];
+    return { implementedBySession };
+  });
+};
+
+export const isPlanImplemented = (sessionID?: string | null): boolean => {
+  const id = typeof sessionID === 'string' ? sessionID.trim() : '';
+  if (!id) return false;
+  return usePiSessionPlanStore.getState().implementedBySession[id] === true;
+};
+
 export const isPendingDraftPlan = (sessionID?: string | null): boolean => {
   const id = typeof sessionID === 'string' ? sessionID.trim() : '';
   if (!id) return false;
@@ -81,6 +114,7 @@ const shouldKeepPlanAgainstOff = (sessionID: string, incoming: SessionPlan | nul
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
   bumpPlanRevision(sessionID);
+  if (plan.status === 'off') clearPlanImplemented(sessionID);
   const previous = usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   usePiSessionPlanStore.setState((state) => ({
     plansBySession: {
@@ -128,10 +162,17 @@ export const dispatchSessionPlanAction = async (
   action: SessionPlanAction,
   options: { model?: string } = {},
 ): Promise<SessionPlan | null> => {
+  if (action === 'implement' && isPlanImplemented(sessionID)) {
+    return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
+  }
   try {
     if (await answerPendingPlanReadyPrompt(sessionID, action)) {
-      if (action === 'exit') clearPendingDraftPlan(sessionID);
+      if (action === 'exit') {
+        clearPendingDraftPlan(sessionID);
+        clearPlanImplemented(sessionID);
+      }
       if (action === 'implement') {
+        markPlanImplemented(sessionID);
         const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
         if (current && (current.status === 'ready' || current.status === 'saved')) {
           const next = {
@@ -149,8 +190,15 @@ export const dispatchSessionPlanAction = async (
   } catch {
     // Prompt already gone: fall through to POST /plan <action>.
   }
+  if (action === 'implement' && isPlanImplemented(sessionID)) {
+    return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
+  }
   const plan = await runSessionPlanAction(sessionID, action, options);
+  if (action === 'implement' && plan) {
+    markPlanImplemented(sessionID);
+  }
   if (action === 'start') {
+    clearPlanImplemented(sessionID);
     if (plan && isFooterPlanSelected(plan.status)) {
       applySessionPlan(sessionID, plan);
       clearPendingDraftPlan(sessionID);
@@ -161,6 +209,7 @@ export const dispatchSessionPlanAction = async (
   }
   if (action === 'exit') {
     clearPendingDraftPlan(sessionID);
+    clearPlanImplemented(sessionID);
   }
   applySessionPlan(sessionID, plan);
   return plan;
@@ -186,4 +235,10 @@ export const usePendingDraftPlan = (sessionID: string | null | undefined): boole
 
 export const useSessionPlan = (sessionID: string | null | undefined): SessionPlan | null => (
   usePiSessionPlanStore((state) => (sessionID ? state.plansBySession[sessionID] ?? null : null))
+);
+
+export const usePlanImplemented = (sessionID: string | null | undefined): boolean => (
+  usePiSessionPlanStore((state) => (
+    sessionID ? state.implementedBySession[sessionID] === true : false
+  ))
 );

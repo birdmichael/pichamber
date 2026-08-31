@@ -3491,6 +3491,9 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
+      // Magic-prompt chips attach a long synthetic instruction. Keep it for
+      // Pi, but the user bubble and session title stay the short visible line.
+      const visibleText = extractPromptText(body.parts, { includeSynthetic: false }) || text;
 
       // Capture liveness *before* this call marks busy. This invocation's own
       // status busy must not steer/followUp an idle first send.
@@ -3514,7 +3517,7 @@ export const createPiHost = ({
         sessionID,
         messageID: userMessageID,
         type: 'text',
-        text,
+        text: visibleText,
       }];
       for (const part of Array.isArray(body.parts) ? body.parts : []) {
         if (!part || part.type === 'text') continue;

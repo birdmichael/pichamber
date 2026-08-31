@@ -60,7 +60,7 @@ import { MobileThinkingButton } from './MobileThinkingButton';
 import { useCurrentSessionActivity, useSessionActivity } from '@/hooks/useSessionActivity';
 import { toast } from '@/components/ui';
 // useMessageStore removed — messages now come from sync system
-import { isVSCodeRuntime } from '@/lib/desktop';
+import { focusDesktopWindow, isDesktopShell, isVSCodeRuntime, requestFilesAccess } from '@/lib/desktop';
 import { useTabletLayout } from '@/lib/device';
 import { useHardwareKeyboard } from '@/lib/hardwareKeyboard';
 import { isIMECompositionEvent } from '@/lib/ime';
@@ -916,6 +916,21 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (newSessionDraftOpen) prefetchResponseStyleInstruction();
     }, [newSessionDraftOpen, isMobile]);
 
+    const isSettingsDialogOpen = useUIStore((state) => state.isSettingsDialogOpen);
+    const wasSettingsDialogOpenRef = React.useRef(false);
+    React.useEffect(() => {
+        if (wasSettingsDialogOpenRef.current && !isSettingsDialogOpen) {
+            void focusDesktopWindow();
+            requestAnimationFrame(() => composerRef.current?.focus());
+        }
+        wasSettingsDialogOpenRef.current = isSettingsDialogOpen;
+    }, [isSettingsDialogOpen]);
+
+    const handleAttachmentMenuOpenChange = React.useCallback((open: boolean) => {
+        if (open) return;
+        requestAnimationFrame(() => composerRef.current?.focus());
+    }, []);
+
     // Session activity for queue availability and controls. In btw mode the
     // composer controls the temporary fork, so the stop button and send-button
     // state follow the FORK's activity; the queue affordance stays tied to the
@@ -1375,7 +1390,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 try {
                     await sessionActions.waitForConnectionOrThrow();
                     const visibleText = await renderMagicPrompt(command.visiblePrompt, variables.visible);
-                    const instructionsText = await renderMagicPrompt(command.instructionsPrompt, variables.instructions);
+                    const instructionsText = wrapSystemReminder(
+                        await renderMagicPrompt(command.instructionsPrompt, variables.instructions),
+                    );
                     startPendingTurn(visibleText, []);
                     await sendMessage(
                         visibleText,
@@ -2551,6 +2568,21 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             void handleVSCodePickFiles();
             return;
         }
+        if (isDesktopShell()) {
+            void (async () => {
+                const result = await requestFilesAccess();
+                if (result.success && result.files?.length) {
+                    const inputStore = useInputStore.getState();
+                    for (const file of result.files) {
+                        const filename = file.path.replace(/\\/g, '/').split('/').pop() || 'file';
+                        inputStore.addLocalPathAttachment(file.path, filename, null);
+                    }
+                }
+                void focusDesktopWindow();
+                composerRef.current?.focus();
+            })();
+            return;
+        }
         fileInputRef.current?.click();
     }, [handleVSCodePickFiles]);
 
@@ -3137,6 +3169,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                         isPermissionAutoAcceptInteractive={isPermissionAutoAcceptInteractive}
                         dictationActive={mobileShell.dictationActive}
                         onOpenSettings={onOpenSettings}
+                        onAttachmentMenuOpenChange={handleAttachmentMenuOpenChange}
                         onPickLocalFiles={handlePickLocalFiles}
                         onOpenIssuePicker={openIssuePicker}
                         onOpenPrPicker={openPrPicker}

@@ -79,6 +79,10 @@ export const isPlanReadyDecisionPrompt = (prompt: {
   });
 };
 
+export const sessionHasPendingPlanReadySelect = (
+  prompts: ReadonlyArray<{ kind: string; status?: string; title?: string; options?: readonly string[] }> | undefined,
+): boolean => (prompts ?? []).some((prompt) => isPlanReadyDecisionPrompt(prompt));
+
 export type PlanReadyRailAction = 'implement' | 'save' | 'exit';
 
 const PLAN_READY_OPTION_BY_ACTION: Record<PlanReadyRailAction, string> = {

@@ -798,4 +798,13 @@ describe('prompt extractors', () => {
       data: 'xyz',
     }]);
   });
+
+  it('omits synthetic instruction parts from the visible user prompt', () => {
+    const parts = [
+      { type: 'text', text: 'Help me set up a scheduled task.' },
+      { type: 'text', text: 'The user wants to set up a scheduled task that OpenChamber runs.', synthetic: true },
+    ];
+    expect(extractPromptText(parts)).toContain('The user wants to set up a scheduled task');
+    expect(extractPromptText(parts, { includeSynthetic: false })).toBe('Help me set up a scheduled task.');
+  });
 });

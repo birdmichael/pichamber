@@ -580,10 +580,12 @@ export const createEventTranslator = ({
   };
 };
 
-export const extractPromptText = (parts) => {
+export const extractPromptText = (parts, options = {}) => {
   if (!Array.isArray(parts)) return '';
+  const includeSynthetic = options.includeSynthetic !== false;
   return parts
     .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+    .filter((part) => includeSynthetic || !part.synthetic)
     .map((part) => part.text)
     .join('\n')
     .trim();
