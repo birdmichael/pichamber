@@ -102,10 +102,11 @@ function shouldPreserveExistingPart(previous: Part, next: Part): boolean {
  * and later LLM calls. That leftover-busy state must not be treated as idle.
  * Idle is `agent_settled` (`session.idle`) or an abort/error that ended the child.
  */
-export function idleLeftoverBusyAfterSettledAssistant(_input?: {
+export function idleLeftoverBusyAfterSettledAssistant(input?: {
   status?: { type?: string } | null
   lastMessage?: { role?: string; time?: { created?: number; completed?: number } } | null
 }): boolean {
+  void input
   return false
 }
 
