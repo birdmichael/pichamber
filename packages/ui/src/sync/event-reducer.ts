@@ -104,7 +104,7 @@ function shouldPreserveExistingPart(previous: Part, next: Part): boolean {
  */
 export function idleLeftoverBusyAfterSettledAssistant(_input?: {
   status?: { type?: string } | null
-  lastMessage?: { role?: string; time?: { completed?: number } } | null
+  lastMessage?: { role?: string; time?: { created?: number; completed?: number } } | null
 }): boolean {
   return false
 }
