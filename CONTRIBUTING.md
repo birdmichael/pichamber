@@ -1,10 +1,12 @@
-# Contributing to OpenChamber
+# Contributing to Pichamber
+
+Pichamber is a macOS Desktop (Electron) app on an in-process Pi kernel. Web is for backend testing. Land one verified feature per pull request on [`birdmichael/pichamber`](https://github.com/birdmichael/pichamber). Do not open PRs against upstream [`openchamber/openchamber`](https://github.com/openchamber/openchamber).
 
 ## Getting Started
 
 ```bash
-git clone https://github.com/openchamber/openchamber.git
-cd openchamber
+git clone https://github.com/birdmichael/pichamber.git
+cd pichamber
 bun install
 ```
 
@@ -31,7 +33,7 @@ bun run electron:dev:bundled  # Electron shell using built web assets
 bun run electron:build        # Package desktop app for the current platform
 ```
 
-Desktop supports macOS, Windows, and Linux. The build output is written to `packages/electron/dist`.
+The product target is **macOS Desktop**. Windows and Linux builds exist, but they are not the primary surface. The build output is written to `packages/electron/dist`.
 
 macOS builds create `dmg` and `zip` files. You need Xcode/build tools for notarized packaging and icon asset work.
 
@@ -106,7 +108,7 @@ OPENCHAMBER_TARGET_ARCH=arm64 bun run electron:build
 bun run --cwd packages/electron verify:linux-appimage
 ```
 
-The final AppImage verifier checks desktop identity and the architecture of Electron, the bundled OpenCode CLI, and packaged native modules.
+The final AppImage verifier checks desktop identity and the architecture of Electron and packaged native modules. The leftover OpenCode CLI extraResource is only present when packaging the OpenCode kernel path.
 
 ## Before Submitting
 
@@ -261,4 +263,4 @@ You can still help:
 
 ## Questions?
 
-Open an [issue](https://github.com/openchamber/openchamber/issues) or ask in [Discord](https://discord.gg/ZYRSdnwwKA).
+Open an [issue](https://github.com/birdmichael/pichamber/issues).
