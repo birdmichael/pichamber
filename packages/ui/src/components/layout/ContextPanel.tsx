@@ -56,9 +56,9 @@ import {
 } from '@/lib/surfaces/chatColumnLayout';
 import { isContextPanelExpandedForMode } from '@/lib/surfaces/planRail';
 import {
-  EDITOR_PANE_MIN_WIDTH,
   EDITOR_SPLIT_HANDLE_WIDTH,
   clampEditorTreeWidth,
+  editorTreeWidthFromDrag,
 } from '@/lib/surfaces/editorSplit';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
@@ -249,21 +249,41 @@ const browserFaviconFor = (url: string, faviconByOrigin: Record<string, string>)
 
 // The editor surface's file-tree column: docked on the right, resizable from
 // its left edge, and animated open/closed like the app sidebars.
-const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ visible, panelWidth }) => {
+const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ visible, panelWidth: fallbackWidth }) => {
   const { t } = useI18n();
   const storedWidth = useUIStore((state) => state.contextEditorTreeWidth);
-  const width = clampEditorTreeWidth(storedWidth, panelWidth);
   const setWidth = useUIStore((state) => state.setContextEditorTreeWidth);
+  const [measuredWidth, setMeasuredWidth] = React.useState(0);
   const [isResizing, setIsResizing] = React.useState(false);
   const startXRef = React.useRef(0);
-  const startWidthRef = React.useRef(width);
+  const startWidthRef = React.useRef(0);
   const liveWidthRef = React.useRef<number | null>(null);
   const pointerIDRef = React.useRef<number | null>(null);
   const columnRef = React.useRef<HTMLDivElement | null>(null);
+  const panelWidth = measuredWidth > 0 ? measuredWidth : fallbackWidth;
+  const width = clampEditorTreeWidth(storedWidth, panelWidth);
+  const panelWidthRef = React.useRef(panelWidth);
+  const widthRef = React.useRef(width);
+  panelWidthRef.current = panelWidth;
+  widthRef.current = width;
 
-  const clampTreeWidth = React.useCallback((value: number) => {
-    return clampEditorTreeWidth(value, panelWidth);
-  }, [panelWidth]);
+  // Measure the files row, not the logical context-panel width. The panel
+  // CSS `min(var(--oc-context-panel-width), calc(100% - reserved))` is often
+  // narrower than `width`, and clamping against the larger number lets the
+  // tree think it has 240px while the editor min-width leaves ~60px visible.
+  React.useLayoutEffect(() => {
+    const parent = columnRef.current?.parentElement;
+    if (!parent || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const update = () => {
+      setMeasuredWidth(parent.clientWidth);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, []);
 
   const applyLiveTreeWidth = React.useCallback((nextWidth: number) => {
     const column = columnRef.current;
@@ -278,47 +298,70 @@ const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ 
     if (!visible) {
       return;
     }
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // ignore
-    }
     pointerIDRef.current = event.pointerId;
     setIsResizing(true);
     startXRef.current = event.clientX;
     startWidthRef.current = width;
     liveWidthRef.current = width;
+    document.documentElement.style.cursor = 'col-resize';
     event.preventDefault();
   };
 
-  const handlePointerMove = (event: React.PointerEvent) => {
-    if (!isResizing || pointerIDRef.current !== event.pointerId) {
-      return;
-    }
-    const delta = startXRef.current - event.clientX;
-    const nextWidth = clampTreeWidth(startWidthRef.current + delta);
-    if (liveWidthRef.current === nextWidth) {
-      return;
-    }
-    liveWidthRef.current = nextWidth;
-    applyLiveTreeWidth(nextWidth);
-  };
-
-  const handlePointerEnd = (event: React.PointerEvent) => {
-    if (pointerIDRef.current !== event.pointerId) {
-      return;
-    }
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // ignore
-    }
-    const finalWidth = clampTreeWidth(liveWidthRef.current ?? width);
+  const finishTreeResize = React.useCallback(() => {
+    const finalWidth = clampEditorTreeWidth(liveWidthRef.current ?? widthRef.current, panelWidthRef.current);
     pointerIDRef.current = null;
     liveWidthRef.current = null;
+    document.documentElement.style.cursor = '';
     setIsResizing(false);
     setWidth(finalWidth);
-  };
+  }, [setWidth]);
+
+  // Window-level drag: pointer capture on the 8px handle is unreliable over
+  // CodeMirror, and handle-only pointermove looks like a no-op.
+  React.useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const handleMove = (event: PointerEvent) => {
+      if (pointerIDRef.current !== event.pointerId) {
+        return;
+      }
+      const nextWidth = editorTreeWidthFromDrag(
+        startWidthRef.current,
+        startXRef.current,
+        event.clientX,
+        panelWidthRef.current,
+      );
+      if (liveWidthRef.current === nextWidth) {
+        return;
+      }
+      liveWidthRef.current = nextWidth;
+      applyLiveTreeWidth(nextWidth);
+    };
+
+    const handleUp = (event: PointerEvent) => {
+      if (pointerIDRef.current !== event.pointerId) {
+        return;
+      }
+      finishTreeResize();
+    };
+
+    const handleWindowBlur = () => {
+      finishTreeResize();
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [applyLiveTreeWidth, finishTreeResize, isResizing]);
 
   const appliedWidth = visible ? width : 0;
 
@@ -342,14 +385,11 @@ const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ 
       {visible && (
         <div
           className={cn(
-            'absolute left-0 top-0 z-20 h-full cursor-col-resize transition-colors hover:bg-[var(--interactive-border)]/80',
+            'absolute left-0 top-0 z-20 h-full cursor-col-resize touch-none transition-colors hover:bg-[var(--interactive-border)]/80',
             isResizing && 'bg-[var(--interactive-border)]'
           )}
           style={{ width: EDITOR_SPLIT_HANDLE_WIDTH, marginLeft: -EDITOR_SPLIT_HANDLE_WIDTH / 2 }}
           onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
           role="separator"
           aria-orientation="vertical"
           aria-label={t('contextPanel.actions.resizePanelAria')}
@@ -357,7 +397,7 @@ const EditorTreeColumn: React.FC<{ visible: boolean; panelWidth: number }> = ({ 
       )}
       <div
         className={cn(
-          'relative z-10 h-full shrink-0 transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+          'relative z-10 h-full min-w-0 shrink-0 overflow-hidden transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
           isResizing && 'pointer-events-none',
           !visible && 'pointer-events-none select-none opacity-0'
         )}
@@ -1164,7 +1204,7 @@ export const ContextPanel: React.FC = () => {
       <div className={cn('relative min-h-0 flex-1 overflow-hidden', isResizing && 'pointer-events-none')}>
         {hasFileTabs ? (
           <div className={cn('absolute inset-0 flex', isFileTabActive ? 'flex' : 'hidden')}>
-            <div className="h-full min-w-0 flex-1" style={{ minWidth: EDITOR_PANE_MIN_WIDTH }}>
+            <div className="h-full min-w-0 flex-1">
               {hasOpenEditorFile ? (
                 <React.Suspense fallback={null}><FilesView mode="editor-only" /></React.Suspense>
               ) : (
