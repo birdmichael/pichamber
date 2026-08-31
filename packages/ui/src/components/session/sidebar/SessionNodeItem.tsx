@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { isSessionPinned, type SessionPinnedTarget } from '@/stores/useSessionPinnedStore';
 import { Icon } from "@/components/icon/Icon";
-import { buildExportFilename, downloadAsMarkdown, downloadTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
+import { buildExportFilename, downloadAsMarkdown, exportFiltersForFormat, exportSessionTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
@@ -647,7 +647,30 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
       const match = disposition.match(/filename="([^"]+)"/i);
       const filename = match?.[1] || `${buildExportFilename(resolvedSession.title ?? null).replace(/\.md$/, '')}.${format}`;
       const mime = format === 'html' ? 'text/html;charset=utf-8' : 'application/x-ndjson;charset=utf-8';
-      downloadTextFile(content, filename, mime);
+      const result = await exportSessionTextFile({
+        content,
+        filename,
+        mime,
+        filters: exportFiltersForFormat(format),
+      });
+      if (result.status === 'canceled') {
+        return;
+      }
+      if (result.status === 'saved') {
+        toast.success(t('sessions.sidebar.session.export.success'), {
+          action: {
+            label: t(getExportRevealLabelKey()),
+            onClick: () => {
+              void revealExportedMarkdown(result.path).then((revealed) => {
+                if (!revealed) {
+                  toast.error(t('sessions.sidebar.session.export.failedRevealPath'));
+                }
+              });
+            },
+          },
+        });
+        return;
+      }
       toast.success(t('sessions.sidebar.session.export.success'));
     } catch {
       toast.error(t('sessions.sidebar.session.export.failed'));

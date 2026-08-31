@@ -1,7 +1,8 @@
 import type { Message, Part } from '@opencode-ai/sdk/v2';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { getCurrentIntlLocale } from '@/lib/i18n';
-import { isVSCodeRuntime, openDesktopPath, revealDesktopPath, saveDesktopMarkdownFile } from '@/lib/desktop';
+import { canSaveDesktopTextFile, isVSCodeRuntime, openDesktopPath, revealDesktopPath, saveDesktopMarkdownFile, saveDesktopTextFile } from '@/lib/desktop';
+import { exportSessionTextFile as exportSessionTextFileWithDeps, type SessionTextExportFilter, type SessionTextExportResult } from '@/lib/exportSessionSave';
 import { getRevealLabelKey } from '@/lib/utils';
 
 type SessionMessageRecord = { info: Message; parts: Part[] };
@@ -202,4 +203,19 @@ export function downloadTextFile(content: string, filename: string, mime = 'text
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+export { exportFiltersForFormat } from '@/lib/exportSessionSave';
+
+export async function exportSessionTextFile(input: {
+  content: string;
+  filename: string;
+  mime: string;
+  filters?: SessionTextExportFilter[];
+}): Promise<SessionTextExportResult> {
+  return exportSessionTextFileWithDeps(input, {
+    canSaveDesktop: canSaveDesktopTextFile,
+    saveDesktop: ({ filename, content, filters }) => saveDesktopTextFile(filename, content, filters),
+    download: downloadTextFile,
+  });
 }

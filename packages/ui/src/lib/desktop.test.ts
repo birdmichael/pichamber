@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { isBrowserClientRuntime, saveDesktopImageFile } from './desktop';
+import { canSaveDesktopTextFile, isBrowserClientRuntime, saveDesktopImageFile, saveDesktopTextFile } from './desktop';
 
 const PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgo=';
 
@@ -75,3 +75,46 @@ describe('saveDesktopImageFile', () => {
   });
 });
 
+describe('saveDesktopTextFile', () => {
+  test('is unavailable without a desktop invoke bridge', () => {
+    expect(canSaveDesktopTextFile()).toBe(false);
+  });
+
+  test('returns null when desktop invoke is unavailable', async () => {
+    expect(await saveDesktopTextFile('session.jsonl', '{"ok":true}\n', [{ name: 'JSONL', extensions: ['jsonl'] }])).toBeNull();
+  });
+
+  test('invokes desktop_save_text_file and returns the written path', async () => {
+    const calls: Array<{ cmd: string; args: Record<string, unknown> }> = [];
+    const path = await withLocalDesktopBridge(async (cmd, args) => {
+      calls.push({ cmd, args });
+      return '/tmp/session.jsonl';
+    }, async () => {
+      expect(canSaveDesktopTextFile()).toBe(true);
+      return saveDesktopTextFile('session.jsonl', '{"ok":true}\n', [{ name: 'JSONL', extensions: ['jsonl'] }]);
+    });
+
+    expect(path).toBe('/tmp/session.jsonl');
+    expect(calls).toEqual([{
+      cmd: 'desktop_save_text_file',
+      args: {
+        defaultFileName: 'session.jsonl',
+        content: '{"ok":true}\n',
+        filters: [{ name: 'JSONL', extensions: ['jsonl'] }],
+      },
+    }]);
+  });
+
+  test('returns null when the save dialog is canceled', async () => {
+    const path = await withLocalDesktopBridge(async () => null, () => (
+      saveDesktopTextFile('session.html', '<html></html>', [{ name: 'HTML', extensions: ['html'] }])
+    ));
+    expect(path).toBeNull();
+  });
+
+  test('rethrows a write failure from the main process', async () => {
+    await expect(withLocalDesktopBridge(async () => {
+      throw new Error('disk full');
+    }, () => saveDesktopTextFile('session.jsonl', '{"ok":true}\n'))).rejects.toThrow('disk full');
+  });
+});
