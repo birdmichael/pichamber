@@ -32,7 +32,9 @@ of those ids onto workspace tabs; see Mobile tabs.
   flip `pr` to `always`: a blank or non-git session must not grow an empty
   PR tab. Desktop Git still opens the create-PR form from the Git header
   when the session is a git repo and no PR exists yet. The numbered chip
-  still opens an existing PR.
+  still opens an existing PR. Detached HEAD is not a pushable local
+  branch: the PR panel explains that a branch is required and Create
+  stays disabled until HEAD is a real local ref.
 - `defaultWidthFraction` is the panel width as a fraction of the content area,
   used until the user manually resizes that surface (manual widths are stored
   per mode in `useUIStore.contextPanelByDirectory[dir].widthByMode`).

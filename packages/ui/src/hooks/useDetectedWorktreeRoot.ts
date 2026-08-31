@@ -59,9 +59,9 @@ export function useDetectedWorktreeMetadata(
         return;
       }
 
-      const branch = currentBranch || '';
+      const branch = currentBranch && currentBranch !== 'HEAD' ? currentBranch : '';
       const name = worktreePath.split('/').filter(Boolean).pop() || worktreePath;
-      const headState = !branch ? 'unborn' : 'branch';
+      const headState = currentBranch === 'HEAD' ? 'detached' : !branch ? 'unborn' : 'branch';
 
       setDetected({
         source: 'sdk',

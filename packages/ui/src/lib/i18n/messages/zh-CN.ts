@@ -1088,6 +1088,7 @@ export const dict: Record<I18nKey, string> = {
   'gitView.pr.toast.titleRequired': '标题不能为空',
   'gitView.pr.toast.updatePrFailed': '更新拉取请求失败',
   'gitView.pullRequest.createHint': '从当前分支创建并管理拉取请求。',
+  'gitView.pullRequest.detachedHeadHint': '当前为分离的 HEAD，请先创建分支。',
   'gitView.pullRequest.availableOnFeatureBranches': '当前分支可以打开 PR 时可用。',
   'gitView.pullRequest.title': '拉取请求',
   'gitView.tabs.worktree': 'worktree',

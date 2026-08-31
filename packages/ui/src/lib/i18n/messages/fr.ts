@@ -907,6 +907,7 @@ export const dict = {
   'gitView.pr.toast.titleRequired': 'Le titre est requis',
   'gitView.pr.toast.updatePrFailed': 'Échec de la mise à jour de la PR',
   'gitView.pullRequest.createHint': 'Créez et gérez les PR depuis cette branche.',
+  'gitView.pullRequest.detachedHeadHint': 'HEAD détaché — créez d\'abord une branche.',
   'gitView.pullRequest.availableOnFeatureBranches': 'Disponible lorsque la branche actuelle peut ouvrir une PR.',
   'gitView.pullRequest.title': 'PR',
   'gitView.tabs.worktree': 'Worktree',

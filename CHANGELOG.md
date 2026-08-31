@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Git: on detached HEAD, the pull request panel asks you to create a branch instead of offering Create PR with HEAD as the local branch.
+
 ## [1.2.7] - 2026-09-01
 
 - **Desktop:** Mini Chat Window loads the Vite UI origin, not the API sidecar, so New Mini Chat no longer 404s with “Static files not found” during `electron:dev`.

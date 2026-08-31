@@ -1007,6 +1007,7 @@ export const dict = {
   'gitView.pr.toast.titleRequired': 'Titel ist erforderlich',
   'gitView.pr.toast.updatePrFailed': 'Fehler beim Aktualisieren des Pull-Requests',
   'gitView.pullRequest.createHint': 'Erstelle und verwalte Pull-Requests aus diesem Branch.',
+  'gitView.pullRequest.detachedHeadHint': 'Detached HEAD — zuerst einen Branch erstellen.',
   'gitView.pullRequest.availableOnFeatureBranches': 'Verfügbar, wenn der aktuelle Branch einen Pull-Request öffnen kann.',
   'gitView.pullRequest.title': 'Pull-Request',
   'gitView.tabs.worktree': 'Worktree',

@@ -1100,6 +1100,7 @@ export const dict: Record<I18nKey, string> = {
   'gitView.pr.toast.titleRequired': '標題不能為空',
   'gitView.pr.toast.updatePrFailed': '更新 Pull Request 失敗',
   'gitView.pullRequest.createHint': '從目前分支建立並管理 Pull Request。',
+  'gitView.pullRequest.detachedHeadHint': '目前為分離的 HEAD，請先建立分支。',
   'gitView.pullRequest.availableOnFeatureBranches': '目前分支可以開啟 PR 時可用。',
   'gitView.pullRequest.title': 'Pull Request',
   'gitView.tabs.worktree': 'Worktree',

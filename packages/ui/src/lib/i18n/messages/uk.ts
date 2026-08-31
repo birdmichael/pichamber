@@ -1088,6 +1088,7 @@ export const dict: Record<I18nKey, string> = {
   "gitView.pr.toast.titleRequired": "Необхідно вказати назву",
   "gitView.pr.toast.updatePrFailed": "Не вдалося оновити PR",
   "gitView.pullRequest.createHint": "Створюйте PR з цієї гілки та керуйте ними.",
+  "gitView.pullRequest.detachedHeadHint": "Відокремлений HEAD — спочатку створіть гілку.",
   "gitView.pullRequest.availableOnFeatureBranches": "Доступно, коли поточна гілка може відкрити PR.",
   "gitView.pullRequest.title": "PR",
   "gitView.tabs.worktree": "Worktree",
