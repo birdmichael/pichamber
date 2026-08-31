@@ -28,8 +28,10 @@ const {
   applySessionPlan,
   applySessionPlanEvent,
   dispatchSessionPlanAction,
+  isPlanImplemented,
   refreshSessionPlan,
   resetPiSessionPlanStore,
+  settleSessionPlanImplementing,
   usePiSessionPlanStore,
 } = await import('./pi-session-plan-store');
 const { applyPiExtensionUiPrompt, resetPiExtensionUiStore } = await import('./pi-extension-ui-store');
@@ -136,6 +138,49 @@ describe('pi session plan store', () => {
     pendingFetch?.resolve({ status: 'ready', planMarkdown: '# Ready' });
     await refreshReady;
     expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('implementing');
+  });
+
+  test('agent_settled clears implementing; leftover GET implementing does not restore building chrome', async () => {
+    applySessionPlan('ses_plan', { status: 'ready', planMarkdown: '# Ready' });
+    applyPiExtensionUiPrompt({
+      id: 'pui_ready',
+      sessionID: 'ses_plan',
+      kind: 'select',
+      title: 'Proposed plan ready. What next?',
+      options: ['Implement here', 'Start fresh and implement'],
+      status: 'pending',
+    });
+
+    await dispatchSessionPlanAction('ses_plan', 'implement');
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('implementing');
+    expect(isPlanImplemented('ses_plan')).toBe(true);
+
+    settleSessionPlanImplementing('ses_plan');
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('off');
+    expect(isPlanImplemented('ses_plan')).toBe(true);
+
+    applySessionPlanEvent({
+      sessionID: 'ses_plan',
+      plan: { status: 'ready', planMarkdown: '# Ready' },
+    });
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('off');
+
+    applySessionPlanEvent({
+      sessionID: 'ses_plan',
+      plan: { status: 'implementing', planMarkdown: '# Ready' },
+    });
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('off');
+
+    const refreshOff = refreshSessionPlan('ses_plan');
+    pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
+    await refreshOff;
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('off');
+    expect(isPlanImplemented('ses_plan')).toBe(true);
+
+    const refreshImplementing = refreshSessionPlan('ses_plan');
+    pendingFetch?.resolve({ status: 'implementing', planMarkdown: '# Ready' });
+    await refreshImplementing;
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('off');
   });
 
   test('Q&A non-implement options still skip the implementing write', async () => {

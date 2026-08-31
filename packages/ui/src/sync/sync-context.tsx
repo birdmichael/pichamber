@@ -41,7 +41,7 @@ import { applySessionEventToGlobalSessions } from "./session-event-router"
 import { handlePiExtensionUiEvent, isPiExtensionUiEventType } from "./pi-extension-ui-events"
 import { handlePiSessionPlanEvent, isPiSessionPlanEventType } from "./pi-session-plan-events"
 import { isPiPlanPluginAvailable, usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
-import { refreshSessionPlan } from "./pi-session-plan-store"
+import { refreshSessionPlan, settleSessionPlanImplementing } from "./pi-session-plan-store"
 import { syncDebug } from "./debug"
 import { getReconnectCandidateSessionIds, mergeBootstrapSessions } from "./reconnect-recovery"
 import { messagesBefore } from "./message-ordering"
@@ -1482,8 +1482,11 @@ export function handleEvent(
 
   if (payload.type === "session.idle") {
     const idleSessionID = getSessionIdFromPayload(payload)
-    if (idleSessionID && isPiPlanPluginAvailable(usePiFeaturePluginsStore.getState().payload)) {
-      void refreshSessionPlan(idleSessionID)
+    if (idleSessionID) {
+      settleSessionPlanImplementing(idleSessionID)
+      if (isPiPlanPluginAvailable(usePiFeaturePluginsStore.getState().payload)) {
+        void refreshSessionPlan(idleSessionID)
+      }
     }
   }
 
