@@ -3,6 +3,8 @@ import {
   getGitBranches,
   getGitStatus,
   gitFetch,
+  GitDirectoriesUnsupportedError,
+  listGitDirectories,
   stageGitFile,
   stageGitFiles,
   unstageGitFile,
@@ -181,5 +183,29 @@ describe('gitApiHttp request priority', () => {
     } finally {
       restoreMocks();
     }
+  });
+});
+
+
+describe('gitApiHttp nested git directories', () => {
+  test('throws GitDirectoriesUnsupportedError on 501', async () => {
+    installWindowMock();
+    globalThis.fetch = (async () => new Response('not implemented', { status: 501 })) as typeof fetch;
+    const error = await captureError(async () => {
+      await listGitDirectories('/workspace');
+    });
+    restoreMocks();
+    expect(error).toBeInstanceOf(GitDirectoriesUnsupportedError);
+  });
+
+  test('returns normalized repository paths', async () => {
+    installWindowMock();
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      path: '/workspace',
+      repositories: [{ path: '/workspace/proj-a', name: 'proj-a' }, { path: '/workspace/proj-b\\', name: 'proj-b' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch;
+    const repos = await listGitDirectories('/workspace');
+    restoreMocks();
+    expect(repos).toEqual(['/workspace/proj-a', '/workspace/proj-b']);
   });
 });

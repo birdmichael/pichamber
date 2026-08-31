@@ -1,7 +1,22 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { GitStatus } from '@/lib/api/types';
 import { useGitStore } from './useGitStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+
+
+// The real transport has no server in tests and fails as a generic error.
+// Tests that exercise other failure modes swap this implementation; the
+// default keeps every pre-existing expectation (generic failure → null).
+const listGitDirectoriesControl: { impl: (root: string) => Promise<string[]> } = {
+  impl: async () => {
+    throw new Error('network unavailable');
+  },
+};
+class TestGitDirectoriesUnsupportedError extends Error {}
+mock.module('@/lib/gitApiHttp', () => ({
+  GitDirectoriesUnsupportedError: TestGitDirectoriesUnsupportedError,
+  listGitDirectories: (root: string) => listGitDirectoriesControl.impl(root),
+}));
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -333,5 +348,125 @@ describe('useGitStore', () => {
     useGitStore.getState().restoreStatus('/repo', previousStatus);
 
     expect(useGitStore.getState().getDirectoryState('/repo')?.status).toBe(initialStatus);
+  });
+});
+
+describe('useGitStore nested repository discovery', () => {
+  beforeEach(() => {
+    listGitDirectoriesControl.impl = async () => {
+      throw new Error('network unavailable');
+    };
+    useGitStore.getState().resetForRuntimeSwitch(getRuntimeKey());
+  });
+
+  test('selects a nested repo per root and persists the selection', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/repo-one');
+
+    expect(useGitStore.getState().nestedRepoSelection.get('/root-a')).toBe('/root-a/repo-one');
+
+    // Re-seeding from storage (as a page refresh would) restores the pick.
+    useGitStore.getState().resetForRuntimeSwitch(getRuntimeKey());
+    expect(useGitStore.getState().nestedRepoSelection.get('/root-a')).toBe('/root-a/repo-one');
+  });
+
+  test('keeps selections isolated per root', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/one');
+    useGitStore.getState().selectNestedRepo('/root-b', '/root-b/two');
+
+    expect(useGitStore.getState().nestedRepoSelection.get('/root-a')).toBe('/root-a/one');
+    expect(useGitStore.getState().nestedRepoSelection.get('/root-b')).toBe('/root-b/two');
+  });
+
+  test('clears only the given root selection', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/one');
+    useGitStore.getState().selectNestedRepo('/root-b', '/root-b/two');
+
+    useGitStore.getState().clearNestedRepoSelection('/root-a');
+
+    expect(useGitStore.getState().nestedRepoSelection.has('/root-a')).toBe(false);
+    expect(useGitStore.getState().nestedRepoSelection.get('/root-b')).toBe('/root-b/two');
+  });
+
+  test('remembers a stale-cleared repository so auto-select can skip it', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/one');
+    useGitStore.getState().selectNestedRepo('/root-b', '/root-b/two');
+
+    useGitStore.getState().clearNestedRepoSelection('/root-a');
+    useGitStore.getState().clearNestedRepoSelection('/root-b');
+    useGitStore.getState().clearNestedRepoSelection('/root-b');
+
+    const clearedA = useGitStore.getState().staleClearedSelections.get('/root-a');
+    const clearedB = useGitStore.getState().staleClearedSelections.get('/root-b');
+    expect(clearedA).toEqual(new Set(['/root-a/one']));
+    // Repeated clears of the same path stay a set, not an ever-growing list.
+    expect(clearedB).toEqual(new Set(['/root-b/two']));
+  });
+
+  test('runtime switch clears stale-cleared memory with the rest', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/one');
+    useGitStore.getState().clearNestedRepoSelection('/root-a');
+
+    useGitStore.getState().resetForRuntimeSwitch('runtime-b');
+
+    expect(useGitStore.getState().staleClearedSelections.size).toBe(0);
+  });
+
+  test('runtime switch does not leak selections or discovery across runtimes', () => {
+    useGitStore.getState().selectNestedRepo('/root-a', '/root-a/one');
+    useGitStore.setState({ nestedReposByRoot: new Map([['/root-a', ['/root-a/one']]]) });
+
+    useGitStore.getState().resetForRuntimeSwitch('runtime-b');
+
+    expect(useGitStore.getState().nestedRepoSelection.size).toBe(0);
+    expect(useGitStore.getState().nestedReposByRoot.size).toBe(0);
+  });
+
+  test('discards an in-flight discovery result when the runtime switches', async () => {
+    const stale = useGitStore.getState().ensureNestedRepos('/root-a');
+    useGitStore.getState().resetForRuntimeSwitch('runtime-b');
+    await stale;
+
+    // The old runtime's late completion must not repopulate the cleared map.
+    expect(useGitStore.getState().nestedReposByRoot.has('/root-a')).toBe(false);
+
+    // Discovery started under the new runtime still commits normally.
+    await useGitStore.getState().ensureNestedRepos('/root-a');
+    expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBeNull();
+  });
+
+  test('marks discovery failure as a failed marker, not an empty success', async () => {
+    await useGitStore.getState().ensureNestedRepos('/root-a');
+
+    expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBeNull();
+  });
+
+  test('marks a 501 runtime as unsupported instead of failed', async () => {
+    listGitDirectoriesControl.impl = async () => {
+      throw new TestGitDirectoriesUnsupportedError();
+    };
+
+    await useGitStore.getState().ensureNestedRepos('/root-a');
+
+    expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBe('unsupported');
+  });
+
+  test('unsupported does not clobber a previous successful discovery', async () => {
+    listGitDirectoriesControl.impl = async () => ['/root-a/one'];
+    await useGitStore.getState().ensureNestedRepos('/root-a');
+
+    listGitDirectoriesControl.impl = async () => {
+      throw new TestGitDirectoriesUnsupportedError();
+    };
+    await useGitStore.getState().ensureNestedRepos('/root-a', { force: true });
+
+    expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toEqual(['/root-a/one']);
+  });
+
+  test('dedupes concurrent discovery runs for the same root', async () => {
+    const first = useGitStore.getState().ensureNestedRepos('/root-a');
+    const second = useGitStore.getState().ensureNestedRepos('/root-a');
+    await Promise.all([first, second]);
+
+    expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBeNull();
   });
 });
