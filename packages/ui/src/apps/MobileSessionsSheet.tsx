@@ -52,6 +52,7 @@ import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { toast } from '@/components/ui';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { MOBILE_SESSION_CHROME_KEYS } from './mobileSessionChromeKeys';
+import { shouldStartMobileNewChatOnPointerDown } from './mobileNewChatOpen';
 import { getProjectLabel, normalizePath } from './mobilePaths';
 import { useAssistantStatus } from '@/hooks/useAssistantStatus';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
@@ -1365,6 +1366,8 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
   };
 
   const handleStartNewChat = () => {
+    // Bare draft: this control is the Chats "+ new chat", not a project New
+    // session. Do not inherit the last project / directory.
     openNewSessionDraft();
     onOpenChange(false);
   };
@@ -1535,7 +1538,21 @@ export const MobileSessionsSheet: React.FC<MobileSessionsSheetProps> = ({ open, 
         variant="default"
         size="sm"
         aria-label={t('mobile.sessions.newChat')}
-        onClick={handleStartNewChat}
+        onPointerDown={(event) => {
+          if (!shouldStartMobileNewChatOnPointerDown(event)) return;
+          // Suppress the leftover click so closing the drawer cannot click
+          // through to the workspace button underneath.
+          event.preventDefault();
+          event.currentTarget.dataset.mobileNewChatArmed = '1';
+          handleStartNewChat();
+        }}
+        onClick={(event) => {
+          if (event.currentTarget.dataset.mobileNewChatArmed === '1') {
+            delete event.currentTarget.dataset.mobileNewChatArmed;
+            return;
+          }
+          handleStartNewChat();
+        }}
         style={{ touchAction: 'manipulation' }}
       >
         <RiAddLine className="size-4" />

@@ -113,4 +113,16 @@ describe('new-session callers', () => {
       /onNewChat=\{handleOpenNewSessionDraftFromHeader\}/,
     );
   });
+
+  test('mobile sessions + new chat is still a projectless chats draft', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../apps/MobileSessionsSheet.tsx', import.meta.url)),
+      'utf8',
+    );
+
+    expect(source).toMatch(
+      /const handleStartNewChat = \(\) => \{[\s\S]*?openNewSessionDraft\(\);/,
+    );
+    expect(source).not.toContain('readInheritedNewSessionDraftOptions');
+  });
 });
