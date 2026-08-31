@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { getPiGoalCommand, isPiGoalComposerButtonVisible } from '@/lib/piGoal';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
+import { useInputStore } from '@/sync/input-store';
 import { refreshFeaturePlugins, usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
 interface PiGoalButtonProps {
@@ -29,17 +30,28 @@ export const PiGoalButton: React.FC<PiGoalButtonProps> = React.memo(({
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
   const payload = usePiFeaturePluginsStore((state) => state.payload);
+  const pendingGoalSeed = useInputStore((state) => state.pendingGoalDialogSeed);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [dialogSeed, setDialogSeed] = React.useState('');
 
   React.useEffect(() => {
     if (!isPiKernel) return;
     void refreshFeaturePlugins();
   }, [isPiKernel]);
 
-  if (!isPiGoalComposerButtonVisible({ isPiKernel, payload })) {
+  React.useEffect(() => {
+    if (pendingGoalSeed === null) return;
+    const seed = useInputStore.getState().consumePendingGoalDialog();
+    if (seed === null) return;
+    setDialogSeed(seed);
+    setDialogOpen(true);
+  }, [pendingGoalSeed]);
+
+  if (!isPiKernel) {
     return null;
   }
 
+  const showButton = isPiGoalComposerButtonVisible({ isPiKernel, payload });
   const command = getPiGoalCommand(payload);
   const label = t('chat.piGoal.buttonAria');
 
@@ -47,7 +59,10 @@ export const PiGoalButton: React.FC<PiGoalButtonProps> = React.memo(({
     <button
       type="button"
       className={footerIconButtonClass}
-      onClick={() => setDialogOpen(true)}
+      onClick={() => {
+        setDialogSeed('');
+        setDialogOpen(true);
+      }}
       aria-label={label}
       {...(withTooltip ? {} : { title: label })}
     >
@@ -57,19 +72,25 @@ export const PiGoalButton: React.FC<PiGoalButtonProps> = React.memo(({
 
   return (
     <>
-      {withTooltip ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="top" sideOffset={6}>{label}</TooltipContent>
-        </Tooltip>
-      ) : button}
+      {showButton ? (
+        withTooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{button}</TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>{label}</TooltipContent>
+          </Tooltip>
+        ) : button
+      ) : null}
       <PiGoalDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setDialogSeed('');
+        }}
         sessionId={sessionId}
         directory={directory}
         command={command}
         draftOpen={draftOpen}
+        initialObjective={dialogSeed}
       />
     </>
   );

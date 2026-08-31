@@ -34,6 +34,7 @@ interface PiGoalDialogProps {
   directory?: string;
   command: string;
   draftOpen?: boolean;
+  initialObjective?: string;
 }
 
 export function PiGoalDialog({
@@ -43,6 +44,7 @@ export function PiGoalDialog({
   directory,
   command,
   draftOpen = false,
+  initialObjective = '',
 }: PiGoalDialogProps) {
   const { t } = useI18n();
   const chrome = usePiPlanChrome();
@@ -65,6 +67,7 @@ export function PiGoalDialog({
       setError(null);
       return;
     }
+    setObjective(initialObjective);
     const store = useSessionUIStore.getState();
     const lastActive = readLastActiveSession(getRuntimeKey());
     openedTargetRef.current = resolvePiGoalTargetSession({
@@ -73,7 +76,7 @@ export function PiGoalDialog({
       routeSessionID: typeof window === 'undefined' ? '' : readPiGoalRouteSessionID(window.location.search),
       lastActiveSessionID: lastActive?.sessionId,
     }) || null;
-  }, [open, sessionId]);
+  }, [open, sessionId, initialObjective]);
 
   React.useEffect(() => {
     if (!open) return;

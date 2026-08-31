@@ -151,3 +151,26 @@ export const resolveDraftPlanStarterClick = (input: {
     return { kind: 'draft-plan', sendText: trimmed || null };
 };
 
+const CRAFT_GOAL_SLASH = /^\/\s*craft-goal\b/i;
+
+export const isCraftGoalSlashCommandText = (text: string): boolean =>
+    CRAFT_GOAL_SLASH.test(text.trim());
+
+/**
+ * Empty-state Craft a Goal must match Start Goal: open the Goal dialog.
+ * Leftover composer text seeds the dialog; it must not send a turn.
+ */
+export const resolveDraftGoalStarterClick = (input: {
+    submitText: string;
+    composerText: string;
+}): { kind: 'draft-goal'; seedText: string } | { kind: 'submit' } => {
+    if (!isCraftGoalSlashCommandText(input.submitText)) {
+        return { kind: 'submit' };
+    }
+    const trimmed = input.composerText.trim();
+    if (isCraftGoalSlashCommandText(trimmed)) {
+        return { kind: 'draft-goal', seedText: trimmed.replace(CRAFT_GOAL_SLASH, '').trim() };
+    }
+    return { kind: 'draft-goal', seedText: trimmed };
+};
+

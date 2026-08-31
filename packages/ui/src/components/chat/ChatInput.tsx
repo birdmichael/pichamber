@@ -146,7 +146,7 @@ import {
     parseSlashCommand,
 } from './composer/submit/slashCommands';
 import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
-import { resolveDraftPlanStarterClick } from '@/lib/draftStarters';
+import { resolveDraftGoalStarterClick, resolveDraftPlanStarterClick } from '@/lib/draftStarters';
 import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
 import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
@@ -1622,6 +1622,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             if (planStarter.sendText) {
                 void handleSubmitRef.current({ presetText: planStarter.sendText });
             }
+            return;
+        }
+        const goalStarter = resolveDraftGoalStarterClick({
+            submitText: text,
+            composerText: draft,
+        });
+        if (goalStarter.kind === 'draft-goal') {
+            useInputStore.getState().requestOpenGoalDialog(goalStarter.seedText);
             return;
         }
         // OpenCode recognizes slash commands only when their arguments follow
