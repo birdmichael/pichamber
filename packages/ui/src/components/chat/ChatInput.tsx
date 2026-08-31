@@ -83,6 +83,7 @@ import { usePermissionStore } from '@/stores/permissionStore';
 import { togglePermissionAutoAccept } from './permissionAutoAccept';
 import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
+import { useAuthSessionStore } from '@/lib/runtime-auth-expiry';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { shouldShowDesktopDraftWelcomeChrome } from '@/lib/draftStarters';
 import { isManagedChatDirectory, resolveNewSessionComposerDirectory } from '@/lib/chatDirectories';
@@ -1121,6 +1122,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             queuedOnly,
         });
         const capturedTarget = messageQueueTarget;
+        // An expired session cannot deliver anything: keep the prompt in the
+        // composer and point at the login banner instead of burning the send
+        // on a guaranteed 401.
+        if (useAuthSessionStore.getState().state !== 'ok') {
+            toast.error(t('sessionAuth.expired.sendBlocked'));
+            return;
+        }
+
         // Snapshot the draft and current-session identity before the first
         // async gap so a later sidebar selection cannot reroute the send.
         const capturedDraftSnapshot = newSessionDraftOpen ? { ...newSessionDraft } : null;

@@ -50,12 +50,8 @@ class StubHTMLElement {
 
   closest(selector: string): StubHTMLElement | null {
     const parts = selector.split(',').map((part) => part.trim());
-    let node: StubHTMLElement | null = this;
-    while (node) {
-      if (parts.some((part) => node!.matchesPart(part))) return node;
-      node = node.parentElement;
-    }
-    return null;
+    if (parts.some((part) => this.matchesPart(part))) return this;
+    return this.parentElement?.closest(selector) ?? null;
   }
 
   private matchesPart(selector: string): boolean {
