@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-09-01
+
+- **Desktop:** Mini Chat Window loads the Vite UI origin, not the API sidecar, so New Mini Chat no longer 404s with “Static files not found” during `electron:dev`.
+- **Desktop:** Ctrl+J opens Terminal with the same working-directory key as the rail. Empty Choose project shows the honest empty state; a selected folder starts a shell.
+- **Mobile:** Work Status Usage long status lines wrap under the provider row instead of clipping in the trailing value.
+- **Chat:** the sidebar stays live (dot + timer) while a Pi tool loop is still running, not only while the model is streaming text.
+- **Chat:** Plan Q&A **Implement here** / **Build** switches the composer to Agent like Composer **构建**, and the Plan banner does not stay on after implement starts.
+- **Settings:** the Pi version row can hint that a newer kernel is available without bringing back Update or Latest chrome.
+- **Desktop:** Windows NSIS afterPack unpacks `chalk` so the installer can finish; Mac `latest-mac.yml` is written after Apple Silicon notarization, and Intel is added to the same feed later.
+
 - **Mobile:** Sessions **+ new chat** closes the drawer on the first tap and opens a projectless chat. Previously the first tap did nothing and a second tap was required.
 - **Settings:** Feature Plugin install (including `pi-xai-oauth`) no longer 500s. The Node-kernel package manager now exposes `installAndPersist`, matching Pi's PackageManager.
 - **Chat / Desktop:** after Plan **Build** implement settles, the composer leaves disabled **building…**. Idle is `agent_settled` (live turn), not leftover `implementing` or adapter busy. Switching chats or Reload Pi no longer resurrects it.
