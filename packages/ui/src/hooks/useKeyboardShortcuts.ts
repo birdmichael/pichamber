@@ -34,7 +34,7 @@ import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
-import { hasOpenDropdown } from './keyboard-shortcut-dom';
+import { hasOpenDropdown, isEditableEventTarget } from './keyboard-shortcut-dom';
 
 export const useKeyboardShortcuts = () => {
   const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
@@ -533,6 +533,15 @@ export const useKeyboardShortcuts = () => {
       if (switchSurfaceDigit !== null
         && !e.repeat
         && eventMatchesShortcutPrefix(e, switchSurfacePrefix, heldKeysRef.current)) {
+        // Typing a digit in a textarea/input/composer must stay text, never a
+        // surface or session switch: the default prefix is a bare modifier, so
+        // this fires on plain ctrl/cmd+1 while the composer has focus.
+        // preventDefault so CodeMirror does not also treat the chord as a command
+        // and so the digit is not inserted.
+        if (isEditableEventTarget(e.target)) {
+          e.preventDefault();
+          return;
+        }
         const state = useUIStore.getState();
         if (state.isMobile || !panelDirectoryKey) {
           return;

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Composer: empty and fenced-block carets stay visible, double-space still inserts a period on macOS, Ctrl/Cmd+1..9 does not switch sessions while typing, PageUp/PageDown no longer hides the Desktop title bar, and CJK IME composition does not jump the caret.
+- Desktop: Ctrl/Cmd+1..9 while the composer is focused no longer wipes the draft.
 - Chat no longer crashes or freezes on huge tool dumps, JavaScript template-string highlighting, truncated `Index:` diffs, or composer drafts with Windows (CRLF) line endings.
 - Git: checkout, stash, and merge refresh git status, and the history graph keeps a reused extra-parent lane on a double merge of the same branch.
 - Files: Markdown preview has in-document search (Ctrl/Cmd+F) with highlighting and next/previous, including when the preview is not focused.
