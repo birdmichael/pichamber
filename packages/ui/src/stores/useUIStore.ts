@@ -18,6 +18,12 @@ import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import type { MultiRunCompareGroup } from '@/types/multirun';
 import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
 import {
+  setCommandPaletteOpenState,
+  setHelpDialogOpenState,
+  toggleCommandPaletteState,
+  toggleHelpDialogState,
+} from '@/lib/overlay-dialogs';
+import {
   isBrowserTabIdentity,
   mergeContextPanelForBrowserScope,
   openedProjectPathSet,
@@ -2000,19 +2006,19 @@ export const useUIStore = create<UIStore>()(
         },
 
         toggleCommandPalette: () => {
-          set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen }));
+          set((state) => toggleCommandPaletteState(state));
         },
 
         setCommandPaletteOpen: (open) => {
-          set({ isCommandPaletteOpen: open });
+          set((state) => setCommandPaletteOpenState(open, state));
         },
 
         toggleHelpDialog: () => {
-          set((state) => ({ isHelpDialogOpen: !state.isHelpDialogOpen }));
+          set((state) => toggleHelpDialogState(state));
         },
 
         setHelpDialogOpen: (open) => {
-          set({ isHelpDialogOpen: open });
+          set((state) => setHelpDialogOpenState(open, state));
         },
 
         setAboutDialogOpen: (open) => {

@@ -17,3 +17,15 @@ describe('dialog sentence case', () => {
     expect(popupClassBlock).toContain('[&_[data-slot=button]]:normal-case');
   });
 });
+
+describe('dialog leftover overlay', () => {
+  test('ending overlays drop pointer-events so X and the next page click work', () => {
+    const overlayBlock = dialogSource.slice(
+      dialogSource.indexOf('data-slot="dialog-overlay"'),
+      dialogSource.indexOf('DialogOverlay.displayName'),
+    );
+    expect(overlayBlock).toContain('data-[ending-style]:pointer-events-none');
+    expect(dialogSource).toContain('app-region-no-drag');
+    expect(dialogSource).toContain('data-slot="dialog-close"');
+  });
+});

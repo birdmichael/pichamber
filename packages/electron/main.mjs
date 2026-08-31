@@ -4925,7 +4925,9 @@ const buildMacMenu = () => {
         { label: 'Settings', accelerator: 'Cmd+,', click: () => dispatchAction('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
-        { label: 'Command Palette', accelerator: 'Cmd+P', click: () => dispatchAction('command-palette') },
+        // registerAccelerator:false → renderer owns Cmd+P so the native
+        // menu does not toggle a second palette on top of Shortcuts (#379).
+        { label: 'Command Palette', accelerator: 'Cmd+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -5035,7 +5037,9 @@ const buildAutoHiddenMenu = () => {
         { label: 'Settings', accelerator: 'Ctrl+,', click: () => dispatchAction('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
-        { label: 'Command Palette', accelerator: 'Ctrl+P', click: () => dispatchAction('command-palette') },
+        // registerAccelerator:false → renderer owns Ctrl+P so the native
+        // menu does not toggle a second palette on top of Shortcuts (#379).
+        { label: 'Command Palette', accelerator: 'Ctrl+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
         { type: 'separator' },
         { role: 'quit' },
       ],
