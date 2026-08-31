@@ -81,8 +81,10 @@ import { useSidebarBulkActions } from './sidebar/hooks/useSidebarBulkActions';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { type SessionGroup, type SessionNode } from './sidebar/types';
 import {
+  countSidebarSearchMatches,
   deriveRecentSessions,
   selectRecentSessionsWithoutWorkspaceGroup,
+  shouldShowSidebarActivitySections,
 } from './sidebar/activitySections';
 import { useSessionPinnedStore } from '@/stores/useSessionPinnedStore';
 import {
@@ -1978,8 +1980,20 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     return renderGroupSessions(group, 'managed-chats', null, true);
   }, [homeDirectory, renderGroupSessions, renderSessionNode, t]);
 
+  const showActivitySections = shouldShowSidebarActivitySections({
+    isVSCode,
+    hasSessionSearchQuery,
+    hasActivitySectionItems,
+    activitySections,
+  });
+  const sidebarSearchMatchCount = countSidebarSearchMatches(
+    hasSessionSearchQuery,
+    searchMatchCount,
+    activitySections,
+  );
+
   const topContent = React.useMemo(
-    () => (!isVSCode && !hasSessionSearchQuery && hasActivitySectionItems) ? (
+    () => showActivitySections ? (
       <SidebarActivitySections
         sections={activitySections}
         renderSessionNode={renderSessionNode}
@@ -1993,7 +2007,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         renderChatsSection={renderChatsSection}
       />
     ) : null,
-    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewChatFromChatsRow, hasActivitySectionItems, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode],
+    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewChatFromChatsRow, isDesktopShellRuntime, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode, showActivitySections],
   );
 
   return (
@@ -2065,7 +2079,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         sessionSearchQuery={sessionSearchQuery}
         setSessionSearchQuery={setSessionSearchQuery}
         hasSessionSearchQuery={hasSessionSearchQuery}
-        searchMatchCount={searchMatchCount}
+        searchMatchCount={sidebarSearchMatchCount}
         collapseAllProjects={collapseAllProjects}
         expandAllProjects={expandAllProjects}
         selectionModeEnabled={selectionModeEnabled}

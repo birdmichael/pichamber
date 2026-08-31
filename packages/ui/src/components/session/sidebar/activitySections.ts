@@ -47,3 +47,41 @@ export const selectRecentSessionsWithoutWorkspaceGroup = (
   sessions: Session[],
   workspaceSessionIds: { readonly has: (id: string) => boolean },
 ): Session[] => sessions.filter((session) => !workspaceSessionIds.has(session.id));
+
+type ActivitySectionWithItems = {
+  items: ReadonlyArray<unknown>;
+};
+
+// Idle keeps the chats block even when it is empty. Search keeps the same
+// block only when a chats/recent row still matches; a query alone must not
+// hide hits that live only in this list.
+export const shouldShowSidebarActivitySections = (args: {
+  isVSCode: boolean;
+  hasSessionSearchQuery: boolean;
+  hasActivitySectionItems: boolean;
+  activitySections: ReadonlyArray<ActivitySectionWithItems>;
+}): boolean => {
+  if (args.isVSCode) {
+    return false;
+  }
+  if (args.hasSessionSearchQuery) {
+    return args.activitySections.some((section) => section.items.length > 0);
+  }
+  return args.hasActivitySectionItems;
+};
+
+export const countSidebarSearchMatches = (
+  hasSessionSearchQuery: boolean,
+  projectMatchCount: number,
+  activitySections: ReadonlyArray<ActivitySectionWithItems>,
+): number => {
+  if (!hasSessionSearchQuery) {
+    return 0;
+  }
+  const activityMatchCount = activitySections.reduce(
+    (total, section) => total + section.items.length,
+    0,
+  );
+  return projectMatchCount + activityMatchCount;
+};
+

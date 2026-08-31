@@ -4,6 +4,25 @@ export type SearchableSessionNode<TSession = { title?: string | null }> = {
 };
 
 /**
+ * Prefix/substring match for sidebar session search.
+ *
+ * Fuse/subsequence matching treats leftover query characters as typos, so
+ * `renamzzz` would still hit `renamed-scan`. Extra characters that are not a
+ * contiguous substring of the title (or other search text) must fail. Keep
+ * useful prefix and mid-string matches (`renam`, `named`) so search stays
+ * usable.
+ */
+export const sessionSearchTextMatches = (haystack: string, query: string): boolean => {
+  if (!query) {
+    return true;
+  }
+  if (!haystack) {
+    return false;
+  }
+  return haystack.includes(query);
+};
+
+/**
  * Keep matching sessions, plus a non-matching ancestor so the tree still
  * shows where a child hit lives. The ancestor is context only.
  */
@@ -17,7 +36,7 @@ export const filterSessionNodesForSearch = <T extends SearchableSessionNode>(
   }
 
   return nodes.flatMap((node) => {
-    const nodeMatches = getSearchText(node.session).includes(query);
+    const nodeMatches = sessionSearchTextMatches(getSearchText(node.session), query);
     if (nodeMatches) {
       return [node];
     }
@@ -42,7 +61,7 @@ export const countMatchingSessionNodes = <T extends SearchableSessionNode>(
   }
 
   return nodes.reduce((total, node) => {
-    const matches = getSearchText(node.session).includes(query);
+    const matches = sessionSearchTextMatches(getSearchText(node.session), query);
     return total + (matches ? 1 : 0) + countMatchingSessionNodes(node.children as T[], query, getSearchText);
   }, 0);
 };

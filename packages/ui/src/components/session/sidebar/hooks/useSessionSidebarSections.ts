@@ -5,7 +5,7 @@ import { dedupeSessionsById, normalizePath } from '../utils';
 import type { WorktreeMetadata } from '@/types/worktree';
 import type { SessionFoldersMap } from '@/stores/useSessionFoldersStore';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
-import { countMatchingSessionNodes } from '../sessionSearch';
+import { countMatchingSessionNodes, sessionSearchTextMatches } from '../sessionSearch';
 
 type ProjectItem = {
   id: string;
@@ -166,10 +166,10 @@ export const useSessionSidebarSections = (args: Args) => {
           normalizedSessionSearchQuery,
           buildSessionSearchText,
         );
-        const groupMatches = buildGroupSearchText(group).includes(normalizedSessionSearchQuery);
+        const groupMatches = sessionSearchTextMatches(buildGroupSearchText(group), normalizedSessionSearchQuery);
         const scopeKey = normalizePath(group.directory ?? null);
         const scopeFolders = scopeKey ? (foldersMap[scopeKey] ?? []) : [];
-        const folderNameMatchCount = scopeFolders.filter((folder) => folder.name.toLowerCase().includes(normalizedSessionSearchQuery)).length;
+        const folderNameMatchCount = scopeFolders.filter((folder) => sessionSearchTextMatches(folder.name.toLowerCase(), normalizedSessionSearchQuery)).length;
 
         result.set(group, {
           filteredNodes,

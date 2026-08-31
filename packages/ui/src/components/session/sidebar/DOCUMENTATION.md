@@ -75,7 +75,7 @@ Wording reuses `sessions.sidebar.*` via `apps/mobileSessionChromeKeys.ts`. Impor
 ### Types and utilities
 
 - `types.ts`: Shared sidebar types (`SessionNode`, `SessionGroup`, summary/search metadata).
-- `activitySections.ts`: Recent membership helpers. `deriveRecentSessions` is the timestamp/active filter; `selectRecentSessionsWithoutWorkspaceGroup` drops sessions that already have a workspace/project row so Recent cannot duplicate them. Single-project mode hides Recent without changing that membership contract.
+- `activitySections.ts`: Recent membership helpers. `deriveRecentSessions` is the timestamp/active filter; `selectRecentSessionsWithoutWorkspaceGroup` drops sessions that already have a workspace/project row so Recent cannot duplicate them. Single-project mode hides Recent without changing that membership contract. `shouldShowSidebarActivitySections` keeps chats/recent visible during search when a filtered row remains; `countSidebarSearchMatches` adds those hits to the project match count.
 - `projectDisplay.ts`: Resolves which project the single-project picker should show when the stored id is missing.
 - `sessionBootstrapDemands.ts`: Builds the deduplicated directory demand plan. Selected directories rank above active projects, expanded groups, visible collapsed groups, and background/collapsed projects.
 - `utils.tsx`: Shared sidebar utilities (path normalization, dedupe, archived scope keys, project relation checks, text highlight, labels, compact/default date formatting). Shared session ranking lives in `sync/session-ordering.ts`.
