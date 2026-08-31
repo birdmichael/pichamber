@@ -294,6 +294,19 @@ mock.module('@/lib/desktopHosts', () => ({
   normalizeHostUrl: mock(() => ''),
 }));
 
+const authSessionStore = {
+  state: 'ok' as const,
+  markAuthenticated: mock(() => undefined),
+};
+
+mock.module('@/lib/runtime-auth-expiry', () => ({
+  installAuthSessionFocusWatch: mock(() => undefined),
+  useAuthSessionStore: Object.assign(
+    (selector: (store: typeof authSessionStore) => unknown) => selector(authSessionStore),
+    { getState: () => authSessionStore },
+  ),
+}));
+
 mock.module('@/lib/passkeys', () => ({
   authenticateWithPasskey: mock(() => Promise.resolve(null)),
   cancelPasskeyCeremony: mock(() => undefined),

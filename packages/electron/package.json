@@ -52,7 +52,7 @@
     "verify:update-manifest": "node ./scripts/verify-update-manifest.mjs",
     "package": "bun run build:web-assets && bun run prepare:pi-kernel && bun run prepare:node && bun run prepare:opencode-cli && bun run bundle:main && bun run rebuild:native && node ./scripts/package.mjs",
     "finalize:latest-yml": "node ./scripts/finalize-latest-yml.mjs",
-    "type-check": "node --check ./main.mjs && node --check ./preload.mjs && node --check ./mini-chat-url.mjs && node --check ./background-throttling.mjs && node --check ./kernel-env.mjs && node --check ./save-image-payload.mjs && node --check ./system-power-events.mjs && node --check ./menu-accelerators.mjs && node --check ./linux-native-dialog-bounds.mjs && node --check ./scripts/prepare-node.mjs && node --check ./scripts/verify-pi-node-kernel.mjs && node --check ./scripts/after-pack.cjs && node --check ./scripts/unpack-node-kernel-deps.cjs",
+    "type-check": "node --check ./main.mjs && node --check ./preload.mjs && node --check ./mini-chat-url.mjs && node --check ./background-throttling.mjs && node --check ./kernel-env.mjs && node --check ./save-image-payload.mjs && node --check ./system-power-events.mjs && node --check ./menu-accelerators.mjs && node --check ./linux-native-dialog-bounds.mjs && node --check ./renderer-recovery.mjs && node --check ./browser-panel-security.mjs && node --check ./scripts/prepare-node.mjs && node --check ./scripts/verify-pi-node-kernel.mjs && node --check ./scripts/after-pack.cjs && node --check ./scripts/unpack-node-kernel-deps.cjs",
     "lint": "node -e \"process.exit(0)\"",
     "prepare:pi-kernel": "node ./scripts/prepare-pi-kernel.mjs"
   },

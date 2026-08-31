@@ -45,6 +45,8 @@ import {
 } from './linux-autostart.mjs';
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
+import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
+import { attachRendererRecovery } from './renderer-recovery.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-text-file.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
@@ -1245,6 +1247,15 @@ const resolveBrowserPanelContents = (rawId) => {
 const hardenBrowserPanelSession = () => {
   const panelSession = session.fromPartition(BROWSER_PANEL_PARTITION);
 
+  app.on('certificate-error', (event, contents, url, error, _certificate, callback) => {
+    if (contents.session === panelSession && shouldAllowBrowserPanelCertificateError({ url, error })) {
+      event.preventDefault();
+      callback(true);
+      return;
+    }
+    callback(false);
+  });
+
   panelSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
     log.info('[electron] browser panel denied a permission request', {
       permission,
@@ -1283,7 +1294,15 @@ const registerPackagedUiProtocol = () => {
         if (filePath.endsWith('.html')) {
           const html = await fsp.readFile(filePath, 'utf8');
           const body = injectRuntimeConfigIntoHtml(html);
-          return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+          // index.html must never be cached: it names the hashed asset
+          // bundles, and a cached copy keeps a freshly installed build
+          // loading the previous version's UI from the renderer disk cache.
+          return new Response(body, {
+            headers: {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-store',
+            },
+          });
         }
         const mimeByExt = {
           '.js': 'text/javascript; charset=utf-8',
@@ -1313,7 +1332,12 @@ const registerPackagedUiProtocol = () => {
     const indexPath = path.join(distPath, 'index.html');
     const html = await fsp.readFile(indexPath, 'utf8');
     const body = injectRuntimeConfigIntoHtml(html);
-    return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    return new Response(body, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
   };
   protocol.handle(UI_PROTOCOL, handlePackagedUiRequest);
   protocol.handle(LEGACY_UI_PROTOCOL, handlePackagedUiRequest);
@@ -1427,7 +1451,7 @@ const maybeShowNativeNotification = (rawInput) => {
   notification.on('click', () => {
     focusForegroundWindow();
     if (sessionId) {
-      emitToAllWindows('openchamber:open-session', { sessionId, directory });
+      emitToPrimaryWindow('openchamber:open-session', { sessionId, directory });
     }
     release();
   });
@@ -2072,6 +2096,18 @@ const emitToAllWindows = (event, detail) => {
   }
 };
 
+// Session navigation must land in ONE window. Broadcasting it makes every
+// open window adopt the same session, hijacking whatever the other windows
+// were doing.
+const emitToPrimaryWindow = (event, detail) => {
+  const windows = BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed());
+  if (windows.length === 0) return;
+  const target = (state.mainWindow && !state.mainWindow.isDestroyed())
+    ? state.mainWindow
+    : windows.find((window) => window.isFocused()) || windows.find((window) => window.isVisible()) || windows[0];
+  emitToWindow(target, event, detail);
+};
+
 const setTaskbarProgress = (value) => {
   if (process.platform !== 'win32') return;
   for (const browserWindow of BrowserWindow.getAllWindows()) {
@@ -2353,7 +2389,7 @@ const dispatchDeepLink = (link) => {
   }
 
   if (link.type === 'session' && link.value) {
-    emitToAllWindows('openchamber:open-session', { sessionId: link.value });
+    emitToPrimaryWindow('openchamber:open-session', { sessionId: link.value });
     return;
   }
   if (link.type === 'host' && link.value) {
@@ -2755,12 +2791,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     }
   });
 
-  browserWindow.webContents.on('render-process-gone', (_event, details) => {
-    log.error('[electron] renderer gone', details);
-    if (!browserWindow.isDestroyed()) {
-      void browserWindow.webContents.reload();
-    }
-  });
+  attachRendererRecovery(browserWindow, { log, label: 'window' });
 
   browserWindow.once('ready-to-show', () => {
     if (browserWindow.__ocLabel === 'main') {
@@ -2984,6 +3015,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
   bindWindowBackgroundThrottling(browserWindow, {
     onChange: () => state.hiddenTrayRepeater?.sync(),
   });
+  attachRendererRecovery(browserWindow, { log, label: 'mini chat' });
 
   if (sessionWindowKey) {
     state.miniChatWindowsBySession.set(sessionWindowKey, browserWindow);

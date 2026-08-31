@@ -195,11 +195,23 @@ const persistToLocalStorage = (settings: DesktopSettings) => {
   setOrRemoveLocalStorage('sttLanguage', typeof settings.sttLanguage === 'string' ? settings.sttLanguage : null);
 };
 
-const dispatchSettingsSynced = (settings: DesktopSettings): void => {
+export interface SettingsSyncedDetail {
+  settings: DesktopSettings;
+  /** Whether listeners may adopt cross-window workspace pointers
+      (activeProjectId / lastDirectory). True only for a bootstrap-grade sync:
+      the settings document is shared by every window of this server, so a
+      mid-session reconciliation adopting them would hijack this window's
+      workspace with another window's choice. */
+  adoptWorkspace: boolean;
+}
+
+const dispatchSettingsSynced = (settings: DesktopSettings, adoptWorkspace: boolean): void => {
   if (typeof window === 'undefined') {
     return;
   }
-  window.dispatchEvent(new CustomEvent<DesktopSettings>('openchamber:settings-synced', { detail: settings }));
+  window.dispatchEvent(new CustomEvent<SettingsSyncedDetail>('openchamber:settings-synced', {
+    detail: { settings, adoptWorkspace },
+  }));
 };
 
 type SettingsSaveState = 'idle' | 'saving' | 'error';
@@ -1744,7 +1756,8 @@ export const invalidateSettingsCache = (): void => {
   _settingsCache = null;
 };
 
-export const syncDesktopSettings = async (): Promise<void> => {
+export const syncDesktopSettings = async (options?: { adoptWorkspace?: boolean }): Promise<void> => {
+  const adoptWorkspace = options?.adoptWorkspace !== false;
   if (typeof window === 'undefined') {
     return;
   }
@@ -1828,7 +1841,7 @@ export const syncDesktopSettings = async (): Promise<void> => {
       if (!isSettingsRuntimeContextCurrent(context)) return;
     }
 
-    dispatchSettingsSynced(authoritativeSettings);
+    dispatchSettingsSynced(authoritativeSettings, adoptWorkspace);
   };
 
   try {
@@ -1864,7 +1877,7 @@ async function _flushSettingsUpdate(): Promise<void> {
         if (!isSettingsRuntimeContextCurrent(context)) return;
         if (updated) {
           applyDesktopUiPreferences(updated);
-          dispatchSettingsSynced(updated);
+          dispatchSettingsSynced(updated, false);
           _settingsCache = null;
         }
         dispatchSettingsSaveState(updated ? 'saved' : 'error');
@@ -1897,7 +1910,7 @@ async function _flushSettingsUpdate(): Promise<void> {
       if (!isSettingsRuntimeContextCurrent(context)) return;
       if (updated) {
         applyDesktopUiPreferences(updated);
-        dispatchSettingsSynced(updated);
+        dispatchSettingsSynced(updated, false);
         dispatchSettingsSaveState('saved');
         // Invalidate GET cache so next read sees the fresh data
         _settingsCache = null;
