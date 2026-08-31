@@ -41,6 +41,14 @@ describe('createEventTranslator', () => {
     expect(settled[1].properties.sessionID).toBe('ses_1');
   });
 
+  it('clears the user-message slot on agent_settled so the next turn can insert', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    expect(t.userMessageID).toBe('msg_user');
+    t.translate({ type: 'agent_settled' });
+    expect(t.userMessageID).toBe(null);
+  });
+
   it('maps text_delta to message.part.delta field text', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });

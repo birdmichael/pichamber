@@ -971,4 +971,10 @@ describe('mergeRemoteSessionSnapshot', () => {
     mergeRemoteSessionSnapshot(state, { isStreaming: false, sessionId: 'ses_1' }, { promptInFlight: false });
     expect(state.isStreaming).toBe(false);
   });
+
+  it('keeps isStreaming true while steer/followUp is in flight', () => {
+    const state = { isStreaming: true, sessionId: 'ses_1' };
+    mergeRemoteSessionSnapshot(state, { isStreaming: false, sessionId: 'ses_1' }, { liveOpInFlight: true });
+    expect(state.isStreaming).toBe(true);
+  });
 });

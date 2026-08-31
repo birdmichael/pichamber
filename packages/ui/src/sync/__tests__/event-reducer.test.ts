@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { Session } from "@opencode-ai/sdk/v2"
 import type { Event, Message, Part, PermissionRequest, QuestionRequest, SessionStatus } from "@opencode-ai/sdk/v2/client"
-import { applyDirectoryEvent } from "../event-reducer"
+import { applyDirectoryEvent, idleLeftoverBusyAfterSettledAssistant } from "../event-reducer"
 import { INITIAL_STATE, type State } from "../types"
 
 function state(overrides: Partial<State> = {}): State {
@@ -274,6 +274,31 @@ describe("applyDirectoryEvent", () => {
 
     expect(applyDirectoryEvent(draft, event)).toBe(false)
     expect(draft.session_status.ses_1).toBe(statusRef)
+  })
+
+  test("does not idle leftover busy when the first assistant message completes", () => {
+    const draft = state({
+      session_status: {
+        ses_1: { type: "busy" } as SessionStatus,
+      },
+    })
+    const completed = {
+      id: "msg_assistant_1",
+      sessionID: "ses_1",
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+    } as Message
+
+    expect(idleLeftoverBusyAfterSettledAssistant({
+      status: { type: "busy" },
+      lastMessage: completed,
+    })).toBe(false)
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: { info: completed },
+    } as Event)).toBe(true)
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
   })
 
   test("skips duplicate session idle events", () => {

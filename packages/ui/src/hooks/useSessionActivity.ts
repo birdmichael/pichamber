@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { idleLeftoverBusyAfterSettledAssistant } from '@/sync/event-reducer';
 import { useSessionStatus, useSessionMessages, useSessionPermissions, useSessionQuestions } from '@/sync/sync-context';
 
 // Mirrors OpenCode SessionStatus: busy|retry|idle.
@@ -66,8 +67,14 @@ export function resolveSessionActivity(input: {
   const statusWorking = hasAuthoritativeStatus && phase !== 'idle';
   // Pi finishes the assistant message before tools run. A settled trailing
   // assistant is not proof the turn is idle — trust live session.status so
-  // busy Enter can still steer / followUp.
-  if (isSettledAssistantMessage(lastMessage) && !statusWorking) return IDLE_RESULT;
+  // Stop stays armed until agent_settled. Never force idle from leftover busy.
+  if (
+    idleLeftoverBusyAfterSettledAssistant({ status: input.status, lastMessage })
+    && isSettledAssistantMessage(lastMessage)
+    && !statusWorking
+  ) {
+    return IDLE_RESULT;
+  }
 
   const isWorking = statusWorking || hasPendingAssistant;
 

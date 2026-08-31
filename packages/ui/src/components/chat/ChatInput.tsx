@@ -1014,10 +1014,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
     // Add message to queue instead of sending
     const handleQueueMessage = React.useCallback(() => {
-        if (isPiKernel) {
-            void handleSubmitRef.current({ delivery: 'followUp' });
-            return;
-        }
         const inputSnapshot = getCurrentInputSnapshot();
         if (!inputSnapshot.hasContent || !currentSessionId || !messageQueueTarget) return;
 
@@ -1052,7 +1048,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!isMobile) {
             composerRef.current?.focus();
         }
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inlineDraftTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, consumeDrafts, currentProviderId, currentModelId, currentAgentName, currentVariant, isPiKernel]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inlineDraftTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, consumeDrafts, currentProviderId, currentModelId, currentAgentName, currentVariant]);
 
     const handleQueuedMessageEdit = React.useCallback((content: string) => {
         setMessage(content);
@@ -1276,7 +1272,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             featurePlugins.payload,
             featurePlugins.status,
         );
-        if (!queuedOnly && !skipPendingPlanBubble) startPendingTurn(primaryText);
+        // Steer/followUp must not paint an optimistic user bubble mid-turn.
+        const skipLiveFollowUpBubble = delivery === 'steer' || delivery === 'followUp';
+        if (!queuedOnly && !skipPendingPlanBubble && !skipLiveFollowUpBubble) startPendingTurn(primaryText);
 
         // Clear queue and input
         if (capturedTarget && queuedMessageId) {

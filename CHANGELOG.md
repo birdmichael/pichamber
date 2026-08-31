@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Chat:** sidebar session rename commits on Enter, not only the check button.
 - **Chat:** the Files panel editor keeps a readable width beside the tree, and the split is resizable.
 - **Chat:** while a reply is running, Enter with Follow-up Queue is answered after the current run; Steer still course-corrects after the current tool. Previously both were dropped.
+- **Chat:** sending during a live Pi turn no longer toasts “Agent is already processing”, inserts a ghost user bubble, or drops Stop after the first assistant line. Queue shows a chip until the turn settles; Steer course-corrects without a second user turn. A rejected follow-up does not mark the still-running reply idle.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 
 ## [1.2.6] - 2026-08-30
