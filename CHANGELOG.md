@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Files: Markdown preview has in-document search (Ctrl/Cmd+F) with highlighting and next/previous, including when the preview is not focused.
 - Git: on detached HEAD, the pull request panel asks you to create a branch instead of offering Create PR with HEAD as the local branch.
 
 ## [1.2.7] - 2026-09-01
