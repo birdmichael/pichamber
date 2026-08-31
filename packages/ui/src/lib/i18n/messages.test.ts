@@ -143,4 +143,22 @@ describe('i18n dictionaries', () => {
     expect(enDict['settings.openchamber.git.option.treeView']).toBe('Tree View');
     expect(zhCnDict['settings.openchamber.git.option.treeView']).toBe('树形视图');
   });
+
+  test('Git empty copy does not promise initialize or open-repo controls', () => {
+    expect(enDict['gitView.empty.notGitRepositoryDescription']).toBe(
+      'Git status is available when this folder is a Git repository.',
+    );
+    expect(enDict['diffView.state.notGitRepository']).toBe(
+      'Not a Git repository. Diffs are available when this folder is a Git repository.',
+    );
+
+    const promisedInit = /initialize|inicializ|initialis|ініціал|zainicjowa|初始化|初期化|초기화/i;
+    const promisedOpenRepo = /open a repository|abre un repositorio|abra um repositório|ouvrez un dépôt|öffnen Sie ein Repository|открыйте сховище|打开一个 Git|開啟一個 Git|リポジトリを開/i;
+
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['gitView.empty.notGitRepositoryDescription'], locale).not.toMatch(promisedInit);
+      expect(dictionary['gitView.empty.notGitRepositoryDescription'], locale).not.toMatch(promisedOpenRepo);
+      expect(dictionary['diffView.state.notGitRepository'], locale).not.toMatch(promisedInit);
+    }
+  });
 });
