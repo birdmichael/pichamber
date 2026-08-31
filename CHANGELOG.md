@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** sidebar session search drops a row when extra characters are not in the title. `renam` still finds `renamed-scan`; `renamzzz` does not.
 - **Desktop:** the Files tree shows names at a usable width, and dragging the splitter resizes it. Previously the editor min-width left a ~60px icon-only strip.
 - **Desktop:** Keyboard Shortcuts closes on X and Esc. Previously the X left the dialog up.
 - **Desktop:** Ctrl+P toggles a single command palette. Opening it on Shortcuts no longer stacks a second dim overlay.

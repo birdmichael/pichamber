@@ -18,6 +18,7 @@ import { SessionFolderItem } from '../SessionFolderItem';
 import type { SortableDragHandleProps } from './sortableItems';
 import { DroppableFolderWrapper, SessionFolderDndScope } from './sessionFolderDnd';
 import type { GroupSearchData, SessionGroup, SessionNode } from './types';
+import { sessionSearchTextMatches } from './sessionSearch';
 import { isBranchDifferentFromLabel, normalizePath, renderHighlightedText } from './utils';
 import { compareSessionsByLifecycleOrder, EMPTY_SESSION_ORDER_RANKS } from '@/sync/session-ordering';
 import {
@@ -485,7 +486,7 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
         return true;
       }
 
-      const folderMatches = entry.folder.name.toLowerCase().includes(normalizedSessionSearchQuery);
+      const folderMatches = sessionSearchTextMatches(entry.folder.name.toLowerCase(), normalizedSessionSearchQuery);
       if (folderMatches || entry.nodes.length > 0) {
         keepByFolderId.set(folderId, true);
         return true;

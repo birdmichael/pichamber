@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { countMatchingSessionNodes, filterSessionNodesForSearch } from './sessionSearch';
+import { countMatchingSessionNodes, filterSessionNodesForSearch, sessionSearchTextMatches } from './sessionSearch';
 
 type Node = {
   session: { title: string };
@@ -56,3 +56,21 @@ describe('sidebar search match count', () => {
     )).toBe(1);
   });
 });
+
+describe('sidebar session search matcher', () => {
+  const tree = [node('renamed-scan')];
+
+  test('prefix and substring queries still match the title', () => {
+    expect(sessionSearchTextMatches('renamed-scan', 'renam')).toBe(true);
+    expect(sessionSearchTextMatches('renamed-scan', 'named')).toBe(true);
+    expect(filterSessionNodesForSearch(tree, 'renam', text)).toHaveLength(1);
+    expect(countMatchingSessionNodes(tree, 'renam', text)).toBe(1);
+  });
+
+  test('trailing extra characters that are not in the title do not match', () => {
+    expect(sessionSearchTextMatches('renamed-scan', 'renamzzz')).toBe(false);
+    expect(filterSessionNodesForSearch(tree, 'renamzzz', text)).toEqual([]);
+    expect(countMatchingSessionNodes(tree, 'renamzzz', text)).toBe(0);
+  });
+});
+
