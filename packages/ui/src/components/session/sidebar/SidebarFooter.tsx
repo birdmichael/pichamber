@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from "@/components/icon/Icon";
 import { useI18n } from '@/lib/i18n';
-import { isPrimaryTitlebarPointer } from '@/components/layout/titlebarIconActivate';
+import { activateTitlebarIconOnPointerDown } from '@/components/layout/titlebarIconActivate';
 import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
 
 type Props = {
@@ -40,21 +40,28 @@ export function SidebarFooter({
   const { t } = useI18n();
   const [settingsTooltipOpen, setSettingsTooltipOpen] = React.useState(false);
 
-  // Close the hover tooltip on press so it cannot eat the activating click.
-  // Do NOT open Settings on pointerdown: that mounts the dialog backdrop before
-  // mouseup, and Base UI treats the same gesture as an outside-press that
-  // closes Settings again (three-click bug #378). Open on click instead.
-  const handleSettingsPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!isPrimaryTitlebarPointer(event.button)) {
+  const ignoreSettingsClickRef = React.useRef(false);
+
+  const handleSettingsPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    ignoreSettingsClickRef.current = activateTitlebarIconOnPointerDown({
+      button: event.button,
+      closeHoverUi: () => setSettingsTooltipOpen(false),
+      activate: () => {
+        markSettingsOpenedFromTrigger();
+        onOpenSettings();
+      },
+    });
+  };
+
+  const handleSettingsClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (ignoreSettingsClickRef.current) {
+      ignoreSettingsClickRef.current = false;
+      event.preventDefault();
       return;
     }
-    setSettingsTooltipOpen(false);
-  }, []);
-
-  const handleSettingsClick = React.useCallback(() => {
     markSettingsOpenedFromTrigger();
     onOpenSettings();
-  }, [onOpenSettings]);
+  };
 
   if (!showRuntimeButtons && !showUpdateButton) {
     return null;

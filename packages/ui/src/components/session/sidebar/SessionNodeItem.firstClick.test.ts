@@ -19,17 +19,13 @@ describe('sidebar first-click activation', () => {
     expect(source).toContain('ignoreRowClickRef');
   });
 
-  test('the Settings gear opens on click, not pointerdown, so the backdrop cannot eat the press', () => {
-    expect(footerSource).toContain('handleSettingsClick');
-    expect(footerSource).toContain('markSettingsOpenedFromTrigger');
-    expect(footerSource).toContain('onClick={handleSettingsClick}');
+  test('the Settings gear activates on primary pointerdown like session rows', () => {
+    expect(footerSource).toContain('activateTitlebarIconOnPointerDown');
+    expect(footerSource).toContain('ignoreSettingsClickRef');
     expect(footerSource).toContain('onPointerDown={handleSettingsPointerDown}');
-    // pointerdown only dismisses the tooltip; opening on pointerdown mounts the
-    // dialog before mouseup and Base UI treats that as an outside-press (#378).
-    expect(footerSource).toContain('setSettingsTooltipOpen(false)');
-    expect(footerSource).not.toContain('activateTitlebarIconOnPointerDown');
-    expect(footerSource).not.toContain('ignoreSettingsClickRef');
-    expect(footerSource).not.toMatch(/activate:\s*\(\)\s*=>\s*\{[\s\S]*onOpenSettings/);
+    expect(footerSource).toContain('onClick={handleSettingsClick}');
+    expect(footerSource).toContain('markSettingsOpenedFromTrigger');
+    expect(footerSource).toMatch(/activate:\s*\(\)\s*=>\s*\{[\s\S]*markSettingsOpenedFromTrigger[\s\S]*onOpenSettings/);
   });
 });
 
