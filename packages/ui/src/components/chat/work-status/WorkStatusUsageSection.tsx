@@ -225,10 +225,12 @@ const UsageSectionBody: React.FC<{
             leading={<ProviderLogo providerId={group.providerId} className="size-4 shrink-0" />}
             label={group.providerName}
             muted
-            value={group.status ? (
-              <WorkStatusValue tone="muted">{group.status}</WorkStatusValue>
-            ) : undefined}
           />
+          {group.status ? (
+            <p className="min-w-0 px-1 pb-1 text-[13px] leading-snug text-muted-foreground whitespace-normal break-words text-wrap">
+              {group.status}
+            </p>
+          ) : null}
           {group.rows.map((row) => {
             const displayPercent = displayMode === 'remaining'
               ? row.window.remainingPercent
