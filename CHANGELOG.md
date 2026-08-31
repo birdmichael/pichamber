@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** Settings home nav scrolls on a swipe. A tap still opens the page. Previously a finger-down on Chat/General (and the rest) opened that page immediately.
 - **Chat:** empty-state Schedule a Task and Craft a Goal send a short user line. The long instruction stays hidden, so the bubble and session title are not the internal prompt. User-visible chip copy says Pichamber, not OpenChamber.
 - **Desktop:** after the native Attach-files dialog (including Esc) or Settings open/close, the renderer takes keyboard focus again. Closing the composer `+` menu with Esc restores the textarea.
 - **Desktop:** Attach files uses the native open-file dialog without the tall GTK custom-type filter. On Linux the chooser is parented and immediately clamped to the display work area so Cancel/Open stay visible on an 800px screen.
