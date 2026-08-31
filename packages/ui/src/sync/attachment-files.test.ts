@@ -126,6 +126,15 @@ describe("attachment file preparation", () => {
     expect(drawio?.mimeType).toBe("text/plain")
   })
 
+  test("accepts in-memory pasted-context text/plain the same as a picked .txt", async () => {
+    const file = new File(["architecture notes"], "pasted-context-1.txt", { type: "text/plain" })
+    const result = await prepare(file)
+
+    expect(result?.mimeType).toBe("text/plain")
+    expect(result?.file.name).toBe("pasted-context-1.txt")
+    expect(await result?.file.text()).toBe("architecture notes")
+  })
+
   test("converts HEIC files to JPEG before attachment", async () => {
     const result = await prepare(new File(["heic-data"], "photo.heic", { type: "image/heic" }))
 
