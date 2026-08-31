@@ -7,6 +7,7 @@ import {
     getBuiltInStarter,
     isPichamberStarterSlashCommand,
     PICHAMBER_STARTER_SLASH_COMMANDS,
+    resolveDraftGoalStarterClick,
     resolveDraftPlanStarterClick,
     shouldOfferLiveCommandAsStarter,
     shouldShowDesktopDraftWelcomeChrome,
@@ -104,6 +105,27 @@ describe('live Plan starter', () => {
             submitText: '/plan',
             draftOpen: false,
             composerText: '',
+        })).toEqual({ kind: 'submit' });
+    });
+});
+
+describe('Craft a Goal starter', () => {
+    test('opens the Goal dialog and does not send leftover composer text', () => {
+        expect(resolveDraftGoalStarterClick({
+            submitText: '/craft-goal',
+            composerText: '',
+        })).toEqual({ kind: 'draft-goal', seedText: '' });
+        expect(resolveDraftGoalStarterClick({
+            submitText: '/craft-goal',
+            composerText: 'projectless-draft',
+        })).toEqual({ kind: 'draft-goal', seedText: 'projectless-draft' });
+        expect(resolveDraftGoalStarterClick({
+            submitText: '/craft-goal',
+            composerText: '/craft-goal leftover',
+        })).toEqual({ kind: 'draft-goal', seedText: 'leftover' });
+        expect(resolveDraftGoalStarterClick({
+            submitText: '/schedule-task',
+            composerText: 'projectless-draft',
         })).toEqual({ kind: 'submit' });
     });
 });

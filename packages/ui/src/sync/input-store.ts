@@ -106,6 +106,8 @@ export type InputState = {
    * narrow layouts); consumed by ChatInput, which owns the command-aware submit.
    */
   pendingPresetSubmit: { text: string; type: "command" | "skill" } | null
+  /** Craft a Goal chip asked to open the Goal dialog instead of sending. */
+  pendingGoalDialogSeed: string | null
   attachedFiles: AttachedFile[]
   activeEditorFile: VSCodeActiveEditorFile | null
 
@@ -113,6 +115,8 @@ export type InputState = {
   consumePendingInputText: () => { text: string; mode: "replace" | "append" | "append-inline" } | null
   requestPresetSubmit: (text: string, type: "command" | "skill") => void
   consumePendingPresetSubmit: () => { text: string; type: "command" | "skill" } | null
+  requestOpenGoalDialog: (seed: string) => void
+  consumePendingGoalDialog: () => string | null
   setPendingSyntheticParts: (parts: SyntheticContextPart[] | null) => void
   consumePendingSyntheticParts: () => SyntheticContextPart[] | null
   addAttachedFile: (file: File) => Promise<boolean>
@@ -132,6 +136,7 @@ export const useInputStore = create<InputState>()((set, get) => ({
   pendingInputMode: "replace",
   pendingSyntheticParts: null,
   pendingPresetSubmit: null,
+  pendingGoalDialogSeed: null,
   attachedFiles: [],
   activeEditorFile: null,
 
@@ -152,6 +157,15 @@ export const useInputStore = create<InputState>()((set, get) => ({
     if (pendingPresetSubmit === null) return null
     set({ pendingPresetSubmit: null })
     return pendingPresetSubmit
+  },
+
+  requestOpenGoalDialog: (seed) => set({ pendingGoalDialogSeed: seed }),
+
+  consumePendingGoalDialog: () => {
+    const { pendingGoalDialogSeed } = get()
+    if (pendingGoalDialogSeed === null) return null
+    set({ pendingGoalDialogSeed: null })
+    return pendingGoalDialogSeed
   },
 
   setPendingSyntheticParts: (parts) => set({ pendingSyntheticParts: parts }),
