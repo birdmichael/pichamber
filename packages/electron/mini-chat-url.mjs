@@ -11,9 +11,9 @@ const addOrigin = (origins, value) => {
   if (origin) origins.add(origin);
 };
 
-// Mini Chat must load the renderer UI origin (Vite HMR in electron-dev,
-// packaged custom protocol in a release), not the API sidecar. The sidecar
-// 404s /mini-chat.html with "Static files not found" when packages/web/dist
+// Mini Chat and extra main windows must load the renderer UI origin (Vite HMR
+// in electron-dev, packaged custom protocol in a release), not the API sidecar.
+// The sidecar 404s HTML with "Static files not found" when packages/web/dist
 // is not built.
 export const resolveMiniChatUiBase = ({
   packaged = false,

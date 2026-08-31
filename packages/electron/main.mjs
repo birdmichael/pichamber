@@ -2276,7 +2276,7 @@ const switchToHostById = async (rawId) => {
   let clientToken = '';
   let requestHeaders = {};
   if (id === LOCAL_HOST_ID) {
-    targetUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+    targetUrl = resolveLocalRendererUrl();
     apiBaseUrl = state.sidecarUrl;
     clientToken = readDesktopLocalClientToken();
     requestHeaders = {};
@@ -2857,6 +2857,21 @@ const activateMainWindow = async (url, localOrigin, bootOutcome, runtimeConfig =
   return state.mainWindow;
 };
 
+const electronDevHmrUiOrigin = () => (
+  isDev ? `http://127.0.0.1:${process.env.OPENCHAMBER_HMR_UI_PORT || '5173'}` : ''
+);
+
+// File → New Window (and later main-window activations) must load the renderer
+// UI origin, not the API sidecar. Same 404 as Mini Chat during electron:dev.
+const resolveLocalRendererUrl = () => resolveMiniChatUiBase({
+  packaged: shouldUsePackagedUi(),
+  packagedUrl: buildPackagedUiUrl('/index.html'),
+  uiOrigin: state.uiOrigin,
+  localOrigin: state.localOrigin,
+  sidecarUrl: state.sidecarUrl,
+  hmrUiOrigin: electronDevHmrUiOrigin(),
+});
+
 const openMainWindow = async () => {
   if (!state.startupResolved) {
     const { initialUrl, localOrigin, bootOutcome, apiBaseUrl, clientToken, requestHeaders } = await resolveInitialUrl();
@@ -2864,7 +2879,7 @@ const openMainWindow = async () => {
   }
 
   const config = readDesktopHostsConfig();
-  const localUiUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+  const localUiUrl = resolveLocalRendererUrl();
   const host = config.defaultHostId && config.defaultHostId !== LOCAL_HOST_ID
     ? config.hosts.find((entry) => entry.id === config.defaultHostId)
     : null;
@@ -2903,10 +2918,6 @@ const createAdditionalWindow = async (url, runtimeConfig = {}) => {
   });
   return browserWindow;
 };
-
-const electronDevHmrUiOrigin = () => (
-  isDev ? `http://127.0.0.1:${process.env.OPENCHAMBER_HMR_UI_PORT || '5173'}` : ''
-);
 
 const buildMiniChatUrl = ({ mode, sessionId, directory, projectId }) => {
   const packaged = shouldUsePackagedUi();
@@ -4761,7 +4772,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
 
     case 'desktop_new_window': {
       const config = readDesktopHostsConfig();
-      const localUiUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+      const localUiUrl = resolveLocalRendererUrl();
       let targetUrl = localUiUrl;
       let runtimeConfig = {
         apiBaseUrl: state.sidecarUrl || state.localOrigin || '',
@@ -4794,7 +4805,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const host = config.hosts.find((entry) => entry.id === hostId);
       if (!host) throw new Error('Host not found');
       if (host.relay) {
-        const windowUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+        const windowUrl = resolveLocalRendererUrl();
         await createAdditionalWindow(windowUrl, {
           apiBaseUrl: '',
           clientToken: host.clientToken || '',
