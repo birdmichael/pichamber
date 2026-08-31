@@ -602,6 +602,7 @@ export const createNodeKernelClient = ({
       await ensureStarted();
       return {
         install: (...args) => call('packageManager', { name: 'install', args }),
+        installAndPersist: (...args) => call('packageManager', { name: 'installAndPersist', args }),
         update: (...args) => call('packageManager', { name: 'update', args }),
         removeAndPersist: (...args) => call('packageManager', { name: 'removeAndPersist', args }),
       };

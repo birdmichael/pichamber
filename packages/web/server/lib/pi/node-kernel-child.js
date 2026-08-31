@@ -326,7 +326,10 @@ const handleCall = async (method, params = {}) => {
   if (method === 'packageManager') {
     await ensureChildHost();
     const manager = await host.resolveFeaturePackageManager();
-    const fn = manager?.[params.name];
+    const name = params.name === 'installAndPersist' && typeof manager?.installAndPersist !== 'function'
+      ? 'install'
+      : params.name;
+    const fn = manager?.[name];
     if (typeof fn !== 'function') {
       throw new Error(`PackageManager method is not available: ${params.name}`);
     }
