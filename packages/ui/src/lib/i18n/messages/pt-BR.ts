@@ -1383,6 +1383,7 @@ export const dict: Record<I18nKey, string> = {
   "filesView.editor.saveNowTitle": "Salvar agora ({shortcut}) - salva automaticamente após 1,5 segundo",
   "filesView.editor.saveNowManualTitle": "Salvar agora ({shortcut})",
   "filesView.editor.saveAria": "Salvar ({shortcut})",
+  "filesView.editor.save": "Salvar",
   "filesView.editor.openInDesktopApp": "Abrir no aplicativo de desktop",
   "filesView.editor.refreshApps": "Atualizar aplicativos",
   "filesView.editor.disableLineWrap": "Desativar ajuste de linha",

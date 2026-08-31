@@ -1254,6 +1254,7 @@ export const dict = {
   'filesView.editor.saveNowTitle': 'Jetzt speichern ({shortcut}) - automatisches Speichern nach 1,5s',
   'filesView.editor.saveNowManualTitle': 'Jetzt speichern ({shortcut})',
   'filesView.editor.saveAria': 'Speichern ({shortcut})',
+  'filesView.editor.save': 'Speichern',
   'filesView.editor.openInDesktopApp': 'In Desktop-App öffnen',
   'filesView.editor.refreshApps': 'Apps aktualisieren',
   'filesView.editor.disableLineWrap': 'Zeilenumbruch deaktivieren',

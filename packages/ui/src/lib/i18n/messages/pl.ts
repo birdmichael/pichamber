@@ -2027,6 +2027,7 @@ export const dict: Record<I18nKey, string> = {
   'filesView.editor.cannotPreviewBinary': 'Nie można podglądać pliku binarnego',
   'filesView.editor.binaryFileDescription': 'Ten plik jest binarny i nie można go edytować w Pichamber. Pobierz go, aby otworzyć w innej aplikacji.',
   'filesView.editor.refreshApps': 'Odśwież aplikacje',
+  'filesView.editor.save': 'Zapisz',
   'filesView.editor.saveAria': 'Zapisz ({shortcut})',
   'filesView.editor.saveFile': 'Zapisz plik',
   'filesView.editor.saveNowTitle': 'Zapisz teraz ({shortcut}) — autozapis po 1,5 s',

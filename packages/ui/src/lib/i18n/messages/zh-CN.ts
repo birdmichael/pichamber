@@ -1383,6 +1383,7 @@ export const dict: Record<I18nKey, string> = {
   'filesView.editor.saveNowTitle': '立即保存（{shortcut}）- 1.5 秒后自动保存',
   'filesView.editor.saveNowManualTitle': '立即保存（{shortcut}）',
   'filesView.editor.saveAria': '保存（{shortcut}）',
+  'filesView.editor.save': '保存',
   'filesView.editor.openInDesktopApp': '在桌面应用中打开',
   'filesView.editor.refreshApps': '刷新应用',
   'filesView.editor.disableLineWrap': '关闭自动换行',

@@ -1184,6 +1184,7 @@ export const dict = {
   'filesView.editor.saveNowTitle': 'Enregistrer maintenant ({shortcut}) - sauvegarde automatique après 1.5s',
   'filesView.editor.saveNowManualTitle': 'Enregistrer maintenant ({shortcut})',
   'filesView.editor.saveAria': 'Enregistrer ({shortcut})',
+  'filesView.editor.save': 'Enregistrer',
   'filesView.editor.openInDesktopApp': 'Ouvrir dans l\'application de bureau',
   'filesView.editor.refreshApps': 'Actualiser les applications',
   'filesView.editor.disableLineWrap': 'Désactiver le retour à la ligne',
