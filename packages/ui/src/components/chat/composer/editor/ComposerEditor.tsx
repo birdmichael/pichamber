@@ -37,6 +37,7 @@ import type { ComposerLanguageContext } from '../language/tokenize';
 import { composerLanguage, setLanguageContext } from './composerLanguage';
 import type { ComposerEditorViewStore } from './viewStore';
 import { composerEditorTheme, composerNativeSelectionExtension } from './theme';
+import { replaceWithCaret } from './documentEdits';
 import { handleComposerHostMouseDown } from './hostMouseDown';
 
 export interface ComposerSelection {
@@ -344,17 +345,17 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             if (!view) return;
             const current = view.state.doc.toString();
             if (current === value) return;
-            view.dispatch({
-                changes: { from: 0, to: current.length, insert: value },
-                // An external rewrite (draft restore, history navigation,
-                // "add to chat", dictation insert) lands the caret at the END,
-                // matching what a plain textarea did when its value was
-                // replaced. Every rewrite that reaches here appends or
-                // replaces wholesale; keeping the old caret instead left it
-                // stranded before the inserted text, and the next insertion
-                // or keystroke landed inside the previous one.
-                selection: { anchor: value.length },
-            });
+            // An external rewrite (draft restore, history navigation,
+            // "add to chat", dictation insert) lands the caret at the END,
+            // matching what a plain textarea did when its value was
+            // replaced. Every rewrite that reaches here appends or
+            // replaces wholesale; keeping the old caret instead left it
+            // stranded before the inserted text, and the next insertion
+            // or keystroke landed inside the previous one.
+            // replaceWithCaret measures the caret on the document CodeMirror
+            // actually produced, so a paste/restore with Windows \r\n cannot
+            // throw RangeError: Selection points outside of document.
+            view.dispatch(replaceWithCaret(view.state, 0, current.length, value));
             // A large insert can push the caret below the fold, and a
             // transaction-time `scrollIntoView` cannot reach it: wrapped-line
             // heights are still estimates during the update, and the
@@ -508,8 +509,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                 if (!view || !text) return;
                 const { from, to } = view.state.selection.main;
                 view.dispatch({
-                    changes: { from, to, insert: text },
-                    selection: { anchor: from + text.length },
+                    ...replaceWithCaret(view.state, from, to, text),
                     userEvent: 'input.type',
                 });
             },
@@ -517,8 +517,13 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                 const view = viewRef.current;
                 if (!view) return;
                 view.dispatch({
-                    changes: { from, to, insert: text },
-                    selection: { anchor: caret ?? from + text.length },
+                    ...replaceWithCaret(
+                        view.state,
+                        from,
+                        to,
+                        text,
+                        caret === undefined ? undefined : { anchor: caret, head: caret },
+                    ),
                     userEvent: 'input.type',
                 });
             },
