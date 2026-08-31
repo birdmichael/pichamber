@@ -37,6 +37,7 @@ import type { ComposerLanguageContext } from '../language/tokenize';
 import { composerLanguage, setLanguageContext } from './composerLanguage';
 import type { ComposerEditorViewStore } from './viewStore';
 import { composerEditorTheme, composerNativeSelectionExtension } from './theme';
+import type { ComposerAutoCorrect } from './autocorrect';
 import { replaceWithCaret } from './documentEdits';
 import { handleComposerHostMouseDown } from './hostMouseDown';
 
@@ -64,8 +65,8 @@ export interface ComposerEditorHandle {
     selectAll(): void;
     /** Replace the current selection, leaving the caret after the insertion. */
     insertText(text: string): void;
-    /** Replace an explicit range; the caret lands at `caret` or after the text. */
-    replaceRange(from: number, to: number, text: string, caret?: number): void;
+    /** Replace a range; selection defaults to a caret after the inserted text. */
+    replaceRange(from: number, to: number, text: string, selectionStart?: number, selectionEnd?: number): void;
     /** Viewport coordinates of the caret, for positioning popups. */
     caretCoords(position?: number): { top: number; bottom: number; left: number } | null;
     /** The scrollable element, for measuring and scroll compensation. */
@@ -90,8 +91,11 @@ export interface ComposerEditorProps {
     placeholder?: string;
     editable?: boolean;
     spellCheck?: boolean;
-    /** Mobile keyboards; ignored on desktop. */
-    autoCorrect?: boolean;
+    /**
+     * The content element's autocorrect keyword. See `autocorrect.ts` for the
+     * case-sensitive CodeMirror workaround.
+     */
+    autoCorrect?: ComposerAutoCorrect;
     autoCapitalize?: 'none' | 'sentences';
     /** Fill the available height instead of growing with the content. */
     fillContainer?: boolean;
@@ -158,7 +162,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             placeholder,
             editable = true,
             spellCheck = false,
-            autoCorrect = false,
+            autoCorrect = 'off',
             autoCapitalize = 'none',
             fillContainer = false,
             maxLines = 8,
@@ -289,7 +293,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                         }),
                         EditorView.contentAttributes.of({
                             spellcheck: String(handlersRef.current.spellCheck ?? false),
-                            autocorrect: handlersRef.current.autoCorrect ? 'on' : 'off',
+                            autocorrect: handlersRef.current.autoCorrect ?? 'off',
                             autocapitalize: handlersRef.current.autoCapitalize ?? 'none',
                             ...(handlersRef.current['aria-label']
                                 ? { 'aria-label': handlersRef.current['aria-label'] }
@@ -345,6 +349,10 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             if (!view) return;
             const current = view.state.doc.toString();
             if (current === value) return;
+            // Skip every controlled writeback while the browser is composing.
+            // A stale value echo can differ from CodeMirror's newer document,
+            // and replacing it would interrupt the IME session and move the caret.
+            if (view.compositionStarted) return;
             // An external rewrite (draft restore, history navigation,
             // "add to chat", dictation insert) lands the caret at the END,
             // matching what a plain textarea did when its value was
@@ -452,7 +460,7 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
             if (!view) return;
             const content = view.contentDOM;
             content.setAttribute('spellcheck', String(spellCheck));
-            content.setAttribute('autocorrect', autoCorrect ? 'on' : 'off');
+            content.setAttribute('autocorrect', autoCorrect);
             content.setAttribute('autocapitalize', autoCapitalize);
         }, [autoCapitalize, autoCorrect, spellCheck]);
 
@@ -513,17 +521,14 @@ export const ComposerEditor = React.forwardRef<ComposerEditorHandle, ComposerEdi
                     userEvent: 'input.type',
                 });
             },
-            replaceRange(from, to, text, caret) {
+            replaceRange(from, to, text, selectionStart, selectionEnd = selectionStart) {
                 const view = viewRef.current;
                 if (!view) return;
+                const caret = selectionStart === undefined
+                    ? undefined
+                    : { anchor: selectionStart, head: selectionEnd ?? selectionStart };
                 view.dispatch({
-                    ...replaceWithCaret(
-                        view.state,
-                        from,
-                        to,
-                        text,
-                        caret === undefined ? undefined : { anchor: caret, head: caret },
-                    ),
+                    ...replaceWithCaret(view.state, from, to, text, caret),
                     userEvent: 'input.type',
                 });
             },

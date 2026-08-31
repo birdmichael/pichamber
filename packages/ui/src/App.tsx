@@ -17,6 +17,7 @@ import { usePushVisibilityBeacon } from '@/hooks/usePushVisibilityBeacon';
 import { useWebNotificationStream } from '@/hooks/useWebNotificationStream';
 import { usePwaInstallPrompt } from '@/hooks/usePwaInstallPrompt';
 import { useWindowTitle } from '@/hooks/useWindowTitle';
+import { useRootScrollLock } from '@/hooks/useRootScrollLock';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { hasModifier } from '@/lib/utils';
 import { isDesktopLocalOriginActive, isDesktopShell, restartDesktopApp, invokeDesktop } from '@/lib/desktop';
@@ -714,6 +715,8 @@ function App({ apis }: AppProps) {
   usePwaInstallPrompt();
 
   useWindowTitle();
+
+  useRootScrollLock();
 
   useRouter();
 

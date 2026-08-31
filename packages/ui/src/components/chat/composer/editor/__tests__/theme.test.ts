@@ -46,6 +46,11 @@ describe('composerEditorTheme', () => {
         expect(rule.borderLeftColor.startsWith('var(--')).toBe(true);
     });
 
+    test('the empty-document caret sits inside the scroller clip', () => {
+        const content = (COMPOSER_EDITOR_THEME_SPEC as Record<string, Record<string, string>>)['.cm-content'];
+        expect(content.paddingInlineStart).toBe('1px');
+    });
+
     test('the drawn caret is wide enough to remain prominent', () => {
         const cursorRule = selectors.find((selector) => selector.includes('.cm-cursor'));
         const rule = (COMPOSER_EDITOR_THEME_SPEC as Record<string, Record<string, string>>)[cursorRule!];
