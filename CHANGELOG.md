@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** the sidebar Settings gear opens on the first press, not three clicks.
 - **Mobile:** after a Plan is ready, Build sits on the collapsed composer (pill), not only the workspace Plan tab.
 - **Mobile:** tapping Agent/Plan on the expanded composer opens the menu instead of collapsing the input.
 - **Mobile:** the model sheet lists Pi providers even when no project is open yet. Previously a cold start skipped `loadProviders` and showed “No providers or models match your search.”

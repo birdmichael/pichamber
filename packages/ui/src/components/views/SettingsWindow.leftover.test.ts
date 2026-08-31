@@ -33,4 +33,9 @@ describe('dialog leftover overlay', () => {
     expect(dialogSource).toContain('useDialogLayerRegistration');
     expect(dialogSource).toContain('dropPointerEventsOnExit && "data-[ending-style]:pointer-events-none"');
   });
+
+  test('blocked dismiss calls cancel so Base UI does not leave an ending overlay', () => {
+    expect(settingsWindowSource).toContain('shouldBlockSettingsDismiss');
+    expect(settingsWindowSource).toContain('eventDetails?.cancel?.()');
+  });
 });

@@ -19,9 +19,13 @@ describe('sidebar first-click activation', () => {
     expect(source).toContain('ignoreRowClickRef');
   });
 
-  test('the Settings gear still activates on pointerdown so it cannot double-open', () => {
+  test('the Settings gear activates on primary pointerdown like session rows', () => {
     expect(footerSource).toContain('activateTitlebarIconOnPointerDown');
     expect(footerSource).toContain('ignoreSettingsClickRef');
+    expect(footerSource).toContain('onPointerDown={handleSettingsPointerDown}');
+    expect(footerSource).toContain('onClick={handleSettingsClick}');
+    expect(footerSource).toContain('markSettingsOpenedFromTrigger');
+    expect(footerSource).toMatch(/activate:\s*\(\)\s*=>\s*\{[\s\S]*markSettingsOpenedFromTrigger[\s\S]*onOpenSettings/);
   });
 });
 
