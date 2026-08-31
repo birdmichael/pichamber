@@ -5,6 +5,7 @@ import { dict as zhCnDict } from '@/lib/i18n/messages/zh-CN';
 import {
   isPlanModeEnabledNotify,
   isPlanReadyDecisionPrompt,
+  isPlanReadyImplementHereOption,
   planReadyOptionForAction,
   localizePiPlanNotifyMessage,
   localizePiPlanSelectOption,
@@ -90,5 +91,9 @@ describe('pi-plan-locale', () => {
     expect(planReadyOptionForAction(['1. Implement here — keep this chat'], 'implement'))
       .toBe('1. Implement here — keep this chat');
     expect(planReadyOptionForAction(['Stay in plan mode'], 'implement')).toBeNull();
+    expect(isPlanReadyImplementHereOption('Implement here')).toBe(true);
+    expect(isPlanReadyImplementHereOption('1. Implement here — keep this chat')).toBe(true);
+    expect(isPlanReadyImplementHereOption('Start fresh and implement')).toBe(false);
+    expect(isPlanReadyImplementHereOption('Save for later')).toBe(false);
   });
 });

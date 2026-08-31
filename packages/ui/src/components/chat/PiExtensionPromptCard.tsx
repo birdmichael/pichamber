@@ -23,7 +23,7 @@ import {
 import type { PiExtensionUiPrompt } from '@/sync/pi-extension-ui';
 import { localizePiPlanSelectOption, localizePiPlanSelectTitle } from '@/sync/pi-plan-locale';
 import { PLAN_MODE_ENABLED_NOTIFY } from '@/sync/pi-session-plan';
-import { refreshSessionPlan } from '@/sync/pi-session-plan-store';
+import { answerPiExtensionPlanReadyOption, refreshSessionPlan } from '@/sync/pi-session-plan-store';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
 import { stopQuestionAnswerKeyBubble } from './questionAnswerFocus';
 import { blurChatInput } from './composer/editor/dom';
@@ -174,6 +174,9 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
         return;
       }
       const value = isMultiple ? selected : selected[0];
+      if (!isMultiple && await answerPiExtensionPlanReadyOption(prompt.sessionID, prompt, value)) {
+        return;
+      }
       await replyPiExtensionUi(prompt.sessionID, prompt.id, value);
       const started = (Array.isArray(value) ? value : [value]).some((option) => (
         /start plan mode/i.test(String(option ?? ''))
@@ -190,7 +193,7 @@ export const PiExtensionPromptCard: React.FC<PiExtensionPromptCardProps> = ({ pr
     } finally {
       setIsResponding(false);
     }
-  }, [customMode, handleFailure, isMultiple, isTextPrompt, options, prompt.id, prompt.sessionID, requiredSatisfied, selected, settled]);
+  }, [customMode, handleFailure, isMultiple, isTextPrompt, options, prompt, requiredSatisfied, selected, settled]);
 
   const handleDismiss = React.useCallback(async () => {
     if (settled) return;

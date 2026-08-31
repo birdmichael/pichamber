@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { maybeOpenPlanRailOnReady, notePlanReadyCycle } from './pi-plan-ready';
-import { isPlanReadyDecisionPrompt, planReadyOptionForAction } from './pi-plan-locale';
+import { isPlanReadyDecisionPrompt, isPlanReadyImplementHereOption, planReadyOptionForAction } from './pi-plan-locale';
 import { replyPiExtensionUi } from './pi-extension-ui';
 import { usePiExtensionUiStore } from './pi-extension-ui-store';
 import {
@@ -108,8 +108,23 @@ const shouldKeepPlanAgainstOff = (sessionID: string, incoming: SessionPlan | nul
   if (incoming?.status !== 'off') return false;
   if (isPendingDraftPlan(sessionID)) return true;
   const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  // User-initiated implement: GET off is not "don't clobber Plan". Keep
+  // optimistic implementing; never preserve ready/active after implement.
+  if (isPlanImplemented(sessionID) || current?.status === 'implementing') {
+    return current?.status === 'implementing';
+  }
   return Boolean(current && isFooterPlanSelected(current.status));
 };
+
+const shouldIgnoreIncomingReady = (sessionID: string, incoming: SessionPlan | null): boolean => {
+  if (incoming?.status !== 'ready') return false;
+  const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  return current?.status === 'implementing' || isPlanImplemented(sessionID);
+};
+
+const shouldSkipIncomingPlan = (sessionID: string, incoming: SessionPlan | null): boolean => (
+  shouldKeepPlanAgainstOff(sessionID, incoming) || shouldIgnoreIncomingReady(sessionID, incoming)
+);
 
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
@@ -133,7 +148,8 @@ export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan
   const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
   // A GET that still says off must not wipe optimistic / just-started Plan.
   // Explicit exit still goes through dispatchSessionPlanAction → applySessionPlan.
-  if (shouldKeepPlanAgainstOff(sessionID, plan)) {
+  // After implement, skip stale off→ready and ready-over-implementing.
+  if (shouldSkipIncomingPlan(sessionID, plan)) {
     return current ?? plan;
   }
   applySessionPlan(sessionID, plan);
@@ -220,7 +236,7 @@ export const applySessionPlanEvent = (value: unknown): SessionPlan | null => {
   const record = value as { sessionID?: unknown; plan?: unknown };
   if (typeof record.sessionID !== 'string' || !record.sessionID.trim()) return null;
   const plan = parseSessionPlan(record.plan);
-  if (shouldKeepPlanAgainstOff(record.sessionID, plan)) {
+  if (shouldSkipIncomingPlan(record.sessionID, plan)) {
     return usePiSessionPlanStore.getState().plansBySession[record.sessionID] ?? plan;
   }
   applySessionPlan(record.sessionID, plan);
@@ -242,3 +258,21 @@ export const usePlanImplemented = (sessionID: string | null | undefined): boolea
     sessionID ? state.implementedBySession[sessionID] === true : false
   ))
 );
+
+/** Q&A / ready-select 「在此实现」 shares composer Build's implement chrome write. */
+export const answerPiExtensionPlanReadyOption = async (
+  sessionID: string,
+  prompt: {
+    kind: string;
+    status?: string;
+    title?: string;
+    options?: readonly string[];
+  },
+  option: unknown,
+): Promise<boolean> => {
+  if (!isPlanReadyDecisionPrompt(prompt)) return false;
+  const raw = typeof option === 'string' ? option : '';
+  if (!raw || !isPlanReadyImplementHereOption(raw)) return false;
+  await dispatchSessionPlanAction(sessionID, 'implement');
+  return true;
+};

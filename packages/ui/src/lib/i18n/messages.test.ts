@@ -64,7 +64,10 @@ describe('i18n dictionaries', () => {
     expect(zhCnDict['chat.piPlan.readySelect.title']).not.toBe(enDict['chat.piPlan.readySelect.title']);
     expect(zhCnDict['chat.piPlan.readySelect.implementFresh']).not.toBe(enDict['chat.piPlan.readySelect.implementFresh']);
     expect(zhCnDict['chat.tool.planModeComplete']).not.toBe(enDict['chat.tool.planModeComplete']);
-    expect(zhCnDict['chat.piPlan.readySelect.title']).toContain('/plan exit');
+    expect(zhCnDict['chat.piPlan.readySelect.title']).not.toContain('/plan exit');
+    expect(zhCnDict['chat.piPlan.readySelect.title']).toContain('智能体');
+    expect(enDict['chat.piPlan.readySelect.title']).not.toContain('/plan exit');
+    expect(enDict['chat.piPlan.readySelect.title']).toContain('Agent');
   });
 
   test('empty-session draft titles stay native and keep {project}', () => {
