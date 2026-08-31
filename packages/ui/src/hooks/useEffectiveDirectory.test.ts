@@ -73,5 +73,18 @@ describe('resolveNewSessionComposerDirectory', () => {
       directoryOverride: PROJECT,
     })).toBe(PROJECT);
   });
+
+  test('chats+ stays on the chats bucket even when home is an opened project path', () => {
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'chat',
+      directoryOverride: null,
+    })).toBe(CHAT_DRAFT_PROJECT_ID);
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'chat',
+      directoryOverride: HOME,
+    })).toBe(CHAT_DRAFT_PROJECT_ID);
+  });
 });
 
