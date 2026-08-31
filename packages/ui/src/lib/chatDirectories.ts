@@ -55,6 +55,30 @@ export function isManagedChatDirectory(
   return !openedProjectPaths?.has(normalizedHome);
 }
 
+export type NewSessionComposerDraft = {
+  open?: boolean;
+  target?: 'chat' | 'project';
+  bootstrapPendingDirectory?: string | null;
+  directoryOverride?: string | null;
+  preparedChatDirectory?: string | null;
+};
+
+/**
+ * Composer identity directory for an unsent New session.
+ * Projectless chats must not share `~` / the last session path with a real
+ * session draft, or Sidebar New session restores that leftover text.
+ */
+export function resolveNewSessionComposerDirectory(
+  draft: NewSessionComposerDraft | null | undefined,
+): string | null {
+  if (!draft?.open) return null;
+  if (draft.target === "chat") {
+    return normalizePath(draft.bootstrapPendingDirectory ?? draft.preparedChatDirectory ?? null)
+      ?? CHAT_DRAFT_PROJECT_ID;
+  }
+  return normalizePath(draft.bootstrapPendingDirectory ?? draft.directoryOverride ?? null);
+}
+
 async function getChatsRootDirectory(): Promise<string> {
   const runtimeKey = getRuntimeKey();
   const existing = chatsRootByRuntime.get(runtimeKey);

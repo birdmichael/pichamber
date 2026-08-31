@@ -99,7 +99,9 @@ import {
   CHAT_DRAFT_PROJECT_ID,
   deleteChatDirectory,
   isChatDirectoryPath,
+  isManagedChatDirectory,
   resolveChatSessionDirectory,
+  resolveNewSessionComposerDirectory,
   warmChatsRootDirectory,
 } from "@/lib/chatDirectories"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
@@ -328,7 +330,7 @@ export type NewSessionDraftState = {
   targetFolderId?: string
   target: "chat" | "project"
   preparedChatDirectory?: string | null
-  /** User-initiated New session: start empty, do not restore a leftover `/`. */
+  /** User-initiated New session: start empty; drop leftover `/` on project drafts. */
   resetComposer?: boolean
 }
 
@@ -741,8 +743,8 @@ export async function materializeOpenDraftSession(selection: {
   const createdDirectory = normalizePath(created.directory ?? draftDirectoryOverride ?? null)
 
   persistDraftTarget({
-    projectId: draftProjectId,
-    directory: createdDirectory,
+    projectId: isChatDraft ? null : draftProjectId,
+    directory: isChatDraft ? null : createdDirectory,
   })
 
   const draftSyntheticParts = draft.syntheticParts
@@ -1049,15 +1051,34 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
     const resetComposer = !options?.automatic && !options?.initialPrompt
-    // Drop only a leftover new-session `/`. A real untitled draft must survive
-    // leaving this composer and clicking New session again.
+    // User-initiated New session starts empty. Project drafts still keep a real
+    // untitled prompt (only a leftover `/` is dropped). Projectless chats used
+    // to share the `~` identity with the previous session and restored it.
     if (resetComposer) {
-      const draftDirectory = target === "chat"
-        ? normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
-        : directory
-      const identity = createChatDraftIdentity(getRuntimeKey(), draftDirectory, null)
-      if (identity && isStrayNewSessionSlashDraft(readChatDraft(identity).text)) {
-        clearChatDraft(identity, true)
+      if (target === "chat") {
+        const chatDirectory = resolveNewSessionComposerDirectory({
+          open: true,
+          target: "chat",
+          directoryOverride: null,
+        })
+        const chatIdentity = createChatDraftIdentity(getRuntimeKey(), chatDirectory, null)
+        if (chatIdentity) clearChatDraft(chatIdentity, true)
+        const leftoverDirectory = normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
+        const leftoverHome = normalizePath(useDirectoryStore.getState().homeDirectory ?? null)
+        const openedProjectPaths = new Set(
+          projects
+            .map((project) => normalizePath(project.path))
+            .filter((path): path is string => Boolean(path)),
+        )
+        if (leftoverDirectory && isManagedChatDirectory(leftoverDirectory, leftoverHome, openedProjectPaths)) {
+          const leftoverIdentity = createChatDraftIdentity(getRuntimeKey(), leftoverDirectory, null)
+          if (leftoverIdentity) clearChatDraft(leftoverIdentity, true)
+        }
+      } else {
+        const identity = createChatDraftIdentity(getRuntimeKey(), directory, null)
+        if (identity && isStrayNewSessionSlashDraft(readChatDraft(identity).text)) {
+          clearChatDraft(identity, true)
+        }
       }
     }
     const nextDraft: NewSessionDraftState = {
