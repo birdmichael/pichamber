@@ -27,6 +27,23 @@ export function normalizeDirectoryExplorerQuery(query: string): string {
   return trimmed;
 }
 
+/**
+ * Apply an insert (typed or pasted) at the caret, then drop a concatenated
+ * `~/` + absolute path. Needed because some desktop input paths (insertText)
+ * update the native value without a React change event until the next render.
+ */
+export function applyDirectoryExplorerQueryEdit(
+  query: string,
+  inserted: string,
+  selectionStart = query.length,
+  selectionEnd = selectionStart,
+): string {
+  const start = Math.max(0, Math.min(selectionStart, query.length));
+  const end = Math.max(start, Math.min(selectionEnd, query.length));
+  const merged = `${query.slice(0, start)}${inserted}${query.slice(end)}`.replace(/\\/g, '/');
+  return normalizeDirectoryExplorerQuery(merged);
+}
+
 export function expandTildeDirectoryPath(value: string, homeDirectory: string): string {
   const trimmed = value.trim();
   if (!homeDirectory) {

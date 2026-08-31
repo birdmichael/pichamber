@@ -29,6 +29,7 @@ import {
   type FilesystemErrorReason,
 } from '@/lib/api/files-errors';
 import {
+  applyDirectoryExplorerQueryEdit,
   normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
   shouldFetchDirectoryExplorerListing,
@@ -583,6 +584,21 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
           ref={inputRef}
           value={query}
           onChange={(event) => setQuery(normalizeDirectoryExplorerQuery(normalizeSeparators(event.target.value)))}
+          onBeforeInput={(event) => {
+            const inserted = (event.nativeEvent as InputEvent).data;
+            if (inserted == null || inserted === '') {
+              return;
+            }
+            const input = event.currentTarget;
+            const start = input.selectionStart ?? query.length;
+            const end = input.selectionEnd ?? start;
+            const merged = `${query.slice(0, start)}${inserted}${query.slice(end)}`.replace(/\\/g, '/');
+            const next = applyDirectoryExplorerQueryEdit(query, inserted, start, end);
+            if (next !== merged) {
+              event.preventDefault();
+              setQuery(next);
+            }
+          }}
           onKeyDown={handleKeyDown}
           placeholder={t('directoryExplorerDialog.pathInput.placeholder')}
           className="border-transparent bg-transparent pl-9 font-mono typography-ui-label shadow-none focus-visible:ring-0"

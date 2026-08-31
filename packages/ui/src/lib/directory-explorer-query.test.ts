@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 
 import {
+  applyDirectoryExplorerQueryEdit,
   expandTildeDirectoryPath,
   normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
@@ -72,4 +73,11 @@ test('drops a ~/ prefix when the remainder is a Windows volume root', () => {
     filter: 'src',
   });
   expect(normalizeDirectoryExplorerQuery('~/D:\\Projects\\app')).toBe('D:\\Projects\\app');
+});
+
+test('drops ~/ when a slash is inserted at the caret', () => {
+  expect(applyDirectoryExplorerQueryEdit('~/', '/')).toBe('/');
+  expect(applyDirectoryExplorerQueryEdit('~/', '/tmp/pichamber-409')).toBe('/tmp/pichamber-409');
+  expect(applyDirectoryExplorerQueryEdit('~/', 'Documents')).toBe('~/Documents');
+  expect(applyDirectoryExplorerQueryEdit('~/', '/', 2, 2)).toBe('/');
 });
