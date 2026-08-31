@@ -13,10 +13,19 @@ stop.
 
 Local TTS (Kokoro via sherpa-onnx OfflineTts) runs in the same worker process
 and is exposed as `POST /api/dictation/tts/speak` (JSON `{text, speakerId?,
-speed?, model?}` → WAV bytes; 503 with `reasonCode` while the model is
-downloading). TTS models live in the same catalog/downloader as STT models
-(`local/model-catalog.js` `LOCAL_TTS_MODEL_CATALOG`) and are managed by the
-same status/download/delete routes.
+speed?, model?, language?, languageSample?}` → WAV bytes; 503 with
+`reasonCode` while the model is downloading). TTS models live in the same
+catalog/downloader as STT models (`local/model-catalog.js`
+`LOCAL_TTS_MODEL_CATALOG`) and are managed by the same status/download/delete
+routes.
+
+With `language: 'auto'` the service detects the language of `languageSample`
+— the whole message the chunk belongs to — or of `text` when no sample is
+given (`../tts/language-detect.js`) and keeps the caller's model when it
+speaks that language; otherwise it switches to the catalog model for the
+language, downloading it on first use like any other model. A language no
+catalog model covers keeps the caller's model, so text is always spoken. The
+response carries `X-Speech-Model` and `X-Speech-Language`.
 
 ## Ownership
 

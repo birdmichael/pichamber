@@ -1058,6 +1058,8 @@ interface ConfigStore {
     sayVoice: string;
     browserVoice: string;
     localTtsVoiceId: number;
+    /** Local and macOS voices follow the language of the text being read. */
+    ttsFollowTextLanguage: boolean;
     openaiVoice: string;
     openaiApiKey: string;
     openaiCompatibleUrl: string;
@@ -1085,6 +1087,7 @@ interface ConfigStore {
     setSayVoice: (voice: string) => void;
     setBrowserVoice: (voice: string) => void;
     setLocalTtsVoiceId: (voiceId: number) => void;
+    setTtsFollowTextLanguage: (enabled: boolean) => void;
     setOpenaiVoice: (voice: string) => void;
     setOpenaiApiKey: (apiKey: string) => void;
     setOpenaiCompatibleUrl: (url: string) => void;
@@ -1268,6 +1271,13 @@ export const useConfigStore = create<ConfigStore>()(
                         }
                     }
                     return 0;
+                })(),
+                ttsFollowTextLanguage: (() => {
+                    if (typeof window !== 'undefined') {
+                        const saved = localStorage.getItem('ttsFollowTextLanguage');
+                        if (saved !== null) return saved === 'true';
+                    }
+                    return true;
                 })(),
                 // Browser voice - load from localStorage or default to empty (auto-select)
                 browserVoice: (() => {
@@ -2917,6 +2927,13 @@ export const useConfigStore = create<ConfigStore>()(
                     set({ localTtsVoiceId: voiceId });
                     if (typeof window !== 'undefined') {
                         localStorage.setItem('localTtsVoiceId', String(voiceId));
+                    }
+                },
+
+                setTtsFollowTextLanguage: (enabled: boolean) => {
+                    set({ ttsFollowTextLanguage: enabled });
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('ttsFollowTextLanguage', String(enabled));
                     }
                 },
 

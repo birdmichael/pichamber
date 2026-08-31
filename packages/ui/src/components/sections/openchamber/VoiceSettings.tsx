@@ -426,6 +426,8 @@ export const VoiceSettings: React.FC = () => {
     const setSayVoice = useConfigStore((state) => state.setSayVoice);
     const localTtsVoiceId = useConfigStore((state) => state.localTtsVoiceId);
     const setLocalTtsVoiceId = useConfigStore((state) => state.setLocalTtsVoiceId);
+    const ttsFollowTextLanguage = useConfigStore((state) => state.ttsFollowTextLanguage);
+    const setTtsFollowTextLanguage = useConfigStore((state) => state.setTtsFollowTextLanguage);
     const { speak: speakLocalTts, stop: stopLocalTts, isPlaying: isLocalTtsPlaying, error: localTtsError } = useLocalTTS();
 
     const previewLocalVoice = useCallback(() => {
@@ -981,6 +983,16 @@ export const VoiceSettings: React.FC = () => {
 
                             {/* Local (Kokoro) TTS model status */}
                             {voiceProvider === 'local' && <LocalTtsModelStatus />}
+
+                            {(voiceProvider === 'local' || voiceProvider === 'say') && (
+                                <SettingsCheckboxRow
+                                    checked={ttsFollowTextLanguage}
+                                    onChange={setTtsFollowTextLanguage}
+                                    label={t('settings.voice.page.field.followTextLanguage')}
+                                    ariaLabel={t('settings.voice.page.field.followTextLanguageAria')}
+                                    info={t('settings.voice.page.field.followTextLanguageInfo')}
+                                />
+                            )}
 
                             {/* Voice Selection */}
                             <SettingsFieldRow label={t('settings.voice.page.field.voice')}>
