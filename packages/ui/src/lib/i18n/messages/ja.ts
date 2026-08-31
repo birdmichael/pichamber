@@ -1084,6 +1084,7 @@ export const dict: Record<I18nKey, string> = {
   'gitView.pr.toast.titleRequired': 'タイトルが必要です',
   'gitView.pr.toast.updatePrFailed': 'プルリクエストの更新に失敗しました',
   'gitView.pullRequest.createHint': 'このブランチからプルリクエストを作成・管理します。',
+  'gitView.pullRequest.detachedHeadHint': '分離HEADです。先にブランチを作成してください。',
   'gitView.pullRequest.availableOnFeatureBranches': '現在のブランチがプルリクエストを開ける場合に利用可能です。',
   'gitView.pullRequest.title': 'プルリクエスト',
   'gitView.tabs.worktree': 'ワークツリー',

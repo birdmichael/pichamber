@@ -40,6 +40,7 @@ import type {
   GitRemote,
 } from '@/lib/api/types';
 import { useI18n } from '@/lib/i18n';
+import { canEnablePullRequestCreate, isPushableLocalBranch, type GitHeadState } from './pullRequestCreate';
 
 type MergeMethod = 'merge' | 'squash' | 'rebase';
 type PrSegment = 'overview' | 'checks' | 'comments';
@@ -319,8 +320,9 @@ export const PullRequestSection: React.FC<{
   trackingBranch?: string;
   remotes?: GitRemote[];
   remoteBranches?: string[];
+  headState?: GitHeadState | null;
   onGeneratedDescription?: () => void;
-}> = ({ directory, branch, baseBranch, trackingBranch, remotes = [], remoteBranches = [], onGeneratedDescription }) => {
+}> = ({ directory, branch, baseBranch, trackingBranch, remotes = [], remoteBranches = [], headState, onGeneratedDescription }) => {
   const { t } = useI18n();
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const { github } = useRuntimeAPIs();
@@ -397,7 +399,8 @@ export const PullRequestSection: React.FC<{
 
   const hasUpstreamRemote = remotes.some((r) => r.name === 'upstream');
   const isFork = hasUpstreamRemote || detectedUpstream !== null;
-  const canShow = Boolean(directory && branch && baseBranch && (branch !== baseBranch || isFork));
+  const hasPushableHead = isPushableLocalBranch(branch, headState);
+  const canShow = Boolean(directory && hasPushableHead && baseBranch && (branch !== baseBranch || isFork));
 
   const prStatusKey = React.useMemo(
     () => getGitHubPrStatusKey(directory, branch, selectedRemote?.name ?? null),
@@ -1263,6 +1266,10 @@ export const PullRequestSection: React.FC<{
   }, [additionalContext, branch, detectedUpstream?.defaultBranchSha, directory, isGenerating, onGeneratedDescription, targetBaseBranch, t, useDetectedUpstream]);
 
   const createPr = React.useCallback(async () => {
+    if (!isPushableLocalBranch(branch, headState)) {
+      toast.error(t('gitView.pullRequest.detachedHeadHint'));
+      return;
+    }
     if (!github?.prCreate) {
       toast.error(t('gitView.pr.toast.githubApiUnavailable'));
       return;
@@ -1315,7 +1322,7 @@ export const PullRequestSection: React.FC<{
     } finally {
       setIsCreating(false);
     }
-  }, [body, branch, detectedUpstream, directory, draft, github, prStatusKey, refresh, scheduleActionRefresh, selectedRemote, targetBaseBranch, title, trackingBranch, updatePrStatus, useDetectedUpstream, t]);
+  }, [body, branch, detectedUpstream, directory, draft, github, headState, prStatusKey, refresh, scheduleActionRefresh, selectedRemote, targetBaseBranch, title, trackingBranch, updatePrStatus, useDetectedUpstream, t]);
 
   const mergePr = React.useCallback(async (pr: GitHubPullRequest) => {
     if (!github?.prMerge) {
@@ -1412,7 +1419,9 @@ export const PullRequestSection: React.FC<{
         <div className="space-y-1 pt-3">
           <div className="typography-ui-header font-semibold text-foreground">{t('gitView.pullRequest.title')}</div>
           <div className="typography-micro text-muted-foreground">
-            {t('gitView.pullRequest.availableOnFeatureBranches')}
+            {hasPushableHead
+              ? t('gitView.pullRequest.availableOnFeatureBranches')
+              : t('gitView.pullRequest.detachedHeadHint')}
           </div>
         </div>
       </section>
@@ -2147,7 +2156,14 @@ export const PullRequestSection: React.FC<{
                     size="sm"
                     className="min-w-[7.5rem] justify-center gap-2"
                     onClick={createPr}
-                    disabled={isCreating || !isConnected || !targetBaseBranch.trim() || (!useDetectedUpstream && targetBaseBranch.trim() === branch)}
+                    disabled={!canEnablePullRequestCreate({
+                      isCreating,
+                      isConnected,
+                      targetBaseBranch,
+                      headBranch: branch,
+                      headState,
+                      useDetectedUpstream,
+                    })}
                   >
                     <span className="inline-flex size-4 items-center justify-center">
                       {isCreating ? <Icon name="loader-4" className="size-4 animate-spin" /> : <Icon name="git-pull-request" className="size-4" />}

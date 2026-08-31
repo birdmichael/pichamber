@@ -2387,6 +2387,7 @@ export const dict: Record<I18nKey, string> = {
   'gitView.pr.toast.titleRequired': 'Tytuł jest wymagany',
   'gitView.pr.toast.updatePrFailed': 'Nie udało się zaktualizować pull requesta',
   'gitView.pullRequest.createHint': 'Utwórz i zarządzaj pull requestami z tej gałęzi.',
+  'gitView.pullRequest.detachedHeadHint': 'Odłączony HEAD — najpierw utwórz gałąź.',
   'gitView.pullRequest.title': 'Pull request',
   'gitView.stash.confirmButton': 'Potwierdź',
   'gitView.stash.description': 'Opis',

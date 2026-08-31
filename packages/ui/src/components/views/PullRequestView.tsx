@@ -15,6 +15,7 @@ import { ScrollShadow } from '@/components/ui/ScrollShadow';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { PullRequestSection } from './git/PullRequestSection';
 import { deriveBaseBranch } from './git/baseBranch';
+import { isPushableLocalBranch } from './git/pullRequestCreate';
 
 const normalizePath = (value?: string | null): string =>
   (value || '').replace(/\\/g, '/').replace(/\/+$/, '');
@@ -214,6 +215,8 @@ export const PullRequestView: React.FC = () => {
   }, [remotes, remoteBranches, remoteUrl, status?.tracking]);
 
   const currentBranch = status?.current ?? null;
+  const headState = worktreeAttachment?.headState ?? worktreeMetadata?.headState;
+  const hasPushableHead = isPushableLocalBranch(currentBranch, headState);
 
   // A pull request opened against a branch that does not exist is worse than a
   // broken walkthrough, so this surface reads the repository's default branch
@@ -240,12 +243,19 @@ export const PullRequestView: React.FC = () => {
     worktreeMetadata?.createdFromBranch,
   ]);
 
-  if (!currentDirectory || !currentBranch) {
+  if (!currentDirectory || !hasPushableHead || !currentBranch) {
+    const detachedHint = Boolean(currentDirectory) && (
+      headState === 'detached'
+      || headState === 'unborn'
+      || currentBranch === 'HEAD'
+    );
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <Icon name="git-pull-request" className="h-12 w-12 text-muted-foreground/50" />
         <div className="typography-ui-header text-foreground">{t('gitView.pullRequest.title')}</div>
-        <div className="max-w-sm typography-micro text-muted-foreground">{t('gitView.pullRequest.createHint')}</div>
+        <div className="max-w-sm typography-micro text-muted-foreground">
+          {detachedHint ? t('gitView.pullRequest.detachedHeadHint') : t('gitView.pullRequest.createHint')}
+        </div>
       </div>
     );
   }
@@ -265,6 +275,7 @@ export const PullRequestView: React.FC = () => {
         trackingBranch={status?.tracking ?? undefined}
         remotes={remotes}
         remoteBranches={remoteBranches}
+        headState={headState}
       />
     </ScrollableOverlay>
   );

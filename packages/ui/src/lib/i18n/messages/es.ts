@@ -1088,6 +1088,7 @@ export const dict: Record<I18nKey, string> = {
   "gitView.pr.toast.titleRequired": "El título es obligatorio",
   "gitView.pr.toast.updatePrFailed": "No se pudo actualizar la PR",
   "gitView.pullRequest.createHint": "Crea y gestiona PR desde esta rama.",
+  "gitView.pullRequest.detachedHeadHint": "HEAD desvinculado: crea una rama primero.",
   "gitView.pullRequest.availableOnFeatureBranches": "Disponible cuando la rama actual puede abrir un PR.",
   "gitView.pullRequest.title": "PR",
   "gitView.tabs.worktree": "Worktree",
