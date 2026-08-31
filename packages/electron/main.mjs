@@ -3894,6 +3894,27 @@ const closeAllDevTunnels = () => {
   pending.then((client) => client.closeAll()).catch(() => {});
 };
 
+
+const restoreRendererKeyboardFocus = (browserWindow) => {
+  const target = browserWindow && !browserWindow.isDestroyed()
+    ? browserWindow
+    : (state.mainWindow && !state.mainWindow.isDestroyed() ? state.mainWindow : null);
+  if (!target) return false;
+  if (target.isMinimized()) target.restore();
+  try { target.show(); } catch {}
+  try { target.focus(); } catch {}
+  try { app.focus?.({ steal: true }); } catch {}
+  const focusWebContents = () => {
+    if (target.isDestroyed()) return;
+    try { target.focus(); } catch {}
+    try { target.webContents?.focus(); } catch {}
+  };
+  focusWebContents();
+  setTimeout(focusWebContents, 0);
+  setTimeout(focusWebContents, 50);
+  return true;
+};
+
 const handleInvoke = async (browserWindow, command, args = {}) => {
   switch (command) {
     case 'desktop_start_window_drag':
@@ -3904,15 +3925,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     // A browser will not follow a custom-protocol link without a user gesture,
     // and the completion page has none.
     case 'desktop_focus_window': {
-      const target = browserWindow && !browserWindow.isDestroyed()
-        ? browserWindow
-        : (state.mainWindow && !state.mainWindow.isDestroyed() ? state.mainWindow : null);
-      if (!target) return false;
-      if (target.isMinimized()) target.restore();
-      target.show();
-      target.focus();
-      app.focus?.({ steal: true });
-      return true;
+      return restoreRendererKeyboardFocus(browserWindow);
     }
 
     case 'desktop_is_window_fullscreen':
@@ -5250,7 +5263,9 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
     throw new Error('IPC not available for this origin');
   }
   const browserWindow = BrowserWindow.fromWebContents(event.sender);
-  const result = await dialog.showOpenDialog(browserWindow || undefined, {
+  let result;
+  try {
+  result = await dialog.showOpenDialog(browserWindow || undefined, {
     title: typeof options?.title === 'string' ? options.title : undefined,
     defaultPath: typeof options?.defaultPath === 'string' && options.defaultPath.trim().length > 0
       ? options.defaultPath.trim()
@@ -5271,6 +5286,9 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
       'createDirectory',
     ].filter(Boolean),
   });
+  } finally {
+    restoreRendererKeyboardFocus(browserWindow);
+  }
   if (result.canceled) return null;
   const grantFilePath = async (filePath) => {
     if (options?.directory) return { path: filePath };

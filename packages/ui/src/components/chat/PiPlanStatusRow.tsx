@@ -18,13 +18,17 @@ export const PiPlanStatusRow: React.FC<PiPlanStatusRowProps> = React.memo(({
   const hintKind = resolvePlanStatusRowHint({
     footerPlanSelected: chrome.footerPlanSelected,
     draftOpen: chrome.draftOpen,
+    implementing: chrome.implementing,
+    implemented: chrome.implemented,
   });
 
   if (!chrome.showToggle || !hintKind) return null;
 
   const hint = hintKind === 'draft'
     ? t('chat.piPlan.draftHint')
-    : t('chat.piPlan.enabledNotify');
+    : hintKind === 'implementing'
+      ? t('chat.piPlan.implementingNotify')
+      : t('chat.piPlan.enabledNotify');
 
   return (
     <div

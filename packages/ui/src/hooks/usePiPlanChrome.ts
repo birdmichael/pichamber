@@ -10,13 +10,17 @@ import {
   canShowPiPlanToggle,
   isPlanChromeDraft,
   planBuildAvailable,
+  planBuildBusyDisabled,
   resolveFooterPlanSelected,
   resolvePlanChromeSessionID,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
   sessionPlanViewAvailable,
 } from '@/sync/pi-session-plan';
-import { refreshSessionPlan, usePendingDraftPlan, useSessionPlan } from '@/sync/pi-session-plan-store';
+import { sessionHasPendingPlanReadySelect } from '@/sync/pi-plan-locale';
+import { syncPlanPanelToSession } from '@/sync/pi-plan-ready';
+import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
+import { refreshSessionPlan, usePendingDraftPlan, usePlanImplemented, useSessionPlan } from '@/sync/pi-session-plan-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
 export function usePiPlanChrome(sessionID?: string | null) {
@@ -38,6 +42,12 @@ export function usePiPlanChrome(sessionID?: string | null) {
   const pendingDraftPlan = usePendingDraftPlan(resolvedSessionId);
   const planPluginAvailable = usePiPlanPluginAvailable();
   const plan = useSessionPlan(resolvedSessionId);
+  const implemented = usePlanImplemented(resolvedSessionId);
+  const hasPendingPlanReadySelect = usePiExtensionUiStore((state) => (
+    resolvedSessionId
+      ? sessionHasPendingPlanReadySelect(state.promptsBySession[resolvedSessionId])
+      : false
+  ));
   const { phase } = useCurrentSessionActivity();
   const busy = phase === 'busy' || phase === 'retry';
   const available = isPiKernel && planPluginAvailable;
@@ -52,6 +62,21 @@ export function usePiPlanChrome(sessionID?: string | null) {
     void refreshSessionPlan(resolvedSessionId);
   }, [available, resolvedSessionId]);
 
+  React.useEffect(() => {
+    if (!available) return;
+    syncPlanPanelToSession({
+      sessionID: resolvedSessionId,
+      plan,
+      pendingDraftPlan,
+    });
+  }, [available, resolvedSessionId, plan, pendingDraftPlan]);
+
+  const implementing = plan?.status === 'implementing';
+  const showBuildRow = available && (
+    hasPendingPlanReadySelect
+    || (!implemented && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan))
+  );
+
   return {
     isPiKernel,
     available,
@@ -60,6 +85,9 @@ export function usePiPlanChrome(sessionID?: string | null) {
     plan,
     status: plan?.status ?? 'off',
     busy,
+    hasPendingPlanReadySelect,
+    implemented,
+    buildDisabled: planBuildBusyDisabled({ busy, hasPendingPlanReadySelect }),
     showToggle: canShowPiPlanToggle(available, resolvedSessionId, draftOpen),
     footerPlanSelected: resolveFooterPlanSelected({
       available,
@@ -69,9 +97,9 @@ export function usePiPlanChrome(sessionID?: string | null) {
       draftPlanSelected,
       pendingDraftPlan,
     }),
-    showBuildRow: available && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan),
-    showViewPlan: available && sessionPlanViewAvailable(plan),
+    showBuildRow,
+    showViewPlan: available && (sessionPlanViewAvailable(plan) || pendingDraftPlan),
     canDiscard: available && sessionPlanCanDiscard(plan),
-    implementing: plan?.status === 'implementing',
+    implementing,
   };
 }

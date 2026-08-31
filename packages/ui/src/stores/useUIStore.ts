@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { EDITOR_TREE_MAX_WIDTH, EDITOR_TREE_MIN_WIDTH } from '@/lib/surfaces/editorSplit';
+
 import { devtools, persist } from 'zustand/middleware';
 import type { SidebarSection } from '@/constants/sidebar';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
@@ -1325,7 +1327,7 @@ export const useUIStore = create<UIStore>()(
           if (!Number.isFinite(width)) {
             return;
           }
-          set({ contextEditorTreeWidth: Math.min(480, Math.max(200, Math.round(width))) });
+          set({ contextEditorTreeWidth: Math.min(EDITOR_TREE_MAX_WIDTH, Math.max(EDITOR_TREE_MIN_WIDTH, Math.round(width))) });
         },
 
         // Rail entry point: activates the most recent tab of the requested

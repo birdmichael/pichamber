@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Chat:** empty-state Schedule a Task and Craft a Goal send a short user line. The long instruction stays hidden, so the bubble and session title are not the internal prompt. User-visible chip copy says Pichamber, not OpenChamber.
+- **Desktop:** after the native Attach-files dialog (including Esc) or Settings open/close, the renderer takes keyboard focus again. Closing the composer `+` menu with Esc restores the textarea.
+- **Desktop:** Attach files uses the native open-file dialog without the tall GTK custom-type filter, so Cancel/Open stay on an 800px window.
+- **Chat:** Work Status Context sources counts the same active MCP servers as the MCP section, including adapter `cached`.
+- **Chat:** the Plan side panel no longer stays open empty on a session that has no plan. Build answers a pending Implement-here card even while the session is busy, and a second Build does not silently exit Plan. After Implement, the banner no longer says files will not be modified.
+- **Chat:** sidebar session rename commits on Enter, not only the check button.
+- **Chat:** the Files panel editor keeps a readable width beside the tree, and the split is resizable.
 - **Chat:** while a reply is running, Enter with Follow-up Queue is answered after the current run; Steer still course-corrects after the current tool. Previously both were dropped.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 

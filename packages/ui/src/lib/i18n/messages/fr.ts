@@ -3095,6 +3095,7 @@ export const dict = {
   'chat.piPlan.discardCancel': 'Conserver le plan',
   'chat.piPlan.discardConfirmAria': 'Confirmation d’abandon du plan',
   'chat.piPlan.enabledNotify': 'Mode Plan activé. Je vais explorer et planifier, sans modifier les fichiers.',
+  'chat.piPlan.implementingNotify': 'Mise en œuvre du plan approuvé. Les fichiers peuvent être modifiés.',
   'chat.piPlan.draftHint': 'Plan commencera à l’envoi.',
   'chat.piPlan.row.aria': 'Mode Plan',
   'chat.piPlan.readySelect.title': 'Le plan est prêt. Et ensuite ? Implémenter ici conserve cette conversation de planification. Recommencer à zéro transfère uniquement le plan approuvé vers une nouvelle session. Après l’implémentation : le plan reste actif jusqu’à /plan exit.',

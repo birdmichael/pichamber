@@ -632,7 +632,7 @@ Keep the review concise and practical. Respond in the same language the user use
     title: 'Review Handoff Instructions',
     group: 'Session',
     description: 'Hidden instructions attached to the /handoff-review command. Produces a handoff for a separate review agent.',
-    template: `Produce a review handoff for another agent. Do not compact or mutate session history. Your output is an assistant message that OpenChamber will send to a separate reviewer agent.
+    template: `Produce a review handoff for another agent. Do not compact or mutate session history. Your output is an assistant message that Pichamber will send to a separate reviewer agent.
 
 Include:
 - The user's original intent and any later clarifications that changed the intent
@@ -645,7 +645,7 @@ Include:
 Formatting:
 - Concise markdown with clear sections
 - No preamble like "Here is a handoff"
-- Do not mention OpenChamber metadata, linked sessions, session IDs, or routing
+- Do not mention Pichamber metadata, linked sessions, session IDs, or routing
 - Respond in the same language the user used most in the conversation`,
   },
   {
@@ -819,7 +819,7 @@ Respond in the same language the user uses.`,
     title: 'Scheduled Task Instructions',
     group: 'Session',
     description: 'Hidden instructions attached to the /schedule-task command. Guides the dialogue that defines a scheduled task and optionally creates it through the openchamber tool.',
-    template: `The user wants to set up a scheduled task: a saved prompt that OpenChamber runs automatically on a schedule (daily, weekly, one time, or cron) in a chosen project, with a chosen model and optional Goal Mode.
+    template: `The user wants to set up a scheduled task: a saved prompt that Pichamber runs automatically on a schedule (daily, weekly, one time, or cron) in a chosen project, with a chosen model and optional Goal Mode.
 
 Run this as a guided dialogue, not a one-shot answer.
 
@@ -839,7 +839,7 @@ Use the \`question\` tool only for clarifying decisions that have a small set of
 
 5. Do not perform the task's work in this session. The deliverable is the scheduled task definition.
 
-6. When everything is settled, present the final task definition clearly. If the \`openchamber\` tool is available, offer to create the task yourself and, only after the user explicitly confirms, create it and report the result. If the tool is unavailable, present the definition so the user can add it in OpenChamber's scheduled tasks UI.
+6. When everything is settled, present the final task definition clearly. If the \`openchamber\` tool is available, offer to create the task yourself and, only after the user explicitly confirms, create it and report the result. If the tool is unavailable, present the definition so the user can add it in Pichamber's scheduled tasks UI.
 
 Respond in the same language the user uses.`,
   },

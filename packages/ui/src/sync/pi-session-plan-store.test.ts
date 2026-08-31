@@ -86,5 +86,11 @@ describe('pi session plan store', () => {
     expect(uiReplies[0]?.url).toContain('/api/pi/ui/pui_ready/reply');
     expect(uiReplies[0]?.body).toContain('Implement here');
     expect(pendingFetch).toBeNull();
+
+    uiReplies.length = 0;
+    const again = await dispatchSessionPlanAction('ses_plan', 'implement');
+    expect(again?.status).toBe('implementing');
+    expect(uiReplies).toHaveLength(0);
+    expect(pendingFetch).toBeNull();
   });
 });

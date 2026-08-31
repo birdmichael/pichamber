@@ -2033,6 +2033,7 @@ export const dict = {
   'chat.piPlan.discardCancel': 'Plan behalten',
   'chat.piPlan.discardConfirmAria': 'Bestätigung zum Verwerfen des Plans',
   'chat.piPlan.enabledNotify': 'Planmodus aktiviert. Ich erkunde und plane, ändere aber keine Dateien.',
+  'chat.piPlan.implementingNotify': 'Der genehmigte Plan wird umgesetzt. Dateien können geändert werden.',
   'chat.piPlan.draftHint': 'Plan startet, wenn Sie senden.',
   'chat.piPlan.row.aria': 'Plan-Modus',
   'chat.piPlan.readySelect.title': 'Der Plan ist bereit. Was als Nächstes? Hier umsetzen behält dieses Planungsgespräch. Neu starten überträgt nur den genehmigten Plan in eine neue Sitzung. Nach dem Umsetzen: Der Plan bleibt aktiv bis /plan exit.',

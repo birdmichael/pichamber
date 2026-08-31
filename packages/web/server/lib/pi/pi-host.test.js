@@ -1551,6 +1551,34 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('promptAsync keeps synthetic instructions for Pi but not the user bubble or title', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = { text, options };
+      return originalPrompt(text, options);
+    };
+
+    const visible = 'Help me set up a scheduled task.';
+    const instructions = 'The user wants to set up a scheduled task: a saved prompt that Pichamber runs automatically.';
+    await host.promptAsync(record.id, {
+      parts: [
+        { type: 'text', text: visible },
+        { type: 'text', text: instructions, synthetic: true },
+      ],
+    });
+
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts[0].text).toBe(visible);
+    expect(user.parts[0].text).not.toContain('Pichamber runs automatically');
+    expect(host.getSession(record.id).info.title).toBe(visible);
+    expect(forwarded.text).toContain(visible);
+    expect(forwarded.text).toContain(instructions);
+    host.dispose();
+  });
+
   it('promptAsync persists a Pi-native image part as a facade file part', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Native image' });

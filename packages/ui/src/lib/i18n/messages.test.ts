@@ -59,6 +59,8 @@ describe('i18n dictionaries', () => {
 
   test('plan-ready decision chrome is translated in zh-CN', () => {
     expect(zhCnDict['chat.piPlan.enabledNotify']).not.toBe(enDict['chat.piPlan.enabledNotify']);
+    expect(zhCnDict['chat.piPlan.implementingNotify']).not.toBe(enDict['chat.piPlan.implementingNotify']);
+    expect(enDict['chat.piPlan.implementingNotify']).toContain('Files may be modified');
     expect(zhCnDict['chat.piPlan.readySelect.title']).not.toBe(enDict['chat.piPlan.readySelect.title']);
     expect(zhCnDict['chat.piPlan.readySelect.implementFresh']).not.toBe(enDict['chat.piPlan.readySelect.implementFresh']);
     expect(zhCnDict['chat.tool.planModeComplete']).not.toBe(enDict['chat.tool.planModeComplete']);

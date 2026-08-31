@@ -24,3 +24,12 @@ describe('sidebar first-click activation', () => {
     expect(footerSource).toContain('ignoreSettingsClickRef');
   });
 });
+
+describe('sidebar session rename', () => {
+  test('Enter commits the draft the same way as the check button', () => {
+    expect(source).toContain("if (event.key === 'Enter')");
+    expect(source).toContain('handleSaveEdit(renameDraft)');
+    expect(source).toContain('event.preventDefault()');
+    expect(source).toContain('event.stopPropagation()');
+  });
+});

@@ -2184,6 +2184,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.piPlan.discardCancel': '保留計畫',
   'chat.piPlan.discardConfirmAria': '捨棄計畫確認',
   'chat.piPlan.enabledNotify': '已啟用計畫模式。我會探索並制定計畫，但不會修改檔案。',
+  'chat.piPlan.implementingNotify': '正在實作已核准的計畫。可能會修改檔案。',
   'chat.piPlan.draftHint': '送出後才會開始 Plan。',
   'chat.piPlan.row.aria': 'Plan 模式',
   'chat.piPlan.readySelect.title': '計畫已就緒。接下來怎麼做？在此實作會保留這次規劃對話。全新開始只會把已核准的計畫轉到新工作階段。實作之後：計畫保持有效，直到 /plan exit。',

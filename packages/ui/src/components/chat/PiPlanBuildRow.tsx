@@ -63,7 +63,7 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
     );
   }
 
-  const disabled = chrome.busy || pending || !chrome.sessionID || !selected;
+  const disabled = chrome.buildDisabled || pending || !chrome.sessionID || !selected;
 
   const build = async () => {
     if (!chrome.sessionID || !selected) return;

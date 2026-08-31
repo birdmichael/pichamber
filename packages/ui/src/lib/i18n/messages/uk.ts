@@ -2192,6 +2192,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.piPlan.discardCancel": "Залишити план",
   "chat.piPlan.discardConfirmAria": "Підтвердження відхилення плану",
   "chat.piPlan.enabledNotify": "Режим Плану ввімкнено. Я досліджуватиму й плануватиму, але не змінюватиму файли.",
+  "chat.piPlan.implementingNotify": "Реалізація затвердженого плану. Файли можуть бути змінені.",
   "chat.piPlan.draftHint": "Plan почнеться після надсилання.",
   "chat.piPlan.row.aria": "Режим Plan",
   "chat.piPlan.readySelect.title": "План готовий. Що далі? Реалізувати тут збереже цю розмову планування. Почати наново перенесе лише затверджений план у нову сесію. Після реалізації: план лишається активним до /plan exit.",

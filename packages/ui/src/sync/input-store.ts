@@ -120,6 +120,7 @@ export type InputState = {
   setAttachedFiles: (files: AttachedFile[]) => void
   clearAttachedFiles: () => void
   addVSCodeFileAttachment: (path: string, name: string, fileSize: number | null) => void
+  addLocalPathAttachment: (path: string, name: string, fileSize: number | null) => void
   addVSCodeSelectionAttachment: (path: string, file: File) => Promise<void>
   setActiveEditorFile: (file: VSCodeActiveEditorFile | null) => void
   /** Add attachments restored from a reverted message (file already on server) */
@@ -243,6 +244,23 @@ export const useInputStore = create<InputState>()((set, get) => ({
       source: 'vscode',
       vscodePath: path,
       vscodeSource: 'file',
+    }
+    set((s) => ({ attachedFiles: [...s.attachedFiles, attached] }))
+  },
+
+  addLocalPathAttachment: (path: string, name: string, fileSize: number | null) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const dataUrl = toFileUrl(path)
+    const isDuplicate = get().attachedFiles.some((f) => f.dataUrl === dataUrl)
+    if (isDuplicate) return
+    const attached: AttachedFile = {
+      id,
+      file: new File([], name, { type: 'application/octet-stream' }),
+      dataUrl,
+      mimeType: 'application/octet-stream',
+      filename: name,
+      size: fileSize || 0,
+      source: 'local',
     }
     set((s) => ({ attachedFiles: [...s.attachedFiles, attached] }))
   },

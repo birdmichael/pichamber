@@ -2,7 +2,8 @@ import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { Icon } from '@/components/icon/Icon';
 import { useSkillsStore } from '@/stores/useSkillsStore';
-import { useMcpStore } from '@/stores/useMcpStore';
+import { computeMcpHealth, useMcpStore } from '@/stores/useMcpStore';
+import { runBackgroundNetworkTask } from '@/lib/background-network';
 import { useSession } from '@/sync/sync-context';
 import { getLinkedIssues } from '@/lib/linkedIssues';
 import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusValue } from './WorkStatusPrimitives';
@@ -34,6 +35,7 @@ export const WorkStatusContextSection: React.FC<Props> = ({ sessionId, directory
   const mcpStatus = useMcpStore(
     React.useCallback((state) => state.getStatusForDirectory(directory), [directory]),
   );
+  const refreshMcp = useMcpStore((state) => state.refresh);
 
   // Skills were previously fetched only when the composer's slash autocomplete
   // opened, so this row reported whatever count happened to be cached — often
@@ -47,12 +49,14 @@ export const WorkStatusContextSection: React.FC<Props> = ({ sessionId, directory
     void loadSkills();
   }, [directory, loadSkills]);
 
+  React.useEffect(() => {
+    void runBackgroundNetworkTask(() => refreshMcp({ directory, silent: true }));
+  }, [directory, refreshMcp]);
+
   const linked = React.useMemo(() => getLinkedIssues(session), [session]);
-  // Connected servers only. A disabled server contributes nothing to the
-  // context, so counting it here contradicts the MCP section right above,
-  // which shows the same servers switched off.
+  // Same source of truth as the MCP section: connected and adapter `cached`.
   const mcpCount = React.useMemo(
-    () => Object.values(mcpStatus ?? {}).filter((entry) => entry?.status === 'connected').length,
+    () => computeMcpHealth(mcpStatus).connected,
     [mcpStatus],
   );
 

@@ -25,3 +25,17 @@ describe('adapter MCP status mapping', () => {
     expect(health.hasFailed).toBe(false);
   });
 });
+
+describe('work-status context MCP count', () => {
+  test('Context sources uses the same active count as Work Status MCP', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { dirname, join } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const section = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../components/chat/work-status/WorkStatusContextSection.tsx'),
+      'utf8',
+    );
+    expect(section).toContain('computeMcpHealth(mcpStatus).connected');
+    expect(section).not.toContain("entry?.status === 'connected'");
+  });
+});

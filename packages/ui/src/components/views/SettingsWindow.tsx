@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
+import { focusDesktopWindow } from '@/lib/desktop';
 import { SettingsView } from './SettingsView';
 
 interface SettingsWindowProps {
@@ -37,6 +38,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
           return;
         }
         onOpenChange(next);
+        if (!next) {
+          void focusDesktopWindow();
+        }
       }}
     >
       <Dialog.Portal>
