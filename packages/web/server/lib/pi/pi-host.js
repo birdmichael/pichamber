@@ -606,6 +606,36 @@ export const resolvePromptDelivery = ({ delivery, isStreaming, statusType } = {}
   return 'prompt';
 };
 
+export const isAgentAlreadyProcessingError = (error) => (
+  /already processing|already streaming|streamingBehavior|steer or followUp/i.test(String(error?.message || ''))
+);
+
+const createDeferred = () => {
+  let resolve = () => {};
+  let settled = false;
+  const promise = new Promise((res) => {
+    resolve = res;
+  });
+  return {
+    promise,
+    resolve() {
+      if (settled) return;
+      settled = true;
+      resolve();
+    },
+    get settled() {
+      return settled;
+    },
+  };
+};
+
+const ensurePromptStartedGate = (record) => {
+  if (!record.promptStarted || record.promptStarted.settled) {
+    record.promptStarted = createDeferred();
+  }
+  return record.promptStarted;
+};
+
 export const resolvePromptModelRef = (model) => {
   if (typeof model === 'string' && model.trim()) return model.trim();
   if (!model || typeof model !== 'object') return '';
@@ -1281,7 +1311,41 @@ const findLiveSessionCommand = (piSession, name) => (
 const isLeftoverPlanStartStreamError = (error) => {
   const status = Number(error?.status);
   if (status === 404 || status === 409 || status === 400) return false;
-  return /already streaming|steer or followUp/i.test(String(error?.message || ''));
+  return isAgentAlreadyProcessingError(error);
+};
+
+const rollbackFacadeUserMessage = (emit, record, userMessageID) => {
+  if (!record || !userMessageID) return false;
+  const before = Array.isArray(record.messages) ? record.messages.length : 0;
+  record.messages = (record.messages || []).filter((entry) => entry?.info?.id !== userMessageID);
+  if ((record.messages || []).length === before) return false;
+  if (record.translator?.userMessageID === userMessageID) {
+    record.translator.clearUserMessage?.();
+  }
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.removed',
+    properties: { sessionID: record.id, messageID: userMessageID },
+  });
+  return true;
+};
+
+const logPromptAsyncFailure = ({
+  sessionID,
+  parentIsStreaming,
+  childIsStreaming,
+  delivery,
+  messageID,
+  error,
+}) => {
+  console.error('[pi-host] promptAsync failed', {
+    sessionID,
+    parentIsStreaming: Boolean(parentIsStreaming),
+    childIsStreaming: Boolean(childIsStreaming),
+    delivery: delivery || null,
+    messageID: messageID || null,
+    error: error?.message || String(error),
+  });
 };
 
 const liveCommandInvocation = (command, fallback) => {
@@ -1842,6 +1906,8 @@ export const createPiHost = ({
       }
     }
     if (piEvent?.type === 'agent_settled') {
+      record.turnActive = false;
+      record.promptStarted?.resolve?.();
       syncPiGoalMarker(record);
     }
     return ocEvents;
@@ -3498,11 +3564,15 @@ export const createPiHost = ({
       // Capture liveness *before* this call marks busy. This invocation's own
       // status busy must not steer/followUp an idle first send.
       const alreadyLive = sessionIsLive(record)
+        || record.turnActive === true
         || record.status?.type === 'busy'
         || record.status?.type === 'retry';
 
       // First-send bind can take longer than the user bubble. Mark busy now so
       // a targeted reload 409s before `piSession` exists or starts streaming.
+      record.turnActive = true;
+      const hadOpenPromptGate = Boolean(record.promptStarted) && !record.promptStarted.settled;
+      const promptStarted = ensurePromptStartedGate(record);
       record.status = { type: 'busy' };
       emit(record.directory, {
         id: createEventId(),
@@ -3540,10 +3610,12 @@ export const createPiHost = ({
 
       try {
         await ensureLiveRecord(record);
-        if (modelRef) {
+        // Keep setSessionModel off the live-turn hot path. Concurrent setModel
+        // IPC snapshots used to clobber parent isStreaming mid-run.
+        if (modelRef && !alreadyLive && !sessionIsLive(record)) {
           await this.setSessionModel(sessionID, modelRef);
         }
-        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking)) {
+        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking) && !alreadyLive) {
           try {
             await this.setSessionThinking(sessionID, requestedThinking);
           } catch {
@@ -3551,6 +3623,19 @@ export const createPiHost = ({
           }
         }
       } catch (error) {
+        if (alreadyLive || sessionIsLive(record)) {
+          logPromptAsyncFailure({
+            sessionID,
+            parentIsStreaming: Boolean(record.piSession?.isStreaming),
+            childIsStreaming: Boolean(record.piSession?.isStreaming),
+            delivery: body.delivery,
+            messageID: userMessageID,
+            error,
+          });
+          throw error;
+        }
+        record.turnActive = false;
+        promptStarted.resolve();
         record.status = { type: 'idle' };
         emit(record.directory, {
           id: createEventId(),
@@ -3565,57 +3650,79 @@ export const createPiHost = ({
       if (runtimeModel) {
         record.translator?.setFallbackModel?.(runtimeModel);
       }
-      record.translator?.setUserMessage?.(userMessageID, {
-        agent: userAgent,
-        model: runtimeModel || body.model,
-      });
 
-      if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
-        record.messages.push({ info: userInfo, parts: userParts });
-      }
-      if (maybeApplyConversationTitle(record)) {
+      const skipInsert = alreadyLive;
+      if (!skipInsert) {
+        record.translator?.setUserMessage?.(userMessageID, {
+          agent: userAgent,
+          model: runtimeModel || body.model,
+        });
+
+        if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
+          record.messages.push({ info: userInfo, parts: userParts });
+        }
+        if (maybeApplyConversationTitle(record)) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
         emit(record.directory, {
           id: createEventId(),
-          type: 'session.updated',
-          properties: { info: record.info },
+          type: 'message.updated',
+          properties: { sessionID, info: userInfo },
         });
-      }
-      emit(record.directory, {
-        id: createEventId(),
-        type: 'message.updated',
-        properties: { sessionID, info: userInfo },
-      });
-      for (const part of userParts) {
-        emit(record.directory, {
-          id: createEventId(),
-          type: 'message.part.updated',
-          properties: { sessionID, part, time: Date.now() },
-        });
+        for (const part of userParts) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'message.part.updated',
+            properties: { sessionID, part, time: Date.now() },
+          });
+        }
       }
 
       const delivery = body.delivery;
       const run = async () => {
         let queuedIntoLiveTurn = false;
         try {
-          const isStreaming = Boolean(record.piSession?.isStreaming) || alreadyLive;
+          if (hadOpenPromptGate && !sessionIsLive(record) && !promptStarted.settled) {
+            await promptStarted.promise;
+          }
+          // Do not treat this invocation's own busy stamp as a live child.
+          const liveNow = sessionIsLive(record) || alreadyLive;
           ensureQuestionToolAdapted(record);
           const action = resolvePromptDelivery({
             delivery,
-            isStreaming,
-            statusType: alreadyLive ? 'busy' : 'idle',
+            isStreaming: Boolean(record.piSession?.isStreaming) || liveNow,
+            statusType: liveNow ? 'busy' : 'idle',
           });
           const imageArg = images.length > 0 ? images : undefined;
+          const markStarted = () => promptStarted.resolve();
           if (action === 'steer' && typeof record.piSession.steer === 'function') {
+            markStarted();
             await record.piSession.steer(text, imageArg);
             queuedIntoLiveTurn = true;
             return;
           }
           if (action === 'followUp' && typeof record.piSession.followUp === 'function') {
+            markStarted();
             await record.piSession.followUp(text, imageArg);
             queuedIntoLiveTurn = true;
             return;
           }
           if (action !== 'prompt' && typeof record.piSession.prompt === 'function') {
+            markStarted();
+            await record.piSession.prompt(text, {
+              ...promptOptions,
+              streamingBehavior: action === 'followUp' ? 'followUp' : 'steer',
+            });
+            queuedIntoLiveTurn = true;
+            return;
+          }
+          markStarted();
+          // Never call bare prompt() while the child (or this host turn) is live.
+          if (liveNow) {
             await record.piSession.prompt(text, {
               ...promptOptions,
               streamingBehavior: action === 'followUp' ? 'followUp' : 'steer',
@@ -3625,6 +3732,35 @@ export const createPiHost = ({
           }
           await record.piSession.prompt(text, promptOptions);
         } catch (error) {
+          const parentIsStreaming = Boolean(record.piSession?.isStreaming);
+          let childIsStreaming = parentIsStreaming;
+          try {
+            if (typeof record.piSession?.refreshSnapshot === 'function') {
+              await record.piSession.refreshSnapshot();
+              childIsStreaming = Boolean(record.piSession?.isStreaming);
+            }
+          } catch {
+          }
+          logPromptAsyncFailure({
+            sessionID,
+            parentIsStreaming,
+            childIsStreaming,
+            delivery,
+            messageID: userMessageID,
+            error,
+          });
+          const stillLive = sessionIsLive(record)
+            || childIsStreaming
+            || parentIsStreaming
+            || alreadyLive;
+          if (stillLive || isAgentAlreadyProcessingError(error)) {
+            if (!skipInsert) rollbackFacadeUserMessage(emit, record, userMessageID);
+            // Do not session.idle / settle a still-running child. A rejected
+            // follow-up is not turn end.
+            queuedIntoLiveTurn = stillLive || alreadyLive;
+            return;
+          }
+          record.turnActive = false;
           record.status = { type: 'idle' };
           emit(record.directory, {
             id: createEventId(),
@@ -3633,6 +3769,7 @@ export const createPiHost = ({
           });
           emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
         } finally {
+          promptStarted.resolve();
           if (!queuedIntoLiveTurn) settleRecordIfStuck(record);
         }
       };

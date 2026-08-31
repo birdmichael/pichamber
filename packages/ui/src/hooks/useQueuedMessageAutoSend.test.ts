@@ -167,6 +167,15 @@ describe('resolveQueuedSessionStatusType', () => {
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
   });
 
+  test('does not auto-send while status is busy even if the trailing assistant completed', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      session_status: { ses_1: { type: 'busy' } },
+      message: { ses_1: [assistantMessage('msg_done', 5)] },
+    });
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
+  });
+
   test('resolves an explicit idle entry and unknown sessions as idle', () => {
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ session_status: { ses_1: { type: 'idle' } } });

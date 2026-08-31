@@ -364,6 +364,9 @@ export const createEventTranslator = ({
         return [event('session.status', { sessionID, status: { type: 'busy' } })];
 
       case 'agent_settled':
+        // Next turn's Pi user message_start must not be swallowed as an echo of
+        // the previous promptAsync insert. Steer/followUp never take this slot.
+        userMessageID = null;
         return [
           event('session.status', { sessionID, status: { type: 'idle' } }),
           event('session.idle', { sessionID }),
@@ -566,6 +569,9 @@ export const createEventTranslator = ({
     translate,
     setAssistantMessage,
     setUserMessage,
+    clearUserMessage() {
+      userMessageID = null;
+    },
     setFallbackModel,
     getFallbackModel() {
       return resolvedFallback;

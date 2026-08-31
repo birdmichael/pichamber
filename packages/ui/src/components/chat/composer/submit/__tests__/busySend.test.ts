@@ -3,12 +3,12 @@ import { describe, expect, test } from 'bun:test';
 import { resolveBusyComposerSend, resolveSubmitDelivery } from '../busySend';
 
 describe('resolveBusyComposerSend', () => {
-    test('Pi Queue busy Enter posts followUp instead of a local queue', () => {
+    test('Pi Queue busy Enter uses the visible local queue until settle', () => {
         expect(resolveBusyComposerSend({
             followUpBehavior: 'queue',
             isPiKernel: true,
             canQueue: true,
-        })).toEqual({ action: 'followUp', delivery: 'followUp' });
+        })).toEqual({ action: 'localQueue' });
     });
 
     test('Pi Steer busy Enter posts steer', () => {
@@ -74,5 +74,14 @@ describe('resolveSubmitDelivery', () => {
             isPiKernel: true,
             sessionPhase: 'idle',
         })).toBeUndefined();
+    });
+
+    test('does not strip explicit followUp just because the UI reports idle', () => {
+        expect(resolveSubmitDelivery({
+            requested: 'followUp',
+            isPiKernel: true,
+            sessionPhase: 'idle',
+            queuedOnly: false,
+        })).toBe('followUp');
     });
 });

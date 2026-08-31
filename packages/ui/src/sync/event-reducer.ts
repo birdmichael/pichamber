@@ -97,6 +97,18 @@ function shouldPreserveExistingPart(previous: Part, next: Part): boolean {
   return false
 }
 
+/**
+ * Pi stamps assistant `time.completed` on the first `message_end`, before tools
+ * and later LLM calls. That leftover-busy state must not be treated as idle.
+ * Idle is `agent_settled` (`session.idle`) or an abort/error that ended the child.
+ */
+export function idleLeftoverBusyAfterSettledAssistant(_input?: {
+  status?: { type?: string } | null
+  lastMessage?: { role?: string; time?: { completed?: number } } | null
+}): boolean {
+  return false
+}
+
 function areSessionStatusesEqual(left: SessionStatus | undefined, right: SessionStatus): boolean {
   if (left === right) return true
   if (!left || left.type !== right.type) return false

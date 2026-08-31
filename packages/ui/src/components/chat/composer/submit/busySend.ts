@@ -1,9 +1,9 @@
 /**
  * Busy-session composer send: map Settings Follow-up behavior onto Pi
- * steer / followUp, or the leftover OpenCode local queue.
+ * steer, or the visible local queue (messageQueueStore) until agent_settled.
  *
- * Pi Queue is session.followUp (POST immediately). It must not land in
- * OpenCode QueuedMessageChips. Explicit delivery must survive even if the
+ * Pi Queue shows a chip and auto-sends on settle. Steer course-corrects
+ * without a second user bubble. Explicit delivery must survive even if the
  * UI still thinks the session is idle — prompt_async / the host decide.
  */
 
@@ -29,11 +29,12 @@ export const resolveBusyComposerSend = (input: {
         return { action: 'submit' };
     }
     if (input.followUpBehavior === 'queue') {
-        if (input.isPiKernel) {
-            return { action: 'followUp', delivery: 'followUp' };
-        }
+        // Visible queue chip until agent_settled, then auto-send. Kernel
+        // followUp remains available via explicit delivery on the wire.
         return { action: 'localQueue' };
     }
+    // Pi and leftover OpenCode both steer; isPiKernel is reserved for delivery
+    // mapping in resolveSubmitDelivery.
     return { action: 'steer', delivery: 'steer' };
 };
 

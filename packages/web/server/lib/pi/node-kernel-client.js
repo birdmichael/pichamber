@@ -143,18 +143,34 @@ export const serializeNodeKernelCreateSessionInput = (input = {}) => {
   };
 };
 
-export const mergeRemoteSessionSnapshot = (state, next, { promptInFlight = false } = {}) => {
+export const mergeRemoteSessionSnapshot = (state, next, { promptInFlight = false, liveOpInFlight = false } = {}) => {
   if (!next || typeof next !== 'object') return state;
   Object.assign(state, next);
-  if (promptInFlight) state.isStreaming = true;
+  // Child snapshots from setModel / refreshSnapshot / setThinkingLevel must not
+  // clobber parent isStreaming while prompt, steer, or followUp is live.
+  if (promptInFlight || liveOpInFlight) state.isStreaming = true;
   return state;
 };
 
 const createRemotePiSession = (client, snapshot) => {
   const state = { ...snapshot };
-  let promptInFlight = 0;
+  let liveOps = 0;
+  let lastChildStreaming = Boolean(state.isStreaming);
   const applySnapshot = (next) => {
-    mergeRemoteSessionSnapshot(state, next, { promptInFlight: promptInFlight > 0 });
+    if (next && typeof next === 'object' && Object.prototype.hasOwnProperty.call(next, 'isStreaming')) {
+      lastChildStreaming = Boolean(next.isStreaming);
+    }
+    mergeRemoteSessionSnapshot(state, next, { liveOpInFlight: liveOps > 0 });
+  };
+  const withLiveOp = async (fn) => {
+    liveOps += 1;
+    state.isStreaming = true;
+    try {
+      return await fn();
+    } finally {
+      liveOps -= 1;
+      state.isStreaming = liveOps > 0 ? true : lastChildStreaming;
+    }
   };
   const call = async (name, args = [], target) => {
     const reply = await client.call('session.method', {
@@ -233,25 +249,21 @@ const createRemotePiSession = (client, snapshot) => {
         return call('appendEntry', [entry], 'sessionManager');
       },
     },
-    async prompt(text, options) {
-      promptInFlight += 1;
-      state.isStreaming = true;
-      try {
-        return await call('prompt', [text, options]);
-      } finally {
-        promptInFlight -= 1;
-        if (promptInFlight === 0) state.isStreaming = false;
-      }
+    prompt(text, options) {
+      return withLiveOp(() => call('prompt', [text, options]));
     },
     steer(text, images) {
-      return call('steer', [text, images]);
+      return withLiveOp(() => call('steer', [text, images]));
     },
     followUp(text, images) {
-      return call('followUp', [text, images]);
+      return withLiveOp(() => call('followUp', [text, images]));
     },
     async abort() {
-      state.isStreaming = false;
-      return call('abort');
+      try {
+        return await call('abort');
+      } finally {
+        if (liveOps === 0) state.isStreaming = lastChildStreaming;
+      }
     },
     getAvailableThinkingLevels() {
       return Array.isArray(state.availableThinkingLevels) ? state.availableThinkingLevels : [];

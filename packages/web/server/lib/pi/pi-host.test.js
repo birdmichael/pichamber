@@ -2814,3 +2814,280 @@ describe('promptAsync busy delivery', () => {
     host.dispose();
   });
 });
+
+describe('promptAsync live follow-up (#369)', () => {
+  const wait = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const createHangingSession = ({ onPrompt, onSteer, onFollowUp, onSetModel } = {}) => {
+    let streaming = false;
+    let release = () => {};
+    const hang = new Promise((resolve) => {
+      release = resolve;
+    });
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const session = {
+      get isStreaming() {
+        return streaming;
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      async prompt(text, options) {
+        onPrompt?.(text, options);
+        streaming = true;
+        emit({ type: 'agent_start' });
+        await hang;
+        streaming = false;
+        emit({ type: 'agent_settled' });
+      },
+      async steer(text, images) {
+        onSteer?.(text, images);
+      },
+      async followUp(text, images) {
+        onFollowUp?.(text, images);
+      },
+      async abort() {
+        streaming = false;
+        release();
+        emit({ type: 'agent_settled' });
+      },
+      setModel(model) {
+        onSetModel?.(model);
+        session.currentModel = model;
+      },
+      setThinkingLevel() {},
+      dispose() {
+        listeners.clear();
+        release();
+      },
+    };
+    session.release = release;
+    return session;
+  };
+
+  it('overlapping promptAsync coalesces into steer without a second user insert', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text, options) => promptCalls.push({ text, options }),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Overlap' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    const second = host.promptAsync(record.id, {
+      messageID: 'msg_second',
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    await second;
+    expect(steerCalls).toEqual(['second']);
+    expect(promptCalls).toHaveLength(1);
+    expect(promptCalls[0].text).toBe('first');
+    expect(promptCalls[0].options?.streamingBehavior).toBeUndefined();
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('skips setSessionModel during a live prompt', async () => {
+    const setModelCalls = [];
+    const session = createHangingSession({
+      onSetModel: (model) => setModelCalls.push(model),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Live model' });
+    const first = host.promptAsync(record.id, {
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    expect(setModelCalls).toEqual([]);
+    await host.promptAsync(record.id, {
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    expect(setModelCalls).toEqual([]);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('stays busy after the first assistant message_end while tools still run', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    let streaming = false;
+    let release = () => {};
+    const hang = new Promise((resolve) => {
+      release = resolve;
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        get isStreaming() {
+          return streaming;
+        },
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          streaming = true;
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_1',
+            toolName: 'bash',
+            args: { command: 'sleep 1' },
+          });
+          await hang;
+          emit({
+            type: 'tool_execution_end',
+            toolCallId: 'call_1',
+            toolName: 'bash',
+            isError: false,
+            result: { content: [{ type: 'text', text: 'ok' }] },
+          });
+          streaming = false;
+          emit({ type: 'agent_settled' });
+        },
+        async abort() {
+          streaming = false;
+          release();
+        },
+        dispose() {
+          listeners.clear();
+          release();
+        },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Tools' });
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait(30);
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant?.info?.time?.completed).toBeGreaterThan(0);
+    expect(assistant.parts.some((part) => part.type === 'tool' && part.state?.status === 'running')).toBe(true);
+    release();
+    await prompt;
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    host.dispose();
+  });
+
+  it('Stop then immediate send starts a new prompt, not a live steer', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text) => promptCalls.push(text),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Abort then send' });
+    const first = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'first' }] });
+    await wait(20);
+    await host.abort(record.id);
+    await first;
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'after-stop' }] });
+    await wait(20);
+    expect(promptCalls).toEqual(['first', 'after-stop']);
+    expect(steerCalls).toEqual([]);
+    session.release();
+    await wait(20);
+    host.dispose();
+  });
+
+  it('queue followUp does not insert a user bubble until the next turn starts', async () => {
+    const followUpCalls = [];
+    const session = createHangingSession({
+      onFollowUp: (text) => followUpCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Queue' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    await host.promptAsync(record.id, {
+      messageID: 'msg_queued',
+      delivery: 'followUp',
+      parts: [{ type: 'text', text: 'queued' }],
+    });
+    expect(followUpCalls).toEqual(['queued']);
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('prompt() throw does not force idle while the child is still running', async () => {
+    const events = [];
+    let streaming = false;
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event.type);
+      },
+      createSession: async () => ({
+        get isStreaming() {
+          return streaming;
+        },
+        subscribe() {
+          return () => {};
+        },
+        async prompt() {
+          streaming = true;
+          throw new Error("Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.");
+        },
+        async abort() {
+          streaming = false;
+        },
+        dispose() {},
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Throw' });
+    await host.promptAsync(record.id, { messageID: 'msg_ghost', parts: [{ type: 'text', text: 'ghost' }] });
+    await wait(30);
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    expect(events).not.toContain('session.idle');
+    expect(host.getMessages(record.id).some((entry) => entry.info.id === 'msg_ghost')).toBe(false);
+    host.dispose();
+  });
+});

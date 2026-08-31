@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
+import { idleLeftoverBusyAfterSettledAssistant } from '@/sync/event-reducer';
 import {
   isSettledAssistantMessage,
   resolveSessionActivity,
@@ -53,6 +54,23 @@ describe('resolveSessionActivity', () => {
       sessionId: 'ses_1',
       status: { type: 'busy' },
       lastMessage: { role: 'user', time: { created: 1_000 } },
+    })).toMatchObject({
+      phase: 'busy',
+      isWorking: true,
+      isBusy: true,
+    });
+  });
+
+  test('does not idle leftover busy after the first settled assistant while tools remain', () => {
+    expect(idleLeftoverBusyAfterSettledAssistant({
+      status: { type: 'busy' },
+      lastMessage: { role: 'assistant', time: { completed: 1_500 } },
+    })).toBe(false);
+
+    expect(resolveSessionActivity({
+      sessionId: 'ses_1',
+      status: { type: 'busy' },
+      lastMessage: { role: 'assistant', time: { created: 1_000, completed: 1_500 } },
     })).toMatchObject({
       phase: 'busy',
       isWorking: true,
