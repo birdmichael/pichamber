@@ -10,6 +10,7 @@ import type {
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { GitDirectoriesUnsupportedError, listGitDirectories } from '@/lib/gitApiHttp';
+import { subscribeGitStatusInvalidations } from '@/lib/gitStatusInvalidation';
 
 const LOG_STALE_THRESHOLD = 10000;
 const REPO_CHECK_STALE_THRESHOLD = 60_000;
@@ -63,7 +64,7 @@ interface GitStore {
   setActiveDirectory: (directory: string | null) => void;
   getDirectoryState: (directory: string) => DirectoryGitState | null;
 
-  fetchStatus: (directory: string, git: GitAPI, options?: { silent?: boolean; mode?: 'light' }) => Promise<boolean>;
+  fetchStatus: (directory: string, git: GitAPI, options?: { silent?: boolean; mode?: 'light'; force?: boolean }) => Promise<boolean>;
   fetchBranches: (directory: string, git: GitAPI) => Promise<void>;
   fetchLog: (directory: string, git: GitAPI, maxCount?: number) => Promise<void>;
   fetchIdentity: (directory: string, git: GitAPI) => Promise<void>;
@@ -123,7 +124,7 @@ interface GitAPI {
 
 const inFlightDiffFetchesByDirectory = new Map<string, Set<string>>();
 const diffFetchGenerationByDirectory = new Map<string, number>();
-const inFlightStatusFetches = new Map<string, Promise<boolean>>();
+const inFlightStatusFetches = new Map<string, { promise: Promise<boolean>; statusMutationRevision: number }>();
 const inFlightEnsureAllByDirectory = new Map<string, Promise<void>>();
 const inFlightNestedRepoDiscovery = new Map<string, Promise<void>>();
 const requestGenerationByChannel = new Map<string, number>();
@@ -131,7 +132,10 @@ const statusMutationRevisionByDirectory = new Map<string, number>();
 let gitRuntimeGeneration = 0;
 let activeGitRuntimeKey = getRuntimeKey();
 
-const runtimeDirectoryKey = (runtimeKey: string, directory: string) => JSON.stringify([runtimeKey, directory]);
+// Trimmed to match `gitApiHttp`'s cache keys, so an invalidation notified for a
+// directory keys the same entry the store's own lookups do.
+const runtimeDirectoryKey = (runtimeKey: string, directory: string) =>
+  JSON.stringify([runtimeKey, directory.trim()]);
 const getStatusFetchKey = (runtimeKey: string, directory: string, mode: GitStatusFetchMode): string =>
   JSON.stringify([runtimeKey, directory, mode]);
 const channelKey = (runtimeKey: string, directory: string, channel: string) =>
@@ -174,6 +178,18 @@ const bumpStatusMutationRevision = (runtimeKey: string, directory: string): void
   const key = runtimeDirectoryKey(runtimeKey, directory);
   statusMutationRevisionByDirectory.set(key, (statusMutationRevisionByDirectory.get(key) ?? 0) + 1);
 };
+
+const getStatusMutationRevision = (runtimeKey: string, directory: string): number =>
+  statusMutationRevisionByDirectory.get(runtimeDirectoryKey(runtimeKey, directory)) ?? 0;
+
+// A successful status-affecting git mutation invalidates the runtime adapter's
+// status cache (see lib/gitStatusInvalidation.ts). Bump the per-directory
+// mutation revision so a status request admitted before the mutation can
+// neither be joined by a post-mutation refresh nor commit its stale payload
+// over the refreshed state.
+subscribeGitStatusInvalidations((directory) => {
+  bumpStatusMutationRevision(getRuntimeKey(), directory);
+});
 
 const getDiffFetchGeneration = (directory: string): number =>
   diffFetchGenerationByDirectory.get(runtimeDirectoryKey(getRuntimeKey(), directory)) ?? 0;
@@ -680,10 +696,16 @@ export const useGitStore = create<GitStore>()(
         const statusFetchMode: GitStatusFetchMode = options.mode ?? 'full';
         const runtimeKey = getRuntimeKey();
         const statusFetchKey = getStatusFetchKey(runtimeKey, directory, statusFetchMode);
-        const existing = inFlightStatusFetches.get(statusFetchKey)
-          ?? (statusFetchMode === 'light' ? inFlightStatusFetches.get(getStatusFetchKey(runtimeKey, directory, 'full')) : undefined);
-        if (existing) {
-          return existing;
+        const statusMutationRevision = getStatusMutationRevision(runtimeKey, directory);
+        if (!options.force) {
+          const existing = inFlightStatusFetches.get(statusFetchKey)
+            ?? (statusFetchMode === 'light' ? inFlightStatusFetches.get(getStatusFetchKey(runtimeKey, directory, 'full')) : undefined);
+          // Join an in-flight request only when it was admitted at the current
+          // mutation revision; a request that predates a mutation must not
+          // satisfy the post-mutation refresh.
+          if (existing && existing.statusMutationRevision === statusMutationRevision) {
+            return existing.promise;
+          }
         }
 
         const token = startRequest(directory, 'status', true);
@@ -817,12 +839,12 @@ export const useGitStore = create<GitStore>()(
           return statusChanged;
         })();
 
-        inFlightStatusFetches.set(statusFetchKey, fetchPromise);
+        inFlightStatusFetches.set(statusFetchKey, { promise: fetchPromise, statusMutationRevision });
 
         try {
           return await fetchPromise;
         } finally {
-          if (inFlightStatusFetches.get(statusFetchKey) === fetchPromise) {
+          if (inFlightStatusFetches.get(statusFetchKey)?.promise === fetchPromise) {
             inFlightStatusFetches.delete(statusFetchKey);
           }
         }
@@ -1026,8 +1048,11 @@ export const useGitStore = create<GitStore>()(
         const { force = false, silentIfCached = false } = options;
         const now = Date.now();
 
+        // `force` applies to status as well as log: a forced refresh must not
+        // resolve from an in-flight status request admitted earlier.
         await get().fetchStatus(directory, git, {
           silent: silentIfCached && Boolean(dirState?.status),
+          force,
         });
 
         const updatedDirState = get().directories.get(directory);
