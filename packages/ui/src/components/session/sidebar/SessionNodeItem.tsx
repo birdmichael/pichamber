@@ -27,6 +27,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionPermissions, useSessionQuestionCount } from '@/sync/sync-context';
+import { resolveSessionRowLiveStatus } from '@/sync/session-row-live-status';
 import { usePendingPiExtensionUiPromptCount } from '@/sync/pi-extension-ui-store';
 import { useSync } from '@/sync/use-sync';
 import { useViewportStore, viewportSessionKey } from '@/sync/viewport-store';
@@ -463,8 +464,18 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   const isZombie = useViewportStore(
     React.useCallback((state) => Boolean(state.sessionMemoryState.get(viewportSessionKey(session.id))?.isZombie), [session.id]),
   );
-  const sessionStatus = useGlobalSessionStatus(session.id);
-  const statusType = sessionStatus?.type ?? 'idle';
+  const globalSessionStatus = useGlobalSessionStatus(session.id);
+  const childSessionStatus = React.useSyncExternalStore(
+    React.useCallback((notify) => directoryStore.subscribe((state, previous) => {
+      if (state.session_status?.[session.id] !== previous.session_status?.[session.id]) notify();
+    }), [directoryStore, session.id]),
+    () => directoryStore.getState().session_status?.[session.id],
+    () => directoryStore.getState().session_status?.[session.id],
+  );
+  const statusType = resolveSessionRowLiveStatus({
+    childStatus: childSessionStatus,
+    globalStatus: globalSessionStatus,
+  });
   const isStreaming = statusType === 'busy' || statusType === 'retry';
   // Read as a boolean, not as the value: the row must not re-render on every
   // tick of the counter it only decides to mount.

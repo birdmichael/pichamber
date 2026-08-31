@@ -475,7 +475,7 @@ export const useTraySync = (): void => {
         // {} = authoritative "everything here is idle".
         const raw = await opencodeClient.getSessionStatusForDirectory(directory).catch(() => null);
         if (disposed || raw === null) return;
-        applyGlobalSessionStatusSnapshot(directory, raw, sessionIds);
+        applyGlobalSessionStatusSnapshot(directory, raw, sessionIds, 'monotonic');
       }));
     };
 

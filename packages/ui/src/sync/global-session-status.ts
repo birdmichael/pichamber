@@ -107,15 +107,19 @@ export const applyGlobalSessionStatusEvent = (directory: string, payload: Event)
   }
 };
 
-// Polled path: an authoritative `/session/status?directory=X` snapshot. Entries
-// missing from the snapshot are idle now — cleared both by directory key and by
-// the caller's session-id list (the server may report a canonicalized directory
-// that differs from the key an event wrote, e.g. via symlinks). Seeds the
-// initial state (events only deliver changes) and reconciles missed events.
+// How a `/session/status` snapshot is reconciled into the global live index.
+//
+// - "monotonic": only confirm/raise busy/retry. Absence is not idle — used by
+//   bootstrap and watchdog polls that can omit a session the SSE already
+//   marked busy (directory mismatch, sessions not listed yet).
+// - "authoritative": missing/idle entries are idle now. Used by reconnect.
+export type GlobalSessionStatusSnapshotMode = 'monotonic' | 'authoritative';
+
 export const applyGlobalSessionStatusSnapshot = (
   rawDirectory: string,
   raw: Record<string, { type?: string }>,
   knownSessionIds?: Iterable<string>,
+  mode: GlobalSessionStatusSnapshotMode = 'authoritative',
 ): void => {
   const directory = normalizeDirectory(rawDirectory);
   const known = new Set(knownSessionIds ?? []);
@@ -125,23 +129,31 @@ export const applyGlobalSessionStatusSnapshot = (
   for (const [sessionId, status] of Object.entries(raw)) {
     if (normalizeStatusType(status?.type) !== 'idle') activeSessionIds.add(sessionId);
   }
-  reconcileSessionActivitySnapshot(activeSessionIds, known);
-  // Timing asks the coverage question instead of being handed a list: a snapshot
-  // authoritatively covers the caller's session list plus every id it reports
-  // itself, and only the handful of sessions actually being timed need an
-  // answer. Reuses the sets already built above, so this allocates nothing.
-  reconcileSessionActivityTiming(
-    activeSessionIds,
-    (sessionId) => known.has(sessionId) || sessionId in raw,
-  );
+  if (mode === 'authoritative') {
+    reconcileSessionActivitySnapshot(activeSessionIds, known);
+    // Timing asks the coverage question instead of being handed a list: a snapshot
+    // authoritatively covers the caller's session list plus every id it reports
+    // itself, and only the handful of sessions actually being timed need an
+    // answer. Reuses the sets already built above, so this allocates nothing.
+    reconcileSessionActivityTiming(
+      activeSessionIds,
+      (sessionId) => known.has(sessionId) || sessionId in raw,
+    );
+  } else {
+    // Raise actives only. An omitted id is "not seen yet", not idle.
+    reconcileSessionActivitySnapshot(activeSessionIds, activeSessionIds);
+    reconcileSessionActivityTiming(activeSessionIds, () => false);
+  }
   useGlobalSessionStatusStore.setState((state) => {
     let changed = false;
     const next = new Map(state.statusById);
 
-    for (const [sessionId, entry] of state.statusById) {
-      if ((entry.directory === directory || known.has(sessionId)) && !(sessionId in raw)) {
-        next.delete(sessionId);
-        changed = true;
+    if (mode === 'authoritative') {
+      for (const [sessionId, entry] of state.statusById) {
+        if ((entry.directory === directory || known.has(sessionId)) && !(sessionId in raw)) {
+          next.delete(sessionId);
+          changed = true;
+        }
       }
     }
 
@@ -149,6 +161,7 @@ export const applyGlobalSessionStatusSnapshot = (
       const type = normalizeStatusType(status?.type);
       const current = next.get(sessionId);
       if (type === 'idle') {
+        if (mode === 'monotonic') continue;
         if (current && (current.directory === directory || known.has(sessionId))) {
           next.delete(sessionId);
           changed = true;

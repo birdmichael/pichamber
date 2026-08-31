@@ -8,6 +8,7 @@ import {
   createSettingsJsonPackageManager,
   writeFeaturePlugins,
 } from './feature-plugins.js';
+import { directoriesMatch } from './directory-identity.js';
 import {
   createInMemoryPiSession,
   createPiHost,
@@ -3102,6 +3103,117 @@ describe('promptAsync live follow-up (#369)', () => {
     expect(host.getStatus()[record.id]?.type).toBe('busy');
     expect(events).not.toContain('session.idle');
     expect(host.getMessages(record.id).some((entry) => entry.info.id === 'msg_ghost')).toBe(false);
+    host.dispose();
+  });
+});
+
+describe('directory identity for session status', () => {
+  it('matches trailing-slash and case aliases', () => {
+    expect(directoriesMatch('/tmp/project', '/tmp/project/')).toBe(true);
+    expect(directoriesMatch('/tmp/Project', '/tmp/project')).toBe(true);
+    expect(directoriesMatch('/tmp/wooly', '/tmp/other')).toBe(false);
+  });
+
+  it('getStatus includes busy sessions for a trailing-slash directory alias', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Alias' });
+    let release = () => {};
+    const hang = new Promise((resolve) => { release = resolve; });
+    record.piSession.prompt = async () => { await hang; };
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(host.getStatus('/tmp/project/')[record.id]).toEqual({ type: 'busy' });
+    expect(host.listSessions('/tmp/project/').some((item) => item.id === record.id)).toBe(true);
+    release();
+    await prompt;
+    host.dispose();
+  });
+});
+
+describe('settleRecordIfStuck vs live tools', () => {
+  const wait = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('no-ops when tools are still running even if isStreaming is stale false', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        isStreaming: false,
+        isCompacting: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_live',
+            toolName: 'bash',
+            args: { command: 'sleep 1' },
+          });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stuck' });
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait();
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant?.info?.time?.completed).toBeGreaterThan(0);
+    expect(assistant.parts.some((part) => part.type === 'tool' && part.state?.status === 'running')).toBe(true);
+    host.dispose();
+  });
+
+  it('revives sidebar busy on tool_execution after a false settle', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        isStreaming: false,
+        isCompacting: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Revive' });
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait();
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    emit({
+      type: 'tool_execution_start',
+      toolCallId: 'call_late',
+      toolName: 'read',
+      args: { path: 'a.ts' },
+    });
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
     host.dispose();
   });
 });

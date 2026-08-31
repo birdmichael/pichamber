@@ -301,6 +301,37 @@ describe("applyDirectoryEvent", () => {
     expect(draft.session_status.ses_1).toEqual({ type: "busy" })
   })
 
+  test("message_end with time.completed while tools remain does not idle session_status", () => {
+    const completed = {
+      id: "msg_assistant_1",
+      sessionID: "ses_1",
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+    } as Message
+    const draft = state({
+      session_status: {
+        ses_1: { type: "busy" } as SessionStatus,
+      },
+      message: { ses_1: [completed] },
+      part: {
+        msg_assistant_1: [{
+          id: "prt_tool",
+          sessionID: "ses_1",
+          messageID: "msg_assistant_1",
+          type: "tool",
+          tool: "bash",
+          state: { status: "running" },
+        } as never],
+      },
+    })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: { info: completed },
+    } as Event)).toBe(false)
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
+  })
+
   test("skips duplicate session idle events", () => {
     const draft = state()
     const event = {
