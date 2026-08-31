@@ -222,6 +222,7 @@ const ChatSectionContent: React.FC = () => {
                 'followUpBehavior',
                 'persistDraft',
                 'inputSpellcheck',
+                'largeTextPaste',
             ]}
         />
     );
