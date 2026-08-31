@@ -182,7 +182,8 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
       return;
     }
     const sync = () => {
-      const el = inputRef.current;
+      const el = inputRef.current
+        ?? document.querySelector<HTMLInputElement>('input[data-testid="directory-explorer-path"]');
       if (!el) {
         return;
       }
@@ -539,6 +540,19 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
   }, [canRequestAccess, finalizeSelection, isOpeningFinder, requestAccess, startAccessing, t, targetPath]);
 
   const handleKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const isSlash = event.key === '/' || event.key === 'slash' || event.code === 'Slash';
+    if (isSlash && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const input = event.currentTarget;
+      const start = input.selectionStart ?? query.length;
+      const end = input.selectionEnd ?? start;
+      const next = applyDirectoryExplorerQueryEdit(query, '/', start, end);
+      const merged = `${query.slice(0, start)}/${query.slice(end)}`.replace(/\\/g, '/');
+      if (next !== merged) {
+        event.preventDefault();
+        setQuery(next);
+        return;
+      }
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setHighlightedIndex((index) => Math.min(rows.length - 1, index + 1));
@@ -604,6 +618,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
         <Icon name="folder-add" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
         <Input
           ref={inputRef}
+          data-testid="directory-explorer-path"
           value={query}
           onChange={(event) => setQuery(normalizeDirectoryExplorerQuery(normalizeSeparators(event.target.value)))}
           onBeforeInput={(event) => {
