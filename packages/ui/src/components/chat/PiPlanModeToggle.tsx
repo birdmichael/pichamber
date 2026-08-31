@@ -111,12 +111,10 @@ export function PiPlanModeToggle({
           aria-pressed={chrome.footerPlanSelected}
           aria-label={t('chat.piPlan.toggleAria')}
           disabled={disabled}
-          // Block focus transfer so the tap does not dismiss the keyboard /
-          // collapse the mobile composer (same guard as MobileModelButton).
-          onMouseDown={(event) => event.preventDefault()}
-          onPointerDownCapture={(event) => {
-            if (event.pointerType === 'touch') event.preventDefault();
-          }}
+          // Do not preventDefault on a DropdownMenuTrigger; Radix opens on
+          // pointerdown and touch preventDefault swallows it. Hold the mobile
+          // composer expanded via onOpenChange instead.
+          onPointerDown={() => onOpenChange?.(true)}
         >
           {triggerLabel}
         </Button>

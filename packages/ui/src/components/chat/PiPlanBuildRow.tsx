@@ -93,12 +93,6 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
             className={cn(dropdownTriggerVariants({ size: 'sm' }), 'max-w-[220px] min-w-0')}
             disabled={disabled}
             aria-label={t('chat.piPlan.buildModelAria')}
-            // Block focus transfer so a tap on the pill does not expand the
-            // composer (same guard as MobilePillComposer Stop).
-            onMouseDown={(event) => event.preventDefault()}
-            onPointerDownCapture={(event) => {
-              if (event.pointerType === 'touch') event.preventDefault();
-            }}
           >
             <span className="truncate">{selected?.label || t('chat.modelControls.selectModel')}</span>
             <Icon name="arrow-down-s" className="size-3.5" />
