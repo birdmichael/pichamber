@@ -141,7 +141,7 @@ const registerWrite = (fsPromises) => {
   return getRoute('POST', '/api/fs/write');
 };
 
-const registerRead = (fsPromises) => {
+const registerRead = (fsPromises, resolveProjectDirectory = async () => ({ directory: '/repo' })) => {
   const { app, getRoute } = createRouteRegistry();
   registerFsRoutes(app, {
     os: { homedir: () => '/home/user' },
@@ -153,7 +153,7 @@ const registerRead = (fsPromises) => {
     spawn: vi.fn(),
     crypto: { randomUUID: () => 'job-0' },
     normalizeDirectoryPath: (p) => p,
-    resolveProjectDirectory: async () => ({ directory: '/repo' }),
+    resolveProjectDirectory,
     buildAugmentedPath: () => '/usr/bin',
     resolveGitBinaryForSpawn: () => 'git',
     openchamberUserConfigRoot: '/home/user/.config',
@@ -455,6 +455,36 @@ describe('fs read', () => {
     expect(res.body).toBe('');
     expect(fsPromises.readFile).toHaveBeenCalledTimes(4);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Read retry exhausted for /repo/file.txt'));
+    warn.mockRestore();
+  });
+
+  it('reads files under a symlinked project root addressed via the client-sent lexical directory', async () => {
+    // /home/user/proj -> /real/proj: the validated base is canonical but the
+    // client (and the file tree) address files under the lexical root.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fsPromises = {
+      realpath: vi.fn(async (targetPath) => {
+        if (targetPath === '/home/user/proj') return '/real/proj';
+        if (targetPath === '/home/user/proj/file.txt') return '/real/proj/file.txt';
+        return targetPath;
+      }),
+      stat: vi.fn(async () => ({ isFile: () => true, size: 4 })),
+      readFile: vi.fn(async () => 'data'),
+    };
+    const handler = registerRead(fsPromises, async () => ({
+      directory: '/real/proj',
+      requestedDirectory: '/home/user/proj',
+    }));
+    const res = createMockResponse();
+
+    await handler({
+      query: { path: '/home/user/proj/file.txt' },
+      get: (name) => (name === 'x-opencode-directory' ? '/home/user/proj' : undefined),
+    }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toBe('data');
+    expect(fsPromises.readFile).toHaveBeenCalledWith('/real/proj/file.txt', 'utf8');
     warn.mockRestore();
   });
 });
