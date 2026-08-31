@@ -29,6 +29,8 @@ import {
   type FilesystemErrorReason,
 } from '@/lib/api/files-errors';
 import {
+  applyDirectoryExplorerQueryEdit,
+  normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
   shouldFetchDirectoryExplorerListing,
 } from '@/lib/directory-explorer-query';
@@ -172,6 +174,74 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
 
   const explorerRootDirectory = dialogHomeDirectory || homeDirectory;
 
+  // X11 / Electron key injection can insert `/` without React onChange.
+  // Capture native input/keydown on document and keep the field normalized.
+  React.useEffect(() => {
+    if (!open || isCloneMode) {
+      return;
+    }
+    const pathInput = (): HTMLInputElement | null => (
+      inputRef.current
+        ?? document.querySelector<HTMLInputElement>('input[data-testid="directory-explorer-path"]')
+    );
+    const applyRaw = (raw: string, el?: HTMLInputElement | null) => {
+      const next = normalizeDirectoryExplorerQuery(normalizeSeparators(raw));
+      if (el && el.value !== next) {
+        el.value = next;
+      }
+      setQuery((current) => (current === next ? current : next));
+      return next;
+    };
+    const onNativeInput = (event: Event) => {
+      const el = event.target;
+      if (!(el instanceof HTMLInputElement) || el.dataset.testid !== 'directory-explorer-path') {
+        return;
+      }
+      applyRaw(el.value, el);
+    };
+    const onNativeKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      const isSlash = event.key === '/'
+        || event.key === 'slash'
+        || event.code === 'Slash'
+        || event.keyCode === 191
+        || event.which === 191;
+      if (!isSlash) {
+        return;
+      }
+      const el = pathInput();
+      if (!el || (event.target !== el && document.activeElement !== el)) {
+        return;
+      }
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? start;
+      const next = applyDirectoryExplorerQueryEdit(el.value, '/', start, end);
+      const merged = `${el.value.slice(0, start)}/${el.value.slice(end)}`.replace(/\\/g, '/');
+      if (next !== merged) {
+        event.preventDefault();
+        event.stopPropagation();
+        applyRaw(next, el);
+      }
+    };
+    const sync = () => {
+      const el = pathInput();
+      if (!el) {
+        return;
+      }
+      applyRaw(el.value, el);
+    };
+    document.addEventListener('input', onNativeInput, true);
+    document.addEventListener('keydown', onNativeKeyDown, true);
+    const id = window.setInterval(sync, 32);
+    return () => {
+      document.removeEventListener('input', onNativeInput, true);
+      document.removeEventListener('keydown', onNativeKeyDown, true);
+      window.clearInterval(id);
+    };
+  }, [open, isCloneMode]);
+
   const addedProjectPaths = React.useMemo(() => new Set(
     projects
       .map((project) => normalizeDirectoryPath(project.path))
@@ -196,13 +266,20 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
       const resolved = await resolveFreshFilesystemHome();
       if (cancelled) return;
       setDialogHomeDirectory(resolved || homeDirectory || '');
-      requestAnimationFrame(() => focusPathInput(inputRef.current));
+      // Do not steal focus or reset the caret after the user has started typing.
+      requestAnimationFrame(() => {
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          focusPathInput(inputRef.current);
+        }
+      });
     };
     void resolveHome();
     return () => {
       cancelled = true;
     };
-  }, [homeDirectory, open]);
+    // Reset only when the dialog opens. Re-running on homeDirectory would wipe
+    // a path the user is mid-typing (including `~/` + `/`).
+  }, [open]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -515,6 +592,19 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
   }, [canRequestAccess, finalizeSelection, isOpeningFinder, requestAccess, startAccessing, t, targetPath]);
 
   const handleKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const isSlash = event.key === '/' || event.key === 'slash' || event.code === 'Slash';
+    if (isSlash && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const input = event.currentTarget;
+      const start = input.selectionStart ?? query.length;
+      const end = input.selectionEnd ?? start;
+      const next = applyDirectoryExplorerQueryEdit(query, '/', start, end);
+      const merged = `${query.slice(0, start)}/${query.slice(end)}`.replace(/\\/g, '/');
+      if (next !== merged) {
+        event.preventDefault();
+        setQuery(next);
+        return;
+      }
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setHighlightedIndex((index) => Math.min(rows.length - 1, index + 1));
@@ -578,13 +668,16 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
       ) : null}
       <div className="relative">
         <Icon name="folder-add" className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/80" />
-        <Input
+        <input
           ref={inputRef}
+          data-testid="directory-explorer-path"
           value={query}
-          onChange={(event) => setQuery(normalizeSeparators(event.target.value))}
+          onChange={(event) => {
+            setQuery(normalizeDirectoryExplorerQuery(normalizeSeparators(event.target.value)));
+          }}
           onKeyDown={handleKeyDown}
           placeholder={t('directoryExplorerDialog.pathInput.placeholder')}
-          className="border-transparent bg-transparent pl-9 font-mono typography-ui-label shadow-none focus-visible:ring-0"
+          className="text-foreground selection:bg-primary selection:text-primary-foreground appearance-none flex h-9 w-full min-w-0 rounded-lg py-1 outline-none ring-1 ring-inset ring-border/60 border-transparent bg-transparent pl-9 font-mono typography-ui-label shadow-none focus:ring-2 focus:ring-[var(--interactive-focus-ring)] focus-visible:outline-none focus-visible:ring-0"
           style={!isMobile && addButtonWidth > 0 ? { paddingRight: `${addButtonWidth + 24}px` } : undefined}
           spellCheck={false}
           autoComplete="off"

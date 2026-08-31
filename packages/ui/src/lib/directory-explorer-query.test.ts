@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 
 import {
+  applyDirectoryExplorerQueryEdit,
   expandTildeDirectoryPath,
   normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
@@ -44,4 +45,39 @@ test('leaves absolute paths alone', () => {
     filter: '',
   });
   expect(expandTildeDirectoryPath('/workspace/', '/home/ada')).toBe('/workspace/');
+});
+
+test('drops a ~/ prefix when the remainder is an absolute path', () => {
+  expect(normalizeDirectoryExplorerQuery('~/tmp/existing')).toBe('~/tmp/existing');
+  expect(normalizeDirectoryExplorerQuery('~//tmp/existing')).toBe('/tmp/existing');
+  expect(normalizeDirectoryExplorerQuery('~//tmp/existing/')).toBe('/tmp/existing/');
+  expect(normalizeDirectoryExplorerQuery('~//')).toBe('/');
+  expect(resolveDirectoryExplorerQuery('~//tmp/existing', '/home/ada')).toEqual({
+    directory: '/tmp/',
+    filter: 'existing',
+  });
+  expect(resolveDirectoryExplorerQuery('~//tmp/existing/', '/home/ada')).toEqual({
+    directory: '/tmp/existing/',
+    filter: '',
+  });
+  expect(shouldFetchDirectoryExplorerListing(
+    resolveDirectoryExplorerQuery('~//tmp/existing', '/home/ada').directory,
+    '/home/ada',
+  )).toBe(true);
+});
+
+test('drops a ~/ prefix when the remainder is a Windows volume root', () => {
+  expect(normalizeDirectoryExplorerQuery('~/C:/Users/ada/src')).toBe('C:/Users/ada/src');
+  expect(resolveDirectoryExplorerQuery('~/C:/Users/ada/src', 'C:/Users/ada')).toEqual({
+    directory: 'C:/Users/ada/',
+    filter: 'src',
+  });
+  expect(normalizeDirectoryExplorerQuery('~/D:\\Projects\\app')).toBe('D:\\Projects\\app');
+});
+
+test('drops ~/ when a slash is inserted at the caret', () => {
+  expect(applyDirectoryExplorerQueryEdit('~/', '/')).toBe('/');
+  expect(applyDirectoryExplorerQueryEdit('~/', '/tmp/pichamber-409')).toBe('/tmp/pichamber-409');
+  expect(applyDirectoryExplorerQueryEdit('~/', 'Documents')).toBe('~/Documents');
+  expect(applyDirectoryExplorerQueryEdit('~/', '/', 2, 2)).toBe('/');
 });

@@ -4,12 +4,44 @@
  * the client has not resolved $HOME yet — the server expands those paths.
  */
 
+const WINDOWS_VOLUME_ROOT = /^[A-Za-z]:[\\/]/;
+
+function isAbsoluteDirectoryPath(value: string): boolean {
+  return value.startsWith('/') || WINDOWS_VOLUME_ROOT.test(value);
+}
+
 export function normalizeDirectoryExplorerQuery(query: string): string {
   const trimmed = query.trim();
   if (trimmed === '~') {
     return '~/';
   }
+  // The field is prefilled `~/`. Typing or pasting an absolute path at the
+  // caret concatenates (`~//tmp/foo`, `~/C:/Users/foo`). Drop the tilde
+  // prefix so the displayed query and the resolved directory match.
+  if (trimmed.startsWith('~/')) {
+    const remainder = trimmed.slice(2);
+    if (isAbsoluteDirectoryPath(remainder)) {
+      return remainder;
+    }
+  }
   return trimmed;
+}
+
+/**
+ * Apply an insert (typed or pasted) at the caret, then drop a concatenated
+ * `~/` + absolute path. Needed because some desktop input paths (insertText)
+ * update the native value without a React change event until the next render.
+ */
+export function applyDirectoryExplorerQueryEdit(
+  query: string,
+  inserted: string,
+  selectionStart = query.length,
+  selectionEnd = selectionStart,
+): string {
+  const start = Math.max(0, Math.min(selectionStart, query.length));
+  const end = Math.max(start, Math.min(selectionEnd, query.length));
+  const merged = `${query.slice(0, start)}${inserted}${query.slice(end)}`.replace(/\\/g, '/');
+  return normalizeDirectoryExplorerQuery(merged);
 }
 
 export function expandTildeDirectoryPath(value: string, homeDirectory: string): string {
@@ -89,7 +121,7 @@ export function shouldFetchDirectoryExplorerListing(
   if (directory === '~/' || directory.startsWith('~/')) {
     return true;
   }
-  if (directory.startsWith('/') || /^[A-Za-z]:[\\/]/.test(directory)) {
+  if (isAbsoluteDirectoryPath(directory)) {
     return true;
   }
   return Boolean(homeDirectory && directory);
