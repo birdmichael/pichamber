@@ -122,14 +122,48 @@ const shouldIgnoreIncomingReady = (sessionID: string, incoming: SessionPlan | nu
   return current?.status === 'implementing' || isPlanImplemented(sessionID);
 };
 
+const shouldIgnoreIncomingImplementing = (sessionID: string, incoming: SessionPlan | null): boolean => {
+  if (incoming?.status !== 'implementing') return false;
+  if (!isPlanImplemented(sessionID)) return false;
+  const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  // After agent_settled flipped implementing → off, leftover adapter
+  // activeImplementation must not resurrect building… chrome.
+  return current?.status !== 'implementing';
+};
+
 const shouldSkipIncomingPlan = (sessionID: string, incoming: SessionPlan | null): boolean => (
-  shouldKeepPlanAgainstOff(sessionID, incoming) || shouldIgnoreIncomingReady(sessionID, incoming)
+  shouldKeepPlanAgainstOff(sessionID, incoming)
+  || shouldIgnoreIncomingReady(sessionID, incoming)
+  || shouldIgnoreIncomingImplementing(sessionID, incoming)
 );
+
+/**
+ * agent_settled / session.idle: leftover implementing is not a live turn.
+ * Keep `implemented` so a stale GET ready cannot restore Build.
+ */
+export const settleSessionPlanImplementing = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  const current = usePiSessionPlanStore.getState().plansBySession[id];
+  if (current?.status !== 'implementing') return;
+  bumpPlanRevision(id);
+  const next: SessionPlan = { status: 'off', planMarkdown: '' };
+  usePiSessionPlanStore.setState((state) => ({
+    plansBySession: {
+      ...state.plansBySession,
+      [id]: next,
+    },
+  }));
+  notePlanReadyCycle(id, next);
+  maybeOpenPlanRailOnReady({ sessionID: id, previous: current, next });
+};
 
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
   bumpPlanRevision(sessionID);
-  if (plan.status === 'off') clearPlanImplemented(sessionID);
+  // Do not clear `implemented` on GET/event off. After implement settles to
+  // off, leftover adapter implementing/ready must stay ignored. Exit/start
+  // still call clearPlanImplemented.
   const previous = usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   usePiSessionPlanStore.setState((state) => ({
     plansBySession: {

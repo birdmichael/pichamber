@@ -9,9 +9,9 @@ import { refreshFeaturePlugins, usePiPlanPluginAvailable } from '@/sync/pi-featu
 import {
   canShowPiPlanToggle,
   isPlanChromeDraft,
-  planBuildAvailable,
   planBuildBusyDisabled,
   resolveFooterPlanSelected,
+  resolvePlanBuildChrome,
   resolvePlanChromeSessionID,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
@@ -71,11 +71,14 @@ export function usePiPlanChrome(sessionID?: string | null) {
     });
   }, [available, resolvedSessionId, plan, pendingDraftPlan]);
 
-  const implementing = plan?.status === 'implementing';
-  const showBuildRow = available && (
-    hasPendingPlanReadySelect
-    || (!implemented && planBuildAvailable(plan?.status) && sessionPlanHasMarkdown(plan))
-  );
+  const { implementing, showBuildRow } = resolvePlanBuildChrome({
+    available,
+    status: plan?.status,
+    implemented,
+    busy,
+    hasPendingPlanReadySelect,
+    hasMarkdown: sessionPlanHasMarkdown(plan),
+  });
 
   return {
     isPiKernel,
