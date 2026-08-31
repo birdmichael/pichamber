@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Desktop:** the Files tree shows names at a usable width, and dragging the splitter resizes it. Previously the editor min-width left a ~60px icon-only strip.
 - **Desktop:** Keyboard Shortcuts closes on X and Esc. Previously the X left the dialog up.
 - **Desktop:** Ctrl+P toggles a single command palette. Opening it on Shortcuts no longer stacks a second dim overlay.
 - **Desktop:** the sidebar Settings gear opens on the first press, not three clicks.
