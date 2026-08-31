@@ -4,10 +4,25 @@
  * the client has not resolved $HOME yet — the server expands those paths.
  */
 
+const WINDOWS_VOLUME_ROOT = /^[A-Za-z]:[\\/]/;
+
+function isAbsoluteDirectoryPath(value: string): boolean {
+  return value.startsWith('/') || WINDOWS_VOLUME_ROOT.test(value);
+}
+
 export function normalizeDirectoryExplorerQuery(query: string): string {
   const trimmed = query.trim();
   if (trimmed === '~') {
     return '~/';
+  }
+  // The field is prefilled `~/`. Typing or pasting an absolute path at the
+  // caret concatenates (`~//tmp/foo`, `~/C:/Users/foo`). Drop the tilde
+  // prefix so the displayed query and the resolved directory match.
+  if (trimmed.startsWith('~/')) {
+    const remainder = trimmed.slice(2);
+    if (isAbsoluteDirectoryPath(remainder)) {
+      return remainder;
+    }
   }
   return trimmed;
 }
@@ -89,7 +104,7 @@ export function shouldFetchDirectoryExplorerListing(
   if (directory === '~/' || directory.startsWith('~/')) {
     return true;
   }
-  if (directory.startsWith('/') || /^[A-Za-z]:[\\/]/.test(directory)) {
+  if (isAbsoluteDirectoryPath(directory)) {
     return true;
   }
   return Boolean(homeDirectory && directory);

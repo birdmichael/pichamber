@@ -45,3 +45,31 @@ test('leaves absolute paths alone', () => {
   });
   expect(expandTildeDirectoryPath('/workspace/', '/home/ada')).toBe('/workspace/');
 });
+
+test('drops a ~/ prefix when the remainder is an absolute path', () => {
+  expect(normalizeDirectoryExplorerQuery('~/tmp/existing')).toBe('~/tmp/existing');
+  expect(normalizeDirectoryExplorerQuery('~//tmp/existing')).toBe('/tmp/existing');
+  expect(normalizeDirectoryExplorerQuery('~//tmp/existing/')).toBe('/tmp/existing/');
+  expect(normalizeDirectoryExplorerQuery('~//')).toBe('/');
+  expect(resolveDirectoryExplorerQuery('~//tmp/existing', '/home/ada')).toEqual({
+    directory: '/tmp/',
+    filter: 'existing',
+  });
+  expect(resolveDirectoryExplorerQuery('~//tmp/existing/', '/home/ada')).toEqual({
+    directory: '/tmp/existing/',
+    filter: '',
+  });
+  expect(shouldFetchDirectoryExplorerListing(
+    resolveDirectoryExplorerQuery('~//tmp/existing', '/home/ada').directory,
+    '/home/ada',
+  )).toBe(true);
+});
+
+test('drops a ~/ prefix when the remainder is a Windows volume root', () => {
+  expect(normalizeDirectoryExplorerQuery('~/C:/Users/ada/src')).toBe('C:/Users/ada/src');
+  expect(resolveDirectoryExplorerQuery('~/C:/Users/ada/src', 'C:/Users/ada')).toEqual({
+    directory: 'C:/Users/ada/',
+    filter: 'src',
+  });
+  expect(normalizeDirectoryExplorerQuery('~/D:\\Projects\\app')).toBe('D:\\Projects\\app');
+});

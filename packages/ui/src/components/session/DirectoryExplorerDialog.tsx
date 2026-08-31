@@ -29,6 +29,7 @@ import {
   type FilesystemErrorReason,
 } from '@/lib/api/files-errors';
 import {
+  normalizeDirectoryExplorerQuery,
   resolveDirectoryExplorerQuery,
   shouldFetchDirectoryExplorerListing,
 } from '@/lib/directory-explorer-query';
@@ -581,7 +582,7 @@ export const DirectoryExplorerDialog: React.FC<DirectoryExplorerDialogProps> = (
         <Input
           ref={inputRef}
           value={query}
-          onChange={(event) => setQuery(normalizeSeparators(event.target.value))}
+          onChange={(event) => setQuery(normalizeDirectoryExplorerQuery(normalizeSeparators(event.target.value)))}
           onKeyDown={handleKeyDown}
           placeholder={t('directoryExplorerDialog.pathInput.placeholder')}
           className="border-transparent bg-transparent pl-9 font-mono typography-ui-label shadow-none focus-visible:ring-0"
