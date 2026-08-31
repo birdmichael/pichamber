@@ -3216,4 +3216,25 @@ describe('settleRecordIfStuck vs live tools', () => {
     expect(host.getStatus()[record.id]?.type).toBe('busy');
     host.dispose();
   });
+
+  it('completed injected tools do not block idle reload', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Idle reload' });
+    record.piSession.emitEvent({
+      type: 'tool_execution_start',
+      toolCallId: 'todo_1',
+      toolName: 'todo',
+      args: { action: 'create' },
+    });
+    record.piSession.emitEvent({
+      type: 'tool_execution_end',
+      toolCallId: 'todo_1',
+      toolName: 'todo',
+      isError: false,
+      result: { details: { action: 'create', tasks: [] } },
+    });
+    await host.reload({ sessionID: record.id });
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    host.dispose();
+  });
 });

@@ -1894,7 +1894,8 @@ export const createPiHost = ({
       && record.status?.type !== 'busy'
       && record.status?.type !== 'retry'
     ) {
-      record.turnActive = true;
+      // Revive sidebar busy only. Do not latch turnActive: injected tool
+      // events (todo snapshots, tests) must still allow idle reload.
       record.status = { type: 'busy' };
       emit(record.directory, {
         id: createEventId(),
@@ -1920,6 +1921,21 @@ export const createPiHost = ({
         syncRecordTodos(record);
       } catch {
         // Keep the last good snapshot. Do not replace a failed replay with [].
+      }
+    }
+    if (
+      piEvent?.type === 'tool_execution_end'
+      && !recordHasRunningToolParts(record)
+      && !sessionIsLive(record)
+      && record.turnActive !== true
+    ) {
+      if (record.status?.type === 'busy' || record.status?.type === 'retry') {
+        record.status = { type: 'idle' };
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.status',
+          properties: { sessionID: record.id, status: { type: 'idle' } },
+        });
       }
     }
     if (piEvent?.type === 'agent_settled') {
