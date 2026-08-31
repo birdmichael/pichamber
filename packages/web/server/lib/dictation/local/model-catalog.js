@@ -71,6 +71,7 @@ export const LOCAL_STT_MODEL_CATALOG = {
 export const LOCAL_TTS_MODEL_CATALOG = {
   'kokoro-en-v0_19': {
     type: 'kokoro',
+    languages: ['en'],
     archiveUrl:
       'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2',
     extractedDir: 'kokoro-en-v0_19',
@@ -129,6 +130,34 @@ export function getLocalSttModelSpec(modelId) {
     ...spec,
     requiredFiles: Object.values(spec.files),
   };
+}
+
+/**
+ * The local TTS model to use for a language, preferring the model the user
+ * selected when it speaks that language. Returns null when no catalog model
+ * covers the language, in which case callers keep the selected model.
+ * @param {string} language BCP-47 primary subtag (`uk`, `zh`...)
+ * @param {string} [preferredModelId]
+ * @returns {string | null}
+ */
+export function resolveLocalTtsModelForLanguage(language, preferredModelId) {
+  const speaks = (modelId) => LOCAL_TTS_MODEL_CATALOG[modelId]?.languages?.includes(language) === true;
+  if (preferredModelId && speaks(preferredModelId)) return preferredModelId;
+  const candidate = LOCAL_TTS_MODEL_IDS.find(speaks);
+  return candidate ?? null;
+}
+
+/**
+ * The speaker id a model should use for a language when the caller's
+ * speaker was chosen for another language. `undefined` keeps the caller's
+ * speaker.
+ * @param {string} modelId
+ * @param {string} language
+ * @returns {number | undefined}
+ */
+export function getLocalTtsDefaultSpeaker(modelId, language) {
+  const speaker = LOCAL_TTS_MODEL_CATALOG[modelId]?.defaultSpeakerByLanguage?.[language];
+  return Number.isInteger(speaker) ? speaker : undefined;
 }
 
 /**
