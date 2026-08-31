@@ -40,6 +40,9 @@ export const HelpDialog: React.FC = () => {
   const isHelpDialogOpen = useUIStore((state) => state.isHelpDialogOpen);
   const setHelpDialogOpen = useUIStore((state) => state.setHelpDialogOpen);
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
+  const handleHelpOpenChange = React.useCallback((open: boolean) => {
+    setHelpDialogOpen(open);
+  }, [setHelpDialogOpen]);
   const mod = getModifierLabel();
   const isVSCode = isVSCodeRuntime();
 
@@ -214,7 +217,7 @@ export const HelpDialog: React.FC = () => {
   ];
 
   return (
-      <Dialog open={isHelpDialogOpen} onOpenChange={setHelpDialogOpen}>
+      <Dialog open={isHelpDialogOpen} onOpenChange={handleHelpOpenChange}>
       <DialogContent className="max-w-2xl w-[min(42rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

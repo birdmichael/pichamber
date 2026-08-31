@@ -500,11 +500,11 @@ export const CommandPalette: React.FC = () => {
 
   return (
     <Dialog open={isCommandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{t('commandPalette.title')}</DialogTitle>
-        <DialogDescription>{t('commandPalette.description')}</DialogDescription>
-      </DialogHeader>
       <DialogContent className="overflow-hidden p-0" showCloseButton>
+        <DialogHeader className="sr-only">
+          <DialogTitle>{t('commandPalette.title')}</DialogTitle>
+          <DialogDescription>{t('commandPalette.description')}</DialogDescription>
+        </DialogHeader>
         <Command
           shouldFilter={false}
           className="[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-8 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-1.5 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4 [&_[cmdk-item]]:typography-meta"

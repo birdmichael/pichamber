@@ -44,7 +44,7 @@ const DialogOverlay = React.forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BaseDialog.Backdrop>
 >(({ className, ...props }, ref) => {
-  const { dropPointerEventsOnExit } = useDialogLayerRegistration();
+  useDialogLayerRegistration();
 
   return (
     <BaseDialog.Backdrop
@@ -54,10 +54,9 @@ const DialogOverlay = React.forwardRef<
         "oc-glass-backdrop fixed inset-0 z-50 bg-black/25 dark:bg-black/40",
         "transition-opacity duration-150 ease-out",
         "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
-        // Last dialog: leftover overlay must not eat the next page click.
-        // Nested close: keep blocking so pointer-over cannot reach the sidebar
-        // while Settings (or another parent modal) is still open.
-        dropPointerEventsOnExit && "data-[ending-style]:pointer-events-none",
+        // Leftover ending overlays must not eat the next X / page click (#379).
+        // Settings still covers the page while a nested dialog is closing.
+        "data-[ending-style]:pointer-events-none",
         className
       )}
       {...props}
@@ -87,7 +86,7 @@ function DialogContent({
           data-slot="dialog-content"
           data-state-slot="dialog"
           className={cn(
-            "relative pointer-events-auto bg-background text-foreground flex flex-col w-full max-w-lg max-h-full gap-4 rounded-xl border p-6 shadow-none overflow-y-auto pwa-dialog-content origin-center",
+            "relative pointer-events-auto app-region-no-drag bg-background text-foreground flex flex-col w-full max-w-lg max-h-full gap-4 rounded-xl border p-6 shadow-none overflow-y-auto pwa-dialog-content origin-center",
             "transition-all duration-150 ease-out",
             "data-[starting-style]:opacity-0 data-[starting-style]:scale-[0.98]",
             "data-[ending-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:pointer-events-none",
@@ -107,7 +106,8 @@ function DialogContent({
         {showCloseButton && (
           <BaseDialog.Close
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring data-[open]:bg-interactive-active data-[open]:text-foreground absolute top-2 right-2 z-10 inline-flex size-7 items-center justify-center rounded-lg opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none text-muted-foreground hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            type="button"
+            className="app-region-no-drag ring-offset-background focus:ring-ring data-[open]:bg-interactive-active data-[open]:text-foreground absolute top-2 right-2 z-50 inline-flex size-7 items-center justify-center rounded-lg opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none text-muted-foreground hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <Icon name="close"/>
             <span className="sr-only">{t('dialog.common.actions.close')}</span>
