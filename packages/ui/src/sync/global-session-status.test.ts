@@ -71,4 +71,23 @@ describe("global session status index", () => {
 
     expect(useGlobalSessionStatusStore.getState().statusById.has("session-a")).toBe(false)
   })
+
+  test("empty status snapshot + known ids does not clear SSE busy in monotonic mode", () => {
+    applyGlobalSessionStatusEvent("/repo", {
+      type: "session.status",
+      properties: { sessionID: "session-a", status: { type: "busy" } },
+    } as Event)
+    expect(useGlobalSessionStatusStore.getState().statusById.get("session-a")?.status.type).toBe("busy")
+
+    applyGlobalSessionStatusSnapshot("/repo", {}, ["session-a"], "monotonic")
+    expect(useGlobalSessionStatusStore.getState().statusById.get("session-a")?.status.type).toBe("busy")
+
+    applyGlobalSessionStatusSnapshot("/repo", { "session-a": { type: "idle" } }, ["session-a"], "monotonic")
+    expect(useGlobalSessionStatusStore.getState().statusById.get("session-a")?.status.type).toBe("busy")
+  })
+
+  test("monotonic snapshot still raises a missed busy session", () => {
+    applyGlobalSessionStatusSnapshot("/repo", { "session-a": { type: "busy" } }, ["session-a"], "monotonic")
+    expect(useGlobalSessionStatusStore.getState().statusById.get("session-a")?.status.type).toBe("busy")
+  })
 })

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
+import { directoriesMatch } from './directory-identity.js';
 import {
   THINKING_LEVELS,
   listPiCommands,
@@ -1885,6 +1886,23 @@ export const createPiHost = ({
   const syncRecordTodos = (record) => publishRecordTodos(record, readRecordEntriesOrThrow(record));
 
   const emitTranslated = (record, piEvent) => {
+    // Tool events do not themselves emit session.status. After a false settle
+    // (prompt IPC finally / empty snapshot) the rest of the turn would look
+    // idle in the sidebar unless we revive busy here.
+    if (
+      (piEvent?.type === 'tool_execution_start' || piEvent?.type === 'tool_execution_update')
+      && record.status?.type !== 'busy'
+      && record.status?.type !== 'retry'
+    ) {
+      // Revive sidebar busy only. Do not latch turnActive: injected tool
+      // events (todo snapshots, tests) must still allow idle reload.
+      record.status = { type: 'busy' };
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'session.status',
+        properties: { sessionID: record.id, status: { type: 'busy' } },
+      });
+    }
     const ocEvents = record.translator.translate(piEvent);
     for (const ocEvent of ocEvents) {
       applyEventToStore(record, ocEvent);
@@ -1903,6 +1921,21 @@ export const createPiHost = ({
         syncRecordTodos(record);
       } catch {
         // Keep the last good snapshot. Do not replace a failed replay with [].
+      }
+    }
+    if (
+      piEvent?.type === 'tool_execution_end'
+      && !recordHasRunningToolParts(record)
+      && !sessionIsLive(record)
+      && record.turnActive !== true
+    ) {
+      if (record.status?.type === 'busy' || record.status?.type === 'retry') {
+        record.status = { type: 'idle' };
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.status',
+          properties: { sessionID: record.id, status: { type: 'idle' } },
+        });
       }
     }
     if (piEvent?.type === 'agent_settled') {
@@ -1931,12 +1964,24 @@ export const createPiHost = ({
     return true;
   };
 
+  const recordHasRunningToolParts = (record) => {
+    const messages = record?.messages;
+    if (!Array.isArray(messages)) return false;
+    for (const entry of messages) {
+      const parts = Array.isArray(entry?.parts) ? entry.parts : [];
+      for (const part of parts) {
+        if (part?.type === 'tool' && part?.state?.status === 'running') return true;
+      }
+    }
+    return false;
+  };
+
   const sessionIsLive = (record) => (
     Boolean(record?.piSession?.isStreaming) || Boolean(record?.piSession?.isCompacting)
   );
 
   const settleRecordIfStuck = (record) => {
-    if (!record || sessionIsLive(record)) return false;
+    if (!record || sessionIsLive(record) || recordHasRunningToolParts(record)) return false;
     if (record.status?.type !== 'busy' && record.status?.type !== 'retry') return false;
     emitTranslated(record, { type: 'agent_settled' });
     return true;
@@ -2766,11 +2811,11 @@ export const createPiHost = ({
 
   const recordMatchesDirectory = (record, directory) => {
     if (!directory) return true;
-    if (record.directory === directory) return true;
+    if (directoriesMatch(record.directory, directory)) return true;
     const parentID = hydratedParentID(record);
     if (!parentID) return false;
     const parent = sessions.get(parentID);
-    return Boolean(parent && parent.directory === directory);
+    return Boolean(parent && directoriesMatch(parent.directory, directory));
   };
 
   const collectAttachedChildRuns = (parent) => {
@@ -3356,7 +3401,7 @@ export const createPiHost = ({
     getStatus(directory) {
       const map = {};
       for (const record of sessions.values()) {
-        if (directory && record.directory !== directory) continue;
+        if (!recordMatchesDirectory(record, directory)) continue;
         if (record.status?.type && record.status.type !== 'idle') {
           map[record.id] = record.status;
         }

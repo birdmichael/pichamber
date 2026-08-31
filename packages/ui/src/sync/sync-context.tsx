@@ -646,8 +646,8 @@ async function resyncDirectorySessionStatuses(
   // of active sessions — reconciled per `mode` (absence ≠ idle under monotonic).
   if (nextStatuses === null) return null
   applySessionStatusSnapshot(store, nextStatuses, candidateSessionIds, mode)
+  applyGlobalSessionStatusSnapshot(directory, nextStatuses, candidateSessionIds, mode)
   if (mode === "authoritative") {
-    applyGlobalSessionStatusSnapshot(directory, nextStatuses, candidateSessionIds)
     // An authoritative snapshot that settles sessions previously observed
     // busy/retry can orphan running tool parts (managed process died
     // mid-turn, #2577): finalize them now. The snapshot write above already
@@ -2062,7 +2062,12 @@ export function SyncProvider(props: {
               if (!context.isCurrent()) return
               store.setState(patch)
               if (patch.session_status) {
-                applyGlobalSessionStatusSnapshot(directory, patch.session_status, store.getState().session.map((session) => session.id))
+                applyGlobalSessionStatusSnapshot(
+                  directory,
+                  patch.session_status,
+                  store.getState().session.map((session) => session.id),
+                  "monotonic",
+                )
               }
               if (patch.session || patch.message) {
                 ingestDirectoryStateIntoRoutingIndex(routingIndex, directory, store.getState())
