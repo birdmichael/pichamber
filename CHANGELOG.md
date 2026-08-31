@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** after a Plan is ready, Build sits on the collapsed composer (pill), not only the workspace Plan tab.
+- **Mobile:** tapping Agent/Plan on the expanded composer opens the menu instead of collapsing the input.
 - **Mobile:** the model sheet lists Pi providers even when no project is open yet. Previously a cold start skipped `loadProviders` and showed “No providers or models match your search.”
 - **Mobile:** Settings home nav scrolls on a swipe. A tap still opens the page. Previously a finger-down on Chat/General (and the rest) opened that page immediately.
 - **Chat:** empty-state Schedule a Task and Craft a Goal send a short user line. The long instruction stays hidden, so the bubble and session title are not the internal prompt. User-visible chip copy says Pichamber, not OpenChamber.

@@ -316,6 +316,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     }, []);
     const [mobileControlsPanel, setMobileControlsPanel] = React.useState<MobileControlsPanel>(null);
     const [mobileAttachMenuOpen, setMobileAttachMenuOpen] = React.useState(false);
+    const [mobilePlanMenuOpen, setMobilePlanMenuOpen] = React.useState(false);
     const [mobileDraftPicker, setMobileDraftPicker] = React.useState<'project' | 'branch' | null>(null);
     const [mobileDraftPickerQuery, setMobileDraftPickerQuery] = React.useState('');
     // Message history navigation state (up/down arrow to recall previous messages)
@@ -2683,6 +2684,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         holders: {
             controlsPanelOpen: Boolean(mobileControlsPanel),
             attachMenuOpen: mobileAttachMenuOpen,
+            planMenuOpen: mobilePlanMenuOpen,
             draftPickerOpen: mobileDraftPicker !== null,
             issuePickerOpen,
             prPickerOpen,
@@ -3168,6 +3170,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                         dictationActive={mobileShell.dictationActive}
                         onOpenSettings={onOpenSettings}
                         onAttachmentMenuOpenChange={handleAttachmentMenuOpenChange}
+                        onPlanMenuOpenChange={setMobilePlanMenuOpen}
                         onPickLocalFiles={handlePickLocalFiles}
                         onOpenIssuePicker={openIssuePicker}
                         onOpenPrPicker={openPrPicker}
