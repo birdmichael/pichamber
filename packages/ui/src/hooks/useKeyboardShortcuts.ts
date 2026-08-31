@@ -45,18 +45,18 @@ export const useKeyboardShortcuts = () => {
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const toggleHelpDialog = useUIStore((s) => s.toggleHelpDialog);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const currentShortcutDirectory = useDirectoryStore((s) => s.currentDirectory);
   const panelDirectoryKey = useContextPanelDirectoryKey();
 
-  // The terminal lives in the context panel; these mirror the rail behavior.
+  // The terminal lives in the context panel; these mirror the rail behavior
+  // (digit shortcuts / right-rail icon), including a projectless Chats draft.
   const toggleTerminalSurface = React.useCallback(() => {
-    if (!currentShortcutDirectory) return;
-    useUIStore.getState().openContextSurface(normalizeContextPanelDirectoryKey(currentShortcutDirectory), 'terminal');
-  }, [currentShortcutDirectory]);
+    if (!panelDirectoryKey) return;
+    useUIStore.getState().openContextSurface(normalizeContextPanelDirectoryKey(panelDirectoryKey), 'terminal');
+  }, [panelDirectoryKey]);
 
   const toggleTerminalSurfaceExpanded = React.useCallback(() => {
-    if (!currentShortcutDirectory) return;
-    const key = normalizeContextPanelDirectoryKey(currentShortcutDirectory);
+    if (!panelDirectoryKey) return;
+    const key = normalizeContextPanelDirectoryKey(panelDirectoryKey);
     const state = useUIStore.getState();
     const panel = state.contextPanelByDirectory[key];
     const activeMode = panel?.isOpen ? panel.tabs.find((tab) => tab.id === panel.activeTabId)?.mode : null;
@@ -64,7 +64,7 @@ export const useKeyboardShortcuts = () => {
       state.openContextSurface(key, 'terminal');
     }
     state.toggleContextPanelExpanded(key);
-  }, [currentShortcutDirectory]);
+  }, [panelDirectoryKey]);
   const isMobile = useUIStore((s) => s.isMobile);
   const setSessionSwitcherOpen = useUIStore((s) => s.setSessionSwitcherOpen);
   const setActiveMainTab = useUIStore((s) => s.setActiveMainTab);
