@@ -20,6 +20,7 @@ import {
 import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
+import { buildMiniChatPageUrl, isAllowedMiniChatNavigationUrl, resolveMiniChatUiBase } from './mini-chat-url.mjs';
 import { sanitizeRuntimeRequestHeaders } from './runtime-request-headers.mjs';
 import {
   assertUpdaterCapability,
@@ -2871,20 +2872,27 @@ const createAdditionalWindow = async (url, runtimeConfig = {}) => {
   return browserWindow;
 };
 
-const buildMiniChatUrl = ({ mode, sessionId, directory, projectId }) => {
-  const base = shouldUsePackagedUi()
-    ? buildPackagedUiUrl('/mini-chat.html')
-    : state.localOrigin || state.sidecarUrl;
-  if (!base) {
-    throw new Error('Local UI is not available');
-  }
+const electronDevHmrUiOrigin = () => (
+  isDev ? `http://127.0.0.1:${process.env.OPENCHAMBER_HMR_UI_PORT || '5173'}` : ''
+);
 
-  const url = new URL(shouldUsePackagedUi() ? base : '/mini-chat.html', base);
-  url.searchParams.set('mode', mode === 'session' ? 'session' : 'draft');
-  if (sessionId) url.searchParams.set('sessionId', sessionId);
-  if (directory) url.searchParams.set('directory', directory);
-  if (projectId) url.searchParams.set('projectId', projectId);
-  return url.toString();
+const buildMiniChatUrl = ({ mode, sessionId, directory, projectId }) => {
+  const packaged = shouldUsePackagedUi();
+  return buildMiniChatPageUrl({
+    base: resolveMiniChatUiBase({
+      packaged,
+      packagedUrl: buildPackagedUiUrl('/mini-chat.html'),
+      uiOrigin: state.uiOrigin,
+      localOrigin: state.localOrigin,
+      sidecarUrl: state.sidecarUrl,
+      hmrUiOrigin: electronDevHmrUiOrigin(),
+    }),
+    packaged,
+    mode,
+    sessionId,
+    directory,
+    projectId,
+  });
 };
 
 const miniChatSessionWindowKey = (runtimeConfig, sessionId) => {
@@ -3011,11 +3019,22 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     return { action: 'deny' };
   });
   browserWindow.webContents.on('will-navigate', (event, url) => {
+    let currentUrl = '';
     try {
-      const target = new URL(url);
-      const local = new URL(shouldUsePackagedUi() ? packagedUiOrigin() : (state.localOrigin || state.sidecarUrl || ''));
-      if (target.origin === local.origin) return;
+      currentUrl = browserWindow.webContents.getURL();
     } catch {
+    }
+    if (isAllowedMiniChatNavigationUrl({
+      url,
+      packaged: shouldUsePackagedUi(),
+      packagedOrigin: packagedUiOrigin(),
+      uiOrigin: state.uiOrigin,
+      localOrigin: state.localOrigin,
+      sidecarUrl: state.sidecarUrl,
+      currentUrl,
+      hmrUiOrigin: electronDevHmrUiOrigin(),
+    })) {
+      return;
     }
     event.preventDefault();
     void shell.openExternal(url).catch(() => {});
