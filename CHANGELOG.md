@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat no longer crashes or freezes on huge tool dumps, JavaScript template-string highlighting, truncated `Index:` diffs, or composer drafts with Windows (CRLF) line endings.
 - Files: Markdown preview has in-document search (Ctrl/Cmd+F) with highlighting and next/previous, including when the preview is not focused.
 - Files: Escape in Markdown preview search closes the find bar, not the Files panel.
 - Git: the Git tab, Diff, Pull Request, Walkthrough, and Work Status follow a nested repository when the project folder is not itself a git repo. Pick another nested repo from the switcher.
