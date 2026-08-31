@@ -11,7 +11,7 @@ import { create } from 'zustand';
 // composer, and the native mobile app, which feeds the signal into its own
 // connection orchestration instead of showing the shared banner.
 
-export type AuthSessionState = 'ok' | 'expired' | 'reauthenticating';
+type AuthSessionState = 'ok' | 'expired' | 'reauthenticating';
 
 interface AuthSessionStore {
   state: AuthSessionState;
