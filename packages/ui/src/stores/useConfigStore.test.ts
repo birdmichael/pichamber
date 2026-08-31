@@ -405,6 +405,29 @@ describe('useConfigStore provider persistence', () => {
     expect(state.currentVariant).toBe('fast');
   });
 
+  test('loadProviders fetches the global catalog when no project directory is known', async () => {
+    // Hosted mobile.html / Pi cold start: no project yet. Skipping the fetch
+    // left the model sheet on "No providers or models match your search."
+    useConfigStore.setState({
+      activeDirectoryKey: '__global__',
+      providers: [],
+      currentProviderId: '',
+      currentModelId: '',
+      selectedProviderId: '',
+      directoryScoped: {},
+    });
+    getProvidersCalls = 0;
+    liveProviderId = 'live';
+
+    await useConfigStore.getState().loadProviders({ directory: null, source: 'test:global' });
+
+    const state = useConfigStore.getState();
+    expect(getProvidersCalls).toBe(1);
+    expect(state.providers.map((entry) => entry.id)).toEqual(['live']);
+    expect(state.currentProviderId).toBe('live');
+    expect(state.currentModelId).toBe('live-model');
+  });
+
   test('the settings provider selection survives a refresh that no longer lists it', async () => {
     // Plugin-registered providers vanish from the list while OpenCode restarts,
     // and a Pi models refresh can omit a still-selected provider. A refresh in
