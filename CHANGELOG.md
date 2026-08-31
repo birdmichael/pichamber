@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Mobile:** Sessions **+ new chat** closes the drawer on the first tap and opens a projectless chat. Previously the first tap did nothing and a second tap was required.
 - **Settings:** Feature Plugin install (including `pi-xai-oauth`) no longer 500s. The Node-kernel package manager now exposes `installAndPersist`, matching Pi's PackageManager.
 - **Chat / Desktop:** after Plan **Build** implement settles, the composer leaves disabled **building…**. Idle is `agent_settled` (live turn), not leftover `implementing` or adapter busy. Switching chats or Reload Pi no longer resurrects it.
 - **Desktop:** Git, Changes, and Diff empty copy no longer tells you to initialize or open a repository. Those panels have no such control. They now say Git status is available when this folder is already a Git repository.
