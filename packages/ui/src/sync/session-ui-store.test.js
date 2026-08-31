@@ -11,6 +11,8 @@ import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { createChatDraftIdentity, readChatDraft, writeChatDraft } from '@/lib/chatDraftPersistence';
+import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
+import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import { applyFeaturePluginsPayload, resetPiFeaturePluginsStore } from './pi-feature-plugins-store';
 
@@ -388,6 +390,36 @@ describe('openNewSessionDraft project binding', () => {
     writeChatDraft(identity, 'pr345-draft-probe', []);
     useSessionUIStore.getState().openNewSessionDraft({ directoryOverride: projectB.path });
     expect(readChatDraft(identity).text).toBe('pr345-draft-probe');
+  });
+
+  test('New session after a projectless draft starts empty', () => {
+    const home = '/home/tester';
+    const storage = getDeferredSafeStorage();
+    storage.removeItem('openchamber.chatDrafts.v2');
+    useProjectsStore.setState({ projects: [], activeProjectId: null });
+    useDirectoryStore.setState({ currentDirectory: home, homeDirectory: home });
+    useSessionUIStore.setState({
+      currentSessionId: 'ses_other',
+      currentSessionDirectory: home,
+    });
+
+    const original = createChatDraftIdentity(getRuntimeKey(), home, 'ses_projectless');
+    const leakedNewSession = createChatDraftIdentity(getRuntimeKey(), home, null);
+    const chatNewSession = createChatDraftIdentity(getRuntimeKey(), CHAT_DRAFT_PROJECT_ID, null);
+    writeChatDraft(original, 'projectless-draft', []);
+    writeChatDraft(leakedNewSession, 'projectless-draft', []);
+    writeChatDraft(chatNewSession, 'projectless-draft', []);
+
+    useSessionUIStore.getState().openNewSessionDraft();
+
+    const draft = useSessionUIStore.getState().newSessionDraft;
+    expect(draft.open).toBe(true);
+    expect(draft.target).toBe('chat');
+    expect(draft.selectedProjectId).toBeNull();
+    expect(draft.directoryOverride).toBeNull();
+    expect(readChatDraft(original).text).toBe('projectless-draft');
+    expect(readChatDraft(leakedNewSession).text).toBe('');
+    expect(readChatDraft(chatNewSession).text).toBe('');
   });
 
   test('still drops a leftover slash untitled draft', () => {

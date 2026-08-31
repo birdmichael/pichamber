@@ -85,7 +85,7 @@ import { extractGitChangedFiles } from './changedFiles';
 import { useI18n } from '@/lib/i18n';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import { shouldShowDesktopDraftWelcomeChrome } from '@/lib/draftStarters';
-import { isManagedChatDirectory } from '@/lib/chatDirectories';
+import { isManagedChatDirectory, resolveNewSessionComposerDirectory } from '@/lib/chatDirectories';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { resolveWelcomeWorkspaceLabel } from '@/lib/workspaceLabel';
 import { sessionEvents } from '@/lib/sessionEvents';
@@ -266,12 +266,10 @@ interface ChatInputProps {
 
 const resolveChatDraftIdentity = (sessionId: string | null): ChatDraftIdentity | null => {
     const sessionState = useSessionUIStore.getState();
-    const newSessionDirectory = sessionState.newSessionDraft?.open
-        ? sessionState.newSessionDraft.bootstrapPendingDirectory ?? sessionState.newSessionDraft.directoryOverride
-        : null;
     const directory = sessionId
         ? sessionState.getDirectoryForSession(sessionId) ?? sessionState.currentSessionDirectory
-        : newSessionDirectory ?? useDirectoryStore.getState().currentDirectory;
+        : resolveNewSessionComposerDirectory(sessionState.newSessionDraft)
+            ?? useDirectoryStore.getState().currentDirectory;
     return createChatDraftIdentity(getRuntimeKey(), directory, sessionId);
 };
 
@@ -379,16 +377,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     );
     const isBtwActive = btwPluginAvailable && Boolean(btwSessionRef) && !btwPanel.collapsed;
     const activeRuntimeKey = getRuntimeKey();
+    const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
+    const newSessionDraftOpen = Boolean(newSessionDraft?.open);
     const chatDraftIdentity = React.useMemo(
         () => createChatDraftIdentity(
             activeRuntimeKey,
-            currentSessionDirectoryForSync ?? currentDirectory,
+            currentSessionId
+                ? (currentSessionDirectoryForSync ?? currentDirectory)
+                : (resolveNewSessionComposerDirectory(newSessionDraft) ?? currentDirectory),
             currentSessionId,
         ),
-        [activeRuntimeKey, currentDirectory, currentSessionDirectoryForSync, currentSessionId],
+        [activeRuntimeKey, currentDirectory, currentSessionDirectoryForSync, currentSessionId, newSessionDraft],
     );
-    const newSessionDraft = useSessionUIStore((s) => s.newSessionDraft);
-    const newSessionDraftOpen = Boolean(newSessionDraft?.open);
     const draftPermissionAutoAcceptEnabled = useSessionUIStore((s) => (
         s.newSessionDraft?.open ? s.newSessionDraft.permissionAutoAcceptEnabled === true : false
     ));

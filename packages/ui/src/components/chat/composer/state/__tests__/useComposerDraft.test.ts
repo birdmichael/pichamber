@@ -74,6 +74,22 @@ describe('applyComposerIdentitySwitch', () => {
     expect(readChatDraft(newSession).text).toBe('');
   });
 
+  test('an existing projectless draft does not leak onto New session', () => {
+    const existing = createChatDraftIdentity('runtime-a', '/home/tester', 'session-a')!;
+    const newSession = createChatDraftIdentity('runtime-a', 'openchamber:chats', null)!;
+
+    const afterOpenDraft = applyComposerIdentitySwitch({
+      previous: existing,
+      next: newSession,
+      currentText: 'projectless-draft',
+      persistEnabled: true,
+    });
+
+    expect(afterOpenDraft.text).toBe('');
+    expect(readChatDraft(existing).text).toBe('projectless-draft');
+    expect(readChatDraft(newSession).text).toBe('');
+  });
+
   test('B keeps its own draft when A is restored', () => {
     const sessionA = createChatDraftIdentity('runtime-a', '/repo', 'session-a')!;
     const sessionB = createChatDraftIdentity('runtime-a', '/repo', 'session-b')!;

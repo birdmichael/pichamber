@@ -29,10 +29,25 @@ const openedProjectPathSet = (
   return paths;
 };
 
+const directoryBelongsToOpenedProject = (
+  directory: string,
+  openedProjectPaths: ReadonlySet<string>,
+): boolean => {
+  for (const path of openedProjectPaths) {
+    if (directory === path) return true;
+    if (path === '/') {
+      if (directory.startsWith('/')) return true;
+      continue;
+    }
+    if (directory.startsWith(`${path}/`)) return true;
+  }
+  return false;
+};
+
 /**
  * New session while in a project follows that project.
  *
- * 1. Current session is a non-managed-chat project session → directoryOverride.
+ * 1. Current session belongs to an opened project (root or worktree) → directoryOverride.
  * 2. Else if an active project is set → selectedProjectId + that path.
  * 3. Else → undefined so `openNewSessionDraft()` stays a projectless chat.
  */
@@ -47,7 +62,11 @@ export function resolveInheritedNewSessionDraftOptions(
     && currentSessionDirectory
     && !isManagedChatDirectory(currentSessionDirectory, input.homeDirectory, openedProjectPaths)
   ) {
-    return { directoryOverride: currentSessionDirectory };
+    // Home/`~` that is not an opened Settings project is a projectless chat.
+    // Do not inherit it as a project workspace even if homeDirectory is unset.
+    if (directoryBelongsToOpenedProject(currentSessionDirectory, openedProjectPaths)) {
+      return { directoryOverride: currentSessionDirectory };
+    }
   }
 
   const activeProjectId = typeof input.activeProjectId === 'string' ? input.activeProjectId.trim() : '';

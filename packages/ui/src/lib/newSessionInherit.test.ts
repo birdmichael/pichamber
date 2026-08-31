@@ -94,6 +94,17 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       activeProjectPath: homeDirectory,
     })).toEqual({ directoryOverride: homeDirectory });
   });
+
+  test('home that is not an opened project stays projectless even without homeDirectory', () => {
+    expect(resolveInheritedNewSessionDraftOptions({
+      currentSessionId: 'ses_home',
+      currentSessionDirectory: homeDirectory,
+      homeDirectory: null,
+      openedProjectPaths: [],
+      activeProjectId: null,
+      activeProjectPath: null,
+    })).toBe(undefined);
+  });
 });
 
 describe('new-session callers', () => {
