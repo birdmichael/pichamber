@@ -412,7 +412,7 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
   const groupMatchesSearch = hasSessionSearchQuery ? searchData?.groupMatches === true : false;
   const shouldFilterGroupContents = hasSessionSearchQuery;
   const sourceGroupNodes = React.useMemo(
-    () => [...(shouldFilterGroupContents ? (searchData?.filteredNodes ?? []) : group.sessions)]
+    () => [...(shouldFilterGroupContents ? (searchData?.filteredNodes ?? group.sessions) : group.sessions)]
       .sort(compareSessionNodes),
     [compareSessionNodes, group.sessions, searchData?.filteredNodes, shouldFilterGroupContents],
   );

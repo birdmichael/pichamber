@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const sessionSidebarSource = readFileSync(join(here, '../SessionSidebar.tsx'), 'utf8');
 const projectsListSource = readFileSync(join(here, 'SidebarProjectsList.tsx'), 'utf8');
+const groupSectionSource = readFileSync(join(here, 'SessionGroupSection.tsx'), 'utf8');
 
 describe('sidebar search keeps chats/recent visible', () => {
   test('SessionSidebar does not hide activity solely because a search query is present', () => {
@@ -23,5 +24,10 @@ describe('sidebar search keeps chats/recent visible', () => {
     );
     expect(emptyProjectSearchBranch).toContain('{props.topContent}');
     expect(emptyProjectSearchBranch).toContain('{props.topContent ? null : props.searchEmptyState}');
+  });
+
+  test('SessionGroupSection falls back to already-filtered group.sessions when searchData is missing', () => {
+    expect(groupSectionSource).toContain('searchData?.filteredNodes ?? group.sessions');
+    expect(groupSectionSource).not.toContain('searchData?.filteredNodes ?? []');
   });
 });
