@@ -61,6 +61,7 @@ export interface ComposerFooterProps {
 
     onOpenSettings?: () => void;
     onAttachmentMenuOpenChange?: (open: boolean) => void;
+    onPlanMenuOpenChange?: (open: boolean) => void;
     onPickLocalFiles: () => void;
     onOpenIssuePicker: () => void;
     onOpenPrPicker: () => void;
@@ -104,6 +105,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
         dictationActive,
         onOpenSettings,
         onAttachmentMenuOpenChange,
+        onPlanMenuOpenChange,
         onPickLocalFiles,
         onOpenIssuePicker,
         onOpenPrPicker,
@@ -188,7 +190,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <SessionGoalObjectiveCounter length={messageLength} />
                               </>
                             ) : null}
-                            <PiPlanModeToggle />
+                            <PiPlanModeToggle onOpenChange={onPlanMenuOpenChange} />
                             <PiGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}

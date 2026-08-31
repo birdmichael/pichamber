@@ -25,7 +25,13 @@ const PLAN_SIDES = [
   { side: 'plan' as const, labelKey: 'chat.piPlan.plan' },
 ] as const;
 
-export function PiPlanModeToggle({ className }: { className?: string }) {
+export function PiPlanModeToggle({
+  className,
+  onOpenChange,
+}: {
+  className?: string;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useI18n();
   const chrome = usePiPlanChrome();
   const { isMobile: deviceIsMobile } = useDeviceInfo();
@@ -95,7 +101,7 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <Button
           type="button"
@@ -105,6 +111,12 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
           aria-pressed={chrome.footerPlanSelected}
           aria-label={t('chat.piPlan.toggleAria')}
           disabled={disabled}
+          // Block focus transfer so the tap does not dismiss the keyboard /
+          // collapse the mobile composer (same guard as MobileModelButton).
+          onMouseDown={(event) => event.preventDefault()}
+          onPointerDownCapture={(event) => {
+            if (event.pointerType === 'touch') event.preventDefault();
+          }}
         >
           {triggerLabel}
         </Button>

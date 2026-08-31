@@ -26,6 +26,18 @@ const headerSource = readFileSync(
   join(__dirname, '../../../layout/Header.tsx'),
   'utf-8',
 );
+const shellSource = readFileSync(
+  join(__dirname, '../state/useMobileComposerShell.ts'),
+  'utf-8',
+);
+const pillSource = readFileSync(
+  join(__dirname, 'MobilePillComposer.tsx'),
+  'utf-8',
+);
+const buildRowSource = readFileSync(
+  join(__dirname, '../../PiPlanBuildRow.tsx'),
+  'utf-8',
+);
 
 const ICON_SLOT_WIDTH = /width:\s*1\.5rem\s*!important/;
 
@@ -68,5 +80,30 @@ describe('mobile composer Agent/Plan chip width', () => {
     expect(headerSource).toContain('isSessionTitleReloadGlyphVisible');
     expect(headerSource).toContain('showSessionTitleReloadGlyph');
     expect(headerSource).toContain('header.sessionReload.tooltip');
+  });
+});
+
+describe('mobile Plan chip focus guard and pill Build', () => {
+  test('Agent/Plan trigger blocks focus transfer so the composer does not collapse', () => {
+    expect(toggleSource).toContain('onMouseDown={(event) => event.preventDefault()}');
+    expect(toggleSource).toContain('onPointerDownCapture');
+    expect(toggleSource).toContain("event.pointerType === 'touch'");
+    expect(toggleSource).toContain('<DropdownMenu onOpenChange={onOpenChange}>');
+  });
+
+  test('planMenuOpen holds the expanded composer while the Agent/Plan menu is open', () => {
+    expect(shellSource).toContain('planMenuOpen');
+    expect(chatInputSource).toContain('planMenuOpen: mobilePlanMenuOpen');
+    expect(footerSource).toContain('onOpenChange={onPlanMenuOpenChange}');
+  });
+
+  test('collapsed pill mounts PiPlanBuildRow', () => {
+    expect(pillSource).toContain('<PiPlanBuildRow');
+  });
+
+  test('PiPlanBuildRow Build and model trigger block focus transfer', () => {
+    expect(buildRowSource).toContain('onMouseDown={(event) => event.preventDefault()}');
+    expect(buildRowSource).toContain('onPointerDownCapture');
+    expect(buildRowSource).toContain("event.pointerType === 'touch'");
   });
 });
