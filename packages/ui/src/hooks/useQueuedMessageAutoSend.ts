@@ -187,16 +187,9 @@ export const shouldDispatchQueuedAutoSend = (
 /**
  * Resolve the live status the queue gate should honor for a session.
  *
- * The server's `/session/status` map only lists busy/retry sessions — idle
- * sessions are absent — so a missing entry means "idle per the snapshot", not
- * "no information". A missed busy event therefore leaves no entry while a turn
- * is still streaming. An in-flight assistant is the live evidence of that
- * running turn: treat it as busy so the queue never dispatches into it.
- * A Steer user bubble can sit after that assistant, so look at the latest
- * assistant, not only the last message. The entry becomes idle when that
- * assistant completes or an idle status event lands. This reads the
- * directory child store directly so both the effect-loop gate and the
- * dispatch-time re-check agree.
+ * `/session/status` omits idle sessions. A missed busy event leaves no entry
+ * while a turn is still streaming. Use the latest assistant (Steer can append
+ * a user bubble after it) so the queue does not dispatch into that turn.
  */
 export const resolveQueuedSessionStatusType = (
   sessionId: string,
