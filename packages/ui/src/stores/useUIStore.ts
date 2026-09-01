@@ -766,6 +766,9 @@ interface UIStore {
   hasManuallyResizedLeftSidebar: boolean;
   contextPanelByDirectory: Record<string, ContextPanelDirectoryState>;
   contextRailOrder: string[];
+  /** Surface ids the user hid from the context rail; stored as the hidden set
+      so surfaces added later appear for everyone. */
+  contextRailHiddenSurfaces: string[];
   contextEditorTreeVisible: boolean;
   contextEditorTreeWidth: number;
   notesPanelHeight: number;
@@ -950,6 +953,8 @@ interface UIStore {
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setContextRailOrder: (order: string[]) => void;
+  setContextRailSurfaceVisible: (surfaceId: string, visible: boolean) => void;
+  setContextRailHiddenSurfaces: (surfaceIds: string[]) => void;
   toggleContextEditorTree: () => void;
   setContextEditorTreeWidth: (width: number) => void;
   openContextSurface: (directory: string, mode: ContextPanelMode) => void;
@@ -1147,6 +1152,7 @@ export const useUIStore = create<UIStore>()(
         hasManuallyResizedLeftSidebar: false,
         contextPanelByDirectory: {},
         contextRailOrder: [],
+        contextRailHiddenSurfaces: [],
         contextEditorTreeVisible: true,
         contextEditorTreeWidth: 240,
         notesPanelHeight: 112,
@@ -1340,6 +1346,23 @@ export const useUIStore = create<UIStore>()(
             ? order.filter((id, index) => typeof id === 'string' && id.trim() !== '' && order.indexOf(id) === index)
             : [];
           set({ contextRailOrder: sanitized });
+        },
+
+        setContextRailSurfaceVisible: (surfaceId, visible) => {
+          set((state) => {
+            const hidden = state.contextRailHiddenSurfaces;
+            const isHidden = hidden.includes(surfaceId);
+            if (visible === !isHidden) return state;
+            return {
+              contextRailHiddenSurfaces: visible
+                ? hidden.filter((entry) => entry !== surfaceId)
+                : [...hidden, surfaceId],
+            };
+          });
+        },
+
+        setContextRailHiddenSurfaces: (surfaceIds) => {
+          set({ contextRailHiddenSurfaces: [...new Set(surfaceIds)] });
         },
 
         toggleContextEditorTree: () => {
@@ -3000,6 +3023,9 @@ export const useUIStore = create<UIStore>()(
           state.contextRailOrder = Array.isArray(state.contextRailOrder)
             ? (state.contextRailOrder as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim() !== '')
             : [];
+          state.contextRailHiddenSurfaces = Array.isArray(state.contextRailHiddenSurfaces)
+            ? (state.contextRailHiddenSurfaces as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim() !== '')
+            : [];
 
           return state;
         },
@@ -3009,6 +3035,7 @@ export const useUIStore = create<UIStore>()(
           sidebarWidth: state.sidebarWidth,
           contextPanelByDirectory: state.contextPanelByDirectory,
           contextRailOrder: state.contextRailOrder,
+          contextRailHiddenSurfaces: state.contextRailHiddenSurfaces,
           contextEditorTreeVisible: state.contextEditorTreeVisible,
           contextEditorTreeWidth: state.contextEditorTreeWidth,
           notesPanelHeight: state.notesPanelHeight,

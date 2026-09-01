@@ -41,10 +41,15 @@ of those ids onto workspace tabs; see Mobile tabs.
 - Rail order is user-reorderable and persisted globally in
   `useUIStore.contextRailOrder`; `sortContextSurfaces` applies it on top of the
   registry's default order and appends any missing surfaces.
+- Which surfaces the rail shows is a user choice, stored as the hidden set
+  (`useUIStore.contextRailHiddenSurfaces`) so a surface added later appears
+  without touching saved settings. The rail's trailing equalizer
+  (`ContextRailSurfacesDialog`) edits that set. Hidden surfaces keep their
+  data and stay reachable from the command palette.
 - `getVisibleContextRailSurfaces` is the single visibility filter shared by the
   rail and the global surface-switch shortcut (`switch_context_surface` in
-  `lib/shortcuts/`): it drops the plan surface unless the caller passes
-  `planModeEnabled`. On Pi that flag is Feature Plugins `plan` installed+enabled
+  `lib/shortcuts/`): it drops surfaces the user hid, then drops the plan
+  surface unless the caller passes `planModeEnabled`. On Pi that flag is Feature Plugins `plan` installed+enabled
   **and** live plan markdown (`ready` / `saved` / `implementing`);
   `planModeExperimentalEnabled` must not gate it. On OpenCode it stays the
   experimental plan-mode flag. It also drops the walkthrough on VS Code and
