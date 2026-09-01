@@ -53,6 +53,25 @@ describe('sessionNavigationHistory', () => {
     expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
   });
 
+  test('does not wipe history while the session list is still loading', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useGlobalSessionsStore.setState({
+      activeSessions: [],
+      hasLoaded: false,
+      status: 'loading',
+    });
+    expect(navigateSessionHistory(-1)).toBe(false);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+    useGlobalSessionsStore.setState({
+      activeSessions: [session('s1'), session('s2'), session('s3')],
+      hasLoaded: true,
+      status: 'ready',
+    });
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+  });
+
   test('skips and drops entries whose session no longer exists', () => {
     useSessionUIStore.setState({ currentSessionId: 's1' });
     useSessionUIStore.setState({ currentSessionId: 's2' });

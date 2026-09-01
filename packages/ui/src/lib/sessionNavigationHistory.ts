@@ -31,8 +31,10 @@ useSessionUIStore.subscribe((state, previousState) => {
  * skipped and dropped. Returns false when there is nowhere to go.
  */
 export const navigateSessionHistory = (delta: -1 | 1): boolean => {
+  const globalSessions = useGlobalSessionsStore.getState();
+  if (!globalSessions.hasLoaded) return false;
   const sessionsById = new Map(
-    useGlobalSessionsStore.getState().activeSessions.map((session) => [session.id, session] as const),
+    globalSessions.activeSessions.map((session) => [session.id, session] as const),
   );
   let nextCursor = cursor + delta;
   while (nextCursor >= 0 && nextCursor < visitedSessionIds.length) {
