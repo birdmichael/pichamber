@@ -7,7 +7,8 @@
  * `text` is what the model reads; the part's `metadata[CONTEXT_METADATA_KEY]`
  * carries the same information structured, so the timeline can render the
  * context as a dedicated block after the message round-trips through the
- * Pi facade (which persists part metadata on the user message).
+ * Pi facade. Structured cards persist on `pichamber.userContext`
+ * because Pi jsonl stores `session.prompt(text)` as one string.
  *
  * This module owns both directions: building the part at send time and
  * parsing the metadata back at render time. Keeping them together is what

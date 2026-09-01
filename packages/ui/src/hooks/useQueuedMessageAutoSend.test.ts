@@ -210,6 +210,43 @@ describe('buildQueuedAutoSendPayload', () => {
     expect(payload?.queuedMessageId).toBe('queued-1');
     expect(payload?.primaryText).toBe('first queued message');
     expect(payload?.primaryAttachments).toEqual([]);
+    expect(payload?.additionalParts).toBeUndefined();
+  });
+
+  test('auto-send attaches context drafts snapshotted on the queued item', () => {
+    const queue: QueuedMessage[] = [
+      {
+        id: 'queued-context',
+        content: 'please fix',
+        createdAt: 1,
+        contextDrafts: [{
+          id: 'icd-1',
+          sessionKey: 's1',
+          source: 'file',
+          fileLabel: 'src/app.ts',
+          startLine: 3,
+          endLine: 5,
+          code: 'const x = 1;',
+          language: 'ts',
+          text: 'fix this',
+          createdAt: 1,
+        }],
+      },
+    ];
+
+    const payload = buildQueuedAutoSendPayload(queue);
+
+    expect(payload?.primaryText).toBe('please fix');
+    expect(payload?.additionalParts).toHaveLength(1);
+    expect(payload?.additionalParts?.[0]).toMatchObject({
+      synthetic: true,
+      metadata: {
+        pichamberContext: {
+          kind: 'code-comment',
+          fileLabel: 'src/app.ts',
+        },
+      },
+    });
   });
 
   test('uses the configured visible agents when parsing queued mentions', () => {
@@ -342,5 +379,38 @@ describe('buildQueuedAutoSendPayload', () => {
         },
       },
     ]);
+  });
+
+  test('auto-send forwards snapshotted context parts', async () => {
+    const payload = buildQueuedAutoSendPayload([
+      {
+        id: 'queued-context',
+        content: 'please fix',
+        createdAt: 1,
+        contextDrafts: [{
+          id: 'icd-1',
+          sessionKey: 's1',
+          source: 'file',
+          fileLabel: 'src/app.ts',
+          startLine: 3,
+          endLine: 5,
+          code: 'const x = 1;',
+          language: 'ts',
+          text: 'fix this',
+          createdAt: 1,
+        }],
+      },
+    ]);
+
+    await sendQueuedAutoSendPayload({
+      runtimeKey: 'runtime-original',
+      sessionId: 'session-original',
+      directory: '/repo',
+    }, payload!, {
+      providerID: 'provider-1',
+      modelID: 'model-1',
+    });
+
+    expect(sendMessageCalls[0]?.[6]).toEqual(payload?.additionalParts);
   });
 });

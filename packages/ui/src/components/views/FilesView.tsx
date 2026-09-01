@@ -991,7 +991,6 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const [mdPreviewFindFocusNonce, setMdPreviewFindFocusNonce] = React.useState(0);
   const mdPreviewContainerRef = React.useRef<HTMLDivElement | null>(null);
   const mdFullscreenPreviewContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const markdownPreviewRef = React.useRef<HTMLDivElement | null>(null);
   // Give the rendered preview keyboard focus (without scrolling it) unless the
   // user is typing somewhere else, so Cmd/Ctrl+F opens the preview find bar
   // right after a Markdown file opens and after any click inside it.
@@ -4077,12 +4076,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                 tabIndex={-1}
                 onMouseDown={focusMdPreviewContainer}
                 ref={(node) => {
-                  markdownPreviewRef.current = node;
                   mdPreviewContainerRef.current = node;
                 }}
               >
                 <FilePreviewCommentMenu
-                  containerRef={markdownPreviewRef}
+                  containerRef={mdPreviewContainerRef}
                   filePath={selectedFile.path}
                   fileContent={fileContent}
                 />
@@ -4469,13 +4467,12 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
               tabIndex={-1}
               onMouseDown={focusMdPreviewContainer}
               ref={(node) => {
-                markdownPreviewRef.current = node;
                 mdFullscreenPreviewContainerRef.current = node;
               }}
             >
               {selectedFile ? (
                 <FilePreviewCommentMenu
-                  containerRef={markdownPreviewRef}
+                  containerRef={mdFullscreenPreviewContainerRef}
                   filePath={selectedFile.path}
                   fileContent={fileContent}
                 />

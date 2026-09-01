@@ -22,6 +22,30 @@ describe("message queue runtime ownership", () => {
     expect(useMessageQueueStore.getState().getQueueForTarget(b)[0]?.content).toBe("from B")
   })
 
+  test("snapshots context drafts onto the queued item", () => {
+    const target = createMessageQueueTarget("session-1", "/repo", "runtime-a")!
+    const draft = {
+      id: "icd-1",
+      sessionKey: "session-1",
+      source: "file" as const,
+      fileLabel: "src/app.ts",
+      startLine: 3,
+      endLine: 5,
+      code: "const x = 1;",
+      language: "ts",
+      text: "fix this",
+      createdAt: 1,
+    }
+    useMessageQueueStore.getState().addToQueue(target, {
+      content: "please fix",
+      contextDrafts: [draft],
+    })
+    const queued = useMessageQueueStore.getState().getQueueForTarget(target)[0]
+    expect(queued?.contextDrafts).toEqual([draft])
+    draft.text = "mutated"
+    expect(useMessageQueueStore.getState().getQueueForTarget(target)[0]?.contextDrafts?.[0]?.text).toBe("fix this")
+  })
+
   test("round trips a composite queue key", () => {
     const target = createMessageQueueTarget("session-1", "/repo", "runtime-a")!
     expect(parseMessageQueueKey(getMessageQueueKey(target))).toEqual(target)

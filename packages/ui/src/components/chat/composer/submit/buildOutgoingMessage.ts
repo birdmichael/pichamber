@@ -39,6 +39,8 @@ export interface OutgoingMessage {
 export interface QueuedInput {
     content: string;
     attachments?: AttachedFile[];
+    /** Context drafts captured when this item was queued. */
+    contextDrafts?: readonly InlineCommentDraft[];
 }
 
 export interface OutgoingMessageInput {
@@ -115,9 +117,12 @@ export function buildOutgoingMessage(
         if (index === 0) {
             primaryText = resolved.text;
             primaryAttachments = attachments;
-            return;
+        } else {
+            additionalParts.push({ text: resolved.text, attachments });
         }
-        additionalParts.push({ text: resolved.text, attachments });
+        for (const draft of queued.contextDrafts ?? []) {
+            additionalParts.push(createContextPart(contextPayloadFromDraft(draft)));
+        }
     });
 
     // The composer's own text follows, becoming primary only when nothing was

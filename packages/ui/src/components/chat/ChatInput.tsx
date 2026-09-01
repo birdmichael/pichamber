@@ -850,6 +850,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         )
     );
     const consumeDrafts = useInlineCommentDraftStore((state) => state.consumeDrafts);
+    const getDrafts = useInlineCommentDraftStore((state) => state.getDrafts);
     const removeInlineCommentDraft = useInlineCommentDraftStore((state) => state.removeDraft);
     const hasDrafts = draftCount > 0;
     const [previewConsoleCount, previewAnnotationCount, reviewCount, terminalContextCount, prCommentCount, prCheckCount] = draftSourceKey.split(':').map((entry) => Number(entry) || 0);
@@ -1044,10 +1045,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const inputSnapshot = getCurrentInputSnapshot();
         if (!inputSnapshot.hasContent || !currentSessionId || !messageQueueTarget) return;
 
-        // Context drafts stay in their store: the send that later delivers the
-        // queue consumes them and attaches them as structured context parts.
         const messageToQueue = inputSnapshot.message.replace(/^\n+|\n+$/g, '');
         const attachmentsToQueue = sanitizeAttachmentsForSend(attachedFiles);
+        const contextDrafts = inlineDraftTarget ? consumeDrafts(inlineDraftTarget) : [];
 
         addToQueue(messageQueueTarget, {
             content: messageToQueue,
@@ -1058,6 +1058,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 agent: currentAgentName ?? undefined,
                 variant: currentVariant ?? undefined,
             } : undefined,
+            contextDrafts: contextDrafts.length > 0 ? contextDrafts : undefined,
         });
 
         // Clear input and attachments
@@ -1072,7 +1073,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!isMobile) {
             composerRef.current?.focus();
         }
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, currentProviderId, currentModelId, currentAgentName, currentVariant]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, currentProviderId, currentModelId, currentAgentName, currentVariant, inlineDraftTarget, consumeDrafts]);
 
     const handleQueuedMessageEdit = React.useCallback((content: string) => {
         setMessage(content);
@@ -1232,12 +1233,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             };
         }
 
-        // Inline review comments and synthetic context are consumed before
-        // assembly so a failed send can restore exactly what it took.
+        // Snapshot live composer drafts for this send. Queued-only submit uses
+        // each queued item's own snapshot and must not steal chips typed later.
+        // Consume only once we are actually sending, so /timeline and empty
+        // assembly leave the chips in place.
         const syntheticParts = consumePendingSyntheticParts();
-        const consumedDraftTarget = inlineDraftTarget;
+        const consumedDraftTarget = queuedOnly ? null : inlineDraftTarget;
         const drafts: InlineCommentDraft[] = consumedDraftTarget
-            ? consumeDrafts(consumedDraftTarget)
+            ? [...getDrafts(consumedDraftTarget)]
             : [];
 
         const availableSkillNames = new Set(
@@ -1274,6 +1277,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const { primaryAttachments, additionalParts, agentMentionName } = outgoing;
 
         if (outgoing.isEmpty) return;
+
+        const consumeLiveDrafts = () => {
+            if (!consumedDraftTarget || drafts.length === 0) return;
+            consumeDrafts(consumedDraftTarget);
+        };
 
         const pendingKey = capturedDraftSnapshot?.open
             ? pendingComposerDraftKey(capturedDraftSnapshot.draftId)
@@ -1474,6 +1482,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             ...additionalParts.flatMap(p => p.attachments ?? []),
         ];
 
+        consumeLiveDrafts();
         const sendPromise = sendMessage(
             primaryText,
             providerIdToSend,

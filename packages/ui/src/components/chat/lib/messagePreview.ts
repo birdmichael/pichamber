@@ -87,8 +87,37 @@ const contextBody = (payload: ContextPartPayload): string => {
     }
 };
 
-const contextPreview = (payload: ContextPartPayload, t: Translate): string => {
-    const summary = contextSummary(payload, t);
+const contextSummaryFallback = (payload: ContextPartPayload): string => {
+    switch (payload.kind) {
+        case 'code-comment':
+        case 'file-quote': {
+            const file = basename(payload.kind === 'code-comment' ? payload.fileLabel : payload.fileLabel);
+            const start = payload.startLine;
+            const end = payload.endLine;
+            if (start == null || end == null) return file;
+            return start === end ? `${file}:${start}` : `${file}:${start}-${end}`;
+        }
+        case 'terminal':
+            return payload.terminalLabel;
+        case 'browser-annotation':
+            return payload.pageUrl;
+        case 'preview-console':
+            return basename(payload.fileLabel);
+        case 'pr-comment':
+        case 'pr-check':
+            return payload.label;
+        case 'chat-quote':
+            return payload.quote.trim().split('\n')[0] ?? '';
+        case 'github-issue':
+        case 'github-pr':
+            return `#${payload.number} ${payload.title}`;
+        case 'linear-issue':
+            return `${payload.identifier} ${payload.title}`;
+    }
+};
+
+const contextPreview = (payload: ContextPartPayload, t?: Translate): string => {
+    const summary = t ? contextSummary(payload, t) : contextSummaryFallback(payload);
     const comment = 'text' in payload ? payload.text.trim() : '';
     const detail = comment.length > 0 ? comment : contextBody(payload).trim();
     return detail.length > 0 ? `${summary}: ${detail}` : summary;
@@ -104,15 +133,13 @@ export function getPromptPreviewText(parts: Part[], t?: Translate): string {
         return typed.join('\n');
     }
 
-    if (t) {
-        const contextLines = parts
-            .map((part) => readContextPart(part))
-            .filter((payload): payload is ContextPartPayload => payload !== null)
-            .map((payload) => contextPreview(payload, t))
-            .filter((line) => line.length > 0);
-        if (contextLines.length > 0) {
-            return contextLines.join(' · ');
-        }
+    const contextLines = parts
+        .map((part) => readContextPart(part))
+        .filter((payload): payload is ContextPartPayload => payload !== null)
+        .map((payload) => contextPreview(payload, t))
+        .filter((line) => line.length > 0);
+    if (contextLines.length > 0) {
+        return contextLines.join(' · ');
     }
 
     return getFullText(parts);

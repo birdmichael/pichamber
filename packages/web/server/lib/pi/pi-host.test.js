@@ -1654,6 +1654,17 @@ describe('createPiHost', () => {
     expect(host.getSession(record.id).info.title).toBe('please fix');
     expect(forwarded.text).toContain('please fix');
     expect(forwarded.text).toContain(contextText);
+    const persisted = host.getSession(record.id).info.metadata?.pichamber?.userContext;
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      messageID: user.info.id,
+      authoredText: 'please fix',
+    });
+    const entries = record.piSession.sessionManager.getEntries();
+    expect(entries.some((entry) => (
+      entry?.customType === 'pichamber.metadata'
+      && entry?.data?.pichamber?.userContext?.[0]?.authoredText === 'please fix'
+    ))).toBe(true);
     host.dispose();
   });
 

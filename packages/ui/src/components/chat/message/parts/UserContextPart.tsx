@@ -27,10 +27,9 @@ const ContextCard: React.FC<{
     /** Render the quote in the code font (code, terminal output, CI logs). */
     mono?: boolean;
     /**
-     * Message-level collapse: with collapsible messages on, the whole user
-     * message (text parts and cards alike) shares one expanded state, so a
-     * collapsed card is a two-line preview and a click asks the message to
-     * expand instead of toggling anything of its own.
+     * Message-level collapse: when the parent user bubble is collapsed, a
+     * click asks that bubble to expand. Each card still owns its own quote
+     * clamp once the bubble is open.
      */
     collapsed?: boolean;
     onExpand?: () => void;
@@ -46,9 +45,11 @@ const ContextCard: React.FC<{
         // and the like) collapse to the caption alone.
         const comment = text.trim();
         return (
-            <div
-                className="my-1 flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 border-l-2 border-[var(--interactive-border)] pl-3 text-xs text-[var(--surface-mutedForeground)]"
+            <button
+                type="button"
+                className="my-1 flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 border-0 border-l-2 border-[var(--interactive-border)] bg-transparent p-0 pl-3 text-left text-xs text-[var(--surface-mutedForeground)]"
                 onClick={onExpand}
+                aria-expanded={false}
                 title={title}
             >
                 <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
@@ -58,15 +59,14 @@ const ContextCard: React.FC<{
                         <span className="text-sm text-[var(--surface-foreground)]">{comment}</span>
                     ) : null}
                 </span>
-            </div>
+            </button>
         );
     }
 
     return (
         <div className="my-1.5 min-w-0 max-w-full">
             <div
-                className={cn('min-w-0 border-l-2 border-[var(--interactive-border)] pl-3', hasBody && 'cursor-pointer')}
-                onClick={hasBody ? () => setExpanded((value) => !value) : undefined}
+                className="min-w-0 border-l-2 border-[var(--interactive-border)] pl-3"
                 title={title}
             >
                 <div className="flex items-center gap-1.5 text-xs text-[var(--surface-mutedForeground)]">
@@ -74,15 +74,18 @@ const ContextCard: React.FC<{
                     <span className="truncate">{summary}</span>
                 </div>
                 {hasBody ? (
-                    <div
+                    <button
+                        type="button"
                         className={cn(
-                            'mt-1 whitespace-pre-wrap break-words text-[var(--surface-mutedForeground)]',
+                            'mt-1 w-full border-0 bg-transparent p-0 text-left whitespace-pre-wrap break-words text-[var(--surface-mutedForeground)]',
                             mono ? 'font-mono text-xs leading-5' : 'text-sm',
                             !expanded && 'line-clamp-4'
                         )}
+                        aria-expanded={expanded}
+                        onClick={() => setExpanded((value) => !value)}
                     >
                         {body}
-                    </div>
+                    </button>
                 ) : null}
             </div>
             {hasText ? (

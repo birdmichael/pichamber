@@ -178,6 +178,17 @@ describe('context drafts', () => {
         expect(buildOutgoingMessage(input({ composerText: 'body' }), deps()).additionalParts)
             .toEqual([]);
     });
+
+    test('queued context drafts become synthetic parts on that send', () => {
+        const result = buildOutgoingMessage(input({
+            queued: [{ content: 'queued body', contextDrafts: [commentDraft()] }],
+        }), deps());
+        expect(result.primaryText).toBe('queued body');
+        expect(result.additionalParts).toHaveLength(1);
+        expect(result.additionalParts[0].synthetic).toBe(true);
+        expect(result.additionalParts[0].metadata?.[CONTEXT_METADATA_KEY])
+            .toEqual(contextPayloadFromDraft(commentDraft()));
+    });
 });
 
 describe('synthetic context', () => {
