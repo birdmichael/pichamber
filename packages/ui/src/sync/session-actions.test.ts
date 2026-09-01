@@ -169,6 +169,14 @@ mock.module("@/lib/opencode/client", () => ({
       if (sessionDeleteError) throw sessionDeleteError
       return Promise.resolve(true)
     }),
+    forkSession: mock((sessionId: string, messageId: string, directory?: string | null) => {
+      replyCalls.push({ method: "session.fork", params: { sessionID: sessionId, messageID: messageId, directory } })
+      return Promise.resolve({
+        id: "session-forked",
+        title: "Fork",
+        time: { created: 2, updated: 2 },
+      })
+    }),
   },
 }))
 
@@ -219,6 +227,22 @@ mock.module("./input-store", () => ({
   useInputStore: {
     getState: () => inputState,
     setState: (patch: Partial<typeof inputState>) => Object.assign(inputState, patch),
+  },
+}))
+
+const restoredContextDrafts: Array<{ target: { directory: string; sessionKey: string }; draft: Record<string, unknown> }> = []
+
+mock.module("@/stores/useInlineCommentDraftStore", () => ({
+  useInlineCommentDraftStore: {
+    getState: () => ({
+      clearDrafts: () => {
+        restoredContextDrafts.length = 0
+      },
+      addDraft: (target: { directory: string; sessionKey: string }, draft: Record<string, unknown>) => {
+        restoredContextDrafts.push({ target, draft })
+        return "icd-restored"
+      },
+    }),
   },
 }))
 
@@ -1400,6 +1424,111 @@ describe("revertToMessage passes session directory", () => {
     expect((thrown as Error).message).toContain("session.revert failed (500)")
     expect((sessionStore.getState().session[0] as Session & { revert?: { messageID?: string } }).revert).toBe(undefined)
     expect(inputState.pendingInputText).toBe("previous draft")
+  })
+})
+
+describe("forkFromMessage restores context drafts", () => {
+  beforeEach(() => {
+    replyCalls.length = 0
+    restoredContextDrafts.length = 0
+    Object.assign(inputState, {
+      pendingInputText: "",
+      pendingInputMode: "normal" as const,
+      attachedFiles: [],
+    })
+  })
+
+  test("puts attached context back on the forked session composer", async () => {
+    const session = { id: "session-a", time: { created: 1 } } as Session
+    const targetMessage = { id: "msg_2", sessionID: "session-a", role: "user", time: { created: 2 } } as Message
+    const textPart = { id: "prt_2", messageID: "msg_2", type: "text", text: "please fix" } as Part
+    const contextPart = {
+      id: "prt_ctx",
+      messageID: "msg_2",
+      type: "text",
+      synthetic: true,
+      text: "Comment on `src/app.ts` lines 3-5 (modified):\n```ts\nconst x = 1;\n```\n\nfix this",
+      metadata: {
+        pichamberContext: {
+          kind: "code-comment",
+          source: "diff",
+          fileLabel: "src/app.ts",
+          startLine: 3,
+          endLine: 5,
+          side: "modified",
+          language: "ts",
+          code: "const x = 1;",
+          text: "fix this",
+        },
+      },
+    } as unknown as Part
+    const sessionStore = createStore({}, {
+      session: [session],
+      message: { "session-a": [targetMessage] },
+      part: { "msg_2": [textPart, contextPart] },
+    })
+    const childStores = createChildStores([["/test/project", sessionStore]])
+
+    const { setActionRefs, forkFromMessage } = await import("./session-actions")
+    setActionRefs(mockSdk as unknown as OpencodeClient, childStores, () => "/test/project")
+
+    await forkFromMessage("session-a", "msg_2")
+
+    expect(replyCalls.find((call) => call.method === "session.fork")?.params).toEqual({
+      sessionID: "session-a",
+      messageID: "msg_2",
+      directory: "/test/project",
+    })
+    expect(inputState.pendingInputText).toBe("please fix")
+    expect(restoredContextDrafts).toHaveLength(1)
+    expect(restoredContextDrafts[0].target).toEqual({ directory: "/test/project", sessionKey: "session-forked" })
+    expect(restoredContextDrafts[0].draft).toMatchObject({
+      source: "diff",
+      fileLabel: "src/app.ts",
+      startLine: 3,
+      endLine: 5,
+      side: "modified",
+      code: "const x = 1;",
+      text: "fix this",
+    })
+  })
+
+  test("does not restore context onto revert", async () => {
+    const session = { id: "session-a", time: { created: 1 } } as Session
+    const targetMessage = { id: "msg_2", sessionID: "session-a", role: "user", time: { created: 2 } } as Message
+    const contextPart = {
+      id: "prt_ctx",
+      messageID: "msg_2",
+      type: "text",
+      synthetic: true,
+      text: "Comment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this",
+      metadata: {
+        pichamberContext: {
+          kind: "code-comment",
+          source: "file",
+          fileLabel: "src/app.ts",
+          startLine: 3,
+          endLine: 5,
+          language: "ts",
+          code: "const x = 1;",
+          text: "fix this",
+        },
+      },
+    } as unknown as Part
+    const sessionStore = createStore({}, {
+      session: [session],
+      message: { "session-a": [targetMessage] },
+      part: { "msg_2": [contextPart] },
+    })
+    const childStores = createChildStores([["/test/project", sessionStore]])
+    sessionRevertResult = { data: { id: "session-a", time: { created: 1, updated: 2 }, revert: { messageID: "msg_2" } } }
+
+    const { setActionRefs, revertToMessage } = await import("./session-actions")
+    setActionRefs(mockSdk as unknown as OpencodeClient, childStores, () => "/test/project")
+
+    await revertToMessage("session-a", "msg_2")
+
+    expect(restoredContextDrafts).toHaveLength(0)
   })
 })
 

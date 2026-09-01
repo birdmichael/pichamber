@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
 - Settings: Keyboard shortcuts are recorded in a dialog (up to two combinations). Open/go actions use a Ctrl/Cmd+K leader; the command palette stays Ctrl/Cmd+P. Esc and X still close the dialog.
 - Desktop: With session tabs on, Ctrl/Cmd+1..9 switches tabs and Alt+W closes the current tab. Context panel surfaces move to Ctrl/Cmd+Alt+1..0.
+- Chat: comments, quotes, and terminal selections on a user message show as cards in the transcript instead of raw paths. Forking that message puts the same context back on the composer.
 - Settings: the editor font size survives a restart, and number fields and selects no longer clip at large interface font sizes.
 - Projects: the folder picker can select several directories at once and add them together.
 - Settings/Providers: after saving an API key or signing in, the provider no longer shows "Credentials missing" with its models hidden until you switch away and back.

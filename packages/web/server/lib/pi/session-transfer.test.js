@@ -1028,6 +1028,26 @@ describe('session-transfer', () => {
     expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('orphan dump')))).toBe(false);
   });
 
+  it('preserves structured context metadata on user text parts', () => {
+    const metadata = {
+      pichamberContext: { kind: 'chat-quote', quote: 'hi', text: 'why' },
+    };
+    const messages = piMessagesFromFacadeEntry({
+      info: { role: 'user', time: { created: 1 } },
+      parts: [{ type: 'text', text: 'quoted', synthetic: true, metadata }],
+    });
+    expect(messages).toEqual([{
+      role: 'user',
+      timestamp: 1,
+      content: [{
+        type: 'text',
+        text: 'quoted',
+        synthetic: true,
+        metadata,
+      }],
+    }]);
+  });
+
   it('maps facade text, tool, and image parts to Pi appendMessage payloads', () => {
     const messages = piMessagesFromFacadeEntry({
       info: { id: 'a1', role: 'assistant', time: { created: 1_700_000_000_200 } },

@@ -545,13 +545,18 @@ const partsFromPiContent = (content, sessionID, messageID) => {
       continue;
     }
     if (typeof item.text === 'string') {
-      parts.push({
+      const textPart = {
         id: createPartId(),
         sessionID,
         messageID,
         type: 'text',
         text: item.text,
-      });
+      };
+      if (item.synthetic === true) textPart.synthetic = true;
+      if (item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)) {
+        textPart.metadata = item.metadata;
+      }
+      parts.push(textPart);
     }
   }
   return parts;
@@ -595,7 +600,12 @@ export const piMessagesFromFacadeEntry = (entry) => {
       continue;
     }
     if (part.type === 'text' && typeof part.text === 'string') {
-      content.push({ type: 'text', text: part.text });
+      const item = { type: 'text', text: part.text };
+      if (part.synthetic === true) item.synthetic = true;
+      if (part.metadata && typeof part.metadata === 'object' && !Array.isArray(part.metadata)) {
+        item.metadata = part.metadata;
+      }
+      content.push(item);
       continue;
     }
     if (part.type === 'tool') {
@@ -2071,7 +2081,25 @@ export const reconcileHydratedMessages = (live, hydrated) => {
     ));
     if (matchIndex < 0) return entry;
     used.add(matchIndex);
-    const liveId = asTrimmedString(liveUsers[matchIndex]?.info?.id);
+    const liveEntry = liveUsers[matchIndex];
+    const liveId = asTrimmedString(liveEntry?.info?.id);
+    const liveParts = Array.isArray(liveEntry?.parts) ? liveEntry.parts : [];
+    const liveHasContext = liveParts.some((part) => {
+      const metadata = part?.metadata;
+      if (!metadata || typeof metadata !== 'object') return false;
+      return Boolean(metadata.pichamberContext || metadata.openchamberContext);
+    });
+    if (liveHasContext) {
+      const id = liveId || entry.info.id;
+      return {
+        ...entry,
+        info: { ...entry.info, id },
+        parts: liveParts.map((part) => ({
+          ...part,
+          messageID: id,
+        })),
+      };
+    }
     if (!liveId || liveId === entry.info.id) return entry;
     return {
       ...entry,

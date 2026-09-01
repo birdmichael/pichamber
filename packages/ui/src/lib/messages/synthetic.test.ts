@@ -120,4 +120,24 @@ describe("filterSyntheticParts", () => {
     ]
     expect(filterSyntheticParts(parts)).toEqual(parts)
   })
+
+  test("keeps structured context parts alongside user text", () => {
+    const userPart = createTextPart("1", "please fix")
+    const contextPart = {
+      ...createTextPart("2", "Comment on `src/app.ts` lines 3-5:\n```ts\nx\n```\n\nfix", true),
+      metadata: {
+        pichamberContext: {
+          kind: "code-comment",
+          source: "file",
+          fileLabel: "src/app.ts",
+          startLine: 3,
+          endLine: 5,
+          language: "ts",
+          code: "x",
+          text: "fix",
+        },
+      },
+    } as Part
+    expect(filterSyntheticParts([userPart, contextPart])).toEqual([userPart, contextPart])
+  })
 })

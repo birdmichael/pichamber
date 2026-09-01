@@ -69,7 +69,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useGitStatus } from '@/stores/useGitStore';
 import { useConfigStore } from '@/stores/useConfigStore';
-import { buildCodeMirrorCommentWidgets, normalizeLineRange, useInlineCommentController } from '@/components/comments';
+import { buildCodeMirrorCommentWidgets, FilePreviewCommentMenu, normalizeLineRange, useInlineCommentController } from '@/components/comments';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
 import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
@@ -991,6 +991,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const [mdPreviewFindFocusNonce, setMdPreviewFindFocusNonce] = React.useState(0);
   const mdPreviewContainerRef = React.useRef<HTMLDivElement | null>(null);
   const mdFullscreenPreviewContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const markdownPreviewRef = React.useRef<HTMLDivElement | null>(null);
   // Give the rendered preview keyboard focus (without scrolling it) unless the
   // user is typing somewhere else, so Cmd/Ctrl+F opens the preview find bar
   // right after a Markdown file opens and after any click inside it.
@@ -4076,9 +4077,15 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                 tabIndex={-1}
                 onMouseDown={focusMdPreviewContainer}
                 ref={(node) => {
+                  markdownPreviewRef.current = node;
                   mdPreviewContainerRef.current = node;
                 }}
               >
+                <FilePreviewCommentMenu
+                  containerRef={markdownPreviewRef}
+                  filePath={selectedFile.path}
+                  fileContent={fileContent}
+                />
               {fileContent.length > 500 * 1024 && (
                 <div className="mb-3 rounded-md border border-status-warning/20 bg-status-warning/10 px-3 py-2 text-sm text-status-warning">
                   {t('filesView.warning.largeFilePreviewLimited', { sizeKb: Math.round(fileContent.length / 1024) })}
@@ -4462,9 +4469,17 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
               tabIndex={-1}
               onMouseDown={focusMdPreviewContainer}
               ref={(node) => {
+                markdownPreviewRef.current = node;
                 mdFullscreenPreviewContainerRef.current = node;
               }}
             >
+              {selectedFile ? (
+                <FilePreviewCommentMenu
+                  containerRef={markdownPreviewRef}
+                  filePath={selectedFile.path}
+                  fileContent={fileContent}
+                />
+              ) : null}
               {fileContent.length > 500 * 1024 && (
                   <div className="mb-3 rounded-md border border-status-warning/20 bg-status-warning/10 px-3 py-2 text-sm text-status-warning">
                     {t('filesView.warning.largeFilePreviewLimited', { sizeKb: Math.round(fileContent.length / 1024) })}

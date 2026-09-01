@@ -3604,7 +3604,8 @@ export const createPiHost = ({
       }
       // Magic-prompt chips attach a long synthetic instruction. Keep it for
       // Pi, but the user bubble and session title stay the short visible line.
-      const visibleText = extractPromptText(body.parts, { includeSynthetic: false }) || text;
+      const authoredText = extractPromptText(body.parts, { includeSynthetic: false });
+      const visibleText = authoredText || text;
 
       // Capture liveness *before* this call marks busy. This invocation's own
       // status busy must not steer/followUp an idle first send.
@@ -3626,13 +3627,45 @@ export const createPiHost = ({
 
       const userMessageID = body.messageID || createMessageId();
       const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
-      const userParts = [{
-        id: createPartId(),
-        sessionID,
-        messageID: userMessageID,
-        type: 'text',
-        text: visibleText,
-      }];
+      const userParts = [];
+      if (authoredText) {
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: authoredText,
+        });
+      }
+      for (const part of Array.isArray(body.parts) ? body.parts : []) {
+        if (!part || part.type !== 'text' || !part.synthetic) continue;
+        const metadata = part.metadata && typeof part.metadata === 'object' && !Array.isArray(part.metadata)
+          ? part.metadata
+          : null;
+        const contextPayload = metadata?.pichamberContext ?? metadata?.openchamberContext;
+        if (!contextPayload || typeof contextPayload !== 'object' || typeof contextPayload.kind !== 'string') {
+          continue;
+        }
+        if (typeof part.text !== 'string' || !part.text.trim()) continue;
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: part.text,
+          synthetic: true,
+          metadata,
+        });
+      }
+      if (userParts.length === 0 && visibleText) {
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: visibleText,
+        });
+      }
       for (const part of Array.isArray(body.parts) ? body.parts : []) {
         if (!part || part.type === 'text') continue;
         const file = facadeFilePartFromUnknown(part, sessionID, userMessageID);

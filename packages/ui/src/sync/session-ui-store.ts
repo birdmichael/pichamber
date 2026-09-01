@@ -14,6 +14,7 @@
 
 import { create } from "zustand"
 import type { Session, Part, Message, TextPart } from "@opencode-ai/sdk/v2/client"
+import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import type { AttachedFile, SessionContextUsage, SessionWorktreeAttachment } from "@/stores/types/sessionTypes"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient } from "@/lib/opencode/client"
@@ -161,7 +162,7 @@ export function routeMessage(params: {
   variant?: string
   inputMode?: "normal" | "shell"
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
-  additionalParts?: Array<{ text: string; synthetic?: boolean; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
+  additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
   delivery?: 'steer' | 'followUp'
   beforeSend?: (messageID: string) => Promise<void>
   onOptimisticInsert?: () => void
@@ -413,7 +414,7 @@ export type SessionUIState = {
     agent?: string,
     attachments?: AttachedFile[],
     agentMentionName?: string,
-    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean }>,
+    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean; metadata?: ContextPartMetadata }>,
     variant?: string,
     inputMode?: "normal" | "shell",
     options?: SendMessageOptions,
@@ -1466,7 +1467,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     agent?: string,
     attachments?: AttachedFile[],
     agentMentionName?: string,
-    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean }>,
+    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean; metadata?: ContextPartMetadata }>,
     variant?: string,
     inputMode?: "normal" | "shell",
     options?: SendMessageOptions,
@@ -1600,6 +1601,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
           additionalParts: mergedAdditionalParts?.map((p) => ({
             text: p.text,
             synthetic: p.synthetic,
+            metadata: p.metadata,
             files: p.attachments?.map((a: AttachedFile) => ({
               type: "file" as const,
               mime: a.mimeType,
@@ -1690,6 +1692,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       additionalParts: additionalParts?.map((p) => ({
         text: p.text,
         synthetic: p.synthetic,
+        metadata: p.metadata,
         files: p.attachments?.map((a) => ({
           type: "file" as const,
           mime: a.mimeType,
