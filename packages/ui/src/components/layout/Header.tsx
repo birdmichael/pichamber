@@ -1372,6 +1372,9 @@ export const Header: React.FC<HeaderProps> = ({
       sourceDirectory: sessionDirectory,
       successMessage: t('sessions.sidebar.session.moveToWorktree.success'),
       failureMessage: t('sessions.sidebar.session.moveToWorktree.failed'),
+      sourceVerificationFailed: t('sessions.sidebar.session.moveToWorktree.sourceVerificationFailed'),
+      applyChangesFailed: t('sessions.sidebar.session.moveToWorktree.applyChangesFailed'),
+      changesMayBeInDestination: t('sessions.sidebar.session.moveToWorktree.changesMayBeInDestination'),
     });
   }, [currentSessionId, isCurrentSessionActive, isCurrentSessionMovingToWorktree, sessionDirectory, t]);
 
