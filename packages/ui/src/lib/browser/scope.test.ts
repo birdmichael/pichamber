@@ -221,4 +221,29 @@ describe('mergeContextPanelChatScope', () => {
     expect(merged?.activeTabId).toBe(parentBChat.id);
     expect(merged?.isOpen).toBe(true);
   });
+
+  test('hides another session leftover browser tab when the current session has its own scope', () => {
+    const leftoverBrowser = { id: 'browser:https://other.example/', mode: 'browser' };
+    const currentBrowser = { id: 'browser:https://this.example/', mode: 'browser' };
+    const directory = {
+      isOpen: true,
+      expanded: false,
+      tabs: [fileTab, leftoverBrowser],
+      activeTabId: leftoverBrowser.id,
+      widthByMode: {},
+      touchedAt: 1,
+    };
+    const sessionScope = {
+      isOpen: true,
+      expanded: false,
+      tabs: [currentBrowser],
+      activeTabId: currentBrowser.id,
+      widthByMode: {},
+      touchedAt: 2,
+    };
+
+    const merged = mergeContextPanelChatScope(PROJECT_A, directory, 'session:ses_a', sessionScope);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual([fileTab.id, currentBrowser.id]);
+    expect(merged?.activeTabId).toBe(currentBrowser.id);
+  });
 });

@@ -55,9 +55,9 @@ export type BrowserScopedPanelState<T extends BrowserScopedTab> = {
 };
 
 /**
- * Files / Git / notes stay on the session directory. Browser tabs live on the
- * project/chats scope. When those keys differ, the visible panel is the
- * session's non-browser tabs plus the scope's browser tabs.
+ * Legacy helper: browser tabs now live on the session directory, same as
+ * Files / Git / notes. Callers that still merge a leftover project/chats
+ * bucket keep this so old persisted keys do not vanish mid-session.
  *
  * Same key (or the same object) is returned unchanged so a normal project
  * session is not double-counted.
@@ -115,9 +115,10 @@ export function mergeContextPanelForBrowserScope<T extends BrowserScopedTab>(
 }
 
 /**
- * Subagent chat tabs follow the parent session, not the project directory.
- * When a session scope exists, directory-scoped leftover chat tabs stay hidden
- * so switching conversations cannot keep another parent's child open.
+ * Subagent chat tabs and browser tabs follow the parent session, not the
+ * project directory. When a session scope exists, directory-scoped leftover
+ * chat/browser tabs stay hidden so switching conversations cannot keep
+ * another session's page or child chat open.
  */
 export function mergeContextPanelChatScope<T extends BrowserScopedTab>(
   sessionKey: string,
@@ -131,9 +132,13 @@ export function mergeContextPanelChatScope<T extends BrowserScopedTab>(
     return sessionState;
   }
 
-  const sessionTabs = (sessionState?.tabs ?? []).filter((tab) => tab.mode !== 'chat');
-  const chatTabs = (chatState?.tabs ?? []).filter((tab) => tab.mode === 'chat');
-  const tabs = [...sessionTabs, ...chatTabs];
+  const sessionTabs = (sessionState?.tabs ?? []).filter(
+    (tab) => tab.mode !== 'chat' && tab.mode !== 'browser',
+  );
+  const scopedTabs = (chatState?.tabs ?? []).filter(
+    (tab) => tab.mode === 'chat' || tab.mode === 'browser',
+  );
+  const tabs = [...sessionTabs, ...scopedTabs];
 
   if (!sessionState && tabs.length === 0) return undefined;
 
@@ -153,11 +158,11 @@ export function mergeContextPanelChatScope<T extends BrowserScopedTab>(
     : (sessionState?.activeTabId ?? chatState?.activeTabId ?? null);
   const activeTabId = requestedActiveTabId && tabs.some((tab) => tab.id === requestedActiveTabId)
     ? requestedActiveTabId
-    : (chatTabs[chatTabs.length - 1]?.id ?? sessionState?.activeTabId ?? tabs[tabs.length - 1]?.id ?? null);
+    : (scopedTabs[scopedTabs.length - 1]?.id ?? sessionState?.activeTabId ?? tabs[tabs.length - 1]?.id ?? null);
 
   return {
     ...base,
-    isOpen: sessionState?.isOpen || Boolean(chatState?.isOpen && chatTabs.length > 0),
+    isOpen: sessionState?.isOpen || Boolean(chatState?.isOpen && scopedTabs.length > 0),
     tabs,
     activeTabId,
   };

@@ -80,7 +80,7 @@ import { useInputStore, type SyntheticContextPart } from "./input-store"
 import { useSessionGoalArmStore } from "@/stores/useSessionGoalArmStore"
 import { setSessionGoal } from "@/lib/sessionGoalActions"
 import { wrapSystemReminder } from "@/lib/systemReminder"
-import { useUIStore } from "@/stores/useUIStore"
+import { bindSessionStoreForBrowserScope, useUIStore } from "@/stores/useUIStore"
 import { useSelectionStore } from "./selection-store"
 import { getViewportSessionMemory, useViewportStore, viewportSessionKey } from "./viewport-store"
 import { useSessionWorktreeStore } from "./session-worktree-store"
@@ -2129,6 +2129,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 setSessionOpener((sessionID, directory) => {
   useSessionUIStore.getState().setCurrentSession(sessionID, directory)
 })
+bindSessionStoreForBrowserScope(useSessionUIStore)
 
 // Write-through persist of the worktree map whenever discovery refreshes it.
 // Reference-equality guard filters hot session updates; the serialized

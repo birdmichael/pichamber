@@ -16,8 +16,9 @@ describe('useUIStore boot graph', () => {
     expect(useUIStore.getState()).toBeDefined();
   });
 
-  test('useUIStore does not statically import directory or projects stores', () => {
+  test('useUIStore does not statically import directory, projects, or session-ui stores', () => {
     expect(uiStoreSource).not.toMatch(/import\s*\{[^}]*\buseDirectoryStore\b/);
     expect(uiStoreSource).not.toMatch(/import\s*\{[^}]*\buseProjectsStore\b/);
+    expect(uiStoreSource).not.toMatch(/from\s+['"]@\/sync\/session-ui-store['"]/);
   });
 });

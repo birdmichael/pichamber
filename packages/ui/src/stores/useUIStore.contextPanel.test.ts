@@ -3,9 +3,15 @@ import { CHAT_DRAFT_PROJECT_ID } from '../lib/chatDirectories';
 import { CONTEXT_SURFACES, sortContextSurfaces } from '../lib/surfaces/registry';
 import { useDirectoryStore } from './useDirectoryStore';
 import { useProjectsStore } from './useProjectsStore';
-import { useUIStore } from './useUIStore';
+import { bindSessionStoreForBrowserScope, useUIStore } from './useUIStore';
+
+let currentSessionId: string | null = null;
 
 beforeEach(() => {
+  currentSessionId = null;
+  bindSessionStoreForBrowserScope({
+    getState: () => ({ currentSessionId }),
+  });
   useUIStore.setState({ contextPanelByDirectory: {}, contextRailOrder: [], contextRailHiddenSurfaces: [] });
   useDirectoryStore.setState({ homeDirectory: '/Users/tester' });
   useProjectsStore.setState({ projects: [] });
@@ -391,7 +397,7 @@ describe('context panel tab limits', () => {
   });
 });
 
-describe('useUIStore browser project/chats scope', () => {
+describe('useUIStore browser session scope', () => {
   const home = '/Users/tester';
   const chatA = `${home}/.config/openchamber/chats/2026-08-25/session-a`;
   const chatB = `${home}/.config/openchamber/chats/2026-08-25/session-b`;
@@ -411,24 +417,26 @@ describe('useUIStore browser project/chats scope', () => {
     expect(draftTabs.some((tab) => tab.targetPath === 'https://example.com/' || tab.targetPath === 'https://example.org/')).toBe(false);
   });
 
-  test('two chat sessions share one browser tab set on the chats sentinel', () => {
+  test('two chat sessions keep separate browser tabs', () => {
+    currentSessionId = 'ses_a';
     useUIStore.getState().openContextPreview(chatA, 'https://example.com/');
     useUIStore.getState().openContextFile(chatA, `${chatA}/notes.md`);
 
-    const chats = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
     const sessionA = useUIStore.getState().contextPanelByDirectory[chatA];
-    expect(chats?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
-    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    const scopeA = useUIStore.getState().contextPanelByDirectory['session:ses_a'];
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
+    expect(scopeA?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
     expect(sessionA?.tabs.some((tab) => tab.mode === 'file')).toBe(true);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
 
+    currentSessionId = 'ses_b';
     useUIStore.getState().openContextSurface(chatB, 'browser');
     const sessionB = useUIStore.getState().contextPanelByDirectory[chatB];
-    const sharedBrowser = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
-    expect(sharedBrowser?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
-    expect(sharedBrowser?.tabs[0]?.id).toBe(chats?.tabs[0]?.id);
-    expect(sessionB?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    const scopeB = useUIStore.getState().contextPanelByDirectory['session:ses_b'];
+    expect(scopeB?.tabs.filter((tab) => tab.mode === 'browser')).toHaveLength(1);
+    expect(scopeB?.tabs[0]?.id).not.toBe(scopeA?.tabs[0]?.id);
     expect(sessionB?.isOpen).toBe(true);
-    expect(sessionB?.activeTabId).toBe(sharedBrowser?.tabs[0]?.id);
+    expect(scopeA?.tabs[0]?.targetPath).toBe('https://example.com/');
     expect(sessionA?.tabs.some((tab) => tab.mode === 'file')).toBe(true);
   });
 
@@ -449,7 +457,8 @@ describe('useUIStore browser project/chats scope', () => {
     expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
   });
 
-  test('moves leftover chat-session browser tabs onto the chats sentinel', () => {
+  test('keeps leftover chat-session browser tabs on that session directory', () => {
+    currentSessionId = 'ses_a';
     useUIStore.setState({
       contextPanelByDirectory: {
         [chatA]: {
@@ -476,13 +485,14 @@ describe('useUIStore browser project/chats scope', () => {
 
     useUIStore.getState().openContextPreview(chatA, 'https://new.example/');
 
-    const chats = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID];
     const sessionA = useUIStore.getState().contextPanelByDirectory[chatA];
-    expect(chats?.tabs.map((tab) => tab.targetPath)).toEqual([
+    const scopeA = useUIStore.getState().contextPanelByDirectory['session:ses_a'];
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
+    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    expect(scopeA?.tabs.map((tab) => tab.targetPath)).toEqual([
       'https://new.example/',
       'https://old.example/',
     ]);
-    expect(sessionA?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
   });
 
   test('home that is an opened Settings project stays a project scope', () => {
@@ -496,13 +506,15 @@ describe('useUIStore browser project/chats scope', () => {
     expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
   });
 
-  test('persisting a chat browser URL writes the chats bucket, not the session dir', () => {
+  test('persisting a chat browser URL writes the session scope', () => {
+    currentSessionId = 'ses_a';
     useUIStore.getState().openContextPreview(chatA, 'https://start.example/');
-    const tabID = useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]?.tabs[0]?.id as string;
+    const tabID = useUIStore.getState().contextPanelByDirectory['session:ses_a']?.tabs[0]?.id as string;
 
     useUIStore.getState().setContextPanelTabTargetPath(chatA, tabID, 'https://later.example/');
 
-    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]?.tabs[0]?.targetPath).toBe('https://later.example/');
-    expect(useUIStore.getState().contextPanelByDirectory[chatA]?.tabs).toEqual([]);
+    expect(useUIStore.getState().contextPanelByDirectory['session:ses_a']?.tabs[0]?.targetPath).toBe('https://later.example/');
+    expect(useUIStore.getState().contextPanelByDirectory[chatA]?.tabs.some((tab) => tab.mode === 'browser')).toBe(false);
+    expect(useUIStore.getState().contextPanelByDirectory[CHAT_DRAFT_PROJECT_ID]).toBe(undefined);
   });
 });

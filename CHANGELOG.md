@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-09-01
+
 - **Chat:** the transcript stays at the latest reply while it streams, unless you scroll away. Scrolling up is not stolen back, and resizing the window keeps the message you were reading in view. Settings → Chat can turn off following new content.
+- **Chat:** while a reply is running, Steer inserts your follow-up immediately so the agent sees it after the current tool. Queue still waits until the reply finishes, then sends queued messages one after another, including chats that are not the currently selected project.
+- **Desktop:** the browser panel follows the open conversation. Switching chats in the same project no longer reuses the previous chat's pages.
 - Settings: Language includes Türkçe. The interface and settings switch with the other shipped locales.
 - Desktop: choose which context-rail panels show; the choice is remembered after refresh. When session tabs are off, Cmd/Ctrl+Alt+Left/Right walks the sessions you opened in this window (with tabs on, those keys still switch adjacent tabs).
 - Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
