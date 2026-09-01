@@ -2108,7 +2108,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const showMiniChatHeaderAction = hasElectronDesktopIPC && (isNewSessionDraftOpen || Boolean(currentSessionId));
 
-  const renderSessionTabMenu = React.useCallback(({ session, isActive, select, closeOtherTabs, components }: SessionTabMenuArgs) => {
+  const renderSessionTabMenu = React.useCallback(({ session, isActive, select, close, closeOtherTabs, components }: SessionTabMenuArgs) => {
     const { Item, Separator } = components;
     const shareUrl = session.share?.url ?? null;
     const canMoveToWorktree = isActive && !isVSCode && !isChatContext && currentSession && !currentSession.parentId;
@@ -2172,6 +2172,9 @@ export const Header: React.FC<HeaderProps> = ({
           </Tooltip>
         ) : null}
         <Separator />
+        <Item onClick={close}>
+          <Icon name="close" className="mr-2 size-4" />{t('header.sessionTabs.closeTab')}
+        </Item>
         <Item onClick={closeOtherTabs}>
           <Icon name="close-circle" className="mr-2 size-4" />{t('header.sessionTabs.closeOtherTabs')}
         </Item>

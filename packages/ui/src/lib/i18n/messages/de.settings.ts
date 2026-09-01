@@ -2426,7 +2426,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': 'Sitzungs-Tabs',
   'settings.openchamber.visual.field.sessionTabs': 'Sitzungen als Tabs in der Kopfzeile anzeigen',
   'settings.openchamber.visual.field.sessionTabsAria': 'Sitzungs-Tabs in der Kopfzeile umschalten',
-  'settings.openchamber.visual.field.sessionTabsInfo': 'Geöffnete Sitzungen erscheinen als Tabs in der Kopfzeile. Ausgeschaltet zeigt die Kopfzeile wieder nur den Sitzungstitel.',
+  'settings.openchamber.visual.field.sessionTabsInfo': 'Geöffnete Sitzungen erscheinen als Tabs in der Kopfzeile. Das Schließen eines Tabs lässt den Chat in der Seitenleiste. Ausgeschaltet zeigt die Kopfzeile wieder nur den Sitzungstitel.',
   'settings.openchamber.visual.field.draftStartersVisible': 'Starter auf dem Bildschirm für neue Sitzungen anzeigen',
   'settings.openchamber.visual.field.draftStartersVisibleAria': 'Starter auf dem Bildschirm für neue Sitzungen anzeigen',
   'settings.openchamber.visual.option.themeMode.system.description': 'Systemeinstellung übernehmen',

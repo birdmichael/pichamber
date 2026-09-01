@@ -2252,7 +2252,7 @@ export const settingsDict = {
   "settings.openchamber.visual.field.sessionTabsGroup": "Pestañas de sesión",
   "settings.openchamber.visual.field.sessionTabs": "Mostrar las sesiones como pestañas en el encabezado",
   "settings.openchamber.visual.field.sessionTabsAria": "Alternar las pestañas de sesión en el encabezado",
-  "settings.openchamber.visual.field.sessionTabsInfo": "Las sesiones que abres se alinean como pestañas en el encabezado. Al desactivarlo, el encabezado vuelve a mostrar solo el título de la sesión.",
+  "settings.openchamber.visual.field.sessionTabsInfo": "Las sesiones que abres se alinean como pestañas en el encabezado. Cerrar una pestaña deja el chat en la barra lateral. Al desactivarlo, el encabezado vuelve a mostrar solo el título de la sesión.",
   "settings.openchamber.visual.field.wideChatLayoutAria": "Diseño de chat ancho",
   "settings.openchamber.visual.field.wideChatLayout": "Diseño de chat ancho",
   "settings.openchamber.visual.field.showSplitAssistantMessageActionsAria": "Acciones en línea del asistente",

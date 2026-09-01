@@ -2153,7 +2153,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': 'Onglets de session',
   'settings.openchamber.visual.field.sessionTabs': 'Afficher les sessions sous forme d\'onglets dans l\'en-tête',
   'settings.openchamber.visual.field.sessionTabsAria': 'Basculer les onglets de session dans l\'en-tête',
-  'settings.openchamber.visual.field.sessionTabsInfo': 'Les sessions ouvertes s\'alignent en onglets dans l\'en-tête. Désactivé, l\'en-tête n\'affiche que le titre de la session.',
+  'settings.openchamber.visual.field.sessionTabsInfo': 'Les sessions ouvertes s\'alignent en onglets dans l\'en-tête. Fermer un onglet laisse le chat dans la barre latérale. Désactivé, l\'en-tête n\'affiche que le titre de la session.',
   'settings.openchamber.visual.field.wideChatLayoutAria': 'Large disposition de discussion',
   'settings.openchamber.visual.field.wideChatLayout': 'Disposition de discussion large',
   'settings.openchamber.visual.field.showSplitAssistantMessageActionsAria': 'Actions intégrées de l\'assistant',

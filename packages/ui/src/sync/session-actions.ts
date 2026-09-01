@@ -38,6 +38,7 @@ import { getImperativeSessionMessageLoader } from "./session-message-loader"
 import { cleanupPersistedSessionState } from "./session-deletion-cleanup"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isAmbiguousTransportFailure } from "@/lib/relay/transport-error"
+import { dropGoneSessionTabs } from "@/lib/sessionTabs"
 import { getStaleRunningToolMessageID } from "./materialization"
 import { normalizePath } from "@/lib/pathNormalization"
 import { mergeMessages } from "./optimistic"
@@ -1023,6 +1024,7 @@ function finalizeConfirmedSessionDeletion(
   const ui = useSessionUIStore.getState()
   if (ui.currentSessionId === sessionId) ui.setCurrentSession(null)
   cleanupSessionWorktreeMetadata(sessionId)
+  dropGoneSessionTabs([sessionId])
   if (sessionDirectory) {
     cleanupPersistedSessionState({
       runtimeKey: expectedRuntimeKey,
@@ -1189,6 +1191,7 @@ export async function archiveSession(sessionId: string, expectedRuntimeKey = get
     useGlobalSessionsStore.getState().upsertSession(archived)
     const ui = useSessionUIStore.getState()
     if (ui.currentSessionId === sessionId) ui.setCurrentSession(null)
+    dropGoneSessionTabs([sessionId])
     return true
   } catch (error) {
     console.error("[session-actions] archiveSession failed", error)

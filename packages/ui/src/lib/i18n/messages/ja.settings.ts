@@ -2285,7 +2285,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': 'セッションタブ',
   'settings.openchamber.visual.field.sessionTabs': 'ヘッダーにセッションをタブとして表示',
   'settings.openchamber.visual.field.sessionTabsAria': 'ヘッダーのセッションタブを切り替え',
-  'settings.openchamber.visual.field.sessionTabsInfo': '開いたセッションがヘッダーにタブとして並びます。オフにするとヘッダーはセッションタイトルのみ表示します。',
+  'settings.openchamber.visual.field.sessionTabsInfo': '開いたセッションがヘッダーにタブとして並びます。タブを閉じてもサイドバーのチャットは残ります。オフにするとヘッダーはセッションタイトルのみ表示します。',
   'settings.openchamber.visual.field.wideChatLayoutAria': 'ワイドチャットレイアウト',
   'settings.openchamber.visual.field.wideChatLayout': 'ワイドチャットレイアウト',
   'settings.openchamber.visual.field.showSplitAssistantMessageActionsAria': 'インラインアシスタントアクション',

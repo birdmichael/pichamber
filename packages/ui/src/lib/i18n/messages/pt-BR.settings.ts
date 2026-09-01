@@ -2252,7 +2252,7 @@ export const settingsDict = {
   "settings.openchamber.visual.field.sessionTabsGroup": "Abas de sessão",
   "settings.openchamber.visual.field.sessionTabs": "Mostrar sessões como abas no cabeçalho",
   "settings.openchamber.visual.field.sessionTabsAria": "Alternar abas de sessão no cabeçalho",
-  "settings.openchamber.visual.field.sessionTabsInfo": "As sessões abertas se alinham como abas no cabeçalho. Desativado, o cabeçalho volta a mostrar apenas o título da sessão.",
+  "settings.openchamber.visual.field.sessionTabsInfo": "As sessões abertas se alinham como abas no cabeçalho. Fechar uma aba deixa o chat na barra lateral. Desativado, o cabeçalho volta a mostrar apenas o título da sessão.",
   "settings.openchamber.visual.field.wideChatLayoutAria": "Layout de chat amplo",
   "settings.openchamber.visual.field.wideChatLayout": "Layout de chat amplo",
   "settings.openchamber.visual.field.showSplitAssistantMessageActionsAria": "Ações inline do assistente",

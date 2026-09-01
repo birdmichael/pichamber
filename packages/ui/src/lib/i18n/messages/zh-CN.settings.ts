@@ -2252,7 +2252,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': '会话标签页',
   'settings.openchamber.visual.field.sessionTabs': '在页眉中以标签页显示会话',
   'settings.openchamber.visual.field.sessionTabsAria': '切换页眉会话标签页',
-  'settings.openchamber.visual.field.sessionTabsInfo': '打开的会话会以标签页形式排列在页眉中。关闭后页眉仅显示会话标题。',
+  'settings.openchamber.visual.field.sessionTabsInfo': '打开的会话会以标签页形式排列在页眉中。关闭标签不会删除侧栏中的会话。关闭此设置后页眉仅显示会话标题。',
   'settings.openchamber.visual.field.wideChatLayoutAria': '宽聊天布局',
   'settings.openchamber.visual.field.wideChatLayout': '宽聊天布局',
   'settings.openchamber.visual.field.showSplitAssistantMessageActionsAria': '内联助手操作',

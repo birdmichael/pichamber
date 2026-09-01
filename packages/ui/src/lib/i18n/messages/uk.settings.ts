@@ -2252,7 +2252,7 @@ export const settingsDict = {
   "settings.openchamber.visual.field.sessionTabsGroup": "Вкладки сесій",
   "settings.openchamber.visual.field.sessionTabs": "Показувати сесії як вкладки в хедері",
   "settings.openchamber.visual.field.sessionTabsAria": "Перемкнути вкладки сесій у хедері",
-  "settings.openchamber.visual.field.sessionTabsInfo": "Відкриті сесії шикуються вкладками в хедері. Якщо вимкнено, хедер знову показує лише назву сесії.",
+  "settings.openchamber.visual.field.sessionTabsInfo": "Відкриті сесії шикуються вкладками в хедері. Закриття вкладки залишає чат на бічній панелі. Якщо вимкнено, хедер знову показує лише назву сесії.",
   "settings.openchamber.visual.field.wideChatLayoutAria": "Широкий макет чату",
   "settings.openchamber.visual.field.wideChatLayout": "Широкий макет чату",
   "settings.openchamber.visual.field.showSplitAssistantMessageActionsAria": "Вбудовані дії асистента",

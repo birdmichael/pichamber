@@ -54,6 +54,7 @@ export type SessionTabMenuArgs = {
   session: Session;
   isActive: boolean;
   select: () => void;
+  close: () => void;
   closeOtherTabs: () => void;
   /** Menu primitives for the surface the menu opens in (dropdown or context menu). */
   components: SessionTabMenuComponents;
@@ -118,6 +119,7 @@ const SessionTabItem: React.FC<{
     session: tab.session,
     isActive,
     select: () => onSelect(tab),
+    close: () => onClose(tab.id),
     closeOtherTabs: () => closeOtherTabs(tab.id),
     components,
   });

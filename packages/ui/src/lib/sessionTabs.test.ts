@@ -9,6 +9,7 @@ import {
   activateAdjacentSessionTab,
   activateSessionTabByIndex,
   closeSessionTabAndActivateNeighbour,
+  dropGoneSessionTabs,
 } from './sessionTabs';
 
 const buildSession = (id: string, directory: string): Session => ({
@@ -35,6 +36,13 @@ describe('sessionTabs', () => {
       hasLoaded: true,
       status: 'ready',
     });
+  });
+
+  test('dropGoneSessionTabs frees a cap slot after archive or delete', () => {
+    useSessionTabsStore.setState({ tabIds: ['ses_a', 'ses_b'] });
+    dropGoneSessionTabs(['ses_b']);
+    expect(useSessionTabsStore.getState().tabIds).toEqual(['ses_a']);
+    expect(activeIds()).toEqual(['ses_a', 'ses_b', 'ses_c']);
   });
 
   test('closeSessionTabAndActivateNeighbour does not archive or delete the session', () => {

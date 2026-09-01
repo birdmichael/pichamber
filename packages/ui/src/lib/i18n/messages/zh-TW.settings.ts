@@ -2067,7 +2067,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': '會話分頁',
   'settings.openchamber.visual.field.sessionTabs': '在頁首以分頁顯示會話',
   'settings.openchamber.visual.field.sessionTabsAria': '切換頁首會話分頁',
-  'settings.openchamber.visual.field.sessionTabsInfo': '開啟的會話會以分頁排列在頁首。關閉後頁首僅顯示會話標題。',
+  'settings.openchamber.visual.field.sessionTabsInfo': '開啟的會話會以分頁排列在頁首。關閉分頁不會刪除側欄中的會話。關閉此設定後頁首僅顯示會話標題。',
   'settings.openchamber.visual.field.wideChatLayoutAria': '寬聊天佈局',
   'settings.openchamber.visual.field.wideChatLayout': '寬聊天佈局',
   'settings.openchamber.visual.field.showSplitAssistantMessageActionsAria': '行內助理操作',

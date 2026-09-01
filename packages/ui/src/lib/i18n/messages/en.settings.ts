@@ -2275,7 +2275,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': 'Session tabs',
   'settings.openchamber.visual.field.sessionTabs': 'Show sessions as tabs in the header',
   'settings.openchamber.visual.field.sessionTabsAria': 'Toggle session tabs in the header',
-  'settings.openchamber.visual.field.sessionTabsInfo': 'Sessions you open line up as tabs in the header. Turning this off restores the plain session title.',
+  'settings.openchamber.visual.field.sessionTabsInfo': 'Sessions you open line up as tabs in the header. Closing a tab leaves the chat in the sidebar. Turning this off restores the plain session title.',
   'settings.openchamber.visual.field.wideChatLayoutAria': 'Wide chat layout',
   'settings.openchamber.visual.field.wideChatLayout': 'Wide Chat Layout',
   'settings.openchamber.visual.field.codeBlockLineWrapAria': 'Wrap code block lines',

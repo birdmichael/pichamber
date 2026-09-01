@@ -49,6 +49,11 @@ export const activateAdjacentSessionTab = (delta: -1 | 1): boolean => {
  * count as neighbours — the same rule the strip uses for rendering. The
  * session itself is never archived or deleted.
  */
+/** Drop tab ids whose sessions were confirmed archived or deleted. */
+export const dropGoneSessionTabs = (sessionIds: readonly string[]): void => {
+  useSessionTabsStore.getState().removeTabs(sessionIds);
+};
+
 export const closeSessionTabAndActivateNeighbour = (sessionId: string): void => {
   const { tabIds, closeTab } = useSessionTabsStore.getState();
   if (!tabIds.includes(sessionId)) return;

@@ -1179,7 +1179,7 @@ export const settingsDict = {
   'settings.openchamber.visual.field.sessionTabsGroup': 'Karty sesji',
   'settings.openchamber.visual.field.sessionTabs': 'Pokazuj sesje jako karty w nagłówku',
   'settings.openchamber.visual.field.sessionTabsAria': 'Przełącz karty sesji w nagłówku',
-  'settings.openchamber.visual.field.sessionTabsInfo': 'Otwierane sesje układają się jako karty w nagłówku. Po wyłączeniu nagłówek pokazuje tylko tytuł sesji.',
+  'settings.openchamber.visual.field.sessionTabsInfo': 'Otwierane sesje układają się jako karty w nagłówku. Zamknięcie karty zostawia czat na pasku bocznym. Po wyłączeniu nagłówek pokazuje tylko tytuł sesji.',
   'settings.openchamber.visual.field.terminalFontSize': 'Rozmiar czcionki terminala',
   'settings.openchamber.visual.field.terminalShell': 'Powłoka terminala',
   'settings.openchamber.visual.field.terminalShellAria': 'Wybierz powłokę terminala',
