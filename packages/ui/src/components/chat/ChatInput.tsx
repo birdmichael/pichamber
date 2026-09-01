@@ -100,6 +100,7 @@ import {
 import { wrapSystemReminder } from '@/lib/systemReminder';
 import { getSyncMessages } from '@/sync/sync-refs';
 import { eventMatchesShortcut, getEffectiveShortcutCombo, normalizeCombo } from '@/lib/shortcuts';
+import { useKeybind } from '@/hooks/useKeybind';
 import {
     assignImageAttachmentFilenames,
     buildAttachmentCitationText,
@@ -2920,6 +2921,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         setSessionAutoAccept,
         t,
     ]);
+
+    useKeybind('toggle_permission_auto_accept', () => {
+        if (!isPermissionAutoAcceptInteractive) return false;
+        handlePermissionAutoAcceptToggle();
+    });
 
     React.useEffect(() => {
         const pendingAbortBanner = Boolean(abortPromptSessionId) && abortPromptSessionId === currentSessionId;

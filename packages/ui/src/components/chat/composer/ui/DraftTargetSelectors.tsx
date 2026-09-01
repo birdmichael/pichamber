@@ -22,6 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useKeybind } from '@/hooks/useKeybind';
 import { useI18n } from '@/lib/i18n';
 import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
@@ -109,6 +110,16 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
         onDirectoryChange,
         theme,
     } = props;
+    const projectTriggerRef = React.useRef<HTMLButtonElement>(null);
+    const worktreeTriggerRef = React.useRef<HTMLButtonElement>(null);
+
+    useKeybind('open_draft_project_picker', () => {
+        projectTriggerRef.current?.click();
+    });
+    useKeybind('open_draft_worktree_picker', () => {
+        if (!showBranchSelector) return false;
+        worktreeTriggerRef.current?.click();
+    });
 
     return (
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5">
@@ -117,6 +128,7 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
                 onValueChange={onProjectChange}
             >
                 <SelectTrigger
+                    ref={projectTriggerRef}
                     size="sm"
                     className="h-7 min-w-0 w-fit max-w-[42vw] sm:max-w-[18rem] border-transparent bg-transparent px-1.5 hover:bg-transparent data-[popup-open]:bg-transparent"
                 >
@@ -141,6 +153,7 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
                     onValueChange={onDirectoryChange}
                 >
                     <SelectTrigger
+                        ref={worktreeTriggerRef}
                         size="sm"
                         className="h-7 min-w-0 w-fit max-w-[48vw] sm:max-w-[20rem] border-transparent bg-transparent px-1.5 hover:bg-transparent data-[popup-open]:bg-transparent"
                     >

@@ -308,6 +308,12 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const { t } = useI18n();
   const [isSessionSearchOpen, setIsSessionSearchOpen] = React.useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = React.useState('');
+
+  React.useEffect(() => {
+    const openSearch = () => setIsSessionSearchOpen(true);
+    window.addEventListener('openchamber:sidebar-session-search', openSearch);
+    return () => window.removeEventListener('openchamber:sidebar-session-search', openSearch);
+  }, []);
   const sessionSearchContainerRef = React.useRef<HTMLDivElement | null>(null);
   const sessionSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);

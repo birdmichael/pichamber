@@ -26,7 +26,7 @@ test('Ctrl+J terminal toggles use the context-panel key, not DirectoryStore', ()
 
   const digitStart = source.indexOf('switchSurfaceDigit !== null');
   const digit = source.slice(digitStart, source.indexOf('open_model_selector', digitStart));
-  expect(digit).toContain('if (isEditableEventTarget(e.target)) {\n          e.preventDefault();\n          return;\n        }');
-  expect(digit).toContain('if (state.isMobile || !panelDirectoryKey)');
+  expect(digit).toContain('if (isEditableEventTarget(event.target)) return;');
+  expect(digit).toContain('if (!state.isMobile && panelDirectoryKey)');
   expect(digit).toContain('normalizeContextPanelDirectoryKey(panelDirectoryKey)');
 });

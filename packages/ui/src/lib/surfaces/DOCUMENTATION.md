@@ -43,7 +43,7 @@ of those ids onto workspace tabs; see Mobile tabs.
   registry's default order and appends any missing surfaces.
 - `getVisibleContextRailSurfaces` is the single visibility filter shared by the
   rail and the global surface-switch shortcut (`switch_context_surface` in
-  `lib/shortcuts.ts`): it drops the plan surface unless the caller passes
+  `lib/shortcuts/`): it drops the plan surface unless the caller passes
   `planModeEnabled`. On Pi that flag is Feature Plugins `plan` installed+enabled
   **and** live plan markdown (`ready` / `saved` / `implementing`);
   `planModeExperimentalEnabled` must not gate it. On OpenCode it stays the

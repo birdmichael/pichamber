@@ -52,7 +52,8 @@ import { formatQuotaValueLabel, formatQuotaResetLabel, formatWindowLabel, QUOTA_
 import { UsageProgressBar } from '@/components/sections/usage/UsageProgressBar';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { formatTimeForPreference } from '@/lib/timeFormat';
-import { eventMatchesShortcut, formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
+import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
+import { useKeybinds } from '@/hooks/useKeybind';
 import {
   getAllModelFamilies,
   getDisplayModelName,
@@ -1940,6 +1941,29 @@ export const Header: React.FC<HeaderProps> = ({
     return base;
   }, [isDesktopApp, t]);
 
+  useKeybinds({
+    rename_current_session: () => {
+      if (!currentSessionId || isMobile) return false;
+      beginHeaderSessionRename();
+    },
+    toggle_services_menu: () => {
+      if (isDesktopServicesOpen) {
+        setIsDesktopServicesOpen(false);
+        return;
+      }
+      setIsDesktopServicesOpen(true);
+      void refreshCurrentInstanceLabel();
+    },
+    cycle_services_tab: () => {
+      if (servicesTabs.length === 0) return false;
+      setIsDesktopServicesOpen(true);
+      void refreshCurrentInstanceLabel();
+    },
+    toggle_context_plan: () => {
+      handleOpenContextPlan();
+    },
+  });
+
 
   const mobileServicesTabItems = React.useMemo<SortableTabsStripItem[]>(() => {
     const items: SortableTabsStripItem[] = [];
@@ -1977,52 +2001,6 @@ export const Header: React.FC<HeaderProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [blurActiveElement, closeMobileHeaderPanels, isMobile, setActiveMainTab, tabs]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const toggleServicesCombo = getEffectiveShortcutCombo('toggle_services_menu', shortcutOverrides);
-      if (eventMatchesShortcut(e, toggleServicesCombo)) {
-        e.preventDefault();
-
-        if (isDesktopServicesOpen) {
-          setIsDesktopServicesOpen(false);
-        } else {
-          setIsDesktopServicesOpen(true);
-          void refreshCurrentInstanceLabel();
-        }
-        return;
-      }
-
-      // The desktop menu holds one destination now, so this shortcut opens it
-      // rather than cycling. The binding is kept: it is user-configurable and
-      // silently dropping it would break existing setups.
-      const cycleServicesCombo = getEffectiveShortcutCombo('cycle_services_tab', shortcutOverrides);
-      if (eventMatchesShortcut(e, cycleServicesCombo)) {
-        e.preventDefault();
-        if (servicesTabs.length === 0) return;
-        setIsDesktopServicesOpen(true);
-        void refreshCurrentInstanceLabel();
-        return;
-      }
-
-      const toggleContextPlanCombo = getEffectiveShortcutCombo('toggle_context_plan', shortcutOverrides);
-      if (eventMatchesShortcut(e, toggleContextPlanCombo)) {
-        e.preventDefault();
-        handleOpenContextPlan();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    shortcutOverrides,
-    isDesktopServicesOpen,
-    servicesTabs,
-    quotaResults.length,
-    fetchAllQuotas,
-    refreshCurrentInstanceLabel,
-    handleOpenContextPlan,
-  ]);
 
   const renderTab = (tab: TabConfig) => {
     const isActive = activeMainTab === tab.id;

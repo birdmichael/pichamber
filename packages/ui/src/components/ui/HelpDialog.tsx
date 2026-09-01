@@ -10,10 +10,11 @@ import { Icon } from "@/components/icon/Icon";
 import { useUIStore } from "@/stores/useUIStore";
 import {
   getEffectiveShortcutCombo,
+  getEffectiveShortcutPrefix,
   getShortcutAction,
-  getModifierLabel,
   formatShortcutForDisplay,
 } from "@/lib/shortcuts";
+import { getModifierLabel } from "@/lib/utils";
 import { useI18n, type I18nKey } from "@/lib/i18n";
 import { isVSCodeRuntime } from "@/lib/desktop";
 import type { IconName } from "@/components/icon/icons";
@@ -179,7 +180,7 @@ export const HelpDialog: React.FC = () => {
           keys: '',
         },
         {
-          keys: [`${mod} + 1...0`],
+          keys: [`${formatShortcutForDisplay(getEffectiveShortcutPrefix('switch_context_surface', shortcutOverrides))}${t('settings.openchamber.keyboardShortcuts.action.switch_context_surface.suffix')}`],
           descriptionKey: "helpDialog.item.switchContextSurface",
           icon: "layout-right",
         },
