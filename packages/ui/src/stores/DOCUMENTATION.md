@@ -72,19 +72,21 @@ mounted session-chat iframe stay enabled independently of that visibility flag
 so a delayed or lost handshake cannot hide an already-materialized transcript
 (busy subagents would otherwise show only the working-status row).
 
-Browser tabs and `useBrowserHistoryStore` are scoped by Settings project, not by
-raw session directory. Isolated chat dirs and home-as-chat share
-`openchamber:chats`; home that is itself an opened project stays a project key.
-Files / Git / notes stay keyed by the real session directory. `BrowserPane`
-also keeps that session directory so annotation drafts and announced servers
-match the composer. Cookies stay on the global Electron partition
-`persist:openchamber-browser`. Resolve the store key with
-`resolveBrowserScopeKey` in `lib/browser/scope.ts`. A projectless Chats draft
-(sidebar Chats-row +, no session until send) uses `openchamber:chats`
-immediately — it must not inherit the last project's directory from
-`DirectoryStore`. `useUIStore` reads home and opened projects through a late
-getter inside `readContextBrowserScopeKey` and must not statically import
-`useDirectoryStore` or `useProjectsStore`.
+Browser *tabs* follow the open conversation (`session:<id>`), the same scope
+as subagent chat tabs, so two sessions in one project do not share a page.
+Files / Git / notes stay on the session directory. Address-bar *history* in
+`useBrowserHistoryStore` still collapses isolated chat dirs and home-as-chat
+onto `openchamber:chats` so suggestions stay useful across projectless chats;
+home that is itself an opened Settings project stays a project key. Resolve
+that history key with `resolveBrowserScopeKey` in `lib/browser/scope.ts`.
+`BrowserPane` still receives the real session directory so annotation drafts
+and announced servers match the composer. Cookies stay on the global Electron
+partition `persist:openchamber-browser`. A projectless Chats draft (sidebar
+Chats-row +, no session until send) uses `openchamber:chats` immediately — it
+must not inherit the last project's directory from `DirectoryStore`.
+`useUIStore` reads home, opened projects, and the current session through late
+getters and must not statically import `useDirectoryStore`,
+`useProjectsStore`, or `useSessionUIStore`.
 
 ### Session / project coordination stores
 

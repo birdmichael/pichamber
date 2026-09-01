@@ -25,10 +25,11 @@ import {
 } from '@/lib/overlay-dialogs';
 import {
   isBrowserTabIdentity,
-  mergeContextPanelForBrowserScope,
+  mergeContextPanelChatScope,
   openedProjectPathSet,
   resolveBrowserScopeKey,
 } from '@/lib/browser/scope';
+import { contextChatScopeKey } from '@/lib/subagents/childSession';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch';
@@ -172,8 +173,13 @@ type BrowserScopeProjectsStore = {
   getState: () => { projects: Array<{ path: string }> };
 };
 
+type BrowserScopeSessionStore = {
+  getState: () => { currentSessionId?: string | null };
+};
+
 let directoryStoreForBrowserScope: BrowserScopeDirectoryStore | undefined;
 let projectsStoreForBrowserScope: BrowserScopeProjectsStore | undefined;
+let sessionStoreForBrowserScope: BrowserScopeSessionStore | undefined;
 
 export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectoryStore): void => {
   directoryStoreForBrowserScope = store;
@@ -181,6 +187,10 @@ export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectorySt
 
 export const bindProjectsStoreForBrowserScope = (store: BrowserScopeProjectsStore): void => {
   projectsStoreForBrowserScope = store;
+};
+
+export const bindSessionStoreForBrowserScope = (store: BrowserScopeSessionStore): void => {
+  sessionStoreForBrowserScope = store;
 };
 
 const requireStoreExport = <T>(specifier: string, exportName: string): T | undefined => {
@@ -219,6 +229,14 @@ const getProjectsStoreForBrowserScope = (): BrowserScopeProjectsStore | undefine
   return projectsStoreForBrowserScope;
 };
 
+const getSessionStoreForBrowserScope = (): BrowserScopeSessionStore | undefined => {
+  return sessionStoreForBrowserScope;
+};
+
+const readCurrentSessionScopeKey = (): string => (
+  contextChatScopeKey(getSessionStoreForBrowserScope()?.getState().currentSessionId)
+);
+
 // Home / opened projects are needed only when a browser action runs. A static
 // import here closes useDirectoryStore → persistence → useUIStore →
 // useDirectoryStore and TDZ-crashes the Desktop renderer before React mounts.
@@ -234,12 +252,12 @@ const readMergedContextPanel = (
   byDirectory: Record<string, ContextPanelDirectoryState>,
   directory: string,
 ): ContextPanelDirectoryState | undefined => {
-  const scopeKey = readContextBrowserScopeKey(directory);
-  return mergeContextPanelForBrowserScope(
+  const chatScopeKey = readCurrentSessionScopeKey();
+  return mergeContextPanelChatScope(
     directory,
     byDirectory[directory],
-    scopeKey,
-    byDirectory[scopeKey],
+    chatScopeKey,
+    chatScopeKey ? byDirectory[chatScopeKey] : undefined,
   );
 };
 
@@ -1424,12 +1442,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          const sessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
-          const writeKey = tab.mode === 'browser'
-            ? readContextBrowserScopeKey(normalizedDirectory)
-            : tab.mode === 'chat' && sessionScope
-              ? sessionScope
-              : normalizedDirectory;
+          const explicitSessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
+          const sessionScope = explicitSessionScope
+            || (tab.mode === 'browser' ? readCurrentSessionScopeKey() : '');
+          const writeKey = (tab.mode === 'chat' || tab.mode === 'browser') && sessionScope
+            ? sessionScope
+            : normalizedDirectory;
 
           set((state) => {
             const prev = state.contextPanelByDirectory[writeKey];
@@ -1440,10 +1458,12 @@ export const useUIStore = create<UIStore>()(
               [writeKey]: nextWrite,
             };
 
-            if (tab.mode === 'browser' && writeKey !== normalizedDirectory) {
+            if ((tab.mode === 'chat' || tab.mode === 'browser') && writeKey !== normalizedDirectory) {
               const sessionPrev = byDirectory[normalizedDirectory];
               const sessionCurrent = touchContextPanelState(sessionPrev);
-              const leftoverBrowserTabs = sessionCurrent.tabs.filter((entry) => entry.mode === 'browser');
+              const leftoverBrowserTabs = tab.mode === 'browser'
+                ? sessionCurrent.tabs.filter((entry) => entry.mode === 'browser')
+                : [];
               if (leftoverBrowserTabs.length > 0) {
                 const existingIds = new Set(nextWrite.tabs.map((entry) => entry.id));
                 const toMove = leftoverBrowserTabs.filter((entry) => !existingIds.has(entry.id));
@@ -1457,16 +1477,9 @@ export const useUIStore = create<UIStore>()(
               byDirectory[normalizedDirectory] = {
                 ...sessionCurrent,
                 isOpen: true,
-                tabs: sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser'),
-                activeTabId: nextWrite.activeTabId,
-                touchedAt: Date.now(),
-              };
-            } else if (tab.mode === 'chat' && writeKey !== normalizedDirectory) {
-              const sessionPrev = byDirectory[normalizedDirectory];
-              const sessionCurrent = touchContextPanelState(sessionPrev);
-              byDirectory[normalizedDirectory] = {
-                ...sessionCurrent,
-                isOpen: true,
+                tabs: tab.mode === 'browser'
+                  ? sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser')
+                  : sessionCurrent.tabs,
                 activeTabId: nextWrite.activeTabId,
                 touchedAt: Date.now(),
               };
@@ -1863,16 +1876,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          const writeKey = mode === 'browser'
-            ? readContextBrowserScopeKey(normalizedDirectory)
-            : normalizedDirectory;
-
           set((state) => {
-            const prev = state.contextPanelByDirectory[writeKey];
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
             const current = touchContextPanelState(prev);
             const byDirectory = {
               ...state.contextPanelByDirectory,
-              [writeKey]: {
+              [normalizedDirectory]: {
                 ...current,
                 widthByMode: {
                   ...current.widthByMode,

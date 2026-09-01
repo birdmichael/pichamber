@@ -3,6 +3,7 @@ import type { Agent, Message } from '@opencode-ai/sdk/v2';
 import type { QueuedMessage } from '../stores/messageQueueStore';
 import { ChildStoreManager } from '@/sync/child-store';
 import { setSyncRefs } from '@/sync/sync-refs';
+import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
 
 let visibleAgents: Agent[] = [];
 const sendMessageCalls: unknown[][] = [];
@@ -101,6 +102,10 @@ describe('shouldDispatchQueuedAutoSend', () => {
   test('dispatches when idle→idle and queue has items', () => {
     expect(shouldDispatchQueuedAutoSend('idle', 'idle', true)).toBe(true);
   });
+
+  test('still dispatches a background-directory queue after busy→idle', () => {
+    expect(shouldDispatchQueuedAutoSend('busy', 'idle', true)).toBe(true);
+  });
 });
 
 describe('queued auto-send retry backoff', () => {
@@ -139,6 +144,7 @@ describe('resolveQueuedSessionStatusType', () => {
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ status: 'complete', session_status: {}, message: {} });
     setSyncRefs({} as never, childStores, DIRECTORY);
+    useGlobalSessionStatusStore.setState({ statusById: new Map() });
   });
 
   test('treats a session with an in-flight assistant turn as busy even when the status entry is missing', () => {
@@ -181,6 +187,15 @@ describe('resolveQueuedSessionStatusType', () => {
     store.setState({ session_status: { ses_1: { type: 'idle' } } });
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
     expect(resolveQueuedSessionStatusType('ses_unknown', DIRECTORY)).toBe('idle');
+  });
+
+  test('treats a globally busy session as busy when the directory child store is missing', () => {
+    useGlobalSessionStatusStore.setState({
+      statusById: new Map([
+        ['ses_bg', { status: { type: 'busy' }, directory: '/other-repo' }],
+      ]),
+    });
+    expect(resolveQueuedSessionStatusType('ses_bg', '/other-repo')).toBe('busy');
   });
 });
 

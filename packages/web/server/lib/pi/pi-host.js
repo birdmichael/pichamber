@@ -3732,9 +3732,10 @@ export const createPiHost = ({
         record.translator?.setFallbackModel?.(runtimeModel);
       }
 
-      const skipInsert = alreadyLive
-        || body.delivery === 'steer'
-        || body.delivery === 'followUp';
+      // followUp skips insert; overlapping idle without delivery coalesces;
+      // steer always inserts.
+      const skipInsert = body.delivery === 'followUp'
+        || (alreadyLive && !body.delivery);
       if (!skipInsert) {
         record.translator?.setUserMessage?.(userMessageID, {
           agent: userAgent,

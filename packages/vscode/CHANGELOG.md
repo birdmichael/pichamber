@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+## [1.2.8] - 2026-09-01
+
+- Chat: while a reply is running, Steer inserts your follow-up immediately so the agent sees it after the current tool. Queue still waits until the reply finishes, then sends queued messages one after another.
 - Chat: Chinese punctuation after a URL stays outside the link. Question cards render Markdown instead of raw `**bold**`. Completed thinking shows the full text. Streaming replies appear a paragraph or code line at a time so line numbers do not jump. The text-selection menu stays on screen near window edges. Typing `@` ranks files and folders together by how well they match.
 - Chat: sending a message no longer shows the same user turn twice after Pi writes it under a different id, a Subagent card or Work Status row can open the child even when the tool payload has no session id, and the first message becomes the session title after reopen.
 - Sessions: dismissing a leftover hover tooltip no longer eats the next click on a session row or other control.

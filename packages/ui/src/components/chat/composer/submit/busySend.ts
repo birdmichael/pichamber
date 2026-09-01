@@ -2,9 +2,9 @@
  * Busy-session composer send: map Settings Follow-up behavior onto Pi
  * steer, or the visible local queue (messageQueueStore) until agent_settled.
  *
- * Pi Queue shows a chip and auto-sends on settle. Steer course-corrects
- * without a second user bubble. Explicit delivery must survive even if the
- * UI still thinks the session is idle — prompt_async / the host decide.
+ * Pi Queue shows a chip and auto-sends on settle. Steer inserts immediately
+ * and course-corrects the live turn. Explicit delivery must survive even if
+ * the UI still thinks the session is idle.
  */
 
 export type FollowUpBehavior = 'steer' | 'queue';

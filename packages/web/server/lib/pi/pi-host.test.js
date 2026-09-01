@@ -2895,6 +2895,9 @@ describe('promptAsync busy delivery', () => {
     expect(steerCalls).toEqual(['STEER-OK']);
     expect(promptCalls).toEqual([]);
     expect(followUpCalls).toEqual([]);
+    expect(host.getMessages(record.id).some((entry) => (
+      entry.parts?.some((part) => part.text === 'STEER-OK')
+    ))).toBe(true);
     host.dispose();
   });
 
@@ -2972,7 +2975,7 @@ describe('promptAsync live follow-up (#369)', () => {
     return session;
   };
 
-  it('overlapping promptAsync coalesces into steer without a second user insert', async () => {
+  it('overlapping promptAsync coalesces into steer and inserts the second user bubble', async () => {
     const promptCalls = [];
     const steerCalls = [];
     const session = createHangingSession({
@@ -3000,6 +3003,36 @@ describe('promptAsync live follow-up (#369)', () => {
     expect(promptCalls).toHaveLength(1);
     expect(promptCalls[0].text).toBe('first');
     expect(promptCalls[0].options?.streamingBehavior).toBeUndefined();
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first', 'msg_second']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('overlapping idle prompt without delivery still coalesces into one user bubble', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text, options) => promptCalls.push({ text, options }),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Overlap idle' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    await host.promptAsync(record.id, {
+      messageID: 'msg_second',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    expect(steerCalls).toEqual(['second']);
     const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
     expect(users.map((entry) => entry.info.id)).toEqual(['msg_first']);
     session.release();

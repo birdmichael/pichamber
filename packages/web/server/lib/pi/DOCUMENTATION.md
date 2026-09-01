@@ -144,10 +144,13 @@ Busy is the session that was already live (`isStreaming` / compacting) or
 already `busy`/`retry` *before this call marked busy*. Do not treat this
 call's own status busy as a live turn — that would steer the first idle
 send. Busy + `followUp` → `session.followUp`. Busy + `steer` or no
-delivery → `session.steer`. Never `prompt()` while that turn is live (Pi
-throws "Already streaming" / "Specify streamingBehavior"). Idle send is
-always `prompt()`. The OpenCode SDK `session.promptAsync` allowlist drops
-`delivery`; the client must also send `$body_delivery`.
+delivery → `session.steer`. Steer inserts the user bubble immediately
+(same as an idle `prompt`) so the agent and transcript see the
+course-correct; `followUp` / Settings Queue still skips that insert
+until Pi emits `message_start`. Never `prompt()` while that turn is live
+(Pi throws "Already streaming" / "Specify streamingBehavior"). Idle send
+is always `prompt()`. The OpenCode SDK `session.promptAsync` allowlist
+drops `delivery`; the client must also send `$body_delivery`.
 `POST /api/pi/directory-runtime/warm` fire-and-forgets
 `ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /
