@@ -26,6 +26,7 @@ import {
   type ShortcutActionId,
 } from '@/lib/shortcuts';
 import { resolvePlanRailEnabled } from '@/lib/surfaces/planRail';
+import { navigateSessionHistory } from '@/lib/sessionNavigationHistory';
 import { getVisibleContextRailSurfaces } from '@/lib/surfaces/registry';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
@@ -162,12 +163,18 @@ export const useKeyboardShortcuts = () => {
       });
     },
     switch_session_previous: () => {
-      if (isVSCodeRuntime() || !useUIStore.getState().sessionTabsEnabled) return false;
-      return activateAdjacentSessionTab(-1) ? undefined : false;
+      if (isVSCodeRuntime()) return false;
+      if (useUIStore.getState().sessionTabsEnabled) {
+        return activateAdjacentSessionTab(-1) ? undefined : false;
+      }
+      return navigateSessionHistory(-1) ? undefined : false;
     },
     switch_session_next: () => {
-      if (isVSCodeRuntime() || !useUIStore.getState().sessionTabsEnabled) return false;
-      return activateAdjacentSessionTab(1) ? undefined : false;
+      if (isVSCodeRuntime()) return false;
+      if (useUIStore.getState().sessionTabsEnabled) {
+        return activateAdjacentSessionTab(1) ? undefined : false;
+      }
+      return navigateSessionHistory(1) ? undefined : false;
     },
     close_session_tab: () => {
       if (isVSCodeRuntime() || !useUIStore.getState().sessionTabsEnabled) return false;
@@ -505,6 +512,7 @@ export const useKeyboardShortcuts = () => {
           const sessionId = useSessionUIStore.getState().currentSessionId;
           const visibleSurfaces = getVisibleContextRailSurfaces({
             railOrder: state.contextRailOrder,
+            hiddenSurfaces: state.contextRailHiddenSurfaces,
             planModeEnabled: resolvePlanRailEnabled({
               isPiKernel,
               featurePlugins: usePiFeaturePluginsStore.getState().payload,

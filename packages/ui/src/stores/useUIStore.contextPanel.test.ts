@@ -6,7 +6,7 @@ import { useProjectsStore } from './useProjectsStore';
 import { useUIStore } from './useUIStore';
 
 beforeEach(() => {
-  useUIStore.setState({ contextPanelByDirectory: {}, contextRailOrder: [] });
+  useUIStore.setState({ contextPanelByDirectory: {}, contextRailOrder: [], contextRailHiddenSurfaces: [] });
   useDirectoryStore.setState({ homeDirectory: '/Users/tester' });
   useProjectsStore.setState({ projects: [] });
 });
@@ -337,6 +337,17 @@ describe('useUIStore contextRailOrder', () => {
   test('setContextRailOrder drops empty and duplicate ids', () => {
     useUIStore.getState().setContextRailOrder(['diff', 'diff', '', 'editor']);
     expect(useUIStore.getState().contextRailOrder).toEqual(['diff', 'editor']);
+  });
+
+  test('setContextRailSurfaceVisible stores the hidden set so later surfaces stay visible', () => {
+    useUIStore.getState().setContextRailSurfaceVisible('git', false);
+    expect(useUIStore.getState().contextRailHiddenSurfaces).toEqual(['git']);
+    useUIStore.getState().setContextRailSurfaceVisible('git', false);
+    expect(useUIStore.getState().contextRailHiddenSurfaces).toEqual(['git']);
+    useUIStore.getState().setContextRailSurfaceVisible('git', true);
+    expect(useUIStore.getState().contextRailHiddenSurfaces).toEqual([]);
+    useUIStore.getState().setContextRailHiddenSurfaces(['browser', 'browser', 'diff']);
+    expect(useUIStore.getState().contextRailHiddenSurfaces).toEqual(['browser', 'diff']);
   });
 
   test('sortContextSurfaces applies persisted order and appends missing surfaces', () => {
