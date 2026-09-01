@@ -168,6 +168,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     keywords: ['editor', 'vim', 'keymap'],
   },
   {
+    id: 'appearance.session-tabs',
+    page: 'general',
+    titleKey: 'settings.openchamber.visual.field.sessionTabsGroup',
+    descriptionKey: 'settings.openchamber.visual.field.sessionTabsInfo',
+    keywords: ['session', 'tabs', 'header', 'working set'],
+    isAvailable: (ctx) => !ctx.isMobile && !ctx.isVSCode,
+  },
+  {
     id: 'appearance.terminal-quick-keys',
     page: 'general',
     titleKey: 'settings.openchamber.visual.field.terminalQuickKeys',
