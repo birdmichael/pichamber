@@ -328,6 +328,9 @@ export const createSettingsHelpers = (dependencies) => {
     if (typeof candidate.collapsibleThinkingBlocks === 'boolean') {
       result.collapsibleThinkingBlocks = candidate.collapsibleThinkingBlocks;
     }
+    if (typeof candidate.streamingAutoFollowEnabled === 'boolean') {
+      result.streamingAutoFollowEnabled = candidate.streamingAutoFollowEnabled;
+    }
     if (typeof candidate.showTextJustificationActivity === 'boolean') {
       result.showTextJustificationActivity = candidate.showTextJustificationActivity;
     }
@@ -946,6 +949,12 @@ export const createSettingsHelpers = (dependencies) => {
           ? settings.collapsibleThinkingBlocks
           : typeof sanitized.collapsibleThinkingBlocks === 'boolean'
             ? sanitized.collapsibleThinkingBlocks
+            : true,
+      streamingAutoFollowEnabled:
+        typeof settings.streamingAutoFollowEnabled === 'boolean'
+          ? settings.streamingAutoFollowEnabled
+          : typeof sanitized.streamingAutoFollowEnabled === 'boolean'
+            ? sanitized.streamingAutoFollowEnabled
             : true,
     };
   };

@@ -322,6 +322,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const { browserTab } = usePwaDetection();
     const directoryShowHidden = useDirectoryShowHidden();
     const showReasoningTraces = useUIStore(state => state.showReasoningTraces);
+    const streamingAutoFollowEnabled = useUIStore(state => state.streamingAutoFollowEnabled);
+    const setStreamingAutoFollowEnabled = useUIStore(state => state.setStreamingAutoFollowEnabled);
     const sessionRecapEnabled = useUIStore(state => state.sessionRecapEnabled);
     const sessionSuggestionEnabled = useUIStore(state => state.sessionSuggestionEnabled);
     const setSessionRecapEnabled = useUIStore(state => state.setSessionRecapEnabled);
@@ -1935,6 +1937,20 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                         </SettingsReveal>
                                     </SettingsSection>
                                 )}
+                                <SettingsSection
+                                    title={t('settings.openchamber.visual.section.streaming')}
+                                    settingsItem="chat.streaming"
+                                    contentClassName={SETTINGS_OPTION_STACK_CLASS}
+                                >
+                                    <SettingsCheckboxRow
+                                        checked={streamingAutoFollowEnabled}
+                                        onChange={setStreamingAutoFollowEnabled}
+                                        label={t('settings.openchamber.visual.field.streamingAutoFollow')}
+                                        ariaLabel={t('settings.openchamber.visual.field.streamingAutoFollowAria')}
+                                        info={t('settings.openchamber.visual.field.streamingAutoFollowInfo')}
+                                        settingsItem="chat.streaming-auto-follow"
+                                    />
+                                </SettingsSection>
 
                                 {(shouldShow('collapsibleUserMessages') || shouldShow('stickyUserHeader') || (shouldShow('promptNavigatorEnabled') && !isVSCode) || shouldShow('wideChatLayout') || shouldShow('splitAssistantMessageActions') || shouldShow('codeBlockLineWrap')) && (
                                 <SettingsSection

@@ -3,11 +3,13 @@ import { useUIStore } from '@/stores/useUIStore';
 export interface AppearancePreferences {
   showReasoningTraces?: boolean;
   collapsibleThinkingBlocks?: boolean;
+  streamingAutoFollowEnabled?: boolean;
 }
 
 type RawAppearancePayload = {
   showReasoningTraces?: unknown;
   collapsibleThinkingBlocks?: unknown;
+  streamingAutoFollowEnabled?: unknown;
 };
 
 const sanitizePreferences = (payload?: RawAppearancePayload | null): AppearancePreferences | null => {
@@ -25,6 +27,10 @@ const sanitizePreferences = (payload?: RawAppearancePayload | null): AppearanceP
     result.collapsibleThinkingBlocks = payload.collapsibleThinkingBlocks;
   }
 
+  if (typeof payload.streamingAutoFollowEnabled === 'boolean') {
+    result.streamingAutoFollowEnabled = payload.streamingAutoFollowEnabled;
+  }
+
   return Object.keys(result).length > 0 ? result : null;
 };
 
@@ -37,6 +43,7 @@ const extractRawAppearance = (data: unknown): RawAppearancePayload | null => {
   const payload: RawAppearancePayload = {
     showReasoningTraces: candidate.showReasoningTraces,
     collapsibleThinkingBlocks: candidate.collapsibleThinkingBlocks,
+    streamingAutoFollowEnabled: candidate.streamingAutoFollowEnabled,
   };
 
   return payload;
@@ -51,6 +58,10 @@ export const applyAppearancePreferences = (preferences: AppearancePreferences): 
 
   if (typeof preferences.collapsibleThinkingBlocks === 'boolean') {
     store.setCollapsibleThinkingBlocks(preferences.collapsibleThinkingBlocks);
+  }
+
+  if (typeof preferences.streamingAutoFollowEnabled === 'boolean') {
+    store.setStreamingAutoFollowEnabled(preferences.streamingAutoFollowEnabled);
   }
 };
 
