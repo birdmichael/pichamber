@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
+
 ## [1.2.8] - 2026-09-01
 
 - Chat: while a reply is running, Steer inserts your follow-up immediately so the agent sees it after the current tool. Queue still waits until the reply finishes, then sends queued messages one after another.

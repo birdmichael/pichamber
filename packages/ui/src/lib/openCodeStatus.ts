@@ -32,6 +32,7 @@ type OpenChamberHealthSnapshot = {
   opencodeLaunchWrapperType?: unknown;
   nodeBinaryResolved?: unknown;
   bunBinaryResolved?: unknown;
+  piNodeRuntime?: unknown;
 };
 
 type OpenChamberOpencodeResolution = {
@@ -149,6 +150,141 @@ const formatLaunchRuntime = (wrapperType: string, node: string, bun: string): st
     return wrapperType;
   }
   return 'direct executable';
+};
+
+const formatPiNodeRuntimeLines = (runtime: Record<string, unknown> | null): string[] => {
+  const lines = ['Pi kernel resolution:'];
+  if (!runtime) {
+    lines.push('- node: (n/a)');
+    return lines;
+  }
+  const command = formatUnknown(runtime.command);
+  const source = formatUnknown(runtime.source);
+  lines.push(`- node: ${command} (source=${source})`);
+  const code = typeof runtime.code === 'string' ? runtime.code.trim() : '';
+  const message = typeof runtime.message === 'string' ? runtime.message.trim() : '';
+  const recovery = typeof runtime.recovery === 'string' ? runtime.recovery.trim() : '';
+  if (runtime.ok === false || code || message) {
+    lines.push(`- error: ${[code, message].filter(Boolean).join(' ') || '(n/a)'}`);
+    if (recovery) lines.push(`- recovery: ${recovery}`);
+  }
+  const hello = isRecord(runtime.hello) ? runtime.hello : null;
+  const sdk = hello && isRecord(hello.sdk) ? hello.sdk : null;
+  if (sdk) {
+    const pkg = typeof sdk.package === 'string' ? sdk.package.trim() : '';
+    const ver = typeof sdk.version === 'string' ? sdk.version.trim() : '';
+    if (pkg || ver) lines.push(`- sdk: ${[pkg, ver].filter(Boolean).join(' ')}`);
+  }
+  if (typeof runtime.childScript === 'string' && runtime.childScript.trim()) {
+    lines.push(`- child-script: ${runtime.childScript.trim()}`);
+  }
+  const pid = runtime.pid ?? hello?.pid;
+  if (typeof pid === 'number' && Number.isFinite(pid) && pid > 0) {
+    lines.push(`- pid: ${pid}`);
+  }
+  return lines;
+};
+
+/** Diagnostic dump of how this process boots. Pi never lists leftover OpenCode PATH. */
+export const formatKernelResolutionLines = ({
+  kernel,
+  health,
+  opencodeResolution,
+  isMac,
+}: {
+  kernel: string;
+  health: OpenChamberHealthSnapshot | null;
+  opencodeResolution: OpenChamberOpencodeResolution | null;
+  isMac: boolean;
+}): string[] => {
+  if (kernel === 'opencode') {
+    if (!isMac) return [];
+
+  const lines: string[] = ['OpenCode resolution:'];
+  const launchDiagnostics = isRecord(health?.lastOpenCodeLaunchDiagnostics)
+    ? health.lastOpenCodeLaunchDiagnostics
+    : null;
+  const actualLaunchArgs = launchDiagnostics && Array.isArray(launchDiagnostics.args)
+    ? launchDiagnostics.args.filter((value): value is string => typeof value === 'string')
+    : [];
+  const configured =
+    opencodeResolution && typeof opencodeResolution.configured === 'string'
+      ? opencodeResolution.configured
+      : null;
+  const resolved =
+    opencodeResolution && typeof opencodeResolution.resolved === 'string'
+      ? opencodeResolution.resolved
+      : (health && typeof health.opencodeBinaryResolved === 'string' ? health.opencodeBinaryResolved : '');
+  const resolvedDir =
+    opencodeResolution && typeof opencodeResolution.resolvedDir === 'string'
+      ? opencodeResolution.resolvedDir
+      : '';
+  const source =
+    opencodeResolution && typeof opencodeResolution.source === 'string'
+      ? opencodeResolution.source
+      : (health && typeof health.opencodeBinarySource === 'string' ? health.opencodeBinarySource : '');
+  const configuredLaunchBinary =
+    opencodeResolution && typeof opencodeResolution.launchBinary === 'string'
+      ? opencodeResolution.launchBinary
+      : (health && typeof health.opencodeLaunchBinary === 'string' ? health.opencodeLaunchBinary : '');
+  const configuredLaunchWrapperType =
+    opencodeResolution && typeof opencodeResolution.launchWrapperType === 'string'
+      ? opencodeResolution.launchWrapperType
+      : (health && typeof health.opencodeLaunchWrapperType === 'string' ? health.opencodeLaunchWrapperType : '');
+  const configuredLaunchArgs =
+    opencodeResolution && Array.isArray(opencodeResolution.launchArgs)
+      ? opencodeResolution.launchArgs.filter((value): value is string => typeof value === 'string')
+      : (health && Array.isArray(health.opencodeLaunchArgs)
+        ? health.opencodeLaunchArgs.filter((value): value is string => typeof value === 'string')
+        : []);
+  const node =
+    opencodeResolution && typeof opencodeResolution.node === 'string'
+      ? opencodeResolution.node
+      : (health && typeof health.nodeBinaryResolved === 'string' ? health.nodeBinaryResolved : '');
+  const bun =
+    opencodeResolution && typeof opencodeResolution.bun === 'string'
+      ? opencodeResolution.bun
+      : (health && typeof health.bunBinaryResolved === 'string' ? health.bunBinaryResolved : '');
+  const detectedNow =
+    opencodeResolution && typeof opencodeResolution.detectedNow === 'string'
+      ? opencodeResolution.detectedNow
+      : '';
+  const detectedSourceNow =
+    opencodeResolution && typeof opencodeResolution.detectedSourceNow === 'string'
+      ? opencodeResolution.detectedSourceNow
+      : '';
+
+  if (configured !== null) {
+    lines.push(`- configured: ${configured.trim().length === 0 ? '(cleared)' : configured}`);
+  }
+  if (resolved) {
+    const dir = resolvedDir || (resolved.includes('/') ? resolved.split('/').slice(0, -1).join('/') || '/' : '');
+    lines.push(`- opencode: ${resolved}${dir ? ` (dir=${dir})` : ''}`);
+  } else {
+    lines.push('- opencode: (n/a)');
+  }
+  lines.push(`- source: ${source || '(n/a)'}`);
+  if (detectedNow) {
+    lines.push(`- detected-now: ${detectedNow}`);
+    lines.push(`- detected-source: ${detectedSourceNow || '(n/a)'}`);
+  }
+  if (launchDiagnostics) {
+    lines.push(`- launched-at: ${formatUnknown(launchDiagnostics.launchedAt)}`);
+    lines.push(`- launch: ${formatUnknown(launchDiagnostics.binary)} ${actualLaunchArgs.join(' ')}`.trim());
+    lines.push(`- cwd: ${formatUnknown(launchDiagnostics.cwd)}`);
+    lines.push(`- wrapper: ${formatUnknown(launchDiagnostics.wrapperType)}`);
+    lines.push(`- runtime: ${formatLaunchRuntime(formatUnknown(launchDiagnostics.wrapperType, ''), node, bun)}`);
+    lines.push(`- PATH entries: ${formatUnknown(launchDiagnostics.pathEntryCount, '(unknown)')}`);
+    lines.push(`- shell env: ${formatUnknown(launchDiagnostics.hasShellEnv, '(unknown)')} (${formatUnknown(launchDiagnostics.shellEnvKeysCount, '?')} keys)`);
+  } else {
+    lines.push(`- launch-binary: ${configuredLaunchBinary || '(n/a)'}`);
+    lines.push(`- launch-wrapper: ${configuredLaunchWrapperType || '(n/a)'}`);
+    lines.push(`- launch-args: ${configuredLaunchArgs.length ? configuredLaunchArgs.join(' ') : '(none)'}`);
+    lines.push(`- runtime: ${formatLaunchRuntime(configuredLaunchWrapperType || '', node, bun)}`);
+  }
+    return lines;
+  }
+  return formatPiNodeRuntimeLines(isRecord(health?.piNodeRuntime) ? health.piNodeRuntime : null);
 };
 
 const buildOpenCodeStatusReport = async (): Promise<string> => {
@@ -296,96 +432,22 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
     }
   }
 
+  const kernel = typeof openChamberHealth?.kernel === 'string' ? openChamberHealth.kernel.trim() : '';
   const isLikelyMac = /Mac OS X|Macintosh/.test(platform);
-  if (isLikelyMac) {
+  const resolutionLines = formatKernelResolutionLines({
+    kernel,
+    health: openChamberHealth,
+    opencodeResolution: openChamberOpencodeResolutionResult.data,
+    isMac: isLikelyMac,
+  });
+  if (resolutionLines.length) {
     lines.push('');
-    lines.push('Pi kernel resolution:');
-
-    const launchDiagnostics = isRecord(openChamberHealth?.lastOpenCodeLaunchDiagnostics)
-      ? openChamberHealth.lastOpenCodeLaunchDiagnostics
-      : null;
-    const actualLaunchArgs = launchDiagnostics && Array.isArray(launchDiagnostics.args)
-      ? launchDiagnostics.args.filter((value): value is string => typeof value === 'string')
-      : [];
-    const openChamberOpencodeResolution = openChamberOpencodeResolutionResult.data;
-    const configured =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.configured === 'string'
-        ? openChamberOpencodeResolution.configured
-        : null;
-    const resolved =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.resolved === 'string'
-        ? openChamberOpencodeResolution.resolved
-        : (openChamberHealth && typeof openChamberHealth.opencodeBinaryResolved === 'string' ? openChamberHealth.opencodeBinaryResolved : '');
-    const resolvedDir =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.resolvedDir === 'string'
-        ? openChamberOpencodeResolution.resolvedDir
-        : '';
-    const source =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.source === 'string'
-        ? openChamberOpencodeResolution.source
-        : (openChamberHealth && typeof openChamberHealth.opencodeBinarySource === 'string' ? openChamberHealth.opencodeBinarySource : '');
-    const configuredLaunchBinary =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.launchBinary === 'string'
-        ? openChamberOpencodeResolution.launchBinary
-        : (openChamberHealth && typeof openChamberHealth.opencodeLaunchBinary === 'string' ? openChamberHealth.opencodeLaunchBinary : '');
-    const configuredLaunchWrapperType =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.launchWrapperType === 'string'
-        ? openChamberOpencodeResolution.launchWrapperType
-        : (openChamberHealth && typeof openChamberHealth.opencodeLaunchWrapperType === 'string' ? openChamberHealth.opencodeLaunchWrapperType : '');
-    const configuredLaunchArgs =
-      openChamberOpencodeResolution && Array.isArray(openChamberOpencodeResolution.launchArgs)
-        ? openChamberOpencodeResolution.launchArgs.filter((value): value is string => typeof value === 'string')
-        : (openChamberHealth && Array.isArray(openChamberHealth.opencodeLaunchArgs)
-          ? openChamberHealth.opencodeLaunchArgs.filter((value): value is string => typeof value === 'string')
-          : []);
-    const node =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.node === 'string'
-        ? openChamberOpencodeResolution.node
-        : (openChamberHealth && typeof openChamberHealth.nodeBinaryResolved === 'string' ? openChamberHealth.nodeBinaryResolved : '');
-    const bun =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.bun === 'string'
-        ? openChamberOpencodeResolution.bun
-        : (openChamberHealth && typeof openChamberHealth.bunBinaryResolved === 'string' ? openChamberHealth.bunBinaryResolved : '');
-    const detectedNow =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.detectedNow === 'string'
-        ? openChamberOpencodeResolution.detectedNow
-        : '';
-    const detectedSourceNow =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.detectedSourceNow === 'string'
-        ? openChamberOpencodeResolution.detectedSourceNow
-        : '';
-
-    if (configured !== null) {
-      lines.push(`- configured: ${configured.trim().length === 0 ? '(cleared)' : configured}`);
-    }
-
-    if (resolved) {
-      const dir = resolvedDir || (resolved.includes('/') ? resolved.split('/').slice(0, -1).join('/') || '/' : '');
-      lines.push(`- opencode: ${resolved}${dir ? ` (dir=${dir})` : ''}`);
-    } else {
-      lines.push('- opencode: (n/a)');
-    }
-
-    lines.push(`- source: ${source || '(n/a)'}`);
-    if (detectedNow) {
-      lines.push(`- detected-now: ${detectedNow}`);
-      lines.push(`- detected-source: ${detectedSourceNow || '(n/a)'}`);
-    }
-    if (launchDiagnostics) {
-      lines.push(`- launched-at: ${formatUnknown(launchDiagnostics.launchedAt)}`);
-      lines.push(`- launch: ${formatUnknown(launchDiagnostics.binary)} ${actualLaunchArgs.join(' ')}`.trim());
-      lines.push(`- cwd: ${formatUnknown(launchDiagnostics.cwd)}`);
-      lines.push(`- wrapper: ${formatUnknown(launchDiagnostics.wrapperType)}`);
-      lines.push(`- runtime: ${formatLaunchRuntime(formatUnknown(launchDiagnostics.wrapperType, ''), node, bun)}`);
-      lines.push(`- PATH entries: ${formatUnknown(launchDiagnostics.pathEntryCount, '(unknown)')}`);
-      lines.push(`- shell env: ${formatUnknown(launchDiagnostics.hasShellEnv, '(unknown)')} (${formatUnknown(launchDiagnostics.shellEnvKeysCount, '?')} keys)`);
-    } else {
-      lines.push(`- launch-binary: ${configuredLaunchBinary || '(n/a)'}`);
-      lines.push(`- launch-wrapper: ${configuredLaunchWrapperType || '(n/a)'}`);
-      lines.push(`- launch-args: ${configuredLaunchArgs.length ? configuredLaunchArgs.join(' ') : '(none)'}`);
-      lines.push(`- runtime: ${formatLaunchRuntime(configuredLaunchWrapperType || '', node, bun)}`);
-    }
-    if (!openChamberOpencodeResolution && openChamberOpencodeResolutionResult.error) {
+    lines.push(...resolutionLines);
+    if (
+      kernel !== 'pi'
+      && !openChamberOpencodeResolutionResult.data
+      && openChamberOpencodeResolutionResult.error
+    ) {
       lines.push(`- resolution-endpoint: ${openChamberOpencodeResolutionResult.error}`);
     }
   }

@@ -71,7 +71,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     const sessionID = req.params.sessionID;
     const directory = resolveDirectory(req);
     if (typeof host.ensureSession === 'function') {
-      return host.ensureSession(sessionID, directory);
+      await host.ensureSession(sessionID, directory);
     }
     return host.getSession(sessionID);
   };

@@ -2970,10 +2970,21 @@ export const createPiHost = ({
     return run;
   };
 
+  const refreshConversationTitle = (record) => {
+    if (!maybeApplyConversationTitle(record)) return false;
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.updated',
+      properties: { info: record.info },
+    });
+    return true;
+  };
+
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
     if (existing) {
       syncPiGoalMarker(existing);
+      refreshConversationTitle(existing);
       return existing;
     }
     if (mock) {
@@ -3287,7 +3298,9 @@ export const createPiHost = ({
       return { ok: true, directory: cwd };
     },
     getSession(sessionID) {
-      return getRecord(sessionID);
+      const record = getRecord(sessionID);
+      refreshConversationTitle(record);
+      return record;
     },
     async ensureSession(sessionID, directory) {
       return ensureRecord(sessionID, directory);
@@ -3295,13 +3308,7 @@ export const createPiHost = ({
     listSessions(directory) {
       const items = Array.from(sessions.values()).filter((record) => recordMatchesDirectory(record, directory));
       for (const record of items) {
-        if (maybeApplyConversationTitle(record)) {
-          emit(record.directory, {
-            id: createEventId(),
-            type: 'session.updated',
-            properties: { info: record.info },
-          });
-        }
+        refreshConversationTitle(record);
       }
       return items;
     },

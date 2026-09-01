@@ -43,7 +43,7 @@ import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { useDeviceInfo, useTabletStandalonePwaRuntime } from '@/lib/device';
-import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
+import { resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom, shouldPersistSessionTitle } from '@/lib/sessionTitle';
 import { cn, hasModifier } from '@/lib/utils';
 import { McpDropdownContent } from '@/components/mcp/McpDropdown';
 import { McpIcon } from '@/components/icons/McpIcon';
@@ -1164,11 +1164,18 @@ export const Header: React.FC<HeaderProps> = ({
     if (!currentSessionId) {
       return activeProjectLabel ?? 'Pichamber';
     }
-    return resolveSessionDisplayTitle(
-      currentSession?.title,
+    return resolveSessionDisplayTitleFrom(
+      [currentLiveSession?.title, currentGlobalSession?.title, currentSession?.title],
       t('sessions.sidebar.session.untitled'),
     );
-  }, [activeProjectLabel, currentSession?.title, currentSessionId, t]);
+  }, [
+    activeProjectLabel,
+    currentGlobalSession?.title,
+    currentLiveSession?.title,
+    currentSession?.title,
+    currentSessionId,
+    t,
+  ]);
   const headerDirectoryStore = useDirectoryStore(openDirectory || undefined, { bootstrap: false });
   const sync = useSync();
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);
@@ -1207,19 +1214,19 @@ export const Header: React.FC<HeaderProps> = ({
 
   const beginHeaderSessionRename = React.useCallback(() => {
     if (!currentSessionId) return;
-    setHeaderSessionTitleDraft(currentSession?.title?.trim() || currentSessionTitle);
+    setHeaderSessionTitleDraft(currentSessionTitle);
     setIsRenamingHeaderSession(true);
-  }, [currentSession?.title, currentSessionId, currentSessionTitle]);
+  }, [currentSessionId, currentSessionTitle]);
   beginHeaderSessionRenameRef.current = beginHeaderSessionRename;
 
   const saveHeaderSessionRename = React.useCallback(async () => {
     if (!currentSessionId) return;
-    const title = headerSessionTitleDraft.trim();
-    if (title && title !== currentSession?.title?.trim()) {
-      await updateSessionTitle(currentSessionId, title);
+    const untitledLabel = t('sessions.sidebar.session.untitled');
+    if (shouldPersistSessionTitle(headerSessionTitleDraft, currentSession?.title, untitledLabel)) {
+      await updateSessionTitle(currentSessionId, headerSessionTitleDraft.trim());
     }
     setIsRenamingHeaderSession(false);
-  }, [currentSession?.title, currentSessionId, headerSessionTitleDraft, updateSessionTitle]);
+  }, [currentSession?.title, currentSessionId, headerSessionTitleDraft, t, updateSessionTitle]);
 
   React.useEffect(() => {
     if (!isRenamingHeaderSession) return;

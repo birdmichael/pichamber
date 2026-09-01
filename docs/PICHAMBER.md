@@ -76,7 +76,7 @@ Useful for UI/bootstrap work. Prompts stream a canned reply and still exercise s
 
 ## Health
 
-`GET /health` reports which kernel is serving the process. It does **not** pretend OpenCode is running when the kernel is Pi.
+`GET /health` reports which kernel is serving the process. It does **not** pretend OpenCode is running when the kernel is Pi. On Pi it also omits leftover OpenCode binary-resolution fields (`opencodeBinaryResolved`, launch spec). Help → Diagnostics lists the bundled Pi Node child (`piNodeRuntime`), not `~/.opencode/bin/opencode`.
 
 On Pi (`OPENCHAMBER_KERNEL=pi`, the default):
 
