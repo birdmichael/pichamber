@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
 - Desktop: idle sessions can move into an existing worktree from the session menu. A confirm dialog appears when the source has uncommitted changes; cancel leaves everything in place, and a failed move rolls the session back.
 - Web: a notification with no title says Pichamber, not OpenChamber.
 - Multi-run: a group can include more than five models. There is no upper cap.

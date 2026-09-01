@@ -1920,3 +1920,52 @@ html.desktop-runtime [class*="cursor-pointer"] {
 html.desktop-runtime .markdown-content [data-openchamber-file-link="true"] {
   cursor: default;
 }
+
+/* Header session tabs: thin separators between inactive neighbours, hidden
+   around the active or hovered tab (mirrors the titlebar tab language). */
+.session-tab-slot {
+  position: relative;
+}
+.session-tab-slot:not(:first-child):not([data-active='true'])::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  inset-inline-start: -2.75px;
+  width: 1.5px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.session-tab-slot[data-active='true'] + .session-tab-slot::before,
+.session-tab-slot:not([data-active='true']):hover::before,
+.session-tab-slot:not([data-active='true']):hover + .session-tab-slot::before {
+  display: none;
+}
+
+/* Header session tabs scroller: never show a scrollbar (it shifts the header
+   content vertically); overflow is communicated by the edge fades. */
+.session-tabs-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.session-tabs-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Session tab titles: fade out instead of "..." — the ellipsis reads as
+   clutter next to the tab's status dot and hover controls. Short titles
+   never reach the fade zone (the span spans the tab, not the text). The
+   fade belongs to the resting state only: while the tab is hovered or its
+   controls are open, the title clips hard so the smear never sits next to
+   the menu/close/rename controls. */
+.session-tab-title {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
+}
+.session-tab:hover .session-tab-title,
+.session-tab[data-controls-open='true'] .session-tab-title {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
