@@ -83,6 +83,16 @@ button,
   color: var(--surface-foreground);
 }
 
+/* Quoted file/chat fragment kept visibly highlighted while its comment input is
+   open (the native selection collapses once the input takes focus). */
+.oc-chat-comment-rect {
+  background-color: var(--interactive-selection);
+}
+
+:root.light .oc-chat-comment-rect {
+  background-color: color-mix(in srgb, var(--interactive-border-focus) 18%, transparent);
+}
+
 .oc-cm-selected-line {
   background: color-mix(in srgb, var(--primary-base) 22%, transparent);
 }

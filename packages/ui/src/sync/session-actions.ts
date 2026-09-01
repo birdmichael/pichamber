@@ -16,6 +16,8 @@ import { useGlobalSessionStatusStore } from "./global-session-status"
 import { registerSessionDirectory } from "./sync-refs"
 import { recordSendFailure } from "./send-failure-log"
 import { isSyntheticPart } from "@/lib/messages/synthetic"
+import { draftFromContextPayload, readContextPart, type ContextCarrierPart, type ContextPartMetadata } from "@/lib/messages/contextParts"
+import { useInlineCommentDraftStore, type InlineCommentDraftTarget } from "@/stores/useInlineCommentDraftStore"
 import { materializeSessionSnapshots } from "./materialization"
 import { stripMessageDiffSnapshots, stripSessionDiffSnapshots } from "./sanitize"
 import { sessionEvents } from "@/lib/sessionEvents"
@@ -537,6 +539,32 @@ function restoreFilePartsToInput(fileParts: Array<Record<string, unknown>>): voi
     if (url) {
       useInputStore.getState().addRestoredAttachment({ url, mimeType: mime, filename })
     }
+  }
+}
+
+/**
+ * Put a message's attached context (review comments, quotes, terminal
+ * selections, annotations) back on the composer chips.
+ *
+ * Context rides out as synthetic parts carrying structured metadata, so a
+ * forked message can be rebuilt into the drafts it came from. Without this
+ * the context is simply gone: the message is pulled back into the composer
+ * with its text and files, but the comments attached to it are not.
+ *
+ * The target's existing drafts are replaced, matching how text and file
+ * attachments are restored — the composer ends up as the message was sent.
+ */
+function restoreContextPartsToInput(
+  parts: readonly ContextCarrierPart[],
+  target: InlineCommentDraftTarget,
+): void {
+  const store = useInlineCommentDraftStore.getState()
+  store.clearDrafts(target)
+  for (const part of parts) {
+    const payload = readContextPart(part)
+    if (!payload) continue
+    const draft = draftFromContextPayload(payload)
+    if (draft) store.addDraft(target, draft)
   }
 }
 
@@ -1409,6 +1437,7 @@ export async function optimisticSend(input: {
   agent?: string
   directory?: string | null
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
+  additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
@@ -1472,15 +1501,38 @@ export async function optimisticSend(input: {
 
   const messageID = ascendingId("msg")
   input.onMessageID?.(messageID)
-  const textPartId = ascendingId("prt")
 
-  const optimisticParts: Part[] = [
-    { id: textPartId, type: "text", text: input.content } as Part,
-  ]
+  const optimisticParts: Part[] = []
+  if (input.content.trim()) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
+  }
+  for (const part of input.additionalParts ?? []) {
+    if (typeof part.text === "string" && part.text.length > 0) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "text",
+        text: part.text,
+        ...(part.synthetic ? { synthetic: true } : {}),
+        ...(part.metadata ? { metadata: part.metadata } : {}),
+      } as Part)
+    }
+    for (const file of part.files ?? []) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "file",
+        mime: file.mime,
+        url: file.url,
+        filename: file.filename,
+      } as Part)
+    }
+  }
   if (input.files) {
     for (const f of input.files) {
       optimisticParts.push({ id: ascendingId("prt"), type: "file", mime: f.mime, url: f.url, filename: f.filename } as Part)
     }
+  }
+  if (optimisticParts.length === 0) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
   }
 
   const optimisticMessage = {
@@ -2152,6 +2204,11 @@ export async function forkFromMessage(sessionId: string, messageId: string): Pro
   }
   // Clear existing attachments and restore file parts from the forked message.
   restoreFilePartsToInput(fileParts)
+  // The forked session is a fresh draft target, so the attached context of the
+  // forked message follows the text into its composer.
+  if (directory) {
+    restoreContextPartsToInput(parts, { directory, sessionKey: forkedSession.id })
+  }
 }
 
 export async function fetchMessagesForSession(sessionID: string, directory?: string | null): Promise<void> {

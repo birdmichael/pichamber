@@ -6,6 +6,7 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useContextStore } from '@/stores/contextStore';
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { parseAgentMentions } from '@/lib/messages/agentMentions';
+import { contextPayloadFromDraft, createContextPart } from '@/lib/messages/contextParts';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { getDirectoryState } from '@/sync/sync-refs';
 import { useDirectorySync } from '@/sync/sync-context';
@@ -91,10 +92,15 @@ export const buildQueuedAutoSendPayload = (
     isPiKernel: options.isPiKernel,
   });
 
+  const additionalParts = (queued.contextDrafts ?? []).map((draft) => (
+    createContextPart(contextPayloadFromDraft(draft))
+  ));
+
   return {
     queuedMessageId: queued.id,
     primaryText: sanitizedText,
     primaryAttachments: queued.attachments ?? [],
+    additionalParts: additionalParts.length > 0 ? additionalParts : undefined,
     agentMentionName: mention?.name,
     sendConfig: queued.sendConfig,
   };
@@ -120,7 +126,7 @@ export const sendQueuedAutoSendPayload = (
     resolved.agent,
     payload.primaryAttachments,
     payload.agentMentionName,
-    undefined,
+    payload.additionalParts,
     resolved.variant,
     'normal',
     { target },

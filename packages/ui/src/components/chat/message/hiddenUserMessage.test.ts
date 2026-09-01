@@ -19,6 +19,28 @@ const userMessage = (parts: Part[]): { info: Message; parts: Part[] } => ({
 });
 
 describe('user message visibility', () => {
+    test('keeps context-only user messages visible', () => {
+        const entry = userMessage([{
+            type: 'text',
+            synthetic: true,
+            text: 'Comment on `src/app.ts` lines 3-5:\n```ts\nx\n```\n\nfix',
+            metadata: {
+                pichamberContext: {
+                    kind: 'code-comment',
+                    source: 'file',
+                    fileLabel: 'src/app.ts',
+                    startLine: 3,
+                    endLine: 5,
+                    language: 'ts',
+                    code: 'x',
+                    text: 'fix',
+                },
+            },
+        } as unknown as Part]);
+        expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);
+        expect(normalizeUserDisplayParts(entry.parts)).toHaveLength(1);
+    });
+
     test('hides user messages that have only an empty text shell', () => {
         const entry = userMessage([{ type: 'text', text: '' } as Part]);
         expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(true);

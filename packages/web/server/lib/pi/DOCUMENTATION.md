@@ -757,7 +757,14 @@ update that same part.
 (`mimeType` + `data`, or a `source` payload) becomes a facade `file` part
 (`mime` + `url: data:...`). `promptAsync` keeps those file/image parts on
 the user message and forwards Pi-native `{ type: "image", data, mimeType }`
-to `session.prompt`. Assistant `provider` / `model` / `usage` copy onto
+to `session.prompt`. Synthetic text parts with `metadata.pichamberContext`
+(or leftover `openchamberContext`) stay on the user bubble as structured
+context; other synthetic text (magic-prompt instructions) is sent to Pi
+but omitted from the bubble. Those context parts are also remembered on
+`pichamber.metadata.userContext` (message id, authored text, structured
+parts) via `persistSessionMetadata`. Hydrate reconstructs the cards from
+that entry: Pi jsonl only has the concatenated `session.prompt` string, so
+do not call `persistFacadeMessages` on a live transcript to rewrite it. Assistant `provider` / `model` / `usage` copy onto
 facade `info` as `providerID`, `modelID`, `model`, `tokens`, and `cost`
 (the same mapping live SSE uses in `mapPiUsageToOpenCodeTokens`). Missing
 usage stays omitted; do not invent numbers or a hardcoded model.

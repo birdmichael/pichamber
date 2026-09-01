@@ -1,6 +1,7 @@
 import type { Part } from '@opencode-ai/sdk/v2';
 
 import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
+import { readContextPart } from '@/lib/messages/contextParts';
 import { normalizePath } from '@/lib/pathNormalization';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 
@@ -8,6 +9,7 @@ import { extractTextContent, isEmptyTextPart } from './partUtils';
 
 const GITHUB_ISSUE_CONTEXT_PREFIX = 'GitHub issue context (JSON)';
 const GITHUB_PR_CONTEXT_PREFIX = 'GitHub pull request context (JSON)';
+const LINEAR_ISSUE_CONTEXT_PREFIX = 'Linear issue context (JSON)';
 
 type GitHubIssueContextPayload = {
     issue?: {
@@ -20,6 +22,14 @@ type GitHubIssueContextPayload = {
 type GitHubPrContextPayload = {
     pr?: {
         number?: unknown;
+        title?: unknown;
+        url?: unknown;
+    };
+};
+
+type LinearIssueContextPayload = {
+    issue?: {
+        identifier?: unknown;
         title?: unknown;
         url?: unknown;
     };
@@ -84,6 +94,24 @@ const buildGitHubAttachmentPart = (text: string): Part | null => {
         } as Part;
     }
 
+    const linearPayload = parseSyntheticJsonPayload<LinearIssueContextPayload>(text, LINEAR_ISSUE_CONTEXT_PREFIX);
+    if (linearPayload) {
+        const issue = linearPayload.issue;
+        const identifier = issue?.identifier;
+        const title = issue?.title;
+        const url = issue?.url;
+        if (typeof identifier !== 'string' || identifier.trim().length === 0 || typeof title !== 'string' || typeof url !== 'string') {
+            return null;
+        }
+
+        return {
+            type: 'file',
+            mime: 'application/vnd.openchamber.linear-issue-link',
+            filename: `${identifier}: ${title}`,
+            url,
+        } as Part;
+    }
+
     return null;
 };
 
@@ -137,6 +165,7 @@ export const normalizeUserDisplayParts = (parts: Part[], options?: {
             const synthetic = (part as { synthetic?: boolean }).synthetic === true;
             if (!synthetic) return true;
             if (part.type !== 'text') return false;
+            if (readContextPart(part)) return true;
             const text = (part as { text?: unknown }).text;
             if (typeof text !== 'string') {
                 return false;
@@ -145,7 +174,8 @@ export const normalizeUserDisplayParts = (parts: Part[], options?: {
             const normalizedText = text.trimStart();
             return shouldKeepSyntheticUserText(text, planModeEnabled)
                 || normalizedText.startsWith(GITHUB_ISSUE_CONTEXT_PREFIX)
-                || normalizedText.startsWith(GITHUB_PR_CONTEXT_PREFIX);
+                || normalizedText.startsWith(GITHUB_PR_CONTEXT_PREFIX)
+                || normalizedText.startsWith(LINEAR_ISSUE_CONTEXT_PREFIX);
         })
         .map((part) => {
             const rawPart = part as Record<string, unknown>;
@@ -157,6 +187,30 @@ export const normalizeUserDisplayParts = (parts: Part[], options?: {
                 const synthetic = rawPart.synthetic === true;
 
                 if (synthetic) {
+                    const contextPayload = readContextPart(part);
+                    if (contextPayload?.kind === 'github-issue' || contextPayload?.kind === 'github-pr' || contextPayload?.kind === 'linear-issue') {
+                        if (contextPayload.kind === 'linear-issue') {
+                            return {
+                                type: 'file',
+                                mime: 'application/vnd.openchamber.linear-issue-link',
+                                filename: `${contextPayload.identifier}: ${contextPayload.title}`,
+                                url: contextPayload.url,
+                            } as Part;
+                        }
+                        return {
+                            type: 'file',
+                            mime: contextPayload.kind === 'github-issue'
+                                ? 'application/vnd.github.issue-link'
+                                : 'application/vnd.github.pull-request-link',
+                            filename: contextPayload.kind === 'github-issue'
+                                ? `Issue #${contextPayload.number}: ${contextPayload.title}`
+                                : `PR #${contextPayload.number}: ${contextPayload.title}`,
+                            url: contextPayload.url,
+                        } as Part;
+                    }
+                    if (contextPayload) {
+                        return part;
+                    }
                     const attachmentPart = buildGitHubAttachmentPart(text);
                     if (attachmentPart) {
                         return attachmentPart;

@@ -13,6 +13,8 @@ import {
   restoreGoalCommandPlacement,
   stampGoalCommandChronology,
   persistFacadeMessages,
+  rememberUserContext,
+  applyPersistedUserContext,
   piMessagesFromFacadeEntry,
   readPiCodingAgentVersion,
   applySessionRuntimeFromEntries,
@@ -1026,6 +1028,69 @@ describe('session-transfer', () => {
       url: 'data:image/png;base64,AAAA',
     });
     expect(messages.some((entry) => entry.parts.some((part) => String(part.text || '').includes('orphan dump')))).toBe(false);
+  });
+
+  it('round-trips structured context through session metadata after string hydrate', () => {
+    const metadata = rememberUserContext({}, {
+      messageID: 'msg_live',
+      authoredText: 'please fix',
+      parts: [{
+        text: 'Comment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this',
+        metadata: {
+          pichamberContext: {
+            kind: 'code-comment',
+            source: 'file',
+            fileLabel: 'src/app.ts',
+            startLine: 3,
+            endLine: 5,
+            language: 'ts',
+            code: 'const x = 1;',
+            text: 'fix this',
+          },
+        },
+      }],
+    });
+    expect(metadata.pichamber.userContext).toHaveLength(1);
+
+    const hydrated = [{
+      info: { id: 'pi_native', role: 'user', sessionID: 'ses_1' },
+      parts: [{
+        type: 'text',
+        text: 'please fix\nComment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this',
+        messageID: 'pi_native',
+      }],
+    }];
+    const applied = applyPersistedUserContext(hydrated, metadata);
+    expect(applied[0].parts).toHaveLength(2);
+    expect(applied[0].parts[0]).toMatchObject({ type: 'text', text: 'please fix' });
+    expect(applied[0].parts[1]).toMatchObject({
+      type: 'text',
+      synthetic: true,
+      metadata: {
+        pichamberContext: { kind: 'code-comment', fileLabel: 'src/app.ts' },
+      },
+    });
+    expect(applyPersistedUserContext(applied, metadata)[0].parts).toHaveLength(2);
+  });
+
+  it('preserves structured context metadata on user text parts', () => {
+    const metadata = {
+      pichamberContext: { kind: 'chat-quote', quote: 'hi', text: 'why' },
+    };
+    const messages = piMessagesFromFacadeEntry({
+      info: { role: 'user', time: { created: 1 } },
+      parts: [{ type: 'text', text: 'quoted', synthetic: true, metadata }],
+    });
+    expect(messages).toEqual([{
+      role: 'user',
+      timestamp: 1,
+      content: [{
+        type: 'text',
+        text: 'quoted',
+        synthetic: true,
+        metadata,
+      }],
+    }]);
   });
 
   it('maps facade text, tool, and image parts to Pi appendMessage payloads', () => {

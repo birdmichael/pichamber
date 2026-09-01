@@ -15,6 +15,8 @@ import {
 } from '@/lib/messages/inlineMessageLinks';
 import { prepareUserMarkdownContent, SKILL_TOKEN_PATTERN } from './userTextPartContent';
 import { extractTerminalContexts } from '@/lib/messages/terminalContext';
+import { readContextPart } from '@/lib/messages/contextParts';
+import UserContextPart from './UserContextPart';
 import {
     USER_TEXT_COLLAPSED_CLASS,
     USER_TEXT_EXPANDED_CLASS,
@@ -37,6 +39,7 @@ const normalizeUserMessageRenderingMode = (mode: unknown): 'markdown' | 'plain' 
 };
 
 const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMention }) => {
+    const contextPayload = React.useMemo(() => readContextPart(part), [part]);
     const partWithText = part as PartWithText;
     const rawText = partWithText.text;
     const serializedText = typeof rawText === 'string' ? rawText : partWithText.content || partWithText.value || '';
@@ -233,6 +236,16 @@ const UserTextPart: React.FC<UserTextPartProps> = ({ part, messageId, agentMenti
             ];
         });
     }, [agentMention, openSkill, skillByName, textContent]);
+
+    if (contextPayload) {
+        return (
+            <UserContextPart
+                payload={contextPayload}
+                collapsed={isCollapsed}
+                onExpand={() => setIsExpanded(true)}
+            />
+        );
+    }
 
     if ((!textContent || textContent.trim().length === 0) && terminalContextState.contexts.length === 0) {
         return null;

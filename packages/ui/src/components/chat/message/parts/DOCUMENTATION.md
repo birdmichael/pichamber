@@ -63,6 +63,11 @@ Use this doc when you ask an agent to change tool/header/description behavior.
 - `JustificationBlock.tsx`
   - Justification block wrapper over `ReasoningTimelineBlock`.
 
+- `UserContextPart.tsx`
+  - Renders user-attached context (code comments, quotes, terminal
+    selections, annotations, PR context) as transcript cards. Structured
+    payloads live in `packages/ui/src/lib/messages/contextParts.ts`.
+
 ## Current important behavior
 
 - Assistant markdown treats raw HTML as inert visible text. The final generated

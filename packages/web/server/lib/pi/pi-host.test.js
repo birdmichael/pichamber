@@ -1603,6 +1603,71 @@ describe('createPiHost', () => {
     host.dispose();
   });
 
+  it('promptAsync keeps structured context parts on the user bubble', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = { text, options };
+      return originalPrompt(text, options);
+    };
+
+    const contextText = 'Comment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this';
+    await host.promptAsync(record.id, {
+      parts: [
+        { type: 'text', text: 'please fix' },
+        {
+          type: 'text',
+          text: contextText,
+          synthetic: true,
+          metadata: {
+            pichamberContext: {
+              kind: 'code-comment',
+              source: 'file',
+              fileLabel: 'src/app.ts',
+              startLine: 3,
+              endLine: 5,
+              language: 'ts',
+              code: 'const x = 1;',
+              text: 'fix this',
+            },
+          },
+        },
+      ],
+    });
+
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts.map((part) => part.type)).toEqual(['text', 'text']);
+    expect(user.parts[0].text).toBe('please fix');
+    expect(user.parts[1]).toMatchObject({
+      type: 'text',
+      synthetic: true,
+      text: contextText,
+      metadata: {
+        pichamberContext: {
+          kind: 'code-comment',
+          fileLabel: 'src/app.ts',
+        },
+      },
+    });
+    expect(host.getSession(record.id).info.title).toBe('please fix');
+    expect(forwarded.text).toContain('please fix');
+    expect(forwarded.text).toContain(contextText);
+    const persisted = host.getSession(record.id).info.metadata?.pichamber?.userContext;
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      messageID: user.info.id,
+      authoredText: 'please fix',
+    });
+    const entries = record.piSession.sessionManager.getEntries();
+    expect(entries.some((entry) => (
+      entry?.customType === 'pichamber.metadata'
+      && entry?.data?.pichamber?.userContext?.[0]?.authoredText === 'please fix'
+    ))).toBe(true);
+    host.dispose();
+  });
+
   it('promptAsync persists a Pi-native image part as a facade file part', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Native image' });

@@ -15,6 +15,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { createMessageQueueTarget, getMessageQueueKey, useMessageQueueStore, type MessageQueueTarget, type QueuedMessage } from '@/stores/messageQueueStore';
+import { useInlineCommentDraftStore } from '@/stores/useInlineCommentDraftStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useInputStore } from '@/sync/input-store';
 import { useI18n } from '@/lib/i18n';
@@ -155,6 +156,12 @@ export const QueuedMessageChips = memo(({ onEditMessage, onSendMessage }: Queued
             if (popped.attachments && popped.attachments.length > 0) {
                 const currentAttachments = useInputStore.getState().attachedFiles;
                 useInputStore.getState().setAttachedFiles([...currentAttachments, ...popped.attachments]);
+            }
+            if (popped.contextDrafts && popped.contextDrafts.length > 0) {
+                useInlineCommentDraftStore.getState().restoreDrafts(
+                    { directory: target.directory, sessionKey: target.sessionId },
+                    popped.contextDrafts,
+                );
             }
             onEditMessage(popped.content, popped.attachments);
         }

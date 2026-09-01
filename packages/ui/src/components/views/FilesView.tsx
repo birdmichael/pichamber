@@ -69,7 +69,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useGitStatus } from '@/stores/useGitStore';
 import { useConfigStore } from '@/stores/useConfigStore';
-import { buildCodeMirrorCommentWidgets, normalizeLineRange, useInlineCommentController } from '@/components/comments';
+import { buildCodeMirrorCommentWidgets, FilePreviewCommentMenu, normalizeLineRange, useInlineCommentController } from '@/components/comments';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
 import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
@@ -4079,6 +4079,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                   mdPreviewContainerRef.current = node;
                 }}
               >
+                <FilePreviewCommentMenu
+                  containerRef={mdPreviewContainerRef}
+                  filePath={selectedFile.path}
+                  fileContent={fileContent}
+                />
               {fileContent.length > 500 * 1024 && (
                 <div className="mb-3 rounded-md border border-status-warning/20 bg-status-warning/10 px-3 py-2 text-sm text-status-warning">
                   {t('filesView.warning.largeFilePreviewLimited', { sizeKb: Math.round(fileContent.length / 1024) })}
@@ -4465,6 +4470,13 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                 mdFullscreenPreviewContainerRef.current = node;
               }}
             >
+              {selectedFile ? (
+                <FilePreviewCommentMenu
+                  containerRef={mdFullscreenPreviewContainerRef}
+                  filePath={selectedFile.path}
+                  fileContent={fileContent}
+                />
+              ) : null}
               {fileContent.length > 500 * 1024 && (
                   <div className="mb-3 rounded-md border border-status-warning/20 bg-status-warning/10 px-3 py-2 text-sm text-status-warning">
                     {t('filesView.warning.largeFilePreviewLimited', { sizeKb: Math.round(fileContent.length / 1024) })}

@@ -545,13 +545,18 @@ const partsFromPiContent = (content, sessionID, messageID) => {
       continue;
     }
     if (typeof item.text === 'string') {
-      parts.push({
+      const textPart = {
         id: createPartId(),
         sessionID,
         messageID,
         type: 'text',
         text: item.text,
-      });
+      };
+      if (item.synthetic === true) textPart.synthetic = true;
+      if (item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)) {
+        textPart.metadata = item.metadata;
+      }
+      parts.push(textPart);
     }
   }
   return parts;
@@ -595,7 +600,12 @@ export const piMessagesFromFacadeEntry = (entry) => {
       continue;
     }
     if (part.type === 'text' && typeof part.text === 'string') {
-      content.push({ type: 'text', text: part.text });
+      const item = { type: 'text', text: part.text };
+      if (part.synthetic === true) item.synthetic = true;
+      if (part.metadata && typeof part.metadata === 'object' && !Array.isArray(part.metadata)) {
+        item.metadata = part.metadata;
+      }
+      content.push(item);
       continue;
     }
     if (part.type === 'tool') {
@@ -635,6 +645,125 @@ export const persistFacadeMessages = (manager, messages) => {
     }
   }
   return true;
+};
+
+const userContextPartsFromUnknown = (value) => {
+  if (!Array.isArray(value)) return [];
+  const parts = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.text !== 'string' || !item.text.trim()) continue;
+    const metadata = isRecord(item.metadata) ? item.metadata : null;
+    const context = metadata?.pichamberContext ?? metadata?.openchamberContext;
+    if (!isRecord(context) || typeof context.kind !== 'string') continue;
+    parts.push({ text: item.text, metadata });
+  }
+  return parts;
+};
+
+const readUserContextList = (metadata) => {
+  const raw = isRecord(metadata) ? metadata.pichamber?.userContext : undefined;
+  if (!Array.isArray(raw)) return [];
+  const list = [];
+  for (const item of raw) {
+    if (!isRecord(item)) continue;
+    const messageID = asTrimmedString(item.messageID);
+    const authoredText = typeof item.authoredText === 'string' ? item.authoredText : '';
+    const parts = userContextPartsFromUnknown(item.parts);
+    if (!messageID && parts.length === 0) continue;
+    list.push({ messageID, authoredText, parts });
+  }
+  return list;
+};
+
+const facadePartsHaveContext = (parts) => (
+  (Array.isArray(parts) ? parts : []).some((part) => {
+    const metadata = part?.metadata;
+    if (!isRecord(metadata)) return false;
+    return Boolean(metadata.pichamberContext || metadata.openchamberContext);
+  })
+);
+
+const joinedUserText = (parts) => (
+  (Array.isArray(parts) ? parts : [])
+    .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
+    .join('')
+);
+
+const userContextMatches = (entry, stored) => {
+  const id = asTrimmedString(entry?.info?.id);
+  if (stored.messageID && id && stored.messageID === id) return true;
+  const text = joinedUserText(entry?.parts);
+  if (!text) return false;
+  if (stored.authoredText && !text.includes(stored.authoredText)) return false;
+  return stored.parts.every((part) => text.includes(part.text));
+};
+
+/**
+ * Remember structured user-context parts on `pichamber.metadata`. Pi jsonl
+ * stores `session.prompt(text)` as one string, so cards cannot round-trip
+ * through the transcript. Do not call persistFacadeMessages on a live
+ * session — appendMessage would duplicate the turn.
+ */
+export const rememberUserContext = (metadata, entry) => {
+  const messageID = asTrimmedString(entry?.messageID);
+  const parts = userContextPartsFromUnknown(entry?.parts);
+  if (!messageID || parts.length === 0) {
+    return isRecord(metadata) ? metadata : {};
+  }
+  const authoredText = typeof entry?.authoredText === 'string' ? entry.authoredText : '';
+  const previous = isRecord(metadata) ? metadata : {};
+  const pichamber = isRecord(previous.pichamber) ? previous.pichamber : {};
+  const existing = readUserContextList(previous).filter((item) => item.messageID !== messageID);
+  return {
+    ...previous,
+    pichamber: {
+      ...pichamber,
+      userContext: [...existing, { messageID, authoredText, parts }],
+    },
+  };
+};
+
+export const applyPersistedUserContext = (messages, metadata) => {
+  const stored = readUserContextList(metadata);
+  if (stored.length === 0 || !Array.isArray(messages)) return messages;
+  const used = new Set();
+  return messages.map((entry) => {
+    if (entry?.info?.role !== 'user') return entry;
+    const parts = Array.isArray(entry.parts) ? entry.parts : [];
+    if (facadePartsHaveContext(parts)) return entry;
+    const matchIndex = stored.findIndex((item, index) => (
+      !used.has(index) && userContextMatches(entry, item)
+    ));
+    if (matchIndex < 0) return entry;
+    used.add(matchIndex);
+    const item = stored[matchIndex];
+    const sessionID = entry.info.sessionID;
+    const messageID = entry.info.id;
+    const fileParts = parts.filter((part) => part && part.type !== 'text');
+    const nextParts = [];
+    if (item.authoredText) {
+      nextParts.push({
+        id: createPartId(),
+        sessionID,
+        messageID,
+        type: 'text',
+        text: item.authoredText,
+      });
+    }
+    for (const part of item.parts) {
+      nextParts.push({
+        id: createPartId(),
+        sessionID,
+        messageID,
+        type: 'text',
+        text: part.text,
+        synthetic: true,
+        metadata: part.metadata,
+      });
+    }
+    nextParts.push(...fileParts);
+    return { ...entry, parts: nextParts };
+  });
 };
 
 export const sanitizeExportBasename = (title) => {
@@ -2071,7 +2200,25 @@ export const reconcileHydratedMessages = (live, hydrated) => {
     ));
     if (matchIndex < 0) return entry;
     used.add(matchIndex);
-    const liveId = asTrimmedString(liveUsers[matchIndex]?.info?.id);
+    const liveEntry = liveUsers[matchIndex];
+    const liveId = asTrimmedString(liveEntry?.info?.id);
+    const liveParts = Array.isArray(liveEntry?.parts) ? liveEntry.parts : [];
+    const liveHasContext = liveParts.some((part) => {
+      const metadata = part?.metadata;
+      if (!metadata || typeof metadata !== 'object') return false;
+      return Boolean(metadata.pichamberContext || metadata.openchamberContext);
+    });
+    if (liveHasContext) {
+      const id = liveId || entry.info.id;
+      return {
+        ...entry,
+        info: { ...entry.info, id },
+        parts: liveParts.map((part) => ({
+          ...part,
+          messageID: id,
+        })),
+      };
+    }
     if (!liveId || liveId === entry.info.id) return entry;
     return {
       ...entry,

@@ -22,7 +22,7 @@ import { buildLinkedIssue } from '@/lib/linkedIssues';
 import { useScopedBlockingQuestions, useUserMessageHistory } from "@/sync/sync-context";
 import { getInlineCommentDraftKey, useInlineCommentDraftStore, type InlineCommentDraft, type InlineCommentDraftTarget } from '@/stores/useInlineCommentDraftStore';
 import { useSnippetsStore } from '@/stores/useSnippetsStore';
-import { appendInlineComments } from '@/lib/messages/inlineComments';
+
 import { renderMagicPrompt } from '@/lib/magicPrompts';
 import { startReviewFlow } from '@/lib/reviewFlow';
 import { destroyBtwSession, shouldInterceptBtwSlash, startBtwSession, type BtwSessionRef } from '@/lib/btw';
@@ -850,6 +850,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         )
     );
     const consumeDrafts = useInlineCommentDraftStore((state) => state.consumeDrafts);
+    const getDrafts = useInlineCommentDraftStore((state) => state.getDrafts);
     const removeInlineCommentDraft = useInlineCommentDraftStore((state) => state.removeDraft);
     const hasDrafts = draftCount > 0;
     const [previewConsoleCount, previewAnnotationCount, reviewCount, terminalContextCount, prCommentCount, prCheckCount] = draftSourceKey.split(':').map((entry) => Number(entry) || 0);
@@ -1044,13 +1045,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const inputSnapshot = getCurrentInputSnapshot();
         if (!inputSnapshot.hasContent || !currentSessionId || !messageQueueTarget) return;
 
-        const drafts = inlineDraftTarget ? consumeDrafts(inlineDraftTarget) : [];
-
-        let messageToQueue = inputSnapshot.message.replace(/^\n+|\n+$/g, '');
-        if (drafts.length > 0) {
-            messageToQueue = appendInlineComments(messageToQueue, drafts);
-        }
+        const messageToQueue = inputSnapshot.message.replace(/^\n+|\n+$/g, '');
         const attachmentsToQueue = sanitizeAttachmentsForSend(attachedFiles);
+        const contextDrafts = inlineDraftTarget ? consumeDrafts(inlineDraftTarget) : [];
 
         addToQueue(messageQueueTarget, {
             content: messageToQueue,
@@ -1061,6 +1058,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 agent: currentAgentName ?? undefined,
                 variant: currentVariant ?? undefined,
             } : undefined,
+            contextDrafts: contextDrafts.length > 0 ? contextDrafts : undefined,
         });
 
         // Clear input and attachments
@@ -1075,7 +1073,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!isMobile) {
             composerRef.current?.focus();
         }
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, inlineDraftTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, consumeDrafts, currentProviderId, currentModelId, currentAgentName, currentVariant]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, currentProviderId, currentModelId, currentAgentName, currentVariant, inlineDraftTarget, consumeDrafts]);
 
     const handleQueuedMessageEdit = React.useCallback((content: string) => {
         setMessage(content);
@@ -1235,12 +1233,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             };
         }
 
-        // Inline review comments and synthetic context are consumed before
-        // assembly so a failed send can restore exactly what it took.
+        // Snapshot live composer drafts for this send. Queued-only submit uses
+        // each queued item's own snapshot and must not steal chips typed later.
+        // Consume only once we are actually sending, so /timeline and empty
+        // assembly leave the chips in place.
         const syntheticParts = consumePendingSyntheticParts();
         const consumedDraftTarget = queuedOnly ? null : inlineDraftTarget;
         const drafts: InlineCommentDraft[] = consumedDraftTarget
-            ? consumeDrafts(consumedDraftTarget)
+            ? [...getDrafts(consumedDraftTarget)]
             : [];
 
         const availableSkillNames = new Set(
@@ -1253,9 +1253,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             composerAttachments: attachedFiles,
             inlineComments: drafts,
             syntheticTexts: syntheticParts?.map((part) => part.text) ?? [],
-            linkedIssueContext: linkedIssue?.contextText ?? null,
+            linkedIssue: linkedIssue
+                ? { number: linkedIssue.number, title: linkedIssue.title, url: linkedIssue.url, contextText: linkedIssue.contextText }
+                : null,
             linkedPr: linkedPr
-                ? { instructions: linkedPr.instructionsText, context: linkedPr.contextText }
+                ? { number: linkedPr.number, title: linkedPr.title, url: linkedPr.url, instructions: linkedPr.instructionsText, context: linkedPr.contextText }
                 : null,
         }, {
             parseAgentMention: (text) => {
@@ -1268,8 +1270,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             },
             sanitizeAttachments: sanitizeAttachmentsForSend,
             collectSkillNames: (text) => collectInlineSkillMentions(text, availableSkillNames),
-            appendComments: (text, comments) =>
-                appendInlineComments(text, comments as InlineCommentDraft[]),
             buildSkillInstruction: buildSkillMentionInstruction,
         });
 
@@ -1277,6 +1277,13 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const { primaryAttachments, additionalParts, agentMentionName } = outgoing;
 
         if (outgoing.isEmpty) return;
+
+        const consumeLiveDrafts = () => {
+            if (!consumedDraftTarget || drafts.length === 0) return;
+            for (const draft of drafts) {
+                removeInlineCommentDraft(consumedDraftTarget, draft.id);
+            }
+        };
 
         const pendingKey = capturedDraftSnapshot?.open
             ? pendingComposerDraftKey(capturedDraftSnapshot.draftId)
@@ -1477,6 +1484,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             ...additionalParts.flatMap(p => p.attachments ?? []),
         ];
 
+        consumeLiveDrafts();
         const sendPromise = sendMessage(
             primaryText,
             providerIdToSend,

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
 import type { AttachedFile } from './types/sessionTypes';
+import type { InlineCommentDraft } from './useInlineCommentDraftStore';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { normalizePath } from '@/lib/pathNormalization';
@@ -52,6 +53,11 @@ export interface QueuedMessage {
         agent?: string;
         variant?: string;
     };
+    /**
+     * Context drafts captured at queue time. Auto-send and queued-only
+     * submit use this snapshot; they must not read the live composer chips.
+     */
+    contextDrafts?: InlineCommentDraft[];
 }
 
 export type MessageQueueTarget = {
@@ -154,6 +160,7 @@ export const useMessageQueueStore = create<MessageQueueStore>()(
                         attachments: message.attachments,
                         createdAt: Date.now(),
                         sendConfig: message.sendConfig,
+                        contextDrafts: message.contextDrafts?.map((draft) => ({ ...draft })),
                     };
 
                     set((state) => {

@@ -73,14 +73,13 @@ describe('parseAgentMentions', () => {
       composerAttachments: [],
       inlineComments: [],
       syntheticTexts: [],
-      linkedIssueContext: null,
+      linkedIssue: null,
       linkedPr: null,
     }, {
       parseAgentMention,
       extractFileMentions: (text) => ({ text, attachments: [] }),
       sanitizeAttachments: (files) => [...(files ?? [])],
       collectSkillNames: () => [],
-      appendComments: (text) => text,
       buildSkillInstruction: () => null,
     });
 
@@ -111,14 +110,13 @@ describe('parseAgentMentions', () => {
       composerAttachments: [],
       inlineComments: [],
       syntheticTexts: [],
-      linkedIssueContext: null,
+      linkedIssue: null,
       linkedPr: null,
     }, {
       parseAgentMention,
       extractFileMentions: (text) => ({ text, attachments: [] }),
       sanitizeAttachments: (files) => [...(files ?? [])],
       collectSkillNames: () => [],
-      appendComments: (text) => text,
       buildSkillInstruction: () => null,
     });
 
