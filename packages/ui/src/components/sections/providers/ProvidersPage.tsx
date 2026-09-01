@@ -196,6 +196,7 @@ export const ProvidersPage: React.FC = () => {
   const [providerSearchQuery, setProviderSearchQuery] = React.useState('');
   const [providerDropdownOpen, setProviderDropdownOpen] = React.useState(false);
   const [providerSources, setProviderSources] = React.useState<Record<string, ProviderSources>>({});
+  const [providerSourceEpoch, setProviderSourceEpoch] = React.useState(0);
   const [showAuthPanel, setShowAuthPanel] = React.useState(false);
   const [authPanelDismissedForId, setAuthPanelDismissedForId] = React.useState<string | null>(null);
   const [editingCustomProviderId, setEditingCustomProviderId] = React.useState<string | null>(null);
@@ -451,7 +452,7 @@ export const ProvidersPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedProviderId, settingsDirectory, t]);
+  }, [selectedProviderId, settingsDirectory, t, providerSourceEpoch]);
 
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
@@ -482,6 +483,7 @@ export const ProvidersPage: React.FC = () => {
       }
       await loadProviders({ directory: settingsDirectory, source: 'settings:api-key-save' });
       setSelectedProvider(providerId);
+      setProviderSourceEpoch((n) => n + 1);
     } catch (error) {
       console.error('Failed to save API key:', error);
       toast.error(t('settings.providers.page.toast.apiKeySaveFailed'));
@@ -564,6 +566,7 @@ export const ProvidersPage: React.FC = () => {
     }
     await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
     setSelectedProvider(providerId);
+    setProviderSourceEpoch((n) => n + 1);
   };
 
   const handleDisconnectProvider = async (providerId: string) => {
@@ -589,6 +592,7 @@ export const ProvidersPage: React.FC = () => {
       // removed:false payloads must not create a phantom pending Apply & Restart.
       noteDeferredRestartFromPayload(payload, 'providers', { id: providerId });
       await loadProviders({ directory: settingsDirectory, source: 'settings:provider-disconnect' });
+      setProviderSourceEpoch((n) => n + 1);
     } catch (error) {
       console.error('Failed to disconnect provider:', error);
       toast.error(t('settings.providers.page.toast.providerDisconnectFailed'));
