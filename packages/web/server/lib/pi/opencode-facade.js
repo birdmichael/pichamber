@@ -1074,7 +1074,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/share', parseJson, handle(async (_req, res) => {
-    json(res, 200, unsupported('session.share'));
+    json(res, 501, unsupported('session.share'));
+  }));
+
+  app.delete('/api/session/:sessionID/share', handle(async (_req, res) => {
+    json(res, 501, unsupported('session.unshare'));
   }));
 
   app.post('/api/session/:sessionID/summarize', parseJson, handle(async (req, res) => {

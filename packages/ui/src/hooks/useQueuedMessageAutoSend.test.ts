@@ -159,6 +159,38 @@ describe('resolveQueuedSessionStatusType', () => {
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
   });
 
+  test('stays busy when a Steer user bubble is appended after the in-flight assistant', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      message: {
+        ses_1: [
+          assistantMessage('msg_streaming'),
+          {
+            id: 'msg_steer',
+            role: 'user',
+            sessionID: 'ses_1',
+            time: { created: 2 },
+          } as Message,
+        ],
+      },
+    });
+
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
+  });
+
+  test('does not stay busy for an older incomplete assistant after a later turn completed', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      message: {
+        ses_1: [
+          assistantMessage('msg_stuck'),
+          assistantMessage('msg_done', 5),
+        ],
+      },
+    });
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
+  });
+
   test('resolves an explicit busy or retry status entry', () => {
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ session_status: { ses_1: { type: 'busy' } } });
