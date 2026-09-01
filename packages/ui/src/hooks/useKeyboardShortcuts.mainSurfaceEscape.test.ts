@@ -7,10 +7,12 @@ const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'useKe
 
 test('Escape on Archive, Scheduled, and Worktrees uses closeMainSurfaces after nested yield', () => {
   const handlerStart = source.indexOf('const handleEscapeKeyDownCapture');
-  const handler = source.slice(handlerStart, source.indexOf('const handleOpenSettingsCapture', handlerStart));
+  const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
 
-  expect(handler).toContain('isInsideDialog || isInsideTerminal || hasDropdownInteraction');
-  expect(handler.indexOf('isInsideDialog')).toBeLessThan(handler.indexOf('shouldCloseMainSurfaceOnEscape'));
+  expect(handler).toContain("target?.closest('[role=\"dialog\"]')");
+  expect(handler).toContain('isTerminalEventTarget(target)');
+  expect(handler).toContain('dropdownOpen');
+  expect(handler.indexOf("target?.closest('[role=\"dialog\"]')")).toBeLessThan(handler.indexOf('shouldCloseMainSurfaceOnEscape'));
   expect(handler.indexOf('shouldCloseMainSurfaceOnEscape')).toBeLessThan(handler.indexOf('closeMainSurfaces'));
   expect(handler).toContain('isMultiRunLauncherOpen');
   expect(handler).toContain('multiRunCompareGroup');
