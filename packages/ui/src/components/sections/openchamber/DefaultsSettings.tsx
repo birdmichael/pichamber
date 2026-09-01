@@ -15,6 +15,7 @@ import {
   SETTINGS_OPTION_STACK_CLASS,
   SETTINGS_NUMBER_STEPPER_ROW_CLASS,
   SETTINGS_NUMBER_UNIT_CLASS,
+  SETTINGS_NUMBER_INPUT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { reportSettingsSaveState, updateDesktopSettings } from '@/lib/persistence';
@@ -600,7 +601,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={200000}
                       step={1024}
-                      className="w-20 tabular-nums"
+                      className={SETTINGS_NUMBER_INPUT_CLASS}
                       aria-label={t('settings.openchamber.defaults.field.reserveTokensAria')}
                     />
                   </div>
@@ -627,7 +628,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={200000}
                       step={1024}
-                      className="w-20 tabular-nums"
+                      className={SETTINGS_NUMBER_INPUT_CLASS}
                       aria-label={t('settings.openchamber.defaults.field.keepRecentTokensAria')}
                     />
                   </div>
@@ -677,6 +678,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={20}
                       step={1}
+                      className={SETTINGS_NUMBER_INPUT_CLASS}
                       aria-label={t('settings.openchamber.defaults.field.maxRetriesAria')}
                     />
                   </div>
@@ -703,7 +705,7 @@ export const DefaultsSettings: React.FC = () => {
                       min={0}
                       max={60000}
                       step={250}
-                      className="w-20 tabular-nums"
+                      className={SETTINGS_NUMBER_INPUT_CLASS}
                       aria-label={t('settings.openchamber.defaults.field.baseDelayMsAria')}
                     />
                     <span className={SETTINGS_NUMBER_UNIT_CLASS}>{t('settings.openchamber.defaults.field.ms')}</span>
