@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+import { notificationTitleFromPayload } from './notificationTitle';
+
 // NOTE: keep the Workbox injection point so vite-plugin-pwa can build.
 // We intentionally do not use Workbox runtime helpers here: iOS Safari can be
 // fragile with more complex SW bundles. For push notifications we only need a
@@ -46,7 +48,7 @@ self.addEventListener('push', (event) => {
       return;
     }
 
-    const title = payload.title || 'OpenChamber';
+    const title = notificationTitleFromPayload(payload);
     const body = payload.body ?? '';
     const icon = payload.icon ?? '/apple-touch-icon-180x180.png';
     const badge = payload.badge ?? '/favicon-32.png';
