@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Chat: Chinese punctuation after a URL stays outside the link. Question cards render Markdown instead of raw `**bold**`. Completed thinking shows the full text. Streaming replies appear a paragraph or code line at a time so line numbers do not jump. The text-selection menu stays on screen near window edges. Typing `@` ranks files and folders together by how well they match.
 - Chat: sending a message no longer shows the same user turn twice after Pi writes it under a different id, a Subagent card or Work Status row can open the child even when the tool payload has no session id, and the first message becomes the session title after reopen.
 - Sessions: dismissing a leftover hover tooltip no longer eats the next click on a session row or other control.
 - Hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.

@@ -73,6 +73,12 @@ Use this doc when you ask an agent to change tool/header/description behavior.
   goes through confirmation (or a locally trusted scheme) rather than
   `openExternalUrl`. File-path probes send the session directory as
   `x-opencode-directory` so a last-browsed project cannot hide a real path.
+  Bare URLs keep following CJK punctuation (`。，、`) as visible text instead
+  of swallowing it into the href. Completed reasoning shows the full text;
+  live streaming commits whole lines via `commitStreamedText` so a shown
+  paragraph or code-fence line does not rewrite in place. Question prompts
+  render through `QuestionMarkdown` (lazy `SimpleMarkdownRenderer` with a
+  verbatim fallback), including Pi question-tool cards.
 - Final assistant Markdown rendering is independent from image gallery
   extraction: gallery presence never changes the chat body. Assistant image
   syntax consistently renders as a shared image icon followed by its filename,

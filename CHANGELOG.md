@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Desktop: idle sessions can move into an existing worktree from the session menu. A confirm dialog appears when the source has uncommitted changes; cancel leaves everything in place, and a failed move rolls the session back.
+- Chat: Chinese punctuation after a URL stays outside the link. Question cards render Markdown instead of raw `**bold**`. Completed thinking shows the full text. Streaming replies appear a paragraph or code line at a time so line numbers do not jump. The text-selection menu stays on screen near window edges. Typing `@` ranks files and folders together by how well they match.
 - Desktop: File → New Window during `electron:dev` loads the Vite UI origin, not the API sidecar, so the second window no longer 404s with “Static files not found”.
 - Desktop: extra windows no longer hijack the first window's session or project. A crashed renderer recovers instead of looping, packaged HTML is not served from cache on a fresh install, theme is remembered per instance, and an expired remote/password login shows a Log in banner.
 - Composer: empty and fenced-block carets stay visible, double-space still inserts a period on macOS, Ctrl/Cmd+1..9 does not switch sessions while typing, PageUp/PageDown no longer hides the Desktop title bar, and CJK IME composition does not jump the caret.

@@ -10,6 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import { useUIStore } from '@/stores/useUIStore';
 import { MarkdownRenderer } from '../../MarkdownRenderer';
 import { useStreamingTextThrottle } from '../../hooks/useStreamingTextThrottle';
+import { commitStreamedText } from '../../lib/streamTextCommit';
 import type { StreamPhase } from '../types';
 
 const TOOL_ROW_TEXT_CLASS = '!text-[length:var(--text-meta)] !leading-5 sm:!leading-6 tracking-normal';
@@ -281,7 +282,9 @@ export const ReasoningTimelineBlock: React.FC<ReasoningTimelineBlockProps> = ({
         };
     }, []);
 
-    if (!text || text.trim().length === 0) {
+    // While streaming, keep the Thinking header even before the first
+    // committed line exists; otherwise a newline-free paragraph hides BusyDots.
+    if (!isStreaming && (!text || text.trim().length === 0)) {
         return null;
     }
 
@@ -452,17 +455,16 @@ const ReasoningPart = React.memo(({
     const rawText = partWithText.text || partWithText.content || '';
     const textContent = React.useMemo(() => cleanReasoningText(rawText), [rawText]);
     const time = partWithText.time;
-    const canBeStreaming = streamPhase === undefined || streamPhase !== 'completed';
-    const isStreaming = chatRenderMode === 'live' && canBeStreaming && typeof time?.end !== 'number';
-    const throttledText = useStreamingTextThrottle({
+    const isLiveStreamPhase = streamPhase === 'streaming' || streamPhase === 'cooldown';
+    const isStreaming = chatRenderMode === 'live' && isLiveStreamPhase && typeof time?.end !== 'number';
+    const throttledTextRaw = useStreamingTextThrottle({
         text: textContent,
         isStreaming,
         identityKey: `${messageId}:${part.id ?? 'reasoning'}`,
     });
+    const throttledText = isStreaming ? commitStreamedText(throttledTextRaw) : throttledTextRaw;
 
-    // Show reasoning even if time.end isn't set yet (during streaming)
-    // Only hide if there's no text content
-    if (!throttledText || throttledText.trim().length === 0) {
+    if (!isStreaming && (!throttledText || throttledText.trim().length === 0)) {
         return null;
     }
 
