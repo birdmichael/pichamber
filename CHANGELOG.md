@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Language includes Türkçe. The interface and settings switch with the other shipped locales.
 - Desktop: choose which context-rail panels show; the choice is remembered after refresh. When session tabs are off, Cmd/Ctrl+Alt+Left/Right walks the sessions you opened in this window (with tabs on, those keys still switch adjacent tabs).
 - Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
 - Settings: Keyboard shortcuts are recorded in a dialog (up to two combinations). Open/go actions use a Ctrl/Cmd+K leader; the command palette stays Ctrl/Cmd+P. Esc and X still close the dialog.
