@@ -459,13 +459,11 @@ export const useKeyboardShortcuts = () => {
     const handleActivePrefixKeyDownCapture = (event: KeyboardEvent) => {
       if (isTerminalEventTarget(event.target)) return;
       if (!dispatcher.hasActivePrefix()) return;
-      // An unmodified completion key typed into an editable target is only a
-      // deliberate sequence when the prefix was armed from that same target;
-      // otherwise it is regular typing and must not be swallowed.
+      // Unmodified keys in an editor are typing, even if this field armed the
+      // leader. Modifier/function-key completions still run.
       if (
         !event.ctrlKey && !event.metaKey && !event.altKey
         && isEditableEventTarget(event.target)
-        && dispatcher.getActivePrefixTarget() !== event.target
       ) {
         dispatcher.clear();
         return;

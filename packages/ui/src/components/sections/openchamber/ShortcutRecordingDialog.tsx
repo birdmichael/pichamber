@@ -19,6 +19,7 @@ import {
   type ShortcutBindingConflict,
   type ShortcutCombo,
   type CustomizableShortcutAction,
+  shortcutRegistry,
 } from '@/lib/shortcuts';
 import { useI18n } from '@/lib/i18n';
 
@@ -170,6 +171,7 @@ export const ShortcutRecordingDialog: React.FC<ShortcutRecordingDialogProps> = (
     if (!action) return;
     setRecording({ chords: [], livePreview: null, settled: false });
     recordingRef.current?.focus();
+    return shortcutRegistry.suspend();
   }, [action]);
 
   const waitingForSecondChord = recording.chords.length === 1 && !recording.settled;
