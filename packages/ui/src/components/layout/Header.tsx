@@ -43,7 +43,7 @@ import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { useDeviceInfo, useTabletStandalonePwaRuntime } from '@/lib/device';
-import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
+import { resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom } from '@/lib/sessionTitle';
 import { cn, hasModifier } from '@/lib/utils';
 import { McpDropdownContent } from '@/components/mcp/McpDropdown';
 import { McpIcon } from '@/components/icons/McpIcon';
@@ -1164,11 +1164,11 @@ export const Header: React.FC<HeaderProps> = ({
     if (!currentSessionId) {
       return activeProjectLabel ?? 'Pichamber';
     }
-    return resolveSessionDisplayTitle(
-      currentSession?.title,
+    return resolveSessionDisplayTitleFrom(
+      [currentLiveSession?.title, currentGlobalSession?.title],
       t('sessions.sidebar.session.untitled'),
     );
-  }, [activeProjectLabel, currentSession?.title, currentSessionId, t]);
+  }, [activeProjectLabel, currentGlobalSession?.title, currentLiveSession?.title, currentSessionId, t]);
   const headerDirectoryStore = useDirectoryStore(openDirectory || undefined, { bootstrap: false });
   const sync = useSync();
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);

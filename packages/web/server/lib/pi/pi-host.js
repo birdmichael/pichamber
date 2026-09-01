@@ -3287,7 +3287,15 @@ export const createPiHost = ({
       return { ok: true, directory: cwd };
     },
     getSession(sessionID) {
-      return getRecord(sessionID);
+      const record = getRecord(sessionID);
+      if (maybeApplyConversationTitle(record)) {
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      }
+      return record;
     },
     async ensureSession(sessionID, directory) {
       return ensureRecord(sessionID, directory);

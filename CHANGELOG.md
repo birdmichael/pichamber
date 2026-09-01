@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
+- Desktop: Help → Diagnostics no longer lists leftover OpenCode PATH as Pi kernel resolution. It reports the bundled Pi Node runtime instead.
+
 ## [1.2.8] - 2026-09-01
 
 - **Chat:** the transcript stays at the latest reply while it streams, unless you scroll away. Scrolling up is not stolen back, and resizing the window keeps the message you were reading in view. Settings → Chat can turn off following new content.

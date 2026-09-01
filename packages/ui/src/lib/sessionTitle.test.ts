@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { isPlaceholderSessionTitle, resolveSessionDisplayTitle } from './sessionTitle';
+import { isPlaceholderSessionTitle, resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom } from './sessionTitle';
 
 describe('session display titles', () => {
   test('treats empty and default labels as placeholders', () => {
@@ -31,5 +31,21 @@ describe('session display titles', () => {
     expect(resolveSessionDisplayTitle('Pi session', untitled)).toBe(untitled);
     expect(resolveSessionDisplayTitle('(no messages)', untitled)).toBe(untitled);
     expect(resolveSessionDisplayTitle('195-daily-ping hello', untitled)).toBe('195-daily-ping hello');
+  });
+
+  test('prefers a listed title over a live placeholder', () => {
+    const untitled = 'Untitled Session';
+    expect(resolveSessionDisplayTitleFrom(
+      ['New session', '帮我提一个issue，为什么手机发送的图片'],
+      untitled,
+    )).toBe('帮我提一个issue，为什么手机发送的图片');
+    expect(resolveSessionDisplayTitleFrom(
+      ['帮我提一个issue', 'New session'],
+      untitled,
+    )).toBe('帮我提一个issue');
+    expect(resolveSessionDisplayTitleFrom(
+      [null, 'New session', ''],
+      untitled,
+    )).toBe(untitled);
   });
 });

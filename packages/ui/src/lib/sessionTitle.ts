@@ -33,3 +33,19 @@ export const resolveSessionDisplayTitle = (
   }
   return trimmed;
 };
+
+/**
+ * Header and sidebar can see different copies of the same session (directory
+ * live store vs global list). A live placeholder must not hide a listed title.
+ * Prefer the first non-placeholder among `titles`.
+ */
+export const resolveSessionDisplayTitleFrom = (
+  titles: readonly unknown[],
+  untitledLabel: string,
+): string => {
+  for (const title of titles) {
+    const resolved = resolveSessionDisplayTitle(title, untitledLabel);
+    if (resolved !== untitledLabel) return resolved;
+  }
+  return untitledLabel;
+};

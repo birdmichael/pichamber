@@ -2,6 +2,27 @@ import { OPENCODE_KERNEL, PI_KERNEL } from './kernel.js';
 
 const isPiKernel = (kernel) => kernel === PI_KERNEL;
 
+/** Leftover OpenCode binary resolver. Not how the Pi kernel boots. */
+const OPENCODE_RESOLVER_EXTRA_KEYS = new Set([
+  'opencodeBinaryResolved',
+  'opencodeBinarySource',
+  'opencodeLaunchBinary',
+  'opencodeLaunchArgs',
+  'opencodeLaunchWrapperType',
+  'lastOpenCodeLaunchDiagnostics',
+  'opencodeViaWsl',
+  'opencodeWslBinary',
+  'opencodeWslPath',
+  'opencodeWslDistro',
+]);
+
+const extrasForKernel = (extras, isPi) => {
+  if (!isPi || !extras || typeof extras !== 'object') return extras || {};
+  return Object.fromEntries(
+    Object.entries(extras).filter(([key]) => !OPENCODE_RESOLVER_EXTRA_KEYS.has(key)),
+  );
+};
+
 export const buildHealthSnapshot = ({
   kernel,
   piMock = false,
@@ -17,7 +38,7 @@ export const buildHealthSnapshot = ({
     : Boolean(openCodePort && isOpenCodeReady && !isRestartingOpenCode);
 
   return {
-    ...extras,
+    ...extrasForKernel(extras, isPi),
     kernel: isPi ? PI_KERNEL : OPENCODE_KERNEL,
     piMock: Boolean(piMock),
     openCodePort: isPi ? null : openCodePort,
