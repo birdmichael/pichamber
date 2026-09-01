@@ -3124,7 +3124,7 @@ export const dict = {
   'contextPanel.mode.pr': 'PR',
   'contextRail.configure.open': 'Panels konfigurieren',
   'contextRail.configure.dialogTitle': 'Leisten-Panels',
-  'contextRail.configure.dialogDescription': 'Wähle, welche Panels die Leiste zeigt. Ausgeblendete Panels behalten ihre Daten und bleiben über die Befehlspalette erreichbar.',
+  'contextRail.configure.dialogDescription': 'Wähle, welche Panels die Leiste zeigt. Ausgeblendete Panels behalten ihre Daten und erscheinen nicht auf der Leiste.',
   'contextRail.configure.showAll': 'Alle anzeigen',
   'contextRail.configure.noneWarning': 'Alle Panels sind ausgeblendet.',
   'contextRail.aria.rail': 'Kontextleiste',

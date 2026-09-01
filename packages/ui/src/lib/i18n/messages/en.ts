@@ -1199,7 +1199,7 @@ export const dict = {
   'contextPanel.mode.browser': 'Browser',
   'contextRail.configure.open': 'Configure panels',
   'contextRail.configure.dialogTitle': 'Rail panels',
-  'contextRail.configure.dialogDescription': 'Choose which panels the rail shows. Hidden panels keep their data and stay reachable from the command palette.',
+  'contextRail.configure.dialogDescription': 'Choose which panels the rail shows. Hidden panels keep their data and stay off the rail.',
   'contextRail.configure.showAll': 'Show all',
   'contextRail.configure.noneWarning': 'All panels are hidden.',
   'contextRail.aria.rail': 'Panel surfaces',

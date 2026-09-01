@@ -1019,7 +1019,7 @@ export const dict = {
   'contextPanel.mode.browser': 'Navigateur',
   'contextRail.configure.open': 'Configurer les panneaux',
   'contextRail.configure.dialogTitle': 'Panneaux de la barre',
-  'contextRail.configure.dialogDescription': 'Choisissez les panneaux affichés par la barre. Les panneaux masqués conservent leurs données et restent accessibles via la palette de commandes.',
+  'contextRail.configure.dialogDescription': 'Choisissez les panneaux affichés par la barre. Les panneaux masqués conservent leurs données et restent hors de la barre.',
   'contextRail.configure.showAll': 'Tout afficher',
   'contextRail.configure.noneWarning': 'Tous les panneaux sont masqués.',
   'contextRail.aria.rail': 'Surfaces du panneau',

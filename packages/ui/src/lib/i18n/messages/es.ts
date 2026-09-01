@@ -1200,7 +1200,7 @@ export const dict: Record<I18nKey, string> = {
   "contextPanel.mode.browser": "Navegador",
   "contextRail.configure.open": "Configurar paneles",
   "contextRail.configure.dialogTitle": "Paneles de la barra",
-  "contextRail.configure.dialogDescription": "Elige qué paneles muestra la barra. Los paneles ocultos conservan sus datos y siguen accesibles desde la paleta de comandos.",
+  "contextRail.configure.dialogDescription": "Elige qué paneles muestra la barra. Los paneles ocultos conservan sus datos y solo se quitan de la barra.",
   "contextRail.configure.showAll": "Mostrar todos",
   "contextRail.configure.noneWarning": "Todos los paneles están ocultos.",
   "contextRail.aria.rail": "Superficies del panel",

@@ -1200,7 +1200,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.mode.browser': '브라우저',
   'contextRail.configure.open': '패널 구성',
   'contextRail.configure.dialogTitle': '레일 패널',
-  'contextRail.configure.dialogDescription': '레일에 표시할 패널을 선택하세요. 숨긴 패널의 데이터는 유지되며 명령 팔레트에서 계속 열 수 있습니다.',
+  'contextRail.configure.dialogDescription': '레일에 표시할 패널을 선택하세요. 숨긴 패널의 데이터는 유지되며 레일에서만 빠집니다.',
   'contextRail.configure.showAll': '모두 표시',
   'contextRail.configure.noneWarning': '모든 패널이 숨겨져 있습니다.',
   'contextRail.aria.rail': '패널 서피스',

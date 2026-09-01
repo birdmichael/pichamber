@@ -80,4 +80,54 @@ describe('sessionNavigationHistory', () => {
     expect(navigateSessionHistory(-1)).toBe(true);
     expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
   });
+
+  test('back from a new-session draft restores the session just left', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useSessionUIStore.getState().setCurrentSession(null);
+    expect(useSessionUIStore.getState().currentSessionId).toBe(null);
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+  });
+
+  test('back from a draft with a single visit returns to that session', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.getState().setCurrentSession(null);
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+  });
+
+  test('does not drop history when a failed list looks empty', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useGlobalSessionsStore.setState({
+      activeSessions: [],
+      archivedSessions: [],
+      hasLoaded: true,
+      status: 'error',
+    });
+    expect(navigateSessionHistory(-1)).toBe(false);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+    useGlobalSessionsStore.setState({
+      activeSessions: [session('s1'), session('s2'), session('s3')],
+      hasLoaded: true,
+      status: 'ready',
+    });
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+  });
+
+  test('can walk back onto an archived session', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useSessionUIStore.setState({ currentSessionId: 's3' });
+    useGlobalSessionsStore.setState({
+      activeSessions: [session('s1'), session('s3')],
+      archivedSessions: [session('s2')],
+      hasLoaded: true,
+      status: 'ready',
+    });
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+  });
 });

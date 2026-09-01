@@ -1200,7 +1200,7 @@ export const dict: Record<I18nKey, string> = {
   "contextPanel.mode.browser": "Браузер",
   "contextRail.configure.open": "Налаштувати панелі",
   "contextRail.configure.dialogTitle": "Панелі рейки",
-  "contextRail.configure.dialogDescription": "Обери, які панелі показує рейка. Приховані панелі зберігають дані й доступні з палітри команд.",
+  "contextRail.configure.dialogDescription": "Обери, які панелі показує рейка. Приховані панелі зберігають дані й зникають лише з рейки.",
   "contextRail.configure.showAll": "Показати всі",
   "contextRail.configure.noneWarning": "Усі панелі приховано.",
   "contextRail.aria.rail": "Поверхні панелі",

@@ -1609,7 +1609,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.mode.browser': 'Przeglądarka',
   'contextRail.configure.open': 'Konfiguruj panele',
   'contextRail.configure.dialogTitle': 'Panele paska',
-  'contextRail.configure.dialogDescription': 'Wybierz, które panele pokazuje pasek. Ukryte panele zachowują dane i pozostają dostępne z palety poleceń.',
+  'contextRail.configure.dialogDescription': 'Wybierz, które panele pokazuje pasek. Ukryte panele zachowują dane i znikają tylko z paska.',
   'contextRail.configure.showAll': 'Pokaż wszystkie',
   'contextRail.configure.noneWarning': 'Wszystkie panele są ukryte.',
   'contextRail.aria.rail': 'Powierzchnie panelu',

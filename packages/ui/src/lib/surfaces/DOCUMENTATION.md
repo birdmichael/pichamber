@@ -45,7 +45,7 @@ of those ids onto workspace tabs; see Mobile tabs.
   (`useUIStore.contextRailHiddenSurfaces`) so a surface added later appears
   without touching saved settings. The rail's trailing equalizer
   (`ContextRailSurfacesDialog`) edits that set. Hidden surfaces keep their
-  data and stay reachable from the command palette.
+  data and stay off the rail and its digit map.
 - `getVisibleContextRailSurfaces` is the single visibility filter shared by the
   rail and the global surface-switch shortcut (`switch_context_surface` in
   `lib/shortcuts/`): it drops surfaces the user hid, then drops the plan

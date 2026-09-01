@@ -1200,7 +1200,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.mode.browser': '浏览器',
   'contextRail.configure.open': '配置面板',
   'contextRail.configure.dialogTitle': '侧栏面板',
-  'contextRail.configure.dialogDescription': '选择侧栏显示哪些面板。隐藏的面板会保留数据，仍可通过命令面板打开。',
+  'contextRail.configure.dialogDescription': '选择侧栏显示哪些面板。隐藏的面板会保留数据，只是不出现在侧栏上。',
   'contextRail.configure.showAll': '全部显示',
   'contextRail.configure.noneWarning': '所有面板均已隐藏。',
   'contextRail.aria.rail': '面板界面',

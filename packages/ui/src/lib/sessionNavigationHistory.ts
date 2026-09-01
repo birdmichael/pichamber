@@ -1,5 +1,6 @@
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useGlobalSessionsStore, resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
+import { getRuntimeKey } from '@/lib/runtime-switch';
 
 // Browser-style back/forward over the order sessions were opened in this
 // window. A normal session switch truncates the forward part and appends;
@@ -12,8 +13,22 @@ const MAX_HISTORY = 100;
 let visitedSessionIds: string[] = [];
 let cursor = -1;
 let navigating = false;
+let boundRuntimeKey = getRuntimeKey();
+
+const resetStack = (): void => {
+  visitedSessionIds = [];
+  cursor = -1;
+};
+
+const ensureRuntimeStack = (): void => {
+  const key = getRuntimeKey();
+  if (key === boundRuntimeKey) return;
+  boundRuntimeKey = key;
+  resetStack();
+};
 
 const recordVisit = (sessionId: string): void => {
+  ensureRuntimeStack();
   if (visitedSessionIds[cursor] === sessionId) return;
   visitedSessionIds = [...visitedSessionIds.slice(0, cursor + 1), sessionId].slice(-MAX_HISTORY);
   cursor = visitedSessionIds.length - 1;
@@ -31,11 +46,30 @@ useSessionUIStore.subscribe((state, previousState) => {
  * skipped and dropped. Returns false when there is nowhere to go.
  */
 export const navigateSessionHistory = (delta: -1 | 1): boolean => {
+  ensureRuntimeStack();
   const globalSessions = useGlobalSessionsStore.getState();
-  if (!globalSessions.hasLoaded) return false;
+  // A failed or in-flight list is not proof the sessions are gone.
+  if (!globalSessions.hasLoaded || globalSessions.status !== 'ready') return false;
   const sessionsById = new Map(
-    globalSessions.activeSessions.map((session) => [session.id, session] as const),
+    [...globalSessions.activeSessions, ...globalSessions.archivedSessions]
+      .map((session) => [session.id, session] as const),
   );
+  const currentId = useSessionUIStore.getState().currentSessionId;
+  const cursorId = cursor >= 0 ? visitedSessionIds[cursor] : undefined;
+  // A new-session draft (or any current id that is not the cursor) sits off
+  // the stack. Back restores the cursor entry instead of stepping past it.
+  if (delta < 0 && currentId !== cursorId && cursorId) {
+    const session = sessionsById.get(cursorId);
+    if (session) {
+      navigating = true;
+      try {
+        useSessionUIStore.getState().setCurrentSession(session.id, resolveGlobalSessionDirectory(session));
+      } finally {
+        navigating = false;
+      }
+      return true;
+    }
+  }
   let nextCursor = cursor + delta;
   while (nextCursor >= 0 && nextCursor < visitedSessionIds.length) {
     const session = sessionsById.get(visitedSessionIds[nextCursor]);
@@ -63,7 +97,7 @@ export const navigateSessionHistory = (delta: -1 | 1): boolean => {
 };
 
 export const resetSessionNavigationHistoryForTests = (): void => {
-  visitedSessionIds = [];
-  cursor = -1;
+  resetStack();
   navigating = false;
+  boundRuntimeKey = getRuntimeKey();
 };

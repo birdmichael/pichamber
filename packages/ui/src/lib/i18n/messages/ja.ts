@@ -1196,7 +1196,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.mode.browser': 'ブラウザ',
   'contextRail.configure.open': 'パネルを設定',
   'contextRail.configure.dialogTitle': 'レールのパネル',
-  'contextRail.configure.dialogDescription': 'レールに表示するパネルを選択します。非表示のパネルもデータは保持され、コマンドパレットから引き続き開けます。',
+  'contextRail.configure.dialogDescription': 'レールに表示するパネルを選択します。非表示のパネルもデータは保持され、レールから外れるだけです。',
   'contextRail.configure.showAll': 'すべて表示',
   'contextRail.configure.noneWarning': 'すべてのパネルが非表示です。',
   'contextRail.aria.rail': 'パネルサーフェス',
