@@ -267,6 +267,36 @@ describe('useMultiRunStore', () => {
     ]);
   });
 
+  test('creates a group with more than five models', async () => {
+    const models = [
+      { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+      { providerID: 'openai', modelID: 'gpt-5' },
+      { providerID: 'xai', modelID: 'grok-4' },
+      { providerID: 'google', modelID: 'gemini-2.5-pro' },
+      { providerID: 'anthropic', modelID: 'claude-opus-4' },
+      { providerID: 'openai', modelID: 'gpt-4.1' },
+    ];
+
+    const result = await useMultiRunStore.getState().createMultiRun({
+      name: 'Six models',
+      isolateRuns: false,
+      groups: [{
+        prompt: 'Compare',
+        models,
+      }],
+    });
+
+    expect(useMultiRunStore.getState().error).toBeNull();
+    expect(result?.sessionIds).toEqual([
+      'ses_multirun_1',
+      'ses_multirun_2',
+      'ses_multirun_3',
+      'ses_multirun_4',
+      'ses_multirun_5',
+      'ses_multirun_6',
+    ]);
+  });
+
   test('Pi create/start path applies each live model and sends the launcher prompt', async () => {
     createdSessionVersion = 'pi';
 
