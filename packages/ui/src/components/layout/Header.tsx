@@ -1165,10 +1165,17 @@ export const Header: React.FC<HeaderProps> = ({
       return activeProjectLabel ?? 'Pichamber';
     }
     return resolveSessionDisplayTitleFrom(
-      [currentLiveSession?.title, currentGlobalSession?.title],
+      [currentLiveSession?.title, currentGlobalSession?.title, currentSession?.title],
       t('sessions.sidebar.session.untitled'),
     );
-  }, [activeProjectLabel, currentGlobalSession?.title, currentLiveSession?.title, currentSessionId, t]);
+  }, [
+    activeProjectLabel,
+    currentGlobalSession?.title,
+    currentLiveSession?.title,
+    currentSession?.title,
+    currentSessionId,
+    t,
+  ]);
   const headerDirectoryStore = useDirectoryStore(openDirectory || undefined, { bootstrap: false });
   const sync = useSync();
   const updateSessionTitle = useSessionUIStore((state) => state.updateSessionTitle);
@@ -1207,15 +1214,16 @@ export const Header: React.FC<HeaderProps> = ({
 
   const beginHeaderSessionRename = React.useCallback(() => {
     if (!currentSessionId) return;
-    setHeaderSessionTitleDraft(currentSession?.title?.trim() || currentSessionTitle);
+    setHeaderSessionTitleDraft(currentSessionTitle);
     setIsRenamingHeaderSession(true);
-  }, [currentSession?.title, currentSessionId, currentSessionTitle]);
+  }, [currentSessionId, currentSessionTitle]);
   beginHeaderSessionRenameRef.current = beginHeaderSessionRename;
 
   const saveHeaderSessionRename = React.useCallback(async () => {
     if (!currentSessionId) return;
     const title = headerSessionTitleDraft.trim();
-    if (title && title !== currentSession?.title?.trim()) {
+    const liveTitle = currentSession?.title?.trim() || '';
+    if (title && title !== liveTitle) {
       await updateSessionTitle(currentSessionId, title);
     }
     setIsRenamingHeaderSession(false);

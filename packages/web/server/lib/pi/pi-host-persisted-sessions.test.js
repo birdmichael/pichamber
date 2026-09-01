@@ -231,6 +231,19 @@ describe('persisted Pi sessions', () => {
     host.dispose();
   });
 
+  it('retitles an already-loaded placeholder on ensureSession without listing', async () => {
+    const home = tempDir('pi-ensure-untitled-title-');
+    const cwd = path.join(home, 'project');
+    fs.mkdirSync(cwd, { recursive: true });
+    const first = createHost({ home, cwd });
+    const created = await first.createSession({ directory: cwd });
+    await first.promptAsync(created.id, { parts: [{ type: 'text', text: '帮我启动一个子代理 查看 我电脑磁盘' }] });
+    await first.updateSession(created.id, { title: 'New session' }, cwd);
+    const ensured = await first.ensureSession(created.id, cwd);
+    expect(ensured.info.title).toBe('帮我启动一个子代理 查看 我电脑磁盘');
+    first.dispose();
+  });
+
   it('persists the first-prompt title so a new host still shows it', async () => {
     const home = tempDir('pi-persist-prompt-title-');
     const cwd = path.join(home, 'project');

@@ -47,5 +47,9 @@ describe('session display titles', () => {
       [null, 'New session', ''],
       untitled,
     )).toBe(untitled);
+    expect(resolveSessionDisplayTitleFrom(
+      ['New session', null, 'cached-title'],
+      untitled,
+    )).toBe('cached-title');
   });
 });
