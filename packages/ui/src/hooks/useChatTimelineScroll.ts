@@ -617,12 +617,7 @@ export const useChatTimelineScroll = ({
                     const listState = listRef.current?.getState();
                     const atEndNow = listState ? resolveTimelineIsAtEnd(listState) : undefined;
                     if (atEndNow === false) {
-                        isAtEndRef.current = false;
-                        setIsPinned(false);
-                        modeRef.current = 'free-scrolling';
-                        liveFollowGenerationRef.current = null;
-                        scheduleShowScrollButton();
-                        queueSave();
+                        onManualNavigationRef.current();
                     }
                     return;
                 }
@@ -887,6 +882,13 @@ export const useChatTimelineScroll = ({
             queueSave();
         };
 
+        const handleOverlayThumbPointerDown = (event: PointerEvent) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (!target.closest('[data-overlay-scrollbar-thumb]')) return;
+            if (canScrollUp()) gesture();
+        };
+
         scrollNode.addEventListener('wheel', handleWheel, { passive: true });
         scrollNode.addEventListener('touchstart', handleTouchStart, { passive: true });
         scrollNode.addEventListener('touchmove', handleTouchMove, { passive: true });
@@ -895,6 +897,7 @@ export const useChatTimelineScroll = ({
         scrollNode.addEventListener('pointerdown', handlePointerDown, { passive: true });
         scrollNode.addEventListener('keydown', handleKeyDown);
         scrollNode.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('pointerdown', handleOverlayThumbPointerDown, true);
 
         return () => {
             scrollNode.removeEventListener('wheel', handleWheel);
@@ -905,6 +908,7 @@ export const useChatTimelineScroll = ({
             scrollNode.removeEventListener('pointerdown', handlePointerDown);
             scrollNode.removeEventListener('keydown', handleKeyDown);
             scrollNode.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('pointerdown', handleOverlayThumbPointerDown, true);
         };
     }, [queueSave, realContentOverflowsViewport, scrollNode]);
 

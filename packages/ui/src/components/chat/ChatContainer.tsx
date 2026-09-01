@@ -552,6 +552,12 @@ const ChatViewport = React.memo(({
         && prev.retryOverlay === next.retryOverlay
         && prev.scrollToBottom === next.scrollToBottom
         && prev.endPinningReleased === next.endPinningReleased
+        && prev.anchorMessageId === next.anchorMessageId
+        && prev.registerList === next.registerList
+        && prev.onAnchorReady === next.onAnchorReady
+        && prev.onAnchorSizeChanged === next.onAnchorSizeChanged
+        && prev.onIsAtEndChange === next.onIsAtEndChange
+        && prev.onTimelineDataChange === next.onTimelineDataChange
         && prev.revealWaited === next.revealWaited
         && prev.revealGate === next.revealGate
         && prev.sessionQuestions === next.sessionQuestions
