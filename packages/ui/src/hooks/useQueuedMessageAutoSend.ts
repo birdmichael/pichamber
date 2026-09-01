@@ -187,15 +187,9 @@ export const shouldDispatchQueuedAutoSend = (
 /**
  * Resolve the live status the queue gate should honor for a session.
  *
- * The server's `/session/status` map only lists busy/retry sessions — idle
- * sessions are absent — so a missing entry means "idle per the snapshot", not
- * "no information". A missed busy event therefore leaves no entry while a turn
- * is still streaming. The trailing in-flight assistant message is the live
- * evidence of that running turn: treat it as busy so the queue never dispatches
- * into it (mirrors `useSessionActivity`'s fallback). The entry becomes idle the
- * moment the message completes or an idle status event lands. This reads the
- * directory child store directly so both the effect-loop gate and the
- * dispatch-time re-check agree.
+ * `/session/status` omits idle sessions. A missed busy event leaves no entry
+ * while a turn is still streaming. Use the latest assistant (Steer can append
+ * a user bubble after it) so the queue does not dispatch into that turn.
  */
 export const resolveQueuedSessionStatusType = (
   sessionId: string,
@@ -211,14 +205,15 @@ export const resolveQueuedSessionStatusType = (
     return globalType;
   }
   const sessionMessages = state?.message?.[sessionId];
-  const lastMessage = sessionMessages && sessionMessages.length > 0
-    ? sessionMessages[sessionMessages.length - 1]
-    : undefined;
-  if (
-    lastMessage?.role === 'assistant'
-    && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number'
-  ) {
-    return 'busy';
+  if (sessionMessages) {
+    for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+      const message = sessionMessages[index];
+      if (message?.role !== 'assistant') continue;
+      if (typeof (message as { time?: { completed?: number } }).time?.completed !== 'number') {
+        return 'busy';
+      }
+      break;
+    }
   }
   return 'idle';
 };

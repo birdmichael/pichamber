@@ -1062,10 +1062,10 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('rejects revert, unrevert, and shell as unsupported instead of empty success', async () => {
+  it('rejects revert, unrevert, shell, share, and unshare as unsupported instead of empty success', async () => {
     const { url, close, kernel } = await startFacade();
     try {
-      for (const action of ['revert', 'unrevert', 'shell']) {
+      for (const action of ['revert', 'unrevert', 'shell', 'share']) {
         const response = await fetch(`${url}/api/session/ses_stub/${action}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -1077,6 +1077,13 @@ describe('OpenCode facade HTTP/SSE', () => {
           kernel: 'pi',
         });
       }
+      const unshare = await fetch(`${url}/api/session/ses_stub/share`, { method: 'DELETE' });
+      expect(unshare.status).toBe(501);
+      expect(await unshare.json()).toMatchObject({
+        error: 'unsupported',
+        kernel: 'pi',
+        message: 'session.unshare is not implemented on the Pi kernel',
+      });
     } finally {
       kernel.dispose();
       await close();
