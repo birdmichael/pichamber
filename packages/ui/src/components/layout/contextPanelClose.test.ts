@@ -14,6 +14,6 @@ describe('ContextPanel close control', () => {
     expect(contextPanelSource).toMatch(/closeContextPanel\(directoryKey\)/);
     expect(contextPanelSource).toMatch(/closeContextPanel\(chatScopeKey\)/);
     expect(contextPanelSource).toContain("t('contextPanel.actions.closePanel')");
-    expect(mergedHookSource).toMatch(/return \{ scopeKey, chatScopeKey, panelState \}/);
+    expect(mergedHookSource).toMatch(/return \{ scopeKey: directoryKey, chatScopeKey, panelState \}/);
   });
 });
