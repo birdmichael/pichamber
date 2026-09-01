@@ -259,6 +259,7 @@ export function routeMessage(params: {
     agent: params.agent,
     directory: requestDirectory,
     files: params.files,
+    additionalParts: params.additionalParts,
     beforeSend: params.beforeSend,
     onOptimisticInsert: params.onOptimisticInsert,
     send: (messageID) => opencodeClient.sendMessage({

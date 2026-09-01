@@ -238,6 +238,12 @@ export function FilePreviewCommentMenu({ containerRef, filePath, fileContent }: 
         >
           <button
             type="button"
+            onPointerDown={(event) => {
+              // Keep the native selection until onClick opens the input.
+              // Otherwise selectionchange hides this pill before openComment.
+              event.preventDefault();
+              commentModeRef.current = true;
+            }}
             onClick={openComment}
             className={cn(
               'px-3.5 py-1.5 rounded-full',

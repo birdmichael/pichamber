@@ -6,16 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import type { ContextPartPayload } from '@/lib/messages/contextParts';
 import { cn } from '@/lib/utils';
 
-/**
- * A context item attached to a user message: an inline code comment, a
- * terminal selection, a browser annotation, or GitHub PR context.
- *
- * The quoted material renders as a messenger-style reply: a source caption and
- * the quote behind a plain left bar, in muted text, clamped to a few lines
- * (click toggles the full quote). The user's comment follows below as regular
- * message text, so the pair reads as "a reply to this quote" instead of a
- * boxed widget inside the bubble.
- */
+/** Renders structured `pichamberContext` payloads as transcript cards. */
 
 const ContextCard: React.FC<{
     icon: IconName;

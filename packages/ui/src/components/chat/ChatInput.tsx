@@ -1280,7 +1280,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
 
         const consumeLiveDrafts = () => {
             if (!consumedDraftTarget || drafts.length === 0) return;
-            consumeDrafts(consumedDraftTarget);
+            for (const draft of drafts) {
+                removeInlineCommentDraft(consumedDraftTarget, draft.id);
+            }
         };
 
         const pendingKey = capturedDraftSnapshot?.open

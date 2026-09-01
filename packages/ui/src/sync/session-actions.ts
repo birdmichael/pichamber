@@ -16,7 +16,7 @@ import { useGlobalSessionStatusStore } from "./global-session-status"
 import { registerSessionDirectory } from "./sync-refs"
 import { recordSendFailure } from "./send-failure-log"
 import { isSyntheticPart } from "@/lib/messages/synthetic"
-import { draftFromContextPayload, readContextPart, type ContextCarrierPart } from "@/lib/messages/contextParts"
+import { draftFromContextPayload, readContextPart, type ContextCarrierPart, type ContextPartMetadata } from "@/lib/messages/contextParts"
 import { useInlineCommentDraftStore, type InlineCommentDraftTarget } from "@/stores/useInlineCommentDraftStore"
 import { materializeSessionSnapshots } from "./materialization"
 import { stripMessageDiffSnapshots, stripSessionDiffSnapshots } from "./sanitize"
@@ -1437,6 +1437,7 @@ export async function optimisticSend(input: {
   agent?: string
   directory?: string | null
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
+  additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
@@ -1500,15 +1501,38 @@ export async function optimisticSend(input: {
 
   const messageID = ascendingId("msg")
   input.onMessageID?.(messageID)
-  const textPartId = ascendingId("prt")
 
-  const optimisticParts: Part[] = [
-    { id: textPartId, type: "text", text: input.content } as Part,
-  ]
+  const optimisticParts: Part[] = []
+  if (input.content.trim()) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
+  }
+  for (const part of input.additionalParts ?? []) {
+    if (typeof part.text === "string" && part.text.length > 0) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "text",
+        text: part.text,
+        ...(part.synthetic ? { synthetic: true } : {}),
+        ...(part.metadata ? { metadata: part.metadata } : {}),
+      } as Part)
+    }
+    for (const file of part.files ?? []) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "file",
+        mime: file.mime,
+        url: file.url,
+        filename: file.filename,
+      } as Part)
+    }
+  }
   if (input.files) {
     for (const f of input.files) {
       optimisticParts.push({ id: ascendingId("prt"), type: "file", mime: f.mime, url: f.url, filename: f.filename } as Part)
     }
+  }
+  if (optimisticParts.length === 0) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
   }
 
   const optimisticMessage = {

@@ -977,6 +977,54 @@ describe("optimisticSend target directory", () => {
     expect(currentStore.getState().session_status["session-new"]).toBe(undefined)
   })
 
+  test("inserts structured context parts and skips an empty text shell", async () => {
+    const targetStore = createStore({})
+    const childStores = createChildStores([["/target/project", targetStore]])
+    let optimisticAdd: OptimisticAddCall | null = null
+
+    const { optimisticSend, setActionRefs, setOptimisticRefs } = await import("./session-actions")
+    setActionRefs(mockSdk as unknown as OpencodeClient, childStores, () => "/target/project")
+    setOptimisticRefs(
+      (input) => {
+        optimisticAdd = input
+      },
+      () => undefined,
+    )
+
+    await optimisticSend({
+      sessionId: "session-new",
+      directory: "/target/project",
+      content: "",
+      providerID: "provider",
+      modelID: "model",
+      additionalParts: [{
+        text: "Comment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this",
+        synthetic: true,
+        metadata: {
+          pichamberContext: {
+            kind: "code-comment",
+            source: "file",
+            fileLabel: "src/app.ts",
+            startLine: 3,
+            endLine: 5,
+            language: "ts",
+            code: "const x = 1;",
+            text: "fix this",
+          },
+        },
+      }],
+      send: async () => undefined,
+    })
+
+    const add = optimisticAdd as unknown as OptimisticAddCall
+    expect(add.parts).toHaveLength(1)
+    expect(add.parts[0]).toMatchObject({
+      type: "text",
+      synthetic: true,
+      metadata: { pichamberContext: { kind: "code-comment", fileLabel: "src/app.ts" } },
+    })
+  })
+
   test("commits the new branch locally and discards its optimistic shadow when sending after a revert", async () => {
     const retainedMessage = { id: "msg_ffffffffffffRetained", role: "user", sessionID: "session-reverted", time: { created: 1 } } as Message
     const revertedMessage = { id: "msg_000000000000Reverted", role: "user", sessionID: "session-reverted", time: { created: 2 } } as Message
