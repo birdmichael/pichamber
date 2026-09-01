@@ -45,3 +45,15 @@ export const resolveSessionDisplayTitleFrom = (
   }
   return untitledLabel;
 };
+
+/** Skip empty/untitled drafts so localized Untitled is not persisted over New session. */
+export const shouldPersistSessionTitle = (
+  draft: unknown,
+  liveTitle: unknown,
+  untitledLabel: string,
+): boolean => {
+  const title = typeof draft === 'string' ? draft.trim() : '';
+  if (!title || isPlaceholderSessionTitle(title) || title === untitledLabel) return false;
+  const live = typeof liveTitle === 'string' ? liveTitle.trim() : '';
+  return title !== live;
+};

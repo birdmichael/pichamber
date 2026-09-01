@@ -161,11 +161,12 @@ const formatPiNodeRuntimeLines = (runtime: Record<string, unknown> | null): stri
   const command = formatUnknown(runtime.command);
   const source = formatUnknown(runtime.source);
   lines.push(`- node: ${command} (source=${source})`);
-  if (runtime.ok === false) {
-    lines.push(`- error: ${formatUnknown(runtime.code)} ${formatUnknown(runtime.message)}`.trim());
-    if (typeof runtime.recovery === 'string' && runtime.recovery.trim()) {
-      lines.push(`- recovery: ${runtime.recovery.trim()}`);
-    }
+  const code = typeof runtime.code === 'string' ? runtime.code.trim() : '';
+  const message = typeof runtime.message === 'string' ? runtime.message.trim() : '';
+  const recovery = typeof runtime.recovery === 'string' ? runtime.recovery.trim() : '';
+  if (runtime.ok === false || code || message) {
+    lines.push(`- error: ${[code, message].filter(Boolean).join(' ') || '(n/a)'}`);
+    if (recovery) lines.push(`- recovery: ${recovery}`);
   }
   const hello = isRecord(runtime.hello) ? runtime.hello : null;
   const sdk = hello && isRecord(hello.sdk) ? hello.sdk : null;
@@ -196,10 +197,8 @@ export const formatKernelResolutionLines = ({
   opencodeResolution: OpenChamberOpencodeResolution | null;
   isMac: boolean;
 }): string[] => {
-  if (kernel === 'pi') {
-    return formatPiNodeRuntimeLines(isRecord(health?.piNodeRuntime) ? health.piNodeRuntime : null);
-  }
-  if (!isMac) return [];
+  if (kernel === 'opencode') {
+    if (!isMac) return [];
 
   const lines: string[] = ['OpenCode resolution:'];
   const launchDiagnostics = isRecord(health?.lastOpenCodeLaunchDiagnostics)
@@ -283,7 +282,9 @@ export const formatKernelResolutionLines = ({
     lines.push(`- launch-args: ${configuredLaunchArgs.length ? configuredLaunchArgs.join(' ') : '(none)'}`);
     lines.push(`- runtime: ${formatLaunchRuntime(configuredLaunchWrapperType || '', node, bun)}`);
   }
-  return lines;
+    return lines;
+  }
+  return formatPiNodeRuntimeLines(isRecord(health?.piNodeRuntime) ? health.piNodeRuntime : null);
 };
 
 const buildOpenCodeStatusReport = async (): Promise<string> => {

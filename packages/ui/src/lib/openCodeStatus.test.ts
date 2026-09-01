@@ -56,4 +56,43 @@ describe('formatKernelResolutionLines', () => {
     expect(text).toContain('/Users/bm/.opencode/bin/opencode');
     expect(text).not.toContain('Pi kernel resolution:');
   });
+
+  test('missing health kernel does not dump leftover OpenCode PATH', () => {
+    const lines = formatKernelResolutionLines({
+      kernel: '',
+      health: null,
+      opencodeResolution: {
+        resolved: '/Users/bm/.opencode/bin/opencode',
+        source: 'path',
+      },
+      isMac: true,
+    });
+
+    const text = lines.join('\n');
+    expect(text).toContain('Pi kernel resolution:');
+    expect(text).not.toContain('/.opencode/bin/opencode');
+  });
+
+  test('prints SDK hello failures even when node resolve ok is true', () => {
+    const lines = formatKernelResolutionLines({
+      kernel: 'pi',
+      health: {
+        piNodeRuntime: {
+          ok: true,
+          command: '/app/node',
+          source: 'bundled',
+          code: 'PI_SDK_UNAVAILABLE',
+          message: 'SDK import failed',
+          recovery: 'Install the bundled Node child.',
+        },
+      },
+      opencodeResolution: null,
+      isMac: true,
+    });
+
+    const text = lines.join('\n');
+    expect(text).toContain('PI_SDK_UNAVAILABLE');
+    expect(text).toContain('SDK import failed');
+    expect(text).toContain('Install the bundled Node child.');
+  });
 });

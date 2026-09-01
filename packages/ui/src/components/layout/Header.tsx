@@ -43,7 +43,7 @@ import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { useDeviceInfo, useTabletStandalonePwaRuntime } from '@/lib/device';
-import { resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom } from '@/lib/sessionTitle';
+import { resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom, shouldPersistSessionTitle } from '@/lib/sessionTitle';
 import { cn, hasModifier } from '@/lib/utils';
 import { McpDropdownContent } from '@/components/mcp/McpDropdown';
 import { McpIcon } from '@/components/icons/McpIcon';
@@ -1221,13 +1221,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   const saveHeaderSessionRename = React.useCallback(async () => {
     if (!currentSessionId) return;
-    const title = headerSessionTitleDraft.trim();
-    const liveTitle = currentSession?.title?.trim() || '';
-    if (title && title !== liveTitle) {
-      await updateSessionTitle(currentSessionId, title);
+    const untitledLabel = t('sessions.sidebar.session.untitled');
+    if (shouldPersistSessionTitle(headerSessionTitleDraft, currentSession?.title, untitledLabel)) {
+      await updateSessionTitle(currentSessionId, headerSessionTitleDraft.trim());
     }
     setIsRenamingHeaderSession(false);
-  }, [currentSession?.title, currentSessionId, headerSessionTitleDraft, updateSessionTitle]);
+  }, [currentSession?.title, currentSessionId, headerSessionTitleDraft, t, updateSessionTitle]);
 
   React.useEffect(() => {
     if (!isRenamingHeaderSession) return;

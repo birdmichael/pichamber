@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { isPlaceholderSessionTitle, resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom } from './sessionTitle';
+import { isPlaceholderSessionTitle, resolveSessionDisplayTitle, resolveSessionDisplayTitleFrom, shouldPersistSessionTitle } from './sessionTitle';
 
 describe('session display titles', () => {
   test('treats empty and default labels as placeholders', () => {
@@ -51,5 +51,12 @@ describe('session display titles', () => {
       ['New session', null, 'cached-title'],
       untitled,
     )).toBe('cached-title');
+  });
+
+  test('does not persist a localized untitled label over New session', () => {
+    expect(shouldPersistSessionTitle('未命名会话', 'New session', '未命名会话')).toBe(false);
+    expect(shouldPersistSessionTitle('Untitled Session', 'New session', 'Untitled Session')).toBe(false);
+    expect(shouldPersistSessionTitle('帮我提一个issue', 'New session', '未命名会话')).toBe(true);
+    expect(shouldPersistSessionTitle('帮我提一个issue', '帮我提一个issue', '未命名会话')).toBe(false);
   });
 });
