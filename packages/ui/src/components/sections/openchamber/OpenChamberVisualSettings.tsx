@@ -57,6 +57,7 @@ import {
     SETTINGS_CLUSTER_CONTROL_CLASS,
     SETTINGS_NUMBER_STEPPER_ROW_CLASS,
     SETTINGS_NUMBER_UNIT_CLASS,
+    SETTINGS_NUMBER_INPUT_CLASS,
     SETTINGS_FIELDS_STACK_CLASS,
     SETTINGS_OPTION_STACK_CLASS,
 } from '@/components/sections/shared/SettingsSection';
@@ -1346,6 +1347,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={50}
                                                 max={200}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                                 aria-label={t('settings.openchamber.visual.field.fontSizePercentageAria')}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
@@ -1376,6 +1378,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={9}
                                                 max={52}
                                                 step={1}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1405,6 +1408,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={9}
                                                 max={32}
                                                 step={1}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1439,6 +1443,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={50}
                                                 max={200}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
                                             <Button size="sm"
@@ -1469,6 +1474,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={0}
                                                 max={100}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1900,6 +1906,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                     min={1000}
                                                     max={100000000}
                                                     step={50000}
+                                                    className={SETTINGS_NUMBER_INPUT_CLASS}
                                                 />
                                             ) : null}
                                         </div>

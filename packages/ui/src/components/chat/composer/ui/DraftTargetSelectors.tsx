@@ -23,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useI18n } from '@/lib/i18n';
+import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { getProjectDisplayLabel } from '@/lib/workspaceLabel';
 import { createWorktreeDraft } from '@/lib/worktreeSessionCreator';
@@ -268,13 +269,7 @@ export function MobileDraftTargetSheets(
                         className="h-9"
                     />
                     <div className="flex flex-col">
-                        {projects
-                            .filter((project) => {
-                                const needle = query.trim().toLowerCase();
-                                if (!needle) return true;
-                                return getProjectDisplayLabel(project, homeDirectory).toLowerCase().includes(needle)
-                                    || project.path.toLowerCase().includes(needle);
-                            })
+                        {rankByQuery(projects, query, (project) => [getProjectDisplayLabel(project, homeDirectory), project.path])
                             .map((project) => (
                                 <button
                                     key={project.id}
@@ -308,8 +303,7 @@ export function MobileDraftTargetSheets(
                     />
                     <div className="flex flex-col">
                         {(() => {
-                            const needle = query.trim().toLowerCase();
-                            const matches = (label: string) => !needle || label.toLowerCase().includes(needle);
+                            const matches = (label: string) => matchesRankQuery([label], query);
                             const selectedValue = selectedDirectory
                                 ?? branchItems[0]?.value
                                 ?? normalizePath(selectedProject.path)
@@ -353,8 +347,7 @@ export function MobileDraftTargetSheets(
                                             {t('chat.chatInput.worktreeNew')}
                                         </button>
                                     </div>
-                                    {worktreeBranchOptions
-                                        .filter((option) => matches(option.label))
+                                    {rankByQuery(worktreeBranchOptions, query, (option) => [option.label])
                                         .map((option) => renderRow(option.value, `${option.pending ? '⏳ ' : ''}${option.label}`))}
                                     {selectedDirectory && !selectedBranchIsKnown && matches(selectedBranchLabel ?? '')
                                         ? renderRow(selectedDirectory, selectedBranchLabel, 'unknown-current')

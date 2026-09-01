@@ -9,6 +9,7 @@ import { useGitBaseBranchStore, gitBaseBranchEntryKey } from '@/stores/useGitBas
 import { coerceDiffScope, branchRangeKey, branchEmptyExcludesWorkingTree, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, isOwnBranchCreationSource, resolveDiffToolbarLayout, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
 import { getBranchBase, getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
 import { getRuntimeKey } from '@/lib/runtime-switch';
+import { rankByQuery } from '@/lib/search/fuzzySearch';
 import { cn } from '@/lib/utils';
 import type { GitStatus, GitRangeFileEntry } from '@/lib/api/types';
 import {
@@ -1957,12 +1958,10 @@ export const DiffView: React.FC<DiffViewProps> = ({
             }
 
             if (!branchBase) {
-                const searchTerm = basePickerSearch.trim().toLowerCase();
-                const candidateBranches = (branches?.all ?? [])
+                const eligibleBranches = (branches?.all ?? [])
                     .map((name: string) => name.replace(/^remotes\//, ''))
-                    .filter((name: string) => name !== currentBranch && !name.endsWith(`/${currentBranch}`))
-                    .filter((name: string) => !searchTerm || name.toLowerCase().includes(searchTerm))
-                    .sort();
+                    .filter((name: string) => name !== currentBranch && !name.endsWith(`/${currentBranch}`));
+                const candidateBranches = rankByQuery(eligibleBranches, basePickerSearch, (name) => [name]);
                 return (
                     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                         <Icon name="git-branch" className="size-6 text-muted-foreground" />

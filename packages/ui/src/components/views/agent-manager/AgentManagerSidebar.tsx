@@ -1,4 +1,5 @@
 import React from 'react';
+import { rankByQuery } from '@/lib/search/fuzzySearch';
 import { toast } from '@/components/ui';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -214,13 +215,10 @@ export const AgentManagerSidebar: React.FC<AgentManagerSidebarProps> = ({
 
   const MAX_VISIBLE = 5;
 
-  const filteredGroups = React.useMemo(() => {
-    if (!searchQuery.trim()) return groups;
-    const query = searchQuery.toLowerCase();
-    return groups.filter(group =>
-      group.name.toLowerCase().includes(query)
-    );
-  }, [searchQuery, groups]);
+  const filteredGroups = React.useMemo(
+    () => rankByQuery(groups, searchQuery, (group) => [group.name]),
+    [searchQuery, groups],
+  );
 
   const visibleGroups = showAll ? filteredGroups : filteredGroups.slice(0, MAX_VISIBLE);
   const remainingCount = filteredGroups.length - MAX_VISIBLE;

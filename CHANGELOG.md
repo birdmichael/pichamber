@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
+- Settings: the editor font size survives a restart, and number fields and selects no longer clip at large interface font sizes.
+- Projects: the folder picker can select several directories at once and add them together.
+- Settings/Providers: after saving an API key or signing in, the provider no longer shows "Credentials missing" with its models hidden until you switch away and back.
+- Themes: custom themes loaded through symlinks now work.
+- Debug: the debug panel (Ctrl/Cmd+Shift+D) has a Requests tab showing in-flight requests and their age over the last five minutes.
+- Search: searchable pickers rank best matches first, match multi-word queries in any order, and ignore punctuation.
+- Sessions: headers now find archived sessions too, so an archived session's title no longer goes missing.
+- Devices: re-pairing a phone keeps the device's existing name instead of resetting it.
 - Desktop: idle sessions can move into an existing worktree from the session menu. A confirm dialog appears when the source has uncommitted changes; cancel leaves everything in place, and a failed move rolls the session back.
 - Web: a notification with no title says Pichamber, not OpenChamber.
 - Multi-run: a group can include more than five models. There is no upper cap.

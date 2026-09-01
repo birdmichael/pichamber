@@ -25,11 +25,12 @@ import {
     SETTINGS_CONTROL_CLUSTER_CLASS,
     SETTINGS_FIELD_LABEL_CLASS,
     SETTINGS_HELPER_CLASS,
+    SETTINGS_NUMBER_INPUT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
+import { cn } from '@/lib/utils';
 import { SettingsReveal } from '@/components/sections/shared/SettingsReveal';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { browserVoiceService } from '@/lib/voice/browserVoiceService';
-import { cn } from '@/lib/utils';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useI18n } from '@/lib/i18n';
 import { useLocalTTS } from '@/hooks/useLocalTTS';
@@ -1131,20 +1132,20 @@ export const VoiceSettings: React.FC = () => {
                             {/* Speech Rate */}
                             <SettingsFieldRow label={t('settings.voice.page.field.speechRate')}>
                                     {!isMobile && <input type="range" min={0.5} max={2} step={0.1} value={speechRate} onChange={(e) => setSpeechRate(Number(e.target.value))} className={sliderClass} />}
-                                    <NumberInput value={speechRate} onValueChange={setSpeechRate} min={0.5} max={2} step={0.1} className="w-16 tabular-nums" />
+                                    <NumberInput value={speechRate} onValueChange={setSpeechRate} min={0.5} max={2} step={0.1} className={cn(SETTINGS_NUMBER_INPUT_CLASS, 'tabular-nums')} />
                             </SettingsFieldRow>
 
                             {/* Speech Pitch */}
                             <SettingsFieldRow label={t('settings.voice.page.field.speechPitch')}>
                                     {!isMobile && <input type="range" min={0.5} max={2} step={0.1} value={speechPitch} onChange={(e) => setSpeechPitch(Number(e.target.value))} className={sliderClass} />}
-                                    <NumberInput value={speechPitch} onValueChange={setSpeechPitch} min={0.5} max={2} step={0.1} className="w-16 tabular-nums" />
+                                    <NumberInput value={speechPitch} onValueChange={setSpeechPitch} min={0.5} max={2} step={0.1} className={cn(SETTINGS_NUMBER_INPUT_CLASS, 'tabular-nums')} />
                             </SettingsFieldRow>
 
                             {/* Speech Volume */}
                             <SettingsFieldRow label={t('settings.voice.page.field.speechVolume')}>
                                     {!isMobile && <input type="range" min={0} max={1} step={0.1} value={speechVolume} onChange={(e) => setSpeechVolume(Number(e.target.value))} className={sliderClass} />}
                                     {isMobile ? (
-                                        <NumberInput value={Math.round(speechVolume * 100)} onValueChange={(v) => setSpeechVolume(v / 100)} min={0} max={100} step={10} className="w-16 tabular-nums" />
+                                        <NumberInput value={Math.round(speechVolume * 100)} onValueChange={(v) => setSpeechVolume(v / 100)} min={0} max={100} step={10} className={cn(SETTINGS_NUMBER_INPUT_CLASS, 'tabular-nums')} />
                                     ) : (
                                         <span className="typography-ui-label text-foreground tabular-nums min-w-[3rem] text-right">
                                             {Math.round(speechVolume * 100)}%

@@ -40,11 +40,15 @@ import {
 import {
   getOAuthAuthMethods,
   parseAuthPayload,
+  providerHasCredentials,
   requiresOpenCodeRestartAfterOAuth,
+  shouldAutoOpenAuthPanel,
   shouldShowApiKeyAuth,
+  shouldShowModelsSection,
   type AuthMethod,
   type OAuthAuthMethodEntry,
 } from './providerAuth';
+import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
 import { ProviderXaiUsage } from './ProviderXaiUsage';
@@ -59,6 +63,9 @@ import {
   type CustomProviderPersistPlan,
   type ProviderConfigScope,
 } from './custom-provider-form';
+
+const providerDeclaresEnv = (provider: { env?: string[] } | undefined): boolean =>
+  Array.isArray(provider?.env) && provider.env.some((name) => name.trim().length > 0);
 
 const formatCompactNumber = (value: number) => new Intl.NumberFormat(getCurrentIntlLocale(), {
   notation: 'compact',
@@ -189,7 +196,9 @@ export const ProvidersPage: React.FC = () => {
   const [providerSearchQuery, setProviderSearchQuery] = React.useState('');
   const [providerDropdownOpen, setProviderDropdownOpen] = React.useState(false);
   const [providerSources, setProviderSources] = React.useState<Record<string, ProviderSources>>({});
+  const [providerSourceEpoch, setProviderSourceEpoch] = React.useState(0);
   const [showAuthPanel, setShowAuthPanel] = React.useState(false);
+  const [authPanelDismissedForId, setAuthPanelDismissedForId] = React.useState<string | null>(null);
   const [editingCustomProviderId, setEditingCustomProviderId] = React.useState<string | null>(null);
   const [editingCustomFormInitial, setEditingCustomFormInitial] = React.useState<CustomProviderFormState | null>(null);
   const [editingCustomScope, setEditingCustomScope] = React.useState<ProviderConfigScope | null>(null);
@@ -352,6 +361,7 @@ export const ProvidersPage: React.FC = () => {
   React.useEffect(() => {
     if (selectedProviderId === ADD_PROVIDER_ID) {
       setShowAuthPanel(true);
+      setAuthPanelDismissedForId(null);
       setEditingCustomProviderId(null);
       setEditingCustomFormInitial(null);
       setEditingCustomScope(null);
@@ -360,6 +370,7 @@ export const ProvidersPage: React.FC = () => {
     }
 
     setShowAuthPanel(false);
+    setAuthPanelDismissedForId(null);
     if (editingCustomProviderId && editingCustomProviderId !== selectedProviderId) {
       setEditingCustomProviderId(null);
       setEditingCustomFormInitial(null);
@@ -369,7 +380,7 @@ export const ProvidersPage: React.FC = () => {
   }, [selectedProviderId, editingCustomProviderId]);
 
   // Unauthenticated providers (OAuth-only plugins before login) should open the
-  // auth panel instead of a false "Connected" summary.
+  // auth panel instead of a false "Connected" summary. Respect an explicit Hide.
   React.useEffect(() => {
     if (!selectedProviderId || selectedProviderId === ADD_PROVIDER_ID) {
       return;
@@ -379,15 +390,26 @@ export const ProvidersPage: React.FC = () => {
       return;
     }
     const provider = providers.find((entry) => entry.id === selectedProviderId);
-    const envEntries = Array.isArray(provider?.env)
-      ? provider.env.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-      : [];
-    const hasCreds = Boolean(sources.auth.exists) || envEntries.length > 0;
-    const isCustomProvider = Boolean(provider && isConfigDefinedCustomProvider(provider, sources));
-    if (requiresProviderAuth(true, hasCreds, isCustomProvider)) {
+    const hasCreds = providerHasCredentials({
+      key: (provider as { key?: string | null } | undefined)?.key,
+      authSourceExists: sources.auth.exists,
+      optionsApiKey: (provider as { options?: { apiKey?: string | null } } | undefined)?.options?.apiKey ?? null,
+      envDeclared: providerDeclaresEnv(provider),
+    });
+    const isEditableCustomProvider = Boolean(
+      provider && isConfigDefinedCustomProvider(provider, sources),
+    );
+    if (
+      shouldAutoOpenAuthPanel({
+        sourcesLoaded: true,
+        hasCredentials: hasCreds,
+        userDismissed: authPanelDismissedForId === selectedProviderId,
+        isEditableCustomProvider,
+      })
+    ) {
       setShowAuthPanel(true);
     }
-  }, [selectedProviderId, providerSources, providers]);
+  }, [selectedProviderId, providerSources, providers, authPanelDismissedForId]);
 
   React.useEffect(() => {
     if (!selectedProviderId || selectedProviderId === ADD_PROVIDER_ID) {
@@ -430,7 +452,7 @@ export const ProvidersPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedProviderId, settingsDirectory, t]);
+  }, [selectedProviderId, settingsDirectory, t, providerSourceEpoch]);
 
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
@@ -461,6 +483,7 @@ export const ProvidersPage: React.FC = () => {
       }
       await loadProviders({ directory: settingsDirectory, source: 'settings:api-key-save' });
       setSelectedProvider(providerId);
+      setProviderSourceEpoch((n) => n + 1);
     } catch (error) {
       console.error('Failed to save API key:', error);
       toast.error(t('settings.providers.page.toast.apiKeySaveFailed'));
@@ -536,12 +559,14 @@ export const ProvidersPage: React.FC = () => {
     t('settings.providers.page.auth.oauthMethodFallback', { index: String(index + 1) });
 
   const handleOAuthConnected = async (providerId: string) => {
+    setAuthPanelDismissedForId(null);
     setShowAuthPanel(false);
     if (!isPiKernel && requiresOpenCodeRestartAfterOAuth(providerId)) {
       recordDeferredOpenCodeRestart('providers', { id: providerId });
     }
     await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
     setSelectedProvider(providerId);
+    setProviderSourceEpoch((n) => n + 1);
   };
 
   const handleDisconnectProvider = async (providerId: string) => {
@@ -567,6 +592,7 @@ export const ProvidersPage: React.FC = () => {
       // removed:false payloads must not create a phantom pending Apply & Restart.
       noteDeferredRestartFromPayload(payload, 'providers', { id: providerId });
       await loadProviders({ directory: settingsDirectory, source: 'settings:provider-disconnect' });
+      setProviderSourceEpoch((n) => n + 1);
     } catch (error) {
       console.error('Failed to disconnect provider:', error);
       toast.error(t('settings.providers.page.toast.providerDisconnectFailed'));
@@ -666,22 +692,16 @@ export const ProvidersPage: React.FC = () => {
                         </div>
                         <ScrollableOverlay outerClassName="max-h-[240px]" className="p-1">
                           {(() => {
-                            const query = providerSearchQuery.toLowerCase();
                             const customLabel = t('settings.providers.page.custom.optionLabel');
                             const customMatches = addCatalogProviders.length === 0
-                              || !query
-                              || customLabel.toLowerCase().includes(query)
-                              || 'other'.includes(query)
-                              || 'custom'.includes(query);
-                            const filtered = addCatalogProviders.filter(p => {
-                              return (p.name || p.id).toLowerCase().includes(query) || p.id.toLowerCase().includes(query);
-                            });
+                              || matchesRankQuery([customLabel, 'other', 'custom'], providerSearchQuery);
+                            const filtered = rankByQuery(addCatalogProviders, providerSearchQuery, (p) => [p.name || p.id, p.id]);
                             if (filtered.length === 0 && !customMatches) {
                               return <p className="py-4 text-center typography-meta text-muted-foreground">{t('settings.providers.page.connect.noProvidersFound')}</p>;
                             }
                             return (
                               <>
-                                {addCatalogProviders.length === 0 && !query ? (
+                                {addCatalogProviders.length === 0 && !providerSearchQuery.trim() ? (
                                   <p className="px-2 py-2 typography-meta text-muted-foreground">
                                     {t(connectedProviderIds.size > 0
                                       ? 'settings.providers.page.connect.allCatalogConnected'
@@ -847,29 +867,31 @@ export const ProvidersPage: React.FC = () => {
   const sourcesLoaded = Boolean(selectedSources);
   const isEditableCustomProvider = sourcesLoaded
     && isConfigDefinedCustomProvider(selectedProvider, selectedSources);
-  const providerEnv = Array.isArray(selectedProvider.env)
-    ? selectedProvider.env.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-    : [];
-  const hasStoredAuth = Boolean(selectedSources?.auth.exists);
-  const hasEnvCredentials = providerEnv.length > 0;
-  const hasCredentials = hasStoredAuth || hasEnvCredentials;
+  const hasCredentials = providerHasCredentials({
+    key: (selectedProvider as { key?: string | null }).key,
+    authSourceExists: selectedSources?.auth.exists,
+    optionsApiKey: (selectedProvider as { options?: { apiKey?: string | null } }).options?.apiKey ?? null,
+    envDeclared: providerDeclaresEnv(selectedProvider),
+  });
   const authStatusIncomplete = requiresProviderAuth(
     sourcesLoaded,
     hasCredentials,
     isEditableCustomProvider,
   );
-  const showModelsSection = providerModels.length > 0 && !authStatusIncomplete;
+  const showModelsSection = shouldShowModelsSection({
+    modelCount: providerModels.length,
+    sourcesLoaded,
+    hasCredentials,
+    isEditableCustomProvider,
+  });
   const incompleteAuthHint = !showApiKeyAuth && oauthAuthMethods.length > 0
     ? t('settings.providers.page.auth.useReconnectHint')
     : t('settings.providers.page.auth.incompleteHint');
 
-  const filteredModels = providerModels.filter((model) => {
-    const name = typeof model?.name === 'string' ? model.name : '';
-    const id = typeof model?.id === 'string' ? model.id : '';
-    const query = modelQuery.trim().toLowerCase();
-    if (!query) return true;
-    return name.toLowerCase().includes(query) || id.toLowerCase().includes(query);
-  });
+  const filteredModels = rankByQuery(providerModels, modelQuery, (model) => [
+    typeof model?.name === 'string' ? model.name : '',
+    typeof model?.id === 'string' ? model.id : '',
+  ]);
 
   if (isCustomEditMode && isEditableCustomProvider && editingCustomFormInitial) {
     return (
@@ -931,7 +953,11 @@ export const ProvidersPage: React.FC = () => {
               variant="outline"
               size="xs"
               className="!font-normal"
-              onClick={() => setShowAuthPanel((prev) => !prev)}
+              onClick={() => {
+                const nextOpen = !showAuthPanel;
+                setShowAuthPanel(nextOpen);
+                setAuthPanelDismissedForId(nextOpen ? null : selectedProvider.id);
+              }}
             >
               {showAuthPanel ? t('settings.providers.page.actions.hide') : t('settings.providers.page.actions.reconnect')}
             </Button>
