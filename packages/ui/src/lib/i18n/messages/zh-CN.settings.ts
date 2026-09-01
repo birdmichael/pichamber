@@ -1301,7 +1301,7 @@ export const settingsDict = {
   'settings.openchamber.keyboardShortcuts.error.exactConflict': '此组合已被 {action} 使用。',
   'settings.openchamber.keyboardShortcuts.error.internalConflict': '此组合与内置快捷键冲突，内置快捷键不能被替换。',
   'settings.openchamber.keyboardShortcuts.action.open_draft_project_picker.label': '打开草稿项目选择器',
-  'settings.openchamber.keyboardShortcuts.action.open_draft_worktree_picker.label': '打开草稿工作树选择器',
+  'settings.openchamber.keyboardShortcuts.action.open_draft_worktree_picker.label': '打开草稿 worktree 选择器',
   'settings.openchamber.keyboardShortcuts.action.open_session_list.label': '打开最近会话',
   'settings.openchamber.keyboardShortcuts.action.toggle_dictation.label': '语音输入',
   'settings.projects.sidebar.total': '总计 {count}',
