@@ -7,6 +7,12 @@ everything between typing and sending.
 own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
+`@` file mentions search files and directories with the longest query token
+(`mentionServerQuery`), then rank both kinds together by match quality
+(`rankFileMentionResults`). Multi-word queries still require every token to
+appear in the path. Pi `@` agents stay on `getComposerMentionableAgents`; do
+not list leftover OpenCode agents.
+
 On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. The composer shows that reason next to an alert glyph, and Enter toasts the same copy. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
 On Desktop, compact-composer Enter still sends and Shift+Enter inserts a newline. In the expanded composer, Enter inserts a newline and Cmd/Ctrl+Enter sends — Linux uses Ctrl+Enter. Mobile already required a modifier to send.
 An existing session with zero messages uses the same Desktop welcome chrome as New session: the same `DraftPresetChips` the installed packages allow, plus the Session panel. The welcome title uses the same friendly workspace label as the sidebar (`~` for the home folder, or the opened project's name), not the raw last path segment. Chip click still submits through the composer send path on that session; it does not mint another chat.
