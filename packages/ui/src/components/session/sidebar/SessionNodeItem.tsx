@@ -57,7 +57,13 @@ import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { MultiRunFusionDialog } from '@/components/multirun/MultiRunFusionDialog';
 import { FusionIcon } from '@/components/icons/FusionIcon';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
-import { startSessionTreeWorktreeMove, useIsSessionWorktreeMovePending } from '@/lib/worktrees/sessionWorktreeMove';
+import {
+  buildSessionTreeMoveMessages,
+  requestSessionTreeMove,
+  startSessionTreeWorktreeMove,
+  useIsSessionWorktreeMovePending,
+} from '@/lib/worktrees/sessionWorktreeMove';
+import { buildSessionWorktreeMenuTargets } from './sessionWorktreeMenu';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
@@ -481,6 +487,26 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   // tick of the counter it only decides to mount.
   const hasActivityDuration = useHasSessionActivityDuration(session.id, isStreaming);
   const isMovingToWorktree = useIsSessionWorktreeMovePending(session.id);
+  const availableWorktreesByProject = useSessionUIStore((state) => state.availableWorktreesByProject);
+  const projects = useProjectsStore((state) => state.projects);
+  const currentWorktree = useSessionUIStore((state) => state.worktreeMetadata.get(session.id) ?? null);
+  const worktreeMoveProjectPath = projects.find((project) => project.id === projectId)?.path
+    ?? currentWorktree?.projectDirectory
+    ?? sessionDirectory
+    ?? null;
+  const worktreeMoveTargets = buildSessionWorktreeMenuTargets({
+    projectPath: worktreeMoveProjectPath,
+    discoveredWorktrees: worktreeMoveProjectPath
+      ? (availableWorktreesByProject.get(worktreeMoveProjectPath)
+        ?? availableWorktreesByProject.get(normalizePath(worktreeMoveProjectPath) ?? worktreeMoveProjectPath)
+        ?? [])
+      : [],
+    sourceDirectory: sessionDirectory ?? null,
+    currentWorktree,
+  });
+  const existingWorktreeMoveTargets = worktreeMoveTargets.filter((target) => (
+    !target.isCurrent && target.metadata.worktreeStatus !== 'missing' && target.metadata.worktreeStatus !== 'invalid'
+  ));
   const sessionPermissions = useSessionPermissions(session.id, sessionDirectory ?? undefined, { bootstrap: false });
   const sessionGoal = getSessionGoal(resolvedSession);
   const piGoalMarked = sessionHasPiGoalMarker(resolvedSession);
@@ -1084,36 +1110,59 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         </>
       ) : null}
       {!isSubtaskSession && !archivedBucket && !isVSCode && !isChatSession ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="block">
+        <Sub>
+          <SubTrigger disabled={!sessionDirectory || isStreaming || isMovingToWorktree} className="[&>svg]:mr-1">
+            <Icon name="folder-shared" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.moveToWorktreeTargets')}
+          </SubTrigger>
+          <SubContent className="min-w-[220px]">
+            {existingWorktreeMoveTargets.map((target) => (
               <Item
-                disabled={!sessionDirectory || isStreaming || isMovingToWorktree}
+                key={target.metadata.path}
+                disabled={!sessionDirectory || isStreaming || isMovingToWorktree || target.metadata.worktreeStatus === 'pending'}
                 onClick={() => {
                   if (!sessionDirectory || isStreaming || isMovingToWorktree) return;
-                  startSessionTreeWorktreeMove({
+                  requestSessionTreeMove({
+                    kind: 'existing',
                     root: resolvedSession,
                     descendants: collectNodeDescendantSessions(node),
                     sourceDirectory: sessionDirectory,
-                    successMessage: t('sessions.sidebar.session.moveToWorktree.success'),
-                    failureMessage: t('sessions.sidebar.session.moveToWorktree.failed'),
+                    destination: target.metadata,
+                    messages: buildSessionTreeMoveMessages(t, {
+                      success: 'sessions.sidebar.session.moveToWorktree.existingSuccess',
+                      failure: 'sessions.sidebar.session.moveToWorktree.existingFailed',
+                    }),
                   });
                 }}
-                className="w-full [&>svg]:mr-1"
+                className="[&>svg]:mr-1"
               >
-                <Icon name="folder-shared" className="mr-1 h-4 w-4" />
-                {t('sessions.sidebar.session.menu.moveToWorktree')}
+                {target.isPrimary
+                  ? t('sessions.sidebar.session.moveToWorktree.main')
+                  : (target.metadata.branch || target.metadata.label || target.metadata.path)}
               </Item>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-72">
-            {isMovingToWorktree
-              ? t('sessions.sidebar.session.moveToWorktree.tooltipMoving')
-              : isStreaming
-                ? t('sessions.sidebar.session.moveToWorktree.tooltipBusy')
-                : t('sessions.sidebar.session.moveToWorktree.tooltip')}
-          </TooltipContent>
-        </Tooltip>
+            ))}
+            <Item
+              disabled={!sessionDirectory || isStreaming || isMovingToWorktree}
+              onClick={() => {
+                if (!sessionDirectory || isStreaming || isMovingToWorktree) return;
+                startSessionTreeWorktreeMove({
+                  root: resolvedSession,
+                  descendants: collectNodeDescendantSessions(node),
+                  sourceDirectory: sessionDirectory,
+                  successMessage: t('sessions.sidebar.session.moveToWorktree.success'),
+                  failureMessage: t('sessions.sidebar.session.moveToWorktree.failed'),
+                  sourceVerificationFailed: t('sessions.sidebar.session.moveToWorktree.sourceVerificationFailed'),
+                  applyChangesFailed: t('sessions.sidebar.session.moveToWorktree.applyChangesFailed'),
+                  changesMayBeInDestination: t('sessions.sidebar.session.moveToWorktree.changesMayBeInDestination'),
+                });
+              }}
+              className="[&>svg]:mr-1"
+            >
+              <Icon name="add" className="mr-1 h-4 w-4" />
+              {t('sessions.sidebar.session.menu.moveToWorktree')}
+            </Item>
+          </SubContent>
+        </Sub>
       ) : null}
       {isMultiRunLikeSession ? (
         <>

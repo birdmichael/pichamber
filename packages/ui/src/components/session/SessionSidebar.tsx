@@ -76,6 +76,12 @@ import {
   type DeleteFolderConfirmState,
   type DeleteSessionConfirmState,
 } from './sidebar/ConfirmDialogs';
+import { SessionWorktreeMoveConfirmDialog } from './sidebar/SessionWorktreeMoveConfirmDialog';
+import {
+  cancelSessionTreeMove,
+  confirmSessionTreeMove,
+  useSessionTreeMoveConfirmation,
+} from '@/lib/worktrees/sessionWorktreeMove';
 import { BulkActionBar } from './sidebar/BulkActionBar';
 import { useSidebarBulkActions } from './sidebar/hooks/useSidebarBulkActions';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
@@ -491,6 +497,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     liveFallbackCacheRef.current = { signature, sessions: candidates };
     return candidates;
   })();
+  const worktreeMoveConfirmation = useSessionTreeMoveConfirmation();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
@@ -2186,6 +2193,13 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         }}
         project={editingProject}
         onSave={handleSaveProjectEdit}
+      />
+
+      <SessionWorktreeMoveConfirmDialog
+        value={worktreeMoveConfirmation}
+        onMoveSessionOnly={() => confirmSessionTreeMove(false)}
+        onMoveAllChanges={() => confirmSessionTreeMove(true)}
+        onCancel={cancelSessionTreeMove}
       />
 
       <NewWorktreeDialog

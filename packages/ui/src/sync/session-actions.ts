@@ -12,6 +12,7 @@ import { computeSubtreeIds } from "./scoped-blocking-requests"
 import { opencodeClient } from "@/lib/opencode/client"
 import { mergeSessionDirectoryMetadata, resolveGlobalSessionDirectory, useGlobalSessionsStore } from "@/stores/useGlobalSessionsStore"
 import { useConfigStore } from "@/stores/useConfigStore"
+import { useGlobalSessionStatusStore } from "./global-session-status"
 import { registerSessionDirectory } from "./sync-refs"
 import { recordSendFailure } from "./send-failure-log"
 import { isSyntheticPart } from "@/lib/messages/synthetic"
@@ -342,6 +343,45 @@ function reconcileSessionMove(
   })
 
   return movedSession
+}
+
+export type SessionLiveActivity = "active" | "idle" | "unknown"
+
+/**
+ * A session's live status can live in a different child store than the one that
+ * wins the directory dedup, so any store reporting a non-idle status counts.
+ * Absence of a non-idle status is not proof of idleness: report "idle" only when
+ * a child store actually covers the session's directory.
+ */
+export function getSessionLiveActivity(sessionId: string): SessionLiveActivity {
+  const stores = _childStores
+
+  if (stores) {
+    for (const [, store] of stores.children) {
+      const status = store.getState().session_status?.[sessionId]
+      if (status && status.type !== "idle") return "active"
+    }
+  }
+
+  if (useGlobalSessionStatusStore.getState().statusById.has(sessionId)) return "active"
+
+  if (!stores) return "unknown"
+  return isSessionCoveredByChildStore(sessionId, stores) ? "idle" : "unknown"
+}
+
+function isSessionCoveredByChildStore(sessionId: string, stores: ChildStoreManager): boolean {
+  for (const store of stores.children.values()) {
+    const state = store.getState()
+    if (state.session_status && Object.prototype.hasOwnProperty.call(state.session_status, sessionId)) return true
+    if (state.session.some((session) => session.id === sessionId)) return true
+  }
+  const directory = useSessionUIStore.getState().getDirectoryForSession(sessionId)
+  if (!directory) return false
+  return stores.children.has(normalizePath(directory) ?? directory)
+}
+
+export function isSessionBusyNow(sessionId: string): boolean {
+  return getSessionLiveActivity(sessionId) === "active"
 }
 
 export async function moveSessionToDirectory(
