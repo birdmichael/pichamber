@@ -667,6 +667,7 @@ export interface SettingsPayload {
   pinnedDirectories?: string[];
   showReasoningTraces?: boolean;
   collapsibleThinkingBlocks?: boolean;
+  streamingAutoFollowEnabled?: boolean;
   showDeletionDialog?: boolean;
   nativeNotificationsEnabled?: boolean;
   notificationMode?: 'always' | 'hidden-only';

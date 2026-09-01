@@ -79,6 +79,7 @@ export type DesktopSettings = {
   /** Work-status panel sections the user switched off. */
   workStatusHiddenSections?: string[];
   collapsibleThinkingBlocks?: boolean;
+  streamingAutoFollowEnabled?: boolean;
   showDeletionDialog?: boolean;
   nativeNotificationsEnabled?: boolean;
   notificationMode?: 'always' | 'hidden-only';
