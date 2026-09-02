@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+
 ## [1.2.9] - 2026-09-02
 
 - **Chat:** after Plan **Implement the plan** / **Implement here**, the next tool rows (Read, Shell, Edit) stay on that turn. Previously the reply kept running (`editing file`) while the transcript froze on Plan mode complete.

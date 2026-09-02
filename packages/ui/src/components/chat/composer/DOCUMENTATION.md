@@ -158,11 +158,13 @@ immediately from the selected model's catalog (`reasoning_options`) and
 waits for `PATCH /model` before applying GET `available`. Empty or
 `off`-only live stays on catalog; a model with no catalog levels hides
 the chip. Each send uses the chip's current model and thinking
-(`resolveComposerSendThinking`); leftover OpenCode `currentVariant` is
-only a fallback. Session `GET /model` restores when the chat opens and
-does not overwrite a later composer pick; a failed first apply
-(providers still loading) retries. Thinking GET waits for `PATCH /model`
-and keeps a later chip pin over jsonl. A new-session draft with
+(`resolveComposerSendThinking`). On Pi leftover OpenCode `currentVariant`
+is not sent. Session `GET /model` restores when the chat opens and
+does not overwrite a later composer pick; automatic history/fallback
+applies are not composer picks. Fetch failure retries. Thinking GET waits for `PATCH /model` and keeps a later chip pin over
+jsonl only when that pin belongs to this session and model. Switching
+chats does not keep the previous chip pin. Mod+Shift+T cycles the Pi
+chip levels through the same apply path as the chip. A new-session draft with
 no session id uses models.dev `reasoning_options` for the selected model
 so picking a 3-level model does not flash all seven levels. OpenCode `build`
 / `plan` / custom agents still show. A Build row (session model + `/plan implement` in this session) appears

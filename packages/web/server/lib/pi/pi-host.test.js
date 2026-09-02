@@ -2538,6 +2538,149 @@ describe('session thinking levels', () => {
     host.dispose();
   });
 
+  it('keeps a live non-narrow thinking subset instead of replacing it with catalog', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Live subset' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'example', modelId: 'example-4.6' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'high';
+
+    expect(await host.getSessionThinking(record.id)).toEqual({
+      thinking: 'high',
+      available: ['low', 'medium', 'high'],
+    });
+    host.dispose();
+  });
+
+  it('awaits shell bind thinking defaults before promptAsync', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-think-'));
+    fs.mkdirSync(path.join(dir, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.pi', 'agent', 'pichamber.json'), JSON.stringify({ thinking: 'medium' }));
+    const order = [];
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => ({
+        getSessionId: () => `ses_shell_${path.basename(dir)}`,
+        getSessionFile: () => path.join(dir, 'session.jsonl'),
+        getEntries: () => [],
+      }),
+      createSession: async () => {
+        const session = createInMemoryPiSession();
+        const originalSetThinking = session.setThinkingLevel.bind(session);
+        session.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+        session.thinkingLevel = 'low';
+        session.setThinkingLevel = (level) => {
+          order.push(`start:${level}`);
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              originalSetThinking(level);
+              order.push(`done:${level}`);
+              resolve();
+            }, 20);
+          });
+        };
+        return session;
+      },
+    });
+    try {
+      const record = await host.createSession({ directory: dir, title: 'Shell think' });
+      expect(record.piSession).toBeNull();
+      await host.promptAsync(record.id, {
+        variant: 'high',
+        parts: [{ type: 'text', text: 'go' }],
+      });
+      const live = host.getSession(record.id);
+      expect(live.piSession.thinkingLevel).toBe('high');
+      expect(order[0]).toBe('start:medium');
+      expect(order[1]).toBe('done:medium');
+      expect(order.indexOf('start:high')).toBeGreaterThan(order.indexOf('done:medium'));
+      expect(order.indexOf('done:high')).toBeGreaterThan(order.indexOf('start:high'));
+    } finally {
+      host.dispose();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('awaits live-session thinking defaults before create returns', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-bind-think-'));
+    fs.mkdirSync(path.join(dir, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.pi', 'agent', 'pichamber.json'), JSON.stringify({ thinking: 'high' }));
+    const order = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      home: dir,
+      createSession: async () => {
+        const session = createInMemoryPiSession();
+        const originalSetThinking = session.setThinkingLevel.bind(session);
+        session.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+        session.thinkingLevel = 'medium';
+        session.setThinkingLevel = (level) => {
+          order.push(`start:${level}`);
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              originalSetThinking(level);
+              order.push(`done:${level}`);
+              resolve();
+            }, 20);
+          });
+        };
+        return session;
+      },
+    });
+    try {
+      const record = await host.createSession({ directory: '/tmp/project', title: 'Bind think' });
+      expect(record.piSession.thinkingLevel).toBe('high');
+      expect(order).toEqual(['start:high', 'done:high']);
+    } finally {
+      host.dispose();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('awaits setThinkingLevel so pairing cannot land after an idle send pin', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Await think' });
+    const order = [];
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'xhigh';
+    const originalSetThinking = record.piSession.setThinkingLevel.bind(record.piSession);
+    record.piSession.setThinkingLevel = (level) => {
+      order.push(`start:${level}`);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          originalSetThinking(level);
+          order.push(`done:${level}`);
+          resolve();
+        }, 20);
+      });
+    };
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'example-4.6' },
+      variant: 'high',
+      parts: [{ type: 'text', text: 'go' }],
+    });
+
+    expect(record.piSession.thinkingLevel).toBe('high');
+    expect(order).toEqual(['start:medium', 'done:medium', 'start:high', 'done:high']);
+    host.dispose();
+  });
+
   it('widens child thinking levels from the jsonl model catalog when live only lists off', async () => {
     const host = createPiHost({
       mock: true,

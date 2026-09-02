@@ -10,13 +10,26 @@ import { create } from 'zustand';
 interface PiThinkingChipStore {
   level: string | undefined;
   hasLevels: boolean;
-  setLevel: (level: string | undefined, hasLevels?: boolean) => void;
+  levels: string[];
+  pinGeneration: number;
+  pinKey: string;
+  setLevel: (level: string | undefined, hasLevels?: boolean, levels?: readonly string[]) => void;
+  bumpPin: (key: string) => void;
 }
 
 export const usePiThinkingChipStore = create<PiThinkingChipStore>((set) => ({
   level: undefined,
   hasLevels: false,
-  setLevel: (level, hasLevels) => set(
-    hasLevels === undefined ? { level } : { level, hasLevels },
-  ),
+  levels: [],
+  pinGeneration: 0,
+  pinKey: '',
+  setLevel: (level, hasLevels, levels) => set((state) => ({
+    level,
+    hasLevels: hasLevels ?? state.hasLevels,
+    levels: levels ? [...levels] : state.levels,
+  })),
+  bumpPin: (key) => set((state) => ({
+    pinGeneration: state.pinGeneration + 1,
+    pinKey: typeof key === 'string' ? key : state.pinKey,
+  })),
 }));

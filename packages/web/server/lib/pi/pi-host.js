@@ -941,15 +941,21 @@ const clampThinkingOntoAvailable = (level, available) => {
   return parsed;
 };
 
-const pairSessionThinkingToAvailable = (piSession, available) => {
+const applySessionThinkingLevel = async (piSession, level) => {
+  if (typeof piSession?.setThinkingLevel !== 'function') return;
+  const applied = piSession.setThinkingLevel(level);
+  if (applied && typeof applied.then === 'function') await applied;
+};
+
+const pairSessionThinkingToAvailable = async (piSession, available) => {
   const snapshot = readSessionThinking(piSession);
   const levels = Array.isArray(available) && available.length > 0 ? available : snapshot.available;
   const next = clampThinkingOntoAvailable(snapshot.thinking, levels);
-  if (!next || typeof piSession?.setThinkingLevel !== 'function') {
+  if (!next) {
     return { thinking: next, available: levels };
   }
   if (next !== snapshot.thinking) {
-    piSession.setThinkingLevel(next);
+    await applySessionThinkingLevel(piSession, next);
   }
   return { thinking: next, available: levels };
 };
@@ -2182,7 +2188,7 @@ export const createPiHost = ({
     }
   };
 
-  const applyLiveSessionDefaults = (piSession) => {
+  const applyLiveSessionDefaults = async (piSession) => {
     try {
       const defaults = readPiDefaults(home);
       if (typeof piSession?.setThinkingLevel !== 'function') return;
@@ -2193,7 +2199,7 @@ export const createPiHost = ({
           level = levels.includes('medium') ? 'medium' : levels[0];
         }
       }
-      piSession.setThinkingLevel(level);
+      await applySessionThinkingLevel(piSession, level);
     } catch {
     }
   };
@@ -2260,7 +2266,7 @@ export const createPiHost = ({
       record.sessionFile = piSession.sessionFile;
     }
     record.translator = createRecordTranslator(record.id, cwd, { piSession });
-    applyLiveSessionDefaults(piSession);
+    await applyLiveSessionDefaults(piSession);
     attachSession(record);
     if (record.disposed) {
       try { record.unsubscribe?.(); } catch {}
@@ -2303,7 +2309,7 @@ export const createPiHost = ({
       model,
       sessionManager,
     });
-    applyLiveSessionDefaults(piSession);
+    await applyLiveSessionDefaults(piSession);
     const persistedId = typeof sessionManager?.getSessionId === 'function'
       ? sessionManager.getSessionId()
       : undefined;
@@ -4252,9 +4258,7 @@ export const createPiHost = ({
         const current = readPiDefaults(home);
         if (argument && THINKING_LEVELS.includes(argument)) {
           writePiDefaults(home, { thinking: argument });
-          if (typeof record.piSession?.setThinkingLevel === 'function') {
-            try { record.piSession.setThinkingLevel(argument); } catch {}
-          }
+          try { await applySessionThinkingLevel(record.piSession, argument); } catch {}
           return reply(`Thinking level set to ${argument}.`);
         }
         return reply(
@@ -4950,8 +4954,16 @@ export const createPiHost = ({
           : [];
         const catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
         const catalog = await readThinkingLevelsFromModel(catalogModel);
-        if (catalog.length > 0) available = catalog;
-        else available = widenThinkingAvailable(available, catalog);
+        const liveMatchesCatalog = catalog.length > 0
+          && !isNarrowThinkingAvailable(available)
+          && available.every((level) => catalog.includes(level));
+        if (liveMatchesCatalog) {
+          available = snapshot.available;
+        } else if (catalog.length > 0) {
+          available = catalog;
+        } else {
+          available = widenThinkingAvailable(available, catalog);
+        }
       } catch {
       }
       return {
@@ -5016,7 +5028,7 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      record.piSession.setThinkingLevel(next);
+      await applySessionThinkingLevel(record.piSession, next);
       return { applied: true, thinking: next, available };
     },
     async setSessionModel(sessionID, modelRef) {

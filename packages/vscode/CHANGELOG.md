@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+
 ## [1.2.9] - 2026-09-02
 
 - Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.

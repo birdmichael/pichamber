@@ -38,6 +38,7 @@ import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils';
+import { cycleComposerThinking } from '@/components/chat/cycleComposerThinking';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
@@ -296,20 +297,7 @@ export const useKeyboardShortcuts = () => {
         || state.isSessionSwitcherOpen
         || state.isAboutDialogOpen;
       if (state.isSettingsDialogOpen || hasOverlay || state.activeMainTab !== 'chat') return false;
-      const config = useConfigStore.getState();
-      if (config.getCurrentModelVariants().length === 0) return false;
-      config.cycleCurrentVariant();
-      const sessionId = useSessionUIStore.getState().currentSessionId;
-      const { currentAgentName, currentProviderId, currentModelId, currentVariant } = useConfigStore.getState();
-      if (sessionId && currentAgentName && currentProviderId && currentModelId) {
-        useSelectionStore.getState().saveAgentModelVariantForSession(
-          sessionId,
-          currentAgentName,
-          currentProviderId,
-          currentModelId,
-          currentVariant,
-        );
-      }
+      return cycleComposerThinking(isPiKernel);
     },
     cycle_favorite_model_forward: () => cycleFavoriteModel(1),
     cycle_favorite_model_backward: () => cycleFavoriteModel(-1),

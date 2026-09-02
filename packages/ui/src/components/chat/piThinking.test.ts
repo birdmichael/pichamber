@@ -4,6 +4,7 @@ import {
   isNarrowPiThinkingAvailable,
   parseAvailablePiThinkingLevels,
   parsePiThinkingLevel,
+  nextCycledPiThinkingLevel,
   resolveComposerSendThinking,
   resolvePairedPiThinking,
   resolvePiThinkingChipPresentation,
@@ -150,7 +151,23 @@ describe('resolveComposerSendThinking', () => {
     expect(resolveComposerSendThinking({ chipLevel: 'high', variant: undefined })).toBe('high');
   });
 
-  test('falls back to leftover variant when the chip has not painted', () => {
+  test('falls back to leftover variant off Pi when the chip has not painted', () => {
     expect(resolveComposerSendThinking({ chipLevel: undefined, variant: 'low' })).toBe('low');
+  });
+
+  test('does not send leftover OpenCode variant on Pi', () => {
+    expect(resolveComposerSendThinking({
+      isPiKernel: true,
+      chipLevel: undefined,
+      variant: 'high',
+    })).toBe(undefined);
+  });
+});
+
+describe('nextCycledPiThinkingLevel', () => {
+  test('advances through catalog levels and wraps', () => {
+    expect(nextCycledPiThinkingLevel('low', ['low', 'medium', 'high'])).toBe('medium');
+    expect(nextCycledPiThinkingLevel('high', ['low', 'medium', 'high'])).toBe('low');
+    expect(nextCycledPiThinkingLevel(undefined, ['low', 'medium', 'high'])).toBe('low');
   });
 });

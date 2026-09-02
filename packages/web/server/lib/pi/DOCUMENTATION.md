@@ -353,8 +353,11 @@ catalog. A new-session draft with no session id uses models.dev
 `reasoning_options` for the selected model id (same slug lookup as
 vision). Missing/empty catalog effort hides the control — do not invent
 seven levels. Catalog pairs immediately; live may only narrow a
-non-narrow subset after the new model is applied. Do not invent
-vendor `thinkingLevelMap` from `/v1/models`.
+non-narrow subset after the new model is applied. GET `/thinking`
+keeps that live subset when it is non-narrow and inside catalog.
+`setThinkingLevel` is awaited on the Node child, including live-session
+defaults during bind/`createFacadeSessionLive` and `/thinking`. Do not
+invent vendor `thinkingLevelMap` from `/v1/models`.
 
 `PATCH /api/session/:id/model` applies the model then pairs thinking onto
 that model's live `getAvailableThinkingLevels()`. Empty or `off`-only

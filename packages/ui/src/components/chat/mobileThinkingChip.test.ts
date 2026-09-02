@@ -45,7 +45,11 @@ describe('mobile thinking chip', () => {
     expect(modelControlsSource).toContain('restoredSessionModelRef');
     expect(modelControlsSource).toContain('composerPickedModelRef');
     expect(modelControlsSource).toContain('fromRestore: true');
+    expect(modelControlsSource).toContain('fromComposer: true');
     expect(modelControlsSource).toContain('thinkingPairKeyRef');
+    expect(modelControlsSource).toContain('pinGeneration');
+    expect(modelControlsSource).toContain('pinKey');
+    expect(modelControlsSource).toContain('applyComposerThinking');
     expect(buttonSource).toContain('hasLevels');
   });
 });

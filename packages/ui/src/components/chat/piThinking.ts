@@ -101,10 +101,25 @@ export function resolvePairedPiThinking(input: {
   };
 }
 
-/** Composer send uses the Pi chip first; OpenCode leftover variant is fallback. */
+/** Composer send uses the Pi chip. Leftover OpenCode variant is off the Pi path. */
 export function resolveComposerSendThinking(input: {
+  isPiKernel?: boolean;
   chipLevel?: string | null;
   variant?: string | null;
 }): PiThinkingLevel | undefined {
-  return parsePiThinkingLevel(input.chipLevel) ?? parsePiThinkingLevel(input.variant);
+  const chip = parsePiThinkingLevel(input.chipLevel);
+  if (chip) return chip;
+  if (input.isPiKernel) return undefined;
+  return parsePiThinkingLevel(input.variant);
+}
+
+export function nextCycledPiThinkingLevel(
+  current: string | undefined,
+  levels: readonly string[],
+): PiThinkingLevel | undefined {
+  const parsed = parseAvailablePiThinkingLevels(levels);
+  if (parsed.length === 0) return undefined;
+  const index = parsed.indexOf(parsePiThinkingLevel(current) as PiThinkingLevel);
+  const nextIndex = index < 0 ? 0 : (index + 1) % parsed.length;
+  return parsed[nextIndex];
 }

@@ -6,8 +6,9 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useUIStore } from '@/stores/useUIStore';
-import { useSelectionStore } from '@/sync/selection-store';
+import { cycleComposerThinking } from '@/components/chat/cycleComposerThinking';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { usePiKernel } from '@/lib/usePiKernel';
 import { useKeybinds } from './useKeybind';
 import { isEditableEventTarget } from './keyboard-shortcut-dom';
 
@@ -27,6 +28,7 @@ export const useMiniChatKeyboardShortcuts = () => {
     });
   }
   const dispatcher = dispatcherRef.current;
+  const isPiKernel = usePiKernel();
 
   const cycleFavoriteModel = (delta: number): boolean | void => {
     const { favoriteModels, addRecentModel } = useUIStore.getState();
@@ -72,28 +74,7 @@ export const useMiniChatKeyboardShortcuts = () => {
       const { isModelSelectorOpen, setModelSelectorOpen } = useUIStore.getState();
       setModelSelectorOpen(!isModelSelectorOpen);
     },
-    cycle_thinking_variant: () => {
-      const configState = useConfigStore.getState();
-      if (configState.getCurrentModelVariants().length === 0) return false;
-
-      configState.cycleCurrentVariant();
-      const sessionId = useSessionUIStore.getState().currentSessionId;
-      const {
-        currentAgentName,
-        currentProviderId,
-        currentModelId,
-        currentVariant,
-      } = useConfigStore.getState();
-      if (sessionId && currentAgentName && currentProviderId && currentModelId) {
-        useSelectionStore.getState().saveAgentModelVariantForSession(
-          sessionId,
-          currentAgentName,
-          currentProviderId,
-          currentModelId,
-          currentVariant,
-        );
-      }
-    },
+    cycle_thinking_variant: () => cycleComposerThinking(isPiKernel),
     cycle_favorite_model_forward: () => cycleFavoriteModel(1),
     cycle_favorite_model_backward: () => cycleFavoriteModel(-1),
   });

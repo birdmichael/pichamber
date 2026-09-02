@@ -457,6 +457,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const currentVariant = useConfigStore((state) => state.currentVariant);
     const composerThinking = usePiThinkingChipStore((state) => state.level);
     const thinkingToSend = resolveComposerSendThinking({
+        isPiKernel,
         chipLevel: composerThinking,
         variant: currentVariant,
     });
