@@ -539,7 +539,9 @@ set, and also skips a Pi-native user id (never a chat bubble). After
 `agent_settled`, the live facade slot clears so the next
 `promptAsync` is not treated as an echo, but the last **visible**
 user id stays: a later `ctx.ui` implement / tool loop without a new
-facade user still parents assistants to that bubble. Empty or
+facade user still parents assistants to that bubble. The completed
+assistant id also clears, so implement tools open a new assistant
+instead of appending to Plan mode complete. Empty or
 Pi-native `parentID` is rewritten onto the last store user before
 SSE emit. The UI reducer attaches empty or Pi-native parents the
 same way and does not retarget an unloaded `msg_*`/`usr_*` parent.
