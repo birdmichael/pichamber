@@ -23,8 +23,11 @@ same Bun process.
 Pi model/provider come from the task fields when they match a live Pi model
 (`host.setSessionModel`). Otherwise they come from Pi defaults
 (`host.getDefaults()` / `~/.pi/agent`). The runtime never invents a provider.
-OpenCode-only extras (session goals, permission auto-accept, slash-command
-dispatch through the OpenCode SDK) stay on the OpenCode path.
+Task thinking (`execution.variant`) is applied with `host.setSessionThinking`
+and also passed to `promptAsync` as `variant`, so a later `setSessionModel`
+cannot drop the pin. OpenCode-only extras (session goals, permission
+auto-accept, slash-command dispatch through the OpenCode SDK) stay on the
+OpenCode path.
 
 ## Cross-instance occurrence claiming
 
