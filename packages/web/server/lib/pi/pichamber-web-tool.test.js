@@ -37,6 +37,30 @@ describe('pichamber_web tool', () => {
     expect(tool.parameters.properties).not.toHaveProperty('sessionId');
   });
 
+
+  it('does not duplicate parameter properties under nested parameters (#468)', () => {
+    const tool = createPichamberWebTool();
+    const nested = tool.parameters.properties.parameters;
+    expect(nested).toEqual(expect.objectContaining({
+      type: 'object',
+      additionalProperties: true,
+    }));
+    expect(nested.properties).toBeUndefined();
+    for (const name of WEB_PARAMETER_NAMES) {
+      expect(tool.parameters.properties).toHaveProperty(name);
+    }
+    const serialized = JSON.stringify({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      },
+    });
+    // Before #468 this was ~4.4k chars from schema duplication alone.
+    expect(serialized.length).toBeLessThan(4000);
+  });
+
   it('keeps flattened arguments after prepareArguments', () => {
     expect(preparePichamberWebArguments({
       action: 'browser.open',

@@ -7,9 +7,9 @@ are two, because controlling sessions and driving a page are separate intents
 the user can want independently:
 
 - `openchamber` — projects, sessions, worktrees, and scheduled tasks. Enabled
-  while the persisted `agentControlToolEnabled` setting is not `false`.
+  while the persisted `agentControlToolEnabled` setting is `true` (opt-in; off by default to keep input tokens close to the Pi CLI).
 - `openchamber_web` — looking at and interacting with the page in OpenChamber's
-  browser panel. Enabled while `agentWebToolEnabled` is not `false`.
+  browser panel. Enabled while `agentWebToolEnabled` is `true` (opt-in; off by default).
 
 The Pi kernel product names are `pichamber` (sessions / scheduled tasks)
 and `pichamber_web` (browser rail). See
@@ -18,7 +18,7 @@ and `pichamber_web` (browser rail). See
 `openchamber` / `openchamber_web` when `OPENCHAMBER_KERNEL=opencode`.
 Do not inject `openchamber` or `openchamber_web` on Pi.
 
-Both default to on, are toggled in Settings → General → OpenCode CLI, and apply
+Both default to off, are toggled in Settings → General → Tools, and apply
 on the next managed OpenCode restart. Each tool carries only its own actions and
 only the parameters those actions use, so turning one off removes its inputs
 from the schema rather than leaving them visible. The plugin is injected only
