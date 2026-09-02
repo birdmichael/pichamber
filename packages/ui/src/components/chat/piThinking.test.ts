@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   clampPiThinkingLevel,
+  isNarrowPiThinkingAvailable,
   parseAvailablePiThinkingLevels,
   parsePiThinkingLevel,
+  resolveComposerSendThinking,
+  resolvePairedPiThinking,
   resolvePiThinkingChipPresentation,
   resolveVisiblePiThinkingLevels,
 } from './piThinking';
@@ -90,5 +93,64 @@ describe('available Pi thinking levels', () => {
     expect(clampPiThinkingLevel('high', ['low', 'high'])).toBe('high');
     expect(clampPiThinkingLevel('off', ['low', 'high'])).toBe('low');
     expect(clampPiThinkingLevel(undefined, undefined)).toBe('medium');
+  });
+});
+
+describe('resolvePairedPiThinking', () => {
+  test('clamps a leftover pin onto the new model catalog immediately', () => {
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: ['low', 'medium', 'high'],
+    })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
+    expect(resolvePairedPiThinking({
+      current: 'high',
+      catalogLevels: ['low', 'medium', 'high'],
+    })).toEqual({ thinking: 'high', levels: ['low', 'medium', 'high'] });
+  });
+
+  test('clears the pin when the selected model has no levels', () => {
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
+    })).toEqual({ thinking: undefined, levels: [] });
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
+      liveAvailable: ['off', 'xhigh'],
+    })).toEqual({ thinking: undefined, levels: [] });
+  });
+
+  test('live available may narrow the catalog, but a stale wider list is ignored', () => {
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      liveAvailable: ['low', 'medium', 'high'],
+    })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: ['low', 'medium', 'high'],
+      liveAvailable: ['low', 'medium', 'high', 'xhigh', 'max'],
+    })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
+  });
+
+  test('off-only live is narrow and keeps the catalog', () => {
+    expect(isNarrowPiThinkingAvailable(['off'])).toBe(true);
+    expect(isNarrowPiThinkingAvailable([])).toBe(true);
+    expect(isNarrowPiThinkingAvailable(['low', 'medium'])).toBe(false);
+    expect(resolvePairedPiThinking({
+      current: 'high',
+      catalogLevels: ['off', 'low', 'medium', 'high'],
+      liveAvailable: ['off'],
+    })).toEqual({ thinking: 'high', levels: ['off', 'low', 'medium', 'high'] });
+  });
+});
+
+describe('resolveComposerSendThinking', () => {
+  test('sends the chip level even when leftover variant is empty', () => {
+    expect(resolveComposerSendThinking({ chipLevel: 'high', variant: undefined })).toBe('high');
+  });
+
+  test('falls back to leftover variant when the chip has not painted', () => {
+    expect(resolveComposerSendThinking({ chipLevel: undefined, variant: 'low' })).toBe('low');
   });
 });

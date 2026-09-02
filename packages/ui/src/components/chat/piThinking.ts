@@ -71,3 +71,40 @@ export function clampPiThinkingLevel(
   }
   return visible[0];
 }
+
+/** Empty or `off`-only live lists are not this model's effort set. */
+export function isNarrowPiThinkingAvailable(available: unknown): boolean {
+  const parsed = parseAvailablePiThinkingLevels(available);
+  return parsed.length === 0 || (parsed.length === 1 && parsed[0] === 'off');
+}
+
+/**
+ * Empty catalog does not invent levels. Live may narrow catalog only when it
+ * is a non-narrow subset (not empty / `off`-only).
+ */
+export function resolvePairedPiThinking(input: {
+  current?: string | null;
+  catalogLevels: readonly string[];
+  liveAvailable?: unknown;
+}): { thinking: PiThinkingLevel | undefined; levels: PiThinkingLevel[] } {
+  const catalog = parseAvailablePiThinkingLevels(input.catalogLevels);
+  if (catalog.length === 0) {
+    return { thinking: undefined, levels: [] };
+  }
+  const live = parseAvailablePiThinkingLevels(input.liveAvailable);
+  const liveMatchesCatalog = !isNarrowPiThinkingAvailable(live)
+    && live.every((level) => catalog.includes(level));
+  const levels = liveMatchesCatalog ? live : catalog;
+  return {
+    thinking: clampPiThinkingLevel(input.current ?? undefined, levels),
+    levels,
+  };
+}
+
+/** Composer send uses the Pi chip first; OpenCode leftover variant is fallback. */
+export function resolveComposerSendThinking(input: {
+  chipLevel?: string | null;
+  variant?: string | null;
+}): PiThinkingLevel | undefined {
+  return parsePiThinkingLevel(input.chipLevel) ?? parsePiThinkingLevel(input.variant);
+}

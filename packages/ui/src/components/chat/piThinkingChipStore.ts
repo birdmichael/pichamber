@@ -9,10 +9,14 @@ import { create } from 'zustand';
  */
 interface PiThinkingChipStore {
   level: string | undefined;
-  setLevel: (level: string | undefined) => void;
+  hasLevels: boolean;
+  setLevel: (level: string | undefined, hasLevels?: boolean) => void;
 }
 
 export const usePiThinkingChipStore = create<PiThinkingChipStore>((set) => ({
   level: undefined,
-  setLevel: (level) => set({ level }),
+  hasLevels: false,
+  setLevel: (level, hasLevels) => set(
+    hasLevels === undefined ? { level } : { level, hasLevels },
+  ),
 }));

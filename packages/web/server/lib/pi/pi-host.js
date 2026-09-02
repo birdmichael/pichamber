@@ -932,6 +932,28 @@ const readSessionThinking = (piSession) => {
   };
 };
 
+const clampThinkingOntoAvailable = (level, available) => {
+  const parsed = THINKING_LEVELS.includes(level) ? level : null;
+  if (Array.isArray(available) && available.length > 0) {
+    if (parsed && available.includes(parsed)) return parsed;
+    return available.includes('medium') ? 'medium' : available[0];
+  }
+  return parsed;
+};
+
+const pairSessionThinkingToAvailable = (piSession, available) => {
+  const snapshot = readSessionThinking(piSession);
+  const levels = Array.isArray(available) && available.length > 0 ? available : snapshot.available;
+  const next = clampThinkingOntoAvailable(snapshot.thinking, levels);
+  if (!next || typeof piSession?.setThinkingLevel !== 'function') {
+    return { thinking: next, available: levels };
+  }
+  if (next !== snapshot.thinking) {
+    piSession.setThinkingLevel(next);
+  }
+  return { thinking: next, available: levels };
+};
+
 const isNarrowThinkingAvailable = (available) => (
   !Array.isArray(available)
   || available.length === 0
@@ -999,6 +1021,20 @@ const widenThinkingAvailable = (live, catalog) => {
   if (catalogLevels.length === 0) return parseThinkingLevelList(live);
   if (isNarrowThinkingAvailable(live) && catalogLevels.length > 0) return catalogLevels;
   return parseThinkingLevelList(live);
+};
+
+const pairThinkingAfterModelChange = async (piSession, model) => {
+  const catalogLevels = await readThinkingLevelsFromModel(model);
+  const liveLevels = readAvailableThinkingLevels(piSession);
+  const liveMatchesCatalog = catalogLevels.length > 0
+    && !isNarrowThinkingAvailable(liveLevels)
+    && liveLevels.every((level) => catalogLevels.includes(level));
+  return pairSessionThinkingToAvailable(
+    piSession,
+    catalogLevels.length > 0
+      ? (liveMatchesCatalog ? liveLevels : catalogLevels)
+      : liveLevels,
+  );
 };
 
 const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
@@ -3710,7 +3746,7 @@ export const createPiHost = ({
         if (modelRef && !alreadyLive && !sessionIsLive(record)) {
           await this.setSessionModel(sessionID, modelRef);
         }
-        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking) && !alreadyLive) {
+        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking) && !alreadyLive && !sessionIsLive(record)) {
           try {
             await this.setSessionThinking(sessionID, requestedThinking);
           } catch {
@@ -4974,12 +5010,7 @@ export const createPiHost = ({
         } catch {
         }
       }
-      let next = THINKING_LEVELS.includes(level) ? level : null;
-      if (available.length > 0) {
-        if (!next || !available.includes(next)) {
-          next = available.includes("medium") ? "medium" : available[0];
-        }
-      }
+      const next = clampThinkingOntoAvailable(level, available);
       if (!next) {
         const error = new Error("Invalid thinking level");
         error.status = 400;
@@ -4994,13 +5025,24 @@ export const createPiHost = ({
         return { applied: false, model: modelRef };
       }
       const raw = typeof modelRef === "string" ? modelRef.trim() : "";
+      const [providerID, modelID] = raw.split("/");
       if (mock) {
-        const [providerID, modelID] = raw.split("/");
-        record.piSession.setModel({
+        const applied = {
           id: modelID || raw,
           ...(providerID ? { provider: providerID } : {}),
-        });
+        };
+        record.piSession.setModel(applied);
         record.translator?.setFallbackModel?.(record.piSession.currentModel);
+        let catalogModel = applied;
+        try {
+          const runtime = await ensureModelRuntime();
+          const models = runtime && typeof runtime.getAvailable === 'function'
+            ? await runtime.getAvailable()
+            : [];
+          catalogModel = findRuntimeModel(models, { providerID, modelID }) || applied;
+        } catch {
+        }
+        await pairThinkingAfterModelChange(record.piSession, catalogModel);
         return { applied: true, model: raw };
       }
       const runtime = await ensureModelRuntime();
@@ -5010,7 +5052,6 @@ export const createPiHost = ({
         throw error;
       }
       const available = await runtime.getAvailable();
-      const [providerID, modelID] = raw.split("/");
       const model = Array.isArray(available)
         ? available.find((item) => (
           item.id === raw
@@ -5022,8 +5063,10 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      record.piSession.setModel(model);
+      const appliedModel = record.piSession.setModel(model);
+      if (appliedModel && typeof appliedModel.then === 'function') await appliedModel;
       record.translator?.setFallbackModel?.(model);
+      await pairThinkingAfterModelChange(record.piSession, model);
       return { applied: true, model: model.provider ? `${model.provider}/${model.id}` : model.id };
     },
     getSessionUsage(sessionID) {

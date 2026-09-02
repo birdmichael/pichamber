@@ -352,17 +352,27 @@ The composer thinking chip renders `available`, not the full seven-level
 catalog. A new-session draft with no session id uses models.dev
 `reasoning_options` for the selected model id (same slug lookup as
 vision). Missing/empty catalog effort hides the control — do not invent
-seven levels. Live `available` wins once a session exists. Do not invent
+seven levels. Catalog pairs immediately; live may only narrow a
+non-narrow subset after the new model is applied. Do not invent
 vendor `thinkingLevelMap` from `/v1/models`.
+
+`PATCH /api/session/:id/model` applies the model then pairs thinking onto
+that model's live `getAvailableThinkingLevels()`. Empty or `off`-only
+live is narrow and widens from catalog levels; a live list that is not a
+subset of catalog is replaced by catalog. An unsupported leftover pin
+(`xhigh` on a 3-level model) becomes `medium`, else the first available
+level.
 
 `GET /api/session/:id/model` returns `{ model, providerID, modelID }` from
 the live session after applying the latest jsonl `model_change`
 (`provider` / `modelId`). A leftover facade `pi`/`pi` pair is not usable
 and becomes `{ model: null, providerID: null, modelID: null }`.
 
-`promptAsync` applies `body.variant` or `body.thinking` through
-`setSessionThinking` when the value is a known Pi level. An unsupported
-pin keeps the session's current thinking. Settings → Projects stores the
+`promptAsync` applies `body.model` then `body.variant` / `body.thinking`
+on an idle send so each turn uses the composer selection. An unsupported
+thinking pin keeps the session's current thinking. Live/busy turns skip
+both `setSessionModel` and `setSessionThinking` so a concurrent
+`setModel` cannot clobber `isStreaming`. Settings → Projects stores the
 pin as official `project.defaultVariant` next to `defaultModel`; map it
 through that existing project setting. Do not write it to global
 `PATCH /api/pi/defaults`.

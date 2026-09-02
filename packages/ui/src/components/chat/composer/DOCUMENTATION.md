@@ -153,9 +153,18 @@ Prefix filtering stays name-only on Pi. The CSS fallback must not be
 mobile composer, not the collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
 `getAvailableThinkingLevels()`, not the full seven-level catalog, and
-clamps the current chip onto that list. A new-session draft with no
-session id uses models.dev `reasoning_options` for the selected model
-so picking grok-4.6 does not flash all seven levels. OpenCode `build`
+clamps the current chip onto that list. Switching models pairs the chip
+immediately from the selected model's catalog (`reasoning_options`) and
+waits for `PATCH /model` before applying GET `available`. Empty or
+`off`-only live stays on catalog; a model with no catalog levels hides
+the chip. Each send uses the chip's current model and thinking
+(`resolveComposerSendThinking`); leftover OpenCode `currentVariant` is
+only a fallback. Session `GET /model` restores when the chat opens and
+does not overwrite a later composer pick; a failed first apply
+(providers still loading) retries. Thinking GET waits for `PATCH /model`
+and keeps a later chip pin over jsonl. A new-session draft with
+no session id uses models.dev `reasoning_options` for the selected model
+so picking a 3-level model does not flash all seven levels. OpenCode `build`
 / `plan` / custom agents still show. A Build row (session model + `/plan implement` in this session) appears
 when a ready or saved plan exists, even if the View Plan rail is closed.
 
