@@ -665,7 +665,7 @@ attached on the Pi kernel. Each setting is independent: either, both, or
 neither.
 
 `pichamber` (label **Pichamber**) is attached when
-`agentControlToolEnabled !== false`. It reuses the shared control-service
+`agentControlToolEnabled === true`. It reuses the shared control-service
 allowlist (`OPENCHAMBER_AGENT_TOOL_ACTIONS`): projects, models, sessions,
 and scheduled tasks. `schedule.status` stays CLI-only. Session
 create/send/fork/list/status/messages go through the in-process host
@@ -679,7 +679,7 @@ installed+enabled, otherwise 400. It does not write leftover Session Goal
 metadata.
 
 `pichamber_web` (label **Pichamber Web**) is attached when
-`agentWebToolEnabled !== false`. The leftover
+`agentWebToolEnabled === true`. The leftover
 OpenCode plugin name `openchamber_web` is not attached on the Pi kernel.
 
 The web tool reuses the existing `browser.*` allowlist and

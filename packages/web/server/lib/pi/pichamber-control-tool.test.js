@@ -45,6 +45,31 @@ describe('pichamber control tool', () => {
     }
   });
 
+
+  it('does not duplicate parameter properties under nested parameters (#468)', () => {
+    const tool = createPichamberControlTool();
+    const nested = tool.parameters.properties.parameters;
+    expect(nested).toEqual(expect.objectContaining({
+      type: 'object',
+      additionalProperties: true,
+    }));
+    expect(nested.properties).toBeUndefined();
+    // Flat fields stay discoverable once; nesting them again roughly doubled tokens.
+    for (const name of CONTROL_PARAMETER_NAMES) {
+      expect(tool.parameters.properties).toHaveProperty(name);
+    }
+    const serialized = JSON.stringify({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      },
+    });
+    // Before #468 this was ~9.2k chars / ~2.3k tokens from schema duplication alone.
+    expect(serialized.length).toBeLessThan(7000);
+  });
+
   it('keeps flattened arguments after prepareArguments', () => {
     expect(preparePichamberControlArguments({
       action: 'session.create',
