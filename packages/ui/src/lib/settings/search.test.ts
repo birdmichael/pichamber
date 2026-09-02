@@ -20,7 +20,7 @@ const runtimeCtx = {
 describe('settings search', () => {
   test('does not treat grok as a substring of ngrok', () => {
     expect(searchHaystackContainsTerm('external tunnel ngrok', 'grok')).toBe(false);
-    expect(searchHaystackContainsTerm('grok usage pi-xai-oauth', 'grok')).toBe(true);
+    expect(searchHaystackContainsTerm('grok usage pi-xai', 'grok')).toBe(true);
   });
 
   test('finds the Claude Code third-party integration', () => {
@@ -463,7 +463,7 @@ describe('settings search', () => {
       { query: 'pi-subagents', id: 'feature-plugins.subagents' },
       { query: '@narumitw/pi-btw', id: 'feature-plugins.btw' },
       { query: '@juicesharp/rpiv-todo', id: 'feature-plugins.todo' },
-      { query: 'pi-xai-oauth', id: 'feature-plugins.xai' },
+      { query: 'pi-xai', id: 'feature-plugins.xai' },
     ] as const;
 
     for (const { query, id } of queries) {

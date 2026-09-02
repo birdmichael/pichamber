@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Feature Plugins Grok Usage installs `pi-xai` (not `pi-xai-oauth`). Providers gain xAI, and Work Status shows Grok usage.
+- Sessions: an empty Chats block still shows the Chats heading and No chats yet. Leftover empty chat folders no longer hide that empty state.
 - Chat: opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
 - Desktop: Help → Diagnostics no longer lists leftover OpenCode PATH as Pi kernel resolution. It reports the bundled Pi Node runtime instead.
 

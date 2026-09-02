@@ -294,18 +294,18 @@ expires }` to `{agentDir}/auth.json` through `writePiProviderAuth`. Refresh
 uses `xaiOAuth.refresh`, not a copied token exchange. Other provider ids
 are 404. No pending authorize is 400. Responses never echo tokens.
 
-Product login is this built-in `/login xai`, not the Feature Plugin
-`xai-auth` catalog. Composer `/login` for `xai` points at Settings →
-Providers. Feature Plugins `xai` is Usage only.
+Product login is this built-in `/login xai`, not an npm xAI OAuth
+extension. Composer `/login` for `xai` points at Settings → Providers.
 
 ## Grok Usage (feature-plugin slot)
 
-Gate is Feature Plugins `xai` (`npm:pi-xai-oauth`) installed+enabled.
-Chrome follows `{agentDir}/settings.json` `packages` only. Chamber
-`enabled` is ignored. Opening Feature Plugins never auto-installs the
-package and must not run the plugin `npx` setup (that would change
-`defaultProvider`). Do not install `@blockedpath/pi-xai-oauth` alongside
-it.
+Gate is Feature Plugins `xai` (`npm:pi-xai`) installed+enabled.
+Chrome follows `{agentDir}/settings.json` `packages`. Leftover
+`npm:pi-xai-oauth` still counts as this slot until uninstall. Install
+writes `npm:pi-xai` and removes leftover `pi-xai-oauth` so the two
+extensions do not conflict. Opening Feature Plugins never runs plugin
+`npx` setup (that would change `defaultProvider`). Do not install
+`@blockedpath/pi-xai-oauth` alongside `pi-xai`.
 
 When the slot is on:
 

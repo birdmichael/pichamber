@@ -46,8 +46,10 @@ import {
 import {
   createSdkPackageManager,
   createSettingsJsonPackageManager,
+  DEFAULT_FEATURE_PLUGIN_SOURCES,
   isFeaturePluginSlot,
   listConfiguredPiPackageSources,
+  XAI_CONFLICTING_OAUTH_SOURCE,
   listFeaturePluginSlashCommands,
   listPiPackages,
   readFeaturePlugins,
@@ -4793,9 +4795,11 @@ export const createPiHost = ({
         throw error;
       }
       const current = readFeaturePlugins(home);
-      const source = typeof body.source === 'string' && body.source.trim()
-        ? body.source.trim()
-        : current[slot].source;
+      const source = slot === 'xai'
+        ? DEFAULT_FEATURE_PLUGIN_SOURCES.xai
+        : (typeof body.source === 'string' && body.source.trim()
+          ? body.source.trim()
+          : current[slot].source);
       if (!source) {
         const error = new Error('Package source is required');
         error.status = 400;
@@ -4813,6 +4817,9 @@ export const createPiHost = ({
         throw error;
       }
       await persist(source);
+      if (slot === 'xai' && typeof manager.removeAndPersist === 'function') {
+        await manager.removeAndPersist(XAI_CONFLICTING_OAUTH_SOURCE).catch(() => undefined);
+      }
       const next = writeFeaturePlugins(home, { [slot]: { source } });
       const reload = await this.reloadIdleSessions();
       return {
@@ -4840,6 +4847,9 @@ export const createPiHost = ({
       }
       const manager = await this.resolveFeaturePackageManager();
       await manager.removeAndPersist(source);
+      if (slot === 'xai') {
+        await manager.removeAndPersist(XAI_CONFLICTING_OAUTH_SOURCE).catch(() => undefined);
+      }
       const reload = await this.reloadIdleSessions();
       return {
         ...toFeaturePluginsPayload({

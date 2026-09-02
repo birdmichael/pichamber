@@ -5,6 +5,7 @@ import {
   deriveRecentSessions,
   selectRecentSessionsWithoutWorkspaceGroup,
   shouldShowSidebarActivitySections,
+  visibleSidebarActivitySections,
 } from './activitySections';
 
 const NOW = 200_000_000;
@@ -103,6 +104,25 @@ describe('shouldShowSidebarActivitySections', () => {
       hasActivitySectionItems: true,
       activitySections: [{ items: [{ id: 'renamed-scan' }] }],
     })).toBe(false);
+  });
+});
+
+describe('visibleSidebarActivitySections', () => {
+  test('keeps an empty chats block when New chat is available', () => {
+    expect(visibleSidebarActivitySections(
+      [
+        { key: 'chats', items: [] },
+        { key: 'active-now', items: [] },
+      ],
+      true,
+    ).map((section) => section.key)).toEqual(['chats']);
+  });
+
+  test('hides empty chats when New chat is unavailable', () => {
+    expect(visibleSidebarActivitySections(
+      [{ key: 'chats', items: [] }, { key: 'active-now', items: [{ id: 'recent' }] }],
+      false,
+    ).map((section) => section.key)).toEqual(['active-now']);
   });
 });
 

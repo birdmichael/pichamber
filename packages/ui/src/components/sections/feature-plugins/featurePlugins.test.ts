@@ -46,7 +46,7 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.todo.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.todo);
     expect(payload.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
     expect(payload.slots.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
-    expect(payload.slots.xai.source).toBe('npm:pi-xai-oauth');
+    expect(payload.slots.xai.source).toBe('npm:pi-xai');
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
     expect(payload.slots.btw.command).toBe('btw');
@@ -87,10 +87,10 @@ describe('feature plugin payload parsing', () => {
           presets: [{ id: 'default', source: 'npm:@juicesharp/rpiv-todo' }],
         },
         xai: {
-          source: 'npm:pi-xai-oauth',
+          source: 'npm:pi-xai',
           enabled: true,
           installed: true,
-          presets: [{ id: 'default', source: 'npm:pi-xai-oauth' }],
+          presets: [{ id: 'default', source: 'npm:pi-xai' }],
         },
       },
     });
@@ -146,7 +146,7 @@ describe('feature plugin payload parsing', () => {
     expect(featurePluginPackageLabel('subagents')).toBe('pi-subagents');
     expect(featurePluginPackageLabel('btw')).toBe('@narumitw/pi-btw');
     expect(featurePluginPackageLabel('todo')).toBe('@juicesharp/rpiv-todo');
-    expect(featurePluginPackageLabel('xai')).toBe('pi-xai-oauth');
+    expect(featurePluginPackageLabel('xai')).toBe('pi-xai');
   });
 
   test('keeps Settings search IDs on the seven slot cards', () => {

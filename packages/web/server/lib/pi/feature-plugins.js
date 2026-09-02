@@ -18,7 +18,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
-  xai: 'npm:pi-xai-oauth',
+  xai: 'npm:pi-xai',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
@@ -114,6 +114,14 @@ export const listConfiguredPiPackageSources = (home = os.homedir()) => {
 
 export const isFeaturePluginSourceInstalled = (source, configuredSources = []) => (
   configuredSources.some((item) => featurePluginSourcesMatch(source, item))
+);
+
+/** Leftover oauth package still counts as the Grok Usage slot until uninstall. */
+export const XAI_CONFLICTING_OAUTH_SOURCE = 'npm:pi-xai-oauth';
+const XAI_SLOT_SOURCE_ALIASES = [DEFAULT_FEATURE_PLUGIN_SOURCES.xai, XAI_CONFLICTING_OAUTH_SOURCE];
+
+export const isXaiSlotSourceInstalled = (configuredSources = []) => (
+  XAI_SLOT_SOURCE_ALIASES.some((source) => isFeaturePluginSourceInstalled(source, configuredSources))
 );
 
 const defaultSlotConfig = (slot) => {
@@ -307,7 +315,9 @@ export const toFeaturePluginsPayload = ({
   const slots = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
-    const installed = isFeaturePluginSourceInstalled(entry.source, configuredSources);
+    const installed = slot === 'xai'
+      ? isXaiSlotSourceInstalled(configuredSources)
+      : isFeaturePluginSourceInstalled(entry.source, configuredSources);
     slots[slot] = {
       ...entry,
       installed,

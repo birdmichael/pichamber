@@ -1447,7 +1447,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.btw.source).toBe('npm:@narumitw/pi-btw');
       expect(body.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
       expect(body.slots.todo.source).not.toBe('npm:rpiv-todo');
-      expect(body.slots.xai.source).toBe('npm:pi-xai-oauth');
+      expect(body.slots.xai.source).toBe('npm:pi-xai');
       expect(body.slots.goal.command).toBe('goal');
       expect(body.slots.btw.command).toBe('btw');
       expect(body.slots.plan.command).toBeUndefined();

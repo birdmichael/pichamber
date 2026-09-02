@@ -1355,9 +1355,9 @@ describe('createPiHost', () => {
           },
         }),
       });
-      const result = await host.installFeaturePlugin('xai', { source: 'npm:pi-xai-oauth' });
-      expect(installed).toEqual(['npm:pi-xai-oauth']);
-      expect(result.slots.xai.source).toBe('npm:pi-xai-oauth');
+      const result = await host.installFeaturePlugin('xai', {});
+      expect(installed).toEqual(['npm:pi-xai']);
+      expect(result.slots.xai.source).toBe('npm:pi-xai');
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

@@ -90,7 +90,7 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.todo.source).not.toBe('npm:rpiv-todo');
     expect(plugins.todo.command).toBeUndefined();
     expect(plugins.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
-    expect(plugins.xai.source).toBe('npm:pi-xai-oauth');
+    expect(plugins.xai.source).toBe('npm:pi-xai');
     expect(plugins.xai.command).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
@@ -277,13 +277,25 @@ describe('existing Pi agent recognition', () => {
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
-  it('enables Grok Usage when packages lists npm:pi-xai-oauth', () => {
+  it('enables Grok Usage when packages lists npm:pi-xai', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: {},
+      configuredSources: ['npm:pi-xai'],
+    });
+    expect(scoped.slots.xai).toMatchObject({
+      source: 'npm:pi-xai',
+      installed: true,
+      enabled: true,
+    });
+    expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['xai-usage']);
+  });
+
+  it('still treats leftover npm:pi-xai-oauth as the Grok Usage slot', () => {
     const scoped = toFeaturePluginsPayload({
       plugins: {},
       configuredSources: ['npm:pi-xai-oauth'],
     });
     expect(scoped.slots.xai).toMatchObject({
-      source: 'npm:pi-xai-oauth',
       installed: true,
       enabled: true,
     });

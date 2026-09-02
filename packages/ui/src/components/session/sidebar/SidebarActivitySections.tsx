@@ -4,6 +4,7 @@ import type { SessionNode } from './types';
 import { useI18n } from '@/lib/i18n';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { Icon } from "@/components/icon/Icon";
+import { visibleSidebarActivitySections } from './activitySections';
 import {
   collectSubtreeContainingId,
   computeNodeStructureKey,
@@ -133,9 +134,7 @@ export function SidebarActivitySections(props: Props): React.ReactNode {
     });
   }, [editingId, openSidebarMenuKey]);
 
-  const visibleSections = sections.filter((section) => (
-    section.items.length > 0 || (section.key === 'chats' && props.onNewChat)
-  ));
+  const visibleSections = visibleSidebarActivitySections(sections, Boolean(props.onNewChat));
   if (visibleSections.length === 0) {
     return null;
   }
@@ -247,7 +246,11 @@ export function SidebarActivitySections(props: Props): React.ReactNode {
             </div>
             {!isCollapsed ? (
               <div className={cn('space-y-0.5')}>
-                {section.key === 'chats' && props.renderChatsSection
+                {section.key === 'chats' && section.items.length === 0 ? (
+                  <div className="py-1 pl-[26px] text-left typography-micro text-muted-foreground">
+                    {t('sessions.sidebar.activity.chatsEmpty')}
+                  </div>
+                ) : section.key === 'chats' && props.renderChatsSection
                   ? props.renderChatsSection(section.items)
                   : visibleItems.map(renderItem)}
                 {!usesCustomRenderer && remainingCount > 0 ? (
