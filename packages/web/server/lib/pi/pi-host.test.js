@@ -1364,6 +1364,139 @@ describe('createPiHost', () => {
     }
   });
 
+  it('installs pi-xai and drops leftover pi-xai-oauth', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-install-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.installFeaturePlugin('xai', {});
+      expect(result.slots.xai).toMatchObject({
+        source: 'npm:pi-xai',
+        installed: true,
+        enabled: true,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('fails Grok Usage install when leftover oauth cannot be removed', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-install-fail-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const inner = createSettingsJsonPackageManager({ home });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          installAndPersist: (source) => inner.installAndPersist(source),
+          async removeAndPersist(source) {
+            if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+            return inner.removeAndPersist(source);
+          },
+        }),
+      });
+      await expect(host.installFeaturePlugin('xai', {})).rejects.toMatchObject({
+        message: 'oauth uninstall failed',
+        status: 500,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai-oauth', 'npm:pi-xai']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls both pi-xai and leftover oauth', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-both-uninstall-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai', 'npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' });
+      expect(result.slots.xai.installed).toBe(false);
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls leftover pi-xai-oauth when Feature Plugins sends pi-xai', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-uninstall-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' });
+      expect(result.slots.xai.installed).toBe(false);
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('fails Grok Usage uninstall when leftover oauth cannot be removed', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-uninstall-fail-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const inner = createSettingsJsonPackageManager({ home });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          async removeAndPersist(source) {
+            if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+            return inner.removeAndPersist(source);
+          },
+        }),
+      });
+      await expect(host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' })).rejects.toMatchObject({
+        message: 'oauth uninstall failed',
+        status: 500,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai-oauth']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('setDefaults persists thinking for session settings', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-defaults-'));
     try {

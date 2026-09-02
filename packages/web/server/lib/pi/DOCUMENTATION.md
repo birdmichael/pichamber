@@ -303,7 +303,9 @@ Gate is Feature Plugins `xai` (`npm:pi-xai`) installed+enabled.
 Chrome follows `{agentDir}/settings.json` `packages`. Leftover
 `npm:pi-xai-oauth` still counts as this slot until uninstall. Install
 writes `npm:pi-xai` and removes leftover `pi-xai-oauth` so the two
-extensions do not conflict. Opening Feature Plugins never runs plugin
+extensions do not conflict. Uninstall removes both aliases independently:
+a missing alias is success; the request fails if the slot is still
+installed afterward. Opening Feature Plugins never runs plugin
 `npx` setup (that would change `defaultProvider`). Do not install
 `@blockedpath/pi-xai-oauth` alongside `pi-xai`.
 

@@ -75,7 +75,7 @@ type ActivitySectionKeyed = {
   items: ReadonlyArray<unknown>;
 };
 
-/** Idle keeps an empty chats block whenever New chat is available. */
+/** Empty leftover chat folders must not hide the Chats empty state. */
 export const visibleSidebarActivitySections = <T extends ActivitySectionKeyed>(
   sections: readonly T[],
   hasNewChatAction: boolean,

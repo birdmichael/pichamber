@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Chat: after Plan **Implement the plan** / **Implement here**, the next tool rows (Read, Shell, Edit) stay on that turn. Previously the reply kept running (`editing file`) while the transcript froze on Plan mode complete.
 - Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.
-- Settings: Feature Plugins Grok Usage installs `pi-xai` (not `pi-xai-oauth`). Providers gain xAI, and Work Status shows Grok usage.
+- Settings: Feature Plugins Grok Usage installs `pi-xai` (not `pi-xai-oauth`). Providers gain xAI, and Work Status shows Grok usage. Uninstall also removes leftover `pi-xai-oauth`, so the card does not stay installed after a successful uninstall.
 - Sessions: an empty Chats block still shows the Chats heading and No chats yet. Leftover empty chat folders no longer hide that empty state.
 - Chat: opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
 - Desktop: Help → Diagnostics no longer lists leftover OpenCode PATH as Pi kernel resolution. It reports the bundled Pi Node runtime instead.

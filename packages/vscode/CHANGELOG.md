@@ -1,7 +1,7 @@
 ## [Unreleased]
 
 - Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.
-- Feature Plugins Grok Usage installs `pi-xai`. Providers gain xAI, and Work Status shows Grok usage.
+- Feature Plugins Grok Usage installs `pi-xai`. Providers gain xAI, and Work Status shows Grok usage. Uninstall also removes leftover `pi-xai-oauth`.
 - Opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
 
 ## [1.2.8] - 2026-09-01
