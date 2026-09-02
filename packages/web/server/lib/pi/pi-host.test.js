@@ -2546,6 +2546,88 @@ describe('session plan status and actions', () => {
     host.dispose();
   });
 
+  it('emits implement-after-plan tools parented to the visible user, not a Pi-native id', async () => {
+    const wait = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+      createSession: async () => ({
+        isStreaming: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_plan',
+            toolName: 'plan_mode_complete',
+            args: {},
+          });
+          emit({
+            type: 'tool_execution_end',
+            toolCallId: 'call_plan',
+            toolName: 'plan_mode_complete',
+            isError: false,
+            result: { details: { plan: '# Ready' } },
+          });
+          emit({ type: 'message_end', message: { role: 'assistant' } });
+          emit({ type: 'agent_settled' });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Implement' });
+    await host.promptAsync(record.id, {
+      messageID: 'msg_plan',
+      parts: [{ type: 'text', text: 'plan this' }],
+    });
+    await wait();
+
+    emit({ type: 'agent_start' });
+    emit({
+      type: 'message_start',
+      message: { role: 'user', id: '5bb000de', content: 'Implement the plan.' },
+    });
+    emit({ type: 'message_start', message: { role: 'assistant', id: 'asst_impl', content: [] } });
+    emit({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    await wait();
+
+    const implementUpdated = [...events].reverse().find((event) => (
+      event.type === 'message.updated'
+      && event.properties?.info?.role === 'assistant'
+      && event.properties.info.id === 'asst_impl'
+    ));
+    expect(implementUpdated?.properties.info.parentID).toBe('msg_plan');
+    const editPart = events.find((event) => (
+      event.type === 'message.part.updated'
+      && event.properties?.part?.tool === 'edit'
+    ));
+    expect(editPart.properties.part.messageID).toBe('asst_impl');
+    const stored = host.getMessages(record.id).find((entry) => (
+      entry.info.role === 'assistant' && entry.parts.some((part) => part.tool === 'edit')
+    ));
+    expect(stored.info.parentID).toBe('msg_plan');
+    expect(events.some((event) => event.properties?.info?.id === '5bb000de')).toBe(false);
+    host.dispose();
+  });
+
   it('resumes a saved plan without sending /plan start', async () => {
     const host = createPiHost({
       mock: true,

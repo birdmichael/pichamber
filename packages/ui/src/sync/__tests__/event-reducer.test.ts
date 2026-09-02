@@ -84,7 +84,83 @@ describe("applyDirectoryEvent", () => {
       type: "message.updated",
       properties: { info: current },
     } as Event)).toBe(true)
-    expect(draft.message.ses_1).toEqual([legacy, current])
+    expect(draft.message.ses_1).toEqual([legacy, { ...current, parentID: legacy.id }])
+  })
+
+  test("parents an implement assistant with a missing Pi-native parent onto the last user", () => {
+    const user = {
+      id: "msg_plan",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 100 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_impl",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "5bb000de",
+          time: { created: 200 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect(draft.message.ses_1[1]).toMatchObject({
+      id: "asst_impl",
+      parentID: "msg_plan",
+    })
+  })
+
+  test("parents an implement assistant with an empty parentID onto the last user", () => {
+    const user = {
+      id: "msg_plan",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 100 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_impl",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "",
+          time: { created: 200 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect((draft.message.ses_1[1] as { parentID?: string }).parentID).toBe("msg_plan")
+  })
+
+  test("does not retarget an assistant whose msg_ parent is merely unloaded", () => {
+    const user = {
+      id: "msg_latest",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 200 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_old",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "msg_older",
+          time: { created: 50 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect((draft.message.ses_1.find((item) => item.id === "asst_old") as { parentID?: string }).parentID)
+      .toBe("msg_older")
   })
 
   test("does not insert a Pi-native user when the live client user already exists", () => {

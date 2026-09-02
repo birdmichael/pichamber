@@ -535,10 +535,16 @@ extension handlers. `promptAsync` inserts a user bubble first (`body.messageID` 
 the client sent one) and is only for chat turns. Pi `message_start`
 for that same prompt uses a jsonl id and must not add a second user
 row. The translator skips that echo when the facade id is already
-set, and also skips a Pi-native user id when the facade id was not
-set yet. `applyEventToStore` does not append a non-`msg_*` user
-while a client id is already in the store, and reparents an
-assistant whose `parentID` is missing onto the last user.
+set, and also skips a Pi-native user id (never a chat bubble). After
+`agent_settled`, the live facade slot clears so the next
+`promptAsync` is not treated as an echo, but the last **visible**
+user id stays: a later `ctx.ui` implement / tool loop without a new
+facade user still parents assistants to that bubble. Empty or
+Pi-native `parentID` is rewritten onto the last store user before
+SSE emit. The UI reducer attaches empty or Pi-native parents the
+same way and does not retarget an unloaded `msg_*`/`usr_*` parent.
+`applyEventToStore` does not append a non-`msg_*` user while a
+client id is already in the store.
 
 Resolution order:
 
