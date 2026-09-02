@@ -10,6 +10,7 @@ import {
   featurePluginSourcesMatch,
   isFeaturePluginSourceInstalled,
   listConfiguredPiPackageSources,
+  removeXaiSlotSources,
   listFeaturePluginSlashCommands,
   listPiPackages,
   mergeFeaturePluginPatch,
@@ -222,6 +223,48 @@ describe('settings.json package manager', () => {
       updated: ['npm:pi-mcp-adapter'],
     });
     await expect(manager.update('npm:missing-package')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('uninstalls leftover oauth after a missing pi-xai alias throws', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-xai-oauth'],
+    });
+    const removed = [];
+    const inner = createSettingsJsonPackageManager({ home });
+    await removeXaiSlotSources({
+      manager: {
+        async removeAndPersist(source) {
+          removed.push(source);
+          if (source === 'npm:pi-xai') throw new Error('npm uninstall failed');
+          return inner.removeAndPersist(source);
+        },
+      },
+      home,
+    });
+    expect(removed).toEqual(['npm:pi-xai', 'npm:pi-xai-oauth']);
+    expect(listConfiguredPiPackageSources(home)).toEqual([]);
+  });
+
+  it('fails uninstall when leftover oauth stays in settings.json', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-xai-oauth'],
+    });
+    const inner = createSettingsJsonPackageManager({ home });
+    await expect(removeXaiSlotSources({
+      manager: {
+        async removeAndPersist(source) {
+          if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+          return inner.removeAndPersist(source);
+        },
+      },
+      home,
+    })).rejects.toMatchObject({
+      message: 'oauth uninstall failed',
+      status: 500,
+    });
+    expect(listConfiguredPiPackageSources(home)).toEqual(['npm:pi-xai-oauth']);
   });
 
   it('does not treat listing as an install', () => {

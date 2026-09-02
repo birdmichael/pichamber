@@ -49,7 +49,8 @@ import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
   isFeaturePluginSlot,
   listConfiguredPiPackageSources,
-  XAI_CONFLICTING_OAUTH_SOURCE,
+  removeXaiConflictingOauthSource,
+  removeXaiSlotSources,
   listFeaturePluginSlashCommands,
   listPiPackages,
   readFeaturePlugins,
@@ -4822,7 +4823,7 @@ export const createPiHost = ({
       }
       await persist(source);
       if (slot === 'xai' && typeof manager.removeAndPersist === 'function') {
-        await manager.removeAndPersist(XAI_CONFLICTING_OAUTH_SOURCE).catch(() => undefined);
+        await removeXaiConflictingOauthSource({ manager, home });
       }
       const next = writeFeaturePlugins(home, { [slot]: { source } });
       const reload = await this.reloadIdleSessions();
@@ -4840,19 +4841,20 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      const current = readFeaturePlugins(home);
-      const source = typeof body.source === 'string' && body.source.trim()
-        ? body.source.trim()
-        : current[slot].source;
-      if (!source) {
-        const error = new Error('Package source is required');
-        error.status = 400;
-        throw error;
-      }
       const manager = await this.resolveFeaturePackageManager();
-      await manager.removeAndPersist(source);
       if (slot === 'xai') {
-        await manager.removeAndPersist(XAI_CONFLICTING_OAUTH_SOURCE).catch(() => undefined);
+        await removeXaiSlotSources({ manager, home });
+      } else {
+        const current = readFeaturePlugins(home);
+        const source = typeof body.source === 'string' && body.source.trim()
+          ? body.source.trim()
+          : current[slot].source;
+        if (!source) {
+          const error = new Error('Package source is required');
+          error.status = 400;
+          throw error;
+        }
+        await manager.removeAndPersist(source);
       }
       const reload = await this.reloadIdleSessions();
       return {
