@@ -41,11 +41,9 @@ import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
-    clampPiThinkingLevel,
-    parseAvailablePiThinkingLevels,
     parsePiThinkingLevel,
+    resolvePairedPiThinking,
     resolvePiThinkingChipPresentation,
-    resolveVisiblePiThinkingLevels,
     type PiThinkingLevel,
 } from './piThinking';
 import { usePiThinkingChipStore } from './piThinkingChipStore';
@@ -392,66 +390,92 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         // and would otherwise keep the empty-catalog fallback after fetch lands.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
     }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
+    const pairedThinking = React.useMemo(() => {
+        if (!isPiKernel) {
+            return { thinking: undefined as string | undefined, levels: [] as PiThinkingLevel[] };
+        }
+        return resolvePairedPiThinking({
+            current: piThinking,
+            catalogLevels: draftThinkingLevels,
+            liveAvailable: piThinkingLevels,
+        });
+    }, [draftThinkingLevels, isPiKernel, piThinking, piThinkingLevels]);
+    const sessionModelApplyRef = React.useRef(Promise.resolve());
+    const piThinkingRef = React.useRef(piThinking);
+    piThinkingRef.current = piThinking;
+    const thinkingPairKey = `${currentSessionIdForThinking ?? ''}|${currentProviderId ?? ''}|${currentModelId ?? ''}`;
+    const thinkingPairKeyRef = React.useRef(thinkingPairKey);
+    thinkingPairKeyRef.current = thinkingPairKey;
     React.useEffect(() => {
         if (!isPiKernel) {
             setPiThinkingLevels(undefined);
             return;
         }
+        const catalogPair = resolvePairedPiThinking({
+            current: piThinking,
+            catalogLevels: draftThinkingLevels,
+        });
+        setPiThinkingLevels(catalogPair.levels.length > 0 ? catalogPair.levels : undefined);
+        const pinStillValid = Boolean(
+            parsePiThinkingLevel(piThinking)
+            && catalogPair.levels.includes(parsePiThinkingLevel(piThinking)!),
+        );
+        if (!pinStillValid && catalogPair.thinking !== piThinking) {
+            setPiThinking(catalogPair.thinking);
+        }
         if (!currentSessionIdForThinking) {
-            setPiThinkingLevels(draftThinkingLevels.length > 0 ? draftThinkingLevels : undefined);
-            if (draftThinkingLevels.length > 0) {
-                const pinned = parsePiThinkingLevel(currentVariant);
-                const nextThinking = clampPiThinkingLevel(pinned ?? piThinking, draftThinkingLevels);
-                if (nextThinking) setPiThinking(nextThinking);
-            }
             return;
         }
         let cancelled = false;
-        void runtimeFetch(`/api/session/${currentSessionIdForThinking}/thinking`, { method: 'GET' })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((payload) => {
-                if (cancelled || !payload) {
-                    return;
-                }
-                const available = parseAvailablePiThinkingLevels(payload.available);
-                if (available.length > 0) {
-                    setPiThinkingLevels(available);
-                } else if (draftThinkingLevels.length > 0) {
-                    setPiThinkingLevels(draftThinkingLevels);
-                }
-                const recorded = parsePiThinkingLevel(payload.thinking);
-                const nextThinking = recorded ?? clampPiThinkingLevel(
-                    piThinking,
-                    available.length > 0 ? available : draftThinkingLevels,
-                );
-                if (nextThinking) {
-                    setPiThinking(nextThinking);
-                }
-            })
-            .catch(() => undefined);
+        const sessionId = currentSessionIdForThinking;
+        const pairKey = thinkingPairKey;
+        void (async () => {
+            await sessionModelApplyRef.current;
+            if (cancelled || catalogPair.levels.length === 0) {
+                return;
+            }
+            const res = await runtimeFetch(`/api/session/${sessionId}/thinking`, { method: 'GET' }).catch(() => null);
+            if (cancelled || thinkingPairKeyRef.current !== pairKey || !res?.ok) {
+                return;
+            }
+            const payload = await res.json().catch(() => null);
+            if (cancelled || thinkingPairKeyRef.current !== pairKey || !payload) {
+                return;
+            }
+            const livePair = resolvePairedPiThinking({
+                current: parsePiThinkingLevel(piThinkingRef.current) ?? parsePiThinkingLevel(payload.thinking),
+                catalogLevels: draftThinkingLevels,
+                liveAvailable: payload.available,
+            });
+            setPiThinkingLevels(livePair.levels.length > 0 ? livePair.levels : undefined);
+            setPiThinking(livePair.thinking);
+        })();
         return () => {
             cancelled = true;
         };
-        // piThinking is a fallback only; including it would re-run after every chip write.
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- draft pin follows currentVariant
-    }, [currentSessionIdForThinking, currentModelId, currentVariant, draftThinkingLevels, isPiKernel]);
+        // Chip writes must not re-GET jsonl thinking.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- pair on model/catalog
+    }, [thinkingPairKey, draftThinkingLevels, isPiKernel]);
 
-    const visiblePiThinkingLevels = React.useMemo(
-        () => resolveVisiblePiThinkingLevels(piThinkingLevels ?? draftThinkingLevels),
-        [draftThinkingLevels, piThinkingLevels],
-    );
+    const visiblePiThinkingLevels = pairedThinking.levels;
 
     React.useEffect(() => {
-        usePiThinkingChipStore.getState().setLevel(isPiKernel ? piThinking : undefined);
-    }, [isPiKernel, piThinking]);
+        usePiThinkingChipStore.getState().setLevel(
+            isPiKernel ? pairedThinking.thinking : undefined,
+            isPiKernel && pairedThinking.levels.length > 0,
+        );
+    }, [isPiKernel, pairedThinking.levels.length, pairedThinking.thinking]);
     React.useEffect(() => {
         return () => {
-            usePiThinkingChipStore.getState().setLevel(undefined);
+            usePiThinkingChipStore.getState().setLevel(undefined, false);
         };
     }, []);
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
         setPiThinking(level);
+        if (!isPiKernel) {
+            setCurrentVariant(level);
+        }
         const sessionId = useSessionUIStore.getState().currentSessionId;
         try {
             await runtimeFetch('/api/pi/defaults', {
@@ -469,7 +493,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         } catch {
             // keep the optimistic chip; Settings → Sessions remains the fallback
         }
-    }, []);
+    }, [isPiKernel, setCurrentVariant]);
 
 
     // Use visible agents (excludes hidden internal agents)
@@ -816,8 +840,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         );
     }, [currentSessionDirectory, currentSessionMessagesFromSync]);
 
+    const composerPickedModelRef = React.useRef(false);
     const tryApplyModelSelection = React.useCallback(
-        (providerId: string, modelId: string, agentName?: string): ModelApplyResult => {
+        (providerId: string, modelId: string, agentName?: string, options?: { fromRestore?: boolean }): ModelApplyResult => {
             if (!providerId || !modelId) {
                 return 'model-missing';
             }
@@ -839,15 +864,22 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 return 'applied';
             }
 
+            if (!options?.fromRestore) {
+                composerPickedModelRef.current = true;
+            }
+
+            if (currentSessionId) {
+                sessionModelApplyRef.current = runtimeFetch(`/api/session/${currentSessionId}/model`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: `${providerId}/${modelId}` }),
+                }).then(() => undefined).catch(() => undefined);
+            }
+
             setProvider(providerId);
             setModel(modelId);
 
             if (currentSessionId) {
-                void runtimeFetch(`/api/session/${currentSessionId}/model`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: `${providerId}/${modelId}` }),
-                }).catch(() => undefined);
                 saveSessionModelSelection(currentSessionId, providerId, modelId);
                 if (agentName) {
                     saveAgentModelForSession(currentSessionId, agentName, providerId, modelId);
@@ -859,32 +891,51 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         [providers, currentProviderId, currentModelId, setProvider, setModel, currentSessionId, saveAgentModelForSession, saveSessionModelSelection],
     );
 
-    const sessionModelRestoreRef = React.useRef<string | null>(null);
+    const restoredSessionModelRef = React.useRef<string | null>(null);
     React.useEffect(() => {
         if (!isPiKernel || !currentSessionId) {
-            sessionModelRestoreRef.current = null;
+            restoredSessionModelRef.current = null;
+            composerPickedModelRef.current = false;
+            return;
+        }
+        if (restoredSessionModelRef.current === currentSessionId) {
             return;
         }
         let cancelled = false;
-        void runtimeFetch(`/api/session/${encodeURIComponent(currentSessionId)}/model`, { method: 'GET' })
+        const sessionId = currentSessionId;
+        void runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/model`, { method: 'GET' })
             .then((res) => (res.ok ? res.json() : null))
             .then((payload) => {
                 if (cancelled || !payload) return;
                 const providerId = typeof payload.providerID === 'string' ? payload.providerID.trim() : '';
                 const modelId = typeof payload.modelID === 'string' ? payload.modelID.trim() : '';
-                if (!providerId || !modelId) return;
-                const restoreKey = `${currentSessionId}|${providerId}|${modelId}`;
-                if (sessionModelRestoreRef.current === restoreKey) return;
-                const result = tryApplyModelSelection(providerId, modelId);
-                if (result !== 'applied') return;
-                saveSessionModelSelection(currentSessionId, providerId, modelId);
-                sessionModelRestoreRef.current = restoreKey;
+                if (!providerId || !modelId) {
+                    restoredSessionModelRef.current = sessionId;
+                    return;
+                }
+                if (composerPickedModelRef.current) {
+                    restoredSessionModelRef.current = sessionId;
+                    return;
+                }
+                const result = tryApplyModelSelection(providerId, modelId, undefined, { fromRestore: true });
+                if (result === 'applied') {
+                    restoredSessionModelRef.current = sessionId;
+                    saveSessionModelSelection(sessionId, providerId, modelId);
+                    return;
+                }
+                if (result === 'provider-missing' || result === 'model-missing') {
+                    return;
+                }
+                restoredSessionModelRef.current = sessionId;
             })
             .catch(() => undefined);
         return () => {
             cancelled = true;
         };
-    }, [currentSessionId, isPiKernel, saveSessionModelSelection, tryApplyModelSelection]);
+        // Restore until it lands. tryApplyModelSelection changes on composer
+        // picks and must not re-fetch a later selection.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentSessionId, isPiKernel, providers.length]);
 
     const getModelVariantOptions = React.useCallback((providerId: string, modelId: string) => {
         const provider = providers.find((entry) => entry.id === providerId);
@@ -1299,6 +1350,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     ]);
 
     React.useEffect(() => {
+        if (isPiKernel) {
+            return;
+        }
         if (!contextHydrated || !currentAgentName) {
             manualVariantSelectionRef.current = false;
             setCurrentVariant(undefined);
@@ -1360,6 +1414,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         getAgentModelVariantForSession,
         setCurrentVariant,
         settingsDefaultVariant,
+        isPiKernel,
     ]);
 
     React.useEffect(() => {
@@ -2115,8 +2170,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderMobilePiThinkingPanel = () => {
-        if (!isCompact || !isPiKernel) return null;
-        const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+        if (!isCompact || !isPiKernel || pairedThinking.levels.length === 0) return null;
+        const thinkingChip = resolvePiThinkingChipPresentation(pairedThinking.thinking);
         return (
             <MobileOverlayPanel
                 open={activeMobilePanel === 'variant'}
@@ -2789,7 +2844,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const renderVariantSelector = () => {
         if (isPiKernel) {
-            const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+            if (pairedThinking.levels.length === 0) {
+                return null;
+            }
+            const thinkingChip = resolvePiThinkingChipPresentation(pairedThinking.thinking);
             const colorClass = thinkingChip.status === 'ready' && thinkingChip.level !== 'off'
                 ? 'text-[color:var(--status-info)]'
                 : 'text-muted-foreground';

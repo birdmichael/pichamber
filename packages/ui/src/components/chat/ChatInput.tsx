@@ -50,6 +50,8 @@ import type { SkillAutocompleteHandle } from './SkillAutocomplete';
 import type { SnippetAutocompleteHandle } from './SnippetAutocomplete';
 import { cn } from "@/lib/utils";
 import { ModelControls } from './ModelControls';
+import { resolveComposerSendThinking } from './piThinking';
+import { usePiThinkingChipStore } from './piThinkingChipStore';
 import { getComposerKnownAgentNames, parseAgentMentions } from '@/lib/messages/agentMentions';
 import { StatusRow } from './StatusRow';
 import { PendingChangesBar } from './PendingChangesBar';
@@ -453,6 +455,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         ? getModelMetadata(currentProviderId, currentModelId)
         : undefined;
     const currentVariant = useConfigStore((state) => state.currentVariant);
+    const composerThinking = usePiThinkingChipStore((state) => state.level);
+    const thinkingToSend = resolveComposerSendThinking({
+        chipLevel: composerThinking,
+        variant: currentVariant,
+    });
     const currentAgentName = useConfigStore((state) => state.currentAgentName);
     const setAgent = useConfigStore((state) => state.setAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
@@ -1056,7 +1063,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 providerID: currentProviderId,
                 modelID: currentModelId,
                 agent: currentAgentName ?? undefined,
-                variant: currentVariant ?? undefined,
+                variant: thinkingToSend,
             } : undefined,
             contextDrafts: contextDrafts.length > 0 ? contextDrafts : undefined,
         });
@@ -1073,7 +1080,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         if (!isMobile) {
             composerRef.current?.focus();
         }
-    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, currentProviderId, currentModelId, currentAgentName, currentVariant, inlineDraftTarget, consumeDrafts]);
+    }, [getCurrentInputSnapshot, currentSessionId, messageQueueTarget, attachedFiles, sanitizeAttachmentsForSend, addToQueue, clearAttachedFiles, isMobile, currentProviderId, currentModelId, currentAgentName, thinkingToSend, inlineDraftTarget, consumeDrafts]);
 
     const handleQueuedMessageEdit = React.useCallback((content: string) => {
         setMessage(content);
@@ -1170,7 +1177,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const providerIdToSend = capturedSendConfig?.providerID ?? currentProviderId;
         const modelIdToSend = capturedSendConfig?.modelID ?? currentModelId;
         const agentNameToSend = capturedSendConfig?.agent ?? currentAgentName;
-        const variantToSend = capturedSendConfig?.variant ?? currentVariant;
+        const variantToSend = capturedSendConfig?.variant ?? thinkingToSend;
 
         if (!providerIdToSend || !modelIdToSend) {
             console.warn('Cannot send message: provider or model not selected');

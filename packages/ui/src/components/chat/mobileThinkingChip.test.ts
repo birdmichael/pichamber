@@ -22,15 +22,30 @@ describe('mobile thinking chip', () => {
 
   test('the chip is Pi-only and keeps the keyboard-open tap guard', () => {
     expect(buttonSource).toContain('usePiKernel');
-    expect(buttonSource).toContain('if (!isPiKernel)');
+    expect(buttonSource).toContain('if (!isPiKernel || !hasLevels)');
     expect(buttonSource).toContain('return null');
     expect(buttonSource).toContain('event.preventDefault()');
   });
 
   test('shares the live thinking level with the hidden ModelControls host', () => {
-    usePiThinkingChipStore.getState().setLevel('low');
+    usePiThinkingChipStore.getState().setLevel('low', true);
     expect(usePiThinkingChipStore.getState().level).toBe('low');
-    usePiThinkingChipStore.getState().setLevel(undefined);
+    expect(usePiThinkingChipStore.getState().hasLevels).toBe(true);
+    usePiThinkingChipStore.getState().setLevel(undefined, false);
     expect(usePiThinkingChipStore.getState().level).toBe(undefined);
+    expect(usePiThinkingChipStore.getState().hasLevels).toBe(false);
+  });
+
+  test('pairs the thinking chip to the selected model catalog immediately', () => {
+    expect(modelControlsSource).toContain('resolvePairedPiThinking');
+    expect(modelControlsSource).toContain('catalogLevels: draftThinkingLevels');
+    expect(modelControlsSource).toContain('resolvePiThinkingChipPresentation(pairedThinking.thinking)');
+    expect(modelControlsSource).toContain('sessionModelApplyRef');
+    expect(modelControlsSource).toContain('pairedThinking.levels.length === 0');
+    expect(modelControlsSource).toContain('restoredSessionModelRef');
+    expect(modelControlsSource).toContain('composerPickedModelRef');
+    expect(modelControlsSource).toContain('fromRestore: true');
+    expect(modelControlsSource).toContain('thinkingPairKeyRef');
+    expect(buttonSource).toContain('hasLevels');
   });
 });

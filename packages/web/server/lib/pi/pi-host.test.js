@@ -2493,6 +2493,30 @@ describe('session thinking levels', () => {
     host.dispose();
   });
 
+  it('promptAsync applies a later idle send onto a new model and thinking', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Next turn' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'first' },
+      variant: 'low',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'second' },
+      variant: 'high',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+
+    expect(record.piSession.currentModel).toEqual({ id: 'second', provider: 'example' });
+    expect(record.piSession.thinkingLevel).toBe('high');
+    host.dispose();
+  });
+
   it('reads live getAvailableThinkingLevels and clamps an unsupported pick', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Think' });
@@ -2561,6 +2585,40 @@ describe('session thinking levels', () => {
       modelID: 'claude-opus-5',
     });
     expect(await host.getSessionThinking(record.id)).toMatchObject({ thinking: 'high' });
+    host.dispose();
+  });
+
+  it('clamps session thinking onto the new model immediately after setSessionModel', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Pair think' });
+    record.piSession.thinkingLevel = 'xhigh';
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+
+    await host.setSessionModel(record.id, 'example/example-4.6');
+
+    expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+
+  it('widens off-only live thinking onto catalog levels after setSessionModel', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['off', 'low', 'medium', 'high'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Off only' });
+    record.piSession.thinkingLevel = 'high';
+    record.piSession.getAvailableThinkingLevels = () => ['off'];
+
+    await host.setSessionModel(record.id, 'example/example-4.6');
+
+    expect(record.piSession.thinkingLevel).toBe('high');
     host.dispose();
   });
 });
