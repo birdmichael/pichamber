@@ -49,6 +49,34 @@ describe('createEventTranslator', () => {
     expect(t.userMessageID).toBe(null);
   });
 
+  it('parents a post-settle implement assistant to the last visible user, not a Pi-native id', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    t.translate({ type: 'agent_settled' });
+    expect(t.userMessageID).toBe(null);
+
+    const skipped = t.translate({
+      type: 'message_start',
+      message: { role: 'user', id: '5bb000de', content: 'Implement the plan.' },
+    });
+    expect(skipped).toEqual([]);
+    expect(t.userMessageID).toBe(null);
+
+    const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.info.parentID).toBe('msg_user');
+    const tool = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    const updated = tool.find((event) => event.type === 'message.updated');
+    expect(updated?.properties.info.parentID ?? started[0].properties.info.parentID).toBe('msg_user');
+    expect(tool.some((event) => event.type === 'message.part.updated' && event.properties.part.tool === 'edit')).toBe(true);
+  });
+
   it('maps text_delta to message.part.delta field text', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
@@ -668,7 +696,7 @@ describe('createEventTranslator', () => {
       message: { role: 'user', id: '5bb000de', content: '帮我启动一个子代理 查看 我电脑磁盘' },
     });
     expect(events).toEqual([]);
-    expect(t.userMessageID).toBe('5bb000de');
+    expect(t.userMessageID).toBe(null);
   });
   it('maps auto_retry_start to session.status retry', () => {
     const events = translator().translate({

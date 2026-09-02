@@ -144,9 +144,41 @@ export function preserveFrozenAssistantCompletion<T extends Message>(existing: T
   } as T
 }
 
+const lastUserMessageId = (messages: Message[] | undefined): string | undefined => {
+  if (!messages) return undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role === "user" && typeof message.id === "string" && message.id.trim()) {
+      return message.id
+    }
+  }
+  return undefined
+}
+
+const parentIdOf = (message: Message | undefined): string => {
+  const parentID = (message as { parentID?: unknown } | undefined)?.parentID
+  return typeof parentID === "string" ? parentID.trim() : ""
+}
+
+/** Empty or Pi-native parentIDs are not chat turns; do not retarget an unloaded `msg_*`/`usr_*` parent. */
+export function attachAssistantToVisibleUser<T extends Message>(
+  messages: Message[] | undefined,
+  next: T,
+): T {
+  if (next.role !== "assistant") return next
+  const fallback = lastUserMessageId(messages)
+  if (!fallback) return next
+  const incoming = parentIdOf(next)
+  if (!incoming) return { ...next, parentID: fallback } as T
+  if (messages?.some((message) => message.id === incoming)) return next
+  if (isClientGeneratedMessageId(incoming)) return next
+  return { ...next, parentID: fallback } as T
+}
+
 function areMessageUpdateFieldsEqual(existing: Message, next: Message): boolean {
   if (existing.role !== next.role) return false
   if ((existing as { finish?: unknown }).finish !== (next as { finish?: unknown }).finish) return false
+  if (parentIdOf(existing) !== parentIdOf(next)) return false
   if ((existing.time as { completed?: number })?.completed !== (next.time as { completed?: number })?.completed) return false
 
   const fields: Array<keyof Message | "structured" | "summary" | "tokens" | "error" | "cost" | "model" | "tools" | "format" | "variant" | "agent" | "system"> = [
@@ -378,8 +410,9 @@ export function applyDirectoryEvent(
     }
 
     case "message.updated": {
-      const info = (event.properties as { info: Message }).info
-      const messages = draft.message[info.sessionID]
+      const rawInfo = (event.properties as { info: Message }).info
+      const messages = draft.message[rawInfo.sessionID]
+      const info = attachAssistantToVisibleUser(messages, rawInfo)
       if (!messages) {
         draft.message[info.sessionID] = [info]
         return true

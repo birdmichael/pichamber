@@ -764,6 +764,16 @@ const lastUserMessage = (store) => {
   return undefined;
 };
 
+const applyAssistantParent = (store, nextInfo) => {
+  if (!nextInfo || nextInfo.role !== 'assistant') return nextInfo;
+  const fallback = lastUserMessage(store)?.info?.id;
+  if (!fallback) return nextInfo;
+  const incoming = typeof nextInfo.parentID === 'string' ? nextInfo.parentID.trim() : '';
+  if (!incoming) return { ...nextInfo, parentID: fallback };
+  if (store.messages.some((entry) => entry?.info?.id === incoming)) return nextInfo;
+  return { ...nextInfo, parentID: fallback };
+};
+
 const resolveStoreRuntimeModel = (store, ...extras) => resolveUsableFacadeModel(
   ...extras,
   store?.translator?.getFallbackModel?.(),
@@ -796,7 +806,11 @@ const applyEventToStore = (store, ocEvent) => {
   const props = ocEvent?.properties || {};
   if (type === 'message.updated' && props.info) {
     const existing = store.messages.find((entry) => entry.info.id === props.info.id);
-    let nextInfo = stampAssistantStoreInfo(props.info, store, existing?.info);
+    let nextInfo = applyAssistantParent(
+      store,
+      stampAssistantStoreInfo(props.info, store, existing?.info),
+    );
+    if (ocEvent.properties) ocEvent.properties.info = nextInfo;
     if (existing) {
       const prevTime = existing.info.time || {};
       const nextTime = nextInfo.time || {};
@@ -827,15 +841,6 @@ const applyEventToStore = (store, ocEvent) => {
     ) {
       // Pi jsonl id for a turn promptAsync already inserted with msg_*.
     } else {
-      if (nextInfo.role === 'assistant' && nextInfo.parentID) {
-        const parentExists = store.messages.some((entry) => entry?.info?.id === nextInfo.parentID);
-        if (!parentExists) {
-          const parent = lastUserMessage(store);
-          if (parent?.info?.id) {
-            nextInfo = { ...nextInfo, parentID: parent.info.id };
-          }
-        }
-      }
       store.messages.push({ info: nextInfo, parts: [] });
     }
   }
@@ -844,14 +849,13 @@ const applyEventToStore = (store, ocEvent) => {
     let entry = store.messages.find((item) => item.info.id === messageID);
     if (!entry) {
       const parent = lastUserMessage(store);
-      const stub = {
+      const stub = applyAssistantParent(store, {
         id: messageID,
         sessionID: props.part.sessionID,
         role: 'assistant',
         time: { created: Date.now() },
-        ...(parent?.info?.id ? { parentID: parent.info.id } : {}),
         ...(parent?.info?.agent ? { agent: parent.info.agent } : { agent: 'pi' }),
-      };
+      });
       entry = {
         info: stampAssistantStoreInfo(stub, store, parent?.info),
         parts: [],

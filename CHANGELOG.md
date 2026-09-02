@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: after Plan **Implement the plan** / **Implement here**, the next tool rows (Read, Shell, Edit) stay on that turn. Previously the reply kept running (`editing file`) while the transcript froze on Plan mode complete.
 - Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.
 - Settings: Feature Plugins Grok Usage installs `pi-xai` (not `pi-xai-oauth`). Providers gain xAI, and Work Status shows Grok usage.
 - Sessions: an empty Chats block still shows the Chats heading and No chats yet. Leftover empty chat folders no longer hide that empty state.
