@@ -17,3 +17,31 @@ export const resolveForkThinkingLevels = (input: {
   }
   return [...input.variantKeys];
 };
+
+/** Keep a pin until the selected model is known; then empty levels clear it. */
+export const nextScheduledTaskThinkingVariant = (input: {
+  thinkingLevels: readonly string[];
+  modelKnown: boolean;
+  currentVariant: string;
+}): string | undefined => {
+  const current = input.currentVariant.trim();
+  if (input.thinkingLevels.length > 0) {
+    return undefined;
+  }
+  if (!input.modelKnown || !current) {
+    return undefined;
+  }
+  return '';
+};
+
+export const persistScheduledTaskThinkingVariant = (input: {
+  thinkingLevels: readonly string[];
+  modelKnown: boolean;
+  currentVariant: string;
+}): string | undefined => {
+  const current = input.currentVariant.trim();
+  if (!current) return undefined;
+  if (input.thinkingLevels.includes(current)) return current;
+  if (!input.modelKnown) return current;
+  return undefined;
+};

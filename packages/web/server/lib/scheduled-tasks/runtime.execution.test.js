@@ -169,6 +169,7 @@ describe('scheduled-tasks execution kernels', () => {
       parts: [{ type: 'text', text: 'Summarize open issues' }],
       model: 'openai/gpt-4o',
     });
+    expect(host.setSessionThinking).not.toHaveBeenCalled();
     expect(projectConfigRuntime.getCurrentTask().state.lastSessionId).toBe('ses_pi_1');
     expect(projectConfigRuntime.getCurrentTask().state.lastStatus).toBe('success');
   });
@@ -274,5 +275,43 @@ describe('scheduled-tasks execution kernels', () => {
     expect(result.ok).toBe(true);
     expect(setSessionAutoAccept).not.toHaveBeenCalled();
     expect(host.promptAsync).toHaveBeenCalledOnce();
+  });
+
+  it('applies the task thinking level on the Pi session and prompt', async () => {
+    const projectConfigRuntime = createProjectConfigRuntime(makeTask({
+      execution: {
+        prompt: 'Analyze yesterday',
+        providerID: 'xai',
+        modelID: 'grok-4.6',
+        variant: 'high',
+      },
+    }));
+    const host = {
+      ready: vi.fn(async () => true),
+      createSession: vi.fn(async () => ({ id: 'ses_pi_5', info: { id: 'ses_pi_5' } })),
+      setSessionModel: vi.fn(async (_id, ref) => ({ applied: true, model: ref })),
+      setSessionThinking: vi.fn(async (_id, level) => ({ applied: true, thinking: level })),
+      promptAsync: vi.fn(async () => ({ info: { id: 'msg_5' } })),
+      getDefaults: vi.fn(() => ({ model: 'anthropic/claude-sonnet' })),
+    };
+
+    const runtime = createRuntime({
+      projectConfigRuntime,
+      getPiHost: () => host,
+      isPiKernelEnabled: () => true,
+    });
+
+    await runtime.start();
+    const result = await runtime.runNow('p1', 'task-1');
+    runtime.stop();
+
+    expect(result.ok).toBe(true);
+    expect(host.setSessionModel).toHaveBeenCalledWith('ses_pi_5', 'xai/grok-4.6');
+    expect(host.setSessionThinking).toHaveBeenCalledWith('ses_pi_5', 'high');
+    expect(host.promptAsync).toHaveBeenCalledWith('ses_pi_5', {
+      parts: [{ type: 'text', text: 'Analyze yesterday' }],
+      model: 'xai/grok-4.6',
+      variant: 'high',
+    });
   });
 });

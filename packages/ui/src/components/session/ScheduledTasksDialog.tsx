@@ -18,6 +18,9 @@ import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/pro
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { cn, formatDirectoryName } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { getProviderModelDisplayName } from '@/lib/modelDisplay';
+import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
+import { useConfigStore } from '@/stores/useConfigStore';
 import type { ProjectEntry } from '@/lib/api/types';
 import {
   deleteScheduledTask,
@@ -39,6 +42,21 @@ const scheduleTimes = (task: ScheduledTask): string[] => {
     : (task.schedule.time ? [task.schedule.time] : []);
   const valid = raw.filter((value) => typeof value === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(value));
   return Array.from(new Set(valid)).sort((a, b) => a.localeCompare(b));
+};
+
+const formatTaskModel = (
+  task: ScheduledTask,
+  providers: Array<{ id: string; models?: Array<{ id?: unknown; name?: unknown }> }>,
+  emptyLabel: string,
+): string => {
+  const providerID = task.execution.providerID?.trim() || '';
+  const modelID = task.execution.modelID?.trim() || '';
+  if (!providerID || !modelID) {
+    return modelID || providerID || emptyLabel;
+  }
+  const provider = providers.find((item) => item.id === providerID);
+  const displayName = getProviderModelDisplayName(provider, modelID);
+  return displayName || modelID;
 };
 
 const formatSchedule = (task: ScheduledTask, t: ReturnType<typeof useI18n>['t']): string => {
@@ -177,6 +195,8 @@ export function ScheduledTasksDialog() {
   const surfaceOpen = open;
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const projects = useProjectsStore((state) => state.projects);
+  const providers = useConfigStore((state) => state.providers);
+  const loadProviders = useConfigStore((state) => state.loadProviders);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
   const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
   const { currentTheme } = useThemeSystem();
@@ -265,6 +285,7 @@ export function ScheduledTasksDialog() {
     if (!surfaceOpen) {
       return;
     }
+    void loadProviders({ source: 'scheduledTasksDialog' });
     const preferredProjectID = activeProject?.id || projects[0]?.id || '';
     setSelectedProjectID(preferredProjectID);
     if (preferredProjectID) {
@@ -273,7 +294,7 @@ export function ScheduledTasksDialog() {
       setTasks([]);
       setLoading(false);
     }
-  }, [surfaceOpen, activeProject, projects, reloadTasks]);
+  }, [surfaceOpen, activeProject, projects, reloadTasks, loadProviders]);
 
   React.useEffect(() => {
     if (!surfaceOpen) {
@@ -495,6 +516,13 @@ export function ScheduledTasksDialog() {
                   </div>
                   <div className="typography-micro truncate text-muted-foreground">
                     {formatSchedule(task, t)}
+                  </div>
+                  <div className="typography-micro truncate text-muted-foreground">
+                    {formatTaskModel(task, providers, t('chat.modelControls.modeValue.none'))}
+                    <span className="text-muted-foreground/50"> · </span>
+                    {task.execution.variant
+                      ? formatEffortLabel(task.execution.variant)
+                      : t('sessions.scheduledTasks.editor.thinkingLevel.default')}
                   </div>
                   {task.loopFile ? (
                     <div

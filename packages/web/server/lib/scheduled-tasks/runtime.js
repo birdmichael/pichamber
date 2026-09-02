@@ -613,10 +613,12 @@ export const createScheduledTasksRuntime = (deps) => {
     await applyPiSessionThinking(host, sessionID, task);
 
     const prompt = expandSnippets(task.execution.prompt, projectPath);
+    const thinking = typeof task?.execution?.variant === 'string' ? task.execution.variant.trim() : '';
     await host.promptAsync(sessionID, {
       parts: [{ type: 'text', text: prompt }],
       ...(task.execution.agent ? { agent: task.execution.agent } : {}),
       ...(modelRef ? { model: modelRef } : {}),
+      ...(thinking ? { variant: thinking } : {}),
     });
 
     const finishedAt = Date.now();
