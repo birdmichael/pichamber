@@ -372,6 +372,17 @@ export const createEventTranslator = ({
         // Next turn's Pi user message_start must not be swallowed as an echo of
         // the previous promptAsync insert. Steer/followUp never take this slot.
         userMessageID = null;
+        // Tools after settle (ctx.ui implement) must not reuse the completed
+        // plan-mode assistant. Keep visibleUserMessageID for parentID.
+        assistantMessageID = null;
+        assistantCreatedAt = null;
+        assistantCompletedAt = null;
+        assistantParentID = null;
+        textParts.clear();
+        reasoningParts.clear();
+        toolParts.clear();
+        toolStartTimes.clear();
+        lastUsage = undefined;
         return [
           event('session.status', { sessionID, status: { type: 'idle' } }),
           event('session.idle', { sessionID }),

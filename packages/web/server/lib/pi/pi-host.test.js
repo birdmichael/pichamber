@@ -2600,7 +2600,6 @@ describe('session plan status and actions', () => {
       type: 'message_start',
       message: { role: 'user', id: '5bb000de', content: 'Implement the plan.' },
     });
-    emit({ type: 'message_start', message: { role: 'assistant', id: 'asst_impl', content: [] } });
     emit({
       type: 'tool_execution_start',
       toolCallId: 'call_edit',
@@ -2609,20 +2608,25 @@ describe('session plan status and actions', () => {
     });
     await wait();
 
-    const implementUpdated = [...events].reverse().find((event) => (
+    const planAssistant = events.find((event) => (
       event.type === 'message.updated'
       && event.properties?.info?.role === 'assistant'
-      && event.properties.info.id === 'asst_impl'
     ));
-    expect(implementUpdated?.properties.info.parentID).toBe('msg_plan');
     const editPart = events.find((event) => (
       event.type === 'message.part.updated'
       && event.properties?.part?.tool === 'edit'
     ));
-    expect(editPart.properties.part.messageID).toBe('asst_impl');
+    expect(editPart.properties.part.messageID).not.toBe(planAssistant.properties.info.id);
+    const implementUpdated = [...events].reverse().find((event) => (
+      event.type === 'message.updated'
+      && event.properties?.info?.role === 'assistant'
+      && event.properties.info.id === editPart.properties.part.messageID
+    ));
+    expect(implementUpdated?.properties.info.parentID).toBe('msg_plan');
     const stored = host.getMessages(record.id).find((entry) => (
       entry.info.role === 'assistant' && entry.parts.some((part) => part.tool === 'edit')
     ));
+    expect(stored.info.id).not.toBe(planAssistant.properties.info.id);
     expect(stored.info.parentID).toBe('msg_plan');
     expect(events.some((event) => event.properties?.info?.id === '5bb000de')).toBe(false);
     host.dispose();

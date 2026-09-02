@@ -77,6 +77,44 @@ describe('createEventTranslator', () => {
     expect(tool.some((event) => event.type === 'message.part.updated' && event.properties.part.tool === 'edit')).toBe(true);
   });
 
+  it('opens a new assistant for tools after settle instead of appending to the completed plan message', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    const planStart = t.translate({ type: 'message_start', message: { role: 'assistant', id: 'asst_plan', content: [] } });
+    expect(planStart[0].properties.info.id).toBe('asst_plan');
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      args: {},
+    });
+    t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      isError: false,
+      result: { details: { plan: '# Ready' } },
+    });
+    t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    t.translate({ type: 'agent_settled' });
+    expect(t.assistantMessageID).toBe(null);
+
+    const tool = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    const updated = tool.find((event) => event.type === 'message.updated');
+    expect(updated.properties.info.id).not.toBe('asst_plan');
+    expect(updated.properties.info.parentID).toBe('msg_user');
+    expect(updated.properties.info.finish).toBeUndefined();
+    expect(updated.properties.info.time.completed).toBeUndefined();
+    const part = tool.find((event) => event.type === 'message.part.updated');
+    expect(part.properties.part.messageID).toBe(updated.properties.info.id);
+    expect(part.properties.part.tool).toBe('edit');
+  });
+
   it('maps text_delta to message.part.delta field text', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
