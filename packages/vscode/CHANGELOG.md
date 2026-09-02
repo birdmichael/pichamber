@@ -1,5 +1,6 @@
 ## [Unreleased]
 
+- Feature Plugins Grok Usage installs `pi-xai`. Providers gain xAI, and Work Status shows Grok usage.
 - Opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
 
 ## [1.2.8] - 2026-09-01

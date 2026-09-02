@@ -70,6 +70,19 @@ export const shouldShowSidebarActivitySections = (args: {
   return args.hasActivitySectionItems;
 };
 
+type ActivitySectionKeyed = {
+  key: string;
+  items: ReadonlyArray<unknown>;
+};
+
+/** Idle keeps an empty chats block whenever New chat is available. */
+export const visibleSidebarActivitySections = <T extends ActivitySectionKeyed>(
+  sections: readonly T[],
+  hasNewChatAction: boolean,
+): T[] => sections.filter((section) => (
+  section.items.length > 0 || (section.key === 'chats' && hasNewChatAction)
+));
+
 export const countSidebarSearchMatches = (
   hasSessionSearchQuery: boolean,
   projectMatchCount: number,
