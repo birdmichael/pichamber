@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: the context rail no longer shows the **配置面板** equalizer. Rail icons stay; hiding surfaces is not a sidebar control.
 - Chat: switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
 
 ## [1.2.9] - 2026-09-02
