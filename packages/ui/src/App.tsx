@@ -36,6 +36,7 @@ import {
 } from '@/lib/desktopBoot';
 import { isLocalKernelReady } from '@/lib/kernelHealth';
 import type { RecoveryVariant } from '@/components/onboarding/DesktopConnectionRecovery';
+import { RecoveryKernelInstall } from '@/components/onboarding/RecoveryKernelInstall';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { markSessionViewed } from '@/sync/notification-store';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -102,6 +103,7 @@ const StartupInitializationRecovery: React.FC<{
           <h1 className="typography-title text-foreground">{t('startup.initRecovery.title')}</h1>
           <p className="typography-body text-muted-foreground">{t('startup.initRecovery.description')}</p>
         </div>
+        <RecoveryKernelInstall surface="init-recovery" />
         <Button type="button" onClick={onRetry} disabled={isRetrying}>
           {isRetrying ? t('startup.initRecovery.retrying') : t('startup.initRecovery.retry')}
         </Button>

@@ -43,6 +43,22 @@ export const localKernelSetup = (kernel: unknown): LocalKernelSetup => {
   };
 };
 
+export type RecoveryKernelInstallSurface = 'init-recovery' | 'desktop-recovery';
+
+/** Install copy for 启动失败 / Local Pi unavailable. Remote recovery variants stay command-free. */
+export const recoveryKernelInstall = (
+  kernel: unknown,
+  options: {
+    surface: RecoveryKernelInstallSurface;
+    variant?: string | null;
+  },
+): LocalKernelSetup | null => {
+  if (options.surface === 'desktop-recovery' && options.variant !== 'local-unavailable') {
+    return null;
+  }
+  return localKernelSetup(kernel);
+};
+
 export const kernelBinaryPlaceholder = (
   kernel: unknown,
   platform: OnboardingPlatform,

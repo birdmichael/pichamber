@@ -95,7 +95,7 @@ On Pi (`OPENCHAMBER_KERNEL=pi`, the default):
 }
 ```
 
-`piBinaryResolved` / `piBinarySource` are chooser/local-setup detection only (PATH, `~/.bun/bin/pi`, `/opt/homebrew/bin/pi`, `~/.hermes/node/bin/pi`, npm global, `command -v pi`). Desktop still does not spawn PATH `pi`. The leftover OpenCode kernel omits those fields and keeps `opencodeBinaryResolved`.
+`piBinaryResolved` / `piBinarySource` are chooser/local-setup detection only (PATH, `~/.bun/bin/pi`, `/opt/homebrew/bin/pi`, `~/.hermes/node/bin/pi`, npm global, `command -v pi`). Startup-failed / Local Pi unavailable recovery shows Pi install/docs from the same kernel, not OpenCode curl. Desktop still does not spawn PATH `pi`. The leftover OpenCode kernel omits those fields and keeps `opencodeBinaryResolved`.
 
 - Pi-ready: `kernelReady` / `piRunning`, or `kernel === "pi"` and `status === "ok"`.
 - OpenCode-ready: `openCodeRunning` and `isOpenCodeReady` on `kernel: "opencode"`.

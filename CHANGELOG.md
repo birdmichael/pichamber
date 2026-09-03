@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 - Chat: picking a thinking level such as xhigh then sending no longer hides the thinking chip. If that level is not live, the chip shows a live level instead of going blank.
 - Sessions: ⋯ Open in Side Panel opens that chat in the right panel, including when the main view is New session or another chat.
 - Desktop: Mini Chat fits the display work area, keeps its composer and window controls visible when maximized on Linux, can be moved from the title bar, and opens under the project shown in the subtitle.
-- Desktop: when local Pi is not ready, Chooser and local setup show Pi install/docs and detect a `pi` binary on PATH instead of the OpenCode curl installer.
+- Desktop: when local Pi is not ready, Chooser, local setup, and the startup-failed recovery screen show Pi install/docs and detect a `pi` binary on PATH instead of the OpenCode curl installer.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Esc closes the Settings window from any section. Nested dialogs, menus, and in-pane drafts still take Esc first.

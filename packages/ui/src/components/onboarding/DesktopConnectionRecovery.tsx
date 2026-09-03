@@ -8,6 +8,7 @@ import {
   getDesktopRecoveryConfig,
   type RecoveryVariant,
 } from './desktopRecoveryConfig';
+import { RecoveryKernelInstall } from './RecoveryKernelInstall';
 
 export type { RecoveryVariant } from './desktopRecoveryConfig';
 
@@ -82,6 +83,8 @@ export function DesktopConnectionRecovery({
             )}
           </p>
         </div>
+
+        <RecoveryKernelInstall surface="desktop-recovery" variant={variant} />
 
         {/* Host info if available */}
         {hostUrl && (variant === 'remote-unreachable' || variant === 'remote-wrong-service' || variant === 'remote-incompatible') && (

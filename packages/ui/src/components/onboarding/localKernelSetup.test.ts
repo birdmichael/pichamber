@@ -6,6 +6,7 @@ import {
   kernelBinaryPlaceholder,
   localKernelSetup,
   readLocalKernelHealth,
+  recoveryKernelInstall,
   resolveLocalKernelName,
 } from './localKernelSetup';
 
@@ -71,5 +72,56 @@ describe('localKernelSetup', () => {
     expect(health.kernel).toBe('opencode');
     expect(health.ready).toBe(true);
     expect(health.piBinaryResolved).toBeNull();
+  });
+});
+
+describe('recovery / init-failure install copy', () => {
+  test('启动失败 init-recovery Pi copy is not the OpenCode curl command', () => {
+    const setup = recoveryKernelInstall('pi', { surface: 'init-recovery' });
+    expect(setup).not.toBeNull();
+    expect(setup?.installCommand).toBe(PI_INSTALL_COMMAND);
+    expect(setup?.installCommand.includes('opencode.ai')).toBe(false);
+    expect(setup?.installCommand.includes('@earendil-works/pi-coding-agent')).toBe(true);
+    expect(setup?.docsUrl.includes('opencode.ai')).toBe(false);
+    expect(setup?.docsUrl.includes('earendil-works/pi')).toBe(true);
+  });
+
+  test('unknown kernel on init-recovery defaults to Pi, not OpenCode', () => {
+    const setup = recoveryKernelInstall(undefined, { surface: 'init-recovery' });
+    expect(setup?.kernel).toBe('pi');
+    expect(setup?.installCommand).toBe(PI_INSTALL_COMMAND);
+  });
+
+  test('desktop local-unavailable Pi copy is not the OpenCode curl command', () => {
+    const setup = recoveryKernelInstall('pi', {
+      surface: 'desktop-recovery',
+      variant: 'local-unavailable',
+    });
+    expect(setup?.installCommand).toBe(PI_INSTALL_COMMAND);
+    expect(setup?.installCommand.includes('opencode.ai')).toBe(false);
+    expect(setup?.docsUrl.includes('opencode.ai')).toBe(false);
+  });
+
+  test('desktop remote recovery variants do not show an install command', () => {
+    expect(recoveryKernelInstall('pi', {
+      surface: 'desktop-recovery',
+      variant: 'remote-unreachable',
+    })).toBeNull();
+    expect(recoveryKernelInstall('pi', {
+      surface: 'desktop-recovery',
+      variant: 'missing-default-host',
+    })).toBeNull();
+  });
+
+  test('leftover OpenCode kernel keeps the OpenCode curl install command on recovery', () => {
+    const initSetup = recoveryKernelInstall('opencode', { surface: 'init-recovery' });
+    expect(initSetup?.installCommand).toBe(OPENCODE_INSTALL_COMMAND);
+    expect(initSetup?.docsUrl).toBe('https://opencode.ai/docs');
+
+    const localSetup = recoveryKernelInstall('opencode', {
+      surface: 'desktop-recovery',
+      variant: 'local-unavailable',
+    });
+    expect(localSetup?.installCommand).toBe('curl -fsSL https://opencode.ai/install | bash');
   });
 });

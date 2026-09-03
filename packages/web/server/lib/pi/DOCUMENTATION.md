@@ -35,9 +35,11 @@ while `upgrade.supported` is false.
 
 `resolvePiCliPath` in `pi-cli-path.js` is independent of
 `resolveOpencodeCliPath`. On the Pi kernel, `GET /health` may include
-`piBinaryResolved` / `piBinarySource` so Chooser/local-setup can show Pi
-install copy and a detected `pi` path. This does not boot the kernel and
-does not spawn PATH `pi`. The leftover OpenCode kernel omits those fields.
+`piBinaryResolved` / `piBinarySource` so Chooser/local-setup can show a
+detected `pi` path. Startup-failed / Local Pi unavailable recovery uses
+the same kernel to show Pi install copy, not OpenCode curl. This does
+not boot the kernel and does not spawn PATH `pi`. The leftover OpenCode
+kernel omits those fields.
 
 `GET /api/pi/extensions` lists configured `settings.json` `packages` plus
 `currentVersion` / `latestVersion` / `updateAvailable` (npm registry
