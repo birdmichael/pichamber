@@ -112,6 +112,8 @@ test('Help Keyboard Shortcuts advertises Cmd+K, H / Ctrl+K, H and does not regis
     0,
     'leftover Ctrl+. must not be advertised on Keyboard Shortcuts',
   );
+});
+
 const readConstArrowFn = (source, name) => {
   const match = source.match(new RegExp(`const ${name} = \\([^)]*\\) => \\{([\\s\\S]*?)\\n\\};`));
   assert.ok(match, `expected ${name}`);

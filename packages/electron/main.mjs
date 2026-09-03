@@ -5106,8 +5106,8 @@ const buildMacMenu = () => {
         // registerAccelerator:false → renderer owns the Cmd+K leader chord
         // (`open_help` is `mod+k h`). Electron cannot bind a sequential
         // accelerator, so the catalog string is display-only (#515).
-        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
-        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+.', click: () => dispatchMenuActionOnce('help-dialog') },
+        // dispatchMenuActionOnce → toggle must not dual-fire IPC+DOM (#514).
+        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => dispatchMenuActionOnce('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Cmd+Shift+L', click: () => dispatchAction('download-logs') },
         { label: 'Toggle Developer Tools', accelerator: 'Cmd+Alt+I', click: () => openDevToolsForMenuTarget() },
         { type: 'separator' },
@@ -5231,8 +5231,8 @@ const buildAutoHiddenMenu = () => {
         // registerAccelerator:false → renderer owns the Ctrl+K leader chord
         // (`open_help` is `mod+k h`). Electron cannot bind a sequential
         // accelerator, so the catalog string is display-only (#515).
-        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
-        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+.', click: () => dispatchMenuActionOnce('help-dialog') },
+        // dispatchMenuActionOnce → toggle must not dual-fire IPC+DOM (#514).
+        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => dispatchMenuActionOnce('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Ctrl+Shift+L', click: () => dispatchAction('download-logs') },
         { type: 'separator' },
         { label: 'Clear Cache', click: () => void handleInvoke(null, 'desktop_clear_cache') },
