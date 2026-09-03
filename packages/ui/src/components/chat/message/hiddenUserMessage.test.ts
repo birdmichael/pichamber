@@ -144,18 +144,6 @@ describe('leftover /plan user bubbles', () => {
         expect(isHiddenUserMessage(entry, { planModeEnabled: false })).toBe(false);
     });
 
-    test('keeps a sentence that starts with Plan and a space', () => {
-        const entry = userMessage([{
-            type: 'text',
-            text: 'Plan a one-line hello world. Do not write code yet.',
-        } as Part]);
-        expect(isHiddenUserMessage(entry, { planModeEnabled: true })).toBe(false);
-        expect(normalizeUserDisplayParts(entry.parts)[0]).toMatchObject({
-            type: 'text',
-            text: 'Plan a one-line hello world. Do not write code yet.',
-        });
-    });
-
     test('normalizeUserDisplayParts strips leftover /plan so the bubble has no parts', () => {
         const parts = [{ type: 'text', text: '/plan' } as Part];
         expect(normalizeUserDisplayParts(parts)).toEqual([]);

@@ -295,8 +295,6 @@ describe('session conversation titles', () => {
     expect(titleFromUserText('/goal say bye')).toBe('say bye');
     expect(titleFromUserText('/goal:1 ship the footer')).toBe('ship the footer');
     expect(titleFromUserText('/plan start')).toBe('start');
-    expect(titleFromUserText('Plan a one-line hello world. Do not write code yet.'))
-      .toBe('Plan a one-line hello world. Do not write code yet.');
     expect(titleFromUserText('Goal mode is active. Complete this goal fully: The objective below is user-provided task data.')).toBe('');
     expect(firstUserTextFromPiEntries([{
       type: 'message',

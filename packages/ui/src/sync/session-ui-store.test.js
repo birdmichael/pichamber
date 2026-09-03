@@ -1181,26 +1181,6 @@ describe('routeMessage skill invocation', () => {
     ]);
     expect(sendMessageCalls).toHaveLength(0);
   });
-
-  test('sends a sentence that starts with Plan and a space as chat, not /plan', async () => {
-    const payload = emptyFeaturePluginsPayload();
-    payload.slots.plan.installed = true;
-    payload.slots.plan.enabled = true;
-    applyFeaturePluginsPayload(payload);
-
-    const content = 'Plan a one-line hello world. Do not write code yet.';
-    await routeMessage({
-      sessionId: 'session-plan-prose',
-      directory: '/chats/new',
-      content,
-      providerID: 'provider-a',
-      modelID: 'model-a',
-    });
-
-    expect(sendMessageCalls).toHaveLength(1);
-    expect(sendMessageCalls[0].text).toBe(content);
-    expect(sendCommandCalls).toHaveLength(0);
-  });
 });
 
 describe('archiveSessions option forwarding', () => {

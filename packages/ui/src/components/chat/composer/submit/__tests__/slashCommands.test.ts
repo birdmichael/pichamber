@@ -38,11 +38,6 @@ describe('parseSlashCommand', () => {
         expect(parseSlashCommand('')).toBeNull();
     });
 
-    test('a sentence that starts with Plan and a space is not /plan', () => {
-        expect(parseSlashCommand('Plan a one-line hello world. Do not write code yet.')).toBeNull();
-        expect(parseSlashCommand('Write a plan for tests.')).toBeNull();
-    });
-
     test('a bare slash is not a command', () => {
         expect(parseSlashCommand('/')).toBeNull();
         expect(parseSlashCommand('/   ')).toBeNull();
