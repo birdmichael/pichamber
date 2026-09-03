@@ -1194,6 +1194,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                 footerModelName={headerModelName}
                                 footerAgentName={headerAgentName}
                                 footerVariant={headerVariant}
+                                footerTokens={getMessageInfoProp(message.info, 'tokens')}
+                                footerCost={getMessageInfoProp(message.info, 'cost')}
                                 isDarkTheme={isDarkTheme}
                             />
 

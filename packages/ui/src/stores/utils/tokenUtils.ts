@@ -1,6 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk/v2";
 
-type TokenBreakdown = {
+export type TokenBreakdown = {
     input?: number;
     output?: number;
     reasoning?: number;
