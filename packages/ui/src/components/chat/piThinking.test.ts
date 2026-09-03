@@ -9,7 +9,9 @@ import {
   resolveEmptyDraftThinkingCurrent,
   resolvePairedPiThinking,
   resolvePiThinkingChipPresentation,
+  resolveTranscriptThinkingLabel,
   resolveVisiblePiThinkingLevels,
+  unionCurrentIntoPiThinkingLevels,
 } from './piThinking';
 
 describe('parsePiThinkingLevel', () => {
@@ -124,20 +126,41 @@ describe('resolvePairedPiThinking', () => {
 
   test('non-narrow live is the menu, even when it is not a catalog subset', () => {
     expect(resolvePairedPiThinking({
-      current: 'xhigh',
-      catalogLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
-      liveAvailable: ['low', 'medium', 'high'],
-    })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
-    expect(resolvePairedPiThinking({
       current: 'high',
       catalogLevels: ['low', 'medium', 'high', 'xhigh'],
       liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
     })).toEqual({ thinking: 'high', levels: ['off', 'minimal', 'low', 'medium', 'high'] });
+  });
+
+  test('unions a known catalog current into live that omitted it', () => {
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      liveAvailable: ['low', 'medium', 'high'],
+    })).toEqual({ thinking: 'xhigh', levels: ['low', 'medium', 'high', 'xhigh'] });
     expect(resolvePairedPiThinking({
       current: 'xhigh',
       catalogLevels: ['low', 'medium', 'high', 'xhigh'],
       liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
-    })).toEqual({ thinking: 'medium', levels: ['off', 'minimal', 'low', 'medium', 'high'] });
+    })).toEqual({
+      thinking: 'xhigh',
+      levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+    });
+  });
+
+  test('unset current stays pending instead of painting medium', () => {
+    expect(resolvePairedPiThinking({
+      current: undefined,
+      catalogLevels: ['low', 'medium', 'high', 'xhigh'],
+    })).toEqual({ thinking: undefined, levels: ['low', 'medium', 'high', 'xhigh'] });
+    expect(resolvePairedPiThinking({
+      current: undefined,
+      catalogLevels: ['low', 'medium', 'high', 'xhigh'],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({
+      thinking: undefined,
+      levels: ['off', 'minimal', 'low', 'medium', 'high'],
+    });
   });
 
   test('off-only live is narrow and keeps the catalog', () => {
@@ -206,5 +229,35 @@ describe('nextCycledPiThinkingLevel', () => {
     expect(nextCycledPiThinkingLevel('low', ['low', 'medium', 'high'])).toBe('medium');
     expect(nextCycledPiThinkingLevel('high', ['low', 'medium', 'high'])).toBe('low');
     expect(nextCycledPiThinkingLevel(undefined, ['low', 'medium', 'high'])).toBe('low');
+  });
+});
+
+describe('unionCurrentIntoPiThinkingLevels', () => {
+  test('does not re-add a leftover pin the catalog dropped', () => {
+    expect(unionCurrentIntoPiThinkingLevels(
+      ['low', 'medium', 'high'],
+      'xhigh',
+      ['low', 'medium', 'high'],
+    )).toEqual(['low', 'medium', 'high']);
+  });
+});
+
+describe('resolveTranscriptThinkingLabel', () => {
+  test('prefers thinking then variant then model.variant', () => {
+    expect(resolveTranscriptThinkingLabel({
+      thinking: 'xhigh',
+      variant: 'medium',
+      modelVariant: 'low',
+    })).toBe('xhigh');
+    expect(resolveTranscriptThinkingLabel({
+      thinking: undefined,
+      variant: 'high',
+    })).toBe('high');
+    expect(resolveTranscriptThinkingLabel({
+      modelVariant: 'max',
+    })).toBe('max');
+    expect(resolveTranscriptThinkingLabel({
+      variant: 'Default',
+    })).toBe(undefined);
   });
 });

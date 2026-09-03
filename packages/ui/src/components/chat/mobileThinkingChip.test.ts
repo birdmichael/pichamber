@@ -52,4 +52,15 @@ describe('mobile thinking chip', () => {
     expect(modelControlsSource).toContain('applyComposerThinking');
     expect(buttonSource).toContain('hasLevels');
   });
+
+  test('session switch waits for GET instead of painting medium', () => {
+    expect(modelControlsSource).toContain('#488: wait for GET');
+    expect(modelControlsSource).toContain('setPiThinking(undefined)');
+  });
+
+  test('composer thinking does not PATCH global Pi defaults', () => {
+    const cycleSource = readFileSync(join(__dirname, 'cycleComposerThinking.ts'), 'utf-8');
+    expect(cycleSource).not.toContain('/api/pi/defaults');
+    expect(cycleSource).toContain('/thinking');
+  });
 });

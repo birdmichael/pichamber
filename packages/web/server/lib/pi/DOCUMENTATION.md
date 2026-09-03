@@ -346,7 +346,9 @@ internal model, not jsonl `model_change`. When live `available` is empty
 or only `off`, widen from that jsonl model's `ModelRuntime` /
 `getSupportedThinkingLevels` (or the model's own `thinkingLevels`).
 `PATCH` still clamps an unsupported pick onto that widened list
-(`medium`, else the first available). Do not call `setModel` on GET —
+(`medium`, else the first available). A requested catalog level such as
+`xhigh` is not clamped to `medium` when catalog/widen includes it;
+the response `thinking` is the applied level. Do not call `setModel` on GET —
 real `setModel` appends another `model_change`.
 The composer thinking chip renders `available`, not the full seven-level
 catalog. A new-session draft with no session id uses models.dev
@@ -373,12 +375,16 @@ and becomes `{ model: null, providerID: null, modelID: null }`.
 
 `promptAsync` applies `body.model` then `body.variant` / `body.thinking`
 on an idle send so each turn uses the composer selection. An unsupported
-thinking pin keeps the session's current thinking. Live/busy turns skip
-both `setSessionModel` and `setSessionThinking` so a concurrent
-`setModel` cannot clobber `isStreaming`. Settings → Projects stores the
-pin as official `project.defaultVariant` next to `defaultModel`; map it
-through that existing project setting. Do not write it to global
-`PATCH /api/pi/defaults`.
+thinking pin keeps the session's current thinking. Each user turn is
+stamped with the **applied** thinking (`userInfo.variant` and
+`userInfo.thinking`) so the transcript can show what that turn sent.
+Hydrate copies the same from the preceding jsonl `thinking_level_change`.
+Live/busy turns skip both `setSessionModel` and `setSessionThinking` so a
+concurrent `setModel` cannot clobber `isStreaming`. Composer chip changes
+`PATCH` session thinking only — not global `PATCH /api/pi/defaults`.
+Settings → Sessions remains the global default path. Settings → Projects
+stores the pin as official `project.defaultVariant` next to `defaultModel`;
+map it through that existing project setting.
 
 ## Desktop `ctx.ui`
 

@@ -2,7 +2,12 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { nextCycledPiThinkingLevel } from './piThinking';
+import {
+  parseAvailablePiThinkingLevels,
+  parsePiThinkingLevel,
+  nextCycledPiThinkingLevel,
+  resolvePairedPiThinking,
+} from './piThinking';
 import { usePiThinkingChipStore } from './piThinkingChipStore';
 
 export function composerThinkingPinKey(
@@ -23,22 +28,42 @@ export async function applyComposerThinking(
   const { currentProviderId, currentModelId } = useConfigStore.getState();
   const chip = usePiThinkingChipStore.getState();
   const pinKey = options?.pinKey ?? composerThinkingPinKey(sessionId, currentProviderId, currentModelId);
-  chip.setLevel(level, true, options?.levels ?? chip.levels);
+  const catalogLevels = options?.levels ?? chip.levels;
+  chip.setLevel(level, true, catalogLevels);
   chip.bumpPin(pinKey);
   const run = applyComposerThinkingChain.then(async () => {
     try {
-      await runtimeFetch('/api/pi/defaults', {
+      if (!sessionId) {
+        return;
+      }
+      const res = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/thinking`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ thinking: level }),
       });
-      if (sessionId) {
-        await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/thinking`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thinking: level }),
-        });
+      if (!res?.ok) {
+        return;
       }
+      const payload = await res.json().catch(() => null);
+      const applied = parsePiThinkingLevel(payload?.thinking);
+      if (!applied) {
+        return;
+      }
+      const later = usePiThinkingChipStore.getState();
+      if (later.pinKey !== pinKey) {
+        return;
+      }
+      const pair = resolvePairedPiThinking({
+        current: applied,
+        catalogLevels,
+        liveAvailable: parseAvailablePiThinkingLevels(payload?.available),
+      });
+      later.setLevel(
+        pair.thinking ?? applied,
+        true,
+        pair.levels.length > 0 ? pair.levels : catalogLevels,
+      );
+      later.bumpPin(pinKey);
     } catch {
       // keep the optimistic chip; Settings → Sessions remains the fallback
     }

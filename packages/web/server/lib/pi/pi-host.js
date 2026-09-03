@@ -1029,18 +1029,42 @@ const widenThinkingAvailable = (live, catalog) => {
   return parseThinkingLevelList(live);
 };
 
+const unionCatalogLevelOntoAvailable = (available, catalog, requested) => {
+  const live = parseThinkingLevelList(available);
+  const catalogLevels = parseThinkingLevelList(catalog);
+  if (isNarrowThinkingAvailable(live) && catalogLevels.length > 0) {
+    return catalogLevels;
+  }
+  const next = live.length > 0 ? [...live] : [...catalogLevels];
+  const parsed = THINKING_LEVELS.includes(requested) ? requested : null;
+  if (parsed && catalogLevels.includes(parsed) && !next.includes(parsed)) {
+    next.push(parsed);
+  }
+  return next;
+};
+
+const stampUserTurnThinking = (userInfo, level) => {
+  if (!userInfo || typeof level !== 'string') return;
+  const next = level.trim();
+  if (!THINKING_LEVELS.includes(next)) return;
+  userInfo.variant = next;
+  userInfo.thinking = next;
+};
+
 const pairThinkingAfterModelChange = async (piSession, model) => {
   const catalogLevels = await readThinkingLevelsFromModel(model);
   const liveLevels = readAvailableThinkingLevels(piSession);
   const liveMatchesCatalog = catalogLevels.length > 0
     && !isNarrowThinkingAvailable(liveLevels)
     && liveLevels.every((level) => catalogLevels.includes(level));
-  return pairSessionThinkingToAvailable(
-    piSession,
-    catalogLevels.length > 0
-      ? (liveMatchesCatalog ? liveLevels : catalogLevels)
-      : liveLevels,
-  );
+  let available = catalogLevels.length > 0
+    ? (liveMatchesCatalog ? liveLevels : catalogLevels)
+    : liveLevels;
+  const current = readSessionThinking(piSession).thinking;
+  if (current && catalogLevels.includes(current) && !(available || []).includes(current)) {
+    available = [...(available || []), current];
+  }
+  return pairSessionThinkingToAvailable(piSession, available);
 };
 
 const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
@@ -1437,6 +1461,12 @@ const appendFacadeUserMessage = (emit, record, body, userText) => {
     agent: userAgent,
     ...(body.model ? { model: body.model } : {}),
   };
+  stampUserTurnThinking(
+    userInfo,
+    typeof body.variant === 'string' ? body.variant
+      : typeof body.thinking === 'string' ? body.thinking
+        : readSessionThinking(record.piSession).thinking,
+  );
   record.messages.push({ info: userInfo, parts: [userPart] });
   emit(record.directory, {
     id: createEventId(),
@@ -3754,10 +3784,14 @@ export const createPiHost = ({
         }
         if (requestedThinking && THINKING_LEVELS.includes(requestedThinking) && !alreadyLive && !sessionIsLive(record)) {
           try {
-            await this.setSessionThinking(sessionID, requestedThinking);
+            const applied = await this.setSessionThinking(sessionID, requestedThinking);
+            stampUserTurnThinking(userInfo, applied?.thinking);
           } catch {
             // Keep the session's current thinking when the pin is unsupported.
           }
+        }
+        if (!userInfo.thinking) {
+          stampUserTurnThinking(userInfo, readSessionThinking(record.piSession).thinking);
         }
       } catch (error) {
         if (alreadyLive || sessionIsLive(record)) {
@@ -4947,6 +4981,7 @@ export const createPiHost = ({
       const snapshot = readSessionThinking(record.piSession);
       const fromEntries = lastThinkingLevelChangeFromEntries(entries);
       let available = snapshot.available;
+      const thinking = fromEntries || snapshot.thinking;
       try {
         const runtime = await ensureModelRuntime();
         const models = runtime && typeof runtime.getAvailable === 'function'
@@ -4964,12 +4999,13 @@ export const createPiHost = ({
         } else {
           available = widenThinkingAvailable(available, catalog);
         }
+        available = unionCatalogLevelOntoAvailable(available, catalog, thinking);
       } catch {
       }
       return {
         ...snapshot,
         available,
-        thinking: fromEntries || snapshot.thinking,
+        thinking,
       };
     },
     async getSessionModel(sessionID) {
@@ -5020,23 +5056,27 @@ export const createPiHost = ({
       const snapshot = readSessionThinking(record.piSession);
       let available = snapshot.available;
       let catalogModel = null;
+      let catalog = [];
+      try {
+        const runtime = await ensureModelRuntime();
+        const models = runtime && typeof runtime.getAvailable === 'function'
+          ? await runtime.getAvailable()
+          : [];
+        catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
+        catalog = await readThinkingLevelsFromModel(catalogModel);
+      } catch {
+      }
       if (isNarrowThinkingAvailable(available)) {
-        try {
-          const runtime = await ensureModelRuntime();
-          const models = runtime && typeof runtime.getAvailable === 'function'
-            ? await runtime.getAvailable()
-            : [];
-          catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
-          available = widenThinkingAvailable(available, await readThinkingLevelsFromModel(catalogModel));
-          if (catalogModel && typeof record.piSession.setModel === 'function') {
-            try {
-              const applied = record.piSession.setModel(catalogModel);
-              if (applied && typeof applied.then === 'function') await applied;
-            } catch {
-            }
+        available = widenThinkingAvailable(available, catalog);
+        if (catalogModel && typeof record.piSession.setModel === 'function') {
+          try {
+            const applied = record.piSession.setModel(catalogModel);
+            if (applied && typeof applied.then === 'function') await applied;
+          } catch {
           }
-        } catch {
         }
+      } else {
+        available = unionCatalogLevelOntoAvailable(available, catalog, level);
       }
       const next = clampThinkingOntoAvailable(level, available);
       if (!next) {

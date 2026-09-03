@@ -701,6 +701,35 @@ describe('session-transfer', () => {
     expect(piSession.thinkingLevel).toBe('high');
   });
 
+  it('stamps each hydrated user turn with the preceding thinking_level_change', () => {
+    const messages = facadeMessagesFromPiEntries([
+      { type: 'thinking_level_change', thinkingLevel: 'high' },
+      {
+        type: 'message',
+        id: 'u1',
+        message: { role: 'user', content: [{ type: 'text', text: 'ping-a' }] },
+      },
+      { type: 'thinking_level_change', thinkingLevel: 'xhigh' },
+      {
+        type: 'message',
+        id: 'u2',
+        message: { role: 'user', content: [{ type: 'text', text: 'xh-send' }] },
+      },
+    ], 'ses_think');
+    expect(messages[0].info).toMatchObject({
+      id: 'u1',
+      role: 'user',
+      variant: 'high',
+      thinking: 'high',
+    });
+    expect(messages[1].info).toMatchObject({
+      id: 'u2',
+      role: 'user',
+      variant: 'xhigh',
+      thinking: 'xhigh',
+    });
+  });
+
   it('maps Pi session entries onto facade messages', () => {
     const messages = facadeMessagesFromPiEntries([
       { type: 'session_info', name: 'skip me' },

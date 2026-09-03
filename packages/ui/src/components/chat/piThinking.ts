@@ -79,10 +79,29 @@ export function isNarrowPiThinkingAvailable(available: unknown): boolean {
 }
 
 /**
+ * Keep a known Pi current (incl catalog `xhigh`) in the menu when live
+ * omitted it. Do not re-add a leftover pin the catalog itself dropped.
+ */
+export function unionCurrentIntoPiThinkingLevels(
+  levels: readonly PiThinkingLevel[],
+  current: string | undefined,
+  catalog: readonly PiThinkingLevel[],
+): PiThinkingLevel[] {
+  const parsed = parsePiThinkingLevel(current);
+  if (!parsed || levels.includes(parsed)) {
+    return [...levels];
+  }
+  if (catalog.length > 0 && !catalog.includes(parsed)) {
+    return [...levels];
+  }
+  return [...levels, parsed];
+}
+
+/**
  * Empty catalog does not invent levels. A non-narrow live list from the
- * session is the kernel's actual set (may add `off`/`minimal` or drop
- * catalog `xhigh`). Off-only / empty live is ignored so the catalog stands
- * until the session answers.
+ * session is the kernel's actual set (may add `off`/`minimal`). A known
+ * current still unions into that live list when the catalog includes it.
+ * Unset current stays pending — do not invent `medium` before GET.
  */
 export function resolvePairedPiThinking(input: {
   current?: string | null;
@@ -94,17 +113,32 @@ export function resolvePairedPiThinking(input: {
     return { thinking: undefined, levels: [] };
   }
   const live = parseAvailablePiThinkingLevels(input.liveAvailable);
-  const levels = !isNarrowPiThinkingAvailable(live) ? live : catalog;
+  const base = !isNarrowPiThinkingAvailable(live) ? live : catalog;
+  const levels = unionCurrentIntoPiThinkingLevels(base, input.current ?? undefined, catalog);
+  const parsed = parsePiThinkingLevel(input.current ?? undefined);
+  if (!parsed) {
+    return { thinking: undefined, levels };
+  }
   return {
-    thinking: clampPiThinkingLevel(input.current ?? undefined, levels),
+    thinking: clampPiThinkingLevel(parsed, levels),
     levels,
   };
 }
 
+export function resolveTranscriptThinkingLabel(input: {
+  thinking?: unknown;
+  variant?: unknown;
+  modelVariant?: unknown;
+}): PiThinkingLevel | undefined {
+  return parsePiThinkingLevel(input.thinking)
+    ?? parsePiThinkingLevel(input.variant)
+    ?? parsePiThinkingLevel(input.modelVariant);
+}
+
 /**
  * Empty drafts have no GET /session/:id/thinking. Prefer the project pin,
- * then Pi defaults, then the current chip. Passing nothing clamps to
- * medium and ignores Settings / project pin.
+ * then Pi defaults, then the current chip. Passing nothing stays unset —
+ * never invent medium and ignore Settings / project pin.
  */
 export function resolveEmptyDraftThinkingCurrent(input: {
   projectVariant?: string | null;

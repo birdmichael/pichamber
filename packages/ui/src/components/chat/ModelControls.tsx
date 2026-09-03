@@ -472,13 +472,19 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             }
             return;
         }
-        const pinStillValid = Boolean(
-            !sessionChanged
-            && parsePiThinkingLevel(piThinking)
-            && catalogPair.levels.includes(parsePiThinkingLevel(piThinking)!),
-        );
-        if (!pinStillValid && catalogPair.thinking !== piThinking) {
-            setPiThinking(catalogPair.thinking);
+        if (sessionChanged) {
+            // #488: wait for GET. Do not clamp missing current → medium.
+            if (piThinking !== undefined) {
+                setPiThinking(undefined);
+            }
+        } else {
+            const pinStillValid = Boolean(
+                parsePiThinkingLevel(piThinking)
+                && catalogPair.levels.includes(parsePiThinkingLevel(piThinking)!),
+            );
+            if (!pinStillValid && catalogPair.thinking !== piThinking) {
+                setPiThinking(catalogPair.thinking);
+            }
         }
         let cancelled = false;
         const sessionId = currentSessionIdForThinking;
@@ -570,6 +576,14 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             levels: visiblePiThinkingLevels,
             pinKey: composerThinkingPinKey(currentSessionIdForThinking, currentProviderId, currentModelId),
         });
+        const chipState = usePiThinkingChipStore.getState();
+        const applied = parsePiThinkingLevel(chipState.level);
+        if (applied) {
+            setPiThinking(applied);
+        }
+        if (Array.isArray(chipState.levels) && chipState.levels.length > 0) {
+            setPiThinkingLevels(chipState.levels);
+        }
     }, [currentModelId, currentProviderId, currentSessionIdForThinking, isPiKernel, setCurrentVariant, visiblePiThinkingLevels]);
 
 
