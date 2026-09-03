@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'bun:test';
 
-import { hasOpenDropdown, isEditableEventTarget } from './keyboard-shortcut-dom';
+import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping } from './keyboard-shortcut-dom';
 
 test('does not treat an unrelated visible listbox as an open dropdown', () => {
   const promptNavigator = {} as Element;
@@ -93,6 +93,23 @@ test('treats a nested span inside a contenteditable or CodeMirror parent as edit
   const cmContent = new StubHTMLElement('DIV', false, { className: 'cm-content' });
   const cmLine = new StubHTMLElement('SPAN', false, { className: 'cm-line', parent: cmContent });
   expect(isEditableEventTarget(cmLine as unknown as HTMLElement)).toBe(true);
+});
+
+test('keeps a composer-armed Ctrl+K leader so the second key is not typed', () => {
+  const composer = element('TEXTAREA');
+  const otherField = element('INPUT');
+  expect(shouldClearShortcutPrefixForTyping(
+    { altKey: false, ctrlKey: false, metaKey: false, target: composer },
+    composer,
+  )).toBe(false);
+  expect(shouldClearShortcutPrefixForTyping(
+    { altKey: false, ctrlKey: false, metaKey: false, target: otherField },
+    composer,
+  )).toBe(true);
+  expect(shouldClearShortcutPrefixForTyping(
+    { altKey: false, ctrlKey: true, metaKey: false, target: composer },
+    composer,
+  )).toBe(false);
 });
 
 afterAll(() => {

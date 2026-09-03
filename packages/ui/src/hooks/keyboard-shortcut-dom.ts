@@ -25,3 +25,13 @@ export function isEditableEventTarget(target: EventTarget | null): boolean {
   if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return true;
   return Boolean(target.closest(EDITABLE_SELECTOR));
 }
+
+/** Unmodified typing in a *different* editable field than the leader press is not a chord. */
+export function shouldClearShortcutPrefixForTyping(
+  event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'target'>,
+  prefixTarget: EventTarget | null,
+): boolean {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  if (!isEditableEventTarget(event.target)) return false;
+  return event.target !== prefixTarget;
+}
