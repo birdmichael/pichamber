@@ -107,33 +107,6 @@ describe('buildHealthSnapshot', () => {
     expect(snapshot.piNodeRuntime).toEqual({ ok: true, command: '/app/node', source: 'bundled' });
   });
 
-  it('keeps Pi CLI detection on the Pi kernel and omits it on OpenCode', () => {
-    const piSnapshot = buildHealthSnapshot({
-      kernel: 'pi',
-      piReady: false,
-      extras: {
-        piBinaryResolved: '/opt/homebrew/bin/pi',
-        piBinarySource: 'fallback',
-        opencodeBinaryResolved: '/Users/bm/.opencode/bin/opencode',
-      },
-    });
-    expect(piSnapshot.piBinaryResolved).toBe('/opt/homebrew/bin/pi');
-    expect(piSnapshot.piBinarySource).toBe('fallback');
-    expect(piSnapshot.opencodeBinaryResolved).toBeUndefined();
-
-    const openCodeSnapshot = buildHealthSnapshot({
-      kernel: 'opencode',
-      extras: {
-        piBinaryResolved: '/opt/homebrew/bin/pi',
-        piBinarySource: 'fallback',
-        opencodeBinaryResolved: '/Users/bm/.opencode/bin/opencode',
-      },
-    });
-    expect(openCodeSnapshot.piBinaryResolved).toBeUndefined();
-    expect(openCodeSnapshot.piBinarySource).toBeUndefined();
-    expect(openCodeSnapshot.opencodeBinaryResolved).toBe('/Users/bm/.opencode/bin/opencode');
-  });
-
   it('keeps leftover OpenCode binary resolution on the OpenCode kernel', () => {
     const snapshot = buildHealthSnapshot({
       kernel: 'opencode',

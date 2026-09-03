@@ -8,14 +8,12 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { restartDesktopApp } from '@/lib/desktop';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { KernelInstallCommand } from './KernelInstallCommand';
-import {
-  kernelBinaryPlaceholder,
-  localKernelSetup,
-  readLocalKernelHealth,
-  type LocalKernelName,
-  type OnboardingPlatform,
-} from './localKernelSetup';
+import { isLocalKernelReady } from '@/lib/kernelHealth';
+
+const INSTALL_COMMAND = 'curl -fsSL https://opencode.ai/install | bash';
+const DOCS_URL = 'https://opencode.ai/docs';
+
+type OnboardingPlatform = 'macos' | 'linux' | 'windows' | 'unknown';
 
 type LocalSetupScreenProps = {
   /** Callback when user goes back */
@@ -27,6 +25,27 @@ type LocalSetupScreenProps = {
   /** Callback when user wants to switch to remote */
   onSwitchToRemote?: () => void;
 };
+
+function BashCommand({ onCopy, copyTitle }: { onCopy: () => void; copyTitle: string }) {
+  return (
+    <div className="flex items-center justify-center gap-3">
+      <code>
+        <span style={{ color: 'var(--syntax-keyword)' }}>curl</span>
+        <span className="text-muted-foreground"> -fsSL </span>
+        <span style={{ color: 'var(--syntax-string)' }}>https://opencode.ai/install</span>
+        <span className="text-muted-foreground"> | </span>
+        <span style={{ color: 'var(--syntax-keyword)' }}>bash</span>
+      </code>
+      <button
+        onClick={onCopy}
+        className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+        title={copyTitle}
+      >
+        <Icon name="file-copy" className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
 const HINT_DELAY_MS = 30000;
 
@@ -44,9 +63,6 @@ export function LocalSetupScreen({
   const [isChecking, setIsChecking] = React.useState(false);
   const [checkError, setCheckError] = React.useState<string | null>(null);
   const [opencodeBinary, setOpencodeBinary] = React.useState('');
-  const [binaryTouched, setBinaryTouched] = React.useState(false);
-  const [kernel, setKernel] = React.useState<LocalKernelName>('pi');
-  const [detectedPiBinary, setDetectedPiBinary] = React.useState<string | null>(null);
   const [platform, setPlatform] = React.useState<OnboardingPlatform>('unknown');
 
   React.useEffect(() => {
@@ -115,28 +131,12 @@ export function LocalSetupScreen({
     try {
       const response = await runtimeFetch('/health');
       if (!response.ok) return false;
-      const data = await response.json().catch(() => null);
-      const snapshot = readLocalKernelHealth(data);
-      setKernel(snapshot.kernel);
-      if (snapshot.piBinaryResolved) {
-        setDetectedPiBinary(snapshot.piBinaryResolved);
-      }
-      return snapshot.ready;
+      const data = await response.json();
+      return isLocalKernelReady(data);
     } catch {
       return false;
     }
   }, []);
-
-  React.useEffect(() => {
-    void checkCliAvailability();
-  }, [checkCliAvailability]);
-
-  React.useEffect(() => {
-    if (binaryTouched || opencodeBinary.trim() || kernel !== 'pi' || !detectedPiBinary) {
-      return;
-    }
-    setOpencodeBinary(detectedPiBinary);
-  }, [binaryTouched, detectedPiBinary, kernel, opencodeBinary]);
 
   const handleBrowse = React.useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -149,7 +149,6 @@ export function LocalSetupScreen({
     try {
       const selected = await requestFileAccess();
       if (selected.success && selected.path && selected.path.trim().length > 0) {
-        setBinaryTouched(true);
         setOpencodeBinary(selected.path.trim());
       }
     } catch {
@@ -176,14 +175,14 @@ export function LocalSetupScreen({
   }, [isDesktopApp, opencodeBinary]);
 
   const handleCopy = React.useCallback(async () => {
-    const result = await copyTextToClipboard(localKernelSetup(kernel).installCommand);
+    const result = await copyTextToClipboard(INSTALL_COMMAND);
     if (result.ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } else {
       console.error('Failed to copy:', result.error);
     }
-  }, [kernel]);
+  }, []);
 
   const handleCheckAndContinue = React.useCallback(async () => {
     setIsChecking(true);
@@ -203,10 +202,13 @@ export function LocalSetupScreen({
     }
   }, [checkCliAvailability, onCliAvailable, t]);
 
-  const setup = localKernelSetup(kernel);
-  const docsUrl = setup.docsUrl;
-  const binaryPlaceholder = kernelBinaryPlaceholder(kernel, platform);
-  const showDetectedPi = kernel === 'pi' && Boolean(detectedPiBinary);
+  const docsUrl = DOCS_URL;
+  const binaryPlaceholder =
+    platform === 'windows'
+      ? 'C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd'
+      : platform === 'linux'
+        ? '/home/you/.bun/bin/opencode'
+        : '/Users/you/.bun/bin/opencode';
 
   return (
     <div
@@ -250,17 +252,8 @@ export function LocalSetupScreen({
                 <Icon name="check" className="h-4 w-4" />
                 {t('onboarding.common.status.copiedToClipboard')}
               </div>
-            ) : showDetectedPi ? (
-              <div className="text-sm font-sans text-foreground break-all">
-                {t('onboarding.localSetup.status.detected', { path: detectedPiBinary || '' })}
-              </div>
             ) : (
-              <KernelInstallCommand
-                command={setup.installCommand}
-                onCopy={handleCopy}
-                copyTitle={t('onboarding.common.copyToClipboard')}
-                layout="local-setup"
-              />
+              <BashCommand onCopy={handleCopy} copyTitle={t('onboarding.common.copyToClipboard')} />
             )}
           </div>
         </div>
@@ -303,10 +296,7 @@ export function LocalSetupScreen({
             <div className="flex gap-2">
               <Input
                 value={opencodeBinary}
-                onChange={(e) => {
-                  setBinaryTouched(true);
-                  setOpencodeBinary(e.target.value);
-                }}
+                onChange={(e) => setOpencodeBinary(e.target.value)}
                 placeholder={binaryPlaceholder}
                 disabled={isRetrying}
                 className="flex-1 font-mono text-xs"

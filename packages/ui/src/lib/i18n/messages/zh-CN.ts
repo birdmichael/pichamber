@@ -2973,7 +2973,6 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.localSetup.helper.checkAndContinue': '点击检测 Pi 是否可用。成功后将自动进入主界面。',
   'onboarding.localSetup.status.watching': '正在等待 Pi',
   'onboarding.localSetup.status.autoContinue': '检测到后将自动继续。',
-  'onboarding.localSetup.status.detected': '已找到 Pi：{path}',
   'onboarding.localSetup.field.alreadyInstalled': '已安装？设置 Pi 可执行文件路径：',
   'onboarding.localSetup.advanced.title': '设置自定义二进制路径',
   'onboarding.localSetup.troubleshoot.title': '遇到问题？',

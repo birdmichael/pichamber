@@ -16,17 +16,10 @@ const OPENCODE_RESOLVER_EXTRA_KEYS = new Set([
   'opencodeWslDistro',
 ]);
 
-/** Pi CLI detection for chooser/local-setup. Desktop does not spawn PATH pi. */
-const PI_RESOLVER_EXTRA_KEYS = new Set([
-  'piBinaryResolved',
-  'piBinarySource',
-]);
-
 const extrasForKernel = (extras, isPi) => {
-  if (!extras || typeof extras !== 'object') return extras || {};
-  const skip = isPi ? OPENCODE_RESOLVER_EXTRA_KEYS : PI_RESOLVER_EXTRA_KEYS;
+  if (!isPi || !extras || typeof extras !== 'object') return extras || {};
   return Object.fromEntries(
-    Object.entries(extras).filter(([key]) => !skip.has(key)),
+    Object.entries(extras).filter(([key]) => !OPENCODE_RESOLVER_EXTRA_KEYS.has(key)),
   );
 };
 

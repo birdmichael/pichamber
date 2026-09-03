@@ -31,14 +31,6 @@ app-bundled SDK, not PATH `pi`, so Settings has no Pi Update and
 electron-updater. The leftover `runPiSelfUpdate` path is not reachable
 while `upgrade.supported` is false.
 
-## Chooser CLI detection
-
-`resolvePiCliPath` in `pi-cli-path.js` is independent of
-`resolveOpencodeCliPath`. On the Pi kernel, `GET /health` may include
-`piBinaryResolved` / `piBinarySource` so Chooser/local-setup can show Pi
-install copy and a detected `pi` path. This does not boot the kernel and
-does not spawn PATH `pi`. The leftover OpenCode kernel omits those fields.
-
 `GET /api/pi/extensions` lists configured `settings.json` `packages` plus
 `currentVersion` / `latestVersion` / `updateAvailable` (npm registry
 `/latest`, 10s timeout, at most 4 in flight, short in-process TTL cache
