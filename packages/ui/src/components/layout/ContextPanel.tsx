@@ -48,6 +48,7 @@ import {
   type EmbeddedSessionChatURLCacheEntry,
   type EmbeddedSessionRuntimeBootstrap,
 } from './contextPanelEmbeddedChat';
+import { shouldYieldFilesPanelEscape } from './contextPanelEscape';
 import { getContextSurfaceWidthFraction } from '@/lib/surfaces/registry';
 import {
   clampContextPanelLayoutWidth,
@@ -729,6 +730,12 @@ export const ContextPanel: React.FC = () => {
       return;
     }
     if (event.currentTarget.querySelector('[data-md-preview-find]')) {
+      return;
+    }
+
+    // Tree context/kebab menus and Create File / Delete dialogs own Escape.
+    // Capture here would close Files as well (issue #517).
+    if (shouldYieldFilesPanelEscape({ target: event.target })) {
       return;
     }
 
