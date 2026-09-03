@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.11] - 2026-09-03
+
 - Settings: Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.
+- Chat: restoring a session no longer paints thinking as Medium. The composer menu only lists levels the kernel can apply (no catalog-only `xhigh` on Grok). Chip, send, and the transcript footer use the applied level.
+- Chat: changing the session thinking chip no longer writes Pi global defaults, so a new projectless chat still follows Settings.
 
 ## [1.2.10] - 2026-09-03
 
