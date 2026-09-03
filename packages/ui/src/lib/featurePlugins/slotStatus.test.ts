@@ -63,6 +63,7 @@ describe('isLeftoverPlanSlashText', () => {
     expect(isPlanSlashCommandText('/plan start')).toBe(true);
     expect(isPlanSlashCommandText('/not-a-real-cmd')).toBe(false);
     expect(isPlanSlashCommandText('outline the repo')).toBe(false);
+    expect(isPlanSlashCommandText('Plan a one-line hello world. Do not write code yet.')).toBe(false);
   });
 
   test('hides typed /plan while Feature Plugins have not loaded or Plan is on', () => {
@@ -76,6 +77,14 @@ describe('isLeftoverPlanSlashText', () => {
   test('keeps typed /plan as chat when the Plan slot is loaded and off', () => {
     const payload = emptyFeaturePluginsPayload();
     expect(isLeftoverPlanSlashText('/plan', payload, 'ready')).toBe(false);
+  });
+
+  test('does not hide a sentence that starts with Plan and a space', () => {
+    expect(isLeftoverPlanSlashText(
+      'Plan a one-line hello world. Do not write code yet.',
+      null,
+      'idle',
+    )).toBe(false);
   });
 });
 
