@@ -969,6 +969,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
+    id: 'feature-plugins.kimi',
+    page: 'feature-plugins',
+    titleKey: 'settings.featurePlugins.slot.kimi.title',
+    descriptionKey: 'settings.featurePlugins.slot.kimi.info',
+    keywords: ['kimi', 'kimi code', 'pi-kimi-code-console-usage', 'npm', 'install', 'usage', 'quota', ...featurePluginSlotSearchKeywords('kimi')],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'snippets.create',
     page: 'snippets',
     titleKey: 'settings.snippets.sidebar.actions.create',

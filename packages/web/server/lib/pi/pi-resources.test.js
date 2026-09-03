@@ -363,16 +363,23 @@ description: >
       { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
       { type: 'api', label: 'API Key' },
     ]);
+    expect(methods['kimi-coding']).toEqual([
+      { type: 'oauth', label: 'Sign in with Kimi Code' },
+      { type: 'api', label: 'API Key' },
+    ]);
     expect(mergeBuiltinPiCatalogProviders([])).toEqual([
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
+      { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
     ]);
     expect(mergeBuiltinPiCatalogProviders([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
     ])).toEqual([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
+      { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
     ]);
     expect(withoutUnconnectedBuiltinCatalogProviders([
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
+      { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
       { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } },
     ])).toEqual([
       { id: 'bmlab', name: 'bmlab', source: 'pi', env: [], models: { fast: { id: 'fast' } } },
@@ -407,7 +414,10 @@ description: >
       providers: [],
       default: {},
     })).toEqual({
-      all: [{ id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} }],
+      all: [
+        { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
+        { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
+      ],
       default: {},
       connected: [],
     });
@@ -421,6 +431,7 @@ description: >
       all: [
         { id: 'xai', name: 'xAI', models: { 'grok-4.6': { id: 'grok-4.6' } } },
         { id: 'bmlab', name: 'bmlab', models: {} },
+        { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
       ],
       default: { xai: 'grok-4.6' },
       connected: ['xai'],
@@ -472,6 +483,7 @@ description: >
 
     const ids = await resolvePiBuiltinCatalogIds();
     expect(ids.has('xai')).toBe(true);
+    expect(ids.has('kimi-coding')).toBe(true);
     expect(ids.has('anthropic')).toBe(true);
   });
 

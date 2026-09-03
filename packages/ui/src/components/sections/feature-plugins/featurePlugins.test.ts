@@ -47,6 +47,8 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
     expect(payload.slots.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
     expect(payload.slots.xai.source).toBe('npm:pi-xai');
+    expect(payload.slots.kimi.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.kimi);
+    expect(payload.slots.kimi.source).toBe('npm:pi-kimi-code-console-usage');
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
     expect(payload.slots.btw.command).toBe('btw');
@@ -60,7 +62,7 @@ describe('feature plugin payload parsing', () => {
     expect(parseFeaturePluginsPayload({ slots: { goal: { source: 'npm:@narumitw/pi-goal' } } })).toBeNull();
   });
 
-  test('accepts a complete seven-slot payload', () => {
+  test('accepts a complete eight-slot payload', () => {
     const parsed = parseFeaturePluginsPayload({
       slots: {
         goal: {
@@ -92,6 +94,12 @@ describe('feature plugin payload parsing', () => {
           installed: true,
           presets: [{ id: 'default', source: 'npm:pi-xai' }],
         },
+        kimi: {
+          source: 'npm:pi-kimi-code-console-usage',
+          enabled: true,
+          installed: true,
+          presets: [{ id: 'default', source: 'npm:pi-kimi-code-console-usage' }],
+        },
       },
     });
     expect(parsed?.slots.goal.installed).toBe(true);
@@ -111,6 +119,20 @@ describe('feature plugin payload parsing', () => {
         subagents: { source: 'npm:pi-subagents', enabled: false, installed: false, presets: [] },
         btw: { source: 'npm:@narumitw/pi-btw', enabled: false, installed: false, presets: [] },
         todo: { source: 'npm:@juicesharp/rpiv-todo', enabled: false, installed: false, presets: [] },
+      },
+    })).toBeNull();
+  });
+
+  test('rejects a seven-slot payload that omits kimi', () => {
+    expect(parseFeaturePluginsPayload({
+      slots: {
+        goal: { source: 'npm:@narumitw/pi-goal', enabled: false, installed: false, presets: [] },
+        plan: { source: 'npm:@narumitw/pi-plan-mode', enabled: false, installed: false, presets: [] },
+        mcp: { source: 'npm:pi-mcp-adapter', enabled: false, installed: false, presets: [] },
+        subagents: { source: 'npm:pi-subagents', enabled: false, installed: false, presets: [] },
+        btw: { source: 'npm:@narumitw/pi-btw', enabled: false, installed: false, presets: [] },
+        todo: { source: 'npm:@juicesharp/rpiv-todo', enabled: false, installed: false, presets: [] },
+        xai: { source: 'npm:pi-xai', enabled: false, installed: false, presets: [] },
       },
     })).toBeNull();
   });
@@ -147,9 +169,10 @@ describe('feature plugin payload parsing', () => {
     expect(featurePluginPackageLabel('btw')).toBe('@narumitw/pi-btw');
     expect(featurePluginPackageLabel('todo')).toBe('@juicesharp/rpiv-todo');
     expect(featurePluginPackageLabel('xai')).toBe('pi-xai');
+    expect(featurePluginPackageLabel('kimi')).toBe('pi-kimi-code-console-usage');
   });
 
-  test('keeps Settings search IDs on the seven slot cards', () => {
+  test('keeps Settings search IDs on the eight slot cards', () => {
     expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
       'feature-plugins.goal',
       'feature-plugins.plan',
@@ -158,6 +181,7 @@ describe('feature plugin payload parsing', () => {
       'feature-plugins.btw',
       'feature-plugins.todo',
       'feature-plugins.xai',
+      'feature-plugins.kimi',
     ]);
   });
 
@@ -180,6 +204,8 @@ describe('feature plugin payload parsing', () => {
     }
     expect(pageSource.includes('<FeaturePluginImpactTags slot={slot} />')).toBe(true);
     expect(FEATURE_PLUGIN_SLOT_COPY.xai.infoHintKey).toBe('settings.featurePlugins.slot.xai.infoHint');
+    expect(FEATURE_PLUGIN_SLOT_COPY.kimi.infoHintKey).toBe('settings.featurePlugins.slot.kimi.infoHint');
+    expect(enDict['settings.featurePlugins.slot.kimi.info']).toContain('Providers');
     expect(pageSource.includes('copy.infoHintKey')).toBe(true);
     expect(pageSource.indexOf('t(copy.infoKey)')).toBeLessThan(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />'));
     expect(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />')).toBeLessThan(pageSource.indexOf('featurePluginPackageLabel(slot)'));
@@ -231,6 +257,7 @@ describe('feature plugin UI impact tags', () => {
     expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.mcp).not.toContain('composer');
     expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.btw).not.toContain('composer');
     expect(FEATURE_PLUGIN_SLOT_UI_IMPACT.todo).toEqual(['workStatus']);
+    expect([...FEATURE_PLUGIN_SLOT_UI_IMPACT.kimi]).toEqual(['workStatus', 'settings', 'commands']);
     expect(featurePluginSlotSearchKeywords('todo')).toEqual(['work status', 'workStatus']);
   });
 

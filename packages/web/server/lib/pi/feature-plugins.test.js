@@ -93,6 +93,9 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
     expect(plugins.xai.source).toBe('npm:pi-xai');
     expect(plugins.xai.command).toBeUndefined();
+    expect(plugins.kimi.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.kimi);
+    expect(plugins.kimi.source).toBe('npm:pi-kimi-code-console-usage');
+    expect(plugins.kimi.command).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -200,6 +203,16 @@ describe('feature plugin slash commands', () => {
     expect(listFeaturePluginSlashCommands({
       slots: { xai: { installed: true, enabled: false } },
     })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { kimi: { installed: true, enabled: true } },
+    })).toEqual([{
+      name: 'kimi-usage',
+      description: 'Show Kimi Code subscription usage',
+      source: 'extension',
+    }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { kimi: { installed: true, enabled: false } },
+    })).toEqual([]);
   });
 });
 
@@ -280,9 +293,11 @@ describe('settings.json package manager', () => {
     expect(payload.slots.btw.installed).toBe(false);
     expect(payload.slots.todo.installed).toBe(false);
     expect(payload.slots.xai.installed).toBe(false);
+    expect(payload.slots.kimi.installed).toBe(false);
     expect(payload.slots.goal.enabled).toBe(false);
     expect(payload.slots.todo.enabled).toBe(false);
     expect(payload.slots.xai.enabled).toBe(false);
+    expect(payload.slots.kimi.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
   });
 
@@ -331,6 +346,19 @@ describe('existing Pi agent recognition', () => {
       enabled: true,
     });
     expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['xai-usage']);
+  });
+
+  it('enables Kimi Usage when packages lists npm:pi-kimi-code-console-usage', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: {},
+      configuredSources: ['npm:pi-kimi-code-console-usage'],
+    });
+    expect(scoped.slots.kimi).toMatchObject({
+      source: 'npm:pi-kimi-code-console-usage',
+      installed: true,
+      enabled: true,
+    });
+    expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['kimi-usage']);
   });
 
   it('still treats leftover npm:pi-xai-oauth as the Grok Usage slot', () => {

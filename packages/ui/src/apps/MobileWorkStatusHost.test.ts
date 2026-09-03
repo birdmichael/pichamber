@@ -66,13 +66,15 @@ describe('MobileWorkStatusHost', () => {
     expect(metadataSource).toContain('repositoryEnabled={!isManagedChatContext}');
   });
 
-  test('hides usage quotas on Pi until the Grok Usage slot is on', () => {
+  test('hides usage quotas on Pi until the Grok or Kimi Usage slot is on', () => {
     expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(false);
     expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, kimiSlotActive: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('session', { isPiKernel: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('repository', { isPiKernel: true })).toBe(true);
     expect(bodySource).toContain("sectionVisible('usage')");
     expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('xai'");
+    expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('kimi'");
   });
 
   test('gates the MCP row on the same Feature Plugin slot as Settings MCP', () => {

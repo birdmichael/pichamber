@@ -1249,6 +1249,90 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /kimi-usage from the Kimi Usage slot before any session exists', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-slot-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => command.name === 'kimi-usage')).toBe(false);
+      host.dispose();
+
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-kimi-code-console-usage');
+      const installed = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(installed.listCommands('/tmp/empty-project').find((command) => command.name === 'kimi-usage')).toMatchObject({
+        name: 'kimi-usage',
+        source: 'extension',
+        description: 'Show Kimi Code subscription usage',
+      });
+      expect(installed.getFeaturePlugins().slots.kimi).toMatchObject({
+        installed: true,
+        enabled: true,
+        source: 'npm:pi-kimi-code-console-usage',
+      });
+      installed.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('returns 404 for /kimi-usage when the slot is off instead of chatting', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-usage-off-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+      await expect(host.runCommand(record.id, { command: 'kimi-usage' }))
+        .rejects.toMatchObject({ status: 404, message: 'Command /kimi-usage is not available on this session' });
+      expect(promptAsyncCalls).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls Kimi Usage without deleting kimi-coding credentials', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-uninstall-auth-'));
+    try {
+      writePiProviderAuth('kimi-coding', {
+        type: 'oauth',
+        access: 'access-secret',
+        refresh: 'refresh-secret',
+        expires: 1_900_000_000_000,
+      }, { home });
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-kimi-code-console-usage');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      expect(host.getFeaturePlugins().slots.kimi.installed).toBe(true);
+      await host.uninstallFeaturePlugin('kimi', { source: 'npm:pi-kimi-code-console-usage' });
+      expect(host.getFeaturePlugins().slots.kimi.installed).toBe(false);
+      const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+      expect(stored['kimi-coding']).toMatchObject({ type: 'oauth' });
+      expect(stored['kimi-coding'].access).toBe('access-secret');
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown slash names instead of sending them as chat', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-unknown-cmd-'));
     try {

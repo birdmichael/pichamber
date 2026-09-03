@@ -326,6 +326,14 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, await host.getXaiUsage());
   }));
 
+  app.get('/api/pi/kimi-usage', handle(async (_req, res) => {
+    if (typeof host.getKimiUsage !== 'function') {
+      json(res, 200, { ok: false, configured: false, slotActive: false });
+      return;
+    }
+    json(res, 200, await host.getKimiUsage());
+  }));
+
   app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {
     const providerId = req.params.providerId;
     const scope = typeof req.query?.scope === 'string' ? req.query.scope : 'auth';

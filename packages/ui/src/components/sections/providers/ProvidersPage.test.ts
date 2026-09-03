@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
 import {
   mergeAddCatalogProviders,
@@ -35,14 +38,18 @@ describe('ProvidersPage available provider loading', () => {
     expect(parseConnectedProviderIds({ all: [{ id: 'xai' }], connected: ['xai'], default: {} })).toEqual(['xai']);
     expect(parseConnectedProviderIds([{ id: 'xai' }])).toEqual([]);
     const catalog = mergeAddCatalogProviders([{ id: 'bmlab', name: 'bmlab' }]);
-    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai']);
+    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding']);
     expect(catalog.find((provider) => provider.id === 'xai')?.name).toBe('xAI / Grok');
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['xai']);
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai']))).toEqual([]);
+    expect(catalog.find((provider) => provider.id === 'kimi-coding')?.name).toBe('Kimi Code');
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding']))).toEqual([]);
     expect(selectAddCatalogProviders(
       [{ id: 'bmlab', name: 'bmlab' }, { id: 'xai', name: 'xai' }],
       new Set(['bmlab', 'xai']),
-    )).toEqual([{ id: 'xai', name: 'xAI / Grok' }]);
+    )).toEqual([
+      { id: 'kimi-coding', name: 'Kimi Code' },
+      { id: 'xai', name: 'xAI / Grok' },
+    ]);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], '', 'xai', true)).toBe(null);
@@ -264,3 +271,18 @@ describe('provider credential state helpers', () => {
     })).toBe(true);
   });
 });
+
+const providersPageSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'ProvidersPage.tsx'),
+  'utf8',
+);
+
+describe('ProvidersPage Kimi Usage mount', () => {
+  test('shows the usage block only when the Kimi slot is on and kimi-coding is connected', () => {
+    expect(providersPageSource).toContain("useFeaturePluginSlotActive('kimi'");
+    expect(providersPageSource).toContain("selectedProvider.id === 'kimi-coding' && hasCredentials");
+    expect(providersPageSource).toContain('<ProviderKimiUsage />');
+    expect(providersPageSource).not.toContain('/api/quota');
+  });
+});
+
