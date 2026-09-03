@@ -34,11 +34,11 @@ export type TurnUsageTooltipModel = {
 };
 
 /**
- * Build the timestamp-hover usage rows from recorded assistant `info.tokens`
+ * Build the duration-hover usage rows from recorded assistant `info.tokens`
  * (and optional `info.cost`).
  *
  * Returns `null` when there is no recorded tokens object, so the footer keeps
- * today's timestamp-only tooltip. A tokens object with zeros is real usage and
+ * today's duration-only tooltip. A tokens object with zeros is real usage and
  * must not be replaced with a fake empty state. Cost is omitted at 0/missing.
  */
 export const resolveTurnUsageTooltip = (
