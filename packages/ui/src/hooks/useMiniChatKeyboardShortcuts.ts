@@ -10,7 +10,7 @@ import { cycleComposerThinking } from '@/components/chat/cycleComposerThinking';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { useKeybinds } from './useKeybind';
-import { isEditableEventTarget } from './keyboard-shortcut-dom';
+import { shouldClearShortcutPrefixForTyping } from './keyboard-shortcut-dom';
 
 export const useMiniChatKeyboardShortcuts = () => {
   const openNewSessionDraft = useSessionUIStore((state) => state.openNewSessionDraft);
@@ -82,11 +82,7 @@ export const useMiniChatKeyboardShortcuts = () => {
   React.useEffect(() => {
     const handleActivePrefixKeyDownCapture = (event: KeyboardEvent) => {
       if (!dispatcher.hasActivePrefix()) return;
-      if (
-        !event.ctrlKey && !event.metaKey && !event.altKey
-        && isEditableEventTarget(event.target)
-        && dispatcher.getActivePrefixTarget() !== event.target
-      ) {
+      if (shouldClearShortcutPrefixForTyping(event, dispatcher.getActivePrefixTarget())) {
         dispatcher.clear();
         return;
       }

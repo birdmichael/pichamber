@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Sessions Default Model uses the live resolved model, not a leftover `example-provider/example-model`. Default Thinking shows for that model, and Enabled models ignore stale example-provider ids.
 - Desktop: opening the app no longer sticks on Local Pi unavailable when the in-process kernel is still starting or already running. Retry Local re-checks live health instead of restarting a healthy local kernel.

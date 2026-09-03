@@ -43,7 +43,7 @@ import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
-import { hasOpenDropdown, isEditableEventTarget, shouldStopDropdownImeEscape } from './keyboard-shortcut-dom';
+import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape } from './keyboard-shortcut-dom';
 
 const dropdownTargetSelector = [
   '[data-slot="dropdown-menu-content"]', '[data-slot="select-content"]', '[role="combobox"]',
@@ -454,12 +454,7 @@ export const useKeyboardShortcuts = () => {
     const handleActivePrefixKeyDownCapture = (event: KeyboardEvent) => {
       if (isTerminalEventTarget(event.target)) return;
       if (!dispatcher.hasActivePrefix()) return;
-      // Unmodified keys in an editor are typing, even if this field armed the
-      // leader. Modifier/function-key completions still run.
-      if (
-        !event.ctrlKey && !event.metaKey && !event.altKey
-        && isEditableEventTarget(event.target)
-      ) {
+      if (shouldClearShortcutPrefixForTyping(event, dispatcher.getActivePrefixTarget())) {
         dispatcher.clear();
         return;
       }
