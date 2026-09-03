@@ -10,6 +10,7 @@ mock.module('@/lib/runtime-fetch', () => ({
     try {
       thinking = JSON.parse(String(init?.body || '{}')).thinking || thinking;
     } catch {
+      thinking = 'high';
     }
     const applied = thinking === 'xhigh' ? 'medium' : thinking;
     return {

@@ -38,7 +38,6 @@ export const ComposerActionButtons = React.memo(function ComposerActionButtons(p
         canAbort,
         hasContent,
         currentSessionId,
-        newSessionDraftOpen,
         onPrimaryAction,
         onQueueMessage,
         onAbort,
