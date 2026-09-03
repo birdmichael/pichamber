@@ -112,4 +112,21 @@ describe('ReasoningTimelineBlock', () => {
     expect(markup).toContain('Planning accessible icon labels with translations');
     expect(markup).not.toContain('&lt;!-- --&gt;');
   });
+
+  test('shows the thinking header while streaming before the first committed line', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider>
+        <ReasoningTimelineBlock
+          text=""
+          variant="thinking"
+          blockId="reasoning-streaming-empty"
+          isStreaming={true}
+          showDuration={false}
+        />
+      </I18nProvider>,
+    );
+
+    expect(markup).toContain('Thinking');
+    expect(markup).toContain('role="button"');
+  });
 });

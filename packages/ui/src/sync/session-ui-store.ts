@@ -14,6 +14,7 @@
 
 import { create } from "zustand"
 import type { Session, Part, Message, TextPart } from "@opencode-ai/sdk/v2/client"
+import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import type { AttachedFile, SessionContextUsage, SessionWorktreeAttachment } from "@/stores/types/sessionTypes"
 import type { WorktreeMetadata } from "@/types/worktree"
 import { opencodeClient } from "@/lib/opencode/client"
@@ -79,7 +80,7 @@ import { useInputStore, type SyntheticContextPart } from "./input-store"
 import { useSessionGoalArmStore } from "@/stores/useSessionGoalArmStore"
 import { setSessionGoal } from "@/lib/sessionGoalActions"
 import { wrapSystemReminder } from "@/lib/systemReminder"
-import { useUIStore } from "@/stores/useUIStore"
+import { bindSessionStoreForBrowserScope, useUIStore } from "@/stores/useUIStore"
 import { useSelectionStore } from "./selection-store"
 import { getViewportSessionMemory, useViewportStore, viewportSessionKey } from "./viewport-store"
 import { useSessionWorktreeStore } from "./session-worktree-store"
@@ -99,7 +100,9 @@ import {
   CHAT_DRAFT_PROJECT_ID,
   deleteChatDirectory,
   isChatDirectoryPath,
+  isManagedChatDirectory,
   resolveChatSessionDirectory,
+  resolveNewSessionComposerDirectory,
   warmChatsRootDirectory,
 } from "@/lib/chatDirectories"
 import { clearLastActiveSession, persistLastActiveSession, readLastActiveSession } from "./last-session-cache"
@@ -159,7 +162,7 @@ export function routeMessage(params: {
   variant?: string
   inputMode?: "normal" | "shell"
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
-  additionalParts?: Array<{ text: string; synthetic?: boolean; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
+  additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
   delivery?: 'steer' | 'followUp'
   beforeSend?: (messageID: string) => Promise<void>
   onOptimisticInsert?: () => void
@@ -229,6 +232,7 @@ export function routeMessage(params: {
         files: params.files,
         beforeSend: params.beforeSend,
         onOptimisticInsert: params.onOptimisticInsert,
+        variant: params.variant,
         send: (messageID) => opencodeClient.sendCommand({
           runtimeKey: params.runtimeKey,
           id: params.sessionId,
@@ -256,8 +260,10 @@ export function routeMessage(params: {
     agent: params.agent,
     directory: requestDirectory,
     files: params.files,
+    additionalParts: params.additionalParts,
     beforeSend: params.beforeSend,
     onOptimisticInsert: params.onOptimisticInsert,
+    variant: params.variant,
     send: (messageID) => opencodeClient.sendMessage({
       runtimeKey: params.runtimeKey,
       id: params.sessionId,
@@ -328,8 +334,13 @@ export type NewSessionDraftState = {
   targetFolderId?: string
   target: "chat" | "project"
   preparedChatDirectory?: string | null
-  /** User-initiated New session: start empty, do not restore a leftover `/`. */
+  /** User-initiated New session: start empty; drop leftover `/` on project drafts. */
   resetComposer?: boolean
+  /**
+   * Chat→project New session: show an empty live composer without writing empty
+   * over the destination project's stored untitled draft.
+   */
+  emptyIncomingComposer?: boolean
 }
 
 export type ViewportAnchor = {
@@ -406,7 +417,7 @@ export type SessionUIState = {
     agent?: string,
     attachments?: AttachedFile[],
     agentMentionName?: string,
-    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean }>,
+    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean; metadata?: ContextPartMetadata }>,
     variant?: string,
     inputMode?: "normal" | "shell",
     options?: SendMessageOptions,
@@ -741,8 +752,8 @@ export async function materializeOpenDraftSession(selection: {
   const createdDirectory = normalizePath(created.directory ?? draftDirectoryOverride ?? null)
 
   persistDraftTarget({
-    projectId: draftProjectId,
-    directory: createdDirectory,
+    projectId: isChatDraft ? null : draftProjectId,
+    directory: isChatDraft ? null : createdDirectory,
   })
 
   const draftSyntheticParts = draft.syntheticParts
@@ -1049,15 +1060,44 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 
     const planSelected = resolveOpenedDraftPlanSelected(options?.planSelected)
     const resetComposer = !options?.automatic && !options?.initialPrompt
-    // Drop only a leftover new-session `/`. A real untitled draft must survive
-    // leaving this composer and clicking New session again.
+    const previousDraft = get().newSessionDraft
+    // Leaving a projectless chats draft for an inherited project New session
+    // must not restore leftover `~` storage into the live composer. Keep the
+    // destination project's stored untitled draft intact for a later reopen.
+    const emptyIncomingComposer = Boolean(
+      resetComposer
+      && target === "project"
+      && previousDraft.open
+      && previousDraft.target === "chat"
+    )
+    // User-initiated New session starts empty. Project drafts still keep a real
+    // untitled prompt (only a leftover `/` is dropped). Projectless chats used
+    // to share the `~` identity with the previous session and restored it.
     if (resetComposer) {
-      const draftDirectory = target === "chat"
-        ? normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
-        : directory
-      const identity = createChatDraftIdentity(getRuntimeKey(), draftDirectory, null)
-      if (identity && isStrayNewSessionSlashDraft(readChatDraft(identity).text)) {
-        clearChatDraft(identity, true)
+      if (target === "chat") {
+        const chatDirectory = resolveNewSessionComposerDirectory({
+          open: true,
+          target: "chat",
+          directoryOverride: null,
+        })
+        const chatIdentity = createChatDraftIdentity(getRuntimeKey(), chatDirectory, null)
+        if (chatIdentity) clearChatDraft(chatIdentity, true)
+        const leftoverDirectory = normalizePath(useDirectoryStore.getState().currentDirectory ?? null)
+        const leftoverHome = normalizePath(useDirectoryStore.getState().homeDirectory ?? null)
+        const openedProjectPaths = new Set(
+          projects
+            .map((project) => normalizePath(project.path))
+            .filter((path): path is string => Boolean(path)),
+        )
+        if (leftoverDirectory && isManagedChatDirectory(leftoverDirectory, leftoverHome, openedProjectPaths)) {
+          const leftoverIdentity = createChatDraftIdentity(getRuntimeKey(), leftoverDirectory, null)
+          if (leftoverIdentity) clearChatDraft(leftoverIdentity, true)
+        }
+      } else {
+        const identity = createChatDraftIdentity(getRuntimeKey(), directory, null)
+        if (identity && isStrayNewSessionSlashDraft(readChatDraft(identity).text)) {
+          clearChatDraft(identity, true)
+        }
       }
     }
     const nextDraft: NewSessionDraftState = {
@@ -1078,6 +1118,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       syntheticParts: options?.syntheticParts,
       targetFolderId: options?.targetFolderId,
       resetComposer,
+      emptyIncomingComposer: emptyIncomingComposer || undefined,
     }
 
     set({
@@ -1429,7 +1470,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
     agent?: string,
     attachments?: AttachedFile[],
     agentMentionName?: string,
-    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean }>,
+    additionalParts?: Array<{ text: string; attachments?: AttachedFile[]; synthetic?: boolean; metadata?: ContextPartMetadata }>,
     variant?: string,
     inputMode?: "normal" | "shell",
     options?: SendMessageOptions,
@@ -1563,6 +1604,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
           additionalParts: mergedAdditionalParts?.map((p) => ({
             text: p.text,
             synthetic: p.synthetic,
+            metadata: p.metadata,
             files: p.attachments?.map((a: AttachedFile) => ({
               type: "file" as const,
               mime: a.mimeType,
@@ -1653,6 +1695,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       additionalParts: additionalParts?.map((p) => ({
         text: p.text,
         synthetic: p.synthetic,
+        metadata: p.metadata,
         files: p.attachments?.map((a) => ({
           type: "file" as const,
           mime: a.mimeType,
@@ -2088,6 +2131,7 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
 setSessionOpener((sessionID, directory) => {
   useSessionUIStore.getState().setCurrentSession(sessionID, directory)
 })
+bindSessionStoreForBrowserScope(useSessionUIStore)
 
 // Write-through persist of the worktree map whenever discovery refreshes it.
 // Reference-equality guard filters hot session updates; the serialized

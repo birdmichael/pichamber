@@ -22,11 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { isSessionPinned, type SessionPinnedTarget } from '@/stores/useSessionPinnedStore';
 import { Icon } from "@/components/icon/Icon";
-import { buildExportFilename, downloadAsMarkdown, downloadTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
+import { buildExportFilename, downloadAsMarkdown, exportFiltersForFormat, exportSessionTextFile, formatSessionAsMarkdown, getExportRevealLabelKey, revealExportedMarkdown, saveAsMarkdownDesktop } from '@/lib/exportSession';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
 import type { ChildSessionExport } from '@/lib/exportSession';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSessionPermissions, useSessionQuestionCount } from '@/sync/sync-context';
+import { resolveSessionRowLiveStatus } from '@/sync/session-row-live-status';
 import { usePendingPiExtensionUiPromptCount } from '@/sync/pi-extension-ui-store';
 import { useSync } from '@/sync/use-sync';
 import { useViewportStore, viewportSessionKey } from '@/sync/viewport-store';
@@ -56,7 +57,13 @@ import { resolveSessionDisplayTitle } from '@/lib/sessionTitle';
 import { MultiRunFusionDialog } from '@/components/multirun/MultiRunFusionDialog';
 import { FusionIcon } from '@/components/icons/FusionIcon';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
-import { startSessionTreeWorktreeMove, useIsSessionWorktreeMovePending } from '@/lib/worktrees/sessionWorktreeMove';
+import {
+  buildSessionTreeMoveMessages,
+  requestSessionTreeMove,
+  startSessionTreeWorktreeMove,
+  useIsSessionWorktreeMovePending,
+} from '@/lib/worktrees/sessionWorktreeMove';
+import { buildSessionWorktreeMenuTargets } from './sessionWorktreeMenu';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 
@@ -463,13 +470,43 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
   const isZombie = useViewportStore(
     React.useCallback((state) => Boolean(state.sessionMemoryState.get(viewportSessionKey(session.id))?.isZombie), [session.id]),
   );
-  const sessionStatus = useGlobalSessionStatus(session.id);
-  const statusType = sessionStatus?.type ?? 'idle';
+  const globalSessionStatus = useGlobalSessionStatus(session.id);
+  const childSessionStatus = React.useSyncExternalStore(
+    React.useCallback((notify) => directoryStore.subscribe((state, previous) => {
+      if (state.session_status?.[session.id] !== previous.session_status?.[session.id]) notify();
+    }), [directoryStore, session.id]),
+    () => directoryStore.getState().session_status?.[session.id],
+    () => directoryStore.getState().session_status?.[session.id],
+  );
+  const statusType = resolveSessionRowLiveStatus({
+    childStatus: childSessionStatus,
+    globalStatus: globalSessionStatus,
+  });
   const isStreaming = statusType === 'busy' || statusType === 'retry';
   // Read as a boolean, not as the value: the row must not re-render on every
   // tick of the counter it only decides to mount.
   const hasActivityDuration = useHasSessionActivityDuration(session.id, isStreaming);
   const isMovingToWorktree = useIsSessionWorktreeMovePending(session.id);
+  const availableWorktreesByProject = useSessionUIStore((state) => state.availableWorktreesByProject);
+  const projects = useProjectsStore((state) => state.projects);
+  const currentWorktree = useSessionUIStore((state) => state.worktreeMetadata.get(session.id) ?? null);
+  const worktreeMoveProjectPath = projects.find((project) => project.id === projectId)?.path
+    ?? currentWorktree?.projectDirectory
+    ?? sessionDirectory
+    ?? null;
+  const worktreeMoveTargets = buildSessionWorktreeMenuTargets({
+    projectPath: worktreeMoveProjectPath,
+    discoveredWorktrees: worktreeMoveProjectPath
+      ? (availableWorktreesByProject.get(worktreeMoveProjectPath)
+        ?? availableWorktreesByProject.get(normalizePath(worktreeMoveProjectPath) ?? worktreeMoveProjectPath)
+        ?? [])
+      : [],
+    sourceDirectory: sessionDirectory ?? null,
+    currentWorktree,
+  });
+  const existingWorktreeMoveTargets = worktreeMoveTargets.filter((target) => (
+    !target.isCurrent && target.metadata.worktreeStatus !== 'missing' && target.metadata.worktreeStatus !== 'invalid'
+  ));
   const sessionPermissions = useSessionPermissions(session.id, sessionDirectory ?? undefined, { bootstrap: false });
   const sessionGoal = getSessionGoal(resolvedSession);
   const piGoalMarked = sessionHasPiGoalMarker(resolvedSession);
@@ -636,7 +673,30 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
       const match = disposition.match(/filename="([^"]+)"/i);
       const filename = match?.[1] || `${buildExportFilename(resolvedSession.title ?? null).replace(/\.md$/, '')}.${format}`;
       const mime = format === 'html' ? 'text/html;charset=utf-8' : 'application/x-ndjson;charset=utf-8';
-      downloadTextFile(content, filename, mime);
+      const result = await exportSessionTextFile({
+        content,
+        filename,
+        mime,
+        filters: exportFiltersForFormat(format),
+      });
+      if (result.status === 'canceled') {
+        return;
+      }
+      if (result.status === 'saved') {
+        toast.success(t('sessions.sidebar.session.export.success'), {
+          action: {
+            label: t(getExportRevealLabelKey()),
+            onClick: () => {
+              void revealExportedMarkdown(result.path).then((revealed) => {
+                if (!revealed) {
+                  toast.error(t('sessions.sidebar.session.export.failedRevealPath'));
+                }
+              });
+            },
+          },
+        });
+        return;
+      }
       toast.success(t('sessions.sidebar.session.export.success'));
     } catch {
       toast.error(t('sessions.sidebar.session.export.failed'));
@@ -712,8 +772,13 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
               onKeyDown={(event) => {
                 event.stopPropagation();
                 if (event.key === 'Escape') {
+                  event.preventDefault();
                   handleCancelEdit();
                   return;
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleSaveEdit(renameDraft);
                 }
               }}
             />
@@ -1045,36 +1110,59 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
         </>
       ) : null}
       {!isSubtaskSession && !archivedBucket && !isVSCode && !isChatSession ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="block">
+        <Sub>
+          <SubTrigger disabled={!sessionDirectory || isStreaming || isMovingToWorktree} className="[&>svg]:mr-1">
+            <Icon name="folder-shared" className="mr-1 h-4 w-4" />
+            {t('sessions.sidebar.session.menu.moveToWorktreeTargets')}
+          </SubTrigger>
+          <SubContent className="min-w-[220px]">
+            {existingWorktreeMoveTargets.map((target) => (
               <Item
-                disabled={!sessionDirectory || isStreaming || isMovingToWorktree}
+                key={target.metadata.path}
+                disabled={!sessionDirectory || isStreaming || isMovingToWorktree || target.metadata.worktreeStatus === 'pending'}
                 onClick={() => {
                   if (!sessionDirectory || isStreaming || isMovingToWorktree) return;
-                  startSessionTreeWorktreeMove({
+                  requestSessionTreeMove({
+                    kind: 'existing',
                     root: resolvedSession,
                     descendants: collectNodeDescendantSessions(node),
                     sourceDirectory: sessionDirectory,
-                    successMessage: t('sessions.sidebar.session.moveToWorktree.success'),
-                    failureMessage: t('sessions.sidebar.session.moveToWorktree.failed'),
+                    destination: target.metadata,
+                    messages: buildSessionTreeMoveMessages(t, {
+                      success: 'sessions.sidebar.session.moveToWorktree.existingSuccess',
+                      failure: 'sessions.sidebar.session.moveToWorktree.existingFailed',
+                    }),
                   });
                 }}
-                className="w-full [&>svg]:mr-1"
+                className="[&>svg]:mr-1"
               >
-                <Icon name="folder-shared" className="mr-1 h-4 w-4" />
-                {t('sessions.sidebar.session.menu.moveToWorktree')}
+                {target.isPrimary
+                  ? t('sessions.sidebar.session.moveToWorktree.main')
+                  : (target.metadata.branch || target.metadata.label || target.metadata.path)}
               </Item>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-72">
-            {isMovingToWorktree
-              ? t('sessions.sidebar.session.moveToWorktree.tooltipMoving')
-              : isStreaming
-                ? t('sessions.sidebar.session.moveToWorktree.tooltipBusy')
-                : t('sessions.sidebar.session.moveToWorktree.tooltip')}
-          </TooltipContent>
-        </Tooltip>
+            ))}
+            <Item
+              disabled={!sessionDirectory || isStreaming || isMovingToWorktree}
+              onClick={() => {
+                if (!sessionDirectory || isStreaming || isMovingToWorktree) return;
+                startSessionTreeWorktreeMove({
+                  root: resolvedSession,
+                  descendants: collectNodeDescendantSessions(node),
+                  sourceDirectory: sessionDirectory,
+                  successMessage: t('sessions.sidebar.session.moveToWorktree.success'),
+                  failureMessage: t('sessions.sidebar.session.moveToWorktree.failed'),
+                  sourceVerificationFailed: t('sessions.sidebar.session.moveToWorktree.sourceVerificationFailed'),
+                  applyChangesFailed: t('sessions.sidebar.session.moveToWorktree.applyChangesFailed'),
+                  changesMayBeInDestination: t('sessions.sidebar.session.moveToWorktree.changesMayBeInDestination'),
+                });
+              }}
+              className="[&>svg]:mr-1"
+            >
+              <Icon name="add" className="mr-1 h-4 w-4" />
+              {t('sessions.sidebar.session.menu.moveToWorktree')}
+            </Item>
+          </SubContent>
+        </Sub>
       ) : null}
       {isMultiRunLikeSession ? (
         <>

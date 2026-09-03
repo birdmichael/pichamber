@@ -5,6 +5,7 @@ import path from 'node:path';
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
+import { directoriesMatch } from './directory-identity.js';
 import {
   THINKING_LEVELS,
   listPiCommands,
@@ -33,20 +34,32 @@ import {
   resolvePiAgentDir,
   resolvePiAuthPath,
   resolvePiModelsPath,
+  KIMI_CODING_PROVIDER_ID,
 } from './pi-resources.js';
 import {
   authorizePiXaiOAuth,
   completePiXaiOAuth,
 } from './xai-oauth.js';
 import {
+  authorizePiKimiOAuth,
+  completePiKimiOAuth,
+} from './kimi-oauth.js';
+import {
   getPiXaiUsage,
   isXaiSlotActive,
 } from './xai-usage.js';
 import {
+  getPiKimiUsage,
+  isKimiSlotActive,
+} from './kimi-usage.js';
+import {
   createSdkPackageManager,
   createSettingsJsonPackageManager,
+  DEFAULT_FEATURE_PLUGIN_SOURCES,
   isFeaturePluginSlot,
   listConfiguredPiPackageSources,
+  removeXaiConflictingOauthSource,
+  removeXaiSlotSources,
   listFeaturePluginSlashCommands,
   listPiPackages,
   readFeaturePlugins,
@@ -153,6 +166,8 @@ import {
   lastModelChangeFromMessages,
   parseSessionImport,
   persistFacadeMessages,
+  rememberUserContext,
+  applyPersistedUserContext,
   reconcileHydratedMessages,
   resolveUsableFacadeModel,
   stampGoalCommandChronology,
@@ -588,6 +603,54 @@ export const resolveListedSessionTitle = (item) => {
   return 'New session';
 };
 
+/**
+ * Busy prompt_async must call AgentSession.steer / followUp, never prompt().
+ * Pi finishes the assistant message before tools run, so isStreaming on a
+ * snapshot can be stale while record.status is still busy.
+ */
+export const resolvePromptDelivery = ({ delivery, isStreaming, statusType } = {}) => {
+  const busy = Boolean(isStreaming) || statusType === 'busy' || statusType === 'retry';
+  const kind = delivery === 'followUp' || delivery === 'follow_up' || delivery === 'queue'
+    ? 'followUp'
+    : delivery === 'steer'
+      ? 'steer'
+      : null;
+  if (kind === 'followUp') return busy ? 'followUp' : 'prompt';
+  if (kind === 'steer') return busy ? 'steer' : 'prompt';
+  if (busy) return 'steer';
+  return 'prompt';
+};
+
+export const isAgentAlreadyProcessingError = (error) => (
+  /already processing|already streaming|streamingBehavior|steer or followUp/i.test(String(error?.message || ''))
+);
+
+const createDeferred = () => {
+  let resolve = () => {};
+  let settled = false;
+  const promise = new Promise((res) => {
+    resolve = res;
+  });
+  return {
+    promise,
+    resolve() {
+      if (settled) return;
+      settled = true;
+      resolve();
+    },
+    get settled() {
+      return settled;
+    },
+  };
+};
+
+const ensurePromptStartedGate = (record) => {
+  if (!record.promptStarted || record.promptStarted.settled) {
+    record.promptStarted = createDeferred();
+  }
+  return record.promptStarted;
+};
+
 export const resolvePromptModelRef = (model) => {
   if (typeof model === 'string' && model.trim()) return model.trim();
   if (!model || typeof model !== 'object') return '';
@@ -711,6 +774,16 @@ const lastUserMessage = (store) => {
   return undefined;
 };
 
+const applyAssistantParent = (store, nextInfo) => {
+  if (!nextInfo || nextInfo.role !== 'assistant') return nextInfo;
+  const fallback = lastUserMessage(store)?.info?.id;
+  if (!fallback) return nextInfo;
+  const incoming = typeof nextInfo.parentID === 'string' ? nextInfo.parentID.trim() : '';
+  if (!incoming) return { ...nextInfo, parentID: fallback };
+  if (store.messages.some((entry) => entry?.info?.id === incoming)) return nextInfo;
+  return { ...nextInfo, parentID: fallback };
+};
+
 const resolveStoreRuntimeModel = (store, ...extras) => resolveUsableFacadeModel(
   ...extras,
   store?.translator?.getFallbackModel?.(),
@@ -743,7 +816,11 @@ const applyEventToStore = (store, ocEvent) => {
   const props = ocEvent?.properties || {};
   if (type === 'message.updated' && props.info) {
     const existing = store.messages.find((entry) => entry.info.id === props.info.id);
-    let nextInfo = stampAssistantStoreInfo(props.info, store, existing?.info);
+    let nextInfo = applyAssistantParent(
+      store,
+      stampAssistantStoreInfo(props.info, store, existing?.info),
+    );
+    if (ocEvent.properties) ocEvent.properties.info = nextInfo;
     if (existing) {
       const prevTime = existing.info.time || {};
       const nextTime = nextInfo.time || {};
@@ -774,15 +851,6 @@ const applyEventToStore = (store, ocEvent) => {
     ) {
       // Pi jsonl id for a turn promptAsync already inserted with msg_*.
     } else {
-      if (nextInfo.role === 'assistant' && nextInfo.parentID) {
-        const parentExists = store.messages.some((entry) => entry?.info?.id === nextInfo.parentID);
-        if (!parentExists) {
-          const parent = lastUserMessage(store);
-          if (parent?.info?.id) {
-            nextInfo = { ...nextInfo, parentID: parent.info.id };
-          }
-        }
-      }
       store.messages.push({ info: nextInfo, parts: [] });
     }
   }
@@ -791,14 +859,13 @@ const applyEventToStore = (store, ocEvent) => {
     let entry = store.messages.find((item) => item.info.id === messageID);
     if (!entry) {
       const parent = lastUserMessage(store);
-      const stub = {
+      const stub = applyAssistantParent(store, {
         id: messageID,
         sessionID: props.part.sessionID,
         role: 'assistant',
         time: { created: Date.now() },
-        ...(parent?.info?.id ? { parentID: parent.info.id } : {}),
         ...(parent?.info?.agent ? { agent: parent.info.agent } : { agent: 'pi' }),
-      };
+      });
       entry = {
         info: stampAssistantStoreInfo(stub, store, parent?.info),
         parts: [],
@@ -874,6 +941,36 @@ const readSessionThinking = (piSession) => {
   };
 };
 
+const clampThinkingOntoAvailable = (level, available) => {
+  const parsed = THINKING_LEVELS.includes(level) ? level : null;
+  if (Array.isArray(available) && available.length > 0) {
+    if (parsed && available.includes(parsed)) return parsed;
+    return available.includes('medium') ? 'medium' : available[0];
+  }
+  return parsed;
+};
+
+const applySessionThinkingLevel = async (piSession, level) => {
+  if (typeof piSession?.setThinkingLevel !== 'function') return;
+  const applied = piSession.setThinkingLevel(level);
+  if (applied && typeof applied.then === 'function') await applied;
+};
+
+const pairSessionThinkingToAvailable = async (piSession, available) => {
+  const snapshot = readSessionThinking(piSession);
+  const levels = Array.isArray(available) && available.length > 0 ? available : snapshot.available;
+  const next = snapshot.thinking && THINKING_LEVELS.includes(snapshot.thinking)
+    ? snapshot.thinking
+    : clampThinkingOntoAvailable(snapshot.thinking, levels);
+  if (!next) {
+    return { thinking: next, available: levels };
+  }
+  if (next !== snapshot.thinking) {
+    await applySessionThinkingLevel(piSession, next);
+  }
+  return { thinking: next, available: levels };
+};
+
 const isNarrowThinkingAvailable = (available) => (
   !Array.isArray(available)
   || available.length === 0
@@ -936,11 +1033,79 @@ const readThinkingLevelsFromModel = async (model) => {
   return parseThinkingLevelList(model.thinkingLevels || model.availableThinkingLevels);
 };
 
+/** Mirror Pi `getSupportedThinkingLevels` when the SDK is not loaded yet. */
+const kernelThinkingLevelsFromModel = (model) => {
+  if (!model || typeof model !== 'object') return [];
+  if (supportedThinkingLevelsFn) {
+    try {
+      const levels = parseThinkingLevelList(supportedThinkingLevelsFn(model));
+      if (levels.length > 0) return levels;
+    } catch {
+    }
+  }
+  if (!model.reasoning) return ['off'];
+  const map = model.thinkingLevelMap && typeof model.thinkingLevelMap === 'object' && !Array.isArray(model.thinkingLevelMap)
+    ? model.thinkingLevelMap
+    : {};
+  return THINKING_LEVELS.filter((level) => {
+    const mapped = map[level];
+    if (mapped === null) return false;
+    if (level === 'xhigh' || level === 'max') return mapped !== undefined;
+    return true;
+  });
+};
+
+const readSerializedThinkingLevels = (model) => {
+  if (!model || typeof model !== 'object') return [];
+  const fromKernel = kernelThinkingLevelsFromModel(model);
+  if (!isNarrowThinkingAvailable(fromKernel)) return fromKernel;
+  const fromModel = parseThinkingLevelList(model.thinkingLevels || model.availableThinkingLevels);
+  return isNarrowThinkingAvailable(fromModel) ? [] : fromModel;
+};
+
 const widenThinkingAvailable = (live, catalog) => {
   const catalogLevels = parseThinkingLevelList(catalog);
   if (catalogLevels.length === 0) return parseThinkingLevelList(live);
   if (isNarrowThinkingAvailable(live) && catalogLevels.length > 0) return catalogLevels;
   return parseThinkingLevelList(live);
+};
+
+const unionCatalogLevelOntoAvailable = (available, catalog, requested) => {
+  const live = parseThinkingLevelList(available);
+  const catalogLevels = parseThinkingLevelList(catalog);
+  if (isNarrowThinkingAvailable(live) && catalogLevels.length > 0) {
+    return catalogLevels;
+  }
+  const next = live.length > 0 ? [...live] : [...catalogLevels];
+  const parsed = THINKING_LEVELS.includes(requested) ? requested : null;
+  if (parsed && catalogLevels.includes(parsed) && !next.includes(parsed)) {
+    next.push(parsed);
+  }
+  return next;
+};
+
+const stampUserTurnThinking = (userInfo, level) => {
+  if (!userInfo || typeof level !== 'string') return;
+  const next = level.trim();
+  if (!THINKING_LEVELS.includes(next)) return;
+  userInfo.variant = next;
+  userInfo.thinking = next;
+};
+
+const pairThinkingAfterModelChange = async (piSession, model) => {
+  const catalogLevels = await readThinkingLevelsFromModel(model);
+  const liveLevels = readAvailableThinkingLevels(piSession);
+  const liveMatchesCatalog = catalogLevels.length > 0
+    && !isNarrowThinkingAvailable(liveLevels)
+    && liveLevels.every((level) => catalogLevels.includes(level));
+  let available = catalogLevels.length > 0
+    ? (liveMatchesCatalog ? liveLevels : catalogLevels)
+    : liveLevels;
+  const current = readSessionThinking(piSession).thinking;
+  if (current && catalogLevels.includes(current) && !(available || []).includes(current)) {
+    available = [...(available || []), current];
+  }
+  return pairSessionThinkingToAvailable(piSession, available);
 };
 
 const PI_MODEL_INPUT_TYPES = new Set(['text', 'image']);
@@ -986,7 +1151,7 @@ const toProviderModelRecord = (model) => {
   const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
   const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
   const input = readPiModelInput(enriched);
-  return {
+  const record = {
     id,
     name: typeof (enriched.name ?? model.name) === 'string' && String(enriched.name ?? model.name).trim()
       ? String(enriched.name ?? model.name).trim()
@@ -1006,6 +1171,11 @@ const toProviderModelRecord = (model) => {
       },
     } : {}),
   };
+  const thinkingLevels = readSerializedThinkingLevels(enriched);
+  if (thinkingLevels.length > 0) {
+    record.thinkingLevels = thinkingLevels;
+  }
+  return record;
 };
 
 const applyPublicProviderConfig = (provider, config) => {
@@ -1059,7 +1229,9 @@ const applyPublicProviderConfig = (provider, config) => {
     const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
     const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
     const hasInput = Array.isArray(input) && input.length > 0;
-    if (!hasContext && !hasOutput && !hasInput && !reasoning) continue;
+    const existingThinking = parseThinkingLevelList(existing.thinkingLevels || existing.availableThinkingLevels);
+    const recordThinking = parseThinkingLevelList(record.thinkingLevels);
+    if (!hasContext && !hasOutput && !hasInput && !reasoning && recordThinking.length === 0) continue;
     provider.models[record.id] = {
       ...existing,
       ...(reasoning && !existingReasoning ? { reasoning: true } : {}),
@@ -1079,6 +1251,7 @@ const applyPublicProviderConfig = (provider, config) => {
           ...(hasOutput && !existingLimit.output ? { output: Number(maxTokens) } : {}),
         },
       } : {}),
+      ...(existingThinking.length === 0 && recordThinking.length > 0 ? { thinkingLevels: recordThinking } : {}),
     };
   }
   return provider;
@@ -1263,7 +1436,41 @@ const findLiveSessionCommand = (piSession, name) => (
 const isLeftoverPlanStartStreamError = (error) => {
   const status = Number(error?.status);
   if (status === 404 || status === 409 || status === 400) return false;
-  return /already streaming|steer or followUp/i.test(String(error?.message || ''));
+  return isAgentAlreadyProcessingError(error);
+};
+
+const rollbackFacadeUserMessage = (emit, record, userMessageID) => {
+  if (!record || !userMessageID) return false;
+  const before = Array.isArray(record.messages) ? record.messages.length : 0;
+  record.messages = (record.messages || []).filter((entry) => entry?.info?.id !== userMessageID);
+  if ((record.messages || []).length === before) return false;
+  if (record.translator?.userMessageID === userMessageID) {
+    record.translator.clearUserMessage?.();
+  }
+  emit(record.directory, {
+    id: createEventId(),
+    type: 'message.removed',
+    properties: { sessionID: record.id, messageID: userMessageID },
+  });
+  return true;
+};
+
+const logPromptAsyncFailure = ({
+  sessionID,
+  parentIsStreaming,
+  childIsStreaming,
+  delivery,
+  messageID,
+  error,
+}) => {
+  console.error('[pi-host] promptAsync failed', {
+    sessionID,
+    parentIsStreaming: Boolean(parentIsStreaming),
+    childIsStreaming: Boolean(childIsStreaming),
+    delivery: delivery || null,
+    messageID: messageID || null,
+    error: error?.message || String(error),
+  });
 };
 
 const liveCommandInvocation = (command, fallback) => {
@@ -1303,6 +1510,12 @@ const appendFacadeUserMessage = (emit, record, body, userText) => {
     agent: userAgent,
     ...(body.model ? { model: body.model } : {}),
   };
+  stampUserTurnThinking(
+    userInfo,
+    typeof body.variant === 'string' ? body.variant
+      : typeof body.thinking === 'string' ? body.thinking
+        : readSessionThinking(record.piSession).thinking,
+  );
   record.messages.push({ info: userInfo, parts: [userPart] });
   emit(record.directory, {
     id: createEventId(),
@@ -1803,6 +2016,23 @@ export const createPiHost = ({
   const syncRecordTodos = (record) => publishRecordTodos(record, readRecordEntriesOrThrow(record));
 
   const emitTranslated = (record, piEvent) => {
+    // Tool events do not themselves emit session.status. After a false settle
+    // (prompt IPC finally / empty snapshot) the rest of the turn would look
+    // idle in the sidebar unless we revive busy here.
+    if (
+      (piEvent?.type === 'tool_execution_start' || piEvent?.type === 'tool_execution_update')
+      && record.status?.type !== 'busy'
+      && record.status?.type !== 'retry'
+    ) {
+      // Revive sidebar busy only. Do not latch turnActive: injected tool
+      // events (todo snapshots, tests) must still allow idle reload.
+      record.status = { type: 'busy' };
+      emit(record.directory, {
+        id: createEventId(),
+        type: 'session.status',
+        properties: { sessionID: record.id, status: { type: 'busy' } },
+      });
+    }
     const ocEvents = record.translator.translate(piEvent);
     for (const ocEvent of ocEvents) {
       applyEventToStore(record, ocEvent);
@@ -1823,7 +2053,24 @@ export const createPiHost = ({
         // Keep the last good snapshot. Do not replace a failed replay with [].
       }
     }
+    if (
+      piEvent?.type === 'tool_execution_end'
+      && !recordHasRunningToolParts(record)
+      && !sessionIsLive(record)
+      && record.turnActive !== true
+    ) {
+      if (record.status?.type === 'busy' || record.status?.type === 'retry') {
+        record.status = { type: 'idle' };
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.status',
+          properties: { sessionID: record.id, status: { type: 'idle' } },
+        });
+      }
+    }
     if (piEvent?.type === 'agent_settled') {
+      record.turnActive = false;
+      record.promptStarted?.resolve?.();
       syncPiGoalMarker(record);
     }
     return ocEvents;
@@ -1847,12 +2094,24 @@ export const createPiHost = ({
     return true;
   };
 
+  const recordHasRunningToolParts = (record) => {
+    const messages = record?.messages;
+    if (!Array.isArray(messages)) return false;
+    for (const entry of messages) {
+      const parts = Array.isArray(entry?.parts) ? entry.parts : [];
+      for (const part of parts) {
+        if (part?.type === 'tool' && part?.state?.status === 'running') return true;
+      }
+    }
+    return false;
+  };
+
   const sessionIsLive = (record) => (
     Boolean(record?.piSession?.isStreaming) || Boolean(record?.piSession?.isCompacting)
   );
 
   const settleRecordIfStuck = (record) => {
-    if (!record || sessionIsLive(record)) return false;
+    if (!record || sessionIsLive(record) || recordHasRunningToolParts(record)) return false;
     if (record.status?.type !== 'busy' && record.status?.type !== 'retry') return false;
     emitTranslated(record, { type: 'agent_settled' });
     return true;
@@ -1971,7 +2230,7 @@ export const createPiHost = ({
     const messages = facadeMessagesFromPiEntries(entries, sessionID, {
       fallbackModel: resolveHostFallbackModel(record),
     });
-    return messages.filter((entry) => {
+    const filtered = messages.filter((entry) => {
       if (entry?.info?.role !== 'user') return true;
       const text = (entry.parts || [])
         .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
@@ -1979,6 +2238,8 @@ export const createPiHost = ({
         .trim();
       return !isGoalSystemPreamble(text);
     });
+    const metadata = record?.info?.metadata || readPersistedSessionMetadata(entries);
+    return applyPersistedUserContext(filtered, metadata);
   };
 
   const createPersistedSessionManager = async (cwd, { title } = {}) => {
@@ -2006,7 +2267,7 @@ export const createPiHost = ({
     }
   };
 
-  const applyLiveSessionDefaults = (piSession) => {
+  const applyLiveSessionDefaults = async (piSession) => {
     try {
       const defaults = readPiDefaults(home);
       if (typeof piSession?.setThinkingLevel !== 'function') return;
@@ -2017,7 +2278,7 @@ export const createPiHost = ({
           level = levels.includes('medium') ? 'medium' : levels[0];
         }
       }
-      piSession.setThinkingLevel(level);
+      await applySessionThinkingLevel(piSession, level);
     } catch {
     }
   };
@@ -2084,7 +2345,7 @@ export const createPiHost = ({
       record.sessionFile = piSession.sessionFile;
     }
     record.translator = createRecordTranslator(record.id, cwd, { piSession });
-    applyLiveSessionDefaults(piSession);
+    await applyLiveSessionDefaults(piSession);
     attachSession(record);
     if (record.disposed) {
       try { record.unsubscribe?.(); } catch {}
@@ -2127,7 +2388,7 @@ export const createPiHost = ({
       model,
       sessionManager,
     });
-    applyLiveSessionDefaults(piSession);
+    await applyLiveSessionDefaults(piSession);
     const persistedId = typeof sessionManager?.getSessionId === 'function'
       ? sessionManager.getSessionId()
       : undefined;
@@ -2682,11 +2943,11 @@ export const createPiHost = ({
 
   const recordMatchesDirectory = (record, directory) => {
     if (!directory) return true;
-    if (record.directory === directory) return true;
+    if (directoriesMatch(record.directory, directory)) return true;
     const parentID = hydratedParentID(record);
     if (!parentID) return false;
     const parent = sessions.get(parentID);
-    return Boolean(parent && parent.directory === directory);
+    return Boolean(parent && directoriesMatch(parent.directory, directory));
   };
 
   const collectAttachedChildRuns = (parent) => {
@@ -2837,10 +3098,21 @@ export const createPiHost = ({
     return run;
   };
 
+  const refreshConversationTitle = (record) => {
+    if (!maybeApplyConversationTitle(record)) return false;
+    emit(record.directory, {
+      id: createEventId(),
+      type: 'session.updated',
+      properties: { info: record.info },
+    });
+    return true;
+  };
+
   const ensureRecord = async (sessionID, directory) => {
     const existing = sessions.get(sessionID);
     if (existing) {
       syncPiGoalMarker(existing);
+      refreshConversationTitle(existing);
       return existing;
     }
     if (mock) {
@@ -3154,7 +3426,9 @@ export const createPiHost = ({
       return { ok: true, directory: cwd };
     },
     getSession(sessionID) {
-      return getRecord(sessionID);
+      const record = getRecord(sessionID);
+      refreshConversationTitle(record);
+      return record;
     },
     async ensureSession(sessionID, directory) {
       return ensureRecord(sessionID, directory);
@@ -3162,13 +3436,7 @@ export const createPiHost = ({
     listSessions(directory) {
       const items = Array.from(sessions.values()).filter((record) => recordMatchesDirectory(record, directory));
       for (const record of items) {
-        if (maybeApplyConversationTitle(record)) {
-          emit(record.directory, {
-            id: createEventId(),
-            type: 'session.updated',
-            properties: { info: record.info },
-          });
-        }
+        refreshConversationTitle(record);
       }
       return items;
     },
@@ -3272,7 +3540,7 @@ export const createPiHost = ({
     getStatus(directory) {
       const map = {};
       for (const record of sessions.values()) {
-        if (directory && record.directory !== directory) continue;
+        if (!recordMatchesDirectory(record, directory)) continue;
         if (record.status?.type && record.status.type !== 'idle') {
           map[record.id] = record.status;
         }
@@ -3360,14 +3628,22 @@ export const createPiHost = ({
       return result;
     },
     authorizeProviderOAuth(providerId) {
+      if (providerId === KIMI_CODING_PROVIDER_ID) {
+        return authorizePiKimiOAuth(providerId);
+      }
       return authorizePiXaiOAuth(providerId);
     },
     async completeProviderOAuth(providerId) {
-      const credential = await completePiXaiOAuth(providerId);
+      const credential = providerId === KIMI_CODING_PROVIDER_ID
+        ? await completePiKimiOAuth(providerId)
+        : await completePiXaiOAuth(providerId);
       return this.setProviderAuth(providerId, credential);
     },
     getXaiUsage(options = {}) {
       return getPiXaiUsage({ home, ...options });
+    },
+    getKimiUsage(options = {}) {
+      return getPiKimiUsage({ home, ...options });
     },
     removeProviderAuth(providerId) {
       const result = removePiProviderAuth(providerId, { home });
@@ -3441,6 +3717,7 @@ export const createPiHost = ({
           ? await runtime.getAvailable()
           : [];
         const builtinIds = await resolvePiBuiltinCatalogIds();
+        await loadSupportedThinkingLevels();
         const providers = withoutUnconnectedBuiltinCatalogProviders(mapPiModelsToProviders(available, {
           configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
         }), {
@@ -3473,9 +3750,22 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
+      // Magic-prompt chips attach a long synthetic instruction. Keep it for
+      // Pi, but the user bubble and session title stay the short visible line.
+      const authoredText = extractPromptText(body.parts, { includeSynthetic: false });
+      const visibleText = authoredText || text;
+
+      // Capture liveness *before* this call marks busy. This invocation's own
+      // status busy must not steer/followUp an idle first send.
+      // Only the child run / this host turn is "live". Leftover status=busy
+      // (adapter jsonl attach, false-idle) must not skip the user insert.
+      const alreadyLive = sessionIsLive(record) || record.turnActive === true;
 
       // First-send bind can take longer than the user bubble. Mark busy now so
       // a targeted reload 409s before `piSession` exists or starts streaming.
+      record.turnActive = true;
+      const hadOpenPromptGate = Boolean(record.promptStarted) && !record.promptStarted.settled;
+      const promptStarted = ensurePromptStartedGate(record);
       record.status = { type: 'busy' };
       emit(record.directory, {
         id: createEventId(),
@@ -3485,13 +3775,45 @@ export const createPiHost = ({
 
       const userMessageID = body.messageID || createMessageId();
       const userAgent = typeof body.agent === 'string' && body.agent.trim() ? body.agent : 'pi';
-      const userParts = [{
-        id: createPartId(),
-        sessionID,
-        messageID: userMessageID,
-        type: 'text',
-        text,
-      }];
+      const userParts = [];
+      if (authoredText) {
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: authoredText,
+        });
+      }
+      for (const part of Array.isArray(body.parts) ? body.parts : []) {
+        if (!part || part.type !== 'text' || !part.synthetic) continue;
+        const metadata = part.metadata && typeof part.metadata === 'object' && !Array.isArray(part.metadata)
+          ? part.metadata
+          : null;
+        const contextPayload = metadata?.pichamberContext ?? metadata?.openchamberContext;
+        if (!contextPayload || typeof contextPayload !== 'object' || typeof contextPayload.kind !== 'string') {
+          continue;
+        }
+        if (typeof part.text !== 'string' || !part.text.trim()) continue;
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: part.text,
+          synthetic: true,
+          metadata,
+        });
+      }
+      if (userParts.length === 0 && visibleText) {
+        userParts.push({
+          id: createPartId(),
+          sessionID,
+          messageID: userMessageID,
+          type: 'text',
+          text: visibleText,
+        });
+      }
       for (const part of Array.isArray(body.parts) ? body.parts : []) {
         if (!part || part.type === 'text') continue;
         const file = facadeFilePartFromUnknown(part, sessionID, userMessageID);
@@ -3513,17 +3835,36 @@ export const createPiHost = ({
 
       try {
         await ensureLiveRecord(record);
-        if (modelRef) {
+        // Keep setSessionModel off the live-turn hot path. Concurrent setModel
+        // IPC snapshots used to clobber parent isStreaming mid-run.
+        if (modelRef && !alreadyLive && !sessionIsLive(record)) {
           await this.setSessionModel(sessionID, modelRef);
         }
-        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking)) {
+        if (requestedThinking && THINKING_LEVELS.includes(requestedThinking) && !alreadyLive && !sessionIsLive(record)) {
           try {
-            await this.setSessionThinking(sessionID, requestedThinking);
+            const applied = await this.setSessionThinking(sessionID, requestedThinking);
+            stampUserTurnThinking(userInfo, applied?.thinking);
           } catch {
             // Keep the session's current thinking when the pin is unsupported.
           }
         }
+        if (!userInfo.thinking) {
+          stampUserTurnThinking(userInfo, readSessionThinking(record.piSession).thinking);
+        }
       } catch (error) {
+        if (alreadyLive || sessionIsLive(record)) {
+          logPromptAsyncFailure({
+            sessionID,
+            parentIsStreaming: Boolean(record.piSession?.isStreaming),
+            childIsStreaming: Boolean(record.piSession?.isStreaming),
+            delivery: body.delivery,
+            messageID: userMessageID,
+            error,
+          });
+          throw error;
+        }
+        record.turnActive = false;
+        promptStarted.resolve();
         record.status = { type: 'idle' };
         emit(record.directory, {
           id: createEventId(),
@@ -3538,53 +3879,140 @@ export const createPiHost = ({
       if (runtimeModel) {
         record.translator?.setFallbackModel?.(runtimeModel);
       }
-      record.translator?.setUserMessage?.(userMessageID, {
-        agent: userAgent,
-        model: runtimeModel || body.model,
-      });
 
-      if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
-        record.messages.push({ info: userInfo, parts: userParts });
-      }
-      if (maybeApplyConversationTitle(record)) {
+      // followUp skips insert; overlapping idle without delivery coalesces;
+      // steer always inserts.
+      const skipInsert = body.delivery === 'followUp'
+        || (alreadyLive && !body.delivery);
+      if (!skipInsert) {
+        record.translator?.setUserMessage?.(userMessageID, {
+          agent: userAgent,
+          model: runtimeModel || body.model,
+        });
+
+        if (!record.messages.some((entry) => entry.info.id === userMessageID)) {
+          record.messages.push({ info: userInfo, parts: userParts });
+        }
+        const persistedContextParts = userParts.filter((part) => {
+          const metadata = part?.metadata;
+          if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false;
+          const context = metadata.pichamberContext ?? metadata.openchamberContext;
+          return Boolean(context && typeof context === 'object' && typeof context.kind === 'string');
+        });
+        if (persistedContextParts.length > 0) {
+          record.info.metadata = rememberUserContext(record.info.metadata, {
+            messageID: userMessageID,
+            authoredText: authoredText || '',
+            parts: persistedContextParts.map((part) => ({
+              text: part.text,
+              metadata: part.metadata,
+            })),
+          });
+          persistSessionMetadata(
+            record.sessionManager || record.piSession?.sessionManager,
+            record.info.metadata,
+          );
+        }
+        if (maybeApplyConversationTitle(record)) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'session.updated',
+            properties: { info: record.info },
+          });
+        }
         emit(record.directory, {
           id: createEventId(),
-          type: 'session.updated',
-          properties: { info: record.info },
+          type: 'message.updated',
+          properties: { sessionID, info: userInfo },
         });
-      }
-      emit(record.directory, {
-        id: createEventId(),
-        type: 'message.updated',
-        properties: { sessionID, info: userInfo },
-      });
-      for (const part of userParts) {
-        emit(record.directory, {
-          id: createEventId(),
-          type: 'message.part.updated',
-          properties: { sessionID, part, time: Date.now() },
-        });
+        for (const part of userParts) {
+          emit(record.directory, {
+            id: createEventId(),
+            type: 'message.part.updated',
+            properties: { sessionID, part, time: Date.now() },
+          });
+        }
       }
 
       const delivery = body.delivery;
       const run = async () => {
+        let queuedIntoLiveTurn = false;
         try {
-          const isStreaming = Boolean(record.piSession?.isStreaming);
+          if (hadOpenPromptGate && !sessionIsLive(record) && !promptStarted.settled) {
+            await promptStarted.promise;
+          }
+          // Do not treat this invocation's own busy stamp as a live child.
+          const liveNow = sessionIsLive(record) || alreadyLive;
           ensureQuestionToolAdapted(record);
-          if (isStreaming && delivery === 'steer' && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text, images);
+          const action = resolvePromptDelivery({
+            delivery,
+            isStreaming: Boolean(record.piSession?.isStreaming) || liveNow,
+            statusType: liveNow ? 'busy' : 'idle',
+          });
+          const imageArg = images.length > 0 ? images : undefined;
+          const markStarted = () => promptStarted.resolve();
+          if (action === 'steer' && typeof record.piSession.steer === 'function') {
+            markStarted();
+            await record.piSession.steer(text, imageArg);
+            queuedIntoLiveTurn = true;
             return;
           }
-          if (isStreaming && (delivery === 'followUp' || delivery === 'follow_up') && typeof record.piSession.followUp === 'function') {
-            await record.piSession.followUp(text, images);
+          if (action === 'followUp' && typeof record.piSession.followUp === 'function') {
+            markStarted();
+            await record.piSession.followUp(text, imageArg);
+            queuedIntoLiveTurn = true;
             return;
           }
-          if (isStreaming && typeof record.piSession.steer === 'function') {
-            await record.piSession.steer(text, images);
+          if (action !== 'prompt' && typeof record.piSession.prompt === 'function') {
+            markStarted();
+            await record.piSession.prompt(text, {
+              ...promptOptions,
+              streamingBehavior: action === 'followUp' ? 'followUp' : 'steer',
+            });
+            queuedIntoLiveTurn = true;
+            return;
+          }
+          markStarted();
+          // Never call bare prompt() while the child (or this host turn) is live.
+          if (liveNow) {
+            await record.piSession.prompt(text, {
+              ...promptOptions,
+              streamingBehavior: action === 'followUp' ? 'followUp' : 'steer',
+            });
+            queuedIntoLiveTurn = true;
             return;
           }
           await record.piSession.prompt(text, promptOptions);
         } catch (error) {
+          const parentIsStreaming = Boolean(record.piSession?.isStreaming);
+          let childIsStreaming = parentIsStreaming;
+          try {
+            if (typeof record.piSession?.refreshSnapshot === 'function') {
+              await record.piSession.refreshSnapshot();
+              childIsStreaming = Boolean(record.piSession?.isStreaming);
+            }
+          } catch {
+          }
+          logPromptAsyncFailure({
+            sessionID,
+            parentIsStreaming,
+            childIsStreaming,
+            delivery,
+            messageID: userMessageID,
+            error,
+          });
+          const stillLive = sessionIsLive(record)
+            || childIsStreaming
+            || parentIsStreaming
+            || alreadyLive;
+          if (stillLive || isAgentAlreadyProcessingError(error)) {
+            if (!skipInsert) rollbackFacadeUserMessage(emit, record, userMessageID);
+            // Do not session.idle / settle a still-running child. A rejected
+            // follow-up is not turn end.
+            queuedIntoLiveTurn = stillLive || alreadyLive;
+            return;
+          }
+          record.turnActive = false;
           record.status = { type: 'idle' };
           emit(record.directory, {
             id: createEventId(),
@@ -3593,7 +4021,8 @@ export const createPiHost = ({
           });
           emit(record.directory, { id: createEventId(), type: 'session.idle', properties: { sessionID } });
         } finally {
-          settleRecordIfStuck(record);
+          promptStarted.resolve();
+          if (!queuedIntoLiveTurn) settleRecordIfStuck(record);
         }
       };
 
@@ -3921,9 +4350,7 @@ export const createPiHost = ({
         const current = readPiDefaults(home);
         if (argument && THINKING_LEVELS.includes(argument)) {
           writePiDefaults(home, { thinking: argument });
-          if (typeof record.piSession?.setThinkingLevel === 'function') {
-            try { record.piSession.setThinkingLevel(argument); } catch {}
-          }
+          try { await applySessionThinkingLevel(record.piSession, argument); } catch {}
           return reply(`Thinking level set to ${argument}.`);
         }
         return reply(
@@ -3949,6 +4376,11 @@ export const createPiHost = ({
             'Open Settings → Providers → xAI and choose Sign in with SuperGrok or X Premium. Tokens stay in ~/.pi/agent/auth.json and Pi refreshes them.',
           );
         }
+        if (target === 'kimi-coding') {
+          return reply(
+            'Open Settings → Providers → Kimi Code and choose Sign in with Kimi Code. Tokens stay in ~/.pi/agent/auth.json and Pi refreshes them.',
+          );
+        }
         return reply(
           'Pi authentication is managed in Settings → Providers and stored in ~/.pi/agent. Interactive /login is not run in this desktop UI.',
         );
@@ -3965,6 +4397,20 @@ export const createPiHost = ({
         }
         return reply(
           'Grok usage is shown in Work Status and Settings → Providers when the Grok Usage plugin is installed.',
+        );
+      }
+
+      if (name === 'kimi-usage') {
+        if (!isKimiSlotActive(this.getFeaturePlugins())) {
+          const error = new Error('Command /kimi-usage is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        if (await ensureLivePluginCommand(record, name)) {
+          return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
+        }
+        return reply(
+          'Kimi Code usage is shown in Work Status and Settings → Providers when the Kimi Usage plugin is installed.',
         );
       }
 
@@ -4505,16 +4951,31 @@ export const createPiHost = ({
         throw error;
       }
       const current = readFeaturePlugins(home);
-      const source = typeof body.source === 'string' && body.source.trim()
-        ? body.source.trim()
-        : current[slot].source;
+      const source = slot === 'xai'
+        ? DEFAULT_FEATURE_PLUGIN_SOURCES.xai
+        : (typeof body.source === 'string' && body.source.trim()
+          ? body.source.trim()
+          : current[slot].source);
       if (!source) {
         const error = new Error('Package source is required');
         error.status = 400;
         throw error;
       }
       const manager = await this.resolveFeaturePackageManager();
-      await manager.installAndPersist(source);
+      const persist = typeof manager.installAndPersist === 'function'
+        ? manager.installAndPersist.bind(manager)
+        : typeof manager.install === 'function'
+          ? manager.install.bind(manager)
+          : null;
+      if (!persist) {
+        const error = new Error('Pi package install is unavailable');
+        error.status = 503;
+        throw error;
+      }
+      await persist(source);
+      if (slot === 'xai' && typeof manager.removeAndPersist === 'function') {
+        await removeXaiConflictingOauthSource({ manager, home });
+      }
       const next = writeFeaturePlugins(home, { [slot]: { source } });
       const reload = await this.reloadIdleSessions();
       return {
@@ -4531,17 +4992,21 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      const current = readFeaturePlugins(home);
-      const source = typeof body.source === 'string' && body.source.trim()
-        ? body.source.trim()
-        : current[slot].source;
-      if (!source) {
-        const error = new Error('Package source is required');
-        error.status = 400;
-        throw error;
-      }
       const manager = await this.resolveFeaturePackageManager();
-      await manager.removeAndPersist(source);
+      if (slot === 'xai') {
+        await removeXaiSlotSources({ manager, home });
+      } else {
+        const current = readFeaturePlugins(home);
+        const source = typeof body.source === 'string' && body.source.trim()
+          ? body.source.trim()
+          : current[slot].source;
+        if (!source) {
+          const error = new Error('Package source is required');
+          error.status = 400;
+          throw error;
+        }
+        await manager.removeAndPersist(source);
+      }
       const reload = await this.reloadIdleSessions();
       return {
         ...toFeaturePluginsPayload({
@@ -4593,6 +5058,7 @@ export const createPiHost = ({
       const snapshot = readSessionThinking(record.piSession);
       const fromEntries = lastThinkingLevelChangeFromEntries(entries);
       let available = snapshot.available;
+      const thinking = fromEntries || snapshot.thinking;
       try {
         const runtime = await ensureModelRuntime();
         const models = runtime && typeof runtime.getAvailable === 'function'
@@ -4600,21 +5066,46 @@ export const createPiHost = ({
           : [];
         const catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
         const catalog = await readThinkingLevelsFromModel(catalogModel);
-        if (catalog.length > 0) available = catalog;
-        else available = widenThinkingAvailable(available, catalog);
+        const liveMatchesCatalog = catalog.length > 0
+          && !isNarrowThinkingAvailable(available)
+          && available.every((level) => catalog.includes(level));
+        if (liveMatchesCatalog) {
+          available = snapshot.available;
+        } else if (catalog.length > 0) {
+          available = catalog;
+        } else {
+          available = widenThinkingAvailable(available, catalog);
+        }
+        available = unionCatalogLevelOntoAvailable(available, catalog, thinking);
       } catch {
       }
       return {
         ...snapshot,
         available,
-        thinking: fromEntries || snapshot.thinking,
+        thinking,
       };
     },
     async getSessionModel(sessionID) {
       const record = await ensureRecord(sessionID);
-      const entries = typeof record.sessionManager?.getEntries === 'function'
+      let entries = typeof record.sessionManager?.getEntries === 'function'
         ? record.sessionManager.getEntries()
         : [];
+      if (!Array.isArray(entries) || entries.length === 0) {
+        const file = typeof record.sessionFile === 'string' && record.sessionFile
+          ? record.sessionFile
+          : (typeof record.piSession?.sessionFile === 'string' ? record.piSession.sessionFile : '');
+        if (file) {
+          try {
+            const text = fs.readFileSync(file, 'utf8');
+            entries = text.split('\n').map((line) => {
+              const trimmed = line.trim();
+              if (!trimmed) return null;
+              try { return JSON.parse(trimmed); } catch { return null; }
+            }).filter(Boolean);
+          } catch {
+          }
+        }
+      }
       applySessionRuntimeFromEntries(record.piSession, entries);
       const usable = resolveUsableFacadeModel(
         lastModelChangeFromEntries(entries),
@@ -4642,37 +5133,47 @@ export const createPiHost = ({
       const snapshot = readSessionThinking(record.piSession);
       let available = snapshot.available;
       let catalogModel = null;
+      let catalog = [];
+      try {
+        const runtime = await ensureModelRuntime();
+        const models = runtime && typeof runtime.getAvailable === 'function'
+          ? await runtime.getAvailable()
+          : [];
+        catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
+        catalog = await readThinkingLevelsFromModel(catalogModel);
+      } catch {
+      }
       if (isNarrowThinkingAvailable(available)) {
-        try {
-          const runtime = await ensureModelRuntime();
-          const models = runtime && typeof runtime.getAvailable === 'function'
-            ? await runtime.getAvailable()
-            : [];
-          catalogModel = findRuntimeModel(models, lastModelChangeFromEntries(entries));
-          available = widenThinkingAvailable(available, await readThinkingLevelsFromModel(catalogModel));
-          if (catalogModel && typeof record.piSession.setModel === 'function') {
-            try {
-              const applied = record.piSession.setModel(catalogModel);
-              if (applied && typeof applied.then === 'function') await applied;
-            } catch {
-            }
+        available = widenThinkingAvailable(available, catalog);
+        if (catalogModel && typeof record.piSession.setModel === 'function') {
+          try {
+            const applied = record.piSession.setModel(catalogModel);
+            if (applied && typeof applied.then === 'function') await applied;
+          } catch {
           }
-        } catch {
         }
+      } else {
+        available = unionCatalogLevelOntoAvailable(available, catalog, level);
       }
-      let next = THINKING_LEVELS.includes(level) ? level : null;
-      if (available.length > 0) {
-        if (!next || !available.includes(next)) {
-          next = available.includes("medium") ? "medium" : available[0];
-        }
+      if (THINKING_LEVELS.includes(level) && !available.includes(level)) {
+        available = [...available, level];
       }
+      const next = THINKING_LEVELS.includes(level)
+        ? level
+        : clampThinkingOntoAvailable(level, available);
       if (!next) {
         const error = new Error("Invalid thinking level");
         error.status = 400;
         throw error;
       }
-      record.piSession.setThinkingLevel(next);
-      return { applied: true, thinking: next, available };
+      const defaultsBefore = readPiDefaults(home).thinking;
+      await applySessionThinkingLevel(record.piSession, next);
+      const defaultsAfter = readPiDefaults(home).thinking;
+      if (defaultsAfter !== defaultsBefore) {
+        writePiDefaults(home, { thinking: defaultsBefore });
+      }
+      const appliedThinking = readSessionThinking(record.piSession).thinking || next;
+      return { applied: true, thinking: appliedThinking, available };
     },
     async setSessionModel(sessionID, modelRef) {
       const record = await ensureLiveRecord(await ensureRecord(sessionID));
@@ -4680,13 +5181,24 @@ export const createPiHost = ({
         return { applied: false, model: modelRef };
       }
       const raw = typeof modelRef === "string" ? modelRef.trim() : "";
+      const [providerID, modelID] = raw.split("/");
       if (mock) {
-        const [providerID, modelID] = raw.split("/");
-        record.piSession.setModel({
+        const applied = {
           id: modelID || raw,
           ...(providerID ? { provider: providerID } : {}),
-        });
+        };
+        record.piSession.setModel(applied);
         record.translator?.setFallbackModel?.(record.piSession.currentModel);
+        let catalogModel = applied;
+        try {
+          const runtime = await ensureModelRuntime();
+          const models = runtime && typeof runtime.getAvailable === 'function'
+            ? await runtime.getAvailable()
+            : [];
+          catalogModel = findRuntimeModel(models, { providerID, modelID }) || applied;
+        } catch {
+        }
+        await pairThinkingAfterModelChange(record.piSession, catalogModel);
         return { applied: true, model: raw };
       }
       const runtime = await ensureModelRuntime();
@@ -4696,7 +5208,6 @@ export const createPiHost = ({
         throw error;
       }
       const available = await runtime.getAvailable();
-      const [providerID, modelID] = raw.split("/");
       const model = Array.isArray(available)
         ? available.find((item) => (
           item.id === raw
@@ -4708,8 +5219,10 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      record.piSession.setModel(model);
+      const appliedModel = record.piSession.setModel(model);
+      if (appliedModel && typeof appliedModel.then === 'function') await appliedModel;
       record.translator?.setFallbackModel?.(model);
+      await pairThinkingAfterModelChange(record.piSession, model);
       return { applied: true, model: model.provider ? `${model.provider}/${model.id}` : model.id };
     },
     getSessionUsage(sessionID) {

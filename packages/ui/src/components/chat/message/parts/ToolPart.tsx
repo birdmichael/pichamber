@@ -32,6 +32,7 @@ import {
     renderTodoOutput,
     tryParseJsonOutput,
     coerceToText,
+    capToolOutputText,
 } from '../toolRenderers';
 import { JsonTreeViewer } from '@/components/ui/JsonTreeViewer';
 import { JsonSummaryView } from './JsonSummaryView';
@@ -52,9 +53,9 @@ import {
     buildTaskSummaryEntriesFromSession,
     normalizeTaskSummaryEntries,
     parseTaskMetadataBlock,
+    prepareTaskToolOutput,
     readTaskSessionIdFromOutput,
     readTaskSessionIdFromRecord,
-    stripTaskMetadataFromOutput,
     type TaskToolSummaryEntry,
 } from './taskToolModel';
 import { areRenderRelevantPartsEqual } from '../renderCompare';
@@ -615,11 +616,15 @@ const getToolOutputText = (
     part: ToolPartType,
     metadata: Record<string, unknown> | undefined,
 ): string => {
+    // Cap oversized payloads before JSON.parse / syntax highlighting / DOM work
+    // so a single huge tool output can't trigger a V8 Zone-allocation OOM that
+    // hard-crashes the renderer (issue #2265).
+    const capped = capToolOutputText(output);
     if (part.tool === 'bash') {
-        return output;
+        return capped;
     }
 
-    return formatEditOutput(output, part.tool, metadata);
+    return formatEditOutput(capped, part.tool, metadata);
 };
 
 const StreamingPlainTextOutput: React.FC<{ output: string }> = ({ output }) => {
@@ -1013,9 +1018,7 @@ const TaskToolSummary: React.FC<{
     const showToolFileIcons = useUIStore((state) => state.showToolFileIcons);
     const runtime = React.useContext(RuntimeAPIContext);
 
-    const trimmedOutput = typeof output === 'string'
-        ? stripTaskMetadataFromOutput(output)
-        : '';
+    const trimmedOutput = prepareTaskToolOutput(typeof output === 'string' ? output : undefined);
     const hasOutput = trimmedOutput.length > 0;
     const [isOutputExpanded, setIsOutputExpanded] = React.useState(false);
 

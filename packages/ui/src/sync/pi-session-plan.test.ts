@@ -14,6 +14,9 @@ import {
   resolveEmptyComposerPlanSelected,
   resolveFooterPlanSelected,
   resolveOpenedDraftPlanSelected,
+  planBuildBusyDisabled,
+  resolveLivePlanImplementing,
+  resolvePlanBuildChrome,
   resolvePlanStatusRowHint,
   sessionPlanCanDiscard,
   sessionPlanHasMarkdown,
@@ -172,6 +175,59 @@ describe('plan toggle and build dispatch', () => {
       footerPlanSelected: false,
       draftOpen: true,
     })).toBeNull();
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: true,
+      draftOpen: false,
+      implemented: true,
+    })).toBe('implementing');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: false,
+      draftOpen: false,
+      implementing: true,
+    })).toBe('implementing');
+    expect(resolvePlanStatusRowHint({
+      footerPlanSelected: false,
+      draftOpen: false,
+      implemented: true,
+    })).toBeNull();
+    expect(resolveLivePlanImplementing({ status: 'implementing', busy: true })).toBe(true);
+    expect(resolveLivePlanImplementing({ status: 'implementing', busy: false })).toBe(false);
+    expect(resolveLivePlanImplementing({ status: 'ready', busy: true })).toBe(false);
+    expect(resolvePlanBuildChrome({
+      available: true,
+      status: 'implementing',
+      implemented: true,
+      busy: true,
+      hasPendingPlanReadySelect: false,
+      hasMarkdown: true,
+    })).toEqual({ implementing: true, showBuildRow: false });
+    expect(resolvePlanBuildChrome({
+      available: true,
+      status: 'implementing',
+      implemented: true,
+      busy: false,
+      hasPendingPlanReadySelect: false,
+      hasMarkdown: true,
+    })).toEqual({ implementing: false, showBuildRow: false });
+    expect(resolvePlanBuildChrome({
+      available: true,
+      status: 'implementing',
+      implemented: false,
+      busy: false,
+      hasPendingPlanReadySelect: false,
+      hasMarkdown: true,
+    })).toEqual({ implementing: false, showBuildRow: false });
+    expect(resolvePlanBuildChrome({
+      available: true,
+      status: 'ready',
+      implemented: false,
+      busy: false,
+      hasPendingPlanReadySelect: false,
+      hasMarkdown: true,
+    })).toEqual({ implementing: false, showBuildRow: true });
+    expect(planBuildBusyDisabled({ busy: true, hasPendingPlanReadySelect: true })).toBe(false);
+    expect(planBuildBusyDisabled({ busy: true, hasPendingPlanReadySelect: false })).toBe(true);
+    expect(planBuildBusyDisabled({ busy: false, hasPendingPlanReadySelect: false })).toBe(false);
   });
 
   test('empty-composer Plan stays on this draft until send or Agent, and a new draft is Agent', () => {

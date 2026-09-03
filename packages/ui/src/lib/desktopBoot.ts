@@ -187,9 +187,6 @@ export function resolveDesktopBootView(
 
   // Recovery screens - something is wrong
   if (outcome.target === 'local' && outcome.status === 'unreachable') {
-    if (outcome.localAvailable === false) {
-      return { screen: 'chooser', localAvailable: false };
-    }
     return { screen: 'recovery', variant: 'local-unavailable', ...availability };
   }
 

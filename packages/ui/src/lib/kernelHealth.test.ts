@@ -13,19 +13,19 @@ describe('isLocalKernelReady', () => {
     })).toBe(true);
   });
 
-  test('treats kernel=pi and status=ok as ready when flags are omitted', () => {
+  test('does not treat kernel=pi and status=ok as ready when ready flags are omitted', () => {
     expect(isLocalKernelReady({
       kernel: 'pi',
       status: 'ok',
       openCodeRunning: false,
       isOpenCodeReady: false,
-    })).toBe(true);
+    })).toBe(false);
   });
 
-  test('does not treat a Pi health payload as ready when the kernel is down', () => {
+  test('does not treat kernel=pi and status=ok as ready when kernelReady is false', () => {
     expect(isLocalKernelReady({
       kernel: 'pi',
-      status: 'error',
+      status: 'ok',
       kernelReady: false,
       piRunning: false,
       openCodeRunning: false,
@@ -33,10 +33,10 @@ describe('isLocalKernelReady', () => {
     })).toBe(false);
   });
 
-  test('does not treat HTTP status ok as ready when kernelReady is explicitly false', () => {
+  test('does not treat a Pi health payload as ready when the kernel is down', () => {
     expect(isLocalKernelReady({
       kernel: 'pi',
-      status: 'ok',
+      status: 'error',
       kernelReady: false,
       piRunning: false,
       openCodeRunning: false,

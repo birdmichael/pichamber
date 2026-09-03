@@ -30,6 +30,7 @@ import type { ComposerEditorHandle } from '../editor/ComposerEditor';
 export interface MobileComposerHolders {
     controlsPanelOpen: boolean;
     attachMenuOpen: boolean;
+    planMenuOpen: boolean;
     draftPickerOpen: boolean;
     issuePickerOpen: boolean;
     prPickerOpen: boolean;
@@ -203,6 +204,7 @@ export function useMobileComposerShell(
     const overlayOpen = overlayHostBusy
         || holders.controlsPanelOpen
         || holders.attachMenuOpen
+        || holders.planMenuOpen
         || holders.issuePickerOpen
         || holders.prPickerOpen;
 
@@ -304,6 +306,7 @@ export function useMobileComposerShell(
         || dictationActive
         || holders.controlsPanelOpen
         || holders.attachMenuOpen
+        || holders.planMenuOpen
         || holders.draftPickerOpen
         || holders.issuePickerOpen
         || holders.prPickerOpen

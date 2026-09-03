@@ -41,6 +41,8 @@ Examples:
 
 These stores coordinate visible app state, navigation, selected tabs, dialogs, and lightweight feature flags.
 
+`useSessionTabsStore` is the opt-in header working set of session ids (web/desktop). Only ids and order live here; titles and liveness come from the session stores at render time. Closing a tab drops it from the strip and never archives or deletes the Pi session. Ids whose session is not in the loaded active list stay stored and do not render. `useUIStore.sessionTabsEnabled` defaults off, so the header stays a plain session title until the General setting is turned on.
+
 `useUIStore` owns mutually exclusive full-page main surfaces: Scheduled Tasks, Archive, Worktrees, New multi-run, and Multi-run compare (`multiRunCompareGroup`). Opening one closes the others. Compare is transient UI state — it is not persisted — and `closeMainSurfaces` clears it with the rest. After a multi-run with two or more sessions starts, the launcher opens compare last so a session-selection close cannot wipe the new surface. Archive, Scheduled Tasks, and Worktrees dismiss through that same action: the header/page close control, or Esc after a nested picker/dialog has already dismissed (Settings layering). Multi-run launcher and compare keep their own Cancel/Esc handlers and must not go through that shared Esc path.
 
 `useCommandsStore` loads Settings → Commands from the command list plus
@@ -60,6 +62,8 @@ is installed and enabled.
 
 `useXaiUsageStore` caches `GET /api/pi/xai-usage` for Work Status Usage and the Providers xAI card. A failed fetch or configured `{ ok: false }` keeps the last successful `ok` snapshot and must not become empty 0% usage. First-load failure stays an error, not "not signed in". A refresh while a request is in flight is queued so the click is not dropped. `reset()` invalidates in-flight results (runtime switch). The Grok Usage slot off hides both surfaces.
 
+`useKimiUsageStore` is the parallel cache for `GET /api/pi/kimi-usage` (Work Status Usage and the Providers Kimi Code card). Same reconcile rules: keep the last successful `ok` snapshot, never invent 0%, first-load failure is an error not "not signed in", queue in-flight refresh, `reset()` on runtime switch. The Kimi Usage slot off hides both surfaces. Pi Work Status Usage is Grok **or** Kimi slot (both installed: xAI then Kimi Code).
+
 Context-panel session chats mount only the active chat iframe. After installing
 its message listener, the iframe requests its authoritative visibility from the
 parent. The parent accepts requests only from a currently mounted chat frame and
@@ -70,19 +74,21 @@ mounted session-chat iframe stay enabled independently of that visibility flag
 so a delayed or lost handshake cannot hide an already-materialized transcript
 (busy subagents would otherwise show only the working-status row).
 
-Browser tabs and `useBrowserHistoryStore` are scoped by Settings project, not by
-raw session directory. Isolated chat dirs and home-as-chat share
-`openchamber:chats`; home that is itself an opened project stays a project key.
-Files / Git / notes stay keyed by the real session directory. `BrowserPane`
-also keeps that session directory so annotation drafts and announced servers
-match the composer. Cookies stay on the global Electron partition
-`persist:openchamber-browser`. Resolve the store key with
-`resolveBrowserScopeKey` in `lib/browser/scope.ts`. A projectless Chats draft
-(sidebar Chats-row +, no session until send) uses `openchamber:chats`
-immediately — it must not inherit the last project's directory from
-`DirectoryStore`. `useUIStore` reads home and opened projects through a late
-getter inside `readContextBrowserScopeKey` and must not statically import
-`useDirectoryStore` or `useProjectsStore`.
+Browser *tabs* follow the open conversation (`session:<id>`), the same scope
+as subagent chat tabs, so two sessions in one project do not share a page.
+Files / Git / notes stay on the session directory. Address-bar *history* in
+`useBrowserHistoryStore` still collapses isolated chat dirs and home-as-chat
+onto `openchamber:chats` so suggestions stay useful across projectless chats;
+home that is itself an opened Settings project stays a project key. Resolve
+that history key with `resolveBrowserScopeKey` in `lib/browser/scope.ts`.
+`BrowserPane` still receives the real session directory so annotation drafts
+and announced servers match the composer. Cookies stay on the global Electron
+partition `persist:openchamber-browser`. A projectless Chats draft (sidebar
+Chats-row +, no session until send) uses `openchamber:chats` immediately — it
+must not inherit the last project's directory from `DirectoryStore`.
+`useUIStore` reads home, opened projects, and the current session through late
+getters and must not statically import `useDirectoryStore`,
+`useProjectsStore`, or `useSessionUIStore`.
 
 ### Session / project coordination stores
 
@@ -95,7 +101,7 @@ Examples:
 
 These stores coordinate persistent project/session metadata across multiple views.
 
-`messageQueueStore.ts` keeps a queued message until its own send resolves, so between dispatch and resolution the entry is still visible to every reader. Dispatchers must therefore mark the send (`markSending`/`clearSending`) and read `getSendableQueue()` — or filter `sendingIds` themselves — instead of dispatching straight from `queuedMessages`; otherwise a composer submit merges a message the auto-send hook is already delivering and it is sent twice (the window is seconds over a relay). `clearQueue()` retains in-flight entries for the same reason. `sendingIds` is deliberately not persisted: a restart has no in-flight sends, and a stale flag would strand a queued message.
+`messageQueueStore.ts` keeps a queued message until its own send resolves, so between dispatch and resolution the entry is still visible to every reader. Dispatchers must therefore mark the send (`markSending`/`clearSending`) and read `getSendableQueue()` — or filter `sendingIds` themselves — instead of dispatching straight from `queuedMessages`; otherwise a composer submit merges a message the auto-send hook is already delivering and it is sent twice (the window is seconds over a relay). `clearQueue()` retains in-flight entries for the same reason. `sendingIds` is deliberately not persisted: a restart has no in-flight sends, and a stale flag would strand a queued message. Context chips (comments, quotes, terminal selections) are snapshotted onto the queued item at queue time as `contextDrafts`; idle auto-send and a queued-only submit attach that snapshot and must not read the live composer draft store.
 
 `useGlobalSessionsStore.ts` owns cold/global active and archived session coverage, including `sessionsByDirectory`. It is complementary to directory child stores: it is not the source of live busy/retry status or session messages.
 
@@ -177,6 +183,8 @@ Important properties:
 - loading state is per-directory, not global
 - `ensureStatus()` and `ensureAll()` are the preferred entry points for consumers
 - in-flight dedupe exists for status and `ensureAll()`
+- nested repository discovery (`nestedReposByRoot`, `nestedRepoSelection`, `ensureNestedRepos`) is per-root state for roots that are not themselves git repositories; discovery failure is a `null` marker (never a valid empty result), a runtime without the discovery route (VS Code) commits an `'unsupported'` marker, and an in-flight discovery whose runtime switched is discarded at commit time instead of repopulating the cleared map. Selections are persisted per runtime + root, and `useEffectiveGitDirectory(root)` resolves the directory git surfaces operate on (`root` when the root is a repository, the selected nested repository otherwise). A selection whose repository fails its probe is dropped and remembered session-only (`staleClearedSelections`) so auto-select does not re-pick it and loop walk+probe; manual picker picks bypass the memory. `hooks/useNestedGitDirectory.ts` owns the resolution flow (root probe, discovery, auto-select, stale-selection recovery) for every consuming surface (Git tab, diff view, pull-request view, walkthrough view, work-status project readout), and `git/NestedRepoResolutionStates.tsx` renders the shared pending/failed/unsupported/empty states
+- worktree bootstrap polling and session/worktree machinery stay keyed on the project root even while a nested repository is selected; only git data and actions follow the selection
 - runtime reset replaces all live entries with that runtime's persisted branch seeds and invalidates old completions
 - status, branches, log, identity, repository probes, and prefetch diffs commit through runtime and per-channel generations
 - status mutations advance a revision so older refreshes cannot undo optimistic or confirmed index changes

@@ -93,6 +93,17 @@ describe('getPiXaiUsage', () => {
     expect(result).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
+  it('treats npm:pi-xai as the Grok Usage slot', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-xai'],
+    });
+    const result = await getPiXaiUsage({ home, fetchImpl: async () => {
+      throw new Error('should not fetch');
+    } });
+    expect(result).toEqual({ ok: false, configured: false, slotActive: true });
+  });
+
   it('reports not configured when the slot is on but there is no oauth', async () => {
     const home = makeTemp();
     writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {

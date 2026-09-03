@@ -6,11 +6,12 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { useContextStore } from '@/stores/contextStore';
 import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { parseAgentMentions } from '@/lib/messages/agentMentions';
+import { contextPayloadFromDraft, createContextPart } from '@/lib/messages/contextParts';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { getDirectoryState } from '@/sync/sync-refs';
 import { useDirectorySync } from '@/sync/sync-context';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { useDirectoryStore } from '@/stores/useDirectoryStore';
+import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
 
 type SessionStatusType = 'idle' | 'busy' | 'retry';
 
@@ -91,10 +92,15 @@ export const buildQueuedAutoSendPayload = (
     isPiKernel: options.isPiKernel,
   });
 
+  const additionalParts = (queued.contextDrafts ?? []).map((draft) => (
+    createContextPart(contextPayloadFromDraft(draft))
+  ));
+
   return {
     queuedMessageId: queued.id,
     primaryText: sanitizedText,
     primaryAttachments: queued.attachments ?? [],
+    additionalParts: additionalParts.length > 0 ? additionalParts : undefined,
     agentMentionName: mention?.name,
     sendConfig: queued.sendConfig,
   };
@@ -120,7 +126,7 @@ export const sendQueuedAutoSendPayload = (
     resolved.agent,
     payload.primaryAttachments,
     payload.agentMentionName,
-    undefined,
+    payload.additionalParts,
     resolved.variant,
     'normal',
     { target },
@@ -181,15 +187,9 @@ export const shouldDispatchQueuedAutoSend = (
 /**
  * Resolve the live status the queue gate should honor for a session.
  *
- * The server's `/session/status` map only lists busy/retry sessions — idle
- * sessions are absent — so a missing entry means "idle per the snapshot", not
- * "no information". A missed busy event therefore leaves no entry while a turn
- * is still streaming. The trailing in-flight assistant message is the live
- * evidence of that running turn: treat it as busy so the queue never dispatches
- * into it (mirrors `useSessionActivity`'s fallback). The entry becomes idle the
- * moment the message completes or an idle status event lands. This reads the
- * directory child store directly so both the effect-loop gate and the
- * dispatch-time re-check agree.
+ * `/session/status` omits idle sessions. A missed busy event leaves no entry
+ * while a turn is still streaming. Use the latest assistant (Steer can append
+ * a user bubble after it) so the queue does not dispatch into that turn.
  */
 export const resolveQueuedSessionStatusType = (
   sessionId: string,
@@ -200,15 +200,20 @@ export const resolveQueuedSessionStatusType = (
   if (statusType === 'busy' || statusType === 'retry') {
     return statusType;
   }
+  const globalType = useGlobalSessionStatusStore.getState().statusById.get(sessionId)?.status?.type;
+  if (globalType === 'busy' || globalType === 'retry') {
+    return globalType;
+  }
   const sessionMessages = state?.message?.[sessionId];
-  const lastMessage = sessionMessages && sessionMessages.length > 0
-    ? sessionMessages[sessionMessages.length - 1]
-    : undefined;
-  if (
-    lastMessage?.role === 'assistant'
-    && typeof (lastMessage as { time?: { completed?: number } }).time?.completed !== 'number'
-  ) {
-    return 'busy';
+  if (sessionMessages) {
+    for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+      const message = sessionMessages[index];
+      if (message?.role !== 'assistant') continue;
+      if (typeof (message as { time?: { completed?: number } }).time?.completed !== 'number') {
+        return 'busy';
+      }
+      break;
+    }
   }
   return 'idle';
 };
@@ -223,7 +228,10 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
   // resolveQueuedSessionStatusType; subscribe so the queue drains the moment
   // the trailing assistant message completes even if status events were missed.
   const sessionMessages = useDirectorySync((state) => state.message);
-  const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
+  // Queues are keyed by the session's own directory. Subscribe to the global
+  // busy/retry index so a queue in a background project still drains when
+  // that session settles — not only the currently selected DirectoryStore.
+  const globalSessionStatus = useGlobalSessionStatusStore((state) => state.statusById);
 
   const inFlightSessionsRef = React.useRef<Set<string>>(new Set());
   const sendFailuresRef = React.useRef<Map<string, QueuedAutoSendFailure>>(new Map());
@@ -336,11 +344,16 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
         nextStatusMap.set(sessionId, status.type as SessionStatusType);
       }
     }
+    for (const [sessionId, entry] of globalSessionStatus) {
+      if (entry?.status?.type === 'busy' || entry?.status?.type === 'retry') {
+        nextStatusMap.set(sessionId, entry.status.type);
+      }
+    }
 
     const queueEntries = Object.entries(queuedMessages);
     queueEntries.forEach(([key, queue]) => {
       const target = parseMessageQueueKey(key);
-      if (!target || target.runtimeKey !== getRuntimeKey() || target.directory !== currentDirectory) return;
+      if (!target || target.runtimeKey !== getRuntimeKey()) return;
       const { sessionId } = target;
       const currentStatusType = resolveQueuedSessionStatusType(sessionId, target.directory);
       const previousStatusType = previousStatusRef.current.get(sessionId);
@@ -363,5 +376,5 @@ export function useQueuedMessageAutoSend(enabledOrOptions?: boolean | { enabled?
     });
 
     previousStatusRef.current = nextStatusMap;
-  }, [enabled, isPiKernel, queuedMessages, sessionStatusRecord, sessionMessages, autoReviewRuns, currentDirectory, retryTick, retryScheduler]);
+  }, [enabled, isPiKernel, queuedMessages, sessionStatusRecord, sessionMessages, globalSessionStatus, autoReviewRuns, retryTick, retryScheduler]);
 }

@@ -4,7 +4,7 @@ import { opencodeClient } from '@/lib/opencode/client';
 import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import type { ProjectEntry } from '@/lib/api/types';
 import type { DesktopSettings } from '@/lib/desktop';
-import { updateDesktopSettings } from '@/lib/persistence';
+import { type SettingsSyncedDetail, updateDesktopSettings } from '@/lib/persistence';
 import { createProjectIdFromPath } from '@/lib/projectId';
 import { getDeferredSafeStorage } from './utils/safeStorage';
 import { useDirectoryStore } from './useDirectoryStore';
@@ -51,6 +51,7 @@ interface ProjectsStore {
   manualProjectOrder: string[];
 
   addProject: (path: string, options?: { label?: string; id?: string }) => ProjectEntry | null;
+  addProjects: (paths: string[]) => Promise<ProjectEntry[]>;
   removeProject: (id: string) => void;
   setActiveProject: (id: string) => void;
   setActiveProjectIdOnly: (id: string) => void;
@@ -69,7 +70,7 @@ interface ProjectsStore {
   reorderProjects: (fromIndex: number, toIndex: number) => void;
   resetForRuntimeSwitch: () => void;
   validateProjectPath: (path: string) => ProjectPathValidationResult;
-  synchronizeFromSettings: (settings: DesktopSettings) => void;
+  synchronizeFromSettings: (settings: DesktopSettings, options?: { adoptActiveProject?: boolean }) => void;
   syncVSCodeWorkspaceFolders: (folders: VSCodeWorkspaceFolderConfig[], activePath?: string | null) => ProjectEntry | null;
   getActiveProject: () => ProjectEntry | null;
 }
@@ -623,6 +624,65 @@ export const useProjectsStore = create<ProjectsStore>()(
       return entry;
     },
 
+    addProjects: async (paths: string[]) => {
+      if (isVSCodeProjectsRuntime) {
+        const added: ProjectEntry[] = [];
+        const seen = new Set<string>();
+        for (const path of paths) {
+          if (seen.has(path)) continue;
+          seen.add(path);
+          const project = get().addProject(path);
+          if (project) {
+            added.push(project);
+          }
+        }
+        return added;
+      }
+      const current = get();
+      const existingPaths = new Set(current.projects.map((project) => project.path));
+      const now = Date.now();
+      const entries: ProjectEntry[] = [];
+      const seenPaths = new Set<string>();
+
+      for (const rawPath of paths) {
+        const validation = get().validateProjectPath(rawPath);
+        if (!validation.ok || !validation.normalizedPath) {
+          continue;
+        }
+        const normalizedPath = validation.normalizedPath;
+        if (existingPaths.has(normalizedPath) || seenPaths.has(normalizedPath)) {
+          continue;
+        }
+        seenPaths.add(normalizedPath);
+        entries.push({
+          id: createProjectIdFromPath(normalizedPath),
+          path: normalizedPath,
+          label: deriveProjectLabel(normalizedPath),
+          color: pickAutoColor([...current.projects, ...entries]),
+          addedAt: now,
+          lastOpenedAt: now,
+        });
+      }
+
+      if (entries.length === 0) {
+        return [];
+      }
+
+      const nextProjects = [...current.projects, ...entries];
+      set({ projects: nextProjects });
+      persistProjects(nextProjects, current.activeProjectId, get().manualProjectOrder);
+
+      if (streamDebugEnabled()) {
+        console.info('[ProjectsStore] Added projects', entries);
+      }
+
+      get().setActiveProject(entries[0].id);
+      for (const entry of entries) {
+        void get().discoverProjectIcon(entry.id);
+      }
+      return entries;
+    },
+
     removeProject: (id: string) => {
       if (isVSCodeProjectsRuntime) {
         return;
@@ -812,7 +872,7 @@ export const useProjectsStore = create<ProjectsStore>()(
 
         const payload = (await response.json().catch(() => null)) as { settings?: DesktopSettings } | null;
         if (payload?.settings) {
-          get().synchronizeFromSettings(payload.settings);
+          get().synchronizeFromSettings(payload.settings, { adoptActiveProject: false });
         }
         return { ok: true };
       } catch (error) {
@@ -841,7 +901,7 @@ export const useProjectsStore = create<ProjectsStore>()(
 
         const payload = (await response.json().catch(() => null)) as { settings?: DesktopSettings } | null;
         if (payload?.settings) {
-          get().synchronizeFromSettings(payload.settings);
+          get().synchronizeFromSettings(payload.settings, { adoptActiveProject: false });
         }
         return { ok: true };
       } catch (error) {
@@ -877,7 +937,7 @@ export const useProjectsStore = create<ProjectsStore>()(
         }
 
         if (payload?.settings) {
-          get().synchronizeFromSettings(payload.settings);
+          get().synchronizeFromSettings(payload.settings, { adoptActiveProject: false });
         }
 
         return {
@@ -927,32 +987,43 @@ export const useProjectsStore = create<ProjectsStore>()(
       set({ projects, activeProjectId: nextActiveProjectId, manualProjectOrder: [] });
     },
 
-    synchronizeFromSettings: (settings: DesktopSettings) => {
+    synchronizeFromSettings: (settings: DesktopSettings, options?: { adoptActiveProject?: boolean }) => {
       if (isVSCodeProjectsRuntime) {
         return;
       }
+      const adoptActiveProject = options?.adoptActiveProject !== false;
       const incomingProjects = sanitizeProjects(settings.projects ?? []);
       const incomingActive = typeof settings.activeProjectId === 'string' && settings.activeProjectId.trim()
         ? settings.activeProjectId.trim()
         : null;
 
       const current = get();
+      const incomingIds = new Set(incomingProjects.map((p) => p.id));
+
+      // The settings document is shared by every window on this server, so
+      // outside a bootstrap sync the incoming active pointer is just another
+      // window's choice — the project LIST still reconciles, but this
+      // window's active project stays its own while it remains valid.
+      const nextActive = adoptActiveProject
+        ? incomingActive
+        : (current.activeProjectId && incomingIds.has(current.activeProjectId)
+          ? current.activeProjectId
+          : incomingActive);
 
       const projectsChanged = JSON.stringify(current.projects) !== JSON.stringify(incomingProjects);
-      const activeChanged = current.activeProjectId !== incomingActive;
+      const activeChanged = current.activeProjectId !== nextActive;
 
       if (!projectsChanged && !activeChanged) {
         return;
       }
 
-      const incomingIds = new Set(incomingProjects.map((p) => p.id));
       const cleanedOrder = get().manualProjectOrder.filter((id) => incomingIds.has(id));
-      set({ projects: incomingProjects, activeProjectId: incomingActive, manualProjectOrder: cleanedOrder });
-      cacheProjects(incomingProjects, incomingActive);
+      set({ projects: incomingProjects, activeProjectId: nextActive, manualProjectOrder: cleanedOrder });
+      cacheProjects(incomingProjects, nextActive);
       persistManualProjectOrder(cleanedOrder);
 
-      if (incomingActive) {
-        const activeProject = incomingProjects.find((project) => project.id === incomingActive);
+      if (activeChanged && nextActive) {
+        const activeProject = incomingProjects.find((project) => project.id === nextActive);
         if (activeProject) {
           opencodeClient.setDirectory(activeProject.path);
           useDirectoryStore.getState().setDirectory(activeProject.path, { showOverlay: false });
@@ -1009,9 +1080,11 @@ bindProjectsStoreForBrowserScope(useProjectsStore);
 
 if (typeof window !== 'undefined') {
   window.addEventListener('openchamber:settings-synced', (event: Event) => {
-    const detail = (event as CustomEvent<DesktopSettings>).detail;
-    if (detail && typeof detail === 'object') {
-      useProjectsStore.getState().synchronizeFromSettings(detail);
+    const detail = (event as CustomEvent<SettingsSyncedDetail>).detail;
+    if (detail && typeof detail === 'object' && detail.settings) {
+      useProjectsStore.getState().synchronizeFromSettings(detail.settings, {
+        adoptActiveProject: detail.adoptWorkspace,
+      });
     }
   });
 }

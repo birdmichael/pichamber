@@ -60,6 +60,8 @@ export interface ComposerFooterProps {
     dictationActive: boolean;
 
     onOpenSettings?: () => void;
+    onAttachmentMenuOpenChange?: (open: boolean) => void;
+    onPlanMenuOpenChange?: (open: boolean) => void;
     onPickLocalFiles: () => void;
     onOpenIssuePicker: () => void;
     onOpenPrPicker: () => void;
@@ -102,6 +104,8 @@ export function ComposerFooter(props: ComposerFooterProps) {
         isPermissionAutoAcceptInteractive,
         dictationActive,
         onOpenSettings,
+        onAttachmentMenuOpenChange,
+        onPlanMenuOpenChange,
         onPickLocalFiles,
         onOpenIssuePicker,
         onOpenPrPicker,
@@ -162,6 +166,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                                 openIssuePicker={onOpenIssuePicker}
                                 openPrPicker={onOpenPrPicker}
                                 onOpenSettings={onOpenSettings}
+                                onMenuOpenChange={onAttachmentMenuOpenChange}
                                 onOpenMobileSheet={onOpenAttachSheet}
                             />
                             {!isPiKernel ? (
@@ -185,7 +190,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             <SessionGoalObjectiveCounter length={messageLength} />
                               </>
                             ) : null}
-                            <PiPlanModeToggle />
+                            <PiPlanModeToggle onOpenChange={onPlanMenuOpenChange} />
                             <PiGoalButton
                                 sessionId={currentSessionId}
                                 directory={directory}
@@ -245,6 +250,7 @@ export function ComposerFooter(props: ComposerFooterProps) {
                             openIssuePicker={onOpenIssuePicker}
                             openPrPicker={onOpenPrPicker}
                             onOpenSettings={onOpenSettings}
+                            onMenuOpenChange={onAttachmentMenuOpenChange}
                         />
                         <FocusModeButton
                             footerIconButtonClass={footerIconButtonClass}

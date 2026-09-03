@@ -111,9 +111,10 @@ and therefore displaces nothing.
 Everything is read from already-warm caches. The panel adds no aggregated
 endpoint. On leftover OpenCode, quota data refreshes through the shared fixed
 three-minute quota timer, which requests only providers enabled for this panel.
-On Pi that timer and `/api/quota/*` are off. The Usage section appears only
-when Feature Plugins Grok Usage (`xai`) is installed; it reads
-`GET /api/pi/xai-usage`. Session context % / cost stay in the Session block.
+On Pi that timer and `/api/quota/*` are off. The Usage section appears when
+Feature Plugins Grok Usage (`xai`) **or** Kimi Usage (`kimi`) is installed;
+it reads `GET /api/pi/xai-usage` and/or `GET /api/pi/kimi-usage`. Session
+context % / cost stay in the Session block.
 
 | Block | Source | Notes |
 |---|---|---|
@@ -123,7 +124,7 @@ when Feature Plugins Grok Usage (`xai`) is installed; it reads
 | PR + checks | `useFreshestPrVisualSummaryForBranch` | **read-only**; follows the freshest remote-keyed entry for the branch |
 | Subagents | Pi: host run list (live `subagent` tool-call session id, not leftover status-file ghosts). OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card. Terminal rows without an id are omitted. Catalog / management `subagent` calls (`list`, `status`, `guide`, …) are not rows and do not mint an empty child chat. |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
-| Usage | Pi: `useXaiUsageStore` over `GET /api/pi/xai-usage` when Feature Plugins `xai` is on. OpenCode: `usageGroups.ts` over `useQuotaStore` | Pi shows xAI allowance / cycle / expiry only. Slot off hides the section. Fetch failure keeps the last good snapshot or shows an error — never 0% and never "not signed in" on a failed request. Leftover `/api/quota/*` stays unregistered on Pi. Session context % / cost stay in Session. |
+| Usage | Pi: `useXaiUsageStore` / `useKimiUsageStore` over `GET /api/pi/xai-usage` and `GET /api/pi/kimi-usage` when Feature Plugins `xai` **or** `kimi` is on (stable order xAI then Kimi Code). OpenCode: `usageGroups.ts` over `useQuotaStore` | Pi shows Grok and/or Kimi Code allowance. Either slot on shows Usage; both off hides the section. Fetch failure keeps the last good snapshot or shows an error — never 0% and never "not signed in" on a failed request. Leftover `/api/quota/*` stays unregistered on Pi. Session context % / cost stay in Session. |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |
 | Goal | `useSessionGoal` | respects the Settings toggle |
 | MCP | `useMcpStore` | Hidden on Pi until the MCP feature-plugin slot is installed and enabled. Presence of `.mcp.json` alone does not show this block. Connect/disconnect reuses the dropdown's actions; on Pi those persist `disabled` on `<cwd>/.pi/mcp.json` and reload the session. `cached` / not-yet-connected is a valid row, not a failure. |
@@ -215,8 +216,8 @@ todo list is the top readout when that section is offered.
 2. **Session** (goal, context, cost), **Project** (attention, branch,
    changes, PR, checks) and **Usage** — true for as long as the session is
    open. Usage sits here rather than lower down because a spent quota stops the
-   work outright. On Pi the provider-quota Usage section is not available
-   (there is no quota API); the Session context meter is unchanged;
+   work outright. On Pi the provider-quota Usage section appears when the
+   Grok Usage or Kimi Usage slot is on; the Session context meter is unchanged;
 3. **Subagents** — what is happening right now. On Pi this section exists
    only when the Subagents slot is installed and enabled;
 4. **MCP**, **Pinned messages**, **Context sources** — supporting material.

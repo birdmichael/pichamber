@@ -502,6 +502,10 @@ describe('OpenCode facade HTTP/SSE', () => {
         { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
         { type: 'api', label: 'API Key' },
       ]);
+      expect(methods['kimi-coding']).toEqual([
+        { type: 'oauth', label: 'Sign in with Kimi Code' },
+        { type: 'api', label: 'API Key' },
+      ]);
     } finally {
       kernel.dispose();
       await close();
@@ -518,22 +522,32 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(Array.isArray(catalog.all)).toBe(true);
       expect(catalog.connected).toEqual([]);
       expect(catalog.all.map((provider) => provider.id)).toContain('xai');
+      expect(catalog.all.map((provider) => provider.id)).toContain('kimi-coding');
       expect(catalog.all.find((provider) => provider.id === 'xai')).toMatchObject({
         id: 'xai',
         name: 'xAI',
       });
+      expect(catalog.all.find((provider) => provider.id === 'kimi-coding')).toMatchObject({
+        id: 'kimi-coding',
+        name: 'Kimi Code',
+      });
       const connected = await (await fetch(`${url}/api/config/providers`)).json();
       expect((connected.providers ?? []).some((provider) => provider.id === 'xai' && Object.keys(provider.models || {}).length === 0)).toBe(false);
+      expect((connected.providers ?? []).some((provider) => provider.id === 'kimi-coding' && Object.keys(provider.models || {}).length === 0)).toBe(false);
 
       const unsupported = await fetch(`${url}/api/provider/openai/oauth/authorize`, { method: 'POST' });
       expect(unsupported.status).toBe(404);
 
       const callback = await fetch(`${url}/api/provider/xai/oauth/callback`, { method: 'POST' });
       expect(callback.status).toBe(400);
+      const kimiCallback = await fetch(`${url}/api/provider/kimi-coding/oauth/callback`, { method: 'POST' });
+      expect(kimiCallback.status).toBe(400);
 
       const usage = await (await fetch(`${url}/api/pi/xai-usage`)).json();
       expect(usage).toEqual({ ok: false, configured: false, slotActive: false });
       expect(usage).not.toMatchObject({ usage: { windows: expect.anything() } });
+      const kimiUsage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
+      expect(kimiUsage).toEqual({ ok: false, configured: false, slotActive: false });
 
       const leftoverQuota = await fetch(`${url}/api/quota`);
       expect(leftoverQuota.status).toBe(404);
@@ -553,6 +567,24 @@ describe('OpenCode facade HTTP/SSE', () => {
         packages: ['npm:pi-xai-oauth'],
       }));
       const usage = await (await fetch(`${url}/api/pi/xai-usage`)).json();
+      expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
+      expect(usage.usage).toBeUndefined();
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reports Kimi usage as unconfigured when the Kimi Usage slot is on without credentials', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const agent = path.join(home, '.pi', 'agent');
+      fs.mkdirSync(agent, { recursive: true });
+      fs.writeFileSync(path.join(agent, 'settings.json'), JSON.stringify({
+        packages: ['npm:pi-kimi-code-console-usage'],
+      }));
+      const usage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
       expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
       expect(usage.usage).toBeUndefined();
     } finally {
@@ -1062,10 +1094,10 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('rejects revert, unrevert, and shell as unsupported instead of empty success', async () => {
+  it('rejects revert, unrevert, shell, share, and unshare as unsupported instead of empty success', async () => {
     const { url, close, kernel } = await startFacade();
     try {
-      for (const action of ['revert', 'unrevert', 'shell']) {
+      for (const action of ['revert', 'unrevert', 'shell', 'share']) {
         const response = await fetch(`${url}/api/session/ses_stub/${action}`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -1077,6 +1109,13 @@ describe('OpenCode facade HTTP/SSE', () => {
           kernel: 'pi',
         });
       }
+      const unshare = await fetch(`${url}/api/session/ses_stub/share`, { method: 'DELETE' });
+      expect(unshare.status).toBe(501);
+      expect(await unshare.json()).toMatchObject({
+        error: 'unsupported',
+        kernel: 'pi',
+        message: 'session.unshare is not implemented on the Pi kernel',
+      });
     } finally {
       kernel.dispose();
       await close();
@@ -1440,7 +1479,8 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.btw.source).toBe('npm:@narumitw/pi-btw');
       expect(body.slots.todo.source).toBe('npm:@juicesharp/rpiv-todo');
       expect(body.slots.todo.source).not.toBe('npm:rpiv-todo');
-      expect(body.slots.xai.source).toBe('npm:pi-xai-oauth');
+      expect(body.slots.xai.source).toBe('npm:pi-xai');
+      expect(body.slots.kimi.source).toBe('npm:pi-kimi-code-console-usage');
       expect(body.slots.goal.command).toBe('goal');
       expect(body.slots.btw.command).toBe('btw');
       expect(body.slots.plan.command).toBeUndefined();
@@ -1450,6 +1490,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(body.slots.btw.installed).toBe(false);
       expect(body.slots.todo.installed).toBe(false);
       expect(body.slots.xai.installed).toBe(false);
+      expect(body.slots.kimi.installed).toBe(false);
       expect(body.slots.goal.enabled).toBe(false);
       const home = kernel.host.getPath().home;
       expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
@@ -1593,11 +1634,14 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(plugins.slots.plan).toMatchObject({ installed: false, enabled: false });
       expect(plugins.slots.btw).toMatchObject({ installed: false, enabled: false });
       expect(plugins.slots.todo).toMatchObject({ installed: false, enabled: false });
+      expect(plugins.slots.xai).toMatchObject({ installed: false, enabled: false });
+      expect(plugins.slots.kimi).toMatchObject({ installed: false, enabled: false });
 
       const commands = await (await fetch(`${url}/api/command`)).json();
       expect(commands.some((command) => command.name === 'run' && command.source === 'extension')).toBe(true);
       expect(commands.some((command) => command.name === 'plan')).toBe(false);
       expect(commands.some((command) => command.name === 'btw')).toBe(false);
+      expect(commands.some((command) => command.name === 'kimi-usage')).toBe(false);
 
       const defaults = await (await fetch(`${url}/api/pi/defaults`)).json();
       expect(defaults.model).toBe('bmlab/grok-4.6');

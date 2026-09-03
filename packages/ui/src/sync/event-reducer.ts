@@ -97,6 +97,19 @@ function shouldPreserveExistingPart(previous: Part, next: Part): boolean {
   return false
 }
 
+/**
+ * Pi stamps assistant `time.completed` on the first `message_end`, before tools
+ * and later LLM calls. That leftover-busy state must not be treated as idle.
+ * Idle is `agent_settled` (`session.idle`) or an abort/error that ended the child.
+ */
+export function idleLeftoverBusyAfterSettledAssistant(input?: {
+  status?: { type?: string } | null
+  lastMessage?: { role?: string; time?: { created?: number; completed?: number } } | null
+}): boolean {
+  void input
+  return false
+}
+
 function areSessionStatusesEqual(left: SessionStatus | undefined, right: SessionStatus): boolean {
   if (left === right) return true
   if (!left || left.type !== right.type) return false
@@ -119,23 +132,6 @@ function areJsonEquivalent(left: unknown, right: unknown): boolean {
   }
 }
 
-const isSettledAssistantMessage = (message: Message | undefined): boolean => (
-  Boolean(
-    message
-    && message.role === "assistant"
-    && typeof (message as { time?: { completed?: number } }).time?.completed === "number"
-    && ((message as { time?: { completed?: number } }).time?.completed ?? 0) > 0,
-  )
-)
-
-const idleLeftoverBusyAfterSettledAssistant = (draft: State, sessionID: string): void => {
-  const messages = draft.message[sessionID]
-  const last = messages?.[messages.length - 1]
-  if (!isSettledAssistantMessage(last)) return
-  if (draft.session_status[sessionID]?.type !== "busy") return
-  draft.session_status[sessionID] = { type: "idle" }
-}
-
 export function preserveFrozenAssistantCompletion<T extends Message>(existing: T | undefined, next: T): T {
   if (next.role !== "assistant" || !existing || existing.role !== "assistant") return next
   const frozen = (existing.time as { completed?: number } | undefined)?.completed
@@ -148,9 +144,41 @@ export function preserveFrozenAssistantCompletion<T extends Message>(existing: T
   } as T
 }
 
+const lastUserMessageId = (messages: Message[] | undefined): string | undefined => {
+  if (!messages) return undefined
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role === "user" && typeof message.id === "string" && message.id.trim()) {
+      return message.id
+    }
+  }
+  return undefined
+}
+
+const parentIdOf = (message: Message | undefined): string => {
+  const parentID = (message as { parentID?: unknown } | undefined)?.parentID
+  return typeof parentID === "string" ? parentID.trim() : ""
+}
+
+/** Empty or Pi-native parentIDs are not chat turns; do not retarget an unloaded `msg_*`/`usr_*` parent. */
+export function attachAssistantToVisibleUser<T extends Message>(
+  messages: Message[] | undefined,
+  next: T,
+): T {
+  if (next.role !== "assistant") return next
+  const fallback = lastUserMessageId(messages)
+  if (!fallback) return next
+  const incoming = parentIdOf(next)
+  if (!incoming) return { ...next, parentID: fallback } as T
+  if (messages?.some((message) => message.id === incoming)) return next
+  if (isClientGeneratedMessageId(incoming)) return next
+  return { ...next, parentID: fallback } as T
+}
+
 function areMessageUpdateFieldsEqual(existing: Message, next: Message): boolean {
   if (existing.role !== next.role) return false
   if ((existing as { finish?: unknown }).finish !== (next as { finish?: unknown }).finish) return false
+  if (parentIdOf(existing) !== parentIdOf(next)) return false
   if ((existing.time as { completed?: number })?.completed !== (next.time as { completed?: number })?.completed) return false
 
   const fields: Array<keyof Message | "structured" | "summary" | "tokens" | "error" | "cost" | "model" | "tools" | "format" | "variant" | "agent" | "system"> = [
@@ -382,11 +410,11 @@ export function applyDirectoryEvent(
     }
 
     case "message.updated": {
-      const info = (event.properties as { info: Message }).info
-      const messages = draft.message[info.sessionID]
+      const rawInfo = (event.properties as { info: Message }).info
+      const messages = draft.message[rawInfo.sessionID]
+      const info = attachAssistantToVisibleUser(messages, rawInfo)
       if (!messages) {
         draft.message[info.sessionID] = [info]
-        idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
         return true
       }
       if (info.role === "user" && findMessageIndex(messages, info.id) < 0) {
@@ -409,9 +437,7 @@ export function applyDirectoryEvent(
         const unchanged = areMessageUpdateFieldsEqual(existing, nextInfo)
         if (unchanged) {
           syncDebug.reducer.messageUpdatedUnchanged(info.sessionID, info.id, info.role, (info as { finish?: unknown }).finish, (info.time as { completed?: number })?.completed)
-          const statusBefore = draft.session_status[info.sessionID]
-          idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
-          return draft.session_status[info.sessionID] !== statusBefore
+          return false
         }
         const next = [...messages]
         if (compareMessagesChronologically(existing, nextInfo) === 0) {
@@ -426,7 +452,6 @@ export function applyDirectoryEvent(
         insertMessageChronologically(next, info)
         draft.message[info.sessionID] = next
       }
-      idleLeftoverBusyAfterSettledAssistant(draft, info.sessionID)
       return true
     }
 

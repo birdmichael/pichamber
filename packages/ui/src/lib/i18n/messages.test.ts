@@ -11,6 +11,7 @@ import { dict as ptBrDict } from './messages/pt-BR';
 import { dict as ukDict } from './messages/uk';
 import { dict as zhCnDict } from './messages/zh-CN';
 import { dict as zhTwDict } from './messages/zh-TW';
+import { dict as trDict } from './messages/tr';
 
 const localeDictionaries = {
   en: enDict,
@@ -24,6 +25,7 @@ const localeDictionaries = {
   pl: plDict,
   'zh-CN': zhCnDict,
   'zh-TW': zhTwDict,
+  tr: trDict,
 } as const;
 
 describe('i18n dictionaries', () => {
@@ -40,6 +42,7 @@ describe('i18n dictionaries', () => {
       expect(dictionary['common.language.german']).toBeTruthy();
       expect(dictionary['common.language.french']).toBeTruthy();
       expect(dictionary['common.language.japanese']).toBeTruthy();
+      expect(dictionary['common.language.turkish']).toBeTruthy();
     }
   });
 
@@ -59,10 +62,15 @@ describe('i18n dictionaries', () => {
 
   test('plan-ready decision chrome is translated in zh-CN', () => {
     expect(zhCnDict['chat.piPlan.enabledNotify']).not.toBe(enDict['chat.piPlan.enabledNotify']);
+    expect(zhCnDict['chat.piPlan.implementingNotify']).not.toBe(enDict['chat.piPlan.implementingNotify']);
+    expect(enDict['chat.piPlan.implementingNotify']).toContain('Files may be modified');
     expect(zhCnDict['chat.piPlan.readySelect.title']).not.toBe(enDict['chat.piPlan.readySelect.title']);
     expect(zhCnDict['chat.piPlan.readySelect.implementFresh']).not.toBe(enDict['chat.piPlan.readySelect.implementFresh']);
     expect(zhCnDict['chat.tool.planModeComplete']).not.toBe(enDict['chat.tool.planModeComplete']);
-    expect(zhCnDict['chat.piPlan.readySelect.title']).toContain('/plan exit');
+    expect(zhCnDict['chat.piPlan.readySelect.title']).not.toContain('/plan exit');
+    expect(zhCnDict['chat.piPlan.readySelect.title']).toContain('智能体');
+    expect(enDict['chat.piPlan.readySelect.title']).not.toContain('/plan exit');
+    expect(enDict['chat.piPlan.readySelect.title']).toContain('Agent');
   });
 
   test('empty-session draft titles stay native and keep {project}', () => {
@@ -137,5 +145,23 @@ describe('i18n dictionaries', () => {
     expect(enDict['contextRail.editorTree.toggle']).toBe('Toggle file tree');
     expect(enDict['settings.openchamber.git.option.treeView']).toBe('Tree View');
     expect(zhCnDict['settings.openchamber.git.option.treeView']).toBe('树形视图');
+  });
+
+  test('Git empty copy does not promise initialize or open-repo controls', () => {
+    expect(enDict['gitView.empty.notGitRepositoryDescription']).toBe(
+      'Git status is available when this folder is a Git repository.',
+    );
+    expect(enDict['diffView.state.notGitRepository']).toBe(
+      'Not a Git repository. Diffs are available when this folder is a Git repository.',
+    );
+
+    const promisedInit = /initialize|inicializ|initialis|ініціал|zainicjowa|初始化|初期化|초기화/i;
+    const promisedOpenRepo = /open a repository|abre un repositorio|abra um repositório|ouvrez un dépôt|öffnen Sie ein Repository|открыйте сховище|打开一个 Git|開啟一個 Git|リポジトリを開/i;
+
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['gitView.empty.notGitRepositoryDescription'], locale).not.toMatch(promisedInit);
+      expect(dictionary['gitView.empty.notGitRepositoryDescription'], locale).not.toMatch(promisedOpenRepo);
+      expect(dictionary['diffView.state.notGitRepository'], locale).not.toMatch(promisedInit);
+    }
   });
 });

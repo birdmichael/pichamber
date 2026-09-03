@@ -71,3 +71,118 @@ export function clampPiThinkingLevel(
   }
   return visible[0];
 }
+
+/** Empty or `off`-only live lists are not this model's effort set. */
+export function isNarrowPiThinkingAvailable(available: unknown): boolean {
+  const parsed = parseAvailablePiThinkingLevels(available);
+  return parsed.length === 0 || (parsed.length === 1 && parsed[0] === 'off');
+}
+
+/**
+ * Keep a known Pi current (incl catalog `xhigh`) in the menu when live
+ * omitted it. Do not re-add a leftover pin the catalog itself dropped.
+ */
+export function unionCurrentIntoPiThinkingLevels(
+  levels: readonly PiThinkingLevel[],
+  current: string | undefined,
+  catalog: readonly PiThinkingLevel[],
+): PiThinkingLevel[] {
+  const parsed = parsePiThinkingLevel(current);
+  if (!parsed || levels.includes(parsed)) {
+    return [...levels];
+  }
+  if (catalog.length > 0 && !catalog.includes(parsed)) {
+    return [...levels];
+  }
+  return [...levels, parsed];
+}
+
+/**
+ * Empty catalog does not invent levels. A non-narrow live list from the
+ * session is the kernel's actual set (may add `off`/`minimal`). A known
+ * current still unions into that live list when the catalog includes it.
+ * Unset current stays pending — do not invent `medium` before GET.
+ */
+export function resolvePairedPiThinking(input: {
+  current?: string | null;
+  catalogLevels: readonly string[];
+  liveAvailable?: unknown;
+}): { thinking: PiThinkingLevel | undefined; levels: PiThinkingLevel[] } {
+  const catalog = parseAvailablePiThinkingLevels(input.catalogLevels);
+  if (catalog.length === 0) {
+    return { thinking: undefined, levels: [] };
+  }
+  const live = parseAvailablePiThinkingLevels(input.liveAvailable);
+  const base = !isNarrowPiThinkingAvailable(live) ? live : catalog;
+  const levels = unionCurrentIntoPiThinkingLevels(base, input.current ?? undefined, catalog);
+  const parsed = parsePiThinkingLevel(input.current ?? undefined);
+  if (!parsed) {
+    return { thinking: undefined, levels };
+  }
+  return {
+    thinking: clampPiThinkingLevel(parsed, levels),
+    levels,
+  };
+}
+
+export function resolveTranscriptThinkingLabel(input: {
+  thinking?: unknown;
+  variant?: unknown;
+  modelVariant?: unknown;
+}): PiThinkingLevel | undefined {
+  return parsePiThinkingLevel(input.thinking)
+    ?? parsePiThinkingLevel(input.variant)
+    ?? parsePiThinkingLevel(input.modelVariant);
+}
+
+/**
+ * Empty-draft menus prefer Pi kernel/SDK `thinkingLevels` on the selected
+ * provider model. models.dev is only the fallback when Pi omitted a list.
+ * Do not union catalog-only extras (xhigh) onto a real Pi list.
+ */
+export function preferPiModelThinkingLevels(
+  piLevels: unknown,
+  catalogLevels: readonly string[] = [],
+): PiThinkingLevel[] {
+  const fromPi = parseAvailablePiThinkingLevels(piLevels);
+  if (fromPi.length > 0) return fromPi;
+  return parseAvailablePiThinkingLevels(catalogLevels);
+}
+
+/**
+ * Empty drafts have no GET /session/:id/thinking. Prefer the project pin,
+ * then Pi defaults, then the current chip. Passing nothing stays unset —
+ * never invent medium and ignore Settings / project pin.
+ */
+export function resolveEmptyDraftThinkingCurrent(input: {
+  projectVariant?: string | null;
+  defaultsThinking?: string | null;
+  current?: string | null;
+}): PiThinkingLevel | undefined {
+  return parsePiThinkingLevel(input.projectVariant)
+    ?? parsePiThinkingLevel(input.defaultsThinking)
+    ?? parsePiThinkingLevel(input.current);
+}
+
+/** Composer send uses the Pi chip. Leftover OpenCode variant is off the Pi path. */
+export function resolveComposerSendThinking(input: {
+  isPiKernel?: boolean;
+  chipLevel?: string | null;
+  variant?: string | null;
+}): PiThinkingLevel | undefined {
+  const chip = parsePiThinkingLevel(input.chipLevel);
+  if (chip) return chip;
+  if (input.isPiKernel) return undefined;
+  return parsePiThinkingLevel(input.variant);
+}
+
+export function nextCycledPiThinkingLevel(
+  current: string | undefined,
+  levels: readonly string[],
+): PiThinkingLevel | undefined {
+  const parsed = parseAvailablePiThinkingLevels(levels);
+  if (parsed.length === 0) return undefined;
+  const index = parsed.indexOf(parsePiThinkingLevel(current) as PiThinkingLevel);
+  const nextIndex = index < 0 ? 0 : (index + 1) % parsed.length;
+  return parsed[nextIndex];
+}

@@ -33,9 +33,9 @@ import { useI18n } from '@/lib/i18n';
 import { resolvePinnedPiAgentName, shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { isLauncherOverlayOpen, markLauncherOverlay, shouldCloseLauncherFormOnEscape } from './launcherEscape';
 import { openMultiRunCompareForSessionIds } from '@/lib/multirun/openCompare';
+import { MAX_MODELS_PER_GROUP, canAddModelToGroup } from './multiRunLimits';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_MODELS_PER_GROUP = 5;
 
 interface MultiRunAttachedFile {
   id: string;
@@ -739,7 +739,7 @@ const RunGroupCard: React.FC<RunGroupCardProps> = ({
   const snippetRef = React.useRef<SnippetAutocompleteHandle>(null);
 
   const handleAddModel = React.useCallback((model: ModelSelectionWithId) => {
-    if (group.models.length >= MAX_MODELS_PER_GROUP) return;
+    if (!canAddModelToGroup(group.models.length)) return;
     onUpdate(group.id, { models: [...group.models, model] });
   }, [group.id, group.models, onUpdate]);
 
@@ -1007,7 +1007,7 @@ const RunGroupCard: React.FC<RunGroupCardProps> = ({
       <div className="flex flex-col gap-1.5">
         <FieldLabel
           required
-          info={<InfoTip>{t('multirun.launcher.models.info', { max: MAX_MODELS_PER_GROUP })}</InfoTip>}
+          info={<InfoTip>{t('multirun.launcher.models.info')}</InfoTip>}
         >
           {t('multirun.launcher.models.label')}
         </FieldLabel>

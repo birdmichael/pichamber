@@ -3,6 +3,7 @@ import type { Agent, Message } from '@opencode-ai/sdk/v2';
 import type { QueuedMessage } from '../stores/messageQueueStore';
 import { ChildStoreManager } from '@/sync/child-store';
 import { setSyncRefs } from '@/sync/sync-refs';
+import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
 
 let visibleAgents: Agent[] = [];
 const sendMessageCalls: unknown[][] = [];
@@ -101,6 +102,10 @@ describe('shouldDispatchQueuedAutoSend', () => {
   test('dispatches when idle→idle and queue has items', () => {
     expect(shouldDispatchQueuedAutoSend('idle', 'idle', true)).toBe(true);
   });
+
+  test('still dispatches a background-directory queue after busy→idle', () => {
+    expect(shouldDispatchQueuedAutoSend('busy', 'idle', true)).toBe(true);
+  });
 });
 
 describe('queued auto-send retry backoff', () => {
@@ -139,6 +144,7 @@ describe('resolveQueuedSessionStatusType', () => {
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ status: 'complete', session_status: {}, message: {} });
     setSyncRefs({} as never, childStores, DIRECTORY);
+    useGlobalSessionStatusStore.setState({ statusById: new Map() });
   });
 
   test('treats a session with an in-flight assistant turn as busy even when the status entry is missing', () => {
@@ -151,6 +157,38 @@ describe('resolveQueuedSessionStatusType', () => {
     });
 
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
+  });
+
+  test('stays busy when a Steer user bubble is appended after the in-flight assistant', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      message: {
+        ses_1: [
+          assistantMessage('msg_streaming'),
+          {
+            id: 'msg_steer',
+            role: 'user',
+            sessionID: 'ses_1',
+            time: { created: 2 },
+          } as Message,
+        ],
+      },
+    });
+
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
+  });
+
+  test('does not stay busy for an older incomplete assistant after a later turn completed', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      message: {
+        ses_1: [
+          assistantMessage('msg_stuck'),
+          assistantMessage('msg_done', 5),
+        ],
+      },
+    });
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
   });
 
   test('resolves an explicit busy or retry status entry', () => {
@@ -167,11 +205,29 @@ describe('resolveQueuedSessionStatusType', () => {
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
   });
 
+  test('does not auto-send while status is busy even if the trailing assistant completed', () => {
+    const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
+    store.setState({
+      session_status: { ses_1: { type: 'busy' } },
+      message: { ses_1: [assistantMessage('msg_done', 5)] },
+    });
+    expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('busy');
+  });
+
   test('resolves an explicit idle entry and unknown sessions as idle', () => {
     const store = childStores.ensureChild(DIRECTORY, { bootstrap: false });
     store.setState({ session_status: { ses_1: { type: 'idle' } } });
     expect(resolveQueuedSessionStatusType('ses_1', DIRECTORY)).toBe('idle');
     expect(resolveQueuedSessionStatusType('ses_unknown', DIRECTORY)).toBe('idle');
+  });
+
+  test('treats a globally busy session as busy when the directory child store is missing', () => {
+    useGlobalSessionStatusStore.setState({
+      statusById: new Map([
+        ['ses_bg', { status: { type: 'busy' }, directory: '/other-repo' }],
+      ]),
+    });
+    expect(resolveQueuedSessionStatusType('ses_bg', '/other-repo')).toBe('busy');
   });
 });
 
@@ -201,6 +257,43 @@ describe('buildQueuedAutoSendPayload', () => {
     expect(payload?.queuedMessageId).toBe('queued-1');
     expect(payload?.primaryText).toBe('first queued message');
     expect(payload?.primaryAttachments).toEqual([]);
+    expect(payload?.additionalParts).toBeUndefined();
+  });
+
+  test('auto-send attaches context drafts snapshotted on the queued item', () => {
+    const queue: QueuedMessage[] = [
+      {
+        id: 'queued-context',
+        content: 'please fix',
+        createdAt: 1,
+        contextDrafts: [{
+          id: 'icd-1',
+          sessionKey: 's1',
+          source: 'file',
+          fileLabel: 'src/app.ts',
+          startLine: 3,
+          endLine: 5,
+          code: 'const x = 1;',
+          language: 'ts',
+          text: 'fix this',
+          createdAt: 1,
+        }],
+      },
+    ];
+
+    const payload = buildQueuedAutoSendPayload(queue);
+
+    expect(payload?.primaryText).toBe('please fix');
+    expect(payload?.additionalParts).toHaveLength(1);
+    expect(payload?.additionalParts?.[0]).toMatchObject({
+      synthetic: true,
+      metadata: {
+        pichamberContext: {
+          kind: 'code-comment',
+          fileLabel: 'src/app.ts',
+        },
+      },
+    });
   });
 
   test('uses the configured visible agents when parsing queued mentions', () => {
@@ -333,5 +426,38 @@ describe('buildQueuedAutoSendPayload', () => {
         },
       },
     ]);
+  });
+
+  test('auto-send forwards snapshotted context parts', async () => {
+    const payload = buildQueuedAutoSendPayload([
+      {
+        id: 'queued-context',
+        content: 'please fix',
+        createdAt: 1,
+        contextDrafts: [{
+          id: 'icd-1',
+          sessionKey: 's1',
+          source: 'file',
+          fileLabel: 'src/app.ts',
+          startLine: 3,
+          endLine: 5,
+          code: 'const x = 1;',
+          language: 'ts',
+          text: 'fix this',
+          createdAt: 1,
+        }],
+      },
+    ]);
+
+    await sendQueuedAutoSendPayload({
+      runtimeKey: 'runtime-original',
+      sessionId: 'session-original',
+      directory: '/repo',
+    }, payload!, {
+      providerID: 'provider-1',
+      modelID: 'model-1',
+    });
+
+    expect(sendMessageCalls[0]?.[6]).toEqual(payload?.additionalParts);
   });
 });

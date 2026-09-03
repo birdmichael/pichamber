@@ -152,10 +152,51 @@ export const resolveFooterPlanSelected = (input: {
 export const resolvePlanStatusRowHint = (input: {
   footerPlanSelected: boolean;
   draftOpen: boolean;
-}): 'draft' | 'enabled' | null => {
+  implementing?: boolean;
+  implemented?: boolean;
+}): 'draft' | 'enabled' | 'implementing' | null => {
+  if (input.implementing) return 'implementing';
+  // Implemented + leftover Plan chip must not keep "files will not be modified".
+  // After the turn is idle, Agent chrome (no chip) drops the building banner.
+  if (input.implemented) return input.footerPlanSelected ? 'implementing' : null;
   if (!input.footerPlanSelected) return null;
   return input.draftOpen ? 'draft' : 'enabled';
 };
+
+/**
+ * building… is a live implement turn. Leftover `implementing` after
+ * agent_settled / idle is not a live turn (same idle rule as #370).
+ */
+export const resolveLivePlanImplementing = (input: {
+  status?: SessionPlanStatus | null;
+  busy: boolean;
+}): boolean => input.status === 'implementing' && input.busy;
+
+/** Build row: ready/saved markdown, or disabled building… while the turn is live. */
+export const resolvePlanBuildChrome = (input: {
+  available: boolean;
+  status?: SessionPlanStatus | null;
+  implemented: boolean;
+  busy: boolean;
+  hasPendingPlanReadySelect: boolean;
+  hasMarkdown: boolean;
+}): { implementing: boolean; showBuildRow: boolean } => {
+  const implementing = resolveLivePlanImplementing({
+    status: input.status,
+    busy: input.busy,
+  });
+  const showBuildRow = input.available && (
+    input.hasPendingPlanReadySelect
+    || (!input.implemented && planBuildAvailable(input.status) && input.hasMarkdown)
+  );
+  return { implementing, showBuildRow };
+};
+
+/** Keep Build clickable while the plan-ready select is waiting, even if the session is busy. */
+export const planBuildBusyDisabled = (input: {
+  busy: boolean;
+  hasPendingPlanReadySelect: boolean;
+}): boolean => input.busy && !input.hasPendingPlanReadySelect;
 
 /**
  * Last Agent/Plan choice for this empty composer.

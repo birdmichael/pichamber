@@ -33,3 +33,27 @@ export const resolveSessionDisplayTitle = (
   }
   return trimmed;
 };
+
+/** First non-placeholder wins; later titles are fallbacks. */
+export const resolveSessionDisplayTitleFrom = (
+  titles: readonly unknown[],
+  untitledLabel: string,
+): string => {
+  for (const title of titles) {
+    const resolved = resolveSessionDisplayTitle(title, untitledLabel);
+    if (resolved !== untitledLabel) return resolved;
+  }
+  return untitledLabel;
+};
+
+/** Skip empty/untitled drafts so localized Untitled is not persisted over New session. */
+export const shouldPersistSessionTitle = (
+  draft: unknown,
+  liveTitle: unknown,
+  untitledLabel: string,
+): boolean => {
+  const title = typeof draft === 'string' ? draft.trim() : '';
+  if (!title || isPlaceholderSessionTitle(title) || title === untitledLabel) return false;
+  const live = typeof liveTitle === 'string' ? liveTitle.trim() : '';
+  return title !== live;
+};

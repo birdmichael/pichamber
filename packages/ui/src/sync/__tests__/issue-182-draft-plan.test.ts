@@ -20,6 +20,7 @@ mock.module('../pi-session-plan-store', () => ({
   clearPendingDraftPlan: () => undefined,
   isPendingDraftPlan: () => false,
   refreshSessionPlan: async () => null,
+  settleSessionPlanImplementing: () => undefined,
   applySessionPlanEvent: () => null,
   resetPiSessionPlanStore: () => undefined,
   usePiSessionPlanStore: {

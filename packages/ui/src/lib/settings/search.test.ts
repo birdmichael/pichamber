@@ -20,7 +20,7 @@ const runtimeCtx = {
 describe('settings search', () => {
   test('does not treat grok as a substring of ngrok', () => {
     expect(searchHaystackContainsTerm('external tunnel ngrok', 'grok')).toBe(false);
-    expect(searchHaystackContainsTerm('grok usage pi-xai-oauth', 'grok')).toBe(true);
+    expect(searchHaystackContainsTerm('grok usage pi-xai', 'grok')).toBe(true);
   });
 
   test('finds the Claude Code third-party integration', () => {
@@ -454,6 +454,16 @@ describe('settings search', () => {
     expect(results.some((result) => result.id === 'feature-plugins.xai')).toBe(true);
   });
 
+  test('searching kimi lands on the Kimi Usage card', () => {
+    const results = buildSettingsSearchResults({
+      query: 'kimi code',
+      runtimeCtx: { ...runtimeCtx, isPiKernel: true },
+      t: (key) => enDict[key],
+      getPageTitle: (page) => page,
+    });
+    expect(results.some((result) => result.id === 'feature-plugins.kimi')).toBe(true);
+  });
+
   test('lands Feature Plugins search on each slot card', () => {
     const getPageTitle = (page: string) => page;
     const queries = [
@@ -463,7 +473,8 @@ describe('settings search', () => {
       { query: 'pi-subagents', id: 'feature-plugins.subagents' },
       { query: '@narumitw/pi-btw', id: 'feature-plugins.btw' },
       { query: '@juicesharp/rpiv-todo', id: 'feature-plugins.todo' },
-      { query: 'pi-xai-oauth', id: 'feature-plugins.xai' },
+      { query: 'pi-xai', id: 'feature-plugins.xai' },
+      { query: 'pi-kimi-code-console-usage', id: 'feature-plugins.kimi' },
     ] as const;
 
     for (const { query, id } of queries) {
@@ -494,12 +505,14 @@ describe('settings search', () => {
       'feature-plugins.subagents',
       'feature-plugins.btw',
       'feature-plugins.xai',
+      'feature-plugins.kimi',
     ]);
     expect(idsFor('work status')).toEqual([
       'feature-plugins.mcp',
       'feature-plugins.subagents',
       'feature-plugins.todo',
       'feature-plugins.xai',
+      'feature-plugins.kimi',
     ]);
     expect(idsFor('sidebar')).toEqual(['feature-plugins.plan']);
     expect(idsFor('session').filter((id) => id.startsWith('feature-plugins.'))).toEqual([
@@ -509,6 +522,7 @@ describe('settings search', () => {
     ]);
     expect(idsFor('settings')).toContain('feature-plugins.mcp');
     expect(idsFor('settings')).toContain('feature-plugins.xai');
+    expect(idsFor('settings')).toContain('feature-plugins.kimi');
     expect(idsFor('settings')).not.toContain('feature-plugins.goal');
     expect(idsFor('composer')).not.toContain('feature-plugins.mcp');
     expect(idsFor('composer')).not.toContain('feature-plugins.btw');

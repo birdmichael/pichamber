@@ -114,13 +114,13 @@ describe('resolveDesktopBootView', () => {
     expect(isLocalUnavailableBootView(null)).toBe(false);
   });
 
-  test('returns remote-only chooser when local runtime is disabled', () => {
+  test('returns recovery when local runtime is disabled', () => {
     expect(
       resolveDesktopBootView({
         isDesktopShell: true,
         bootOutcome: { target: 'local', status: 'unreachable', localAvailable: false },
       }),
-    ).toEqual({ screen: 'chooser', localAvailable: false });
+    ).toEqual({ screen: 'recovery', variant: 'local-unavailable', localAvailable: false });
   });
 
   test('returns recovery view for remote missing', () => {

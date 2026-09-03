@@ -31,6 +31,13 @@ describe('dialog leftover overlay', () => {
 
   test('shared dialog overlays keep pointer events on nested exit', () => {
     expect(dialogSource).toContain('useDialogLayerRegistration');
-    expect(dialogSource).toContain('dropPointerEventsOnExit && "data-[ending-style]:pointer-events-none"');
+    // dialog.tsx always drops pointer events on ending-style overlays (#379),
+    // not only when dropPointerEventsOnExit is true.
+    expect(dialogSource).toContain('"data-[ending-style]:pointer-events-none"');
+  });
+
+  test('blocked dismiss calls cancel so Base UI does not leave an ending overlay', () => {
+    expect(settingsWindowSource).toContain('shouldBlockSettingsDismiss');
+    expect(settingsWindowSource).toContain('eventDetails?.cancel?.()');
   });
 });

@@ -1,3 +1,4 @@
+import type { ContextPartMetadata } from '@/lib/messages/contextParts';
 import { createOpencodeClient, OpencodeClient } from "@opencode-ai/sdk/v2";
 import type { PermissionV2Request, PermissionV2Effect, PermissionV2Source } from "@opencode-ai/sdk/v2/client";
 import type { FilesAPI } from "../api/types";
@@ -766,6 +767,7 @@ class OpencodeService {
     additionalParts?: Array<{
       text: string;
       synthetic?: boolean;
+      metadata?: ContextPartMetadata;
       files?: Array<FileInputLite>;
     }>;
     messageId?: string;
@@ -816,11 +818,10 @@ class OpencodeService {
     if (params.additionalParts && params.additionalParts.length > 0) {
       for (const additional of params.additionalParts) {
         if (additional.text && additional.text.trim()) {
-          parts.push({
-            type: 'text',
-            text: additional.text,
-            ...(additional.synthetic ? { synthetic: true } : {}),
-          });
+          const additionalTextPart: TextPartInput = { type: 'text', text: additional.text };
+          if (additional.synthetic) additionalTextPart.synthetic = true;
+          if (additional.metadata) additionalTextPart.metadata = additional.metadata;
+          parts.push(additionalTextPart);
         }
         if (additional.files && additional.files.length > 0) {
           for (const file of additional.files) {
@@ -878,7 +879,10 @@ class OpencodeService {
         agent: params.agent,
         variant: params.variant,
         messageID: messageId,
-        ...(params.delivery ? { delivery: params.delivery } : {}),
+        // SDK session.promptAsync allowlists body keys and drops `delivery`.
+        // `$body_delivery` is the hey-api extra-body escape so Pi steer/followUp
+        // actually reaches prompt_async.
+        ...(params.delivery ? { delivery: params.delivery, $body_delivery: params.delivery } : {}),
         ...(params.format ? { format: params.format } : {}),
         parts,
       });

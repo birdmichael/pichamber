@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { Session } from '@opencode-ai/sdk/v2';
-import { deriveRecentSessions, selectRecentSessionsWithoutWorkspaceGroup } from './activitySections';
+import {
+  countSidebarSearchMatches,
+  deriveRecentSessions,
+  selectRecentSessionsWithoutWorkspaceGroup,
+  shouldShowSidebarActivitySections,
+  visibleSidebarActivitySections,
+} from './activitySections';
 
 const NOW = 200_000_000;
 const RECENT = NOW - (48 * 60 * 60 * 1000);
@@ -62,3 +68,74 @@ describe('selectRecentSessionsWithoutWorkspaceGroup', () => {
     expect(selectRecentSessionsWithoutWorkspaceGroup(recent, new Set())).toEqual([orphanActive]);
   });
 });
+
+describe('shouldShowSidebarActivitySections', () => {
+  test('idle keeps the chats block via hasActivitySectionItems even when empty', () => {
+    expect(shouldShowSidebarActivitySections({
+      isVSCode: false,
+      hasSessionSearchQuery: false,
+      hasActivitySectionItems: true,
+      activitySections: [{ items: [] }],
+    })).toBe(true);
+  });
+
+  test('does not hide activity solely because a search query is present', () => {
+    expect(shouldShowSidebarActivitySections({
+      isVSCode: false,
+      hasSessionSearchQuery: true,
+      hasActivitySectionItems: true,
+      activitySections: [{ items: [{ id: 'renamed-scan' }] }],
+    })).toBe(true);
+  });
+
+  test('search hides the block when every chats/recent section is empty', () => {
+    expect(shouldShowSidebarActivitySections({
+      isVSCode: false,
+      hasSessionSearchQuery: true,
+      hasActivitySectionItems: true,
+      activitySections: [{ items: [] }, { items: [] }],
+    })).toBe(false);
+  });
+
+  test('VS Code never shows the activity block', () => {
+    expect(shouldShowSidebarActivitySections({
+      isVSCode: true,
+      hasSessionSearchQuery: true,
+      hasActivitySectionItems: true,
+      activitySections: [{ items: [{ id: 'renamed-scan' }] }],
+    })).toBe(false);
+  });
+});
+
+describe('visibleSidebarActivitySections', () => {
+  test('keeps an empty chats block when New chat is available', () => {
+    expect(visibleSidebarActivitySections(
+      [
+        { key: 'chats', items: [] },
+        { key: 'active-now', items: [] },
+      ],
+      true,
+    ).map((section) => section.key)).toEqual(['chats']);
+  });
+
+  test('hides empty chats when New chat is unavailable', () => {
+    expect(visibleSidebarActivitySections(
+      [{ key: 'chats', items: [] }, { key: 'active-now', items: [{ id: 'recent' }] }],
+      false,
+    ).map((section) => section.key)).toEqual(['active-now']);
+  });
+});
+
+describe('countSidebarSearchMatches', () => {
+  test('adds chats and recent hits to project matches', () => {
+    expect(countSidebarSearchMatches(true, 2, [
+      { items: [{ id: 'chat-a' }, { id: 'chat-b' }] },
+      { items: [{ id: 'recent-a' }] },
+    ])).toBe(5);
+  });
+
+  test('is zero without a query even if sections have rows', () => {
+    expect(countSidebarSearchMatches(false, 2, [{ items: [{ id: 'chat-a' }] }])).toBe(0);
+  });
+});
+

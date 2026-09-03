@@ -76,9 +76,21 @@ button,
 }
 
 :root.light .message-content-text::selection,
-:root.light .message-content-text ::selection {
+:root.light .message-content-text ::selection,
+:root.light .oc-file-preview::selection,
+:root.light .oc-file-preview ::selection {
   background: color-mix(in srgb, var(--interactive-border-focus) 18%, transparent);
   color: var(--surface-foreground);
+}
+
+/* Quoted file/chat fragment kept visibly highlighted while its comment input is
+   open (the native selection collapses once the input takes focus). */
+.oc-chat-comment-rect {
+  background-color: var(--interactive-selection);
+}
+
+:root.light .oc-chat-comment-rect {
+  background-color: color-mix(in srgb, var(--interactive-border-focus) 18%, transparent);
 }
 
 .oc-cm-selected-line {
@@ -619,6 +631,34 @@ html:not(.dark) .chat-scroll {
   background: transparent !important;
 }
 
+@keyframes oc-chat-hydration-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.oc-chat-hydration-reveal,
+[data-timeline-reveal='fading'] {
+  animation: oc-chat-hydration-reveal 100ms ease-out both;
+}
+
+/* Timeline root while a freshly opened session still has provisional first
+   paints (see timelineRevealGate.ts): hidden until every hold releases, then
+   revealed as a whole. */
+[data-timeline-reveal='pending'] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-chat-hydration-reveal,
+  [data-timeline-reveal='fading'] {
+    animation: none;
+  }
+}
+
 /* Hide native scrollbars for overlay targets (all browsers) */
 .overlay-scrollbar-target {
   scrollbar-width: none !important;
@@ -660,10 +700,15 @@ html:not(.dark) .chat-scroll {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  opacity: 0;
   transition: opacity 0.2s ease;
   /* Above sticky zone headers (z-20) — the thumb must never dive under
      a stuck sidebar header while scrolling. */
   z-index: 30;
+}
+
+.overlay-scrollbar[data-visible="true"] {
+  opacity: 1;
 }
 
 .overlay-scrollbar--dense,
@@ -674,14 +719,18 @@ html:not(.dark) .chat-scroll {
 }
 
 .overlay-scrollbar__thumb {
-  pointer-events: auto;
+  pointer-events: none;
   position: absolute;
   width: 6px;
   background: var(--oc-scrollbar-thumb);
   border-radius: 9999px;
   opacity: 0.8;
   transition: background-color 0.15s ease, opacity 0.15s ease;
-  will-change: transform, height;
+  will-change: transform;
+}
+
+.overlay-scrollbar[data-visible="true"] .overlay-scrollbar__thumb {
+  pointer-events: auto;
 }
 
 .overlay-scrollbar__thumb:hover,
@@ -1917,4 +1966,53 @@ html.desktop-runtime [class*="cursor-pointer"] {
 }
 html.desktop-runtime .markdown-content [data-openchamber-file-link="true"] {
   cursor: default;
+}
+
+/* Header session tabs: thin separators between inactive neighbours, hidden
+   around the active or hovered tab (mirrors the titlebar tab language). */
+.session-tab-slot {
+  position: relative;
+}
+.session-tab-slot:not(:first-child):not([data-active='true'])::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  inset-inline-start: -2.75px;
+  width: 1.5px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--border);
+}
+.session-tab-slot[data-active='true'] + .session-tab-slot::before,
+.session-tab-slot:not([data-active='true']):hover::before,
+.session-tab-slot:not([data-active='true']):hover + .session-tab-slot::before {
+  display: none;
+}
+
+/* Header session tabs scroller: never show a scrollbar (it shifts the header
+   content vertically); overflow is communicated by the edge fades. */
+.session-tabs-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.session-tabs-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Session tab titles: fade out instead of "..." — the ellipsis reads as
+   clutter next to the tab's status dot and hover controls. Short titles
+   never reach the fade zone (the span spans the tab, not the text). The
+   fade belongs to the resting state only: while the tab is hovered or its
+   controls are open, the title clips hard so the smear never sits next to
+   the menu/close/rename controls. */
+.session-tab-title {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
+}
+.session-tab:hover .session-tab-title,
+.session-tab[data-controls-open='true'] .session-tab-title {
+  -webkit-mask-image: none;
+  mask-image: none;
 }

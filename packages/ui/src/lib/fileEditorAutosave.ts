@@ -58,3 +58,43 @@ export function shouldAllowFileDraftSave(gate: FileEditorSaveDraftGate): boolean
   }
   return true;
 }
+
+export type FileEditorSaveChromeState = 'idle' | 'dirty' | 'saving' | 'saved';
+
+/**
+ * Visible save-state chrome for the Files editor.
+ * Dirty is immediate on first keystroke; Saving/Saved follow the in-flight write.
+ * Autosave itself stays optional — this only describes what the UI must show.
+ */
+export function getFileEditorSaveChromeState(input: {
+  isDirty: boolean;
+  isSaving: boolean;
+  autoSaveStatus: 'idle' | 'saved';
+}): FileEditorSaveChromeState {
+  if (input.isSaving) {
+    return 'saving';
+  }
+  if (input.isDirty) {
+    return 'dirty';
+  }
+  if (input.autoSaveStatus === 'saved') {
+    return 'saved';
+  }
+  return 'idle';
+}
+
+/** Active tab / editor-only filename with a dirty bullet when the buffer is unsaved. */
+export function formatFileEditorTabName(fileName: string, isDirty: boolean): string {
+  return isDirty ? `${fileName} •` : fileName;
+}
+
+/**
+ * Hover-only floating controls hide dirty/Saving/Saved. Persist that chrome on
+ * desktop unless the expanded (always-visible) editor toolbar already shows it.
+ */
+export function shouldShowPersistentFileEditorSaveChrome(input: {
+  isMobile: boolean;
+  expandedEditorToolbar: boolean;
+}): boolean {
+  return !input.isMobile && !input.expandedEditorToolbar;
+}

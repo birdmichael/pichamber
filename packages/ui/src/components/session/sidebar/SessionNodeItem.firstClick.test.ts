@@ -19,8 +19,21 @@ describe('sidebar first-click activation', () => {
     expect(source).toContain('ignoreRowClickRef');
   });
 
-  test('the Settings gear still activates on pointerdown so it cannot double-open', () => {
+  test('the Settings gear activates on primary pointerdown like session rows', () => {
     expect(footerSource).toContain('activateTitlebarIconOnPointerDown');
     expect(footerSource).toContain('ignoreSettingsClickRef');
+    expect(footerSource).toContain('onPointerDown={handleSettingsPointerDown}');
+    expect(footerSource).toContain('onClick={handleSettingsClick}');
+    expect(footerSource).toContain('markSettingsOpenedFromTrigger');
+    expect(footerSource).toMatch(/activate:\s*\(\)\s*=>\s*\{[\s\S]*markSettingsOpenedFromTrigger[\s\S]*onOpenSettings/);
+  });
+});
+
+describe('sidebar session rename', () => {
+  test('Enter commits the draft the same way as the check button', () => {
+    expect(source).toContain("if (event.key === 'Enter')");
+    expect(source).toContain('handleSaveEdit(renameDraft)');
+    expect(source).toContain('event.preventDefault()');
+    expect(source).toContain('event.stopPropagation()');
   });
 });

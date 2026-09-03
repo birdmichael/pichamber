@@ -139,6 +139,18 @@ before inserting the user message so a failed bind does not leave a ghost
 turn and returns the session to idle. `GET` messages/list/session and
 `getSessionUsage` stay live-free on the shell record (`available: false`
 until `piSession.getContextUsage` exists).
+`promptAsync` `delivery` is `steer` | `followUp` | `follow_up` | `queue`.
+Busy is the session that was already live (`isStreaming` / compacting) or
+already `busy`/`retry` *before this call marked busy*. Do not treat this
+call's own status busy as a live turn — that would steer the first idle
+send. Busy + `followUp` → `session.followUp`. Busy + `steer` or no
+delivery → `session.steer`. Steer inserts the user bubble immediately
+(same as an idle `prompt`) so the agent and transcript see the
+course-correct; `followUp` / Settings Queue still skips that insert
+until Pi emits `message_start`. Never `prompt()` while that turn is live
+(Pi throws "Already streaming" / "Specify streamingBehavior"). Idle send
+is always `prompt()`. The OpenCode SDK `session.promptAsync` allowlist
+drops `delivery`; the client must also send `$body_delivery`.
 `POST /api/pi/directory-runtime/warm` fire-and-forgets
 `ensureDirectoryRuntime` for a cwd. Opening, hydrating, or reloading a live
 record must pass the existing manager/file. `host.reload()` /
@@ -282,18 +294,20 @@ expires }` to `{agentDir}/auth.json` through `writePiProviderAuth`. Refresh
 uses `xaiOAuth.refresh`, not a copied token exchange. Other provider ids
 are 404. No pending authorize is 400. Responses never echo tokens.
 
-Product login is this built-in `/login xai`, not the Feature Plugin
-`xai-auth` catalog. Composer `/login` for `xai` points at Settings →
-Providers. Feature Plugins `xai` is Usage only.
+Product login is this built-in `/login xai`, not an npm xAI OAuth
+extension. Composer `/login` for `xai` points at Settings → Providers.
 
 ## Grok Usage (feature-plugin slot)
 
-Gate is Feature Plugins `xai` (`npm:pi-xai-oauth`) installed+enabled.
-Chrome follows `{agentDir}/settings.json` `packages` only. Chamber
-`enabled` is ignored. Opening Feature Plugins never auto-installs the
-package and must not run the plugin `npx` setup (that would change
-`defaultProvider`). Do not install `@blockedpath/pi-xai-oauth` alongside
-it.
+Gate is Feature Plugins `xai` (`npm:pi-xai`) installed+enabled.
+Chrome follows `{agentDir}/settings.json` `packages`. Leftover
+`npm:pi-xai-oauth` still counts as this slot until uninstall. Install
+writes `npm:pi-xai` and removes leftover `pi-xai-oauth` so the two
+extensions do not conflict. Uninstall removes both aliases independently:
+a missing alias is success; the request fails if the slot is still
+installed afterward. Opening Feature Plugins never runs plugin
+`npx` setup (that would change `defaultProvider`). Do not install
+`@blockedpath/pi-xai-oauth` alongside `pi-xai`.
 
 When the slot is on:
 
@@ -311,6 +325,63 @@ When the slot is on:
 - `GET /api/command` lists `/xai-usage` before a session exists.
 
 Work Status Usage and the Providers xAI card share that payload. Session
+context % / cost stay in the Session block.
+
+## Built-in Kimi Code catalog and subscription login
+
+`GET /api/provider` `all` also merges the Kimi Code stub
+(`kimi-coding`) from `PI_BUILTIN_CATALOG_PROVIDERS` so Add can list
+Kimi Code before login. `connected` and `GET /api/config/providers`
+still hide a model-less stub: `withoutUnconnectedBuiltinCatalogProviders`
+drops `kimi-coding` unless `auth.json` or user/project `models.json` has
+that provider. Product login is built-in `/login kimi-coding`, not the
+Feature Plugin. `getPiAuthMethods` always reports `kimi-coding` as
+Sign in with Kimi Code OAuth first, API key second — connected or not,
+and whether the Kimi Usage slot is installed.
+
+`POST /api/provider/:id/oauth/authorize` and `/callback` accept
+`kimi-coding` in addition to `xai`. Other ids are 404. No pending
+authorize is 400. Authorize times out if `device_code` never arrives.
+The helper is Pi `kimiCodingOAuth` loaded from bundled `pi-ai`
+`dist/auth/oauth/kimi-coding.js` next to `@earendil-works/pi-coding-agent`
+via the same `findNamedPackageDir` pattern as xAI. Callback writes
+`{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
+key `kimi-coding` through `writePiProviderAuth`. Refresh uses
+`kimiCodingOAuth.refresh`, not a copied token exchange. Responses never
+echo access, refresh, or user id. Composer `/login kimi-coding` points
+at Settings → Providers.
+
+## Kimi Usage (feature-plugin slot)
+
+Gate is Feature Plugins `kimi` (`npm:pi-kimi-code-console-usage`)
+installed+enabled. Chrome follows `{agentDir}/settings.json` `packages`.
+Chamber `pichamber.json` `enabled` is ignored. Opening Feature Plugins
+never auto-installs and never runs plugin `npx` setup (that would change
+`defaultProvider`). Uninstall turns the slot off and must not delete
+`auth.json` `kimi-coding` credentials. Product login is built-in
+`/login kimi-coding`, not the Feature Plugin.
+
+When the slot is on:
+
+- `GET /api/pi/kimi-usage` (Pi kernel only) reads `auth.json`
+  `kimi-coding` (oauth first, else api key) and GETs
+  `https://api.kimi.com/coding/v1/usages`. Slot off is
+  `{ ok: false, configured: false, slotActive: false }` with no outbound
+  HTTP even if logged in. Missing credentials is
+  `{ ok: false, configured: false, slotActive: true }`. Fetch or refresh
+  failure is `{ ok: false, configured: true, usage: null, error }` and
+  must not invent `usedPercent: 0`. Success maps weekly `usage` (7 days)
+  and `limits[]` `duration===300` `TIME_UNIT_MINUTE` onto a `5h` rolling
+  window (freshly reset 5h with only `window` and no `detail` renders
+  **5h 0%**). Oauth refresh uses Pi `kimiCodingOAuth.refresh` when
+  `expires` is within 5 minutes or usages returns 401/403. The response
+  never includes the access token, refresh token, or user id. Leftover
+  `/api/quota/*` and `packages/web/server/lib/quota/providers/kimi.js`
+  stay unused. Do not hit moonshot.ai balance.
+- `GET /api/command` lists `/kimi-usage` before a session exists.
+
+Work Status Usage and the Providers Kimi Code card share that payload
+only while the slot is on and the provider is connected. Session
 context % / cost stay in the Session block.
 
 ## Tool part timing
@@ -332,26 +403,45 @@ internal model, not jsonl `model_change`. When live `available` is empty
 or only `off`, widen from that jsonl model's `ModelRuntime` /
 `getSupportedThinkingLevels` (or the model's own `thinkingLevels`).
 `PATCH` still clamps an unsupported pick onto that widened list
-(`medium`, else the first available). Do not call `setModel` on GET —
+(`medium`, else the first available). A requested catalog level such as
+`xhigh` is not clamped to `medium` when catalog/widen includes it;
+the response `thinking` is the applied level. Do not call `setModel` on GET —
 real `setModel` appends another `model_change`.
 The composer thinking chip renders `available`, not the full seven-level
 catalog. A new-session draft with no session id uses models.dev
 `reasoning_options` for the selected model id (same slug lookup as
 vision). Missing/empty catalog effort hides the control — do not invent
-seven levels. Live `available` wins once a session exists. Do not invent
-vendor `thinkingLevelMap` from `/v1/models`.
+seven levels. Catalog pairs immediately; live may only narrow a
+non-narrow subset after the new model is applied. GET `/thinking`
+keeps that live subset when it is non-narrow and inside catalog.
+`setThinkingLevel` is awaited on the Node child, including live-session
+defaults during bind/`createFacadeSessionLive` and `/thinking`. Do not
+invent vendor `thinkingLevelMap` from `/v1/models`.
+
+`PATCH /api/session/:id/model` applies the model then pairs thinking onto
+that model's live `getAvailableThinkingLevels()`. Empty or `off`-only
+live is narrow and widens from catalog levels; a live list that is not a
+subset of catalog is replaced by catalog. An unsupported leftover pin
+(`xhigh` on a 3-level model) becomes `medium`, else the first available
+level.
 
 `GET /api/session/:id/model` returns `{ model, providerID, modelID }` from
 the live session after applying the latest jsonl `model_change`
 (`provider` / `modelId`). A leftover facade `pi`/`pi` pair is not usable
 and becomes `{ model: null, providerID: null, modelID: null }`.
 
-`promptAsync` applies `body.variant` or `body.thinking` through
-`setSessionThinking` when the value is a known Pi level. An unsupported
-pin keeps the session's current thinking. Settings → Projects stores the
-pin as official `project.defaultVariant` next to `defaultModel`; map it
-through that existing project setting. Do not write it to global
-`PATCH /api/pi/defaults`.
+`promptAsync` applies `body.model` then `body.variant` / `body.thinking`
+on an idle send so each turn uses the composer selection. An unsupported
+thinking pin keeps the session's current thinking. Each user turn is
+stamped with the **applied** thinking (`userInfo.variant` and
+`userInfo.thinking`) so the transcript can show what that turn sent.
+Hydrate copies the same from the preceding jsonl `thinking_level_change`.
+Live/busy turns skip both `setSessionModel` and `setSessionThinking` so a
+concurrent `setModel` cannot clobber `isStreaming`. Composer chip changes
+`PATCH` session thinking only — not global `PATCH /api/pi/defaults`.
+Settings → Sessions remains the global default path. Settings → Projects
+stores the pin as official `project.defaultVariant` next to `defaultModel`;
+map it through that existing project setting.
 
 ## Desktop `ctx.ui`
 
@@ -523,10 +613,18 @@ extension handlers. `promptAsync` inserts a user bubble first (`body.messageID` 
 the client sent one) and is only for chat turns. Pi `message_start`
 for that same prompt uses a jsonl id and must not add a second user
 row. The translator skips that echo when the facade id is already
-set, and also skips a Pi-native user id when the facade id was not
-set yet. `applyEventToStore` does not append a non-`msg_*` user
-while a client id is already in the store, and reparents an
-assistant whose `parentID` is missing onto the last user.
+set, and also skips a Pi-native user id (never a chat bubble). After
+`agent_settled`, the live facade slot clears so the next
+`promptAsync` is not treated as an echo, but the last **visible**
+user id stays: a later `ctx.ui` implement / tool loop without a new
+facade user still parents assistants to that bubble. The completed
+assistant id also clears, so implement tools open a new assistant
+instead of appending to Plan mode complete. Empty or
+Pi-native `parentID` is rewritten onto the last store user before
+SSE emit. The UI reducer attaches empty or Pi-native parents the
+same way and does not retarget an unloaded `msg_*`/`usr_*` parent.
+`applyEventToStore` does not append a non-`msg_*` user while a
+client id is already in the store.
 
 Resolution order:
 
@@ -597,7 +695,7 @@ that project. Settings → Extensions packages lists those configured package na
   (Goal slot installed+enabled → `/goal`; Plan slot installed+enabled →
   `/plan`; Subagents slot installed+enabled → `/run`; Btw slot
   installed+enabled → `/btw`; Grok Usage slot installed+enabled →
-  `/xai-usage`).
+  `/xai-usage`; Kimi Usage slot installed+enabled → `/kimi-usage`).
   `/goal` copy is "Run a goal to completion". `/plan` copy is "Enter or
   manage Plan mode". `/run` copy is user-facing ("Run a subagent as a
   one-shot workflow"), not plugin jargon. `/btw` is listed as
@@ -643,7 +741,7 @@ attached on the Pi kernel. Each setting is independent: either, both, or
 neither.
 
 `pichamber` (label **Pichamber**) is attached when
-`agentControlToolEnabled !== false`. It reuses the shared control-service
+`agentControlToolEnabled === true`. It reuses the shared control-service
 allowlist (`OPENCHAMBER_AGENT_TOOL_ACTIONS`): projects, models, sessions,
 and scheduled tasks. `schedule.status` stays CLI-only. Session
 create/send/fork/list/status/messages go through the in-process host
@@ -657,7 +755,7 @@ installed+enabled, otherwise 400. It does not write leftover Session Goal
 metadata.
 
 `pichamber_web` (label **Pichamber Web**) is attached when
-`agentWebToolEnabled !== false`. The leftover
+`agentWebToolEnabled === true`. The leftover
 OpenCode plugin name `openchamber_web` is not attached on the Pi kernel.
 
 The web tool reuses the existing `browser.*` allowlist and
@@ -748,7 +846,14 @@ update that same part.
 (`mimeType` + `data`, or a `source` payload) becomes a facade `file` part
 (`mime` + `url: data:...`). `promptAsync` keeps those file/image parts on
 the user message and forwards Pi-native `{ type: "image", data, mimeType }`
-to `session.prompt`. Assistant `provider` / `model` / `usage` copy onto
+to `session.prompt`. Synthetic text parts with `metadata.pichamberContext`
+(or leftover `openchamberContext`) stay on the user bubble as structured
+context; other synthetic text (magic-prompt instructions) is sent to Pi
+but omitted from the bubble. Those context parts are also remembered on
+`pichamber.metadata.userContext` (message id, authored text, structured
+parts) via `persistSessionMetadata`. Hydrate reconstructs the cards from
+that entry: Pi jsonl only has the concatenated `session.prompt` string, so
+do not call `persistFacadeMessages` on a live transcript to rewrite it. Assistant `provider` / `model` / `usage` copy onto
 facade `info` as `providerID`, `modelID`, `model`, `tokens`, and `cost`
 (the same mapping live SSE uses in `mapPiUsageToOpenCodeTokens`). Missing
 usage stays omitted; do not invent numbers or a hardcoded model.

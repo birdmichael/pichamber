@@ -86,6 +86,40 @@ describe('buildHealthSnapshot', () => {
     expect(snapshot.piRunning).toBe(true);
   });
 
+  it('omits leftover OpenCode binary resolution on the Pi kernel', () => {
+    const snapshot = buildHealthSnapshot({
+      kernel: 'pi',
+      piReady: true,
+      extras: {
+        opencodeBinaryResolved: '/Users/bm/.opencode/bin/opencode',
+        opencodeBinarySource: 'path',
+        opencodeLaunchBinary: '/Users/bm/.opencode/bin/opencode',
+        opencodeLaunchArgs: [],
+        lastOpenCodeLaunchDiagnostics: { binary: '/Users/bm/.opencode/bin/opencode' },
+        piNodeRuntime: { ok: true, command: '/app/node', source: 'bundled' },
+      },
+    });
+
+    expect(snapshot.opencodeBinaryResolved).toBeUndefined();
+    expect(snapshot.opencodeBinarySource).toBeUndefined();
+    expect(snapshot.opencodeLaunchBinary).toBeUndefined();
+    expect(snapshot.lastOpenCodeLaunchDiagnostics).toBeUndefined();
+    expect(snapshot.piNodeRuntime).toEqual({ ok: true, command: '/app/node', source: 'bundled' });
+  });
+
+  it('keeps leftover OpenCode binary resolution on the OpenCode kernel', () => {
+    const snapshot = buildHealthSnapshot({
+      kernel: 'opencode',
+      openCodePort: 4096,
+      isOpenCodeReady: true,
+      extras: {
+        opencodeBinaryResolved: '/Users/bm/.opencode/bin/opencode',
+      },
+    });
+
+    expect(snapshot.opencodeBinaryResolved).toBe('/Users/bm/.opencode/bin/opencode');
+  });
+
   it('treats a restarting OpenCode process as not running', () => {
     const snapshot = buildHealthSnapshot({
       kernel: 'opencode',

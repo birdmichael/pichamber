@@ -79,6 +79,10 @@ export const isPlanReadyDecisionPrompt = (prompt: {
   });
 };
 
+export const sessionHasPendingPlanReadySelect = (
+  prompts: ReadonlyArray<{ kind: string; status?: string; title?: string; options?: readonly string[] }> | undefined,
+): boolean => (prompts ?? []).some((prompt) => isPlanReadyDecisionPrompt(prompt));
+
 export type PlanReadyRailAction = 'implement' | 'save' | 'exit';
 
 const PLAN_READY_OPTION_BY_ACTION: Record<PlanReadyRailAction, string> = {
@@ -86,6 +90,10 @@ const PLAN_READY_OPTION_BY_ACTION: Record<PlanReadyRailAction, string> = {
   save: 'save for later',
   exit: 'discard plan and exit',
 };
+
+export const isPlanReadyImplementHereOption = (option: string): boolean => (
+  normalizeOptionLabel(displaySelectOption(option).label) === PLAN_READY_OPTION_BY_ACTION.implement
+);
 
 /** Raw ctx.ui option for a View Plan rail action, or null if that card is absent. */
 export const planReadyOptionForAction = (

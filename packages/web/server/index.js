@@ -752,12 +752,13 @@ const piKernel = piKernelEnabled
       getCustomTools: async () => {
         const settings = await readSettingsFromDiskMigrated().catch(() => null);
         const tools = [];
-        if (settings?.agentControlToolEnabled !== false) {
+        // Opt-in: these schemas cost ~2–3k input tokens on every turn (#468).
+        if (settings?.agentControlToolEnabled === true) {
           tools.push(createPichamberControlTool({
             executeAction: (...args) => openChamberControlService.execute(...args),
           }));
         }
-        if (settings?.agentWebToolEnabled !== false) {
+        if (settings?.agentWebToolEnabled === true) {
           tools.push(createPichamberWebTool({
             executeAction: (...args) => openChamberControlService.execute(...args),
           }));
@@ -1165,8 +1166,8 @@ const openCodeLifecycleRuntime = createOpenCodeLifecycleRuntime({
     const settings = await readSettingsFromDiskMigrated().catch(() => null);
     // Each capability is its own tool and its own switch; the plugin is only
     // injected while at least one of them is on.
-    const includeControl = settings?.agentControlToolEnabled !== false;
-    const includeWeb = settings?.agentWebToolEnabled !== false;
+    const includeControl = settings?.agentControlToolEnabled === true;
+    const includeWeb = settings?.agentWebToolEnabled === true;
     const managedEnv = includeControl || includeWeb
       ? await (agentToolRuntime?.prepareManagedOpenCodeEnv({ includeControl, includeWeb }) || {})
       : {};

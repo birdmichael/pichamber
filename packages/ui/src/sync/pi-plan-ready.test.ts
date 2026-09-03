@@ -6,6 +6,8 @@ import {
   maybeOpenPlanRailOnReady,
   resetPlanReadyRailOpenForTests,
   shouldAutoOpenPlanRail,
+  shouldClosePlanPanelForSession,
+  syncPlanPanelToSession,
 } from './pi-plan-ready';
 import { applySessionPlan, resetPiSessionPlanStore } from './pi-session-plan-store';
 
@@ -173,5 +175,37 @@ describe('plan-ready store and events', () => {
     expect(state?.expanded).toBe(false);
     expect(state?.activeTabId).toBe('plan');
     expect(useUIStore.getState().activeMainTab).toBe('chat');
+  });
+});
+
+describe('syncPlanPanelToSession', () => {
+  test('does not close Plan chrome for a session that has a plan or pending draft', () => {
+    expect(shouldClosePlanPanelForSession({
+      plan: { status: 'active', planMarkdown: '' },
+    })).toBe(false);
+    expect(shouldClosePlanPanelForSession({
+      plan: { status: 'off', planMarkdown: '' },
+      pendingDraftPlan: true,
+    })).toBe(false);
+    expect(shouldClosePlanPanelForSession({
+      plan: null,
+    })).toBe(true);
+    expect(shouldClosePlanPanelForSession({
+      plan: { status: 'off', planMarkdown: '' },
+    })).toBe(true);
+  });
+
+  test('closes an empty leftover Plan rail when switching to a session without a plan', () => {
+    useUIStore.getState().openContextPlan(directory);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.isOpen).toBe(true);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.activeTabId).toBe('plan');
+    syncPlanPanelToSession({
+      sessionID: 'ses_b',
+      plan: null,
+      directoryHint: directory,
+    });
+    const state = useUIStore.getState().contextPanelByDirectory[directory];
+    const planStillActive = state?.isOpen && state.activeTabId === 'plan';
+    expect(planStillActive).toBe(false);
   });
 });

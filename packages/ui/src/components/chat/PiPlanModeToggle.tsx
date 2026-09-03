@@ -25,7 +25,13 @@ const PLAN_SIDES = [
   { side: 'plan' as const, labelKey: 'chat.piPlan.plan' },
 ] as const;
 
-export function PiPlanModeToggle({ className }: { className?: string }) {
+export function PiPlanModeToggle({
+  className,
+  onOpenChange,
+}: {
+  className?: string;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useI18n();
   const chrome = usePiPlanChrome();
   const { isMobile: deviceIsMobile } = useDeviceInfo();
@@ -95,7 +101,7 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <Button
           type="button"
@@ -105,6 +111,10 @@ export function PiPlanModeToggle({ className }: { className?: string }) {
           aria-pressed={chrome.footerPlanSelected}
           aria-label={t('chat.piPlan.toggleAria')}
           disabled={disabled}
+          // Do not preventDefault on a DropdownMenuTrigger; Radix opens on
+          // pointerdown and touch preventDefault swallows it. Hold the mobile
+          // composer expanded via onOpenChange instead.
+          onPointerDown={() => onOpenChange?.(true)}
         >
           {triggerLabel}
         </Button>

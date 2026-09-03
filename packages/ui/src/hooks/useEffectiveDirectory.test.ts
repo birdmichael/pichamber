@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { CHAT_DRAFT_PROJECT_ID } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, resolveNewSessionComposerDirectory } from '@/lib/chatDirectories';
 import {
   resolveContextPanelDirectoryKey,
   resolveEffectiveDirectory,
@@ -56,3 +56,35 @@ describe('resolveContextPanelDirectoryKey', () => {
     expect(resolveContextPanelDirectoryKey(undefined, null)).toBe('');
   });
 });
+
+describe('resolveNewSessionComposerDirectory', () => {
+  test('projectless chat drafts use the chats bucket, not ~', () => {
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'chat',
+      directoryOverride: null,
+    })).toBe(CHAT_DRAFT_PROJECT_ID);
+  });
+
+  test('project drafts keep their directory override', () => {
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'project',
+      directoryOverride: PROJECT,
+    })).toBe(PROJECT);
+  });
+
+  test('chats+ stays on the chats bucket even when home is an opened project path', () => {
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'chat',
+      directoryOverride: null,
+    })).toBe(CHAT_DRAFT_PROJECT_ID);
+    expect(resolveNewSessionComposerDirectory({
+      open: true,
+      target: 'chat',
+      directoryOverride: HOME,
+    })).toBe(CHAT_DRAFT_PROJECT_ID);
+  });
+});
+

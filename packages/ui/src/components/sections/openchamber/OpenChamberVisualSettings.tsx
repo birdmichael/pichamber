@@ -3,7 +3,7 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import type { ThemeMode } from '@/types/theme';
-import { useUIStore } from '@/stores/useUIStore';
+import { useUIStore, type LargeTextPasteBehavior } from '@/stores/useUIStore';
 import { useMessageQueueStore, type FollowUpBehavior } from '@/stores/messageQueueStore';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui';
@@ -57,6 +57,7 @@ import {
     SETTINGS_CLUSTER_CONTROL_CLASS,
     SETTINGS_NUMBER_STEPPER_ROW_CLASS,
     SETTINGS_NUMBER_UNIT_CLASS,
+    SETTINGS_NUMBER_INPUT_CLASS,
     SETTINGS_FIELDS_STACK_CLASS,
     SETTINGS_OPTION_STACK_CLASS,
 } from '@/components/sections/shared/SettingsSection';
@@ -277,11 +278,26 @@ const FOLLOW_UP_BEHAVIOR_OPTIONS: Option<FollowUpBehavior>[] = [
     },
 ];
 
+const LARGE_TEXT_PASTE_BEHAVIOR_OPTIONS: Option<LargeTextPasteBehavior>[] = [
+    {
+        id: 'ask',
+        labelKey: 'settings.openchamber.visual.option.largeTextPaste.ask.label',
+    },
+    {
+        id: 'attach',
+        labelKey: 'settings.openchamber.visual.option.largeTextPaste.attach.label',
+    },
+    {
+        id: 'inline',
+        labelKey: 'settings.openchamber.visual.option.largeTextPaste.inline.label',
+    },
+];
+
 const normalizeUserMessageRenderingMode = (mode: unknown): 'markdown' | 'plain' => {
     return mode === 'markdown' ? 'markdown' : 'plain';
 };
 
-type VisibleSetting = 'sessionAssist' | 'sessionGoal' | 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'terminalFontSize' | 'terminalShell' | 'terminalLoginShell' | 'editorFontSize' | 'spacing' | 'inputBarOffset' | 'mermaidRendering' | 'userMessageRendering' | 'chatRenderMode' | 'messageTransport' | 'activityRenderMode' | 'collapsibleUserMessages' | 'stickyUserHeader' | 'promptNavigatorEnabled' | 'wideChatLayout' | 'codeBlockLineWrap' | 'splitAssistantMessageActions' | 'subagentReadOnlyBanner' | 'diffLayout' | 'mobileStatusBar' | 'dotfiles' | 'fileViewerPreview' | 'reasoning' | 'showToolFileIcons' | 'showTurnChangedFiles' | 'expandedTools' | 'followUpBehavior' | 'terminalQuickKeys' | 'fileEditorKeymap' | 'persistDraft' | 'inputSpellcheck' | 'reportUsage' | 'expandedEditorToolbar' | 'autoSaveEnabled';
+type VisibleSetting = 'sessionAssist' | 'sessionGoal' | 'theme' | 'windowControlsPosition' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'terminalFontSize' | 'terminalShell' | 'terminalLoginShell' | 'editorFontSize' | 'spacing' | 'inputBarOffset' | 'mermaidRendering' | 'userMessageRendering' | 'chatRenderMode' | 'messageTransport' | 'activityRenderMode' | 'collapsibleUserMessages' | 'stickyUserHeader' | 'promptNavigatorEnabled' | 'wideChatLayout' | 'codeBlockLineWrap' | 'splitAssistantMessageActions' | 'subagentReadOnlyBanner' | 'diffLayout' | 'mobileStatusBar' | 'dotfiles' | 'fileViewerPreview' | 'reasoning' | 'showToolFileIcons' | 'showTurnChangedFiles' | 'expandedTools' | 'followUpBehavior' | 'terminalQuickKeys' | 'fileEditorKeymap' | 'persistDraft' | 'inputSpellcheck' | 'largeTextPaste' | 'reportUsage' | 'expandedEditorToolbar' | 'autoSaveEnabled' | 'sessionTabs';
 
 const WINDOW_CONTROLS_POSITION_OPTIONS: Array<{ id: DesktopWindowControlsPosition; labelKey: string }> = [
     { id: 'left', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsLeft' },
@@ -306,6 +322,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const { browserTab } = usePwaDetection();
     const directoryShowHidden = useDirectoryShowHidden();
     const showReasoningTraces = useUIStore(state => state.showReasoningTraces);
+    const streamingAutoFollowEnabled = useUIStore(state => state.streamingAutoFollowEnabled);
+    const setStreamingAutoFollowEnabled = useUIStore(state => state.setStreamingAutoFollowEnabled);
     const sessionRecapEnabled = useUIStore(state => state.sessionRecapEnabled);
     const sessionSuggestionEnabled = useUIStore(state => state.sessionSuggestionEnabled);
     const setSessionRecapEnabled = useUIStore(state => state.setSessionRecapEnabled);
@@ -366,6 +384,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const setDiffLayoutPreference = useUIStore(state => state.setDiffLayoutPreference);
     const showTerminalQuickKeysOnDesktop = useUIStore(state => state.showTerminalQuickKeysOnDesktop);
     const setShowTerminalQuickKeysOnDesktop = useUIStore(state => state.setShowTerminalQuickKeysOnDesktop);
+    const sessionTabsEnabled = useUIStore(state => state.sessionTabsEnabled);
+    const setSessionTabsEnabled = useUIStore(state => state.setSessionTabsEnabled);
     const fileEditorKeymap = useUIStore(state => state.fileEditorKeymap);
     const setFileEditorKeymap = useUIStore(state => state.setFileEditorKeymap);
     const followUpBehavior = useMessageQueueStore(state => state.followUpBehavior);
@@ -374,6 +394,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const setPersistChatDraft = useUIStore(state => state.setPersistChatDraft);
     const inputSpellcheckEnabled = useUIStore(state => state.inputSpellcheckEnabled);
     const setInputSpellcheckEnabled = useUIStore(state => state.setInputSpellcheckEnabled);
+    const largeTextPasteBehavior = useUIStore(state => state.largeTextPasteBehavior);
+    const setLargeTextPasteBehavior = useUIStore(state => state.setLargeTextPasteBehavior);
     const showToolFileIcons = useUIStore(state => state.showToolFileIcons);
     const setShowToolFileIcons = useUIStore(state => state.setShowToolFileIcons);
     const showTurnChangedFiles = useUIStore(state => state.showTurnChangedFiles);
@@ -637,7 +659,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
         ? hasLocalizationSettings
         : (shouldShow('theme') || showWindowControlsPositionSetting || showMobileLayoutSetting || shouldShow('pwaInstallName') || shouldShow('pwaOrientation') || shouldShow('timeFormat') || shouldShow('weekStart'));
     const hasLayoutSettings = shouldShow('fontSize') || shouldShow('terminalFontSize') || shouldShow('editorFontSize') || shouldShow('spacing') || (shouldShow('inputBarOffset') && isMobile);
-    const hasNavigationSettings = (shouldShow('terminalQuickKeys') && !isMobile) || ((shouldShow('terminalShell') || shouldShow('terminalLoginShell')) && !isVSCode) || shouldShow('fileEditorKeymap') || shouldShow('autoSaveEnabled') || (shouldShow('expandedEditorToolbar') && !isVSCode);
+    const hasNavigationSettings = (shouldShow('terminalQuickKeys') && !isMobile) || ((shouldShow('terminalShell') || shouldShow('terminalLoginShell')) && !isVSCode) || shouldShow('fileEditorKeymap') || shouldShow('autoSaveEnabled') || (shouldShow('expandedEditorToolbar') && !isVSCode) || (shouldShow('sessionTabs') && !isVSCode && !isMobile);
     const hasBehaviorSettings = shouldShow('mermaidRendering')
         || (shouldShow('sessionGoal') && !isVSCode)
         || shouldShow('userMessageRendering')
@@ -659,6 +681,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
         || shouldShow('persistDraft')
         || shouldShow('showToolFileIcons')
         || shouldShow('expandedTools')
+        || shouldShow('largeTextPaste')
         || (!isMobile && shouldShow('inputSpellcheck'));
     const showBehaviorDisplaySettings = shouldShow('chatRenderMode')
         || (shouldShow('activityRenderMode') && chatRenderMode === 'sorted');
@@ -681,6 +704,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
         || shouldShow('persistDraft')
         || shouldShow('showToolFileIcons')
         || shouldShow('showTurnChangedFiles')
+        || shouldShow('largeTextPaste')
         || (!isMobile && shouldShow('inputSpellcheck'))
         || shouldShow('reasoning')
         || shouldShow('expandedTools');
@@ -1325,6 +1349,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={50}
                                                 max={200}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                                 aria-label={t('settings.openchamber.visual.field.fontSizePercentageAria')}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
@@ -1355,6 +1380,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={9}
                                                 max={52}
                                                 step={1}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1384,6 +1410,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={9}
                                                 max={32}
                                                 step={1}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1418,6 +1445,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={50}
                                                 max={200}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>%</span>
                                             <Button size="sm"
@@ -1448,6 +1476,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 min={0}
                                                 max={100}
                                                 step={5}
+                                                className={SETTINGS_NUMBER_INPUT_CLASS}
                                             />
                                             <span className={SETTINGS_NUMBER_UNIT_CLASS}>px</span>
                                             <Button size="sm"
@@ -1554,6 +1583,20 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 />
                             )}
                         </div>
+                        {shouldShow('sessionTabs') && !isVSCode && !isMobile && (
+                            <SettingsControlGroup
+                                title={t('settings.openchamber.visual.field.sessionTabsGroup')}
+                                settingsItem="appearance.session-tabs"
+                            >
+                                <SettingsCheckboxRow
+                                    checked={sessionTabsEnabled}
+                                    onChange={setSessionTabsEnabled}
+                                    label={t('settings.openchamber.visual.field.sessionTabs')}
+                                    ariaLabel={t('settings.openchamber.visual.field.sessionTabsAria')}
+                                    info={t('settings.openchamber.visual.field.sessionTabsInfo')}
+                                />
+                            </SettingsControlGroup>
+                        )}
                     </SettingsSection>
                 )}
 
@@ -1865,6 +1908,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                     min={1000}
                                                     max={100000000}
                                                     step={50000}
+                                                    className={SETTINGS_NUMBER_INPUT_CLASS}
                                                 />
                                             ) : null}
                                         </div>
@@ -1893,6 +1937,20 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                         </SettingsReveal>
                                     </SettingsSection>
                                 )}
+                                <SettingsSection
+                                    title={t('settings.openchamber.visual.section.streaming')}
+                                    settingsItem="chat.streaming"
+                                    contentClassName={SETTINGS_OPTION_STACK_CLASS}
+                                >
+                                    <SettingsCheckboxRow
+                                        checked={streamingAutoFollowEnabled}
+                                        onChange={setStreamingAutoFollowEnabled}
+                                        label={t('settings.openchamber.visual.field.streamingAutoFollow')}
+                                        ariaLabel={t('settings.openchamber.visual.field.streamingAutoFollowAria')}
+                                        info={t('settings.openchamber.visual.field.streamingAutoFollowInfo')}
+                                        settingsItem="chat.streaming-auto-follow"
+                                    />
+                                </SettingsSection>
 
                                 {(shouldShow('collapsibleUserMessages') || shouldShow('stickyUserHeader') || (shouldShow('promptNavigatorEnabled') && !isVSCode) || shouldShow('wideChatLayout') || shouldShow('splitAssistantMessageActions') || shouldShow('codeBlockLineWrap')) && (
                                 <SettingsSection
@@ -2010,7 +2068,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 </SettingsSection>
                                 )}
 
-                                {(shouldShow('persistDraft') || (!isMobile && shouldShow('inputSpellcheck'))) && (
+                                {(shouldShow('persistDraft') || shouldShow('largeTextPaste') || (!isMobile && shouldShow('inputSpellcheck'))) && (
                                 <SettingsSection
                                     title={t('settings.openchamber.visual.section.composer')}
                                     settingsItem="chat.composer"
@@ -2034,6 +2092,26 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                         ariaLabel={t('settings.openchamber.visual.field.enableSpellcheckInTextInputsAria')}
                                         settingsItem="chat.spellcheck"
                                     />
+                                )}
+
+                                {shouldShow('largeTextPaste') && (
+                                    <SettingsControlGroup
+                                        title={t('settings.openchamber.visual.field.largeTextPaste')}
+                                        info={t('settings.openchamber.visual.field.largeTextPasteHint')}
+                                        settingsItem="chat.large-text-paste"
+                                    >
+                                        <SettingsRadioGroup aria-label={t('settings.openchamber.visual.field.largeTextPasteAria')}>
+                                            {LARGE_TEXT_PASTE_BEHAVIOR_OPTIONS.map((option) => (
+                                                <SettingsRadioOption
+                                                    key={option.id}
+                                                    selected={largeTextPasteBehavior === option.id}
+                                                    onSelect={() => setLargeTextPasteBehavior(option.id)}
+                                                    label={tUnsafe(option.labelKey)}
+                                                    ariaLabel={t('settings.openchamber.visual.field.largeTextPasteOptionAria', { option: tUnsafe(option.labelKey) })}
+                                                />
+                                            ))}
+                                        </SettingsRadioGroup>
+                                    </SettingsControlGroup>
                                 )}
                                 </SettingsSection>
                                 )}

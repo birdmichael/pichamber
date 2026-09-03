@@ -597,8 +597,8 @@ describe("NumberInput 5-digit width (compaction reserve tokens)", () => {
     const reserveBlock = source.slice(reserveIdx, keepIdx);
     const keepBlock = source.slice(keepIdx, retryIdx);
     // NumberInput defaults to w-10 + overflow-x-hidden, which clips 16384 to 163.
-    expect(reserveBlock).toContain('className="w-20 tabular-nums"');
-    expect(keepBlock).toContain('className="w-20 tabular-nums"');
+    expect(reserveBlock).toContain('className={SETTINGS_NUMBER_INPUT_CLASS}');
+    expect(keepBlock).toContain('className={SETTINGS_NUMBER_INPUT_CLASS}');
     expect(source).toContain("useState(16384)");
   });
 });

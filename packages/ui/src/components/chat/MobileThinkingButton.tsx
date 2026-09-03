@@ -19,9 +19,10 @@ export const MobileThinkingButton: React.FC<MobileThinkingButtonProps> = ({
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
     const level = usePiThinkingChipStore((state) => state.level);
+    const hasLevels = usePiThinkingChipStore((state) => state.hasLevels);
     const thinkingChip = resolvePiThinkingChipPresentation(level);
 
-    if (!isPiKernel) {
+    if (!isPiKernel || !hasLevels) {
         return null;
     }
 

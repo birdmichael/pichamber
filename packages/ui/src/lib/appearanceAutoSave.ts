@@ -15,6 +15,7 @@ type AppearanceSlice = {
   sessionGoalDefaultBudgetEnabled: boolean;
   sessionGoalDefaultBudget: number;
   collapsibleThinkingBlocks: boolean;
+  streamingAutoFollowEnabled: boolean;
   showDeletionDialog: boolean;
   nativeNotificationsEnabled: boolean;
   notificationMode: 'always' | 'hidden-only';
@@ -70,6 +71,7 @@ export const startAppearanceAutoSave = (): void => {
     sessionGoalDefaultBudgetEnabled: useUIStore.getState().sessionGoalDefaultBudgetEnabled,
     sessionGoalDefaultBudget: useUIStore.getState().sessionGoalDefaultBudget,
     collapsibleThinkingBlocks: useUIStore.getState().collapsibleThinkingBlocks,
+    streamingAutoFollowEnabled: useUIStore.getState().streamingAutoFollowEnabled,
     showDeletionDialog: useUIStore.getState().showDeletionDialog,
     nativeNotificationsEnabled: useUIStore.getState().nativeNotificationsEnabled,
     notificationMode: useUIStore.getState().notificationMode,
@@ -112,6 +114,7 @@ export const startAppearanceAutoSave = (): void => {
       sessionGoalDefaultBudgetEnabled: state.sessionGoalDefaultBudgetEnabled,
       sessionGoalDefaultBudget: state.sessionGoalDefaultBudget,
       collapsibleThinkingBlocks: state.collapsibleThinkingBlocks,
+      streamingAutoFollowEnabled: state.streamingAutoFollowEnabled,
       showDeletionDialog: state.showDeletionDialog,
       nativeNotificationsEnabled: state.nativeNotificationsEnabled,
       notificationMode: state.notificationMode,
@@ -173,6 +176,9 @@ export const startAppearanceAutoSave = (): void => {
     }
     if (current.collapsibleThinkingBlocks !== previous.collapsibleThinkingBlocks) {
       diff.collapsibleThinkingBlocks = current.collapsibleThinkingBlocks;
+    }
+    if (current.streamingAutoFollowEnabled !== previous.streamingAutoFollowEnabled) {
+      diff.streamingAutoFollowEnabled = current.streamingAutoFollowEnabled;
     }
     if (current.showDeletionDialog !== previous.showDeletionDialog) {
       diff.showDeletionDialog = current.showDeletionDialog;

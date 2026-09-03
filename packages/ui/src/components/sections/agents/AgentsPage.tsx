@@ -23,6 +23,7 @@ import {
   SETTINGS_SELECT_ROW_TRIGGER_CLASS,
   SETTINGS_ICON_BUTTON_CLASS,
   SETTINGS_CUSTOM_TRIGGER_CLASS,
+  SETTINGS_NUMBER_INPUT_CLASS,
 } from '@/components/sections/shared/SettingsSection';
 import {
   Select,
@@ -471,7 +472,7 @@ export const AgentsPage: React.FC = () => {
             inputMode="decimal"
             placeholder="—"
             emptyLabel="—"
-            className="w-16"
+            className={SETTINGS_NUMBER_INPUT_CLASS}
             disabled={fieldsReadOnly}
           />
           {temperature !== undefined && !fieldsReadOnly && (
@@ -510,7 +511,7 @@ export const AgentsPage: React.FC = () => {
             inputMode="decimal"
             placeholder="—"
             emptyLabel="—"
-            className="w-16"
+            className={SETTINGS_NUMBER_INPUT_CLASS}
             disabled={fieldsReadOnly}
           />
           {topP !== undefined && !fieldsReadOnly && (

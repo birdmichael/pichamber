@@ -41,6 +41,80 @@ describe('createEventTranslator', () => {
     expect(settled[1].properties.sessionID).toBe('ses_1');
   });
 
+  it('clears the user-message slot on agent_settled so the next turn can insert', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    expect(t.userMessageID).toBe('msg_user');
+    t.translate({ type: 'agent_settled' });
+    expect(t.userMessageID).toBe(null);
+  });
+
+  it('parents a post-settle implement assistant to the last visible user, not a Pi-native id', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    t.translate({ type: 'agent_settled' });
+    expect(t.userMessageID).toBe(null);
+
+    const skipped = t.translate({
+      type: 'message_start',
+      message: { role: 'user', id: '5bb000de', content: 'Implement the plan.' },
+    });
+    expect(skipped).toEqual([]);
+    expect(t.userMessageID).toBe(null);
+
+    const started = t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    expect(started[0].properties.info.parentID).toBe('msg_user');
+    const tool = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    const updated = tool.find((event) => event.type === 'message.updated');
+    expect(updated?.properties.info.parentID ?? started[0].properties.info.parentID).toBe('msg_user');
+    expect(tool.some((event) => event.type === 'message.part.updated' && event.properties.part.tool === 'edit')).toBe(true);
+  });
+
+  it('opens a new assistant for tools after settle instead of appending to the completed plan message', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    const planStart = t.translate({ type: 'message_start', message: { role: 'assistant', id: 'asst_plan', content: [] } });
+    expect(planStart[0].properties.info.id).toBe('asst_plan');
+    t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      args: {},
+    });
+    t.translate({
+      type: 'tool_execution_end',
+      toolCallId: 'call_plan',
+      toolName: 'plan_mode_complete',
+      isError: false,
+      result: { details: { plan: '# Ready' } },
+    });
+    t.translate({ type: 'message_end', message: { role: 'assistant' } });
+    t.translate({ type: 'agent_settled' });
+    expect(t.assistantMessageID).toBe(null);
+
+    const tool = t.translate({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    const updated = tool.find((event) => event.type === 'message.updated');
+    expect(updated.properties.info.id).not.toBe('asst_plan');
+    expect(updated.properties.info.parentID).toBe('msg_user');
+    expect(updated.properties.info.finish).toBeUndefined();
+    expect(updated.properties.info.time.completed).toBeUndefined();
+    const part = tool.find((event) => event.type === 'message.part.updated');
+    expect(part.properties.part.messageID).toBe(updated.properties.info.id);
+    expect(part.properties.part.tool).toBe('edit');
+  });
+
   it('maps text_delta to message.part.delta field text', () => {
     const t = translator();
     t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
@@ -660,7 +734,7 @@ describe('createEventTranslator', () => {
       message: { role: 'user', id: '5bb000de', content: '帮我启动一个子代理 查看 我电脑磁盘' },
     });
     expect(events).toEqual([]);
-    expect(t.userMessageID).toBe('5bb000de');
+    expect(t.userMessageID).toBe(null);
   });
   it('maps auto_retry_start to session.status retry', () => {
     const events = translator().translate({
@@ -797,5 +871,14 @@ describe('prompt extractors', () => {
       mimeType: 'image/jpeg',
       data: 'xyz',
     }]);
+  });
+
+  it('omits synthetic instruction parts from the visible user prompt', () => {
+    const parts = [
+      { type: 'text', text: 'Help me set up a scheduled task.' },
+      { type: 'text', text: 'The user wants to set up a scheduled task that OpenChamber runs.', synthetic: true },
+    ];
+    expect(extractPromptText(parts)).toContain('The user wants to set up a scheduled task');
+    expect(extractPromptText(parts, { includeSynthetic: false })).toBe('Help me set up a scheduled task.');
   });
 });

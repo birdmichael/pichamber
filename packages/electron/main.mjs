@@ -21,6 +21,7 @@ import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
 import { resolveLocalBootStatus, waitForPiKernelReady } from './pi-kernel-ready.mjs';
+import { buildMiniChatPageUrl, isAllowedMiniChatNavigationUrl, resolveMiniChatUiBase } from './mini-chat-url.mjs';
 import { sanitizeRuntimeRequestHeaders } from './runtime-request-headers.mjs';
 import {
   assertUpdaterCapability,
@@ -45,8 +46,12 @@ import {
 } from './linux-autostart.mjs';
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
+import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
+import { attachRendererRecovery } from './renderer-recovery.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
+import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-text-file.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
+import { beginLinuxNativeDialogConstrain } from './linux-native-dialog-bounds.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
 
 const execFileAsync = promisify(execFile);
@@ -1243,6 +1248,15 @@ const resolveBrowserPanelContents = (rawId) => {
 const hardenBrowserPanelSession = () => {
   const panelSession = session.fromPartition(BROWSER_PANEL_PARTITION);
 
+  app.on('certificate-error', (event, contents, url, error, _certificate, callback) => {
+    if (contents.session === panelSession && shouldAllowBrowserPanelCertificateError({ url, error })) {
+      event.preventDefault();
+      callback(true);
+      return;
+    }
+    callback(false);
+  });
+
   panelSession.setPermissionRequestHandler((_contents, permission, callback, details) => {
     log.info('[electron] browser panel denied a permission request', {
       permission,
@@ -1281,7 +1295,15 @@ const registerPackagedUiProtocol = () => {
         if (filePath.endsWith('.html')) {
           const html = await fsp.readFile(filePath, 'utf8');
           const body = injectRuntimeConfigIntoHtml(html);
-          return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+          // index.html must never be cached: it names the hashed asset
+          // bundles, and a cached copy keeps a freshly installed build
+          // loading the previous version's UI from the renderer disk cache.
+          return new Response(body, {
+            headers: {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-store',
+            },
+          });
         }
         const mimeByExt = {
           '.js': 'text/javascript; charset=utf-8',
@@ -1311,7 +1333,12 @@ const registerPackagedUiProtocol = () => {
     const indexPath = path.join(distPath, 'index.html');
     const html = await fsp.readFile(indexPath, 'utf8');
     const body = injectRuntimeConfigIntoHtml(html);
-    return new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    return new Response(body, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
+    });
   };
   protocol.handle(UI_PROTOCOL, handlePackagedUiRequest);
   protocol.handle(LEGACY_UI_PROTOCOL, handlePackagedUiRequest);
@@ -1425,7 +1452,7 @@ const maybeShowNativeNotification = (rawInput) => {
   notification.on('click', () => {
     focusForegroundWindow();
     if (sessionId) {
-      emitToAllWindows('openchamber:open-session', { sessionId, directory });
+      emitToPrimaryWindow('openchamber:open-session', { sessionId, directory });
     }
     release();
   });
@@ -2072,6 +2099,18 @@ const emitToAllWindows = (event, detail) => {
   }
 };
 
+// Session navigation must land in ONE window. Broadcasting it makes every
+// open window adopt the same session, hijacking whatever the other windows
+// were doing.
+const emitToPrimaryWindow = (event, detail) => {
+  const windows = BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed());
+  if (windows.length === 0) return;
+  const target = (state.mainWindow && !state.mainWindow.isDestroyed())
+    ? state.mainWindow
+    : windows.find((window) => window.isFocused()) || windows.find((window) => window.isVisible()) || windows[0];
+  emitToWindow(target, event, detail);
+};
+
 const setTaskbarProgress = (value) => {
   if (process.platform !== 'win32') return;
   for (const browserWindow of BrowserWindow.getAllWindows()) {
@@ -2240,7 +2279,7 @@ const switchToHostById = async (rawId) => {
   let clientToken = '';
   let requestHeaders = {};
   if (id === LOCAL_HOST_ID) {
-    targetUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+    targetUrl = resolveLocalRendererUrl();
     apiBaseUrl = state.sidecarUrl;
     clientToken = readDesktopLocalClientToken();
     requestHeaders = {};
@@ -2353,7 +2392,7 @@ const dispatchDeepLink = (link) => {
   }
 
   if (link.type === 'session' && link.value) {
-    emitToAllWindows('openchamber:open-session', { sessionId: link.value });
+    emitToPrimaryWindow('openchamber:open-session', { sessionId: link.value });
     return;
   }
   if (link.type === 'host' && link.value) {
@@ -2755,12 +2794,7 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     }
   });
 
-  browserWindow.webContents.on('render-process-gone', (_event, details) => {
-    log.error('[electron] renderer gone', details);
-    if (!browserWindow.isDestroyed()) {
-      void browserWindow.webContents.reload();
-    }
-  });
+  attachRendererRecovery(browserWindow, { log, label: 'window' });
 
   browserWindow.once('ready-to-show', () => {
     if (browserWindow.__ocLabel === 'main') {
@@ -2826,6 +2860,21 @@ const activateMainWindow = async (url, localOrigin, bootOutcome, runtimeConfig =
   return state.mainWindow;
 };
 
+const electronDevHmrUiOrigin = () => (
+  isDev ? `http://127.0.0.1:${process.env.OPENCHAMBER_HMR_UI_PORT || '5173'}` : ''
+);
+
+// File → New Window (and later main-window activations) must load the renderer
+// UI origin, not the API sidecar. Same 404 as Mini Chat during electron:dev.
+const resolveLocalRendererUrl = () => resolveMiniChatUiBase({
+  packaged: shouldUsePackagedUi(),
+  packagedUrl: buildPackagedUiUrl('/index.html'),
+  uiOrigin: state.uiOrigin,
+  localOrigin: state.localOrigin,
+  sidecarUrl: state.sidecarUrl,
+  hmrUiOrigin: electronDevHmrUiOrigin(),
+});
+
 const openMainWindow = async () => {
   if (!state.startupResolved) {
     const { initialUrl, localOrigin, bootOutcome, apiBaseUrl, clientToken, requestHeaders } = await resolveInitialUrl();
@@ -2833,7 +2882,7 @@ const openMainWindow = async () => {
   }
 
   const config = readDesktopHostsConfig();
-  const localUiUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+  const localUiUrl = resolveLocalRendererUrl();
   const host = config.defaultHostId && config.defaultHostId !== LOCAL_HOST_ID
     ? config.hosts.find((entry) => entry.id === config.defaultHostId)
     : null;
@@ -2874,19 +2923,22 @@ const createAdditionalWindow = async (url, runtimeConfig = {}) => {
 };
 
 const buildMiniChatUrl = ({ mode, sessionId, directory, projectId }) => {
-  const base = shouldUsePackagedUi()
-    ? buildPackagedUiUrl('/mini-chat.html')
-    : state.localOrigin || state.sidecarUrl;
-  if (!base) {
-    throw new Error('Local UI is not available');
-  }
-
-  const url = new URL(shouldUsePackagedUi() ? base : '/mini-chat.html', base);
-  url.searchParams.set('mode', mode === 'session' ? 'session' : 'draft');
-  if (sessionId) url.searchParams.set('sessionId', sessionId);
-  if (directory) url.searchParams.set('directory', directory);
-  if (projectId) url.searchParams.set('projectId', projectId);
-  return url.toString();
+  const packaged = shouldUsePackagedUi();
+  return buildMiniChatPageUrl({
+    base: resolveMiniChatUiBase({
+      packaged,
+      packagedUrl: buildPackagedUiUrl('/mini-chat.html'),
+      uiOrigin: state.uiOrigin,
+      localOrigin: state.localOrigin,
+      sidecarUrl: state.sidecarUrl,
+      hmrUiOrigin: electronDevHmrUiOrigin(),
+    }),
+    packaged,
+    mode,
+    sessionId,
+    directory,
+    projectId,
+  });
 };
 
 const miniChatSessionWindowKey = (runtimeConfig, sessionId) => {
@@ -2977,6 +3029,7 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
   bindWindowBackgroundThrottling(browserWindow, {
     onChange: () => state.hiddenTrayRepeater?.sync(),
   });
+  attachRendererRecovery(browserWindow, { log, label: 'mini chat' });
 
   if (sessionWindowKey) {
     state.miniChatWindowsBySession.set(sessionWindowKey, browserWindow);
@@ -3013,11 +3066,22 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     return { action: 'deny' };
   });
   browserWindow.webContents.on('will-navigate', (event, url) => {
+    let currentUrl = '';
     try {
-      const target = new URL(url);
-      const local = new URL(shouldUsePackagedUi() ? packagedUiOrigin() : (state.localOrigin || state.sidecarUrl || ''));
-      if (target.origin === local.origin) return;
+      currentUrl = browserWindow.webContents.getURL();
     } catch {
+    }
+    if (isAllowedMiniChatNavigationUrl({
+      url,
+      packaged: shouldUsePackagedUi(),
+      packagedOrigin: packagedUiOrigin(),
+      uiOrigin: state.uiOrigin,
+      localOrigin: state.localOrigin,
+      sidecarUrl: state.sidecarUrl,
+      currentUrl,
+      hmrUiOrigin: electronDevHmrUiOrigin(),
+    })) {
+      return;
     }
     event.preventDefault();
     void shell.openExternal(url).catch(() => {});
@@ -3901,6 +3965,27 @@ const closeAllDevTunnels = () => {
   pending.then((client) => client.closeAll()).catch(() => {});
 };
 
+
+const restoreRendererKeyboardFocus = (browserWindow) => {
+  const target = browserWindow && !browserWindow.isDestroyed()
+    ? browserWindow
+    : (state.mainWindow && !state.mainWindow.isDestroyed() ? state.mainWindow : null);
+  if (!target) return false;
+  if (target.isMinimized()) target.restore();
+  try { target.show(); } catch {}
+  try { target.focus(); } catch {}
+  try { app.focus?.({ steal: true }); } catch {}
+  const focusWebContents = () => {
+    if (target.isDestroyed()) return;
+    try { target.focus(); } catch {}
+    try { target.webContents?.focus(); } catch {}
+  };
+  focusWebContents();
+  setTimeout(focusWebContents, 0);
+  setTimeout(focusWebContents, 50);
+  return true;
+};
+
 const handleInvoke = async (browserWindow, command, args = {}) => {
   switch (command) {
     case 'desktop_start_window_drag':
@@ -3911,15 +3996,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
     // A browser will not follow a custom-protocol link without a user gesture,
     // and the completion page has none.
     case 'desktop_focus_window': {
-      const target = browserWindow && !browserWindow.isDestroyed()
-        ? browserWindow
-        : (state.mainWindow && !state.mainWindow.isDestroyed() ? state.mainWindow : null);
-      if (!target) return false;
-      if (target.isMinimized()) target.restore();
-      target.show();
-      target.focus();
-      app.focus?.({ steal: true });
-      return true;
+      return restoreRendererKeyboardFocus(browserWindow);
     }
 
     case 'desktop_is_window_fullscreen':
@@ -4159,23 +4236,28 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       };
     }
 
-    case 'desktop_save_markdown_file': {
+    case 'desktop_save_markdown_file':
+    case 'desktop_save_text_file': {
       const defaultPath = typeof args.defaultFileName === 'string' ? args.defaultFileName.trim() : '';
       if (!defaultPath) {
         throw new Error('Default file name is required');
       }
 
       const content = typeof args.content === 'string' ? args.content : '';
+      const filters = command === 'desktop_save_markdown_file'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : normalizeSaveDialogFilters(args.filters);
       const result = await dialog.showSaveDialog(browserWindow || undefined, {
         defaultPath,
-        filters: [{ name: 'Markdown', extensions: ['md'] }],
+        ...(filters.length > 0 ? { filters } : {}),
       });
-      if (result.canceled || !result.filePath) {
+      const filePath = resolveSaveDialogWritePath(result);
+      if (!filePath) {
         return null;
       }
 
-      await fsp.writeFile(result.filePath, content, 'utf8');
-      return result.filePath;
+      await fsp.writeFile(filePath, content, 'utf8');
+      return filePath;
     }
 
     case 'desktop_save_image': {
@@ -4486,7 +4568,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (Object.prototype.hasOwnProperty.call(nextConfigInput, 'localClientToken') && isLocalRuntimeUrl(state.apiBaseUrl || state.sidecarUrl || state.localOrigin || '')) {
         state.clientToken = readDesktopLocalClientToken();
       }
-      const sidecar = state.sidecarUrl || state.localOrigin;
+      const sidecar = state.sidecarUrl || state.localOrigin || '';
       const localKernelReady = sidecar
         ? await waitForPiKernelReady(sidecar, { timeoutMs: 2000, initialPollMs: 200 })
         : false;
@@ -4702,7 +4784,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
 
     case 'desktop_new_window': {
       const config = readDesktopHostsConfig();
-      const localUiUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+      const localUiUrl = resolveLocalRendererUrl();
       let targetUrl = localUiUrl;
       let runtimeConfig = {
         apiBaseUrl: state.sidecarUrl || state.localOrigin || '',
@@ -4735,7 +4817,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const host = config.hosts.find((entry) => entry.id === hostId);
       if (!host) throw new Error('Host not found');
       if (host.relay) {
-        const windowUrl = shouldUsePackagedUi() ? buildPackagedUiUrl('/index.html') : (state.sidecarUrl || state.localOrigin);
+        const windowUrl = resolveLocalRendererUrl();
         await createAdditionalWindow(windowUrl, {
           apiBaseUrl: '',
           clientToken: host.clientToken || '',
@@ -4923,7 +5005,9 @@ const buildMacMenu = () => {
         { label: 'Settings', accelerator: 'Cmd+,', click: () => dispatchAction('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
-        { label: 'Command Palette', accelerator: 'Cmd+P', click: () => dispatchAction('command-palette') },
+        // registerAccelerator:false → renderer owns Cmd+P so the native
+        // menu does not toggle a second palette on top of Shortcuts (#379).
+        { label: 'Command Palette', accelerator: 'Cmd+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -5033,7 +5117,9 @@ const buildAutoHiddenMenu = () => {
         { label: 'Settings', accelerator: 'Ctrl+,', click: () => dispatchAction('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
-        { label: 'Command Palette', accelerator: 'Ctrl+P', click: () => dispatchAction('command-palette') },
+        // registerAccelerator:false → renderer owns Ctrl+P so the native
+        // menu does not toggle a second palette on top of Shortcuts (#379).
+        { label: 'Command Palette', accelerator: 'Ctrl+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
         { type: 'separator' },
         { role: 'quit' },
       ],
@@ -5262,7 +5348,13 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
     throw new Error('IPC not available for this origin');
   }
   const browserWindow = BrowserWindow.fromWebContents(event.sender);
-  const result = await dialog.showOpenDialog(browserWindow || undefined, {
+  const linuxDialogConstrain = await beginLinuxNativeDialogConstrain({
+    browserWindow,
+    electronScreen: screen,
+  });
+  let result;
+  try {
+  result = await dialog.showOpenDialog(browserWindow || undefined, {
     title: typeof options?.title === 'string' ? options.title : undefined,
     defaultPath: typeof options?.defaultPath === 'string' && options.defaultPath.trim().length > 0
       ? options.defaultPath.trim()
@@ -5283,6 +5375,10 @@ ipcMain.handle('openchamber:dialog:open', async (event, options) => {
       'createDirectory',
     ].filter(Boolean),
   });
+  } finally {
+    linuxDialogConstrain.stop();
+    restoreRendererKeyboardFocus(browserWindow);
+  }
   if (result.canceled) return null;
   const grantFilePath = async (filePath) => {
     if (options?.directory) return { path: filePath };

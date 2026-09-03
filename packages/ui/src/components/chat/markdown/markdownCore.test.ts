@@ -52,7 +52,9 @@ import { escapeRawMarkdownHtml, isLocalFileUrl, MARKDOWN_FORBIDDEN_TAGS } from '
 const {
   __markdownImageCandidateCacheForTests,
   extractMarkdownImageCandidates,
+  renderMarkdownBlocks,
   renderMarkdownSync,
+  separateCjkUrlPunctuation,
 } = await import('./markdownCore');
 const { resolveMarkdownImageSource } = await import('./markdownImageAssets');
 
@@ -89,6 +91,28 @@ describe('markdown sanitization', () => {
     expect(html).toContain('href="file:///workspace/notes.md"');
     expect(html).not.toContain('href="javascript:alert(1)"');
     expect(html).not.toContain('href="ms-msdt:/id%20PCWDiagnostic"');
+  });
+
+  test('does not swallow CJK punctuation into a bare URL href', async () => {
+    expect(separateCjkUrlPunctuation('见 https://example.com。继续')).toBe('见 https://example.com 。继续');
+    const html = renderMarkdownSync('见 https://example.com。', 'inline');
+    expect(html).toContain('href="https://example.com"');
+    expect(html).not.toContain('href="https://example.com。"');
+    expect(html).toContain('。');
+
+    const blocks = await renderMarkdownBlocks('见 https://example.com。', false, 'cjk-url');
+    const joined = blocks.map((block) => block.html).join('');
+    expect(joined).toContain('href="https://example.com"');
+    expect(joined).not.toContain('href="https://example.com。"');
+    expect(joined).toContain('。');
+  });
+
+  test('does not rewrite CJK punctuation inside code, angle autolinks, or link destinations', () => {
+    expect(separateCjkUrlPunctuation('`https://example.com。`')).toBe('`https://example.com。`');
+    expect(separateCjkUrlPunctuation('```\nhttps://example.com。\n```')).toBe('```\nhttps://example.com。\n```');
+    expect(separateCjkUrlPunctuation('<https://example.com。>')).toBe('<https://example.com。>');
+    expect(separateCjkUrlPunctuation('[文档](https://example.com。)')).toBe('[文档](https://example.com。)');
+    expect(separateCjkUrlPunctuation('[文档](https://example.com)。')).toBe('[文档](https://example.com)。');
   });
 });
 

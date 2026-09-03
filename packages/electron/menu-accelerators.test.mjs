@@ -54,3 +54,16 @@ test('File New Session keeps Cmd+N / Ctrl+N as a hint and does not register it',
     assert.match(item, /registerAccelerator:\s*false/);
   }
 });
+
+test('Command Palette keeps Cmd+P / Ctrl+P as a hint and does not register it', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const items = [...source.matchAll(/\{ label: 'Command Palette', accelerator: '(Cmd\+P|Ctrl\+P)'[^}]*\}/g)]
+    .map((match) => match[0]);
+
+  assert.equal(items.length, 2, 'expected darwin Cmd+P and Linux/Windows Ctrl+P Command Palette items');
+  assert.ok(items.some((item) => item.includes("accelerator: 'Cmd+P'")));
+  assert.ok(items.some((item) => item.includes("accelerator: 'Ctrl+P'")));
+  for (const item of items) {
+    assert.match(item, /registerAccelerator:\s*false/);
+  }
+});

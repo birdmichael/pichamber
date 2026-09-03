@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { EDITOR_TREE_MAX_WIDTH, EDITOR_TREE_MIN_WIDTH } from '@/lib/surfaces/editorSplit';
+
 import { devtools, persist } from 'zustand/middleware';
 import type { SidebarSection } from '@/constants/sidebar';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
@@ -16,11 +18,18 @@ import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import type { MultiRunCompareGroup } from '@/types/multirun';
 import { markSettingsOpenedFromTrigger } from '@/lib/settings-dismiss';
 import {
+  setCommandPaletteOpenState,
+  setHelpDialogOpenState,
+  toggleCommandPaletteState,
+  toggleHelpDialogState,
+} from '@/lib/overlay-dialogs';
+import {
   isBrowserTabIdentity,
-  mergeContextPanelForBrowserScope,
+  mergeContextPanelChatScope,
   openedProjectPathSet,
   resolveBrowserScopeKey,
 } from '@/lib/browser/scope';
+import { contextChatScopeKey } from '@/lib/subagents/childSession';
 
 export type MainTab = 'chat' | 'plan' | 'git' | 'diff' | 'terminal' | 'files' | 'context' | 'diagram';
 export type PendingDiffScope = 'working' | 'staged' | 'turn' | 'branch';
@@ -35,6 +44,16 @@ export type WeekStartPreference = 'auto' | 'sunday' | 'monday';
 export type DesktopWindowControlsPosition = 'left' | 'right';
 export type DesktopWindowControlsStyle = 'classic' | 'traffic-lights';
 export type FileEditorKeymap = 'default' | 'vim';
+export type LargeTextPasteBehavior = 'ask' | 'attach' | 'inline';
+
+export const DEFAULT_LARGE_TEXT_PASTE_BEHAVIOR: LargeTextPasteBehavior = 'ask';
+
+export const normalizeLargeTextPasteBehavior = (value: unknown): LargeTextPasteBehavior => {
+  if (value === 'attach' || value === 'inline' || value === 'ask') {
+    return value;
+  }
+  return DEFAULT_LARGE_TEXT_PASTE_BEHAVIOR;
+};
 
 function normalizeFileEditorKeymap(value: unknown): FileEditorKeymap {
   return value === 'vim' ? 'vim' : 'default';
@@ -154,8 +173,13 @@ type BrowserScopeProjectsStore = {
   getState: () => { projects: Array<{ path: string }> };
 };
 
+type BrowserScopeSessionStore = {
+  getState: () => { currentSessionId?: string | null };
+};
+
 let directoryStoreForBrowserScope: BrowserScopeDirectoryStore | undefined;
 let projectsStoreForBrowserScope: BrowserScopeProjectsStore | undefined;
+let sessionStoreForBrowserScope: BrowserScopeSessionStore | undefined;
 
 export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectoryStore): void => {
   directoryStoreForBrowserScope = store;
@@ -163,6 +187,10 @@ export const bindDirectoryStoreForBrowserScope = (store: BrowserScopeDirectorySt
 
 export const bindProjectsStoreForBrowserScope = (store: BrowserScopeProjectsStore): void => {
   projectsStoreForBrowserScope = store;
+};
+
+export const bindSessionStoreForBrowserScope = (store: BrowserScopeSessionStore): void => {
+  sessionStoreForBrowserScope = store;
 };
 
 const requireStoreExport = <T>(specifier: string, exportName: string): T | undefined => {
@@ -201,6 +229,14 @@ const getProjectsStoreForBrowserScope = (): BrowserScopeProjectsStore | undefine
   return projectsStoreForBrowserScope;
 };
 
+const getSessionStoreForBrowserScope = (): BrowserScopeSessionStore | undefined => {
+  return sessionStoreForBrowserScope;
+};
+
+const readCurrentSessionScopeKey = (): string => (
+  contextChatScopeKey(getSessionStoreForBrowserScope()?.getState().currentSessionId)
+);
+
 // Home / opened projects are needed only when a browser action runs. A static
 // import here closes useDirectoryStore → persistence → useUIStore →
 // useDirectoryStore and TDZ-crashes the Desktop renderer before React mounts.
@@ -216,12 +252,12 @@ const readMergedContextPanel = (
   byDirectory: Record<string, ContextPanelDirectoryState>,
   directory: string,
 ): ContextPanelDirectoryState | undefined => {
-  const scopeKey = readContextBrowserScopeKey(directory);
-  return mergeContextPanelForBrowserScope(
+  const chatScopeKey = readCurrentSessionScopeKey();
+  return mergeContextPanelChatScope(
     directory,
     byDirectory[directory],
-    scopeKey,
-    byDirectory[scopeKey],
+    chatScopeKey,
+    chatScopeKey ? byDirectory[chatScopeKey] : undefined,
   );
 };
 
@@ -748,6 +784,9 @@ interface UIStore {
   hasManuallyResizedLeftSidebar: boolean;
   contextPanelByDirectory: Record<string, ContextPanelDirectoryState>;
   contextRailOrder: string[];
+  /** Surface ids the user hid from the context rail; stored as the hidden set
+      so surfaces added later appear for everyone. */
+  contextRailHiddenSurfaces: string[];
   contextEditorTreeVisible: boolean;
   contextEditorTreeWidth: number;
   notesPanelHeight: number;
@@ -820,6 +859,7 @@ interface UIStore {
   eventStreamStatus: EventStreamStatus;
   eventStreamHint: string | null;
   showReasoningTraces: boolean;
+  streamingAutoFollowEnabled: boolean;
   sessionRecapEnabled: boolean;
   sessionSuggestionEnabled: boolean;
   sessionGoalEnabled: boolean;
@@ -896,11 +936,14 @@ interface UIStore {
   maxLastMessageLength: number; // chars — truncate {last_message} when summarization is off
 
   showTerminalQuickKeysOnDesktop: boolean;
+  /** Header session tabs (web/desktop), opt-in. Off keeps the plain session title. */
+  sessionTabsEnabled: boolean;
   persistChatDraft: boolean;
   showOpenCodeUpdateNotifications: boolean;
   agentControlToolEnabled: boolean;
   agentWebToolEnabled: boolean;
   inputSpellcheckEnabled: boolean;
+  largeTextPasteBehavior: LargeTextPasteBehavior;
   wideChatLayoutEnabled: boolean;
   codeBlockLineWrap: boolean;
   showToolFileIcons: boolean;
@@ -929,6 +972,8 @@ interface UIStore {
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setContextRailOrder: (order: string[]) => void;
+  setContextRailSurfaceVisible: (surfaceId: string, visible: boolean) => void;
+  setContextRailHiddenSurfaces: (surfaceIds: string[]) => void;
   toggleContextEditorTree: () => void;
   setContextEditorTreeWidth: (width: number) => void;
   openContextSurface: (directory: string, mode: ContextPanelMode) => void;
@@ -997,6 +1042,7 @@ interface UIStore {
   setSettingsRemoteInstancesSelectedId: (instanceId: string | null) => void;
   setEventStreamStatus: (status: EventStreamStatus, hint?: string | null) => void;
   setShowReasoningTraces: (value: boolean) => void;
+  setStreamingAutoFollowEnabled: (value: boolean) => void;
   setSessionRecapEnabled: (value: boolean) => void;
   setSessionSuggestionEnabled: (value: boolean) => void;
   setSessionGoalEnabled: (value: boolean) => void;
@@ -1061,6 +1107,7 @@ interface UIStore {
   setNativeNotificationsEnabled: (value: boolean) => void;
   setNotificationMode: (mode: 'always' | 'hidden-only') => void;
   setShowTerminalQuickKeysOnDesktop: (value: boolean) => void;
+  setSessionTabsEnabled: (value: boolean) => void;
   setNotifyOnSubtasks: (value: boolean) => void;
   setDockBadgeEnabled: (value: boolean) => void;
   setNotifyOnCompletion: (value: boolean) => void;
@@ -1078,6 +1125,7 @@ interface UIStore {
   setAgentControlToolEnabled: (value: boolean) => void;
   setAgentWebToolEnabled: (value: boolean) => void;
   setInputSpellcheckEnabled: (value: boolean) => void;
+  setLargeTextPasteBehavior: (value: LargeTextPasteBehavior) => void;
   setWideChatLayoutEnabled: (value: boolean) => void;
   setCodeBlockLineWrap: (value: boolean) => void;
   setShowToolFileIcons: (value: boolean) => void;
@@ -1124,6 +1172,7 @@ export const useUIStore = create<UIStore>()(
         hasManuallyResizedLeftSidebar: false,
         contextPanelByDirectory: {},
         contextRailOrder: [],
+        contextRailHiddenSurfaces: [],
         contextEditorTreeVisible: true,
         contextEditorTreeWidth: 240,
         notesPanelHeight: 112,
@@ -1168,6 +1217,7 @@ export const useUIStore = create<UIStore>()(
         eventStreamStatus: 'idle',
         eventStreamHint: null,
         showReasoningTraces: true,
+        streamingAutoFollowEnabled: true,
         sessionRecapEnabled: true,
         sessionSuggestionEnabled: true,
         sessionGoalEnabled: true,
@@ -1234,11 +1284,13 @@ export const useUIStore = create<UIStore>()(
         maxLastMessageLength: 250,
 
         showTerminalQuickKeysOnDesktop: false,
+        sessionTabsEnabled: false,
         persistChatDraft: true,
         showOpenCodeUpdateNotifications: !isWindowsArm64(),
-        agentControlToolEnabled: true,
-        agentWebToolEnabled: true,
+        agentControlToolEnabled: false,
+        agentWebToolEnabled: false,
         inputSpellcheckEnabled: false,
+        largeTextPasteBehavior: DEFAULT_LARGE_TEXT_PASTE_BEHAVIOR,
         wideChatLayoutEnabled: false,
         codeBlockLineWrap: true,
         showToolFileIcons: true,
@@ -1317,6 +1369,23 @@ export const useUIStore = create<UIStore>()(
           set({ contextRailOrder: sanitized });
         },
 
+        setContextRailSurfaceVisible: (surfaceId, visible) => {
+          set((state) => {
+            const hidden = state.contextRailHiddenSurfaces;
+            const isHidden = hidden.includes(surfaceId);
+            if (visible === !isHidden) return state;
+            return {
+              contextRailHiddenSurfaces: visible
+                ? hidden.filter((entry) => entry !== surfaceId)
+                : [...hidden, surfaceId],
+            };
+          });
+        },
+
+        setContextRailHiddenSurfaces: (surfaceIds) => {
+          set({ contextRailHiddenSurfaces: [...new Set(surfaceIds)] });
+        },
+
         toggleContextEditorTree: () => {
           set((state) => ({ contextEditorTreeVisible: !state.contextEditorTreeVisible }));
         },
@@ -1325,7 +1394,7 @@ export const useUIStore = create<UIStore>()(
           if (!Number.isFinite(width)) {
             return;
           }
-          set({ contextEditorTreeWidth: Math.min(480, Math.max(200, Math.round(width))) });
+          set({ contextEditorTreeWidth: Math.min(EDITOR_TREE_MAX_WIDTH, Math.max(EDITOR_TREE_MIN_WIDTH, Math.round(width))) });
         },
 
         // Rail entry point: activates the most recent tab of the requested
@@ -1373,12 +1442,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          const sessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
-          const writeKey = tab.mode === 'browser'
-            ? readContextBrowserScopeKey(normalizedDirectory)
-            : tab.mode === 'chat' && sessionScope
-              ? sessionScope
-              : normalizedDirectory;
+          const explicitSessionScope = typeof tab.sessionScope === 'string' ? tab.sessionScope.trim() : '';
+          const sessionScope = explicitSessionScope
+            || (tab.mode === 'browser' ? readCurrentSessionScopeKey() : '');
+          const writeKey = (tab.mode === 'chat' || tab.mode === 'browser') && sessionScope
+            ? sessionScope
+            : normalizedDirectory;
 
           set((state) => {
             const prev = state.contextPanelByDirectory[writeKey];
@@ -1389,10 +1458,12 @@ export const useUIStore = create<UIStore>()(
               [writeKey]: nextWrite,
             };
 
-            if (tab.mode === 'browser' && writeKey !== normalizedDirectory) {
+            if ((tab.mode === 'chat' || tab.mode === 'browser') && writeKey !== normalizedDirectory) {
               const sessionPrev = byDirectory[normalizedDirectory];
               const sessionCurrent = touchContextPanelState(sessionPrev);
-              const leftoverBrowserTabs = sessionCurrent.tabs.filter((entry) => entry.mode === 'browser');
+              const leftoverBrowserTabs = tab.mode === 'browser'
+                ? sessionCurrent.tabs.filter((entry) => entry.mode === 'browser')
+                : [];
               if (leftoverBrowserTabs.length > 0) {
                 const existingIds = new Set(nextWrite.tabs.map((entry) => entry.id));
                 const toMove = leftoverBrowserTabs.filter((entry) => !existingIds.has(entry.id));
@@ -1406,16 +1477,9 @@ export const useUIStore = create<UIStore>()(
               byDirectory[normalizedDirectory] = {
                 ...sessionCurrent,
                 isOpen: true,
-                tabs: sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser'),
-                activeTabId: nextWrite.activeTabId,
-                touchedAt: Date.now(),
-              };
-            } else if (tab.mode === 'chat' && writeKey !== normalizedDirectory) {
-              const sessionPrev = byDirectory[normalizedDirectory];
-              const sessionCurrent = touchContextPanelState(sessionPrev);
-              byDirectory[normalizedDirectory] = {
-                ...sessionCurrent,
-                isOpen: true,
+                tabs: tab.mode === 'browser'
+                  ? sessionCurrent.tabs.filter((entry) => entry.mode !== 'browser')
+                  : sessionCurrent.tabs,
                 activeTabId: nextWrite.activeTabId,
                 touchedAt: Date.now(),
               };
@@ -1812,16 +1876,12 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          const writeKey = mode === 'browser'
-            ? readContextBrowserScopeKey(normalizedDirectory)
-            : normalizedDirectory;
-
           set((state) => {
-            const prev = state.contextPanelByDirectory[writeKey];
+            const prev = state.contextPanelByDirectory[normalizedDirectory];
             const current = touchContextPanelState(prev);
             const byDirectory = {
               ...state.contextPanelByDirectory,
-              [writeKey]: {
+              [normalizedDirectory]: {
                 ...current,
                 widthByMode: {
                   ...current.widthByMode,
@@ -1998,19 +2058,19 @@ export const useUIStore = create<UIStore>()(
         },
 
         toggleCommandPalette: () => {
-          set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen }));
+          set((state) => toggleCommandPaletteState(state));
         },
 
         setCommandPaletteOpen: (open) => {
-          set({ isCommandPaletteOpen: open });
+          set((state) => setCommandPaletteOpenState(open, state));
         },
 
         toggleHelpDialog: () => {
-          set((state) => ({ isHelpDialogOpen: !state.isHelpDialogOpen }));
+          set((state) => toggleHelpDialogState(state));
         },
 
         setHelpDialogOpen: (open) => {
-          set({ isHelpDialogOpen: open });
+          set((state) => setHelpDialogOpenState(open, state));
         },
 
         setAboutDialogOpen: (open) => {
@@ -2113,6 +2173,10 @@ export const useUIStore = create<UIStore>()(
 
         setShowReasoningTraces: (value) => {
           set({ showReasoningTraces: value });
+        },
+
+        setStreamingAutoFollowEnabled: (value) => {
+          set({ streamingAutoFollowEnabled: value });
         },
 
         setSessionRecapEnabled: (value) => {
@@ -2631,6 +2695,10 @@ export const useUIStore = create<UIStore>()(
           set({ showTerminalQuickKeysOnDesktop: value });
         },
 
+        setSessionTabsEnabled: (value) => {
+          set({ sessionTabsEnabled: value });
+        },
+
         setNotifyOnSubtasks: (value) => {
           set({ notifyOnSubtasks: value });
         },
@@ -2667,6 +2735,9 @@ export const useUIStore = create<UIStore>()(
         },
         setInputSpellcheckEnabled: (value) => {
           set({ inputSpellcheckEnabled: value });
+        },
+        setLargeTextPasteBehavior: (value) => {
+          set({ largeTextPasteBehavior: normalizeLargeTextPasteBehavior(value) });
         },
         setWideChatLayoutEnabled: (value) => {
           set({ wideChatLayoutEnabled: value });
@@ -2959,6 +3030,7 @@ export const useUIStore = create<UIStore>()(
           }
 
           state.fileEditorKeymap = normalizeFileEditorKeymap(state.fileEditorKeymap);
+          state.largeTextPasteBehavior = normalizeLargeTextPasteBehavior(state.largeTextPasteBehavior);
 
           if (typeof state.autoSaveEnabled !== 'boolean') {
             state.autoSaveEnabled = true;
@@ -2966,6 +3038,9 @@ export const useUIStore = create<UIStore>()(
 
           state.contextRailOrder = Array.isArray(state.contextRailOrder)
             ? (state.contextRailOrder as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim() !== '')
+            : [];
+          state.contextRailHiddenSurfaces = Array.isArray(state.contextRailHiddenSurfaces)
+            ? (state.contextRailHiddenSurfaces as unknown[]).filter((id): id is string => typeof id === 'string' && id.trim() !== '')
             : [];
 
           return state;
@@ -2976,6 +3051,7 @@ export const useUIStore = create<UIStore>()(
           sidebarWidth: state.sidebarWidth,
           contextPanelByDirectory: state.contextPanelByDirectory,
           contextRailOrder: state.contextRailOrder,
+          contextRailHiddenSurfaces: state.contextRailHiddenSurfaces,
           contextEditorTreeVisible: state.contextEditorTreeVisible,
           contextEditorTreeWidth: state.contextEditorTreeWidth,
           notesPanelHeight: state.notesPanelHeight,
@@ -2994,6 +3070,7 @@ export const useUIStore = create<UIStore>()(
           isSessionCreateDialogOpen: state.isSessionCreateDialogOpen,
           // Note: isSettingsDialogOpen intentionally NOT persisted
           showReasoningTraces: state.showReasoningTraces,
+          streamingAutoFollowEnabled: state.streamingAutoFollowEnabled,
           sessionRecapEnabled: state.sessionRecapEnabled,
           sessionSuggestionEnabled: state.sessionSuggestionEnabled,
           sessionGoalEnabled: state.sessionGoalEnabled,
@@ -3034,6 +3111,7 @@ export const useUIStore = create<UIStore>()(
           nativeNotificationsEnabled: state.nativeNotificationsEnabled,
           notificationMode: state.notificationMode,
           showTerminalQuickKeysOnDesktop: state.showTerminalQuickKeysOnDesktop,
+          sessionTabsEnabled: state.sessionTabsEnabled,
           notifyOnSubtasks: state.notifyOnSubtasks,
           dockBadgeEnabled: state.dockBadgeEnabled,
           notifyOnCompletion: state.notifyOnCompletion,
@@ -3049,6 +3127,7 @@ export const useUIStore = create<UIStore>()(
           agentControlToolEnabled: state.agentControlToolEnabled,
           agentWebToolEnabled: state.agentWebToolEnabled,
           inputSpellcheckEnabled: state.inputSpellcheckEnabled,
+          largeTextPasteBehavior: state.largeTextPasteBehavior,
           wideChatLayoutEnabled: state.wideChatLayoutEnabled,
           codeBlockLineWrap: state.codeBlockLineWrap,
           showToolFileIcons: state.showToolFileIcons,

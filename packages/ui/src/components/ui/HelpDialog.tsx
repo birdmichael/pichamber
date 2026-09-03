@@ -10,10 +10,11 @@ import { Icon } from "@/components/icon/Icon";
 import { useUIStore } from "@/stores/useUIStore";
 import {
   getEffectiveShortcutCombo,
+  getEffectiveShortcutPrefix,
   getShortcutAction,
-  getModifierLabel,
   formatShortcutForDisplay,
 } from "@/lib/shortcuts";
+import { getModifierLabel } from "@/lib/utils";
 import { useI18n, type I18nKey } from "@/lib/i18n";
 import { isVSCodeRuntime } from "@/lib/desktop";
 import type { IconName } from "@/components/icon/icons";
@@ -40,6 +41,9 @@ export const HelpDialog: React.FC = () => {
   const isHelpDialogOpen = useUIStore((state) => state.isHelpDialogOpen);
   const setHelpDialogOpen = useUIStore((state) => state.setHelpDialogOpen);
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
+  const handleHelpOpenChange = React.useCallback((open: boolean) => {
+    setHelpDialogOpen(open);
+  }, [setHelpDialogOpen]);
   const mod = getModifierLabel();
   const isVSCode = isVSCodeRuntime();
 
@@ -176,7 +180,7 @@ export const HelpDialog: React.FC = () => {
           keys: '',
         },
         {
-          keys: [`${mod} + 1...0`],
+          keys: [`${formatShortcutForDisplay(getEffectiveShortcutPrefix('switch_context_surface', shortcutOverrides))}${t('settings.openchamber.keyboardShortcuts.action.switch_context_surface.suffix')}`],
           descriptionKey: "helpDialog.item.switchContextSurface",
           icon: "layout-right",
         },
@@ -214,7 +218,7 @@ export const HelpDialog: React.FC = () => {
   ];
 
   return (
-      <Dialog open={isHelpDialogOpen} onOpenChange={setHelpDialogOpen}>
+      <Dialog open={isHelpDialogOpen} onOpenChange={handleHelpOpenChange}>
       <DialogContent className="max-w-2xl w-[min(42rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

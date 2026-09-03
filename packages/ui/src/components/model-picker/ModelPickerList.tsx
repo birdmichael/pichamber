@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getCurrentIntlLocale } from '@/lib/i18n';
 import { formatModelContextTokens, lookupModelMetadata, mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
 import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
+import { matchesRankQuery } from '@/lib/search/fuzzySearch';
 import { cn } from '@/lib/utils';
 import { useModelPickerSectionsStore } from '@/stores/useModelPickerSectionsStore';
 import type { ModelMetadata } from '@/types';
@@ -441,18 +442,18 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
     return hiddenModels.some((hidden) => hidden.providerID === providerID && hidden.modelID === modelID);
   }, [hiddenModels]);
 
-  const matchesQuery = React.useCallback((modelName: string, providerName: string) => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return true;
-    return modelName.toLowerCase().includes(query) || providerName.toLowerCase().includes(query);
-  }, [searchQuery]);
+  const matchesQuery = React.useCallback(
+    (modelName: string, providerName: string, modelID?: string) =>
+      matchesRankQuery([modelName, modelID, providerName], searchQuery),
+    [searchQuery],
+  );
 
   const filteredFavorites = React.useMemo(() => favoriteModels.filter(({ model, providerID, modelID }) => {
     if (allowedProviderSet && !allowedProviderSet.has(providerID)) return false;
     if (isModelAllowed && !isModelAllowed(providerID, modelID)) return false;
     if (isHidden(providerID, modelID)) return false;
     const providerName = providerById.get(providerID)?.name || providerID;
-    return matchesQuery(getModelDisplayName(model), providerName);
+    return matchesQuery(getModelDisplayName(model), providerName, modelID);
   }), [allowedProviderSet, favoriteModels, isHidden, isModelAllowed, matchesQuery, providerById]);
 
   const filteredRecents = React.useMemo(() => recentModels.filter(({ model, providerID, modelID }) => {
@@ -460,7 +461,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
     if (isModelAllowed && !isModelAllowed(providerID, modelID)) return false;
     if (isHidden(providerID, modelID)) return false;
     const providerName = providerById.get(providerID)?.name || providerID;
-    return matchesQuery(getModelDisplayName(model), providerName);
+    return matchesQuery(getModelDisplayName(model), providerName, modelID);
   }), [allowedProviderSet, isHidden, isModelAllowed, matchesQuery, providerById, recentModels]);
 
   const orderedProviders = React.useMemo(() => {
@@ -481,7 +482,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
         const modelID = typeof model.id === 'string' ? model.id : '';
         if (!modelID || isHidden(provider.id, modelID)) return false;
         if (isModelAllowed && !isModelAllowed(provider.id, modelID)) return false;
-        return matchesQuery(getModelDisplayName(model), provider.name || provider.id);
+        return matchesQuery(getModelDisplayName(model), provider.name || provider.id, modelID);
       });
       return { ...provider, models: filteredModels };
     })

@@ -5,7 +5,104 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Desktop: opening the app no longer sticks on Local Pi unavailable when the in-process kernel is still starting or already running. Retry Local re-checks live health instead of restarting a healthy local kernel.
+- Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
+
+## [1.2.11] - 2026-09-03
+
+- Settings: Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.
+- Chat: restoring a session no longer paints thinking as Medium. The composer menu only lists levels the kernel can apply (no catalog-only `xhigh` on Grok). Chip, send, and the transcript footer use the applied level.
+- Chat: changing the session thinking chip no longer writes Pi global defaults, so a new projectless chat still follows Settings.
+
+## [1.2.10] - 2026-09-03
+
+- **Desktop:** first launch stays on Chooser when the Pi kernel cannot start. A returning user with a dead kernel sees Recovery instead of the main chat.
+- **Desktop:** `/api/opencode/health` is unhealthy when the Pi kernel is down. A slow custom Node no longer latches as failed after 15s if the child is still starting.
+- Chat: Send with no model shows a toast instead of doing nothing.
+- Sessions: sidebar search keeps the query after you click a result. Ctrl+R restores the open session and its model chip.
+- Chat: reopening a long session no longer paints empty assistant bubbles. After reload, an existing session's model is rebound from the jsonl instead of Select model.
+- Chat: a new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium. The thinking menu uses the session's live levels (`off` / `minimal` when the kernel lists them) instead of leftover catalog `xhigh`.
+- Chat: switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+- Desktop: the context rail no longer shows the **配置面板** equalizer. Rail icons stay; hiding surfaces is not a sidebar control.
+- Desktop: host agent tools `pichamber` / `pichamber_web` are opt-in, which cuts send-path input tokens.
+
+## [1.2.9] - 2026-09-02
+
+- **Chat:** after Plan **Implement the plan** / **Implement here**, the next tool rows (Read, Shell, Edit) stay on that turn. Previously the reply kept running (`editing file`) while the transcript froze on Plan mode complete.
+- Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.
+- Settings: Feature Plugins Grok Usage installs `pi-xai` (not `pi-xai-oauth`). Providers gain xAI, and Work Status shows Grok usage. Uninstall also removes leftover `pi-xai-oauth`, so the card does not stay installed after a successful uninstall.
+- Sessions: an empty Chats block still shows the Chats heading and No chats yet. Leftover empty chat folders no longer hide that empty state.
+- Chat: opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
+- Desktop: Help → Diagnostics no longer lists leftover OpenCode PATH as Pi kernel resolution. It reports the bundled Pi Node runtime instead.
+
+## [1.2.8] - 2026-09-01
+
+- **Chat:** the transcript stays at the latest reply while it streams, unless you scroll away. Scrolling up is not stolen back, and resizing the window keeps the message you were reading in view. Settings → Chat can turn off following new content.
+- **Chat:** while a reply is running, Steer inserts your follow-up immediately so the agent sees it after the current tool. Queue still waits until the reply finishes, then sends queued messages one after another, including chats that are not the currently selected project.
+- **Desktop:** the browser panel follows the open conversation. Switching chats in the same project no longer reuses the previous chat's pages.
+- Settings: Language includes Türkçe. The interface and settings switch with the other shipped locales.
+- Desktop: choose which context-rail panels show; the choice is remembered after refresh. When session tabs are off, Cmd/Ctrl+Alt+Left/Right walks the sessions you opened in this window (with tabs on, those keys still switch adjacent tabs).
+- Desktop: optional session tabs in the header (off by default). Closing a tab leaves the chat in the sidebar; it does not archive or delete the session.
+- Settings: Keyboard shortcuts are recorded in a dialog (up to two combinations). Open/go actions use a Ctrl/Cmd+K leader; the command palette stays Ctrl/Cmd+P. Esc and X still close the dialog.
+- Desktop: With session tabs on, Ctrl/Cmd+1..9 switches tabs and Alt+W closes the current tab. Context panel surfaces move to Ctrl/Cmd+Alt+1..0.
+- Chat: comments, quotes, and terminal selections on a user message show as cards on that turn. Forking the turn puts the same context back on the composer.
+- Settings: the editor font size survives a restart, and number fields and selects no longer clip at large interface font sizes.
+- Projects: the folder picker can select several directories at once and add them together.
+- Settings/Providers: after saving an API key or signing in, the provider no longer shows "Credentials missing" with its models hidden until you switch away and back.
+- Themes: custom themes loaded through symlinks now work.
+- Debug: the debug panel (Ctrl/Cmd+Shift+D) has a Requests tab showing in-flight requests and their age over the last five minutes.
+- Search: searchable pickers rank best matches first, match multi-word queries in any order, and ignore punctuation.
+- Sessions: headers now find archived sessions too, so an archived session's title no longer goes missing.
+- Devices: re-pairing a phone keeps the device's existing name instead of resetting it.
+- Desktop: idle sessions can move into an existing worktree from the session menu. A confirm dialog appears when the source has uncommitted changes; cancel leaves everything in place, and a failed move rolls the session back.
+- Web: a notification with no title says Pichamber, not OpenChamber.
+- Multi-run: a group can include more than five models. There is no upper cap.
+- Chat: Chinese punctuation after a URL stays outside the link. Question cards render Markdown instead of raw `**bold**`. Completed thinking shows the full text. Streaming replies appear a paragraph or code line at a time so line numbers do not jump. The text-selection menu stays on screen near window edges. Typing `@` ranks files and folders together by how well they match.
+- Desktop: File → New Window during `electron:dev` loads the Vite UI origin, not the API sidecar, so the second window no longer 404s with “Static files not found”.
+- Desktop: extra windows no longer hijack the first window's session or project. A crashed renderer recovers instead of looping, packaged HTML is not served from cache on a fresh install, theme is remembered per instance, and an expired remote/password login shows a Log in banner.
+- Composer: empty and fenced-block carets stay visible, double-space still inserts a period on macOS, Ctrl/Cmd+1..9 does not switch sessions while typing, PageUp/PageDown no longer hides the Desktop title bar, and CJK IME composition does not jump the caret.
+- Desktop: Ctrl/Cmd+1..9 while the composer is focused no longer wipes the draft.
+- Files: a project whose root is a symlink can list/read/write files; large files use a virtualized preview; a macOS trackpad tap selects a file instead of starting a drag.
+- Chat no longer crashes or freezes on huge tool dumps, JavaScript template-string highlighting, truncated `Index:` diffs, or composer drafts with Windows (CRLF) line endings.
+- Git: checkout, stash, and merge refresh git status, and the history graph keeps a reused extra-parent lane on a double merge of the same branch.
+- Files: Markdown preview has in-document search (Ctrl/Cmd+F) with highlighting and next/previous, including when the preview is not focused.
+- Files: Escape in Markdown preview search closes the find bar, not the Files panel.
+- Git: the Git tab, Diff, Pull Request, Walkthrough, and Work Status follow a nested repository when the project folder is not itself a git repo. Pick another nested repo from the switcher.
+- Git: on detached HEAD, the pull request panel asks you to create a branch instead of offering Create PR with HEAD as the local branch.
+
+## [1.2.7] - 2026-09-01
+
+- **Desktop:** Mini Chat Window loads the Vite UI origin, not the API sidecar, so New Mini Chat no longer 404s with “Static files not found” during `electron:dev`.
+- **Desktop:** Ctrl+J opens Terminal with the same working-directory key as the rail. Empty Choose project shows the honest empty state; a selected folder starts a shell.
+- **Mobile:** Work Status Usage long status lines wrap under the provider row instead of clipping in the trailing value.
+- **Chat:** the sidebar stays live (dot + timer) while a Pi tool loop is still running, not only while the model is streaming text.
+- **Chat:** Plan Q&A **Implement here** / **Build** switches the composer to Agent like Composer **构建**, and the Plan banner does not stay on after implement starts.
+- **Settings:** the Pi version row can hint that a newer kernel is available without bringing back Update or Latest chrome.
+- **Desktop:** Windows NSIS afterPack unpacks `chalk` so the installer can finish; Mac `latest-mac.yml` is written after Apple Silicon notarization, and Intel is added to the same feed later.
+
+- **Mobile:** Sessions **+ new chat** closes the drawer on the first tap and opens a projectless chat. Previously the first tap did nothing and a second tap was required.
+- **Settings:** Feature Plugin install (including `pi-xai-oauth`) no longer 500s. The Node-kernel package manager now exposes `installAndPersist`, matching Pi's PackageManager.
+- **Chat / Desktop:** after Plan **Build** implement settles, the composer leaves disabled **building…**. Idle is `agent_settled` (live turn), not leftover `implementing` or adapter busy. Switching chats or Reload Pi no longer resurrects it.
+- **Desktop:** Git, Changes, and Diff empty copy no longer tells you to initialize or open a repository. Those panels have no such control. They now say Git status is available when this folder is already a Git repository.
+- **Desktop:** sidebar session search matches titles in chats as well as project lists. Extra characters that are not a substring drop the row: `renam` still finds `renamed-scan`; `renamzzz` does not.
+- **Desktop:** sidebar search lists matching chats rows, not only the header count.
+- **Desktop:** the Files tree shows names at a usable width, and dragging the splitter resizes it. Previously the editor min-width left a ~60px icon-only strip.
+- **Desktop:** Keyboard Shortcuts closes on X and Esc. Previously the X left the dialog up.
+- **Desktop:** Ctrl+P toggles a single command palette. Opening it on Shortcuts no longer stacks a second dim overlay.
+- **Desktop:** the sidebar Settings gear opens on the first press, not three clicks.
+- **Mobile:** after a Plan is ready, Build sits on the collapsed composer (pill), not only the workspace Plan tab.
+- **Mobile:** tapping Agent/Plan on the expanded composer opens the menu instead of collapsing the input.
+- **Mobile:** the model sheet lists Pi providers even when no project is open yet. Previously a cold start skipped `loadProviders` and showed “No providers or models match your search.”
+- **Mobile:** Settings home nav scrolls on a swipe. A tap still opens the page. Previously a finger-down on Chat/General (and the rest) opened that page immediately.
+- **Chat:** empty-state Schedule a Task and Craft a Goal send a short user line. The long instruction stays hidden, so the bubble and session title are not the internal prompt. User-visible chip copy says Pichamber, not OpenChamber.
+- **Desktop:** after the native Attach-files dialog (including Esc) or Settings open/close, the renderer takes keyboard focus again. Closing the composer `+` menu with Esc restores the textarea.
+- **Desktop:** Attach files uses the native open-file dialog without the tall GTK custom-type filter. On Linux the chooser is parented and immediately clamped to the display work area so Cancel/Open stay visible on an 800px screen.
+- **Chat:** Work Status Context sources counts the same active MCP servers as the MCP section, including adapter `cached`.
+- **Chat:** the Plan side panel no longer stays open empty on a session that has no plan. Build answers a pending Implement-here card even while the session is busy, and a second Build does not silently exit Plan. After Implement, the banner no longer says files will not be modified.
+- **Chat:** sidebar session rename commits on Enter, not only the check button.
+- **Chat:** the Files panel editor keeps a readable width beside the tree, and the split is resizable.
+- **Chat:** while a reply is running, Enter with Follow-up Queue is answered after the current run; Steer still course-corrects after the current tool. Previously both were dropped.
+- **Chat:** sending during a live Pi turn no longer toasts “Agent is already processing”, inserts a ghost user bubble, or drops Stop after the first assistant line. Queue shows a chip until the turn settles; Steer course-corrects without a second user turn. A rejected follow-up does not mark the still-running reply idle.
 
 ## [1.2.6] - 2026-08-30
 

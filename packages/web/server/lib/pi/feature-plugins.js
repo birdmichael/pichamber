@@ -9,7 +9,7 @@ import {
 } from './pi-resources.js';
 import { wrapPackageManagerWithElectronNativeTree } from './user-extension-electron-tree.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -18,7 +18,8 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
-  xai: 'npm:pi-xai-oauth',
+  xai: 'npm:pi-xai',
+  kimi: 'npm:pi-kimi-code-console-usage',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
@@ -115,6 +116,96 @@ export const listConfiguredPiPackageSources = (home = os.homedir()) => {
 export const isFeaturePluginSourceInstalled = (source, configuredSources = []) => (
   configuredSources.some((item) => featurePluginSourcesMatch(source, item))
 );
+
+/** Leftover oauth package still counts as the Grok Usage slot until uninstall. */
+export const XAI_CONFLICTING_OAUTH_SOURCE = 'npm:pi-xai-oauth';
+const XAI_SLOT_SOURCE_ALIASES = [DEFAULT_FEATURE_PLUGIN_SOURCES.xai, XAI_CONFLICTING_OAUTH_SOURCE];
+
+export const isXaiSlotSourceInstalled = (configuredSources = []) => (
+  XAI_SLOT_SOURCE_ALIASES.some((source) => isFeaturePluginSourceInstalled(source, configuredSources))
+);
+
+const packageUninstallUnavailableError = () => {
+  const error = new Error('Pi package uninstall is unavailable');
+  error.status = 503;
+  return error;
+};
+
+const xaiSlotStillInstalledError = (cause) => {
+  const error = cause instanceof Error
+    ? cause
+    : new Error('Grok Usage package is still installed');
+  if (error.status == null) error.status = 500;
+  return error;
+};
+
+/** npm uninstall of a missing alias must not block leftover oauth removal. */
+const removeFeaturePluginSourceAllowingMissing = async ({
+  manager,
+  source,
+  home = os.homedir(),
+}) => {
+  if (typeof manager?.removeAndPersist !== 'function') {
+    throw packageUninstallUnavailableError();
+  }
+  const spec = typeof source === 'string' ? source.trim() : '';
+  if (!spec) return;
+  const wasConfigured = isFeaturePluginSourceInstalled(
+    spec,
+    listConfiguredPiPackageSources(home),
+  );
+  try {
+    await manager.removeAndPersist(spec);
+  } catch (error) {
+    const stillConfigured = isFeaturePluginSourceInstalled(
+      spec,
+      listConfiguredPiPackageSources(home),
+    );
+    if (!wasConfigured && !stillConfigured) return;
+    throw error;
+  }
+};
+
+export const removeXaiConflictingOauthSource = async ({
+  manager,
+  home = os.homedir(),
+}) => {
+  try {
+    await removeFeaturePluginSourceAllowingMissing({
+      manager,
+      source: XAI_CONFLICTING_OAUTH_SOURCE,
+      home,
+    });
+  } catch (error) {
+    throw xaiSlotStillInstalledError(error);
+  }
+  if (isFeaturePluginSourceInstalled(
+    XAI_CONFLICTING_OAUTH_SOURCE,
+    listConfiguredPiPackageSources(home),
+  )) {
+    throw xaiSlotStillInstalledError(new Error('Leftover pi-xai-oauth is still installed'));
+  }
+};
+
+export const removeXaiSlotSources = async ({
+  manager,
+  home = os.homedir(),
+}) => {
+  if (typeof manager?.removeAndPersist !== 'function') {
+    throw packageUninstallUnavailableError();
+  }
+  const errors = [];
+  for (const source of XAI_SLOT_SOURCE_ALIASES) {
+    try {
+      await removeFeaturePluginSourceAllowingMissing({ manager, source, home });
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (isXaiSlotSourceInstalled(listConfiguredPiPackageSources(home))) {
+    throw xaiSlotStillInstalledError(errors[0]);
+  }
+};
 
 const defaultSlotConfig = (slot) => {
   const next = {
@@ -296,6 +387,14 @@ export const listFeaturePluginSlashCommands = (payload) => {
       source: 'extension',
     });
   }
+  const kimi = payload?.slots?.kimi;
+  if (kimi?.installed && kimi.enabled) {
+    listed.push({
+      name: 'kimi-usage',
+      description: 'Show Kimi Code subscription usage',
+      source: 'extension',
+    });
+  }
   return listed;
 };
 
@@ -307,7 +406,9 @@ export const toFeaturePluginsPayload = ({
   const slots = {};
   for (const slot of FEATURE_PLUGIN_SLOTS) {
     const entry = normalized[slot];
-    const installed = isFeaturePluginSourceInstalled(entry.source, configuredSources);
+    const installed = slot === 'xai'
+      ? isXaiSlotSourceInstalled(configuredSources)
+      : isFeaturePluginSourceInstalled(entry.source, configuredSources);
     slots[slot] = {
       ...entry,
       installed,

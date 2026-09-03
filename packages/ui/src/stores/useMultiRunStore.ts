@@ -17,6 +17,7 @@ import { useSnippetsStore } from './useSnippetsStore';
 import { useGlobalSessionsStore } from './useGlobalSessionsStore';
 import { getMultiRunSessionTitle } from '@/lib/multirun/title';
 import { getSyncChildStores, registerSessionDirectory } from '@/sync/sync-refs';
+import { MAX_MODELS_PER_GROUP, canAddModelToGroup } from '@/components/multirun/multiRunLimits';
 
 const toGitSafeSlug = (value: string): string => {
   return value
@@ -159,8 +160,8 @@ export const useMultiRunStore = create<MultiRunStore>()(
             set({ error: `Group ${gi + 1}: select at least 1 model` });
             return null;
           }
-          if (groups[gi].models.length > 5) {
-            set({ error: `Group ${gi + 1}: maximum 5 models allowed` });
+          if (!canAddModelToGroup(groups[gi].models.length)) {
+            set({ error: `Group ${gi + 1}: maximum ${MAX_MODELS_PER_GROUP} models allowed` });
             return null;
           }
         }

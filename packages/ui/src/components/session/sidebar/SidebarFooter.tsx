@@ -39,9 +39,10 @@ export function SidebarFooter({
 }: Props): React.ReactNode {
   const { t } = useI18n();
   const [settingsTooltipOpen, setSettingsTooltipOpen] = React.useState(false);
+
   const ignoreSettingsClickRef = React.useRef(false);
 
-  const handleSettingsPointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+  const handleSettingsPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     ignoreSettingsClickRef.current = activateTitlebarIconOnPointerDown({
       button: event.button,
       closeHoverUi: () => setSettingsTooltipOpen(false),
@@ -50,16 +51,17 @@ export function SidebarFooter({
         onOpenSettings();
       },
     });
-  }, [onOpenSettings]);
+  };
 
-  const handleSettingsClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleSettingsClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (ignoreSettingsClickRef.current) {
       ignoreSettingsClickRef.current = false;
       event.preventDefault();
       return;
     }
+    markSettingsOpenedFromTrigger();
     onOpenSettings();
-  }, [onOpenSettings]);
+  };
 
   if (!showRuntimeButtons && !showUpdateButton) {
     return null;

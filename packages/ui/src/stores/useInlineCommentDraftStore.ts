@@ -4,7 +4,7 @@ import { getRuntimeKey } from '@/lib/runtime-switch';
 import { normalizePath } from '@/lib/pathNormalization';
 import { createDeferredSafeJSONStorage } from './utils/safeStorage';
 
-export type InlineCommentSource = 'diff' | 'plan' | 'file' | 'preview-console' | 'preview-annotation' | 'terminal' | 'pr-comment' | 'pr-check';
+export type InlineCommentSource = 'diff' | 'plan' | 'file' | 'preview-console' | 'preview-annotation' | 'terminal' | 'pr-comment' | 'pr-check' | 'chat-quote' | 'file-quote';
 
 export type InlineCommentDraftTarget = {
   directory: string;
@@ -22,6 +22,8 @@ export interface InlineCommentDraft {
   code: string;
   language: string;
   text: string;
+  /** Owning terminal session; set only for `source: 'terminal'`. */
+  terminalId?: string;
   createdAt: number;
 }
 

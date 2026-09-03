@@ -13,7 +13,12 @@ import { MobileOverlayPanel } from '@/components/ui/MobileOverlayPanel';
 import { toast } from '@/components/ui';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
 import { AgentSelector } from '@/components/sections/commands/AgentSelector';
-import { isPrimaryMode } from '@/components/chat/mobileControlsUtils';
+import { formatEffortLabel, isPrimaryMode } from '@/components/chat/mobileControlsUtils';
+import {
+  nextScheduledTaskThinkingVariant,
+  persistScheduledTaskThinkingVariant,
+  resolveForkThinkingLevels,
+} from '@/components/session/forkThinkingLevels';
 import { CommandAutocomplete, type CommandAutocompleteHandle, type CommandInfo } from '@/components/chat/CommandAutocomplete';
 import { FileMentionAutocomplete, type FileMentionHandle } from '@/components/chat/FileMentionAutocomplete';
 import { SnippetAutocomplete, type SnippetAutocompleteHandle } from '@/components/chat/SnippetAutocomplete';
@@ -737,6 +742,8 @@ export function ScheduledTaskEditorDialog(props: {
   const loadProviders = useConfigStore((state) => state.loadProviders);
   const loadAgents = useConfigStore((state) => state.loadAgents);
   const providers = useConfigStore((state) => state.providers);
+  const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+  const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
   const currentProviderID = useConfigStore((state) => state.currentProviderId);
   const currentModelID = useConfigStore((state) => state.currentModelId);
   const currentVariant = useConfigStore((state) => state.currentVariant || '');
@@ -849,29 +856,46 @@ export function ScheduledTaskEditorDialog(props: {
     const model = provider?.models?.find((item) => item.id === draft.execution.modelID) as { variants?: Record<string, unknown> } | undefined;
     return model?.variants ? Object.keys(model.variants) : [];
   }, [providers, draft.execution.providerID, draft.execution.modelID]);
-  const hasVariantOptions = variantOptions.length > 0;
+  const thinkingLevels = React.useMemo(
+    () => resolveForkThinkingLevels({
+      isPiKernel,
+      providerId: draft.execution.providerID,
+      modelId: draft.execution.modelID,
+      getModelMetadata,
+      variantKeys: variantOptions,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
+    [draft.execution.modelID, draft.execution.providerID, getModelMetadata, isPiKernel, modelsMetadata, variantOptions],
+  );
+  const hasThinkingLevels = thinkingLevels.length > 0;
+  const selectedModelKnown = React.useMemo(() => {
+    const provider = providers.find((item) => item.id === draft.execution.providerID);
+    return Boolean(provider?.models?.some((item) => item.id === draft.execution.modelID));
+  }, [draft.execution.modelID, draft.execution.providerID, providers]);
   const selectedVariantValue = React.useMemo(() => {
-    if (!hasVariantOptions) {
-      return '__default';
-    }
     if (!draft.execution.variant) {
       return '__default';
     }
-    return variantOptions.includes(draft.execution.variant) ? draft.execution.variant : '__default';
-  }, [draft.execution.variant, hasVariantOptions, variantOptions]);
+    return thinkingLevels.includes(draft.execution.variant) ? draft.execution.variant : '__default';
+  }, [draft.execution.variant, thinkingLevels]);
 
   React.useEffect(() => {
-    if (hasVariantOptions || !draft.execution.variant) {
+    const nextVariant = nextScheduledTaskThinkingVariant({
+      thinkingLevels,
+      modelKnown: selectedModelKnown,
+      currentVariant: draft.execution.variant,
+    });
+    if (nextVariant === undefined) {
       return;
     }
     setDraft((prev) => ({
       ...prev,
       execution: {
         ...prev.execution,
-        variant: '',
+        variant: nextVariant,
       },
     }));
-  }, [hasVariantOptions, draft.execution.variant]);
+  }, [draft.execution.variant, selectedModelKnown, thinkingLevels]);
 
   const toggleWeekday = React.useCallback((weekday: number, nextChecked: boolean) => {
     setDraft((prev) => {
@@ -1153,6 +1177,11 @@ export function ScheduledTaskEditorDialog(props: {
     }
 
     const pinnedAgent = resolvePinnedPiAgentName(isPiKernel, draft.execution.agent);
+    const thinkingVariant = persistScheduledTaskThinkingVariant({
+      thinkingLevels,
+      modelKnown: selectedModelKnown,
+      currentVariant: draft.execution.variant,
+    });
     const payload: Partial<ScheduledTask> = {
       ...(draft.id ? { id: draft.id } : {}),
       name: draft.name.trim(),
@@ -1176,7 +1205,7 @@ export function ScheduledTaskEditorDialog(props: {
         prompt: draft.execution.prompt,
         providerID: draft.execution.providerID,
         modelID: draft.execution.modelID,
-        ...(draft.execution.variant.trim() ? { variant: draft.execution.variant.trim() } : {}),
+        ...(thinkingVariant ? { variant: thinkingVariant } : {}),
         ...(pinnedAgent ? { agent: pinnedAgent } : {}),
         ...(draft.execution.permissionAutoAccept ? { permissionAutoAccept: true } : {}),
         ...(draft.execution.goalEnabled ? { goalEnabled: true } : {}),
@@ -1196,7 +1225,7 @@ export function ScheduledTaskEditorDialog(props: {
     } finally {
       setSaving(false);
     }
-  }, [draft, isPiKernel, onOpenChange, onSave, t]);
+  }, [draft, isPiKernel, onOpenChange, onSave, selectedModelKnown, t, thinkingLevels]);
 
   const descriptionId = React.useId();
   const hasOpenFloatingMenu = React.useCallback(() => {
@@ -1522,11 +1551,11 @@ export function ScheduledTaskEditorDialog(props: {
               />
             </div>
 
+            {hasThinkingLevels ? (
             <div className="flex min-w-0 flex-col gap-1">
               <FieldLabel>{t('sessions.scheduledTasks.editor.thinkingLevel.label')}</FieldLabel>
               <Select
                 value={selectedVariantValue}
-                disabled={!hasVariantOptions}
                 onValueChange={(value) => {
                   setDraft((prev) => ({
                     ...prev,
@@ -1541,17 +1570,18 @@ export function ScheduledTaskEditorDialog(props: {
                   <SelectValue>
                     {(value) => value === '__default'
                       ? t('sessions.scheduledTasks.editor.thinkingLevel.default')
-                      : value}
+                      : formatEffortLabel(typeof value === 'string' ? value : '')}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__default">{t('sessions.scheduledTasks.editor.thinkingLevel.default')}</SelectItem>
-                  {variantOptions.map((variant) => (
-                    <SelectItem key={variant} value={variant}>{variant}</SelectItem>
+                  {thinkingLevels.map((level) => (
+                    <SelectItem key={level} value={level}>{formatEffortLabel(level)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            ) : null}
           </div>
 
           {showAgentPicker ? (

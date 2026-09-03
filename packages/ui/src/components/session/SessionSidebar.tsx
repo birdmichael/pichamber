@@ -76,13 +76,21 @@ import {
   type DeleteFolderConfirmState,
   type DeleteSessionConfirmState,
 } from './sidebar/ConfirmDialogs';
+import { SessionWorktreeMoveConfirmDialog } from './sidebar/SessionWorktreeMoveConfirmDialog';
+import {
+  cancelSessionTreeMove,
+  confirmSessionTreeMove,
+  useSessionTreeMoveConfirmation,
+} from '@/lib/worktrees/sessionWorktreeMove';
 import { BulkActionBar } from './sidebar/BulkActionBar';
 import { useSidebarBulkActions } from './sidebar/hooks/useSidebarBulkActions';
 import { useSessionDisplayStore } from '@/stores/useSessionDisplayStore';
 import { type SessionGroup, type SessionNode } from './sidebar/types';
 import {
+  countSidebarSearchMatches,
   deriveRecentSessions,
   selectRecentSessionsWithoutWorkspaceGroup,
+  shouldShowSidebarActivitySections,
 } from './sidebar/activitySections';
 import { useSessionPinnedStore } from '@/stores/useSessionPinnedStore';
 import {
@@ -300,6 +308,12 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const { t } = useI18n();
   const [isSessionSearchOpen, setIsSessionSearchOpen] = React.useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = React.useState('');
+
+  React.useEffect(() => {
+    const openSearch = () => setIsSessionSearchOpen(true);
+    window.addEventListener('openchamber:sidebar-session-search', openSearch);
+    return () => window.removeEventListener('openchamber:sidebar-session-search', openSearch);
+  }, []);
   const sessionSearchContainerRef = React.useRef<HTMLDivElement | null>(null);
   const sessionSearchInputRef = React.useRef<HTMLInputElement | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -489,6 +503,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     liveFallbackCacheRef.current = { signature, sessions: candidates };
     return candidates;
   })();
+  const worktreeMoveConfirmation = useSessionTreeMoveConfirmation();
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
@@ -1978,8 +1993,20 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
     return renderGroupSessions(group, 'managed-chats', null, true);
   }, [homeDirectory, renderGroupSessions, renderSessionNode, t]);
 
+  const showActivitySections = shouldShowSidebarActivitySections({
+    isVSCode,
+    hasSessionSearchQuery,
+    hasActivitySectionItems,
+    activitySections,
+  });
+  const sidebarSearchMatchCount = countSidebarSearchMatches(
+    hasSessionSearchQuery,
+    searchMatchCount,
+    activitySections,
+  );
+
   const topContent = React.useMemo(
-    () => (!isVSCode && !hasSessionSearchQuery && hasActivitySectionItems) ? (
+    () => showActivitySections ? (
       <SidebarActivitySections
         sections={activitySections}
         renderSessionNode={renderSessionNode}
@@ -1993,7 +2020,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         renderChatsSection={renderChatsSection}
       />
     ) : null,
-    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewChatFromChatsRow, hasActivitySectionItems, hasSessionSearchQuery, isDesktopShellRuntime, isVSCode, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode],
+    [activitySections, alwaysShowSidebarActions, editingId, handleOpenNewChatFromChatsRow, isDesktopShellRuntime, openSidebarMenuKey, recentExpandedParents, renderChatsSection, renderSessionNode, showActivitySections],
   );
 
   return (
@@ -2065,7 +2092,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         sessionSearchQuery={sessionSearchQuery}
         setSessionSearchQuery={setSessionSearchQuery}
         hasSessionSearchQuery={hasSessionSearchQuery}
-        searchMatchCount={searchMatchCount}
+        searchMatchCount={sidebarSearchMatchCount}
         collapseAllProjects={collapseAllProjects}
         expandAllProjects={expandAllProjects}
         selectionModeEnabled={selectionModeEnabled}
@@ -2172,6 +2199,13 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         }}
         project={editingProject}
         onSave={handleSaveProjectEdit}
+      />
+
+      <SessionWorktreeMoveConfirmDialog
+        value={worktreeMoveConfirmation}
+        onMoveSessionOnly={() => confirmSessionTreeMove(false)}
+        onMoveAllChanges={() => confirmSessionTreeMove(true)}
+        onCancel={cancelSessionTreeMove}
       />
 
       <NewWorktreeDialog

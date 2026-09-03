@@ -63,7 +63,7 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
     );
   }
 
-  const disabled = chrome.busy || pending || !chrome.sessionID || !selected;
+  const disabled = chrome.buildDisabled || pending || !chrome.sessionID || !selected;
 
   const build = async () => {
     if (!chrome.sessionID || !selected) return;
@@ -114,7 +114,18 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
           })}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button type="button" size="sm" disabled={disabled} onClick={() => void build()}>
+      <Button
+        type="button"
+        size="sm"
+        disabled={disabled}
+        // Block focus transfer so tapping Build on the pill does not expand
+        // or collapse the composer. onClick still fires.
+        onMouseDown={(event) => event.preventDefault()}
+        onPointerDownCapture={(event) => {
+          if (event.pointerType === 'touch') event.preventDefault();
+        }}
+        onClick={() => void build()}
+      >
         {t('chat.piPlan.build')}
       </Button>
     </div>

@@ -164,6 +164,7 @@ const GeneralSectionContent: React.FC = () => {
                 'fileEditorKeymap',
                 'autoSaveEnabled',
                 'expandedEditorToolbar',
+                ...(!isVSCode ? ['sessionTabs' as const] : []),
                 ...(!isVSCode ? ['terminalQuickKeys' as const] : []),
                 ...(!isVSCode ? ['terminalShell' as const] : []),
                 ...(!isVSCode ? ['terminalLoginShell' as const] : []),
@@ -222,6 +223,7 @@ const ChatSectionContent: React.FC = () => {
                 'followUpBehavior',
                 'persistDraft',
                 'inputSpellcheck',
+                'largeTextPaste',
             ]}
         />
     );

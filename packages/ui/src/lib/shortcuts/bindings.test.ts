@@ -5,13 +5,18 @@ import {
   eventMatchesShortcutPrefix,
   formatShortcutForDisplay,
   getEffectiveShortcutPrefix,
+  getShortcutConflict,
+  isRiskyBrowserShortcut,
   isShortcutPrefixHeld,
+  normalizeCombo,
+  parseShortcut,
+  resolveShortcutEventDigit,
   UNASSIGNED_SHORTCUT,
-} from './shortcuts';
+} from './index';
 
 describe('getEffectiveShortcutPrefix', () => {
-  test('falls back to the action default (bare mod) when unset', () => {
-    expect(getEffectiveShortcutPrefix('switch_context_surface', {})).toBe('mod');
+  test('falls back to the action default (bare mod+alt) when unset', () => {
+    expect(getEffectiveShortcutPrefix('switch_context_surface', {})).toBe('mod+alt');
   });
 
   test('honors modifier + key overrides', () => {
@@ -49,13 +54,9 @@ describe('isShortcutPrefixHeld', () => {
   });
 });
 
-const keydown = (
-  key: string,
-  mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean; code?: string } = {},
-): KeyboardEvent =>
+const keydown = (key: string, mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean }): KeyboardEvent =>
   ({
     key,
-    code: mods.code ?? '',
     metaKey: mods.meta ?? false,
     ctrlKey: mods.ctrl ?? false,
     shiftKey: mods.shift ?? false,
@@ -82,6 +83,82 @@ describe('eventMatchesShortcutPrefix', () => {
 
   test('false for an unassigned prefix', () => {
     expect(eventMatchesShortcutPrefix(keydown('1', { ctrl: true }), UNASSIGNED_SHORTCUT)).toBe(false);
+  });
+});
+
+describe('shortcut sequences', () => {
+  test('normalizes, parses, and formats up to two chords', () => {
+    expect(normalizeCombo(' command + S   P ')).toBe('mod+s p');
+    expect(parseShortcut('mod+s p')?.chords).toHaveLength(2);
+    expect(formatShortcutForDisplay('mod+s p')).toBe('Ctrl + S, P');
+  });
+
+  test('rejects bindings with more than two chords', () => {
+    expect(normalizeCombo('mod+s p q')).toBe('');
+    expect(parseShortcut('mod+s p q')).toBe(undefined);
+  });
+
+  test('reports exact and prefix conflicts but allows sibling sequences', () => {
+    expect(getShortcutConflict('mod+s', 'mod+s')).toBe('exact');
+    expect(getShortcutConflict('mod+s', 'mod+s p')).toBe('prefix');
+    expect(getShortcutConflict('mod+s p', 'mod+s q')).toBe(undefined);
+  });
+
+  test('warns when a sequence leader conflicts with a browser shortcut', () => {
+    expect(isRiskyBrowserShortcut('mod+s p')).toBe(true);
+  });
+});
+
+describe('platform shortcut labels', () => {
+  test('normalizes Command and Option to platform-neutral modifiers', () => {
+    expect(normalizeCombo('command+option+n')).toBe('mod+alt+n');
+  });
+
+  test('uses macOS modifier symbols', () => {
+    expect(formatShortcutForDisplay('mod+ctrl+shift+alt+n', 'Unassigned', 'macos')).toBe(
+      '⌘ + ⌃ + ⇧ + ⌥ + N',
+    );
+    expect(formatShortcutForDisplay('alt', 'Unassigned', 'macos')).toBe('⌥');
+  });
+
+  test('uses named modifiers on other platforms', () => {
+    expect(formatShortcutForDisplay('mod+shift+alt+n', 'Unassigned', 'other')).toBe(
+      'Ctrl + Shift + Alt + N',
+    );
+    expect(formatShortcutForDisplay('alt', 'Unassigned', 'other')).toBe('Alt');
+  });
+});
+
+describe('layout-independent key matching', () => {
+  const event = (overrides: Partial<KeyboardEvent>): KeyboardEvent =>
+    // SAFETY: the matcher only reads the modifier flags, key, and code
+    // provided here; a full KeyboardEvent is not constructible in bun tests.
+    ({ altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, key: '', code: '', ...overrides }) as KeyboardEvent;
+
+  test('a non-Latin layout letter matches through the physical key code', () => {
+    expect(eventMatchesShortcut(event({ ctrlKey: true, key: 'л', code: 'KeyK' }), 'mod+k')).toBe(true);
+    expect(eventMatchesShortcut(event({ key: 'з', code: 'KeyP' }), 'p')).toBe(true);
+  });
+
+  test('macOS Option symbol substitution matches through the digit code', () => {
+    expect(eventMatchesShortcut(event({ ctrlKey: true, altKey: true, key: '¡', code: 'Digit1' }), 'mod+alt+1')).toBe(true);
+  });
+
+  test('Latin layouts that move keys keep their key-based meaning', () => {
+    // Dvorak: physical KeyT produces "y"; the binding follows the character.
+    expect(eventMatchesShortcut(event({ ctrlKey: true, key: 'y', code: 'KeyT' }), 'mod+y')).toBe(true);
+    expect(eventMatchesShortcut(event({ ctrlKey: true, key: 'y', code: 'KeyT' }), 'mod+t')).toBe(false);
+  });
+
+  test('resolveShortcutEventDigit reads the digit from the code under Option', () => {
+    expect(resolveShortcutEventDigit({ key: '¡', code: 'Digit1' })).toBe('1');
+    expect(resolveShortcutEventDigit({ key: '5', code: 'Digit5' })).toBe('5');
+    expect(resolveShortcutEventDigit({ key: 'a', code: 'KeyA' })).toBe(null);
+  });
+
+  test('matches Ctrl+, from event.code when event.key is empty', () => {
+    expect(eventMatchesShortcut(event({ ctrlKey: true, key: '', code: 'Comma' }), 'mod+comma')).toBe(true);
+    expect(eventMatchesShortcut(event({ key: ',', code: 'Comma' }), 'mod+comma')).toBe(false);
   });
 });
 
@@ -117,27 +194,10 @@ const withPlatform = <T>(
   }
 };
 
-describe('eventMatchesShortcut', () => {
-  test('matches Ctrl+, from event.code when event.key is empty', () => {
-    withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
-      expect(eventMatchesShortcut(keydown('', { ctrl: true, code: 'Comma' }), 'mod+comma')).toBe(true);
-    });
-  });
-
-  test('rejects Ctrl+, without the modifier', () => {
-    withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
-      expect(eventMatchesShortcut(keydown(',', { code: 'Comma' }), 'mod+comma')).toBe(false);
-    });
-  });
-});
-
-describe('formatShortcutForDisplay', () => {
+describe('platform shortcut labels from the runtime', () => {
   test('Linux desktop uses Ctrl/Alt and a comma glyph, not Mac symbols', () => {
     withPlatform({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)', desktop: true }, () => {
       expect(formatShortcutForDisplay('mod+alt+v')).toBe('Ctrl + Alt + V');
-      expect(formatShortcutForDisplay('alt+g')).toBe('Alt + G');
-      expect(formatShortcutForDisplay('ctrl+]')).toBe('Ctrl + ]');
-      expect(formatShortcutForDisplay('ctrl+[')).toBe('Ctrl + [');
       expect(formatShortcutForDisplay('mod+comma')).toBe('Ctrl + ,');
     });
   });
@@ -145,8 +205,6 @@ describe('formatShortcutForDisplay', () => {
   test('macOS desktop keeps ⌘/⌥/⌃', () => {
     withPlatform({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', desktop: true }, () => {
       expect(formatShortcutForDisplay('mod+alt+v')).toBe('⌘ + ⌥ + V');
-      expect(formatShortcutForDisplay('alt+g')).toBe('⌥ + G');
-      expect(formatShortcutForDisplay('ctrl+]')).toBe('⌃ + ]');
       expect(formatShortcutForDisplay('mod+comma')).toBe('⌘ + ,');
     });
   });

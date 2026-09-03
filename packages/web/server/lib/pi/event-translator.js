@@ -64,6 +64,8 @@ export const createEventTranslator = ({
   let assistantCompletedAt = null;
   let assistantParentID = null;
   let userMessageID = null;
+  // Visible facade user id outlives agent_settled; never a non-msg_/usr_ id.
+  let visibleUserMessageID = null;
   let agent = 'pi';
   let model = undefined;
   let lastUsage = undefined;
@@ -74,10 +76,12 @@ export const createEventTranslator = ({
     now: now(),
   });
 
+  const facadeUserParentID = () => userMessageID || visibleUserMessageID || '';
+
   const setAssistantMessage = (messageID) => {
     assistantMessageID = messageID;
     if (assistantCreatedAt == null) assistantCreatedAt = now();
-    if (!assistantParentID && userMessageID) assistantParentID = userMessageID;
+    if (!assistantParentID && facadeUserParentID()) assistantParentID = facadeUserParentID();
   };
 
   const setFallbackModel = (next) => {
@@ -86,6 +90,7 @@ export const createEventTranslator = ({
 
   const setUserMessage = (messageID, extras = {}) => {
     userMessageID = messageID;
+    if (messageID) visibleUserMessageID = messageID;
     if (typeof extras.agent === 'string' && extras.agent.trim()) {
       agent = extras.agent;
     }
@@ -102,7 +107,7 @@ export const createEventTranslator = ({
     assistantMessageID = messageID || nextMessageId();
     assistantCreatedAt = now();
     assistantCompletedAt = null;
-    assistantParentID = userMessageID;
+    assistantParentID = facadeUserParentID();
     textParts.clear();
     reasoningParts.clear();
     toolParts.clear();
@@ -138,7 +143,7 @@ export const createEventTranslator = ({
       role: 'assistant',
       // OpenCode chat turns group assistants by parentID === user message id.
       // Without this the UI drops the reply (streaming and on reload).
-      parentID: assistantParentID || userMessageID || '',
+      parentID: assistantParentID || facadeUserParentID(),
       ...(usable ? {
         modelID: usable.modelID,
         providerID: usable.providerID,
@@ -364,6 +369,20 @@ export const createEventTranslator = ({
         return [event('session.status', { sessionID, status: { type: 'busy' } })];
 
       case 'agent_settled':
+        // Next turn's Pi user message_start must not be swallowed as an echo of
+        // the previous promptAsync insert. Steer/followUp never take this slot.
+        userMessageID = null;
+        // Tools after settle (ctx.ui implement) must not reuse the completed
+        // plan-mode assistant. Keep visibleUserMessageID for parentID.
+        assistantMessageID = null;
+        assistantCreatedAt = null;
+        assistantCompletedAt = null;
+        assistantParentID = null;
+        textParts.clear();
+        reasoningParts.clear();
+        toolParts.clear();
+        toolStartTimes.clear();
+        lastUsage = undefined;
         return [
           event('session.status', { sessionID, status: { type: 'idle' } }),
           event('session.idle', { sessionID }),
@@ -407,10 +426,10 @@ export const createEventTranslator = ({
           }
           const incomingId = typeof message.id === 'string' ? message.id : '';
           if (incomingId && !/^(msg_|usr_)/.test(incomingId)) {
-            userMessageID = incomingId;
             return [];
           }
           userMessageID = incomingId || nextMessageId();
+          visibleUserMessageID = userMessageID;
           const partID = nextPartId();
           return [
             messageUpdated({
@@ -566,6 +585,10 @@ export const createEventTranslator = ({
     translate,
     setAssistantMessage,
     setUserMessage,
+    clearUserMessage() {
+      userMessageID = null;
+      visibleUserMessageID = null;
+    },
     setFallbackModel,
     getFallbackModel() {
       return resolvedFallback;
@@ -580,10 +603,12 @@ export const createEventTranslator = ({
   };
 };
 
-export const extractPromptText = (parts) => {
+export const extractPromptText = (parts, options = {}) => {
   if (!Array.isArray(parts)) return '';
+  const includeSynthetic = options.includeSynthetic !== false;
   return parts
     .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+    .filter((part) => includeSynthetic || !part.synthetic)
     .map((part) => part.text)
     .join('\n')
     .trim();

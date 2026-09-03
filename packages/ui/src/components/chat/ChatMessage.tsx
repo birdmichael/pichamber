@@ -41,6 +41,7 @@ import { getContextObligatoryMessages } from '@/lib/contextObligatoryMessages';
 import { setContextObligatoryMessage } from '@/sync/session-actions';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { canOfferOpenCodeSessionStub, usePiKernel } from '@/lib/usePiKernel';
+import { parsePiThinkingLevel, resolveTranscriptThinkingLabel } from './piThinking';
 import { focusChatInput } from './composer/editor/dom';
 
 const ToolOutputDialog = lazyWithChunkRecovery(() => import('./message/ToolOutputDialog'));
@@ -249,13 +250,20 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         const providerID = getMessageInfoProp(previousMessage.info, 'providerID');
         const modelID = getMessageInfoProp(previousMessage.info, 'modelID');
         const variant = getMessageInfoProp(previousMessage.info, 'variant');
+        const thinking = getMessageInfoProp(previousMessage.info, 'thinking');
+        const model = getMessageInfoProp(previousMessage.info, 'model');
+        const modelVariant = typeof model === 'object' && model !== null
+            ? (model as { variant?: unknown }).variant
+            : undefined;
         const resolvedAgent =
             typeof mode === 'string' && mode.trim().length > 0
                 ? mode
                 : (typeof agent === 'string' && agent.trim().length > 0 ? agent : undefined);
         const resolvedProvider = typeof providerID === 'string' && providerID.trim().length > 0 ? providerID : undefined;
         const resolvedModel = typeof modelID === 'string' && modelID.trim().length > 0 ? modelID : undefined;
-        const resolvedVariant = typeof variant === 'string' && variant.trim().length > 0 ? variant : undefined;
+        const resolvedThinking = resolveTranscriptThinkingLabel({ thinking, variant, modelVariant });
+        const resolvedVariant = resolvedThinking
+            ?? (typeof variant === 'string' && variant.trim().length > 0 ? variant : undefined);
 
         if (!resolvedAgent && !resolvedProvider && !resolvedModel && !resolvedVariant) {
             return null;
@@ -689,8 +697,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }, []);
 
     const headerVariantRaw = !isUser ? (turnGroupingContext?.userMessageVariant ?? previousUserMetadata?.variant) : undefined;
-
-    const headerVariant = !isUser && modelHasVariants ? (headerVariantRaw ?? 'Default') : undefined;
+    const piFooterThinking = parsePiThinkingLevel(headerVariantRaw);
+    const headerVariant = !isUser
+        ? (piFooterThinking
+            ? piFooterThinking
+            : (modelHasVariants ? (headerVariantRaw ?? 'Default') : undefined))
+        : undefined;
 
     // Summary body removed — flat rendering means text is always inline.
 
@@ -1182,6 +1194,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                 footerModelName={headerModelName}
                                 footerAgentName={headerAgentName}
                                 footerVariant={headerVariant}
+                                footerTokens={getMessageInfoProp(message.info, 'tokens')}
+                                footerCost={getMessageInfoProp(message.info, 'cost')}
                                 isDarkTheme={isDarkTheme}
                             />
 

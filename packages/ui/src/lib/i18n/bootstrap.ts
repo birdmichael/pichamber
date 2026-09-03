@@ -209,6 +209,25 @@ const JA_MESSAGES: BootstrapMessages = {
   loadingData: (providersText, agentsText) => `データを読み込み中 (${providersText}, ${agentsText})…`,
 };
 
+const TR_MESSAGES: BootstrapMessages = {
+  startingApi: 'Pi başlatılıyor…',
+  initializing: 'Başlatılıyor…',
+  connecting: 'Bağlanılıyor…',
+  connected: 'Bağlandı!',
+  connectionError: 'Bağlantı hatası',
+  disconnected: 'Bağlantı kesildi',
+  reconnecting: 'Yeniden bağlanılıyor…',
+  initialDataLoadFailed: 'Pi bağlandı, ancak ilk veri yüklemesi başarısız oldu.',
+  cliNotFound: 'Pi CLI bulunamadı. Lütfen önce kurun.',
+  providersReady: '✓ Sağlayıcılar',
+  providersLoading: '… Sağlayıcılar',
+  agentsReady: '✓ Agent’lar',
+  agentsLoading: '… Agent’lar',
+  startingDevServer: (hostLabel) => `Webview geliştirme sunucusu başlatılıyor (${hostLabel})...`,
+  waitingDevServer: (hostLabel, attempt) => `Webview geliştirme sunucusu bekleniyor (${hostLabel})... deneme ${attempt}`,
+  loadingData: (providersText, agentsText) => `Veriler yükleniyor (${providersText}, ${agentsText})…`,
+};
+
 const DE_MESSAGES: BootstrapMessages = {
   startingApi: 'OpenCode API wird gestartet…',
   initializing: 'Initialisierung…',
@@ -244,6 +263,7 @@ const BOOTSTRAP_MESSAGES: Record<Locale, BootstrapMessages> = {
   ko: KO_MESSAGES,
   pl: PL_MESSAGES,
   ja: JA_MESSAGES,
+  tr: TR_MESSAGES,
 };
 
 export const readStoredLocaleForBootstrap = (): Locale => {

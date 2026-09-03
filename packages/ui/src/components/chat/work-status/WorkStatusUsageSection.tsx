@@ -13,29 +13,33 @@ import { useUsageProviderGroups, type UsageProviderGroup } from '@/components/us
 import { useConfigStore } from '@/stores/useConfigStore';
 import { pickUsageHeadline } from './usageHeadline';
 import { runBackgroundNetworkTask } from '@/lib/background-network';
+import { UsageProgressBar } from '@/components/sections/usage/UsageProgressBar';
 import { WorkStatusRow, WorkStatusCollapsibleSection, WorkStatusValue } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useXaiUsageStore } from '@/stores/useXaiUsageStore';
+import { useKimiUsageStore } from '@/stores/useKimiUsageStore';
 import { presentXaiUsage } from '@/lib/pi/xai-usage';
+import { formatKimiMembershipLabel, formatKimiWindowLabel, presentKimiUsage } from '@/lib/pi/kimi-usage';
 import type { UsageWindow } from '@/types';
 
 /**
- * OpenCode provider rate limits.
+ * OpenCode provider rate limits, plus Pi Grok / Kimi usage.
  *
- * The mobile popover renders these as filled cards; that language does not
- * survive here — the fills and their padding fight the panel's flat rows and
- * cost roughly twice the height. Only the data is shared
- * (`useUsageProviderGroups`); the presentation is the panel's own row
- * vocabulary, with each provider as a quiet sub-heading.
+ * Window rows reuse OpenChamber quota chrome: label + optional reset time +
+ * percent, then `UsageProgressBar`. The 300px card asked for that language
+ * back; padding stays tight (`px-1`, `gap-1` / `gap-1.5`) so the bar still
+ * fits. Provider identity is a quiet WorkStatusRow (logo + name, membership
+ * badge hard-right). Only the data is shared (`useUsageProviderGroups`).
  *
  * Sits above Subagents and MCP: a spent quota stops the work outright, so it
  * belongs with the readouts that hold for the whole session rather than with
  * whatever happens to be running.
  *
- * On Pi this section mounts only when the Grok Usage feature-plugin slot is
- * on (`isWorkStatusSectionAvailable`). Session context % / cost stay in the
- * Session block.
+ * On Pi this section mounts when the Grok Usage or Kimi Usage feature-plugin
+ * slot is on (`isWorkStatusSectionAvailable`). Session context % / cost stay
+ * in the Session block.
  */
 
 const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {
@@ -80,17 +84,67 @@ const useXaiUsageGroups = (): UsageProviderGroup[] => {
   }, [error, isLoading, payload, t]);
 };
 
-const PiXaiUsageSection: React.FC = () => {
+const useKimiUsageGroups = (): UsageProviderGroup[] => {
   const { t } = useI18n();
-  const groups = useXaiUsageGroups();
-  const isLoading = useXaiUsageStore((state) => state.isLoading);
-  const fetchUsage = useXaiUsageStore((state) => state.fetchUsage);
+  const payload = useKimiUsageStore((state) => state.payload);
+  const error = useKimiUsageStore((state) => state.error);
+  const isLoading = useKimiUsageStore((state) => state.isLoading);
+  return React.useMemo(() => {
+    const presentation = presentKimiUsage({ payload, error, isLoading });
+    if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
+    if (payload && !payload.slotActive) return [];
+    const windows = payload?.usage?.windows ?? {};
+    const rows = Object.entries(windows).map(([label, window]) => ({
+      key: `window-${label}`,
+      label: formatKimiWindowLabel(label, t),
+      window,
+    }));
+    const status = presentation.kind === 'notConfigured'
+      ? t('settings.providers.page.kimiUsage.notConfigured')
+      : presentation.kind === 'error'
+        ? (presentation.auth
+          ? t('settings.providers.page.kimiUsage.refreshFailed')
+          : (presentation.message || t('settings.providers.page.kimiUsage.error')))
+        : rows.length === 0
+          ? t('header.services.noRateLimitsReported')
+          : null;
+    if (presentation.kind === 'loading' && rows.length === 0) return [];
+    return [{
+      providerId: 'kimi-coding',
+      providerName: payload?.providerName || 'Kimi Code',
+      rows,
+      status,
+      badge: formatKimiMembershipLabel(payload?.membershipLevel, t),
+    }];
+  }, [error, isLoading, payload, t]);
+};
+
+const PiUsageSection: React.FC = () => {
+  const { t } = useI18n();
+  const xaiSlotActive = useFeaturePluginSlotActive('xai', true);
+  const kimiSlotActive = useFeaturePluginSlotActive('kimi', true);
+  const xaiGroups = useXaiUsageGroups();
+  const kimiGroups = useKimiUsageGroups();
+  const xaiLoading = useXaiUsageStore((state) => state.isLoading);
+  const kimiLoading = useKimiUsageStore((state) => state.isLoading);
+  const fetchXaiUsage = useXaiUsageStore((state) => state.fetchUsage);
+  const fetchKimiUsage = useKimiUsageStore((state) => state.fetchUsage);
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const displayMode = useQuotaStore((state) => state.displayMode);
 
   React.useEffect(() => {
-    void runBackgroundNetworkTask(() => fetchUsage());
-  }, [fetchUsage]);
+    if (xaiSlotActive) void runBackgroundNetworkTask(() => fetchXaiUsage());
+  }, [fetchXaiUsage, xaiSlotActive]);
+
+  React.useEffect(() => {
+    if (kimiSlotActive) void runBackgroundNetworkTask(() => fetchKimiUsage());
+  }, [fetchKimiUsage, kimiSlotActive]);
+
+  const groups = React.useMemo(() => [
+    ...(xaiSlotActive ? xaiGroups : []),
+    ...(kimiSlotActive ? kimiGroups : []),
+  ], [kimiGroups, kimiSlotActive, xaiGroups, xaiSlotActive]);
+  const isLoading = (xaiSlotActive && xaiLoading) || (kimiSlotActive && kimiLoading);
 
   React.useEffect(() => {
     if (groups.length === 0) return;
@@ -101,14 +155,19 @@ const PiXaiUsageSection: React.FC = () => {
 
   if (groups.length === 0) return null;
 
+  const currentProviderId = groups[0]?.providerId || 'xai';
+
   return (
     <UsageSectionBody
       groups={groups}
       displayMode={displayMode}
       isLoading={isLoading}
-      onRefresh={() => void fetchUsage()}
+      onRefresh={() => {
+        if (xaiSlotActive) void fetchXaiUsage();
+        if (kimiSlotActive) void fetchKimiUsage();
+      }}
       timeFormatPreference={timeFormatPreference}
-      currentProviderId="xai"
+      currentProviderId={currentProviderId}
       modeLabel={displayMode === 'remaining' ? t('header.services.remaining') : t('header.services.used')}
     />
   );
@@ -185,7 +244,7 @@ const UsageSectionBody: React.FC<{
   const headline = pickUsageHeadline(groups, currentProviderId);
   const headlineMetric = headline
     ? formatQuotaValueLabel(
-      headline.row.window.valueLabel,
+      headline.group.providerId === 'kimi-coding' ? undefined : headline.row.window.valueLabel,
       displayMode === 'remaining' ? headline.row.window.remainingPercent : headline.row.window.usedPercent,
     )
     : null;
@@ -224,38 +283,50 @@ const UsageSectionBody: React.FC<{
           <WorkStatusRow
             leading={<ProviderLogo providerId={group.providerId} className="size-4 shrink-0" />}
             label={group.providerName}
+            value={group.badge}
             muted
-            value={group.status ? (
-              <WorkStatusValue tone="muted">{group.status}</WorkStatusValue>
-            ) : undefined}
           />
+          {group.status ? (
+            <p className="min-w-0 px-1 pb-1 text-[13px] leading-snug text-muted-foreground whitespace-normal break-words text-wrap">
+              {group.status}
+            </p>
+          ) : null}
           {group.rows.map((row) => {
             const displayPercent = displayMode === 'remaining'
               ? row.window.remainingPercent
               : row.window.usedPercent;
-            const metricLabel = formatQuotaValueLabel(row.window.valueLabel, displayPercent);
+            const metricLabel = formatQuotaValueLabel(
+              group.providerId === 'kimi-coding' ? undefined : row.window.valueLabel,
+              displayPercent,
+            );
             const resetLabel = formatQuotaResetLabel(
               row.window.resetAt,
               row.window.resetAfterFormatted ?? row.window.resetAtFormatted,
               timeFormatPreference,
             );
             return (
-              <WorkStatusRow
-                key={`${group.providerId}-${row.key}`}
-                label={(
-                  <span className="inline-flex min-w-0 items-baseline gap-1.5">
-                    <span className="truncate">
+              <div key={`${group.providerId}-${row.key}`} className="flex flex-col gap-1 px-1 py-1">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <div className="min-w-0 flex items-center gap-1.5">
+                    <span className="truncate typography-ui-label text-foreground">
                       {row.subtitle ? `${row.subtitle} · ${row.label}` : row.label}
                     </span>
                     {resetLabel ? (
-                      <span className="shrink-0 text-[11px] text-muted-foreground">{resetLabel}</span>
+                      <span className="truncate typography-micro text-muted-foreground">
+                        {resetLabel}
+                      </span>
                     ) : null}
+                  </div>
+                  <span className="shrink-0 typography-ui-label text-foreground tabular-nums">
+                    {metricLabel === '-' ? '' : metricLabel}
                   </span>
-                )}
-                value={metricLabel === '-' ? undefined : (
-                  <WorkStatusValue tone={windowTone(row.window)}>{metricLabel}</WorkStatusValue>
-                )}
-              />
+                </div>
+                <UsageProgressBar
+                  percent={displayPercent}
+                  tonePercent={row.window.usedPercent}
+                  className="h-1.5"
+                />
+              </div>
             );
           })}
         </React.Fragment>
@@ -265,5 +336,5 @@ const UsageSectionBody: React.FC<{
 };
 
 export const WorkStatusUsageSection: React.FC = () => (
-  usePiKernel() ? <PiXaiUsageSection /> : <OpenCodeUsageSection />
+  usePiKernel() ? <PiUsageSection /> : <OpenCodeUsageSection />
 );

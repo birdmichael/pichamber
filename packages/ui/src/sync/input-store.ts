@@ -4,6 +4,7 @@
  */
 
 import { create } from "zustand"
+import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import type { AttachedFile } from "@/stores/types/sessionTypes"
 import { prepareAttachmentFiles } from "./attachment-files"
 
@@ -86,6 +87,7 @@ export type SyntheticContextPart = {
   text: string
   attachments?: AttachedFile[]
   synthetic?: boolean
+  metadata?: ContextPartMetadata
 }
 
 export type VSCodeActiveEditorFile = {
@@ -106,6 +108,8 @@ export type InputState = {
    * narrow layouts); consumed by ChatInput, which owns the command-aware submit.
    */
   pendingPresetSubmit: { text: string; type: "command" | "skill" } | null
+  /** Craft a Goal chip asked to open the Goal dialog instead of sending. */
+  pendingGoalDialogSeed: string | null
   attachedFiles: AttachedFile[]
   activeEditorFile: VSCodeActiveEditorFile | null
 
@@ -113,6 +117,8 @@ export type InputState = {
   consumePendingInputText: () => { text: string; mode: "replace" | "append" | "append-inline" } | null
   requestPresetSubmit: (text: string, type: "command" | "skill") => void
   consumePendingPresetSubmit: () => { text: string; type: "command" | "skill" } | null
+  requestOpenGoalDialog: (seed: string) => void
+  consumePendingGoalDialog: () => string | null
   setPendingSyntheticParts: (parts: SyntheticContextPart[] | null) => void
   consumePendingSyntheticParts: () => SyntheticContextPart[] | null
   addAttachedFile: (file: File) => Promise<boolean>
@@ -120,6 +126,7 @@ export type InputState = {
   setAttachedFiles: (files: AttachedFile[]) => void
   clearAttachedFiles: () => void
   addVSCodeFileAttachment: (path: string, name: string, fileSize: number | null) => void
+  addLocalPathAttachment: (path: string, name: string, fileSize: number | null) => void
   addVSCodeSelectionAttachment: (path: string, file: File) => Promise<void>
   setActiveEditorFile: (file: VSCodeActiveEditorFile | null) => void
   /** Add attachments restored from a reverted message (file already on server) */
@@ -131,6 +138,7 @@ export const useInputStore = create<InputState>()((set, get) => ({
   pendingInputMode: "replace",
   pendingSyntheticParts: null,
   pendingPresetSubmit: null,
+  pendingGoalDialogSeed: null,
   attachedFiles: [],
   activeEditorFile: null,
 
@@ -151,6 +159,15 @@ export const useInputStore = create<InputState>()((set, get) => ({
     if (pendingPresetSubmit === null) return null
     set({ pendingPresetSubmit: null })
     return pendingPresetSubmit
+  },
+
+  requestOpenGoalDialog: (seed) => set({ pendingGoalDialogSeed: seed }),
+
+  consumePendingGoalDialog: () => {
+    const { pendingGoalDialogSeed } = get()
+    if (pendingGoalDialogSeed === null) return null
+    set({ pendingGoalDialogSeed: null })
+    return pendingGoalDialogSeed
   },
 
   setPendingSyntheticParts: (parts) => set({ pendingSyntheticParts: parts }),
@@ -243,6 +260,23 @@ export const useInputStore = create<InputState>()((set, get) => ({
       source: 'vscode',
       vscodePath: path,
       vscodeSource: 'file',
+    }
+    set((s) => ({ attachedFiles: [...s.attachedFiles, attached] }))
+  },
+
+  addLocalPathAttachment: (path: string, name: string, fileSize: number | null) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const dataUrl = toFileUrl(path)
+    const isDuplicate = get().attachedFiles.some((f) => f.dataUrl === dataUrl)
+    if (isDuplicate) return
+    const attached: AttachedFile = {
+      id,
+      file: new File([], name, { type: 'application/octet-stream' }),
+      dataUrl,
+      mimeType: 'application/octet-stream',
+      filename: name,
+      size: fileSize || 0,
+      source: 'local',
     }
     set((s) => ({ attachedFiles: [...s.attachedFiles, attached] }))
   },

@@ -22,7 +22,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useKeybind } from '@/hooks/useKeybind';
 import { useI18n } from '@/lib/i18n';
+import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { PROJECT_COLOR_MAP, PROJECT_ICON_MAP, ProjectIconImage } from '@/lib/projectMeta';
 import { getProjectDisplayLabel } from '@/lib/workspaceLabel';
 import { createWorktreeDraft } from '@/lib/worktreeSessionCreator';
@@ -108,6 +110,16 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
         onDirectoryChange,
         theme,
     } = props;
+    const projectTriggerRef = React.useRef<HTMLButtonElement>(null);
+    const worktreeTriggerRef = React.useRef<HTMLButtonElement>(null);
+
+    useKeybind('open_draft_project_picker', () => {
+        projectTriggerRef.current?.click();
+    });
+    useKeybind('open_draft_worktree_picker', () => {
+        if (!showBranchSelector) return false;
+        worktreeTriggerRef.current?.click();
+    });
 
     return (
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5 px-0.5">
@@ -116,6 +128,7 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
                 onValueChange={onProjectChange}
             >
                 <SelectTrigger
+                    ref={projectTriggerRef}
                     size="sm"
                     className="h-7 min-w-0 w-fit max-w-[42vw] sm:max-w-[18rem] border-transparent bg-transparent px-1.5 hover:bg-transparent data-[popup-open]:bg-transparent"
                 >
@@ -140,6 +153,7 @@ export function DraftTargetSelectors(props: DraftTargetProps) {
                     onValueChange={onDirectoryChange}
                 >
                     <SelectTrigger
+                        ref={worktreeTriggerRef}
                         size="sm"
                         className="h-7 min-w-0 w-fit max-w-[48vw] sm:max-w-[20rem] border-transparent bg-transparent px-1.5 hover:bg-transparent data-[popup-open]:bg-transparent"
                     >
@@ -268,13 +282,7 @@ export function MobileDraftTargetSheets(
                         className="h-9"
                     />
                     <div className="flex flex-col">
-                        {projects
-                            .filter((project) => {
-                                const needle = query.trim().toLowerCase();
-                                if (!needle) return true;
-                                return getProjectDisplayLabel(project, homeDirectory).toLowerCase().includes(needle)
-                                    || project.path.toLowerCase().includes(needle);
-                            })
+                        {rankByQuery(projects, query, (project) => [getProjectDisplayLabel(project, homeDirectory), project.path])
                             .map((project) => (
                                 <button
                                     key={project.id}
@@ -308,8 +316,7 @@ export function MobileDraftTargetSheets(
                     />
                     <div className="flex flex-col">
                         {(() => {
-                            const needle = query.trim().toLowerCase();
-                            const matches = (label: string) => !needle || label.toLowerCase().includes(needle);
+                            const matches = (label: string) => matchesRankQuery([label], query);
                             const selectedValue = selectedDirectory
                                 ?? branchItems[0]?.value
                                 ?? normalizePath(selectedProject.path)
@@ -353,8 +360,7 @@ export function MobileDraftTargetSheets(
                                             {t('chat.chatInput.worktreeNew')}
                                         </button>
                                     </div>
-                                    {worktreeBranchOptions
-                                        .filter((option) => matches(option.label))
+                                    {rankByQuery(worktreeBranchOptions, query, (option) => [option.label])
                                         .map((option) => renderRow(option.value, `${option.pending ? '⏳ ' : ''}${option.label}`))}
                                     {selectedDirectory && !selectedBranchIsKnown && matches(selectedBranchLabel ?? '')
                                         ? renderRow(selectedDirectory, selectedBranchLabel, 'unknown-current')

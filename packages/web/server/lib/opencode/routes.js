@@ -29,6 +29,7 @@ export const registerOpenCodeRoutes = (app, dependencies) => {
     refreshOpenCodeAfterConfigChange,
     buildOpenCodeUrl,
     getOpenCodeAuthHeaders,
+    getPiHost,
     fsPromises = fs.promises,
   } = dependencies;
 
@@ -332,6 +333,11 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
 
   app.get('/api/opencode/health', async (_req, res) => {
     if (isPiKernelEnabled()) {
+      const host = typeof getPiHost === 'function' ? getPiHost() : null;
+      const ready = typeof host?.isReady === 'function' ? host.isReady() === true : false;
+      if (!ready) {
+        return res.status(503).json({ healthy: false, kernel: 'pi' });
+      }
       return res.json({ healthy: true, kernel: 'pi' });
     }
     try {

@@ -29,6 +29,7 @@ import { getEditModeColors } from '@/lib/permissions/editModeColors';
 import { cn, fuzzyMatch } from '@/lib/utils';
 import { useContextStore } from '@/stores/contextStore';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useSessionMessages, useSessionRenderable } from '@/sync/sync-context';
@@ -41,13 +42,15 @@ import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
-    clampPiThinkingLevel,
     parseAvailablePiThinkingLevels,
     parsePiThinkingLevel,
+    preferPiModelThinkingLevels,
+    resolveEmptyDraftThinkingCurrent,
+    resolvePairedPiThinking,
     resolvePiThinkingChipPresentation,
-    resolveVisiblePiThinkingLevels,
     type PiThinkingLevel,
 } from './piThinking';
+import { applyComposerThinking, composerThinkingPinKey } from './cycleComposerThinking';
 import { usePiThinkingChipStore } from './piThinkingChipStore';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { useOpenCodeReadiness } from '@/hooks/useOpenCodeReadiness';
@@ -356,6 +359,34 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const getCurrentAgent = useConfigStore((state) => state.getCurrentAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
 
+    const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
+    const draftOpen = useSessionUIStore((s) => s.newSessionDraft.open);
+    const draftTarget = useSessionUIStore((s) => s.newSessionDraft.target);
+    const draftSelectedProjectId = useSessionUIStore((s) => s.newSessionDraft.selectedProjectId);
+    const activeProjectId = useProjectsStore((s) => s.activeProjectId);
+    const projects = useProjectsStore((s) => s.projects);
+    const emptyDraftProjectVariant = React.useMemo(() => {
+        if (currentSessionIdForThinking) {
+            return undefined;
+        }
+        if (draftOpen && draftTarget === 'chat') {
+            return undefined;
+        }
+        const projectId = draftOpen && draftTarget === 'project'
+            ? (draftSelectedProjectId ?? activeProjectId)
+            : activeProjectId;
+        const project = projects.find((entry) => entry.id === projectId);
+        return parsePiThinkingLevel(project?.defaultVariant);
+    }, [
+        activeProjectId,
+        currentSessionIdForThinking,
+        draftOpen,
+        draftSelectedProjectId,
+        draftTarget,
+        projects,
+    ]);
+    const [piDefaultsThinking, setPiDefaultsThinking] = React.useState<string | undefined>(undefined);
+
     React.useEffect(() => {
         if (!isPiKernel) {
             return;
@@ -367,10 +398,17 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 if (cancelled || !payload) {
                     return;
                 }
-                const projectPin = parsePiThinkingLevel(useConfigStore.getState().currentVariant);
-                const nextThinking = projectPin ?? parsePiThinkingLevel(payload.thinking);
-                if (nextThinking) {
-                    setPiThinking(nextThinking);
+                const defaultsThinking = parsePiThinkingLevel(payload.thinking);
+                setPiDefaultsThinking(defaultsThinking);
+                if (!currentSessionIdForThinking) {
+                    const nextThinking = resolveEmptyDraftThinkingCurrent({
+                        projectVariant: emptyDraftProjectVariant,
+                        defaultsThinking,
+                        current: undefined,
+                    });
+                    if (nextThinking) {
+                        setPiThinking(nextThinking);
+                    }
                 }
                 if (Array.isArray(payload.enabledModels)) {
                     setEnabledModels(payload.enabledModels.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0));
@@ -380,96 +418,185 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [isPiKernel]);
+        // Refetch when the composer is an empty draft so Settings / project pin land.
+    }, [currentSessionIdForThinking, emptyDraftProjectVariant, isPiKernel]);
 
-    const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
     const draftThinkingLevels = React.useMemo(() => {
         if (!isPiKernel || !currentProviderId || !currentModelId) {
             return [];
         }
-        return resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId));
+        const provider = providers.find((entry) => entry.id === currentProviderId);
+        const model = Array.isArray(provider?.models)
+            ? provider.models.find((entry) => entry.id === currentModelId) as ProviderModel | undefined
+            : undefined;
+        return preferPiModelThinkingLevels(
+            model?.thinkingLevels ?? model?.availableThinkingLevels,
+            resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId)),
+        );
         // modelsMetadata is required: getModelMetadata is a stable store method
         // and would otherwise keep the empty-catalog fallback after fetch lands.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
-    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
+    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata, providers]);
+    const pairedThinking = React.useMemo(() => {
+        if (!isPiKernel) {
+            return { thinking: undefined as string | undefined, levels: [] as PiThinkingLevel[] };
+        }
+        return resolvePairedPiThinking({
+            current: piThinking,
+            catalogLevels: draftThinkingLevels,
+            liveAvailable: piThinkingLevels,
+        });
+    }, [draftThinkingLevels, isPiKernel, piThinking, piThinkingLevels]);
+    const sessionModelApplyRef = React.useRef(Promise.resolve());
+    const thinkingPairKey = composerThinkingPinKey(
+        currentSessionIdForThinking,
+        currentProviderId,
+        currentModelId,
+    );
+    const thinkingPairKeyRef = React.useRef(thinkingPairKey);
+    thinkingPairKeyRef.current = thinkingPairKey;
+    const thinkingSessionIdRef = React.useRef(currentSessionIdForThinking);
     React.useEffect(() => {
         if (!isPiKernel) {
             setPiThinkingLevels(undefined);
             return;
         }
+        const sessionChanged = thinkingSessionIdRef.current !== currentSessionIdForThinking;
+        thinkingSessionIdRef.current = currentSessionIdForThinking;
+        const emptyDraftCurrent = resolveEmptyDraftThinkingCurrent({
+            projectVariant: emptyDraftProjectVariant,
+            defaultsThinking: piDefaultsThinking,
+            current: piThinking,
+        });
+        const catalogPair = resolvePairedPiThinking({
+            current: currentSessionIdForThinking
+                ? (sessionChanged ? undefined : piThinking)
+                : emptyDraftCurrent,
+            catalogLevels: draftThinkingLevels,
+        });
+        setPiThinkingLevels(catalogPair.levels.length > 0 ? catalogPair.levels : undefined);
         if (!currentSessionIdForThinking) {
-            setPiThinkingLevels(draftThinkingLevels.length > 0 ? draftThinkingLevels : undefined);
-            if (draftThinkingLevels.length > 0) {
-                const pinned = parsePiThinkingLevel(currentVariant);
-                const nextThinking = clampPiThinkingLevel(pinned ?? piThinking, draftThinkingLevels);
-                if (nextThinking) setPiThinking(nextThinking);
+            if (catalogPair.thinking !== piThinking) {
+                setPiThinking(catalogPair.thinking);
             }
             return;
         }
+        if (sessionChanged) {
+            // #488: wait for GET. Do not clamp missing current → medium.
+            if (piThinking !== undefined) {
+                setPiThinking(undefined);
+            }
+        } else {
+            const pinStillValid = Boolean(
+                parsePiThinkingLevel(piThinking)
+                && catalogPair.levels.includes(parsePiThinkingLevel(piThinking)!),
+            );
+            if (!pinStillValid && catalogPair.thinking !== piThinking) {
+                setPiThinking(catalogPair.thinking);
+            }
+        }
         let cancelled = false;
-        void runtimeFetch(`/api/session/${currentSessionIdForThinking}/thinking`, { method: 'GET' })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((payload) => {
-                if (cancelled || !payload) {
-                    return;
-                }
-                const available = parseAvailablePiThinkingLevels(payload.available);
-                if (available.length > 0) {
-                    setPiThinkingLevels(available);
-                } else if (draftThinkingLevels.length > 0) {
-                    setPiThinkingLevels(draftThinkingLevels);
-                }
-                const recorded = parsePiThinkingLevel(payload.thinking);
-                const nextThinking = recorded ?? clampPiThinkingLevel(
-                    piThinking,
-                    available.length > 0 ? available : draftThinkingLevels,
-                );
-                if (nextThinking) {
-                    setPiThinking(nextThinking);
-                }
-            })
-            .catch(() => undefined);
+        const sessionId = currentSessionIdForThinking;
+        const pairKey = thinkingPairKey;
+        const pinSnapshot = usePiThinkingChipStore.getState();
+        void (async () => {
+            await sessionModelApplyRef.current;
+            if (cancelled || catalogPair.levels.length === 0) {
+                return;
+            }
+            const res = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/thinking`, { method: 'GET' }).catch(() => null);
+            if (cancelled || thinkingPairKeyRef.current !== pairKey || !res?.ok) {
+                return;
+            }
+            const payload = await res.json().catch(() => null);
+            if (cancelled || thinkingPairKeyRef.current !== pairKey || !payload) {
+                return;
+            }
+            const pin = usePiThinkingChipStore.getState();
+            const keepChipPin = pin.pinKey === pairKey && pin.pinGeneration !== pinSnapshot.pinGeneration;
+            const chipPin = keepChipPin ? parsePiThinkingLevel(pin.level) : undefined;
+            const livePair = resolvePairedPiThinking({
+                current: chipPin ?? parsePiThinkingLevel(payload.thinking),
+                catalogLevels: draftThinkingLevels,
+                liveAvailable: payload.available,
+            });
+            if (cancelled || thinkingPairKeyRef.current !== pairKey) {
+                return;
+            }
+            const laterPin = usePiThinkingChipStore.getState();
+            if (laterPin.pinKey === pairKey && laterPin.pinGeneration !== pin.pinGeneration) {
+                return;
+            }
+            setPiThinkingLevels(livePair.levels.length > 0 ? livePair.levels : undefined);
+            if (chipPin && livePair.levels.includes(chipPin)) {
+                setPiThinking(chipPin);
+                return;
+            }
+            setPiThinking(livePair.thinking);
+        })();
         return () => {
             cancelled = true;
         };
-        // piThinking is a fallback only; including it would re-run after every chip write.
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- draft pin follows currentVariant
-    }, [currentSessionIdForThinking, currentModelId, currentVariant, draftThinkingLevels, isPiKernel]);
+        // Pair on model/catalog. Chip writes bump pinGeneration instead of re-GET.
+        // Empty drafts also re-pair when Settings / project pin arrive.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [thinkingPairKey, draftThinkingLevels, emptyDraftProjectVariant, isPiKernel, piDefaultsThinking]);
 
-    const visiblePiThinkingLevels = React.useMemo(
-        () => resolveVisiblePiThinkingLevels(piThinkingLevels ?? draftThinkingLevels),
-        [draftThinkingLevels, piThinkingLevels],
-    );
+    const visiblePiThinkingLevels = pairedThinking.levels;
 
+    const chipPinGeneration = usePiThinkingChipStore((state) => state.pinGeneration);
+    const chipPinKey = usePiThinkingChipStore((state) => state.pinKey);
     React.useEffect(() => {
-        usePiThinkingChipStore.getState().setLevel(isPiKernel ? piThinking : undefined);
-    }, [isPiKernel, piThinking]);
+        const store = usePiThinkingChipStore.getState();
+        const pinned = parsePiThinkingLevel(store.level);
+        const keepPin = Boolean(
+            store.pinKey === thinkingPairKey
+            && pinned
+            && pairedThinking.levels.includes(pinned),
+        );
+        store.setLevel(
+            isPiKernel ? (keepPin ? pinned : pairedThinking.thinking) : undefined,
+            isPiKernel && pairedThinking.levels.length > 0,
+            isPiKernel ? pairedThinking.levels : [],
+        );
+    }, [chipPinGeneration, chipPinKey, isPiKernel, pairedThinking.levels, pairedThinking.thinking, thinkingPairKey]);
+    React.useEffect(() => {
+        const store = usePiThinkingChipStore.getState();
+        if (store.pinKey !== thinkingPairKey) {
+            return;
+        }
+        const pinned = parsePiThinkingLevel(store.level);
+        if (pinned && pinned !== piThinking) {
+            setPiThinking(pinned);
+        }
+    }, [chipPinGeneration, chipPinKey, piThinking, thinkingPairKey]);
     React.useEffect(() => {
         return () => {
-            usePiThinkingChipStore.getState().setLevel(undefined);
+            usePiThinkingChipStore.getState().setLevel(undefined, false, []);
         };
     }, []);
 
     const handlePiThinkingSelect = React.useCallback(async (level: string) => {
         setPiThinking(level);
-        const sessionId = useSessionUIStore.getState().currentSessionId;
-        try {
-            await runtimeFetch('/api/pi/defaults', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ thinking: level }),
-            });
-            if (sessionId) {
-                await runtimeFetch(`/api/session/${sessionId}/thinking`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ thinking: level }),
-                });
-            }
-        } catch {
-            // keep the optimistic chip; Settings → Sessions remains the fallback
+        if (!isPiKernel) {
+            setCurrentVariant(level);
         }
-    }, []);
+        await applyComposerThinking(level, {
+            levels: visiblePiThinkingLevels,
+            pinKey: composerThinkingPinKey(currentSessionIdForThinking, currentProviderId, currentModelId),
+        });
+        const chipState = usePiThinkingChipStore.getState();
+        const applied = parsePiThinkingLevel(chipState.level);
+        if (applied) {
+            setPiThinking(applied);
+        }
+        if (Array.isArray(chipState.levels) && chipState.levels.length > 0) {
+            const appliedLevels = parseAvailablePiThinkingLevels(chipState.levels);
+            if (appliedLevels.length > 0) {
+                setPiThinkingLevels(appliedLevels);
+            }
+        }
+    }, [currentModelId, currentProviderId, currentSessionIdForThinking, isPiKernel, setCurrentVariant, visiblePiThinkingLevels]);
 
 
     // Use visible agents (excludes hidden internal agents)
@@ -816,8 +943,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         );
     }, [currentSessionDirectory, currentSessionMessagesFromSync]);
 
+    const composerPickedModelRef = React.useRef(false);
     const tryApplyModelSelection = React.useCallback(
-        (providerId: string, modelId: string, agentName?: string): ModelApplyResult => {
+        (providerId: string, modelId: string, agentName?: string, options?: { fromRestore?: boolean; fromComposer?: boolean }): ModelApplyResult => {
             if (!providerId || !modelId) {
                 return 'model-missing';
             }
@@ -835,19 +963,26 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
             const providerMatches = currentProviderId === providerId;
             const modelMatches = currentModelId === modelId;
+            if (options?.fromComposer) {
+                composerPickedModelRef.current = true;
+            }
+
             if (providerMatches && modelMatches) {
                 return 'applied';
+            }
+
+            if (currentSessionId) {
+                sessionModelApplyRef.current = runtimeFetch(`/api/session/${encodeURIComponent(currentSessionId)}/model`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: `${providerId}/${modelId}` }),
+                }).then(() => undefined).catch(() => undefined);
             }
 
             setProvider(providerId);
             setModel(modelId);
 
             if (currentSessionId) {
-                void runtimeFetch(`/api/session/${currentSessionId}/model`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: `${providerId}/${modelId}` }),
-                }).catch(() => undefined);
                 saveSessionModelSelection(currentSessionId, providerId, modelId);
                 if (agentName) {
                     saveAgentModelForSession(currentSessionId, agentName, providerId, modelId);
@@ -859,32 +994,64 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         [providers, currentProviderId, currentModelId, setProvider, setModel, currentSessionId, saveAgentModelForSession, saveSessionModelSelection],
     );
 
-    const sessionModelRestoreRef = React.useRef<string | null>(null);
+    const restoredSessionModelRef = React.useRef<string | null>(null);
     React.useEffect(() => {
         if (!isPiKernel || !currentSessionId) {
-            sessionModelRestoreRef.current = null;
+            restoredSessionModelRef.current = null;
+            composerPickedModelRef.current = false;
+            return;
+        }
+        if (restoredSessionModelRef.current === currentSessionId) {
             return;
         }
         let cancelled = false;
-        void runtimeFetch(`/api/session/${encodeURIComponent(currentSessionId)}/model`, { method: 'GET' })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((payload) => {
-                if (cancelled || !payload) return;
+        const sessionId = currentSessionId;
+        void (async () => {
+            for (let attempt = 0; attempt < 3 && !cancelled; attempt += 1) {
+                const res = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/model`, {
+                    method: 'GET',
+                }).catch(() => null);
+                if (cancelled) return;
+                if (!res?.ok) {
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
+                }
+                const payload = await res.json().catch(() => null);
+                if (cancelled) return;
+                if (!payload) {
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
+                }
                 const providerId = typeof payload.providerID === 'string' ? payload.providerID.trim() : '';
                 const modelId = typeof payload.modelID === 'string' ? payload.modelID.trim() : '';
-                if (!providerId || !modelId) return;
-                const restoreKey = `${currentSessionId}|${providerId}|${modelId}`;
-                if (sessionModelRestoreRef.current === restoreKey) return;
-                const result = tryApplyModelSelection(providerId, modelId);
-                if (result !== 'applied') return;
-                saveSessionModelSelection(currentSessionId, providerId, modelId);
-                sessionModelRestoreRef.current = restoreKey;
-            })
-            .catch(() => undefined);
+                if (!providerId || !modelId) {
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
+                }
+                if (composerPickedModelRef.current) {
+                    restoredSessionModelRef.current = sessionId;
+                    return;
+                }
+                const result = tryApplyModelSelection(providerId, modelId, undefined, { fromRestore: true });
+                if (result === 'applied') {
+                    restoredSessionModelRef.current = sessionId;
+                    saveSessionModelSelection(sessionId, providerId, modelId);
+                    return;
+                }
+                if (result === 'provider-missing' || result === 'model-missing') {
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
+                }
+                restoredSessionModelRef.current = sessionId;
+                return;
+            }
+        })();
         return () => {
             cancelled = true;
         };
-    }, [currentSessionId, isPiKernel, saveSessionModelSelection, tryApplyModelSelection]);
+        // User composer picks skip this GET; fetch failure retries without marking restored.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentSessionId, isPiKernel, providers.length]);
 
     const getModelVariantOptions = React.useCallback((providerId: string, modelId: string) => {
         const provider = providers.find((entry) => entry.id === providerId);
@@ -964,9 +1131,17 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         setCurrentVariant,
     ]);
 
-    const applyModelSelectionWithVariant = React.useCallback((providerId: string, modelId: string, variant: string | undefined, agentNameOverride?: string | null) => {
+    const applyModelSelectionWithVariant = React.useCallback((
+        providerId: string,
+        modelId: string,
+        variant: string | undefined,
+        agentNameOverride?: string | null,
+        options?: { fromComposer?: boolean },
+    ) => {
         const effectiveAgentName = agentNameOverride ?? resolveLiveAgentName() ?? undefined;
-        const result = tryApplyModelSelection(providerId, modelId, effectiveAgentName);
+        const result = tryApplyModelSelection(providerId, modelId, effectiveAgentName, {
+            fromComposer: options?.fromComposer,
+        });
         if (result !== 'applied') {
             return result;
         }
@@ -1299,6 +1474,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     ]);
 
     React.useEffect(() => {
+        if (isPiKernel) {
+            return;
+        }
         if (!contextHydrated || !currentAgentName) {
             manualVariantSelectionRef.current = false;
             setCurrentVariant(undefined);
@@ -1360,6 +1538,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         getAgentModelVariantForSession,
         setCurrentVariant,
         settingsDefaultVariant,
+        isPiKernel,
     ]);
 
     React.useEffect(() => {
@@ -1432,8 +1611,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         try {
             const effectiveAgentName = options?.agentName ?? resolveLiveAgentName() ?? undefined;
             const result = options?.applyVariant
-                ? applyModelSelectionWithVariant(providerId, modelId, options.variant, effectiveAgentName)
-                : tryApplyModelSelection(providerId, modelId, effectiveAgentName);
+                ? applyModelSelectionWithVariant(providerId, modelId, options.variant, effectiveAgentName, { fromComposer: true })
+                : tryApplyModelSelection(providerId, modelId, effectiveAgentName, { fromComposer: true });
             if (result !== 'applied') {
                 if (result === 'provider-missing') {
                     console.error('[ModelControls] Provider not available for selection:', providerId);
@@ -1790,7 +1969,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         }
 
         const handleMobileModelApply = (providerId: string, modelId: string, variant: string | undefined) => {
-            const result = applyModelSelectionWithVariant(providerId, modelId, variant);
+            const result = applyModelSelectionWithVariant(providerId, modelId, variant, undefined, { fromComposer: true });
             if (result !== 'applied') {
                 if (result === 'provider-missing') {
                     console.error('[ModelControls] Provider not available for selection:', providerId);
@@ -2115,8 +2294,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     };
 
     const renderMobilePiThinkingPanel = () => {
-        if (!isCompact || !isPiKernel) return null;
-        const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+        if (!isCompact || !isPiKernel || pairedThinking.levels.length === 0) return null;
+        const thinkingChip = resolvePiThinkingChipPresentation(pairedThinking.thinking);
         return (
             <MobileOverlayPanel
                 open={activeMobilePanel === 'variant'}
@@ -2171,7 +2350,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         };
 
         const handleSelect = (variant: string | undefined) => {
-            const result = applyModelSelectionWithVariant(targetProviderId, targetModelId, variant);
+            const result = applyModelSelectionWithVariant(targetProviderId, targetModelId, variant, undefined, { fromComposer: true });
             if (result !== 'applied') {
                 return;
             }
@@ -2789,7 +2968,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const renderVariantSelector = () => {
         if (isPiKernel) {
-            const thinkingChip = resolvePiThinkingChipPresentation(piThinking);
+            if (pairedThinking.levels.length === 0) {
+                return null;
+            }
+            const thinkingChip = resolvePiThinkingChipPresentation(pairedThinking.thinking);
             const colorClass = thinkingChip.status === 'ready' && thinkingChip.level !== 'off'
                 ? 'text-[color:var(--status-info)]'
                 : 'text-muted-foreground';

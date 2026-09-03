@@ -1,6 +1,6 @@
 import type { I18nKey } from '@/lib/i18n';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai'] as const;
+export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi'] as const;
 
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
@@ -11,7 +11,8 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   subagents: 'npm:pi-subagents',
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
-  xai: 'npm:pi-xai-oauth',
+  xai: 'npm:pi-xai',
+  kimi: 'npm:pi-kimi-code-console-usage',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS: Partial<Record<FeaturePluginSlot, string>> = {
@@ -68,6 +69,7 @@ export const FEATURE_PLUGIN_SLOT_UI_IMPACT: Record<FeaturePluginSlot, readonly F
   btw: ['commands', 'session'],
   todo: ['workStatus'],
   xai: ['workStatus', 'settings', 'commands'],
+  kimi: ['workStatus', 'settings', 'commands'],
 };
 
 const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
@@ -104,6 +106,11 @@ const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
     workStatus: 'settings.featurePlugins.slot.xai.surface.workStatus.tooltip',
     settings: 'settings.featurePlugins.slot.xai.surface.settings.tooltip',
     commands: 'settings.featurePlugins.slot.xai.surface.commands.tooltip',
+  },
+  kimi: {
+    workStatus: 'settings.featurePlugins.slot.kimi.surface.workStatus.tooltip',
+    settings: 'settings.featurePlugins.slot.kimi.surface.settings.tooltip',
+    commands: 'settings.featurePlugins.slot.kimi.surface.commands.tooltip',
   },
 };
 
@@ -188,6 +195,12 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
     infoKey: 'settings.featurePlugins.slot.xai.info',
     infoHintKey: 'settings.featurePlugins.slot.xai.infoHint',
     settingsItem: 'feature-plugins.xai',
+  },
+  kimi: {
+    titleKey: 'settings.featurePlugins.slot.kimi.title',
+    infoKey: 'settings.featurePlugins.slot.kimi.info',
+    infoHintKey: 'settings.featurePlugins.slot.kimi.infoHint',
+    settingsItem: 'feature-plugins.kimi',
   },
 };
 

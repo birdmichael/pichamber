@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
 import {
   mergeAddCatalogProviders,
@@ -15,8 +18,11 @@ import {
   getOAuthAuthMethods,
   normalizeAuthType,
   parseAuthPayload,
+  providerHasCredentials,
   requiresOpenCodeRestartAfterOAuth,
+  shouldAutoOpenAuthPanel,
   shouldShowApiKeyAuth,
+  shouldShowModelsSection,
 } from './providerAuth';
 
 describe('ProvidersPage available provider loading', () => {
@@ -32,14 +38,18 @@ describe('ProvidersPage available provider loading', () => {
     expect(parseConnectedProviderIds({ all: [{ id: 'xai' }], connected: ['xai'], default: {} })).toEqual(['xai']);
     expect(parseConnectedProviderIds([{ id: 'xai' }])).toEqual([]);
     const catalog = mergeAddCatalogProviders([{ id: 'bmlab', name: 'bmlab' }]);
-    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai']);
+    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding']);
     expect(catalog.find((provider) => provider.id === 'xai')?.name).toBe('xAI / Grok');
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['xai']);
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai']))).toEqual([]);
+    expect(catalog.find((provider) => provider.id === 'kimi-coding')?.name).toBe('Kimi Code');
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding']))).toEqual([]);
     expect(selectAddCatalogProviders(
       [{ id: 'bmlab', name: 'bmlab' }, { id: 'xai', name: 'xai' }],
       new Set(['bmlab', 'xai']),
-    )).toEqual([{ id: 'xai', name: 'xAI / Grok' }]);
+    )).toEqual([
+      { id: 'kimi-coding', name: 'Kimi Code' },
+      { id: 'xai', name: 'xAI / Grok' },
+    ]);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], '', 'xai', true)).toBe(null);
@@ -132,3 +142,147 @@ describe('provider auth method helpers', () => {
     expect(requiresOpenCodeRestartAfterOAuth('github-copilot')).toBe(true);
   });
 });
+
+describe('provider credential state helpers', () => {
+  test('providerHasCredentials requires key, options.apiKey, declared env, or auth source', () => {
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false })).toBe(false);
+    expect(providerHasCredentials({ key: '', authSourceExists: false })).toBe(false);
+    expect(providerHasCredentials({ key: '   ', authSourceExists: false })).toBe(false);
+
+    expect(providerHasCredentials({ key: 'sk-...', authSourceExists: false })).toBe(true);
+    expect(providerHasCredentials({ key: undefined, authSourceExists: true })).toBe(true);
+  });
+
+  test('providerHasCredentials counts declared env vars for multi-variable providers', () => {
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, envDeclared: true })).toBe(true);
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, envDeclared: false })).toBe(false);
+  });
+
+  test('providerHasCredentials treats options.apiKey as a usable credential', () => {
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, optionsApiKey: 'sk-config' })).toBe(true);
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, optionsApiKey: '' })).toBe(false);
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, optionsApiKey: '   ' })).toBe(false);
+    expect(providerHasCredentials({ key: undefined, authSourceExists: false, optionsApiKey: null })).toBe(false);
+  });
+
+  test('env-less OAuth-only provider without credentials opens panel and hides models', () => {
+    const hasCredentials = providerHasCredentials({
+      key: undefined,
+      authSourceExists: false,
+    });
+    expect(hasCredentials).toBe(false);
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials,
+      userDismissed: false,
+    })).toBe(true);
+    expect(shouldShowModelsSection({
+      modelCount: 1,
+      sourcesLoaded: true,
+      hasCredentials,
+    })).toBe(false);
+  });
+
+  test('provider with stored auth or key shows Connected and models', () => {
+    const fromKey = providerHasCredentials({ key: 'sk-live', authSourceExists: false });
+    const fromAuth = providerHasCredentials({ key: undefined, authSourceExists: true });
+    expect(fromKey).toBe(true);
+    expect(fromAuth).toBe(true);
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials: fromKey,
+      userDismissed: false,
+    })).toBe(false);
+    expect(shouldShowModelsSection({
+      modelCount: 3,
+      sourcesLoaded: true,
+      hasCredentials: fromAuth,
+    })).toBe(true);
+  });
+
+  test('editable custom provider keeps models visible even with no credentials signal', () => {
+    const hasCredentials = providerHasCredentials({
+      key: undefined,
+      authSourceExists: false,
+      optionsApiKey: null,
+    });
+    expect(hasCredentials).toBe(false);
+    expect(shouldShowModelsSection({
+      modelCount: 1,
+      sourcesLoaded: true,
+      hasCredentials: false,
+      isEditableCustomProvider: true,
+    })).toBe(true);
+    expect(shouldShowModelsSection({
+      modelCount: 1,
+      sourcesLoaded: true,
+      hasCredentials: false,
+      isEditableCustomProvider: false,
+    })).toBe(false);
+  });
+
+  test('auth save followed by providers refresh recognizes credentials without stale missing state', () => {
+    const before = providerHasCredentials({
+      key: undefined,
+      authSourceExists: false,
+    });
+    expect(before).toBe(false);
+    expect(shouldShowModelsSection({
+      modelCount: 2,
+      sourcesLoaded: true,
+      hasCredentials: before,
+    })).toBe(false);
+
+    const afterProvidersRefresh = providerHasCredentials({
+      key: 'oauth-token-present',
+      authSourceExists: false,
+    });
+    expect(afterProvidersRefresh).toBe(true);
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials: afterProvidersRefresh,
+      userDismissed: false,
+    })).toBe(false);
+    expect(shouldShowModelsSection({
+      modelCount: 2,
+      sourcesLoaded: true,
+      hasCredentials: afterProvidersRefresh,
+    })).toBe(true);
+
+    expect(providerHasCredentials({
+      key: 'oauth-token-present',
+      authSourceExists: true,
+    })).toBe(true);
+  });
+
+  test('explicit hide keeps the auth panel closed while credentials are still missing', () => {
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials: false,
+      userDismissed: true,
+    })).toBe(false);
+  });
+
+  test('models stay visible while sources are still loading', () => {
+    expect(shouldShowModelsSection({
+      modelCount: 4,
+      sourcesLoaded: false,
+      hasCredentials: false,
+    })).toBe(true);
+  });
+});
+
+const providersPageSource = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'ProvidersPage.tsx'),
+  'utf8',
+);
+
+describe('ProvidersPage Kimi Usage mount', () => {
+  test('shows the usage block only when the Kimi slot is on and kimi-coding is connected', () => {
+    expect(providersPageSource).toContain("useFeaturePluginSlotActive('kimi'");
+    expect(providersPageSource).toContain("selectedProvider.id === 'kimi-coding' && hasCredentials");
+    expect(providersPageSource).toContain('<ProviderKimiUsage />');
+    expect(providersPageSource).not.toContain('/api/quota');
+  });
+});
+

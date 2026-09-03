@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
+import { focusDesktopWindow } from '@/lib/desktop';
 import { SettingsView } from './SettingsView';
 
 interface SettingsWindowProps {
@@ -31,12 +32,18 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
       open={open}
       onOpenChange={(next, eventDetails) => {
         if (shouldBlockSettingsDismiss(next, eventDetails)) {
+          // Base UI still applies the close unless cancel() is called, which
+          // leaves ending-style overlays that eat the next gear click (#378).
+          eventDetails?.cancel?.();
           if (!next && eventDetails?.reason === 'escape-key') {
             notifySettingsEscapeForm();
           }
           return;
         }
         onOpenChange(next);
+        if (!next) {
+          void focusDesktopWindow();
+        }
       }}
     >
       <Dialog.Portal>

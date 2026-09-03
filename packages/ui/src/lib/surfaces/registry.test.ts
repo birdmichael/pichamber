@@ -97,4 +97,14 @@ describe('getVisibleContextRailSurfaces', () => {
     const surfaces = getVisibleContextRailSurfaces({ ...baseOptions, railOrder: ['git', 'context'] });
     expect(surfaces.slice(0, 2).map((surface) => surface.id)).toEqual(['git', 'context']);
   });
+
+  test('drops surfaces the user hid from the rail', () => {
+    const surfaces = getVisibleContextRailSurfaces({
+      ...baseOptions,
+      hiddenSurfaces: ['git', 'browser'],
+    });
+    expect(surfaces.some((surface) => surface.id === 'git')).toBe(false);
+    expect(surfaces.some((surface) => surface.id === 'browser')).toBe(false);
+    expect(surfaces.some((surface) => surface.id === 'context')).toBe(true);
+  });
 });

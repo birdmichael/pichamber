@@ -166,6 +166,7 @@ export const ContextPanelRail: React.FC = () => {
   const gitDirectory = directoryKey && directoryKey !== CHAT_DRAFT_PROJECT_ID ? directoryKey : null;
   const workStatusPanelVisible = useUIStore((state) => state.workStatusPanelVisible);
   const contextRailOrder = useUIStore((state) => state.contextRailOrder);
+  const contextRailHiddenSurfaces = useUIStore((state) => state.contextRailHiddenSurfaces);
   const setContextRailOrder = useUIStore((state) => state.setContextRailOrder);
   const openContextSurface = useUIStore((state) => state.openContextSurface);
   const shortcutOverrides = useUIStore((state) => state.shortcutOverrides);
@@ -271,13 +272,14 @@ export const ContextPanelRail: React.FC = () => {
   const surfaces = React.useMemo(() => {
     return getVisibleContextRailSurfaces({
       railOrder: contextRailOrder,
+      hiddenSurfaces: contextRailHiddenSurfaces,
       planModeEnabled: showPlanSurface,
       isVSCode: isVSCodeRuntime(),
       screenWidth,
       tabs,
       isGitRepo: isGitRepo === true,
     });
-  }, [contextRailOrder, isGitRepo, showPlanSurface, screenWidth, tabs]);
+  }, [contextRailHiddenSurfaces, contextRailOrder, isGitRepo, showPlanSurface, screenWidth, tabs]);
 
   const handleDragEnd = React.useCallback((event: DragEndEvent) => {
     const { active, over } = event;

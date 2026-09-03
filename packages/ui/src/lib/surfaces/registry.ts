@@ -191,6 +191,9 @@ export const sortContextSurfaces = (railOrder: readonly string[]): ContextSurfac
 
 type VisibleRailSurfacesOptions = {
   railOrder: readonly string[];
+  /** Surfaces the user chose to hide from the rail (and from the digit
+      shortcuts, which share this filter). */
+  hiddenSurfaces?: readonly string[];
   planModeEnabled: boolean;
   isVSCode: boolean;
   screenWidth: number;
@@ -202,7 +205,8 @@ type VisibleRailSurfacesOptions = {
 /**
  * The context panel rail's visible, user-ordered surfaces. Shared by the rail
  * (for rendering and number badges) and the global surface-switch shortcut so
- * both agree on which surface each digit maps to.
+ * both agree on which surface each digit maps to. Surfaces in `hiddenSurfaces`
+ * are dropped first so a hidden panel leaves both the rail and the digit map.
  *
  * Content-driven surfaces are hidden (not disabled) until content exists; an
  * existing tab keeps them visible even if the content source went away.
@@ -211,6 +215,9 @@ type VisibleRailSurfacesOptions = {
  */
 export const getVisibleContextRailSurfaces = (options: VisibleRailSurfacesOptions): ContextSurfaceDescriptor[] => {
   return sortContextSurfaces(options.railOrder).filter((surface) => {
+    if (options.hiddenSurfaces?.includes(surface.id)) {
+      return false;
+    }
     if (surface.id === 'plan' && !options.planModeEnabled) {
       return false;
     }

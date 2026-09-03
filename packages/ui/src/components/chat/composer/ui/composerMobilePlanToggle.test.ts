@@ -26,6 +26,18 @@ const headerSource = readFileSync(
   join(__dirname, '../../../layout/Header.tsx'),
   'utf-8',
 );
+const shellSource = readFileSync(
+  join(__dirname, '../state/useMobileComposerShell.ts'),
+  'utf-8',
+);
+const pillSource = readFileSync(
+  join(__dirname, 'MobilePillComposer.tsx'),
+  'utf-8',
+);
+const buildRowSource = readFileSync(
+  join(__dirname, '../../PiPlanBuildRow.tsx'),
+  'utf-8',
+);
 
 const ICON_SLOT_WIDTH = /width:\s*1\.5rem\s*!important/;
 
@@ -68,5 +80,44 @@ describe('mobile composer Agent/Plan chip width', () => {
     expect(headerSource).toContain('isSessionTitleReloadGlyphVisible');
     expect(headerSource).toContain('showSessionTitleReloadGlyph');
     expect(headerSource).toContain('header.sessionReload.tooltip');
+  });
+});
+
+describe('mobile Plan chip focus guard and pill Build', () => {
+  test('Agent/Plan trigger holds the composer without preventDefault on the Radix trigger', () => {
+    expect(toggleSource).not.toContain('event.preventDefault()');
+    expect(toggleSource).not.toContain('onMouseDown={(event) => event.preventDefault()}');
+    expect(toggleSource).not.toContain('onPointerDownCapture');
+    expect(toggleSource).toContain('onPointerDown={() => onOpenChange?.(true)}');
+    expect(toggleSource).toContain('<DropdownMenu onOpenChange={onOpenChange}>');
+  });
+
+  test('planMenuOpen holds the expanded composer while the Agent/Plan menu is open', () => {
+    expect(shellSource).toContain('planMenuOpen');
+    expect(chatInputSource).toContain('planMenuOpen: mobilePlanMenuOpen');
+    expect(footerSource).toContain('onOpenChange={onPlanMenuOpenChange}');
+  });
+
+  test('collapsed pill mounts PiPlanBuildRow', () => {
+    expect(pillSource).toContain('<PiPlanBuildRow');
+  });
+
+  test('PiPlanBuildRow Build still has preventDefault; model trigger does not', () => {
+    const modelTrigger = buildRowSource.slice(
+      buildRowSource.indexOf('<DropdownMenuTrigger'),
+      buildRowSource.indexOf('</DropdownMenuTrigger>'),
+    );
+    expect(modelTrigger).not.toContain('event.preventDefault()');
+    expect(modelTrigger).not.toContain('onMouseDown');
+    expect(modelTrigger).not.toContain('onPointerDownCapture');
+
+    const buildButton = buildRowSource.slice(
+      buildRowSource.lastIndexOf('<Button'),
+      buildRowSource.lastIndexOf('</Button>'),
+    );
+    expect(buildButton).toContain("t('chat.piPlan.build')");
+    expect(buildButton).toContain('onMouseDown={(event) => event.preventDefault()}');
+    expect(buildButton).toContain('onPointerDownCapture');
+    expect(buildButton).toContain("event.pointerType === 'touch'");
   });
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUIStore } from '@/stores/useUIStore';
 import { parseRoute, updateBrowserURL, hasRouteParams } from '@/lib/router';
+import { openSessionFromRoute } from '@/lib/router/openSessionFromRoute';
 import type { RouteState, AppRouteState } from '@/lib/router';
 import type { MainTab } from '@/stores/useUIStore';
 import { resolveSettingsSlug } from '@/lib/settings/metadata';
@@ -48,7 +49,6 @@ export function useRouter(): void {
   const isApplyingRouteRef = React.useRef(false);
 
   // Get store actions (stable references)
-  const setCurrentSession = useSessionUIStore((state) => state.setCurrentSession);
   const setActiveMainTab = useUIStore((state) => state.setActiveMainTab);
   const setSettingsDialogOpen = useUIStore((state) => state.setSettingsDialogOpen);
   const setSettingsPage = useUIStore((state) => state.setSettingsPage);
@@ -66,13 +66,9 @@ export function useRouter(): void {
       isApplyingRouteRef.current = true;
 
       try {
-        // 1. Apply session first (may trigger async operations)
+        // 1. Apply session first (current window only — #431).
         if (route.sessionId) {
-          const currentSessionId = useSessionUIStore.getState().currentSessionId;
-          if (route.sessionId !== currentSessionId) {
-            const directoryHint = useSessionUIStore.getState().getDirectoryForSession(route.sessionId);
-            setCurrentSession(route.sessionId, directoryHint);
-          }
+          await openSessionFromRoute(route.sessionId);
         }
 
         // 2. Handle settings (takes precedence over tabs - it's a full-screen overlay)
@@ -101,7 +97,7 @@ export function useRouter(): void {
         isApplyingRouteRef.current = false;
       }
     },
-    [setCurrentSession, setActiveMainTab, setSettingsDialogOpen, setSettingsPage, navigateToDiff]
+    [setActiveMainTab, setSettingsDialogOpen, setSettingsPage, navigateToDiff]
   );
 
   /**

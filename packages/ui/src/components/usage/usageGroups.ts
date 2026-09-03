@@ -13,11 +13,13 @@ export type UsageLimitRow = {
 };
 
 export type UsageProviderGroup = {
-  providerId: QuotaProviderId;
+  providerId: QuotaProviderId | 'kimi-coding';
   providerName: string;
   rows: UsageLimitRow[];
   /** Provider-level message: a fetch error, or "nothing reported". */
   status: string | null;
+  /** Optional trailing membership / plan label on the provider header row. */
+  badge?: string | null;
 };
 
 /**

@@ -12,9 +12,12 @@ import { computeSubtreeIds } from "./scoped-blocking-requests"
 import { opencodeClient } from "@/lib/opencode/client"
 import { mergeSessionDirectoryMetadata, resolveGlobalSessionDirectory, useGlobalSessionsStore } from "@/stores/useGlobalSessionsStore"
 import { useConfigStore } from "@/stores/useConfigStore"
+import { useGlobalSessionStatusStore } from "./global-session-status"
 import { registerSessionDirectory } from "./sync-refs"
 import { recordSendFailure } from "./send-failure-log"
 import { isSyntheticPart } from "@/lib/messages/synthetic"
+import { draftFromContextPayload, readContextPart, type ContextCarrierPart, type ContextPartMetadata } from "@/lib/messages/contextParts"
+import { useInlineCommentDraftStore, type InlineCommentDraftTarget } from "@/stores/useInlineCommentDraftStore"
 import { materializeSessionSnapshots } from "./materialization"
 import { stripMessageDiffSnapshots, stripSessionDiffSnapshots } from "./sanitize"
 import { sessionEvents } from "@/lib/sessionEvents"
@@ -37,6 +40,7 @@ import { getImperativeSessionMessageLoader } from "./session-message-loader"
 import { cleanupPersistedSessionState } from "./session-deletion-cleanup"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isAmbiguousTransportFailure } from "@/lib/relay/transport-error"
+import { dropGoneSessionTabs } from "@/lib/sessionTabs"
 import { getStaleRunningToolMessageID } from "./materialization"
 import { normalizePath } from "@/lib/pathNormalization"
 import { mergeMessages } from "./optimistic"
@@ -344,6 +348,45 @@ function reconcileSessionMove(
   return movedSession
 }
 
+export type SessionLiveActivity = "active" | "idle" | "unknown"
+
+/**
+ * A session's live status can live in a different child store than the one that
+ * wins the directory dedup, so any store reporting a non-idle status counts.
+ * Absence of a non-idle status is not proof of idleness: report "idle" only when
+ * a child store actually covers the session's directory.
+ */
+export function getSessionLiveActivity(sessionId: string): SessionLiveActivity {
+  const stores = _childStores
+
+  if (stores) {
+    for (const [, store] of stores.children) {
+      const status = store.getState().session_status?.[sessionId]
+      if (status && status.type !== "idle") return "active"
+    }
+  }
+
+  if (useGlobalSessionStatusStore.getState().statusById.has(sessionId)) return "active"
+
+  if (!stores) return "unknown"
+  return isSessionCoveredByChildStore(sessionId, stores) ? "idle" : "unknown"
+}
+
+function isSessionCoveredByChildStore(sessionId: string, stores: ChildStoreManager): boolean {
+  for (const store of stores.children.values()) {
+    const state = store.getState()
+    if (state.session_status && Object.prototype.hasOwnProperty.call(state.session_status, sessionId)) return true
+    if (state.session.some((session) => session.id === sessionId)) return true
+  }
+  const directory = useSessionUIStore.getState().getDirectoryForSession(sessionId)
+  if (!directory) return false
+  return stores.children.has(normalizePath(directory) ?? directory)
+}
+
+export function isSessionBusyNow(sessionId: string): boolean {
+  return getSessionLiveActivity(sessionId) === "active"
+}
+
 export async function moveSessionToDirectory(
   session: Session,
   sourceDirectory: string,
@@ -496,6 +539,32 @@ function restoreFilePartsToInput(fileParts: Array<Record<string, unknown>>): voi
     if (url) {
       useInputStore.getState().addRestoredAttachment({ url, mimeType: mime, filename })
     }
+  }
+}
+
+/**
+ * Put a message's attached context (review comments, quotes, terminal
+ * selections, annotations) back on the composer chips.
+ *
+ * Context rides out as synthetic parts carrying structured metadata, so a
+ * forked message can be rebuilt into the drafts it came from. Without this
+ * the context is simply gone: the message is pulled back into the composer
+ * with its text and files, but the comments attached to it are not.
+ *
+ * The target's existing drafts are replaced, matching how text and file
+ * attachments are restored — the composer ends up as the message was sent.
+ */
+function restoreContextPartsToInput(
+  parts: readonly ContextCarrierPart[],
+  target: InlineCommentDraftTarget,
+): void {
+  const store = useInlineCommentDraftStore.getState()
+  store.clearDrafts(target)
+  for (const part of parts) {
+    const payload = readContextPart(part)
+    if (!payload) continue
+    const draft = draftFromContextPayload(payload)
+    if (draft) store.addDraft(target, draft)
   }
 }
 
@@ -983,6 +1052,7 @@ function finalizeConfirmedSessionDeletion(
   const ui = useSessionUIStore.getState()
   if (ui.currentSessionId === sessionId) ui.setCurrentSession(null)
   cleanupSessionWorktreeMetadata(sessionId)
+  dropGoneSessionTabs([sessionId])
   if (sessionDirectory) {
     cleanupPersistedSessionState({
       runtimeKey: expectedRuntimeKey,
@@ -1149,6 +1219,7 @@ export async function archiveSession(sessionId: string, expectedRuntimeKey = get
     useGlobalSessionsStore.getState().upsertSession(archived)
     const ui = useSessionUIStore.getState()
     if (ui.currentSessionId === sessionId) ui.setCurrentSession(null)
+    dropGoneSessionTabs([sessionId])
     return true
   } catch (error) {
     console.error("[session-actions] archiveSession failed", error)
@@ -1366,6 +1437,8 @@ export async function optimisticSend(input: {
   agent?: string
   directory?: string | null
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
+  additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
+  variant?: string
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
@@ -1429,17 +1502,41 @@ export async function optimisticSend(input: {
 
   const messageID = ascendingId("msg")
   input.onMessageID?.(messageID)
-  const textPartId = ascendingId("prt")
 
-  const optimisticParts: Part[] = [
-    { id: textPartId, type: "text", text: input.content } as Part,
-  ]
+  const optimisticParts: Part[] = []
+  if (input.content.trim()) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
+  }
+  for (const part of input.additionalParts ?? []) {
+    if (typeof part.text === "string" && part.text.length > 0) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "text",
+        text: part.text,
+        ...(part.synthetic ? { synthetic: true } : {}),
+        ...(part.metadata ? { metadata: part.metadata } : {}),
+      } as Part)
+    }
+    for (const file of part.files ?? []) {
+      optimisticParts.push({
+        id: ascendingId("prt"),
+        type: "file",
+        mime: file.mime,
+        url: file.url,
+        filename: file.filename,
+      } as Part)
+    }
+  }
   if (input.files) {
     for (const f of input.files) {
       optimisticParts.push({ id: ascendingId("prt"), type: "file", mime: f.mime, url: f.url, filename: f.filename } as Part)
     }
   }
+  if (optimisticParts.length === 0) {
+    optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
+  }
 
+  const optimisticVariant = typeof input.variant === "string" ? input.variant.trim() : ""
   const optimisticMessage = {
     id: messageID,
     role: "user" as const,
@@ -1452,6 +1549,7 @@ export async function optimisticSend(input: {
     model: `${input.providerID}/${input.modelID}`,
     metadata: {} as Record<string, unknown>,
     time: { created: Date.now(), completed: 0 },
+    ...(optimisticVariant ? { variant: optimisticVariant, thinking: optimisticVariant } : {}),
   } as unknown as Message
 
   // Insert into store + register in shadow Map (for mergeOptimisticPage cleanup)
@@ -2109,6 +2207,11 @@ export async function forkFromMessage(sessionId: string, messageId: string): Pro
   }
   // Clear existing attachments and restore file parts from the forked message.
   restoreFilePartsToInput(fileParts)
+  // The forked session is a fresh draft target, so the attached context of the
+  // forked message follows the text into its composer.
+  if (directory) {
+    restoreContextPartsToInput(parts, { directory, sessionKey: forkedSession.id })
+  }
 }
 
 export async function fetchMessagesForSession(sessionID: string, directory?: string | null): Promise<void> {

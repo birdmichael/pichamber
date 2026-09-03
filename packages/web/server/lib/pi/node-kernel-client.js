@@ -143,11 +143,34 @@ export const serializeNodeKernelCreateSessionInput = (input = {}) => {
   };
 };
 
+export const mergeRemoteSessionSnapshot = (state, next, { promptInFlight = false, liveOpInFlight = false } = {}) => {
+  if (!next || typeof next !== 'object') return state;
+  Object.assign(state, next);
+  // Child snapshots from setModel / refreshSnapshot / setThinkingLevel must not
+  // clobber parent isStreaming while prompt, steer, or followUp is live.
+  if (promptInFlight || liveOpInFlight) state.isStreaming = true;
+  return state;
+};
+
 const createRemotePiSession = (client, snapshot) => {
   const state = { ...snapshot };
+  let liveOps = 0;
+  let lastChildStreaming = Boolean(state.isStreaming);
   const applySnapshot = (next) => {
-    if (!next || typeof next !== 'object') return;
-    Object.assign(state, next);
+    if (next && typeof next === 'object' && Object.prototype.hasOwnProperty.call(next, 'isStreaming')) {
+      lastChildStreaming = Boolean(next.isStreaming);
+    }
+    mergeRemoteSessionSnapshot(state, next, { liveOpInFlight: liveOps > 0 });
+  };
+  const withLiveOp = async (fn) => {
+    liveOps += 1;
+    state.isStreaming = true;
+    try {
+      return await fn();
+    } finally {
+      liveOps -= 1;
+      state.isStreaming = liveOps > 0 ? true : lastChildStreaming;
+    }
   };
   const call = async (name, args = [], target) => {
     const reply = await client.call('session.method', {
@@ -226,23 +249,21 @@ const createRemotePiSession = (client, snapshot) => {
         return call('appendEntry', [entry], 'sessionManager');
       },
     },
-    async prompt(text, options) {
-      state.isStreaming = true;
-      try {
-        return await call('prompt', [text, options]);
-      } finally {
-        state.isStreaming = false;
-      }
+    prompt(text, options) {
+      return withLiveOp(() => call('prompt', [text, options]));
     },
     steer(text, images) {
-      return call('steer', [text, images]);
+      return withLiveOp(() => call('steer', [text, images]));
     },
     followUp(text, images) {
-      return call('followUp', [text, images]);
+      return withLiveOp(() => call('followUp', [text, images]));
     },
     async abort() {
-      state.isStreaming = false;
-      return call('abort');
+      try {
+        return await call('abort');
+      } finally {
+        if (liveOps === 0) state.isStreaming = lastChildStreaming;
+      }
     },
     getAvailableThinkingLevels() {
       return Array.isArray(state.availableThinkingLevels) ? state.availableThinkingLevels : [];
@@ -510,13 +531,20 @@ export const createNodeKernelClient = ({
     if (started) return started;
     started = new Promise((resolve, reject) => {
       try {
-        spawnChild();
+        if (!child) {
+          spawnChild();
+        }
       } catch (error) {
         started = null;
         reject(error);
         return;
       }
       const timer = setTimeout(() => {
+        if (child?.connected) {
+          console.warn('[pi-host] Pi node kernel still starting after 15s; waiting for ready');
+          return;
+        }
+        started = null;
         reject(new Error('Pi node kernel did not become ready'));
       }, 15000);
       const onReady = (message) => {
@@ -581,6 +609,7 @@ export const createNodeKernelClient = ({
       await ensureStarted();
       return {
         install: (...args) => call('packageManager', { name: 'install', args }),
+        installAndPersist: (...args) => call('packageManager', { name: 'installAndPersist', args }),
         update: (...args) => call('packageManager', { name: 'update', args }),
         removeAndPersist: (...args) => call('packageManager', { name: 'removeAndPersist', args }),
       };

@@ -3,11 +3,17 @@ import type { OpencodeClient, Project } from "@opencode-ai/sdk/v2/client"
 import { bootstrapDirectory } from "./bootstrap"
 import { INITIAL_STATE, type State } from "./types"
 
-const createSdk = (options?: { commandList?: () => Promise<{ data: unknown[] }> }) => ({
+const createSdk = (options?: {
+  commandList?: () => Promise<{ data: unknown[] }>
+  onStatus?: (input?: unknown) => void
+}) => ({
   project: { current: async () => ({ data: { id: "project-a" } }) },
   config: { get: async () => ({ data: {} }) },
   path: { get: async () => ({ data: { state: "", config: "", worktree: "/repo", directory: "/repo", home: "/home" } }) },
-  session: { status: async () => ({ data: {} }) },
+  session: { status: async (input?: unknown) => {
+    options?.onStatus?.(input)
+    return { data: {} }
+  } },
   command: { list: options?.commandList ?? (async () => ({ data: [] })) },
   mcp: { status: async () => ({ data: {} }) },
   lsp: { status: async () => ({ data: [] }) },
@@ -88,6 +94,24 @@ describe("bootstrapDirectory", () => {
 
     expect(result).toBe("failed")
     expect(state.session.map((session) => session.id)).toEqual(["cached"])
+  })
+
+  test("requests session status for the directory being bootstrapped", async () => {
+    let state = createState()
+    const statusArgs: unknown[] = []
+    const result = await bootstrapDirectory({
+      directory: "/repo/wooly",
+      sdk: createSdk({ onStatus: (input) => statusArgs.push(input) }),
+      getState: () => state,
+      set: (patch) => {
+        state = { ...state, ...patch }
+      },
+      global: { config: {}, projects: [project] },
+      loadSessions: async () => undefined,
+    })
+
+    expect(result).toBe("complete")
+    expect(statusArgs).toEqual([{ directory: "/repo/wooly" }])
   })
 
   test("rejects stale work before committing", async () => {

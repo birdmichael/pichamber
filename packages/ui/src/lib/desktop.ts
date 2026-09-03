@@ -79,6 +79,7 @@ export type DesktopSettings = {
   /** Work-status panel sections the user switched off. */
   workStatusHiddenSections?: string[];
   collapsibleThinkingBlocks?: boolean;
+  streamingAutoFollowEnabled?: boolean;
   showDeletionDialog?: boolean;
   nativeNotificationsEnabled?: boolean;
   notificationMode?: 'always' | 'hidden-only';
@@ -697,6 +698,59 @@ export const requestFileAccess = async (
   return { success: false, error: 'Native file picker not available' };
 };
 
+
+export type DesktopPickedFile = {
+  path: string;
+  outsideFileGrant?: string;
+};
+
+const normalizeDesktopPickedFile = (value: unknown): DesktopPickedFile | null => {
+  if (typeof value === 'string' && value.trim()) {
+    return { path: value.trim() };
+  }
+  if (!isDesktopFileGrantResult(value)) return null;
+  const path = typeof value.path === 'string' ? value.path.trim() : '';
+  if (!path) return null;
+  return {
+    path,
+    ...(typeof value.outsideFileGrant === 'string' && value.outsideFileGrant
+      ? { outsideFileGrant: value.outsideFileGrant }
+      : {}),
+  };
+};
+
+/** Multi-file native picker for composer Attach. Skip filters so the GTK chooser fits a short window. */
+export const requestFilesAccess = async (
+  options?: { title?: string; defaultPath?: string },
+): Promise<{ success: boolean; files?: DesktopPickedFile[]; error?: string }> => {
+  if (!(hasDesktopInvoke() && isDesktopLocalOriginActive())) {
+    return { success: false, error: 'Native file picker not available' };
+  }
+  return withNativeFilePicker(async () => {
+    try {
+      const selected = await getDesktopBridge()?.openDialog?.({
+        directory: false,
+        multiple: true,
+        returnGrant: true,
+        title: options?.title?.trim() || 'Attach files',
+        ...(options?.defaultPath ? { defaultPath: options.defaultPath } : {}),
+      });
+      if (!selected) {
+        return { success: false, error: 'File selection cancelled' };
+      }
+      const raw = Array.isArray(selected) ? selected : [selected];
+      const files = raw.map(normalizeDesktopPickedFile).filter((file): file is DesktopPickedFile => Boolean(file));
+      if (files.length === 0) {
+        return { success: false, error: 'File selection cancelled' };
+      }
+      return { success: true, files };
+    } catch (error) {
+      console.warn('Failed to request files access', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+};
+
 export const requestExistingFileAccess = async (
   path: string
 ): Promise<
@@ -895,11 +949,20 @@ export const revealDesktopPath = async (path: string): Promise<boolean> => {
   }
 };
 
+export type DesktopSaveFileFilter = {
+  name: string;
+  extensions: string[];
+};
+
+export const canSaveDesktopTextFile = (): boolean => (
+  hasDesktopInvoke() && isDesktopLocalOriginActive()
+);
+
 export const saveDesktopMarkdownFile = async (
   defaultFileName: string,
   content: string,
 ): Promise<string | null> => {
-  if (!hasDesktopInvoke() || !isDesktopLocalOriginActive()) {
+  if (!canSaveDesktopTextFile()) {
     return null;
   }
 
@@ -918,6 +981,28 @@ export const saveDesktopMarkdownFile = async (
     console.warn('Failed to save markdown file', error);
     return null;
   }
+};
+
+export const saveDesktopTextFile = async (
+  defaultFileName: string,
+  content: string,
+  filters?: DesktopSaveFileFilter[],
+): Promise<string | null> => {
+  if (!canSaveDesktopTextFile()) {
+    return null;
+  }
+
+  const trimmedFileName = defaultFileName?.trim();
+  if (!trimmedFileName) {
+    return null;
+  }
+
+  const result = await invokeDesktop<string>('desktop_save_text_file', {
+    defaultFileName: trimmedFileName,
+    content,
+    filters,
+  });
+  return typeof result === 'string' && result.trim().length > 0 ? result : null;
 };
 
 export const saveDesktopImageFile = async (

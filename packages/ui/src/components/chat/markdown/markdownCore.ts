@@ -200,11 +200,37 @@ const hasOpenFence = (raw: string): boolean => {
   return !new RegExp(`^[\\t ]{0,3}${char}{${size},}[\\t ]*$`).test(last);
 };
 
+// GFM autolink otherwise swallows CJK punctuation after a bare URL
+// (`https://example.com。` becomes one href). Insert a space so the
+// punctuation stays visible text, matching GitHub's URL boundary.
+// Skip fenced/inline code, `<https://…>` autolinks, and `[text](url)`
+// destinations — those are not GFM bare autolinks.
+const CJK_URL_PUNCTUATION_RE = /(https?:\/\/[^\s<]+)([。，、；：？！）】》」』\u3001\u3002\uff0c\uff0e\uff1a\uff1b\uff1f\uff01]+)/g;
+const PROTECTED_MARKDOWN_RE = /(`{3,}[\s\S]*?`{3,}|~{3,}[\s\S]*?~{3,}|`[^`\n]*`|<https?:\/\/[^>\s]+>|!?\[[^\]]*\]\([^)]*\))/g;
+
+const splitBareCjkUrls = (chunk: string): string => {
+  CJK_URL_PUNCTUATION_RE.lastIndex = 0;
+  return chunk.replace(CJK_URL_PUNCTUATION_RE, '$1 $2');
+};
+
+export const separateCjkUrlPunctuation = (text: string): string => {
+  let result = '';
+  let lastIndex = 0;
+  PROTECTED_MARKDOWN_RE.lastIndex = 0;
+  for (const match of text.matchAll(PROTECTED_MARKDOWN_RE)) {
+    const start = match.index ?? 0;
+    result += splitBareCjkUrls(text.slice(lastIndex, start));
+    result += match[0];
+    lastIndex = start + match[0].length;
+  }
+  return result + splitBareCjkUrls(text.slice(lastIndex));
+};
+
 const heal = (text: string): string => {
   try {
-    return remend(text, { linkMode: 'text-only' });
+    return separateCjkUrlPunctuation(remend(text, { linkMode: 'text-only' }));
   } catch {
-    return text;
+    return separateCjkUrlPunctuation(text);
   }
 };
 
@@ -513,7 +539,7 @@ const touch = (key: string, entry: { hash: string; html: string }): void => {
 
 const parseBlock = async (block: MarkdownBlock, imageMode: MarkdownImageMode): Promise<string> => {
   const parser = imageMode === 'label' ? imageLabelParser : inlineImageParser;
-  const parsed = await Promise.resolve(parser.parse(block.src));
+  const parsed = await Promise.resolve(parser.parse(separateCjkUrlPunctuation(block.src)));
   const withMath = renderMathExpressions(parsed);
   const highlighted = block.highlight ? await highlightCodeBlocks(withMath) : withMath;
   return sanitize(highlighted);
@@ -531,7 +557,7 @@ const parseBlock = async (block: MarkdownBlock, imageMode: MarkdownImageMode): P
 export const renderMarkdownSync = (text: string, imageMode: MarkdownImageMode = 'inline'): string => {
   if (!text) return '';
   const parser = imageMode === 'label' ? imageLabelParser : inlineImageParser;
-  const parsed = parser.parse(text) as string;
+  const parsed = parser.parse(separateCjkUrlPunctuation(text)) as string;
   const withMath = renderMathExpressions(parsed);
   return sanitize(withMath);
 };

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   createChatDraftIdentity,
   readChatDraft,
+  writeChatDraft,
 } from '@/lib/chatDraftPersistence';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { applyComposerIdentitySwitch } from '../useComposerDraft';
@@ -74,6 +75,22 @@ describe('applyComposerIdentitySwitch', () => {
     expect(readChatDraft(newSession).text).toBe('');
   });
 
+  test('an existing projectless draft does not leak onto New session', () => {
+    const existing = createChatDraftIdentity('runtime-a', '/home/tester', 'session-a')!;
+    const newSession = createChatDraftIdentity('runtime-a', 'openchamber:chats', null)!;
+
+    const afterOpenDraft = applyComposerIdentitySwitch({
+      previous: existing,
+      next: newSession,
+      currentText: 'projectless-draft',
+      persistEnabled: true,
+    });
+
+    expect(afterOpenDraft.text).toBe('');
+    expect(readChatDraft(existing).text).toBe('projectless-draft');
+    expect(readChatDraft(newSession).text).toBe('');
+  });
+
   test('B keeps its own draft when A is restored', () => {
     const sessionA = createChatDraftIdentity('runtime-a', '/repo', 'session-a')!;
     const sessionB = createChatDraftIdentity('runtime-a', '/repo', 'session-b')!;
@@ -93,5 +110,42 @@ describe('applyComposerIdentitySwitch', () => {
 
     expect(afterLeaveB.text).toBe('ping');
     expect(readChatDraft(sessionB).text).toBe('bravo');
+  });
+
+  test('emptyIncoming clears live composer without wiping destination untitled', () => {
+    const chats = createChatDraftIdentity('runtime-a', 'openchamber:chats', null)!;
+    const home = createChatDraftIdentity('runtime-a', '/home/box', null)!;
+    writeChatDraft(chats, 'projectless-draft-411', []);
+    writeChatDraft(home, 'projectless-draft-411', []);
+
+    const switched = applyComposerIdentitySwitch({
+      previous: chats,
+      next: home,
+      currentText: 'projectless-draft-411',
+      persistEnabled: true,
+      emptyIncoming: true,
+    });
+
+    expect(switched.changed).toBe(true);
+    expect(switched.text).toBe('');
+    expect(readChatDraft(chats).text).toBe('projectless-draft-411');
+    expect(readChatDraft(home).text).toBe('projectless-draft-411');
+  });
+
+  test('emptyIncoming still clears live text when identities collide on ~', () => {
+    const home = createChatDraftIdentity('runtime-a', '/home/box', null)!;
+    writeChatDraft(home, 'projectless-draft-411', []);
+
+    const switched = applyComposerIdentitySwitch({
+      previous: home,
+      next: home,
+      currentText: 'projectless-draft-411',
+      persistEnabled: true,
+      emptyIncoming: true,
+    });
+
+    expect(switched.changed).toBe(true);
+    expect(switched.text).toBe('');
+    expect(readChatDraft(home).text).toBe('projectless-draft-411');
   });
 });

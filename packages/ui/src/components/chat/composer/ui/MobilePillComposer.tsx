@@ -15,6 +15,7 @@ import { Icon } from '@/components/icon/Icon';
 import { StopIcon } from '@/components/icons/StopIcon';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
 import { PiGoalStatusRow } from '@/components/chat/PiGoalStatusRow';
+import { PiPlanBuildRow } from '@/components/chat/PiPlanBuildRow';
 import { PiPlanStatusRow } from '@/components/chat/PiPlanStatusRow';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
 import { useI18n } from '@/lib/i18n';
@@ -83,6 +84,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
             className="mb-1.5"
         />
         <PiPlanStatusRow className="mb-1.5" />
+        <PiPlanBuildRow className="mb-1.5 w-full justify-end" />
         </>
         ) : (
         <SessionGoalRow

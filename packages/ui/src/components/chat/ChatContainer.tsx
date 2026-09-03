@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ChatEmptyState from './ChatEmptyState';
 import { useGlobalSyncStore } from '@/sync/global-sync-store';
 import MessageList, { type MessageListHandle } from './MessageList';
+import { createTimelineRevealGate, TIMELINE_REVEAL_CAP_MS, TimelineRevealGateContext, type TimelineRevealGate } from './timelineRevealGate';
 import { PermissionCard } from './PermissionCard';
 import { QuestionCard } from './QuestionCard';
 import { PiExtensionPromptCard } from './PiExtensionPromptCard';
@@ -33,8 +34,8 @@ import { StatusRowContainer } from './StatusRowContainer';
 import { SessionRecapNote } from '@/components/chat/SessionRecapSpacer';
 import ScrollToBottomButton from './components/ScrollToBottomButton';
 import { PromptNavigatorRail } from './components/PromptNavigatorRail';
-import { ScrollShadow } from '@/components/ui/ScrollShadow';
-import { useChatAutoFollow, type AnimationHandlers, type ContentChangeReason } from '@/hooks/useChatAutoFollow';
+import { useScrollShadow } from '@/components/ui/useScrollShadow';
+import { useChatTimelineScroll, type TimelineListHandle } from '@/hooks/useChatTimelineScroll';
 import { useChatTimelineController } from './hooks/useChatTimelineController';
 import { TimelineDialog } from './TimelineDialog';
 import { useChatTurnNavigation } from './hooks/useChatTurnNavigation';
@@ -82,6 +83,7 @@ import { PARENT_CHAT_MIN_WIDTH } from '@/lib/surfaces/chatColumnLayout';
 import { useWorkStatusVisibility } from './work-status/useWorkStatusVisibility';
 import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/contextPanelEmbeddedChat';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
+import { hasContextParts } from '@/lib/messages/contextParts';
 import { isLeftoverPlanSlashText } from '@/lib/featurePlugins/slotStatus';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { hasPendingUserTranscriptPaint, isHiddenUserMessage } from './message/hiddenUserMessage';
@@ -100,6 +102,9 @@ const CHAT_SCROLL_STYLE = {
     overscrollBehavior: 'contain',
     overscrollBehaviorY: 'contain',
 } as const;
+const STATUS_OVERLAY_RESERVED_HEIGHT = 40;
+const TIMELINE_SETTLE_STABLE_FRAMES = 2;
+const TIMELINE_SETTLE_CAP_MS = 300;
 const CHAT_NAVIGATION_IGNORED_TARGET_SELECTOR = [
     'a[href]',
     'button',
@@ -180,11 +185,15 @@ type ChatViewportProps = {
     currentSessionKey: string;
     isDesktopExpandedInput: boolean;
     isMobile: boolean;
-    stickyUserHeader: boolean;
     directory?: string;
     scrollRef: React.RefObject<HTMLDivElement | null>;
     messageListRef: React.RefObject<MessageListHandle | null>;
-    pendingRevealWork: boolean;
+    registerList: (list: TimelineListHandle | null) => void;
+    anchorMessageId: string | null;
+    onAnchorReady: (messageId: string, anchorIndex: number) => void;
+    onAnchorSizeChanged: (messageId: string) => void;
+    onIsAtEndChange: (isAtEnd: boolean) => void;
+    onTimelineDataChange: () => void;
     renderedMessages: SessionMessageRecord[];
     isLoadingOlder: boolean;
     sessionIsWorking: boolean;
@@ -196,10 +205,10 @@ type ChatViewportProps = {
         confirmedAt?: number;
         fallbackTimestamp?: number;
     } | null;
-    handleMessageContentChange: (reason?: ContentChangeReason) => void;
-    getAnimationHandlers: (messageId: string) => AnimationHandlers;
-    handleHistoryScroll: () => void;
     scrollToBottom: () => void;
+    endPinningReleased: boolean;
+    revealWaited: boolean;
+    revealGate: TimelineRevealGate;
     sessionQuestions: QuestionRequest[];
     sessionPermissions: PermissionRequest[];
     isProgrammaticFollowActive: boolean;
@@ -219,21 +228,25 @@ const ChatViewport = React.memo(({
     currentSessionKey,
     isDesktopExpandedInput,
     isMobile,
-    stickyUserHeader,
     directory,
     scrollRef,
     messageListRef,
-    pendingRevealWork,
+    registerList,
+    anchorMessageId,
+    onAnchorReady,
+    onAnchorSizeChanged,
+    onIsAtEndChange,
+    onTimelineDataChange,
     renderedMessages,
     isLoadingOlder,
     sessionIsWorking,
     streamingMessageId,
     activeStreamingPhase,
     retryOverlay,
-    handleMessageContentChange,
-    getAnimationHandlers,
-    handleHistoryScroll,
     scrollToBottom,
+    endPinningReleased,
+    revealWaited,
+    revealGate,
     sessionQuestions,
     sessionPermissions,
     isProgrammaticFollowActive,
@@ -295,7 +308,10 @@ const ChatViewport = React.memo(({
             // Other fully synthetic user messages (loop continuations,
             // plan-mode injections) are not prompts the user typed — keep
             // them out of the navigator entirely.
-            if (isFullySyntheticMessage(message.parts)) {
+            // Attached context (a quoted message, a terminal selection) is
+            // synthetic transport-wise but is a turn the user sent, so a
+            // context-only message stays navigable.
+            if (isFullySyntheticMessage(message.parts) && !hasContextParts(message.parts)) {
                 continue;
             }
             let displayParts = normalizedPromptPartsCache.current.get(message.parts);
@@ -357,87 +373,155 @@ const ChatViewport = React.memo(({
         scrollRef.current?.focus({ preventScroll: true });
     }, [scrollRef]);
 
+    const listHeader = React.useMemo(() => (
+        showLoadOlderButton ? (
+            <div className="flex justify-center pt-3 pb-1">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onLoadOlder}
+                    disabled={isLoadingOlder}
+                >
+                    {isLoadingOlder && (
+                        <Icon name="loader-4" className="size-4 animate-spin" />
+                    )}
+                    {t('chat.history.loadOlder')}
+                </Button>
+            </div>
+        ) : null
+    ), [isLoadingOlder, onLoadOlder, showLoadOlderButton, t]);
+
+    const listFooter = React.useMemo(() => (
+        <>
+            {(sessionQuestions.length > 0 || sessionPermissions.length > 0 || transcriptPiPrompts.length > 0) && (
+                <div>
+                    {sessionQuestions.map((question) => (
+                        <QuestionCard key={question.id} question={question} />
+                    ))}
+                    {transcriptPiPrompts.map((prompt) => (
+                        <PiExtensionPromptCard key={prompt.id} prompt={prompt} />
+                    ))}
+                    {sessionPermissions.map((permission) => (
+                        <PermissionCard key={permission.id} permission={permission} />
+                    ))}
+                </div>
+            )}
+
+            <SessionRecapNote sessionId={currentSessionId} directory={directory} isMobile={isMobile} />
+
+            <div className="flex-shrink-0" style={{ height: isMobile ? '40px' : '10vh' }} aria-hidden="true" />
+        </>
+    ), [currentSessionId, directory, isMobile, sessionPermissions, sessionQuestions, transcriptPiPrompts]);
+
+    const timelineRootRef = React.useRef<HTMLDivElement | null>(null);
+    const endPinningReleasedRef = React.useRef(endPinningReleased);
+    endPinningReleasedRef.current = endPinningReleased;
+    const revealWaitedRef = React.useRef(revealWaited);
+    revealWaitedRef.current = revealWaited;
+    React.useLayoutEffect(() => {
+        const root = timelineRootRef.current;
+        if (!root) return;
+        root.setAttribute('data-timeline-reveal', 'pending');
+        let finished = false;
+        let timer: number | null = null;
+        let frame: number | null = null;
+        const reveal = (fade: boolean) => {
+            if (finished) return;
+            finished = true;
+            if (timer !== null) window.clearTimeout(timer);
+            const startedAt = performance.now();
+            let lastHeight = -1;
+            let stableFrames = 0;
+            const settle = () => {
+                frame = null;
+                const node = scrollRef.current;
+                let height = -1;
+                if (node) {
+                    height = node.scrollHeight;
+                    if (!endPinningReleasedRef.current) {
+                        const end = height - node.clientHeight;
+                        if (end - node.scrollTop > 1) node.scrollTop = end;
+                    }
+                }
+                stableFrames = height === lastHeight ? stableFrames + 1 : 0;
+                lastHeight = height;
+                if (stableFrames < TIMELINE_SETTLE_STABLE_FRAMES && performance.now() - startedAt < TIMELINE_SETTLE_CAP_MS) {
+                    frame = window.requestAnimationFrame(settle);
+                    return;
+                }
+                if (fade) root.setAttribute('data-timeline-reveal', 'fading');
+                else root.removeAttribute('data-timeline-reveal');
+            };
+            frame = window.requestAnimationFrame(settle);
+        };
+        queueMicrotask(() => {
+            if (finished) return;
+            revealGate.close();
+            if (revealGate.holds === 0) {
+                reveal(revealWaitedRef.current);
+                return;
+            }
+            revealGate.onEmpty = () => reveal(true);
+            timer = window.setTimeout(() => reveal(true), TIMELINE_REVEAL_CAP_MS);
+        });
+        return () => {
+            finished = true;
+            if (timer !== null) window.clearTimeout(timer);
+            if (frame !== null) window.cancelAnimationFrame(frame);
+            revealGate.onEmpty = null;
+        };
+    }, [revealGate, scrollRef]);
+
+    const scrollContainerProps = React.useMemo(() => ({
+        className: 'absolute inset-0 overflow-y-auto overflow-x-hidden z-0 chat-scroll overlay-scrollbar-target',
+        style: CHAT_SCROLL_STYLE,
+        tabIndex: 0,
+        onClick: focusScrollContainer,
+        'data-scrollbar': 'chat',
+        'data-scroll-shadow': 'true',
+        'data-orientation': 'vertical',
+    }), [focusScrollContainer]);
+
     return (
         <div
             className={cn(
                 'relative min-h-0',
                 isDesktopExpandedInput
                     ? 'absolute inset-0 opacity-0 pointer-events-none'
-                    : 'flex-1'
+                    : 'flex-1',
             )}
+            ref={timelineRootRef}
             aria-hidden={isDesktopExpandedInput}
         >
             <div className="absolute inset-0">
-                <ScrollShadow
-                    className="absolute inset-0 overflow-y-auto overflow-x-hidden z-0 chat-scroll overlay-scrollbar-target"
-                    ref={scrollRef}
-                    style={CHAT_SCROLL_STYLE}
-                    observeMutations={false}
-                    hideTopShadow={isMobile && stickyUserHeader}
-                    tabIndex={0}
-                    onClick={focusScrollContainer}
-                    onScroll={handleHistoryScroll}
-                    data-scroll-shadow="true"
-                    data-scrollbar="chat"
-                >
-                    <div className="relative z-0 min-h-full">
-                        {showLoadOlderButton && (
-                            <div className="flex justify-center pt-3 pb-1">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={onLoadOlder}
-                                    disabled={isLoadingOlder}
-                                >
-                                    {isLoadingOlder && (
-                                        <Icon name="loader-4" className="size-4 animate-spin" />
-                                    )}
-                                    {t('chat.history.loadOlder')}
-                                </Button>
-                            </div>
-                        )}
-                        <MessageList
-                            key={currentSessionKey}
-                            ref={messageListRef}
-                            sessionKey={currentSessionId}
-                            disableStaging={pendingRevealWork}
-                            messages={renderedMessages}
-                            sessionIsWorking={sessionIsWorking}
-                            activeStreamingMessageId={streamingMessageId}
-                            activeStreamingPhase={activeStreamingPhase}
-                            retryOverlay={retryOverlay}
-                            onMessageContentChange={handleMessageContentChange}
-                            getAnimationHandlers={getAnimationHandlers}
-                            isLoadingOlder={isLoadingOlder}
-                            scrollToBottom={scrollToBottom}
-                            scrollRef={scrollRef}
-                            directory={directory}
-                        />
-                        {(sessionQuestions.length > 0 || sessionPermissions.length > 0 || transcriptPiPrompts.length > 0) && (
-                            <div>
-                                {sessionQuestions.map((question) => (
-                                    <QuestionCard key={question.id} question={question} />
-                                ))}
-                                {transcriptPiPrompts.map((prompt) => (
-                                    <PiExtensionPromptCard key={prompt.id} prompt={prompt} />
-                                ))}
-                                {sessionPermissions.map((permission) => (
-                                    <PermissionCard key={permission.id} permission={permission} />
-                                ))}
-                            </div>
-                        )}
-                        <PiExtensionConfirmDialog prompt={pendingPiConfirm} />
-
-                        <SessionRecapNote sessionId={currentSessionId} directory={directory} isMobile={isMobile} />
-
-                        <div className="mb-3">
-                            <StatusRowContainer />
-                        </div>
-
-                        <div className="flex-shrink-0" style={{ height: isMobile ? '40px' : '10vh' }} aria-hidden="true" />
-                    </div>
-                </ScrollShadow>
-                <OverlayScrollbar containerRef={scrollRef} suppressVisibility={isProgrammaticFollowActive} userIntentOnly observeMutations={false} />
+              <TimelineRevealGateContext.Provider value={revealGate}>
+                <MessageList
+                    key={currentSessionKey}
+                    ref={messageListRef}
+                    sessionKey={currentSessionId}
+                    messages={renderedMessages}
+                    sessionIsWorking={sessionIsWorking}
+                    activeStreamingMessageId={streamingMessageId}
+                    activeStreamingPhase={activeStreamingPhase}
+                    retryOverlay={retryOverlay}
+                    isLoadingOlder={isLoadingOlder}
+                    scrollToBottom={scrollToBottom}
+                    endPinningReleased={endPinningReleased}
+                    directory={directory}
+                    registerList={registerList}
+                    anchorMessageId={anchorMessageId}
+                    onAnchorReady={onAnchorReady}
+                    onAnchorSizeChanged={onAnchorSizeChanged}
+                    composerOverlayHeight={0}
+                    onIsAtEndChange={onIsAtEndChange}
+                    onTimelineDataChange={onTimelineDataChange}
+                    listHeader={listHeader}
+                    listFooter={listFooter}
+                    scrollContainerProps={scrollContainerProps}
+                />
+              </TimelineRevealGateContext.Provider>
+                <PiExtensionConfirmDialog prompt={pendingPiConfirm} />
+                <OverlayScrollbar containerRef={scrollRef} disableHorizontal suppressVisibility={isProgrammaticFollowActive} userIntentOnly observeMutations={false} />
                 {showPromptNavigator && promptTurnIds.length >= 2 ? (
                     <PromptNavigatorRail
                         turnIds={promptTurnIds}
@@ -457,21 +541,25 @@ const ChatViewport = React.memo(({
         && prev.currentSessionKey === next.currentSessionKey
         && prev.isDesktopExpandedInput === next.isDesktopExpandedInput
         && prev.isMobile === next.isMobile
-        && prev.stickyUserHeader === next.stickyUserHeader
         && prev.directory === next.directory
         && prev.scrollRef === next.scrollRef
         && prev.messageListRef === next.messageListRef
-        && prev.pendingRevealWork === next.pendingRevealWork
         && prev.renderedMessages === next.renderedMessages
         && prev.isLoadingOlder === next.isLoadingOlder
         && prev.sessionIsWorking === next.sessionIsWorking
         && prev.streamingMessageId === next.streamingMessageId
         && prev.activeStreamingPhase === next.activeStreamingPhase
         && prev.retryOverlay === next.retryOverlay
-        && prev.handleMessageContentChange === next.handleMessageContentChange
-        && prev.getAnimationHandlers === next.getAnimationHandlers
-        && prev.handleHistoryScroll === next.handleHistoryScroll
         && prev.scrollToBottom === next.scrollToBottom
+        && prev.endPinningReleased === next.endPinningReleased
+        && prev.anchorMessageId === next.anchorMessageId
+        && prev.registerList === next.registerList
+        && prev.onAnchorReady === next.onAnchorReady
+        && prev.onAnchorSizeChanged === next.onAnchorSizeChanged
+        && prev.onIsAtEndChange === next.onIsAtEndChange
+        && prev.onTimelineDataChange === next.onTimelineDataChange
+        && prev.revealWaited === next.revealWaited
+        && prev.revealGate === next.revealGate
         && prev.sessionQuestions === next.sessionQuestions
         && prev.sessionPermissions === next.sessionPermissions
         && prev.isProgrammaticFollowActive === next.isProgrammaticFollowActive
@@ -634,6 +722,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const currentSessionKey = currentSessionId
         ? JSON.stringify([getRuntimeKey(), effectiveSessionDirectory, currentSessionId])
         : null;
+    const revealGateRef = React.useRef<{ key: string | null; gate: TimelineRevealGate } | null>(null);
+    if (revealGateRef.current?.key !== currentSessionKey) {
+        revealGateRef.current = { key: currentSessionKey, gate: createTimelineRevealGate() };
+    }
+    const revealGate = revealGateRef.current.gate;
     const ensureSessionRenderable = React.useCallback(
         (sessionId: string) => sync.ensureSessionRenderable(sessionId, false, effectiveSessionDirectory),
         [effectiveSessionDirectory, sync],
@@ -1002,23 +1095,71 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         activeTurnChangeRef.current(turnId);
     }, []);
 
+    const [statusOverlayHeight, setStatusOverlayHeight] = React.useState(0);
+    const composerOverlayHeight = Math.max(STATUS_OVERLAY_RESERVED_HEIGHT, statusOverlayHeight);
+    const statusOverlayObserverRef = React.useRef<ResizeObserver | null>(null);
+    const onStatusOverlayNode = React.useCallback((node: HTMLDivElement | null) => {
+        statusOverlayObserverRef.current?.disconnect();
+        statusOverlayObserverRef.current = null;
+        if (!node || !globalThis.ResizeObserver) {
+            setStatusOverlayHeight(0);
+            return;
+        }
+        const update = () => {
+            const height = node.getBoundingClientRect().height + 8;
+            setStatusOverlayHeight((prev) => (Math.abs(prev - height) < 1 ? prev : height));
+        };
+        const observer = new ResizeObserver(update);
+        observer.observe(node);
+        statusOverlayObserverRef.current = observer;
+        update();
+    }, []);
+    React.useEffect(() => () => {
+        statusOverlayObserverRef.current?.disconnect();
+        statusOverlayObserverRef.current = null;
+    }, []);
+    const lastUserMessageId = React.useMemo(() => {
+        for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+            const message = sessionMessages[index];
+            if (message.info.role === 'user') {
+                return message.info.id;
+            }
+        }
+        return null;
+    }, [sessionMessages]);
+    const lastRevealSessionKeyRef = React.useRef<string | null>(null);
+    const revealWaitedRef = React.useRef(false);
+    if (currentSessionKey !== lastRevealSessionKeyRef.current) {
+        lastRevealSessionKeyRef.current = currentSessionKey;
+        revealWaitedRef.current = Boolean(currentSessionId) && !hasRenderableSessionSnapshot;
+    }
+    const revealWaited = revealWaitedRef.current;
+
     const {
         scrollRef,
-        notifyContentChange: handleMessageContentChange,
-        getAnimationHandlers,
+        scrollNode,
+        registerList,
+        anchorMessageId,
+        onAnchorReady,
+        onAnchorSizeChanged,
+        onIsAtEndChange,
+        onManualNavigation,
+        onTimelineDataChange,
         goToBottom,
         scrollToBottomOnSend,
-        releaseAutoFollow,
         restoreSnapshot,
         isPinned,
         isFollowingProgrammatically,
         showScrollButton,
-    } = useChatAutoFollow({
+        userOwnsScroll,
+    } = useChatTimelineScroll({
         currentSessionId,
         currentSessionKey,
         sessionMessageCount,
+        composerOverlayHeight,
+        lastUserMessageId,
         sessionIsWorking,
-        isMobile,
+        revealGate,
         onActiveTurnChange: handleActiveTurnChange,
     });
 
@@ -1056,10 +1197,24 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         messageListRef,
         loadMoreMessages,
         goToBottom,
-        releaseAutoFollow,
+        releaseAutoFollow: onManualNavigation,
         isPinned,
         showScrollButton,
     });
+    const scrollNodeRef = React.useMemo(() => ({ current: scrollNode }), [scrollNode]);
+    useScrollShadow(scrollNodeRef, {
+        observeMutations: false,
+        hideTopShadow: isMobile && stickyUserHeader,
+    });
+    const handleHistoryScroll = timelineController.handleHistoryScroll;
+    React.useEffect(() => {
+        if (!scrollNode) return;
+        const onScroll = () => handleHistoryScroll();
+        scrollNode.addEventListener('scroll', onScroll, { passive: true });
+        return () => {
+            scrollNode.removeEventListener('scroll', onScroll);
+        };
+    }, [handleHistoryScroll, scrollNode]);
     const resumeToLatestInstant = React.useCallback(() => {
         goToBottom('instant');
     }, [goToBottom]);
@@ -1069,8 +1224,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         && timelineController.historySignals.canLoadEarlier;
     const timelineLoadEarlier = timelineController.loadEarlier;
     const handleLoadOlderClick = React.useCallback(() => {
+        onManualNavigation();
         void timelineLoadEarlier({ userInitiated: true });
-    }, [timelineLoadEarlier]);
+    }, [onManualNavigation, timelineLoadEarlier]);
 
     React.useEffect(() => {
         activeTurnChangeRef.current = timelineController.handleActiveTurnChange;
@@ -1080,8 +1236,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         if (sessionPermissions.length === 0 && sessionQuestions.length === 0 && piExtensionPrompts.length === 0) {
             return;
         }
-        handleMessageContentChange('permission');
-    }, [handleMessageContentChange, piExtensionPrompts, sessionPermissions, sessionQuestions]);
+        onTimelineDataChange();
+    }, [onTimelineDataChange, piExtensionPrompts, sessionPermissions, sessionQuestions]);
 
     const navigation = useChatTurnNavigation({
         sessionId: currentSessionId,
@@ -1092,7 +1248,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         resumeToBottom: timelineController.resumeToBottomInstant,
     });
     const handlePromptNavigatorSelect = React.useCallback((turnId: string) => {
-        void navigation.scrollToTurnId(turnId, { behavior: 'smooth' });
+        void navigation.scrollToTurnId(turnId, { behavior: 'auto' });
     }, [navigation]);
     const canLoadEarlierPrompts = timelineController.historySignals.canLoadEarlier;
     const showPromptNavigator = !isMobile
@@ -1240,7 +1396,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         lastScrolledSessionKeyRef.current = currentSessionKey;
         if (hasHashTarget) {
             // Hash navigation handler will scroll to target; we just release auto-follow.
-            releaseAutoFollow();
+            onManualNavigation();
             return;
         }
 
@@ -1252,7 +1408,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         } else {
             window.requestAnimationFrame(run);
         }
-    }, [active, currentSessionId, currentSessionKey, releaseAutoFollow, restoreSnapshot]);
+    }, [active, currentSessionId, currentSessionKey, onManualNavigation, restoreSnapshot]);
 
     React.useEffect(() => {
         if (!messagesEnabled || !currentSessionId) return;
@@ -1469,21 +1625,25 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 currentSessionKey={currentSessionKey ?? currentSessionId}
                 isDesktopExpandedInput={isDesktopExpandedInput}
                 isMobile={isMobile}
-                stickyUserHeader={stickyUserHeader}
                 directory={effectiveSessionDirectory}
                 scrollRef={scrollRef}
                 messageListRef={messageListRef}
-                pendingRevealWork={timelineController.pendingRevealWork}
+                registerList={registerList}
+                anchorMessageId={anchorMessageId}
+                onAnchorReady={onAnchorReady}
+                onAnchorSizeChanged={onAnchorSizeChanged}
+                onIsAtEndChange={onIsAtEndChange}
+                onTimelineDataChange={onTimelineDataChange}
                 renderedMessages={timelineController.renderedMessages}
                 isLoadingOlder={timelineController.isLoadingOlder}
                 sessionIsWorking={sessionIsWorking}
                 streamingMessageId={streamingMessageId}
                 activeStreamingPhase={activeStreamingPhase}
                 retryOverlay={retryOverlay}
-                handleMessageContentChange={handleMessageContentChange}
-                getAnimationHandlers={getAnimationHandlers}
-                handleHistoryScroll={timelineController.handleHistoryScroll}
                 scrollToBottom={resumeToLatestInstant}
+                endPinningReleased={userOwnsScroll}
+                revealWaited={revealWaited}
+                revealGate={revealGate}
                 sessionQuestions={sessionQuestions}
                 sessionPermissions={sessionPermissions}
                 isProgrammaticFollowActive={isFollowingProgrammatically}
@@ -1511,6 +1671,26 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                         visible={timelineController.showScrollToBottom}
                         onClick={navigation.resumeToLatest}
                     />
+                )}
+                {!isDesktopExpandedInput && (
+                    <div
+                        className={cn(
+                            'pointer-events-none absolute bottom-full inset-x-0 mb-2 transition-opacity duration-100',
+                            userOwnsScroll && 'opacity-0',
+                        )}
+                    >
+                        <div className="chat-input-column">
+                            <div
+                                ref={onStatusOverlayNode}
+                                className={cn(
+                                    '[&:not(:has(*))]:hidden',
+                                    userOwnsScroll ? 'pointer-events-none' : 'pointer-events-auto',
+                                )}
+                            >
+                                <StatusRowContainer />
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
             </div>

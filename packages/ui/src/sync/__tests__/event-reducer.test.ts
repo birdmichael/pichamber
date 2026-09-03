@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { Session } from "@opencode-ai/sdk/v2"
 import type { Event, Message, Part, PermissionRequest, QuestionRequest, SessionStatus } from "@opencode-ai/sdk/v2/client"
-import { applyDirectoryEvent } from "../event-reducer"
+import { applyDirectoryEvent, idleLeftoverBusyAfterSettledAssistant } from "../event-reducer"
 import { INITIAL_STATE, type State } from "../types"
 
 function state(overrides: Partial<State> = {}): State {
@@ -84,7 +84,83 @@ describe("applyDirectoryEvent", () => {
       type: "message.updated",
       properties: { info: current },
     } as Event)).toBe(true)
-    expect(draft.message.ses_1).toEqual([legacy, current])
+    expect(draft.message.ses_1).toEqual([legacy, { ...current, parentID: legacy.id }])
+  })
+
+  test("parents an implement assistant with a missing Pi-native parent onto the last user", () => {
+    const user = {
+      id: "msg_plan",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 100 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_impl",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "5bb000de",
+          time: { created: 200 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect(draft.message.ses_1[1]).toMatchObject({
+      id: "asst_impl",
+      parentID: "msg_plan",
+    })
+  })
+
+  test("parents an implement assistant with an empty parentID onto the last user", () => {
+    const user = {
+      id: "msg_plan",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 100 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_impl",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "",
+          time: { created: 200 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect((draft.message.ses_1[1] as { parentID?: string }).parentID).toBe("msg_plan")
+  })
+
+  test("does not retarget an assistant whose msg_ parent is merely unloaded", () => {
+    const user = {
+      id: "msg_latest",
+      sessionID: "ses_1",
+      role: "user",
+      time: { created: 200 },
+    } as Message
+    const draft = state({ message: { ses_1: [user] } })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "asst_old",
+          sessionID: "ses_1",
+          role: "assistant",
+          parentID: "msg_older",
+          time: { created: 50 },
+        } as Message,
+      },
+    } as Event)).toBe(true)
+    expect((draft.message.ses_1.find((item) => item.id === "asst_old") as { parentID?: string }).parentID)
+      .toBe("msg_older")
   })
 
   test("does not insert a Pi-native user when the live client user already exists", () => {
@@ -276,6 +352,62 @@ describe("applyDirectoryEvent", () => {
     expect(draft.session_status.ses_1).toBe(statusRef)
   })
 
+  test("does not idle leftover busy when the first assistant message completes", () => {
+    const draft = state({
+      session_status: {
+        ses_1: { type: "busy" } as SessionStatus,
+      },
+    })
+    const completed = {
+      id: "msg_assistant_1",
+      sessionID: "ses_1",
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+    } as Message
+
+    expect(idleLeftoverBusyAfterSettledAssistant({
+      status: { type: "busy" },
+      lastMessage: completed,
+    })).toBe(false)
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: { info: completed },
+    } as Event)).toBe(true)
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
+  })
+
+  test("message_end with time.completed while tools remain does not idle session_status", () => {
+    const completed = {
+      id: "msg_assistant_1",
+      sessionID: "ses_1",
+      role: "assistant",
+      time: { created: 1, completed: 2 },
+    } as Message
+    const draft = state({
+      session_status: {
+        ses_1: { type: "busy" } as SessionStatus,
+      },
+      message: { ses_1: [completed] },
+      part: {
+        msg_assistant_1: [{
+          id: "prt_tool",
+          sessionID: "ses_1",
+          messageID: "msg_assistant_1",
+          type: "tool",
+          tool: "bash",
+          state: { status: "running" },
+        } as never],
+      },
+    })
+
+    expect(applyDirectoryEvent(draft, {
+      type: "message.updated",
+      properties: { info: completed },
+    } as Event)).toBe(false)
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
+  })
+
   test("skips duplicate session idle events", () => {
     const draft = state()
     const event = {
@@ -409,7 +541,7 @@ describe("applyDirectoryEvent", () => {
     expect((draft.message.ses_1[0]?.time as { completed?: number }).completed).toBe(1_500)
   })
 
-  test("clears leftover busy when the trailing assistant is already finished", () => {
+  test("does not idle a busy session just because the trailing assistant finished", () => {
     const draft = state({
       session_status: { ses_1: { type: "busy" } as SessionStatus },
       message: {
@@ -436,6 +568,6 @@ describe("applyDirectoryEvent", () => {
       },
     } as Event)
 
-    expect(draft.session_status.ses_1).toEqual({ type: "idle" })
+    expect(draft.session_status.ses_1).toEqual({ type: "busy" })
   })
 })

@@ -29,9 +29,10 @@ export const useWorkStatusSectionVisibility = (): {
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const todoSlotActive = useFeaturePluginSlotActive('todo', isPiKernel);
   const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
+  const kimiSlotActive = useFeaturePluginSlotActive('kimi', isPiKernel);
   const sectionContext = React.useMemo(
-    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive, xaiSlotActive }),
-    [isMcpFeaturePluginActive, isPiKernel, subagentsSlotActive, todoSlotActive, xaiSlotActive],
+    () => ({ isPiKernel, isMcpFeaturePluginActive, subagentsSlotActive, todoSlotActive, xaiSlotActive, kimiSlotActive }),
+    [isMcpFeaturePluginActive, isPiKernel, kimiSlotActive, subagentsSlotActive, todoSlotActive, xaiSlotActive],
   );
   const sectionVisible = React.useCallback<WorkStatusSectionVisible>(
     (sectionId) => isWorkStatusSectionVisible(hiddenSections, sectionId, sectionContext),

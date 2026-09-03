@@ -71,7 +71,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     const sessionID = req.params.sessionID;
     const directory = resolveDirectory(req);
     if (typeof host.ensureSession === 'function') {
-      return host.ensureSession(sessionID, directory);
+      await host.ensureSession(sessionID, directory);
     }
     return host.getSession(sessionID);
   };
@@ -98,6 +98,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/health', handle(async (_req, res) => {
+    const ready = typeof host?.isReady === 'function' ? host.isReady() === true : true;
+    if (!ready) {
+      json(res, 503, { healthy: false, kernel: 'pi' });
+      return;
+    }
     json(res, 200, { healthy: true, kernel: 'pi' });
   }));
 
@@ -319,6 +324,14 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       return;
     }
     json(res, 200, await host.getXaiUsage());
+  }));
+
+  app.get('/api/pi/kimi-usage', handle(async (_req, res) => {
+    if (typeof host.getKimiUsage !== 'function') {
+      json(res, 200, { ok: false, configured: false, slotActive: false });
+      return;
+    }
+    json(res, 200, await host.getKimiUsage());
   }));
 
   app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {
@@ -1074,7 +1087,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.post('/api/session/:sessionID/share', parseJson, handle(async (_req, res) => {
-    json(res, 200, unsupported('session.share'));
+    json(res, 501, unsupported('session.share'));
+  }));
+
+  app.delete('/api/session/:sessionID/share', handle(async (_req, res) => {
+    json(res, 501, unsupported('session.unshare'));
   }));
 
   app.post('/api/session/:sessionID/summarize', parseJson, handle(async (req, res) => {

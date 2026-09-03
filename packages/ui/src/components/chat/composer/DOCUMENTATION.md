@@ -7,6 +7,12 @@ everything between typing and sending.
 own state and wires these modules together; it should not grow logic that
 belongs to one of them.
 
+`@` file mentions search files and directories with the longest query token
+(`mentionServerQuery`), then rank both kinds together by match quality
+(`rankFileMentionResults`). Multi-word queries still require every token to
+appear in the path. Pi `@` agents stay on `getComposerMentionableAgents`; do
+not list leftover OpenCode agents.
+
 On the Pi kernel, composer Enter does not send a normal chat turn while a Desktop `ctx.ui` prompt (`select` / `confirm` / `input` / `editor`) is waiting for that session. Submit or dismiss the in-chat card (or confirm modal) instead. The composer shows that reason next to an alert glyph, and Enter toasts the same copy. This is not OpenCode `question.reply`. Opening a session hydrates pending `GET /api/pi/ui` prompts into the transcript even when there are no messages yet; the empty-chat welcome must not hide those cards. `/plan start` confirms with a `pi.ui.notify` toast on the shared desktop toast surface.
 On Desktop, compact-composer Enter still sends and Shift+Enter inserts a newline. In the expanded composer, Enter inserts a newline and Cmd/Ctrl+Enter sends — Linux uses Ctrl+Enter. Mobile already required a modifier to send.
 An existing session with zero messages uses the same Desktop welcome chrome as New session: the same `DraftPresetChips` the installed packages allow, plus the Session panel. The welcome title uses the same friendly workspace label as the sidebar (`~` for the home folder, or the opened project's name), not the raw last path segment. Chip click still submits through the composer send path on that session; it does not mint another chat.
@@ -147,9 +153,20 @@ Prefix filtering stays name-only on Pi. The CSS fallback must not be
 mobile composer, not the collapsed pill. On Pi the thinking chip lists
 `GET /api/session/:id/thinking` `available` from live
 `getAvailableThinkingLevels()`, not the full seven-level catalog, and
-clamps the current chip onto that list. A new-session draft with no
-session id uses models.dev `reasoning_options` for the selected model
-so picking grok-4.6 does not flash all seven levels. OpenCode `build`
+clamps the current chip onto that list. Switching models pairs the chip
+immediately from the selected model's catalog (`reasoning_options`) and
+waits for `PATCH /model` before applying GET `available`. Empty or
+`off`-only live stays on catalog; a model with no catalog levels hides
+the chip. Each send uses the chip's current model and thinking
+(`resolveComposerSendThinking`). On Pi leftover OpenCode `currentVariant`
+is not sent. Session `GET /model` restores when the chat opens and
+does not overwrite a later composer pick; automatic history/fallback
+applies are not composer picks. Fetch failure retries. Thinking GET waits for `PATCH /model` and keeps a later chip pin over
+jsonl only when that pin belongs to this session and model. Switching
+chats does not keep the previous chip pin. Mod+Shift+T cycles the Pi
+chip levels through the same apply path as the chip. A new-session draft with
+no session id uses models.dev `reasoning_options` for the selected model
+so picking a 3-level model does not flash all seven levels. OpenCode `build`
 / `plan` / custom agents still show. A Build row (session model + `/plan implement` in this session) appears
 when a ready or saved plan exists, even if the View Plan rail is closed.
 
@@ -164,6 +181,20 @@ when a ready or saved plan exists, even if the View Plan rail is closed.
 | `attachments/` | Files: paths, drop payloads |
 | `ui/` | Presentation |
 | `text.ts` | How inserted text meets the text already there |
+| `largeTextPaste.ts` | Detect large plain-text pastes and build virtual `.txt` files |
+| `largeTextPasteOffer.ts` | Ask-toast offer id begin/resolve (supersede + double-apply guards) |
+
+`ChatInput.handlePaste` owns paste orchestration: URL-over-selection markdown
+links, clipboard images (attach + citation), and large plain-text pastes.
+Large pastes (about 2,000 characters or 25 lines) follow the composer setting
+`largeTextPasteBehavior` (`ask` / `attach` / `inline`). Attaching creates an
+in-memory `text/plain` file named `pasted-context-N.txt`, inserts a bracket
+citation, and sends it through the same attachment pipeline as a manually
+picked `.txt` file. Ask-toast actions read live composer/attachment state so
+typing or other attaches between paste and choice stay consistent. Short text,
+images, and URL wraps keep their existing paths. Pi `addAttachedFile` already
+accepts in-memory `text/plain` (declared MIME `text/` → `text/plain`); no
+kernel change.
 
 ## The prompt language
 

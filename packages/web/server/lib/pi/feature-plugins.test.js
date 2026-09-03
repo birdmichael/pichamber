@@ -10,6 +10,7 @@ import {
   featurePluginSourcesMatch,
   isFeaturePluginSourceInstalled,
   listConfiguredPiPackageSources,
+  removeXaiSlotSources,
   listFeaturePluginSlashCommands,
   listPiPackages,
   mergeFeaturePluginPatch,
@@ -90,8 +91,11 @@ describe('feature plugin defaults and persist', () => {
     expect(plugins.todo.source).not.toBe('npm:rpiv-todo');
     expect(plugins.todo.command).toBeUndefined();
     expect(plugins.xai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.xai);
-    expect(plugins.xai.source).toBe('npm:pi-xai-oauth');
+    expect(plugins.xai.source).toBe('npm:pi-xai');
     expect(plugins.xai.command).toBeUndefined();
+    expect(plugins.kimi.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.kimi);
+    expect(plugins.kimi.source).toBe('npm:pi-kimi-code-console-usage');
+    expect(plugins.kimi.command).toBeUndefined();
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
@@ -199,6 +203,16 @@ describe('feature plugin slash commands', () => {
     expect(listFeaturePluginSlashCommands({
       slots: { xai: { installed: true, enabled: false } },
     })).toEqual([]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { kimi: { installed: true, enabled: true } },
+    })).toEqual([{
+      name: 'kimi-usage',
+      description: 'Show Kimi Code subscription usage',
+      source: 'extension',
+    }]);
+    expect(listFeaturePluginSlashCommands({
+      slots: { kimi: { installed: true, enabled: false } },
+    })).toEqual([]);
   });
 });
 
@@ -224,6 +238,48 @@ describe('settings.json package manager', () => {
     await expect(manager.update('npm:missing-package')).rejects.toMatchObject({ status: 404 });
   });
 
+  it('uninstalls leftover oauth after a missing pi-xai alias throws', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-xai-oauth'],
+    });
+    const removed = [];
+    const inner = createSettingsJsonPackageManager({ home });
+    await removeXaiSlotSources({
+      manager: {
+        async removeAndPersist(source) {
+          removed.push(source);
+          if (source === 'npm:pi-xai') throw new Error('npm uninstall failed');
+          return inner.removeAndPersist(source);
+        },
+      },
+      home,
+    });
+    expect(removed).toEqual(['npm:pi-xai', 'npm:pi-xai-oauth']);
+    expect(listConfiguredPiPackageSources(home)).toEqual([]);
+  });
+
+  it('fails uninstall when leftover oauth stays in settings.json', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
+      packages: ['npm:pi-xai-oauth'],
+    });
+    const inner = createSettingsJsonPackageManager({ home });
+    await expect(removeXaiSlotSources({
+      manager: {
+        async removeAndPersist(source) {
+          if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+          return inner.removeAndPersist(source);
+        },
+      },
+      home,
+    })).rejects.toMatchObject({
+      message: 'oauth uninstall failed',
+      status: 500,
+    });
+    expect(listConfiguredPiPackageSources(home)).toEqual(['npm:pi-xai-oauth']);
+  });
+
   it('does not treat listing as an install', () => {
     const home = makeTemp();
     const payload = toFeaturePluginsPayload({
@@ -237,9 +293,11 @@ describe('settings.json package manager', () => {
     expect(payload.slots.btw.installed).toBe(false);
     expect(payload.slots.todo.installed).toBe(false);
     expect(payload.slots.xai.installed).toBe(false);
+    expect(payload.slots.kimi.installed).toBe(false);
     expect(payload.slots.goal.enabled).toBe(false);
     expect(payload.slots.todo.enabled).toBe(false);
     expect(payload.slots.xai.enabled).toBe(false);
+    expect(payload.slots.kimi.enabled).toBe(false);
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))).toBe(false);
   });
 
@@ -277,13 +335,38 @@ describe('existing Pi agent recognition', () => {
     expect(fs.existsSync(path.join(home, '.pi', 'agent', 'pichamber.json'))).toBe(false);
   });
 
-  it('enables Grok Usage when packages lists npm:pi-xai-oauth', () => {
+  it('enables Grok Usage when packages lists npm:pi-xai', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: {},
+      configuredSources: ['npm:pi-xai'],
+    });
+    expect(scoped.slots.xai).toMatchObject({
+      source: 'npm:pi-xai',
+      installed: true,
+      enabled: true,
+    });
+    expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['xai-usage']);
+  });
+
+  it('enables Kimi Usage when packages lists npm:pi-kimi-code-console-usage', () => {
+    const scoped = toFeaturePluginsPayload({
+      plugins: {},
+      configuredSources: ['npm:pi-kimi-code-console-usage'],
+    });
+    expect(scoped.slots.kimi).toMatchObject({
+      source: 'npm:pi-kimi-code-console-usage',
+      installed: true,
+      enabled: true,
+    });
+    expect(listFeaturePluginSlashCommands(scoped).map((item) => item.name)).toEqual(['kimi-usage']);
+  });
+
+  it('still treats leftover npm:pi-xai-oauth as the Grok Usage slot', () => {
     const scoped = toFeaturePluginsPayload({
       plugins: {},
       configuredSources: ['npm:pi-xai-oauth'],
     });
     expect(scoped.slots.xai).toMatchObject({
-      source: 'npm:pi-xai-oauth',
       installed: true,
       enabled: true,
     });

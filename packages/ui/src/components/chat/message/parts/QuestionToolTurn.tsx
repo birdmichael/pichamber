@@ -4,6 +4,7 @@ import type { ToolPart } from '@opencode-ai/sdk/v2';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { PiExtensionPromptCard } from '@/components/chat/PiExtensionPromptCard';
+import { QuestionMarkdown } from '@/components/chat/QuestionMarkdown';
 import { usePiExtensionUiPrompts } from '@/sync/pi-extension-ui-store';
 import {
   isActiveQuestionToolStatus,
@@ -60,9 +61,11 @@ const QuestionToolPartCard: React.FC<{
               <div className="typography-meta text-muted-foreground">{t('chat.toolPart.awaitingResponse')}</div>
             ) : items.map((item, index) => (
               <div key={`${item.question}:${index}`} className="space-y-1.5">
-                <div className="typography-meta font-medium text-foreground">
-                  {item.question || t('chat.piExtensionUi.questionFallback')}
-                </div>
+                <QuestionMarkdown
+                  content={item.question || t('chat.piExtensionUi.questionFallback')}
+                  size="meta"
+                  className="font-medium text-foreground"
+                />
                 {item.answer ? (
                   <div className="typography-meta text-foreground whitespace-pre-wrap">{item.answer}</div>
                 ) : item.cancelled ? (

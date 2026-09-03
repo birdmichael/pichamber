@@ -328,22 +328,30 @@ const authMethodType = (entry) => {
 const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API Key');
 
 export const XAI_PROVIDER_ID = 'xai';
+export const KIMI_CODING_PROVIDER_ID = 'kimi-coding';
 const XAI_OAUTH_LOGIN_LABEL = 'Sign in with SuperGrok or X Premium';
+const KIMI_OAUTH_LOGIN_LABEL = 'Sign in with Kimi Code';
 
 const XAI_AUTH_METHODS = [
   { type: 'oauth', label: XAI_OAUTH_LOGIN_LABEL },
   { type: 'api', label: 'API Key' },
 ];
 
+const KIMI_AUTH_METHODS = [
+  { type: 'oauth', label: KIMI_OAUTH_LOGIN_LABEL },
+  { type: 'api', label: 'API Key' },
+];
+
 export const PI_BUILTIN_CATALOG_PROVIDERS = [
   { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
+  { id: KIMI_CODING_PROVIDER_ID, name: 'Kimi Code', source: 'pi', env: [], models: {} },
 ];
 
 const defaultBuiltinCatalogIds = () => new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
 
 let cachedPiBuiltinCatalogIds = null;
 
-/** Pi bundled provider ids from `@earendil-works/pi-ai`, plus the xAI Add stub. */
+/** Pi bundled provider ids from `@earendil-works/pi-ai`, plus the xAI and Kimi Code Add stubs. */
 export const resolvePiBuiltinCatalogIds = async () => {
   if (cachedPiBuiltinCatalogIds) return cachedPiBuiltinCatalogIds;
   const ids = defaultBuiltinCatalogIds();
@@ -435,12 +443,21 @@ export const toPiProviderListPayload = (catalog) => {
 export const getPiAuthMethods = (home = os.homedir()) => {
   const auth = readJsonObject(resolvePiAuthPath(home));
   const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
-  const ids = new Set([...Object.keys(auth), ...Object.keys(providers), XAI_PROVIDER_ID]);
+  const ids = new Set([
+    ...Object.keys(auth),
+    ...Object.keys(providers),
+    XAI_PROVIDER_ID,
+    KIMI_CODING_PROVIDER_ID,
+  ]);
   const result = {};
   for (const id of ids) {
     if (!id) continue;
     if (id === XAI_PROVIDER_ID) {
       result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
+      continue;
+    }
+    if (id === KIMI_CODING_PROVIDER_ID) {
+      result[id] = KIMI_AUTH_METHODS.map((method) => ({ ...method }));
       continue;
     }
     const methodType = authMethodType(auth[id]);

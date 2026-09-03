@@ -141,12 +141,13 @@ export const createPichamberControlTool = ({ executeAction } = {}) => ({
         })),
         description: 'Pichamber action to perform',
       },
+      // Flat fields once. Nested `parameters` stays accepted by prepareArguments
+      // without re-listing every property (that duplicate roughly doubled tokens).
       ...CONTROL_PARAMETER_PROPERTIES,
       parameters: {
         type: 'object',
-        properties: CONTROL_PARAMETER_PROPERTIES,
-        additionalProperties: false,
-        description: 'Inputs for the action; use an empty object when none are needed',
+        additionalProperties: true,
+        description: 'Optional bag of the same inputs; prefer top-level fields. An explicit bag wins on conflict.',
       },
     },
     required: ['action'],

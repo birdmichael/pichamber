@@ -3,7 +3,7 @@ import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUISto
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import type { PiExtensionUiPrompt } from './pi-extension-ui';
 import { isPlanReadyDecisionPrompt } from './pi-plan-locale';
-import { sessionPlanHasMarkdown, type SessionPlan } from './pi-session-plan';
+import { sessionPlanHasMarkdown, sessionPlanViewAvailable, type SessionPlan } from './pi-session-plan';
 
 let openedReadySessionID: string | null = null;
 
@@ -81,4 +81,36 @@ export const maybeOpenPlanRailOnReady = (input: {
   openedReadySessionID = sessionID;
   openPlanReadySurface(directory);
   return true;
+};
+
+export const shouldClosePlanPanelForSession = (input: {
+  plan: SessionPlan | null | undefined;
+  pendingDraftPlan?: boolean;
+}): boolean => {
+  if (input.pendingDraftPlan) return false;
+  return !sessionPlanViewAvailable(input.plan);
+};
+
+/** Close a leftover Plan tab when the open session has no plan of its own. */
+export const syncPlanPanelToSession = (input: {
+  sessionID: string | null | undefined;
+  plan: SessionPlan | null | undefined;
+  pendingDraftPlan?: boolean;
+  directoryHint?: string | null;
+}): void => {
+  if (!shouldClosePlanPanelForSession(input)) return;
+  const sessionID = typeof input.sessionID === 'string' ? input.sessionID.trim() : '';
+  const directory = resolvePlanReadyDirectory(sessionID, input.directoryHint);
+  if (!directory) return;
+  const ui = useUIStore.getState();
+  if (ui.isMobile) {
+    if (ui.activeMainTab === 'plan') ui.setActiveMainTab('chat');
+    return;
+  }
+  const key = normalizeContextPanelDirectoryKey(directory);
+  const panel = ui.contextPanelByDirectory[key];
+  if (!panel?.isOpen) return;
+  const active = panel.tabs.find((tab) => tab.id === panel.activeTabId);
+  if (active?.mode !== 'plan') return;
+  ui.closeContextPanelTab(directory, active.id);
 };

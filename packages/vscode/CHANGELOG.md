@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+## [1.2.11] - 2026-09-03
+
+- Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.
+- Restoring a session no longer paints thinking as Medium. The composer menu only lists levels the kernel can apply (no catalog-only `xhigh` on Grok). Chip, send, and the transcript footer use the applied level.
+- Changing the session thinking chip no longer writes Pi global defaults, so a new projectless chat still follows Settings.
+
+## [1.2.10] - 2026-09-03
+
+- Switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+- Send with no model shows a toast instead of doing nothing.
+- Sidebar search keeps the query after you click a result. Reloading restores the open session and its model chip.
+- Reopening a long session no longer paints empty assistant bubbles. After reload, an existing session's model is rebound from the jsonl instead of Select model.
+- A new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium.
+
+## [1.2.9] - 2026-09-02
+
+- Scheduled tasks: the editor lists thinking levels for the selected model, the task list shows that model and level, and a run uses both instead of falling back to defaults.
+- Feature Plugins Grok Usage installs `pi-xai`. Providers gain xAI, and Work Status shows Grok usage. Uninstall also removes leftover `pi-xai-oauth`.
+- Opening a named session no longer shows Untitled Session in the header when the sidebar already has the title.
+
+## [1.2.8] - 2026-09-01
+
+- Chat: while a reply is running, Steer inserts your follow-up immediately so the agent sees it after the current tool. Queue still waits until the reply finishes, then sends queued messages one after another.
+- Chat: Chinese punctuation after a URL stays outside the link. Question cards render Markdown instead of raw `**bold**`. Completed thinking shows the full text. Streaming replies appear a paragraph or code line at a time so line numbers do not jump. The text-selection menu stays on screen near window edges. Typing `@` ranks files and folders together by how well they match.
 - Chat: sending a message no longer shows the same user turn twice after Pi writes it under a different id, a Subagent card or Work Status row can open the child even when the tool payload has no session id, and the first message becomes the session title after reopen.
 - Sessions: dismissing a leftover hover tooltip no longer eats the next click on a session row or other control.
 - Hovering a user message keeps the action buttons inside the column instead of clipping them off the right edge.

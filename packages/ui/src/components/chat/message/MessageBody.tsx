@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { SaveProjectPlanDialog } from '@/components/session/SaveProjectPlanDialog';
 import { ForkSessionDialog, type ForkSessionExecution } from '@/components/session/ForkSessionDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { resolveTurnUsageTooltip } from './turnUsageTooltip';
 import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import type { ContentChangeReason } from '@/hooks/useChatAutoFollow';
 
@@ -466,6 +467,8 @@ interface MessageBodyProps {
     footerModelName?: string;
     footerAgentName?: string;
     footerVariant?: string;
+    footerTokens?: unknown;
+    footerCost?: unknown;
     isDarkTheme?: boolean;
 }
 
@@ -1119,6 +1122,8 @@ const AssistantMessageBody = React.memo(({
     footerModelName,
     footerAgentName,
     footerVariant,
+    footerTokens,
+    footerCost,
     isDarkTheme = false,
 }: Omit<MessageBodyProps, 'isUser'>) => {
     const { t, locale } = useI18n();
@@ -2160,6 +2165,32 @@ const AssistantMessageBody = React.memo(({
         return formatted.length > 0 ? formatted : null;
     }, [messageCompletedAt, messageCreatedAt, timeFormatPreference, locale]);
 
+    const turnUsageTooltip = React.useMemo(
+        () => resolveTurnUsageTooltip(footerTokens, footerCost),
+        [footerTokens, footerCost],
+    );
+
+    const usageTooltipRows = turnUsageTooltip ? (
+        <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
+            <span>{t('chat.messageBody.usage.input')}</span>
+            <span className="text-right">{turnUsageTooltip.input.toLocaleString(locale)}</span>
+            <span>{t('chat.messageBody.usage.output')}</span>
+            <span className="text-right">{turnUsageTooltip.output.toLocaleString(locale)}</span>
+            <span>{t('chat.messageBody.usage.reasoning')}</span>
+            <span className="text-right">{turnUsageTooltip.reasoning.toLocaleString(locale)}</span>
+            <span>{t('chat.messageBody.usage.cacheRead')}</span>
+            <span className="text-right">{turnUsageTooltip.cacheRead.toLocaleString(locale)}</span>
+            <span>{t('chat.messageBody.usage.cacheWrite')}</span>
+            <span className="text-right">{turnUsageTooltip.cacheWrite.toLocaleString(locale)}</span>
+            {turnUsageTooltip.cost ? (
+                <>
+                    <span>{t('chat.messageBody.usage.cost')}</span>
+                    <span className="text-right">{turnUsageTooltip.cost}</span>
+                </>
+            ) : null}
+        </div>
+    ) : null;
+
     const footerTimestampClassName = 'text-sm text-muted-foreground/60 tabular-nums flex items-center gap-1';
     const canOpenMessagePreview = !isMiniChatSurface && !isMobile && !isVSCode;
 
@@ -2394,7 +2425,9 @@ const AssistantMessageBody = React.memo(({
                                         <span className="message-footer__label">{turnDurationText}</span>
                                     </span>
                                 </TooltipTrigger>
-                                <TooltipContent>{turnDurationText}</TooltipContent>
+                                <TooltipContent className={usageTooltipRows ? 'text-left tabular-nums' : undefined}>
+                                    {usageTooltipRows ?? turnDurationText}
+                                </TooltipContent>
                             </Tooltip>
                         ) : null}
                         {footerTimestamp ? (
@@ -2408,7 +2441,9 @@ const AssistantMessageBody = React.memo(({
                                         <span className="message-footer__label">{footerTimestamp}</span>
                                     </span>
                                 </TooltipTrigger>
-                                <TooltipContent>{footerTimestamp}</TooltipContent>
+                                <TooltipContent className={!turnDurationText && usageTooltipRows ? 'text-left tabular-nums' : undefined}>
+                                    {!turnDurationText && usageTooltipRows ? usageTooltipRows : footerTimestamp}
+                                </TooltipContent>
                             </Tooltip>
                         ) : null}
                         {!isMiniChatSurface && isLastAssistantInTurn && hasStopFinish ? (

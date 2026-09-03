@@ -8,7 +8,7 @@ import { SessionManager, CURRENT_SESSION_VERSION } from '@earendil-works/pi-codi
 import { createPiKernel } from './index.js';
 import { resolveKernelName } from './kernel.js';
 import { PI_NODE_UNAVAILABLE_CODE, PI_SDK_UNAVAILABLE_CODE, toNodeReadablePath } from './node-runtime.js';
-import { createNodeKernelClient, dispatchNodeKernelParentUiCall, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
+import { createNodeKernelClient, dispatchNodeKernelParentUiCall, mergeRemoteSessionSnapshot, reapPiChromeCdpProcesses, resolveNodeKernelChildScript, serializeNodeKernelCreateSessionInput, shouldForwardNodeKernelHostEvent } from './node-kernel-client.js';
 import { serializeSessionCommands, serializeSessionSnapshot } from './node-kernel-protocol.js';
 import { bindNodeKernelChildUiContext, serializeUiOpts } from './node-kernel-ui.js';
 import { createInMemoryPiSession, createPiHost, sessionDirForCwd } from './pi-host.js';
@@ -956,5 +956,25 @@ describe('node kernel host-event ownership', () => {
       parentHost.dispose();
       childHost.dispose();
     }
+  });
+});
+
+describe('mergeRemoteSessionSnapshot', () => {
+  it('keeps isStreaming true while a parent prompt is in flight', () => {
+    const state = { isStreaming: true, sessionId: 'ses_1' };
+    mergeRemoteSessionSnapshot(state, { isStreaming: false, sessionId: 'ses_1' }, { promptInFlight: true });
+    expect(state.isStreaming).toBe(true);
+  });
+
+  it('allows a snapshot to clear isStreaming when no prompt is in flight', () => {
+    const state = { isStreaming: true, sessionId: 'ses_1' };
+    mergeRemoteSessionSnapshot(state, { isStreaming: false, sessionId: 'ses_1' }, { promptInFlight: false });
+    expect(state.isStreaming).toBe(false);
+  });
+
+  it('keeps isStreaming true while steer/followUp is in flight', () => {
+    const state = { isStreaming: true, sessionId: 'ses_1' };
+    mergeRemoteSessionSnapshot(state, { isStreaming: false, sessionId: 'ses_1' }, { liveOpInFlight: true });
+    expect(state.isStreaming).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { maybeOpenPlanRailOnReady, notePlanReadyCycle } from './pi-plan-ready';
-import { isPlanReadyDecisionPrompt, planReadyOptionForAction } from './pi-plan-locale';
+import { isPlanReadyDecisionPrompt, isPlanReadyImplementHereOption, planReadyOptionForAction } from './pi-plan-locale';
 import { replyPiExtensionUi } from './pi-extension-ui';
 import { usePiExtensionUiStore } from './pi-extension-ui-store';
 import {
@@ -16,9 +16,14 @@ import {
 type PiSessionPlanState = {
   plansBySession: Record<string, SessionPlan>;
   pendingDraftPlanBySession: Record<string, true>;
+  implementedBySession: Record<string, true>;
 };
 
-const empty: PiSessionPlanState = { plansBySession: {}, pendingDraftPlanBySession: {} };
+const empty: PiSessionPlanState = {
+  plansBySession: {},
+  pendingDraftPlanBySession: {},
+  implementedBySession: {},
+};
 
 export const usePiSessionPlanStore = create<PiSessionPlanState>(() => empty);
 
@@ -57,6 +62,34 @@ export const clearPendingDraftPlan = (sessionID: string): void => {
   });
 };
 
+export const markPlanImplemented = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  usePiSessionPlanStore.setState((state) => ({
+    implementedBySession: {
+      ...state.implementedBySession,
+      [id]: true,
+    },
+  }));
+};
+
+export const clearPlanImplemented = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  usePiSessionPlanStore.setState((state) => {
+    if (!state.implementedBySession[id]) return state;
+    const implementedBySession = { ...state.implementedBySession };
+    delete implementedBySession[id];
+    return { implementedBySession };
+  });
+};
+
+export const isPlanImplemented = (sessionID?: string | null): boolean => {
+  const id = typeof sessionID === 'string' ? sessionID.trim() : '';
+  if (!id) return false;
+  return usePiSessionPlanStore.getState().implementedBySession[id] === true;
+};
+
 export const isPendingDraftPlan = (sessionID?: string | null): boolean => {
   const id = typeof sessionID === 'string' ? sessionID.trim() : '';
   if (!id) return false;
@@ -75,12 +108,62 @@ const shouldKeepPlanAgainstOff = (sessionID: string, incoming: SessionPlan | nul
   if (incoming?.status !== 'off') return false;
   if (isPendingDraftPlan(sessionID)) return true;
   const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  // User-initiated implement: GET off is not "don't clobber Plan". Keep
+  // optimistic implementing; never preserve ready/active after implement.
+  if (isPlanImplemented(sessionID) || current?.status === 'implementing') {
+    return current?.status === 'implementing';
+  }
   return Boolean(current && isFooterPlanSelected(current.status));
+};
+
+const shouldIgnoreIncomingReady = (sessionID: string, incoming: SessionPlan | null): boolean => {
+  if (incoming?.status !== 'ready') return false;
+  const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  return current?.status === 'implementing' || isPlanImplemented(sessionID);
+};
+
+const shouldIgnoreIncomingImplementing = (sessionID: string, incoming: SessionPlan | null): boolean => {
+  if (incoming?.status !== 'implementing') return false;
+  if (!isPlanImplemented(sessionID)) return false;
+  const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
+  // After agent_settled flipped implementing → off, leftover adapter
+  // activeImplementation must not resurrect building… chrome.
+  return current?.status !== 'implementing';
+};
+
+const shouldSkipIncomingPlan = (sessionID: string, incoming: SessionPlan | null): boolean => (
+  shouldKeepPlanAgainstOff(sessionID, incoming)
+  || shouldIgnoreIncomingReady(sessionID, incoming)
+  || shouldIgnoreIncomingImplementing(sessionID, incoming)
+);
+
+/**
+ * agent_settled / session.idle: leftover implementing is not a live turn.
+ * Keep `implemented` so a stale GET ready cannot restore Build.
+ */
+export const settleSessionPlanImplementing = (sessionID: string): void => {
+  const id = sessionID.trim();
+  if (!id) return;
+  const current = usePiSessionPlanStore.getState().plansBySession[id];
+  if (current?.status !== 'implementing') return;
+  bumpPlanRevision(id);
+  const next: SessionPlan = { status: 'off', planMarkdown: '' };
+  usePiSessionPlanStore.setState((state) => ({
+    plansBySession: {
+      ...state.plansBySession,
+      [id]: next,
+    },
+  }));
+  notePlanReadyCycle(id, next);
+  maybeOpenPlanRailOnReady({ sessionID: id, previous: current, next });
 };
 
 export const applySessionPlan = (sessionID: string, plan: SessionPlan | null): void => {
   if (!plan) return;
   bumpPlanRevision(sessionID);
+  // Do not clear `implemented` on GET/event off. After implement settles to
+  // off, leftover adapter implementing/ready must stay ignored. Exit/start
+  // still call clearPlanImplemented.
   const previous = usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   usePiSessionPlanStore.setState((state) => ({
     plansBySession: {
@@ -99,7 +182,8 @@ export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan
   const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
   // A GET that still says off must not wipe optimistic / just-started Plan.
   // Explicit exit still goes through dispatchSessionPlanAction → applySessionPlan.
-  if (shouldKeepPlanAgainstOff(sessionID, plan)) {
+  // After implement, skip stale off→ready and ready-over-implementing.
+  if (shouldSkipIncomingPlan(sessionID, plan)) {
     return current ?? plan;
   }
   applySessionPlan(sessionID, plan);
@@ -128,10 +212,17 @@ export const dispatchSessionPlanAction = async (
   action: SessionPlanAction,
   options: { model?: string } = {},
 ): Promise<SessionPlan | null> => {
+  if (action === 'implement' && isPlanImplemented(sessionID)) {
+    return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
+  }
   try {
     if (await answerPendingPlanReadyPrompt(sessionID, action)) {
-      if (action === 'exit') clearPendingDraftPlan(sessionID);
+      if (action === 'exit') {
+        clearPendingDraftPlan(sessionID);
+        clearPlanImplemented(sessionID);
+      }
       if (action === 'implement') {
+        markPlanImplemented(sessionID);
         const current = usePiSessionPlanStore.getState().plansBySession[sessionID];
         if (current && (current.status === 'ready' || current.status === 'saved')) {
           const next = {
@@ -149,8 +240,15 @@ export const dispatchSessionPlanAction = async (
   } catch {
     // Prompt already gone: fall through to POST /plan <action>.
   }
+  if (action === 'implement' && isPlanImplemented(sessionID)) {
+    return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
+  }
   const plan = await runSessionPlanAction(sessionID, action, options);
+  if (action === 'implement' && plan) {
+    markPlanImplemented(sessionID);
+  }
   if (action === 'start') {
+    clearPlanImplemented(sessionID);
     if (plan && isFooterPlanSelected(plan.status)) {
       applySessionPlan(sessionID, plan);
       clearPendingDraftPlan(sessionID);
@@ -161,6 +259,7 @@ export const dispatchSessionPlanAction = async (
   }
   if (action === 'exit') {
     clearPendingDraftPlan(sessionID);
+    clearPlanImplemented(sessionID);
   }
   applySessionPlan(sessionID, plan);
   return plan;
@@ -171,7 +270,7 @@ export const applySessionPlanEvent = (value: unknown): SessionPlan | null => {
   const record = value as { sessionID?: unknown; plan?: unknown };
   if (typeof record.sessionID !== 'string' || !record.sessionID.trim()) return null;
   const plan = parseSessionPlan(record.plan);
-  if (shouldKeepPlanAgainstOff(record.sessionID, plan)) {
+  if (shouldSkipIncomingPlan(record.sessionID, plan)) {
     return usePiSessionPlanStore.getState().plansBySession[record.sessionID] ?? plan;
   }
   applySessionPlan(record.sessionID, plan);
@@ -187,3 +286,27 @@ export const usePendingDraftPlan = (sessionID: string | null | undefined): boole
 export const useSessionPlan = (sessionID: string | null | undefined): SessionPlan | null => (
   usePiSessionPlanStore((state) => (sessionID ? state.plansBySession[sessionID] ?? null : null))
 );
+
+export const usePlanImplemented = (sessionID: string | null | undefined): boolean => (
+  usePiSessionPlanStore((state) => (
+    sessionID ? state.implementedBySession[sessionID] === true : false
+  ))
+);
+
+/** Q&A / ready-select 「在此实现」 shares composer Build's implement chrome write. */
+export const answerPiExtensionPlanReadyOption = async (
+  sessionID: string,
+  prompt: {
+    kind: string;
+    status?: string;
+    title?: string;
+    options?: readonly string[];
+  },
+  option: unknown,
+): Promise<boolean> => {
+  if (!isPlanReadyDecisionPrompt(prompt)) return false;
+  const raw = typeof option === 'string' ? option : '';
+  if (!raw || !isPlanReadyImplementHereOption(raw)) return false;
+  await dispatchSessionPlanAction(sessionID, 'implement');
+  return true;
+};

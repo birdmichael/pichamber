@@ -8,6 +8,7 @@ import {
   createSettingsJsonPackageManager,
   writeFeaturePlugins,
 } from './feature-plugins.js';
+import { directoriesMatch } from './directory-identity.js';
 import {
   createInMemoryPiSession,
   createPiHost,
@@ -19,6 +20,7 @@ import {
   mergeLiveExtensionCommands,
   normalizePiSessionUsage,
   readLiveSessionCommands,
+  resolvePromptDelivery,
   resolvePromptModelRef,
   titleFromUserText,
 } from './pi-host.js';
@@ -173,6 +175,31 @@ describe('mapPiModelsToProviders', () => {
     );
     expect(kept[0].models['grok-4.6'].input).toEqual(['text', 'image']);
     expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(true);
+  });
+
+  it('serializes SDK thinkingLevels for grok-like models without inventing xhigh', () => {
+    const providers = mapPiModelsToProviders([
+      { id: 'grok-4.6', name: 'Grok 4.6', provider: 'pr17test', reasoning: true },
+    ]);
+    expect(providers[0].models['grok-4.6'].thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high',
+    ]);
+    expect(providers[0].models['grok-4.6'].thinkingLevels).not.toContain('xhigh');
+  });
+
+  it('keeps xhigh when the Pi/SDK thinkingLevelMap includes it', () => {
+    const providers = mapPiModelsToProviders([
+      {
+        id: 'gpt-5.6-terra',
+        name: 'Terra',
+        provider: 'bmlab',
+        reasoning: true,
+        thinkingLevelMap: { xhigh: 'xhigh', max: 'max' },
+      },
+    ]);
+    expect(providers[0].models['gpt-5.6-terra'].thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+    ]);
   });
 });
 
@@ -1222,6 +1249,90 @@ describe('createPiHost', () => {
     }
   });
 
+  it('lists /kimi-usage from the Kimi Usage slot before any session exists', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-slot-cmd-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(host.listCommands('/tmp/empty-project').some((command) => command.name === 'kimi-usage')).toBe(false);
+      host.dispose();
+
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-kimi-code-console-usage');
+      const installed = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/empty-project',
+      });
+      expect(installed.listCommands('/tmp/empty-project').find((command) => command.name === 'kimi-usage')).toMatchObject({
+        name: 'kimi-usage',
+        source: 'extension',
+        description: 'Show Kimi Code subscription usage',
+      });
+      expect(installed.getFeaturePlugins().slots.kimi).toMatchObject({
+        installed: true,
+        enabled: true,
+        source: 'npm:pi-kimi-code-console-usage',
+      });
+      installed.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('returns 404 for /kimi-usage when the slot is off instead of chatting', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-usage-off-'));
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const record = await host.createSession({ directory: '/tmp/project' });
+      let promptAsyncCalls = 0;
+      const originalPromptAsync = host.promptAsync.bind(host);
+      host.promptAsync = async (...args) => {
+        promptAsyncCalls += 1;
+        return originalPromptAsync(...args);
+      };
+      await expect(host.runCommand(record.id, { command: 'kimi-usage' }))
+        .rejects.toMatchObject({ status: 404, message: 'Command /kimi-usage is not available on this session' });
+      expect(promptAsyncCalls).toBe(0);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls Kimi Usage without deleting kimi-coding credentials', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-kimi-uninstall-auth-'));
+    try {
+      writePiProviderAuth('kimi-coding', {
+        type: 'oauth',
+        access: 'access-secret',
+        refresh: 'refresh-secret',
+        expires: 1_900_000_000_000,
+      }, { home });
+      await createSettingsJsonPackageManager({ home }).installAndPersist('npm:pi-kimi-code-console-usage');
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      expect(host.getFeaturePlugins().slots.kimi.installed).toBe(true);
+      await host.uninstallFeaturePlugin('kimi', { source: 'npm:pi-kimi-code-console-usage' });
+      expect(host.getFeaturePlugins().slots.kimi.installed).toBe(false);
+      const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+      expect(stored['kimi-coding']).toMatchObject({ type: 'oauth' });
+      expect(stored['kimi-coding'].access).toBe('access-secret');
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('rejects unknown slash names instead of sending them as chat', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-unknown-cmd-'));
     try {
@@ -1333,6 +1444,162 @@ describe('createPiHost', () => {
       expect(host.listCommands('/tmp/project', { sessionID: idle.id }).some((command) => (
         command.name === 'goal' && command.source === 'extension'
       ))).toBe(true);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('installs a feature plugin when the package manager only exposes install', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-install-'));
+    const installed = [];
+    try {
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          install: async (source) => {
+            installed.push(source);
+          },
+        }),
+      });
+      const result = await host.installFeaturePlugin('xai', {});
+      expect(installed).toEqual(['npm:pi-xai']);
+      expect(result.slots.xai.source).toBe('npm:pi-xai');
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('installs pi-xai and drops leftover pi-xai-oauth', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-install-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.installFeaturePlugin('xai', {});
+      expect(result.slots.xai).toMatchObject({
+        source: 'npm:pi-xai',
+        installed: true,
+        enabled: true,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('fails Grok Usage install when leftover oauth cannot be removed', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-install-fail-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const inner = createSettingsJsonPackageManager({ home });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          installAndPersist: (source) => inner.installAndPersist(source),
+          async removeAndPersist(source) {
+            if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+            return inner.removeAndPersist(source);
+          },
+        }),
+      });
+      await expect(host.installFeaturePlugin('xai', {})).rejects.toMatchObject({
+        message: 'oauth uninstall failed',
+        status: 500,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai-oauth', 'npm:pi-xai']);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls both pi-xai and leftover oauth', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-both-uninstall-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai', 'npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' });
+      expect(result.slots.xai.installed).toBe(false);
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('uninstalls leftover pi-xai-oauth when Feature Plugins sends pi-xai', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-uninstall-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+      });
+      const result = await host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' });
+      expect(result.slots.xai.installed).toBe(false);
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual([]);
+      host.dispose();
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('fails Grok Usage uninstall when leftover oauth cannot be removed', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-host-xai-oauth-uninstall-fail-'));
+    try {
+      fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.pi', 'agent', 'settings.json'), `${JSON.stringify({
+        packages: ['npm:pi-xai-oauth'],
+      }, null, 2)}\n`);
+      const inner = createSettingsJsonPackageManager({ home });
+      const host = createPiHost({
+        mock: true,
+        home,
+        defaultDirectory: '/tmp/project',
+        createPackageManager: async () => ({
+          async removeAndPersist(source) {
+            if (source === 'npm:pi-xai-oauth') throw new Error('oauth uninstall failed');
+            return inner.removeAndPersist(source);
+          },
+        }),
+      });
+      await expect(host.uninstallFeaturePlugin('xai', { source: 'npm:pi-xai' })).rejects.toMatchObject({
+        message: 'oauth uninstall failed',
+        status: 500,
+      });
+      expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')).packages)
+        .toEqual(['npm:pi-xai-oauth']);
       host.dispose();
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
@@ -1547,6 +1814,99 @@ describe('createPiHost', () => {
       mimeType: 'image/png',
       data: 'AAAA',
     }]);
+    host.dispose();
+  });
+
+  it('promptAsync keeps synthetic instructions for Pi but not the user bubble or title', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = { text, options };
+      return originalPrompt(text, options);
+    };
+
+    const visible = 'Help me set up a scheduled task.';
+    const instructions = 'The user wants to set up a scheduled task: a saved prompt that Pichamber runs automatically.';
+    await host.promptAsync(record.id, {
+      parts: [
+        { type: 'text', text: visible },
+        { type: 'text', text: instructions, synthetic: true },
+      ],
+    });
+
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts[0].text).toBe(visible);
+    expect(user.parts[0].text).not.toContain('Pichamber runs automatically');
+    expect(host.getSession(record.id).info.title).toBe(visible);
+    expect(forwarded.text).toContain(visible);
+    expect(forwarded.text).toContain(instructions);
+    host.dispose();
+  });
+
+  it('promptAsync keeps structured context parts on the user bubble', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project' });
+    let forwarded;
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      forwarded = { text, options };
+      return originalPrompt(text, options);
+    };
+
+    const contextText = 'Comment on `src/app.ts` lines 3-5:\n```ts\nconst x = 1;\n```\n\nfix this';
+    await host.promptAsync(record.id, {
+      parts: [
+        { type: 'text', text: 'please fix' },
+        {
+          type: 'text',
+          text: contextText,
+          synthetic: true,
+          metadata: {
+            pichamberContext: {
+              kind: 'code-comment',
+              source: 'file',
+              fileLabel: 'src/app.ts',
+              startLine: 3,
+              endLine: 5,
+              language: 'ts',
+              code: 'const x = 1;',
+              text: 'fix this',
+            },
+          },
+        },
+      ],
+    });
+
+    const user = host.getMessages(record.id).find((entry) => entry.info.role === 'user');
+    expect(user.parts.map((part) => part.type)).toEqual(['text', 'text']);
+    expect(user.parts[0].text).toBe('please fix');
+    expect(user.parts[1]).toMatchObject({
+      type: 'text',
+      synthetic: true,
+      text: contextText,
+      metadata: {
+        pichamberContext: {
+          kind: 'code-comment',
+          fileLabel: 'src/app.ts',
+        },
+      },
+    });
+    expect(host.getSession(record.id).info.title).toBe('please fix');
+    expect(forwarded.text).toContain('please fix');
+    expect(forwarded.text).toContain(contextText);
+    const persisted = host.getSession(record.id).info.metadata?.pichamber?.userContext;
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      messageID: user.info.id,
+      authoredText: 'please fix',
+    });
+    const entries = record.piSession.sessionManager.getEntries();
+    expect(entries.some((entry) => (
+      entry?.customType === 'pichamber.metadata'
+      && entry?.data?.pichamber?.userContext?.[0]?.authoredText === 'please fix'
+    ))).toBe(true);
     host.dispose();
   });
 
@@ -2242,6 +2602,71 @@ describe('session thinking levels', () => {
     host.dispose();
   });
 
+  it('stamps applied thinking on the user turn', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stamp think' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    await host.promptAsync(record.id, {
+      variant: 'high',
+      parts: [{ type: 'text', text: 'go' }],
+    });
+
+    const user = record.messages.find((entry) => entry.info?.role === 'user');
+    expect(user.info).toMatchObject({
+      role: 'user',
+      variant: 'high',
+      thinking: 'high',
+    });
+    host.dispose();
+  });
+
+  it('stamps a requested Pi thinking level even when live omitted it', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stamp requested' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    await host.promptAsync(record.id, {
+      variant: 'max',
+      parts: [{ type: 'text', text: 'go' }],
+    });
+
+    const user = record.messages.find((entry) => entry.info?.role === 'user');
+    expect(user.info).toMatchObject({
+      role: 'user',
+      variant: 'max',
+      thinking: 'max',
+    });
+    expect(record.piSession.thinkingLevel).toBe('max');
+    host.dispose();
+  });
+
+  it('promptAsync applies a later idle send onto a new model and thinking', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Next turn' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'medium';
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'first' },
+      variant: 'low',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'second' },
+      variant: 'high',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+
+    expect(record.piSession.currentModel).toEqual({ id: 'second', provider: 'example' });
+    expect(record.piSession.thinkingLevel).toBe('high');
+    host.dispose();
+  });
+
   it('reads live getAvailableThinkingLevels and clamps an unsupported pick', async () => {
     const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
     const record = await host.createSession({ directory: '/tmp/project', title: 'Think' });
@@ -2256,10 +2681,211 @@ describe('session thinking levels', () => {
     const applied = await host.setSessionThinking(record.id, 'max');
     expect(applied).toEqual({
       applied: true,
-      thinking: 'medium',
+      thinking: 'max',
+      available: ['low', 'medium', 'high', 'max'],
+    });
+    expect(record.piSession.thinkingLevel).toBe('max');
+    host.dispose();
+  });
+
+  it('applies a requested catalog thinking level even when live omitted it', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Catalog xhigh' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'example', modelId: 'example-4.6' });
+    record.piSession.getAvailableThinkingLevels = () => ['off', 'minimal', 'low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'high';
+
+    const applied = await host.setSessionThinking(record.id, 'xhigh');
+    expect(applied).toEqual({
+      applied: true,
+      thinking: 'xhigh',
+      available: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+    });
+    expect(record.piSession.thinkingLevel).toBe('xhigh');
+    const got = await host.getSessionThinking(record.id);
+    expect(got.thinking).toBe('xhigh');
+    expect(got.available).toContain('xhigh');
+    host.dispose();
+  });
+
+  it('returns the kernel-applied thinking when setThinkingLevel clamps', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Kernel clamp' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'example', modelId: 'example-4.6' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'high';
+    record.piSession.setThinkingLevel = (level) => {
+      record.piSession.thinkingLevel = level === 'xhigh' ? 'medium' : level;
+    };
+
+    const applied = await host.setSessionThinking(record.id, 'xhigh');
+    expect(applied.thinking).toBe('medium');
+    expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+
+  it('keeps a live non-narrow thinking subset instead of replacing it with catalog', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Live subset' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'example', modelId: 'example-4.6' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'high';
+
+    expect(await host.getSessionThinking(record.id)).toEqual({
+      thinking: 'high',
       available: ['low', 'medium', 'high'],
     });
-    expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+
+  it('awaits shell bind thinking defaults before promptAsync', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shell-think-'));
+    fs.mkdirSync(path.join(dir, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.pi', 'agent', 'pichamber.json'), JSON.stringify({ thinking: 'medium' }));
+    const order = [];
+    const host = createPiHost({
+      mock: false,
+      defaultDirectory: dir,
+      home: dir,
+      createDirectoryRuntime: async ({ cwd }) => ({ session: null, directory: cwd }),
+      createSessionManager: () => ({
+        getSessionId: () => `ses_shell_${path.basename(dir)}`,
+        getSessionFile: () => path.join(dir, 'session.jsonl'),
+        getEntries: () => [],
+      }),
+      createSession: async () => {
+        const session = createInMemoryPiSession();
+        const originalSetThinking = session.setThinkingLevel.bind(session);
+        session.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+        session.thinkingLevel = 'low';
+        session.setThinkingLevel = (level) => {
+          order.push(`start:${level}`);
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              originalSetThinking(level);
+              order.push(`done:${level}`);
+              resolve();
+            }, 20);
+          });
+        };
+        return session;
+      },
+    });
+    try {
+      const record = await host.createSession({ directory: dir, title: 'Shell think' });
+      expect(record.piSession).toBeNull();
+      await host.promptAsync(record.id, {
+        variant: 'high',
+        parts: [{ type: 'text', text: 'go' }],
+      });
+      const live = host.getSession(record.id);
+      expect(live.piSession.thinkingLevel).toBe('high');
+      expect(order[0]).toBe('start:medium');
+      expect(order[1]).toBe('done:medium');
+      expect(order.indexOf('start:high')).toBeGreaterThan(order.indexOf('done:medium'));
+      expect(order.indexOf('done:high')).toBeGreaterThan(order.indexOf('start:high'));
+    } finally {
+      host.dispose();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('awaits live-session thinking defaults before create returns', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-bind-think-'));
+    fs.mkdirSync(path.join(dir, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.pi', 'agent', 'pichamber.json'), JSON.stringify({ thinking: 'high' }));
+    const order = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      home: dir,
+      createSession: async () => {
+        const session = createInMemoryPiSession();
+        const originalSetThinking = session.setThinkingLevel.bind(session);
+        session.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+        session.thinkingLevel = 'medium';
+        session.setThinkingLevel = (level) => {
+          order.push(`start:${level}`);
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              originalSetThinking(level);
+              order.push(`done:${level}`);
+              resolve();
+            }, 20);
+          });
+        };
+        return session;
+      },
+    });
+    try {
+      const record = await host.createSession({ directory: '/tmp/project', title: 'Bind think' });
+      expect(record.piSession.thinkingLevel).toBe('high');
+      expect(order).toEqual(['start:high', 'done:high']);
+    } finally {
+      host.dispose();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('awaits setThinkingLevel so pairing cannot land after an idle send pin', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Await think' });
+    const order = [];
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'xhigh';
+    const originalSetThinking = record.piSession.setThinkingLevel.bind(record.piSession);
+    record.piSession.setThinkingLevel = (level) => {
+      order.push(`start:${level}`);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          originalSetThinking(level);
+          order.push(`done:${level}`);
+          resolve();
+        }, 20);
+      });
+    };
+
+    await host.promptAsync(record.id, {
+      model: { providerID: 'example', modelID: 'example-4.6' },
+      variant: 'high',
+      parts: [{ type: 'text', text: 'go' }],
+    });
+
+    expect(record.piSession.thinkingLevel).toBe('high');
+    expect(order).toEqual(['start:high', 'done:high']);
     host.dispose();
   });
 
@@ -2310,6 +2936,40 @@ describe('session thinking levels', () => {
       modelID: 'claude-opus-5',
     });
     expect(await host.getSessionThinking(record.id)).toMatchObject({ thinking: 'high' });
+    host.dispose();
+  });
+
+  it('keeps a known Pi thinking level after setSessionModel', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Pair think' });
+    record.piSession.thinkingLevel = 'xhigh';
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+
+    await host.setSessionModel(record.id, 'example/example-4.6');
+
+    expect(record.piSession.thinkingLevel).toBe('xhigh');
+    host.dispose();
+  });
+
+  it('widens off-only live thinking onto catalog levels after setSessionModel', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['off', 'low', 'medium', 'high'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Off only' });
+    record.piSession.thinkingLevel = 'high';
+    record.piSession.getAvailableThinkingLevels = () => ['off'];
+
+    await host.setSessionModel(record.id, 'example/example-4.6');
+
+    expect(record.piSession.thinkingLevel).toBe('high');
     host.dispose();
   });
 });
@@ -2425,6 +3085,92 @@ describe('session plan status and actions', () => {
     expect(replies).toEqual([['pui_ready', 'Implement here']]);
     expect(prompted).toEqual([]);
     expect(plan.status).toBe('ready');
+    host.dispose();
+  });
+
+  it('emits implement-after-plan tools parented to the visible user, not a Pi-native id', async () => {
+    const wait = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const events = [];
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event);
+      },
+      createSession: async () => ({
+        isStreaming: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_plan',
+            toolName: 'plan_mode_complete',
+            args: {},
+          });
+          emit({
+            type: 'tool_execution_end',
+            toolCallId: 'call_plan',
+            toolName: 'plan_mode_complete',
+            isError: false,
+            result: { details: { plan: '# Ready' } },
+          });
+          emit({ type: 'message_end', message: { role: 'assistant' } });
+          emit({ type: 'agent_settled' });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Implement' });
+    await host.promptAsync(record.id, {
+      messageID: 'msg_plan',
+      parts: [{ type: 'text', text: 'plan this' }],
+    });
+    await wait();
+
+    emit({ type: 'agent_start' });
+    emit({
+      type: 'message_start',
+      message: { role: 'user', id: '5bb000de', content: 'Implement the plan.' },
+    });
+    emit({
+      type: 'tool_execution_start',
+      toolCallId: 'call_edit',
+      toolName: 'edit',
+      args: { path: 'README.md' },
+    });
+    await wait();
+
+    const planAssistant = events.find((event) => (
+      event.type === 'message.updated'
+      && event.properties?.info?.role === 'assistant'
+    ));
+    const editPart = events.find((event) => (
+      event.type === 'message.part.updated'
+      && event.properties?.part?.tool === 'edit'
+    ));
+    expect(editPart.properties.part.messageID).not.toBe(planAssistant.properties.info.id);
+    const implementUpdated = [...events].reverse().find((event) => (
+      event.type === 'message.updated'
+      && event.properties?.info?.role === 'assistant'
+      && event.properties.info.id === editPart.properties.part.messageID
+    ));
+    expect(implementUpdated?.properties.info.parentID).toBe('msg_plan');
+    const stored = host.getMessages(record.id).find((entry) => (
+      entry.info.role === 'assistant' && entry.parts.some((part) => part.tool === 'edit')
+    ));
+    expect(stored.info.id).not.toBe(planAssistant.properties.info.id);
+    expect(stored.info.parentID).toBe('msg_plan');
+    expect(events.some((event) => event.properties?.info?.id === '5bb000de')).toBe(false);
     host.dispose();
   });
 
@@ -2679,3 +3425,565 @@ describe('session plan status and actions', () => {
   });
 });
 
+describe('resolvePromptDelivery', () => {
+  it('uses prompt for an idle send even with followUp delivery', () => {
+    expect(resolvePromptDelivery({ delivery: 'followUp', isStreaming: false, statusType: 'idle' })).toBe('prompt');
+    expect(resolvePromptDelivery({ delivery: 'steer', isStreaming: false })).toBe('prompt');
+    expect(resolvePromptDelivery({})).toBe('prompt');
+  });
+
+  it('maps busy followUp/steer and defaults busy with no delivery to steer', () => {
+    expect(resolvePromptDelivery({ delivery: 'followUp', isStreaming: true })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'follow_up', statusType: 'busy' })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'queue', statusType: 'retry' })).toBe('followUp');
+    expect(resolvePromptDelivery({ delivery: 'steer', isStreaming: false, statusType: 'busy' })).toBe('steer');
+    expect(resolvePromptDelivery({ isStreaming: false, statusType: 'busy' })).toBe('steer');
+  });
+});
+
+describe('promptAsync busy delivery', () => {
+  const wait = () => new Promise((resolve) => setTimeout(resolve, 40));
+
+  it('idle first send still calls prompt, not steer', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Idle send' });
+    const promptCalls = [];
+    const steerCalls = [];
+    const followUpCalls = [];
+    const originalPrompt = record.piSession.prompt.bind(record.piSession);
+    record.piSession.prompt = async (text, options) => {
+      promptCalls.push(text);
+      return originalPrompt(text, options);
+    };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'hello' }] });
+    await wait();
+    expect(promptCalls).toEqual(['hello']);
+    expect(steerCalls).toEqual([]);
+    expect(followUpCalls).toEqual([]);
+    host.dispose();
+  });
+
+  it('leftover status=busy without a live turn still inserts the user prompt', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Leftover busy' });
+    record.status = { type: 'busy' };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'INSERT-OK' }] });
+    expect(host.getMessages(record.id).some((entry) => (
+      entry.parts?.some((part) => part.text === 'INSERT-OK')
+    ))).toBe(true);
+    host.dispose();
+  });
+
+  it('busy followUp calls session.followUp even when isStreaming is stale false', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Follow-up' });
+    const promptCalls = [];
+    const followUpCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.turnActive = true;
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, {
+      delivery: 'followUp',
+      parts: [{ type: 'text', text: 'FOLLOWUP-OK' }],
+    });
+    await wait();
+    expect(followUpCalls).toEqual(['FOLLOWUP-OK']);
+    expect(promptCalls).toEqual([]);
+    expect(steerCalls).toEqual([]);
+    host.dispose();
+  });
+
+  it('busy steer calls session.steer instead of prompt', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Steer' });
+    const promptCalls = [];
+    const followUpCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.turnActive = true;
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.followUp = async (text) => { followUpCalls.push(text); };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, {
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'STEER-OK' }],
+    });
+    await wait();
+    expect(steerCalls).toEqual(['STEER-OK']);
+    expect(promptCalls).toEqual([]);
+    expect(followUpCalls).toEqual([]);
+    expect(host.getMessages(record.id).some((entry) => (
+      entry.parts?.some((part) => part.text === 'STEER-OK')
+    ))).toBe(true);
+    host.dispose();
+  });
+
+  it('busy send with no delivery does not call prompt when prompt would throw', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Default steer' });
+    const promptCalls = [];
+    const steerCalls = [];
+    record.status = { type: 'busy' };
+    record.turnActive = true;
+    record.piSession.prompt = async (text) => {
+      promptCalls.push(text);
+      throw new Error('Already streaming; use steer or followUp');
+    };
+    record.piSession.steer = async (text) => { steerCalls.push(text); };
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'course correct' }] });
+    await wait();
+    expect(steerCalls).toEqual(['course correct']);
+    expect(promptCalls).toEqual([]);
+    host.dispose();
+  });
+});
+
+describe('promptAsync live follow-up (#369)', () => {
+  const wait = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const createHangingSession = ({ onPrompt, onSteer, onFollowUp, onSetModel } = {}) => {
+    let streaming = false;
+    let release = () => {};
+    const hang = new Promise((resolve) => {
+      release = resolve;
+    });
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const session = {
+      get isStreaming() {
+        return streaming;
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      async prompt(text, options) {
+        onPrompt?.(text, options);
+        streaming = true;
+        emit({ type: 'agent_start' });
+        await hang;
+        streaming = false;
+        emit({ type: 'agent_settled' });
+      },
+      async steer(text, images) {
+        onSteer?.(text, images);
+      },
+      async followUp(text, images) {
+        onFollowUp?.(text, images);
+      },
+      async abort() {
+        streaming = false;
+        release();
+        emit({ type: 'agent_settled' });
+      },
+      setModel(model) {
+        onSetModel?.(model);
+        session.currentModel = model;
+      },
+      setThinkingLevel() {},
+      dispose() {
+        listeners.clear();
+        release();
+      },
+    };
+    session.release = release;
+    return session;
+  };
+
+  it('overlapping promptAsync coalesces into steer and inserts the second user bubble', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text, options) => promptCalls.push({ text, options }),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Overlap' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    const second = host.promptAsync(record.id, {
+      messageID: 'msg_second',
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    await second;
+    expect(steerCalls).toEqual(['second']);
+    expect(promptCalls).toHaveLength(1);
+    expect(promptCalls[0].text).toBe('first');
+    expect(promptCalls[0].options?.streamingBehavior).toBeUndefined();
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first', 'msg_second']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('overlapping idle prompt without delivery still coalesces into one user bubble', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text, options) => promptCalls.push({ text, options }),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Overlap idle' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    await host.promptAsync(record.id, {
+      messageID: 'msg_second',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    expect(steerCalls).toEqual(['second']);
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('skips setSessionModel during a live prompt', async () => {
+    const setModelCalls = [];
+    const session = createHangingSession({
+      onSetModel: (model) => setModelCalls.push(model),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Live model' });
+    const first = host.promptAsync(record.id, {
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    expect(setModelCalls).toEqual([]);
+    await host.promptAsync(record.id, {
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+      delivery: 'steer',
+      parts: [{ type: 'text', text: 'second' }],
+    });
+    expect(setModelCalls).toEqual([]);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('stays busy after the first assistant message_end while tools still run', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    let streaming = false;
+    let release = () => {};
+    const hang = new Promise((resolve) => {
+      release = resolve;
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        get isStreaming() {
+          return streaming;
+        },
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          streaming = true;
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_1',
+            toolName: 'bash',
+            args: { command: 'sleep 1' },
+          });
+          await hang;
+          emit({
+            type: 'tool_execution_end',
+            toolCallId: 'call_1',
+            toolName: 'bash',
+            isError: false,
+            result: { content: [{ type: 'text', text: 'ok' }] },
+          });
+          streaming = false;
+          emit({ type: 'agent_settled' });
+        },
+        async abort() {
+          streaming = false;
+          release();
+        },
+        dispose() {
+          listeners.clear();
+          release();
+        },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Tools' });
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait(30);
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant?.info?.time?.completed).toBeGreaterThan(0);
+    expect(assistant.parts.some((part) => part.type === 'tool' && part.state?.status === 'running')).toBe(true);
+    release();
+    await prompt;
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    host.dispose();
+  });
+
+  it('Stop then immediate send starts a new prompt, not a live steer', async () => {
+    const promptCalls = [];
+    const steerCalls = [];
+    const session = createHangingSession({
+      onPrompt: (text) => promptCalls.push(text),
+      onSteer: (text) => steerCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Abort then send' });
+    const first = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'first' }] });
+    await wait(20);
+    await host.abort(record.id);
+    await first;
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'after-stop' }] });
+    await wait(20);
+    expect(promptCalls).toEqual(['first', 'after-stop']);
+    expect(steerCalls).toEqual([]);
+    session.release();
+    await wait(20);
+    host.dispose();
+  });
+
+  it('queue followUp does not insert a user bubble until the next turn starts', async () => {
+    const followUpCalls = [];
+    const session = createHangingSession({
+      onFollowUp: (text) => followUpCalls.push(text),
+    });
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => session,
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Queue' });
+    const first = host.promptAsync(record.id, {
+      messageID: 'msg_first',
+      parts: [{ type: 'text', text: 'first' }],
+    });
+    await wait(20);
+    await host.promptAsync(record.id, {
+      messageID: 'msg_queued',
+      delivery: 'followUp',
+      parts: [{ type: 'text', text: 'queued' }],
+    });
+    expect(followUpCalls).toEqual(['queued']);
+    const users = host.getMessages(record.id).filter((entry) => entry.info.role === 'user');
+    expect(users.map((entry) => entry.info.id)).toEqual(['msg_first']);
+    session.release();
+    await first;
+    host.dispose();
+  });
+
+  it('prompt() throw does not force idle while the child is still running', async () => {
+    const events = [];
+    let streaming = false;
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      onEvent(_directory, event) {
+        events.push(event.type);
+      },
+      createSession: async () => ({
+        get isStreaming() {
+          return streaming;
+        },
+        subscribe() {
+          return () => {};
+        },
+        async prompt() {
+          streaming = true;
+          throw new Error("Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message.");
+        },
+        async abort() {
+          streaming = false;
+        },
+        dispose() {},
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Throw' });
+    await host.promptAsync(record.id, { messageID: 'msg_ghost', parts: [{ type: 'text', text: 'ghost' }] });
+    await wait(30);
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    expect(events).not.toContain('session.idle');
+    expect(host.getMessages(record.id).some((entry) => entry.info.id === 'msg_ghost')).toBe(false);
+    host.dispose();
+  });
+});
+
+describe('directory identity for session status', () => {
+  it('matches trailing-slash and case aliases', () => {
+    expect(directoriesMatch('/tmp/project', '/tmp/project/')).toBe(true);
+    expect(directoriesMatch('/tmp/Project', '/tmp/project')).toBe(true);
+    expect(directoriesMatch('/tmp/wooly', '/tmp/other')).toBe(false);
+  });
+
+  it('getStatus includes busy sessions for a trailing-slash directory alias', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Alias' });
+    let release = () => {};
+    const hang = new Promise((resolve) => { release = resolve; });
+    record.piSession.prompt = async () => { await hang; };
+    const prompt = host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(host.getStatus('/tmp/project/')[record.id]).toEqual({ type: 'busy' });
+    expect(host.listSessions('/tmp/project/').some((item) => item.id === record.id)).toBe(true);
+    release();
+    await prompt;
+    host.dispose();
+  });
+});
+
+describe('settleRecordIfStuck vs live tools', () => {
+  const wait = (ms = 30) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('no-ops when tools are still running even if isStreaming is stale false', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        isStreaming: false,
+        isCompacting: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+          emit({
+            type: 'tool_execution_start',
+            toolCallId: 'call_live',
+            toolName: 'bash',
+            args: { command: 'sleep 1' },
+          });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Stuck' });
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait();
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    expect(assistant?.info?.time?.completed).toBeGreaterThan(0);
+    expect(assistant.parts.some((part) => part.type === 'tool' && part.state?.status === 'running')).toBe(true);
+    host.dispose();
+  });
+
+  it('revives sidebar busy on tool_execution after a false settle', async () => {
+    const listeners = new Set();
+    const emit = (event) => {
+      for (const listener of Array.from(listeners)) listener(event);
+    };
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createSession: async () => ({
+        isStreaming: false,
+        isCompacting: false,
+        subscribe(listener) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        async prompt() {
+          emit({ type: 'agent_start' });
+          emit({ type: 'message_start', message: { role: 'assistant', content: [] } });
+          emit({
+            type: 'message_end',
+            message: { role: 'assistant', content: [{ type: 'text', text: 'working' }] },
+          });
+        },
+        async abort() {},
+        dispose() { listeners.clear(); },
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Revive' });
+    await host.promptAsync(record.id, { parts: [{ type: 'text', text: 'go' }] });
+    await wait();
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    emit({
+      type: 'tool_execution_start',
+      toolCallId: 'call_late',
+      toolName: 'read',
+      args: { path: 'a.ts' },
+    });
+    expect(host.getStatus()[record.id]?.type).toBe('busy');
+    host.dispose();
+  });
+
+  it('completed injected tools do not block idle reload', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Idle reload' });
+    record.piSession.emitEvent({
+      type: 'tool_execution_start',
+      toolCallId: 'todo_1',
+      toolName: 'todo',
+      args: { action: 'create' },
+    });
+    record.piSession.emitEvent({
+      type: 'tool_execution_end',
+      toolCallId: 'todo_1',
+      toolName: 'todo',
+      isError: false,
+      result: { details: { action: 'create', tasks: [] } },
+    });
+    await host.reload({ sessionID: record.id });
+    expect(host.getStatus()[record.id]).toBeUndefined();
+    host.dispose();
+  });
+});

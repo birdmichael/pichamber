@@ -94,6 +94,17 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       activeProjectPath: homeDirectory,
     })).toEqual({ directoryOverride: homeDirectory });
   });
+
+  test('home that is not an opened project stays projectless even without homeDirectory', () => {
+    expect(resolveInheritedNewSessionDraftOptions({
+      currentSessionId: 'ses_home',
+      currentSessionDirectory: homeDirectory,
+      homeDirectory: null,
+      openedProjectPaths: [],
+      activeProjectId: null,
+      activeProjectPath: null,
+    })).toBe(undefined);
+  });
 });
 
 describe('new-session callers', () => {
@@ -112,5 +123,17 @@ describe('new-session callers', () => {
     expect(source).not.toMatch(
       /onNewChat=\{handleOpenNewSessionDraftFromHeader\}/,
     );
+  });
+
+  test('mobile sessions + new chat is still a projectless chats draft', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../apps/MobileSessionsSheet.tsx', import.meta.url)),
+      'utf8',
+    );
+
+    expect(source).toMatch(
+      /const handleStartNewChat = \(\) => \{[\s\S]*?openNewSessionDraft\(\);/,
+    );
+    expect(source).not.toContain('readInheritedNewSessionDraftOptions');
   });
 });

@@ -1,5 +1,7 @@
 import type { NotificationPayload, NotificationsAPI } from '@pichamber/ui/lib/api/types';
 
+import { notificationTitleFromPayload } from '../notificationTitle';
+
 const SW_READY_TIMEOUT_MS = 1500;
 const NOTIFICATION_DEDUPE_TTL_MS = 5000;
 const NOTIFICATION_DEDUPE_STORAGE_PREFIX = 'openchamber-notification-claim:';
@@ -103,7 +105,7 @@ const notifyWithServiceWorker = async (payload?: NotificationPayload): Promise<b
   }
 
   try {
-    await registration.showNotification(payload?.title ?? 'OpenChamber', {
+    await registration.showNotification(notificationTitleFromPayload(payload ?? {}), {
       body: payload?.body,
       tag: payload?.tag,
     });
@@ -168,7 +170,7 @@ const notifyWithWebAPI = async (payload?: NotificationPayload): Promise<boolean>
       return true;
     }
 
-    new Notification(payload?.title ?? 'OpenChamber', {
+    new Notification(notificationTitleFromPayload(payload ?? {}), {
       body: payload?.body,
       tag: payload?.tag,
     });

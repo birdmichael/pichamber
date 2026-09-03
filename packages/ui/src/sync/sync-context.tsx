@@ -41,7 +41,7 @@ import { applySessionEventToGlobalSessions } from "./session-event-router"
 import { handlePiExtensionUiEvent, isPiExtensionUiEventType } from "./pi-extension-ui-events"
 import { handlePiSessionPlanEvent, isPiSessionPlanEventType } from "./pi-session-plan-events"
 import { isPiPlanPluginAvailable, usePiFeaturePluginsStore } from "./pi-feature-plugins-store"
-import { refreshSessionPlan } from "./pi-session-plan-store"
+import { refreshSessionPlan, settleSessionPlanImplementing } from "./pi-session-plan-store"
 import { syncDebug } from "./debug"
 import { getReconnectCandidateSessionIds, mergeBootstrapSessions } from "./reconnect-recovery"
 import { messagesBefore } from "./message-ordering"
@@ -646,8 +646,8 @@ async function resyncDirectorySessionStatuses(
   // of active sessions — reconciled per `mode` (absence ≠ idle under monotonic).
   if (nextStatuses === null) return null
   applySessionStatusSnapshot(store, nextStatuses, candidateSessionIds, mode)
+  applyGlobalSessionStatusSnapshot(directory, nextStatuses, candidateSessionIds, mode)
   if (mode === "authoritative") {
-    applyGlobalSessionStatusSnapshot(directory, nextStatuses, candidateSessionIds)
     // An authoritative snapshot that settles sessions previously observed
     // busy/retry can orphan running tool parts (managed process died
     // mid-turn, #2577): finalize them now. The snapshot write above already
@@ -1482,8 +1482,11 @@ export function handleEvent(
 
   if (payload.type === "session.idle") {
     const idleSessionID = getSessionIdFromPayload(payload)
-    if (idleSessionID && isPiPlanPluginAvailable(usePiFeaturePluginsStore.getState().payload)) {
-      void refreshSessionPlan(idleSessionID)
+    if (idleSessionID) {
+      settleSessionPlanImplementing(idleSessionID)
+      if (isPiPlanPluginAvailable(usePiFeaturePluginsStore.getState().payload)) {
+        void refreshSessionPlan(idleSessionID)
+      }
     }
   }
 
@@ -2062,7 +2065,12 @@ export function SyncProvider(props: {
               if (!context.isCurrent()) return
               store.setState(patch)
               if (patch.session_status) {
-                applyGlobalSessionStatusSnapshot(directory, patch.session_status, store.getState().session.map((session) => session.id))
+                applyGlobalSessionStatusSnapshot(
+                  directory,
+                  patch.session_status,
+                  store.getState().session.map((session) => session.id),
+                  "monotonic",
+                )
               }
               if (patch.session || patch.message) {
                 ingestDirectoryStateIntoRoutingIndex(routingIndex, directory, store.getState())

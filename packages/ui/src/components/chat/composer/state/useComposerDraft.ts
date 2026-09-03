@@ -38,9 +38,37 @@ export function applyComposerIdentitySwitch(options: {
     currentText: string;
     currentMentions?: Iterable<string>;
     persistEnabled: boolean;
+    /**
+     * Chat→project New session: keep the live composer empty without writing
+     * empty onto the destination identity (preserves a real project untitled).
+     */
+    emptyIncoming?: boolean;
 }): ComposerIdentitySwitchResult {
     const previousKey = options.previous ? getChatDraftIdentityKey(options.previous) : null;
     const nextKey = options.next ? getChatDraftIdentityKey(options.next) : null;
+
+    const collectActiveMentions = (): Set<string> => {
+        const activeMentions = new Set<string>();
+        for (const mention of options.currentMentions ?? []) {
+            if (options.currentText.includes(`@${mention}`)) activeMentions.add(mention);
+        }
+        return activeMentions;
+    };
+
+    if (options.emptyIncoming) {
+        if (options.persistEnabled && previousKey !== nextKey) {
+            writeChatDraft(options.previous, options.currentText, collectActiveMentions());
+        }
+        // Do not read or write the destination — leftover `~` storage must not
+        // appear live, and an empty write must not wipe a real project draft.
+        const shouldChange = previousKey !== nextKey || Boolean(options.currentText);
+        return {
+            changed: shouldChange,
+            text: '',
+            confirmedMentions: new Set(),
+        };
+    }
+
     if (previousKey === nextKey) {
         return {
             changed: false,
@@ -53,10 +81,7 @@ export function applyComposerIdentitySwitch(options: {
         return { changed: true, text: '', confirmedMentions: new Set() };
     }
 
-    const activeMentions = new Set<string>();
-    for (const mention of options.currentMentions ?? []) {
-        if (options.currentText.includes(`@${mention}`)) activeMentions.add(mention);
-    }
+    const activeMentions = collectActiveMentions();
     writeChatDraft(options.previous, options.currentText, activeMentions);
     const restored = readChatDraft(options.next);
     return { changed: true, text: restored.text, confirmedMentions: restored.confirmedMentions };
@@ -95,6 +120,11 @@ export interface ComposerDraftOptions {
     onIdentityChange?: () => void;
     /** Called after a non-empty draft is restored, to select its text. */
     onDraftRestored?: () => void;
+    /**
+     * When set, an identity switch saves the outgoing draft then loads empty
+     * into the live composer without persisting empty onto the destination.
+     */
+    emptyIncomingComposer?: boolean;
 }
 
 export interface ComposerDraftControls {
@@ -116,6 +146,7 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
         initialDraft,
         onIdentityChange,
         onDraftRestored,
+        emptyIncomingComposer = false,
     } = options;
 
     const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -192,6 +223,7 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
             currentText: messageRef.current,
             currentMentions: confirmedMentionsRef.current,
             persistEnabled,
+            emptyIncoming: emptyIncomingComposer,
         });
         if (!switched.changed) {
             currentIdentityRef.current = identity;
@@ -224,7 +256,7 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
         if (switched.text) {
             requestAnimationFrame(() => callbacksRef.current.onDraftRestored?.());
         }
-    }, [clearPending, confirmedMentionsRef, identity, messageRef, persistEnabled, setMessage]);
+    }, [clearPending, confirmedMentionsRef, emptyIncomingComposer, identity, messageRef, persistEnabled, setMessage]);
 
     // A draft deleted elsewhere (session deleted, drafts cleared) clears the
     // composer if it is the one on screen.

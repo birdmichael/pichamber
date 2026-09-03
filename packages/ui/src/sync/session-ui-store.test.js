@@ -11,6 +11,9 @@ import { useCommandsStore } from '@/stores/useCommandsStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { createChatDraftIdentity, readChatDraft, writeChatDraft } from '@/lib/chatDraftPersistence';
+import { CHAT_DRAFT_PROJECT_ID, resolveNewSessionComposerDirectory } from '@/lib/chatDirectories';
+import { applyComposerIdentitySwitch } from '@/components/chat/composer/state/useComposerDraft';
+import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
 import { applyFeaturePluginsPayload, resetPiFeaturePluginsStore } from './pi-feature-plugins-store';
 
@@ -390,6 +393,116 @@ describe('openNewSessionDraft project binding', () => {
     expect(readChatDraft(identity).text).toBe('pr345-draft-probe');
   });
 
+  test('New session after a projectless draft starts empty', () => {
+    const home = '/home/tester';
+    const storage = getDeferredSafeStorage();
+    storage.removeItem('openchamber.chatDrafts.v2');
+    useProjectsStore.setState({ projects: [], activeProjectId: null });
+    useDirectoryStore.setState({ currentDirectory: home, homeDirectory: home });
+    useSessionUIStore.setState({
+      currentSessionId: 'ses_other',
+      currentSessionDirectory: home,
+    });
+
+    const original = createChatDraftIdentity(getRuntimeKey(), home, 'ses_projectless');
+    const leakedNewSession = createChatDraftIdentity(getRuntimeKey(), home, null);
+    const chatNewSession = createChatDraftIdentity(getRuntimeKey(), CHAT_DRAFT_PROJECT_ID, null);
+    writeChatDraft(original, 'projectless-draft', []);
+    writeChatDraft(leakedNewSession, 'projectless-draft', []);
+    writeChatDraft(chatNewSession, 'projectless-draft', []);
+
+    useSessionUIStore.getState().openNewSessionDraft();
+
+    const draft = useSessionUIStore.getState().newSessionDraft;
+    expect(draft.open).toBe(true);
+    expect(draft.target).toBe('chat');
+    expect(draft.selectedProjectId).toBeNull();
+    expect(draft.directoryOverride).toBeNull();
+    expect(readChatDraft(original).text).toBe('projectless-draft');
+    expect(readChatDraft(leakedNewSession).text).toBe('');
+    expect(readChatDraft(chatNewSession).text).toBe('');
+  });
+
+  test('chats+ draft composer directory stays the chats bucket when home is an opened project', () => {
+    const home = '/home/box';
+    const homeProject = { id: 'proj-home', path: home, label: '~' };
+    useProjectsStore.setState({ projects: [homeProject], activeProjectId: homeProject.id });
+    useDirectoryStore.setState({ currentDirectory: home, homeDirectory: home });
+    useSessionUIStore.setState({
+      currentSessionId: null,
+      currentSessionDirectory: null,
+      newSessionDraft: { open: false, draftId: 0, target: 'chat', directoryOverride: null, parentID: null },
+    });
+
+    useSessionUIStore.getState().openNewSessionDraft({ target: 'chat' });
+
+    const draft = useSessionUIStore.getState().newSessionDraft;
+    expect(draft.open).toBe(true);
+    expect(draft.target).toBe('chat');
+    expect(draft.selectedProjectId).toBeNull();
+    expect(draft.directoryOverride).toBeNull();
+    expect(resolveNewSessionComposerDirectory(draft)).toBe(CHAT_DRAFT_PROJECT_ID);
+    expect(resolveNewSessionComposerDirectory(draft)).not.toBe(home);
+  });
+
+  test('inherited New session after chats draft empties live composer without wiping project untitled', () => {
+    const home = '/home/box';
+    const homeProject = { id: 'proj-home', path: home, label: '~' };
+    const storage = getDeferredSafeStorage();
+    storage.removeItem('openchamber.chatDrafts.v2');
+    useProjectsStore.setState({ projects: [homeProject], activeProjectId: homeProject.id });
+    useDirectoryStore.setState({ currentDirectory: home, homeDirectory: home });
+
+    // Desktop: chats-row + opens a projectless draft.
+    useSessionUIStore.getState().openNewSessionDraft({ target: 'chat' });
+    const chatsDraft = useSessionUIStore.getState().newSessionDraft;
+    expect(chatsDraft.target).toBe('chat');
+    expect(resolveNewSessionComposerDirectory(chatsDraft)).toBe(CHAT_DRAFT_PROJECT_ID);
+
+    const chatsIdentity = createChatDraftIdentity(getRuntimeKey(), CHAT_DRAFT_PROJECT_ID, null);
+    const homeIdentity = createChatDraftIdentity(getRuntimeKey(), home, null);
+    // Live typed text on chats, plus leftover destination storage (Desktop fail mode).
+    writeChatDraft(chatsIdentity, 'projectless-draft-411', []);
+    writeChatDraft(homeIdentity, 'projectless-draft-411', []);
+
+    // Top New session / Cmd+N inherits the opened home project.
+    useSessionUIStore.getState().openNewSessionDraft({
+      selectedProjectId: homeProject.id,
+      directoryOverride: home,
+    });
+
+    const draft = useSessionUIStore.getState().newSessionDraft;
+    expect(draft.open).toBe(true);
+    expect(draft.target).toBe('project');
+    expect(draft.directoryOverride).toBe(home);
+    expect(draft.selectedProjectId).toBe(homeProject.id);
+    expect(draft.emptyIncomingComposer).toBe(true);
+    expect(resolveNewSessionComposerDirectory(draft)).toBe(home);
+
+    // Chats draft stays stored; destination untitled is not wiped by an empty write.
+    expect(readChatDraft(chatsIdentity).text).toBe('projectless-draft-411');
+    expect(readChatDraft(homeIdentity).text).toBe('projectless-draft-411');
+
+    // Identity switch from chats → home must show empty live text (onDraftRestored
+    // only fires for non-empty incoming). Destination storage stays intact.
+    const switched = applyComposerIdentitySwitch({
+      previous: chatsIdentity,
+      next: homeIdentity,
+      currentText: 'projectless-draft-411',
+      persistEnabled: true,
+      emptyIncoming: draft.emptyIncomingComposer,
+    });
+    expect(switched.changed).toBe(true);
+    expect(switched.text).toBe('');
+    expect(readChatDraft(chatsIdentity).text).toBe('projectless-draft-411');
+    expect(readChatDraft(homeIdentity).text).toBe('projectless-draft-411');
+
+    // Reopening New session for the same project still keeps the untitled draft.
+    useSessionUIStore.getState().openNewSessionDraft({ directoryOverride: home });
+    expect(readChatDraft(homeIdentity).text).toBe('projectless-draft-411');
+    expect(useSessionUIStore.getState().newSessionDraft.emptyIncomingComposer).toBeFalsy();
+  });
+
   test('still drops a leftover slash untitled draft', () => {
     const identity = createChatDraftIdentity(getRuntimeKey(), projectB.path, null);
     writeChatDraft(identity, '/', []);
@@ -668,6 +781,52 @@ describe('sendMessage draft snapshot (issues #2222 / #2315)', () => {
     expect(sendMessageCalls).toHaveLength(1);
     expect(sendMessageCalls[0].id).toBe('session-project-a');
     expect(sendMessageCalls[0].directory).toBe('/projects/alpha');
+  });
+});
+
+describe('routeMessage delivery', () => {
+  test('forwards followUp delivery to sendMessage instead of dropping it', async () => {
+    const calls = [];
+    const originalSendMessage = opencodeClient.sendMessage;
+    const childStore = {
+      getState: () => ({ session: [], message: {}, part: {}, session_status: {} }),
+      setState: () => {},
+    };
+    setActionRefs(opencodeClient, {
+      children: new Map(),
+      ensureChild: () => childStore,
+      getChild: () => childStore,
+    }, () => '/repo');
+    setOptimisticRefs(() => {}, () => {});
+    useConfigStore.setState({ isConnected: true });
+    opencodeClient.sendMessage = async (params) => {
+      calls.push(params);
+      return 'msg';
+    };
+    try {
+      await routeMessage({
+        sessionId: 'ses_busy',
+        directory: '/repo',
+        content: 'FOLLOWUP-OK',
+        providerID: 'provider-a',
+        modelID: 'model-a',
+        delivery: 'followUp',
+      });
+      await routeMessage({
+        sessionId: 'ses_busy',
+        directory: '/repo',
+        content: 'STEER-OK',
+        providerID: 'provider-a',
+        modelID: 'model-a',
+        delivery: 'steer',
+      });
+    } finally {
+      opencodeClient.sendMessage = originalSendMessage;
+    }
+    expect(calls.map((call) => ({ text: call.text, delivery: call.delivery }))).toEqual([
+      { text: 'FOLLOWUP-OK', delivery: 'followUp' },
+      { text: 'STEER-OK', delivery: 'steer' },
+    ]);
   });
 });
 

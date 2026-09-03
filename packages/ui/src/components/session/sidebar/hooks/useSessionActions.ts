@@ -70,14 +70,6 @@ export const useSessionActions = (args: Args) => {
       // Selecting a session always leaves any full-page surface, even when
       // the session is already the current one (no store transition fires).
       useUIStore.getState().closeMainSurfaces();
-      const resetSessionSearch = () => {
-        if (!args.isSessionSearchOpen && args.sessionSearchQuery.length === 0) {
-          return;
-        }
-        args.setSessionSearchQuery('');
-        args.setIsSessionSearchOpen(false);
-      };
-
       if (args.mobileVariant) {
         args.setActiveMainTab('chat');
         args.setSessionSwitcherOpen(false);
@@ -87,13 +79,11 @@ export const useSessionActions = (args: Args) => {
         if (args.allowReselect) {
           args.onSessionSelected?.(sessionId);
         }
-        resetSessionSearch();
         return;
       }
       streamPerfMark('navigation.session_state_set');
       args.setCurrentSession(sessionId, sessionDirectory ?? null);
       args.onSessionSelected?.(sessionId);
-      resetSessionSearch();
     },
     [args],
   );

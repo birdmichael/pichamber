@@ -20,6 +20,7 @@ import { shouldShowPiFromSubagentLabel } from '@/lib/subagents/subagentTool';
 import { QUESTION_CUSTOM_TEXTAREA_MIN_HEIGHT, getQuestionCustomTextareaHeight } from './questionTextareaSizing';
 import { stopQuestionAnswerKeyBubble } from './questionAnswerFocus';
 import { blurChatInput } from './composer/editor/dom';
+import { QuestionMarkdown } from './QuestionMarkdown';
 
 interface QuestionCardProps {
   question: QuestionRequest;
@@ -442,7 +443,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({ question }) => {
               </div>
             ) : activeQuestion ? (
               <>
-                <div className="typography-meta font-medium text-foreground mb-1.5">{activeQuestion.question}</div>
+                <QuestionMarkdown
+                  content={activeQuestion.question}
+                  size="meta"
+                  className="font-medium text-foreground mb-1.5"
+                />
 
                 {isMultiple ? (
                   <div className="typography-micro text-muted-foreground mb-1.5">{t('chat.questionCard.selectMultiple')}</div>

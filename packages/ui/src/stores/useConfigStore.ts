@@ -864,9 +864,9 @@ const resolveConfigDirectory = (directory: string | null | undefined): string | 
             return projectPath;
         }
     } catch {
-        return null;
+        return dir;
     }
-    return null;
+    return dir;
 };
 
 const toConfigDirectoryKey = (directory: string | null | undefined): string =>
@@ -1058,6 +1058,8 @@ interface ConfigStore {
     sayVoice: string;
     browserVoice: string;
     localTtsVoiceId: number;
+    /** Local and macOS voices follow the language of the text being read. */
+    ttsFollowTextLanguage: boolean;
     openaiVoice: string;
     openaiApiKey: string;
     openaiCompatibleUrl: string;
@@ -1085,6 +1087,7 @@ interface ConfigStore {
     setSayVoice: (voice: string) => void;
     setBrowserVoice: (voice: string) => void;
     setLocalTtsVoiceId: (voiceId: number) => void;
+    setTtsFollowTextLanguage: (enabled: boolean) => void;
     setOpenaiVoice: (voice: string) => void;
     setOpenaiApiKey: (apiKey: string) => void;
     setOpenaiCompatibleUrl: (url: string) => void;
@@ -1268,6 +1271,13 @@ export const useConfigStore = create<ConfigStore>()(
                         }
                     }
                     return 0;
+                })(),
+                ttsFollowTextLanguage: (() => {
+                    if (typeof window !== 'undefined') {
+                        const saved = localStorage.getItem('ttsFollowTextLanguage');
+                        if (saved !== null) return saved === 'true';
+                    }
+                    return true;
                 })(),
                 // Browser voice - load from localStorage or default to empty (auto-select)
                 browserVoice: (() => {
@@ -1569,13 +1579,15 @@ export const useConfigStore = create<ConfigStore>()(
                     // Providers are project-scoped: resolve a worktree to its project
                     // so it reuses one shared snapshot instead of its own.
                     const configDirectory = resolveConfigDirectory(requestedDirectory);
-                    if (!configDirectory) {
-                        markStartupTrace('loadProviders:skippedUnknownDirectory', { requestedDirectory, source: options?.source ?? 'unknown' });
-                        return;
-                    }
-                    const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
-                    const directoryKey = toDirectoryKey(configDirectory);
                     const source = options?.source ?? 'unknown';
+                    // Pi catalogs (and hosted mobile with no project yet) are
+                    // global — still fetch under __global__ instead of leaving
+                    // the model picker empty.
+                    const directoryKey = toDirectoryKey(configDirectory);
+                    const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
+                    if (!configDirectory) {
+                        markStartupTrace('loadProviders:globalCatalog', { requestedDirectory, source });
+                    }
                     markStartupTrace('loadProviders:called', { directoryKey, source, requestedDirectory, effectiveDirectory });
 
                     // Dedup: if a load is already in-flight for this directory, reuse it
@@ -2010,13 +2022,12 @@ export const useConfigStore = create<ConfigStore>()(
                     // Agents are project-scoped: resolve a worktree to its project
                     // so it reuses one shared snapshot instead of its own.
                     const configDirectory = resolveConfigDirectory(requestedDirectory);
-                    if (!configDirectory) {
-                        markStartupTrace('loadAgents:skippedUnknownDirectory', { requestedDirectory, source: options?.source ?? 'unknown' });
-                        return false;
-                    }
-                    const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
-                    const directoryKey = toDirectoryKey(configDirectory);
                     const source = options?.source ?? 'unknown';
+                    const directoryKey = toDirectoryKey(configDirectory);
+                    const effectiveDirectory = configDirectory ?? opencodeClient.getDirectory() ?? null;
+                    if (!configDirectory) {
+                        markStartupTrace('loadAgents:globalCatalog', { requestedDirectory, source });
+                    }
                     markStartupTrace('loadAgents:called', { directoryKey, source, requestedDirectory, effectiveDirectory });
 
                     // Dedup: if a load is already in-flight for this directory, reuse it
@@ -2919,6 +2930,13 @@ export const useConfigStore = create<ConfigStore>()(
                     }
                 },
 
+                setTtsFollowTextLanguage: (enabled: boolean) => {
+                    set({ ttsFollowTextLanguage: enabled });
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem('ttsFollowTextLanguage', String(enabled));
+                    }
+                },
+
                 setBrowserVoice: (voice: string) => {
                     set({ browserVoice: voice });
                     if (typeof window !== 'undefined') {
@@ -3194,6 +3212,10 @@ export const useConfigStore = create<ConfigStore>()(
                             const configDirectory = resolvedInitialDirectory ?? getFallbackProjectDirectory();
                             if (!configDirectory) {
                                 markStartupTrace('initializeApp:noProjectConfigDirectory');
+                                await Promise.all([
+                                    get().loadProviders({ directory: null, source: 'initializeApp:global' }),
+                                    get().loadAgents({ directory: null, source: 'initializeApp:global' }),
+                                ]);
                                 set({ isInitialized: true, isConnected: true, hasEverConnected: true, connectionPhase: "connected" });
                                 return;
                             }
