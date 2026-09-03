@@ -48,7 +48,7 @@ import {
   type EmbeddedSessionChatURLCacheEntry,
   type EmbeddedSessionRuntimeBootstrap,
 } from './contextPanelEmbeddedChat';
-import { shouldYieldFilesPanelEscape } from './contextPanelEscape';
+import { shouldYieldFilesPanelEscape as shouldYieldFilesOverlayEscape } from './contextPanelEscape';
 import { getContextSurfaceWidthFraction } from '@/lib/surfaces/registry';
 import {
   clampContextPanelLayoutWidth,
@@ -61,7 +61,7 @@ import {
   clampEditorTreeWidth,
   editorTreeWidthFromDrag,
 } from '@/lib/surfaces/editorSplit';
-import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
+import { shouldYieldFilesPanelEscape as shouldYieldFilesFindEscape } from '@/lib/files-panel-escape';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -725,15 +725,14 @@ export const ContextPanel: React.FC = () => {
     }
 
     // Find/Replace owns the first Escape (same as ×). Capture here would
-    // close the Files panel first (issues #414, #512). Tree context-menu
-    // yield is issue #517 and is not included in this helper yet.
-    if (shouldYieldFilesPanelEscape(event, event.currentTarget)) {
+    // close the Files panel first (issues #414, #512).
+    if (shouldYieldFilesFindEscape(event, event.currentTarget)) {
       return;
     }
 
     // Tree context/kebab menus and Create File / Delete dialogs own Escape.
     // Capture here would close Files as well (issue #517).
-    if (shouldYieldFilesPanelEscape({ target: event.target })) {
+    if (shouldYieldFilesOverlayEscape({ target: event.target })) {
       return;
     }
 
