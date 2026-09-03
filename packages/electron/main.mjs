@@ -2468,6 +2468,13 @@ const dispatchAddSelectionToChat = () => {
   if (target) emitToWindow(target, 'openchamber:menu-action', 'add-selection-to-chat');
 };
 
+// Toggle-style View items must reach the renderer exactly once. Dual IPC+DOM
+// delivery (dispatchMenuAction) toggles twice and looks like a no-op (#509).
+const dispatchViewToggleAction = (action) => {
+  const target = getMenuTargetWindow();
+  if (target) emitToWindow(target, 'openchamber:menu-action', action);
+};
+
 // Mini-chat draft windows are not deduplicated, so this must reach the renderer
 // exactly once — emitToWindow alone (no DOM-event double dispatch). The renderer
 // resolves the active directory/project and opens the window.
@@ -5085,8 +5092,10 @@ const buildMacMenu = () => {
         { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
         { label: 'System Theme', click: () => dispatchAction('theme-system') },
         { type: 'separator' },
-        { label: 'Toggle Session Sidebar', accelerator: 'Cmd+Alt+L', click: () => dispatchAction('toggle-sidebar') },
-        { label: 'Toggle Memory Debug', accelerator: 'Cmd+Shift+D', click: () => dispatchAction('toggle-memory-debug') },
+        // registerAccelerator:false → renderer owns Cmd+Alt+L / Cmd+Shift+D
+        // so the native menu does not toggle a second time (#509).
+        { label: 'Toggle Session Sidebar', accelerator: 'Cmd+Alt+L', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-sidebar') },
+        { label: 'Toggle Memory Debug', accelerator: 'Cmd+Shift+D', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-memory-debug') },
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
@@ -5197,8 +5206,10 @@ const buildAutoHiddenMenu = () => {
         { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
         { label: 'System Theme', click: () => dispatchAction('theme-system') },
         { type: 'separator' },
-        { label: 'Toggle Session Sidebar', accelerator: 'Ctrl+Alt+L', click: () => dispatchAction('toggle-sidebar') },
-        { label: 'Toggle Memory Debug', accelerator: 'Ctrl+Shift+D', click: () => dispatchAction('toggle-memory-debug') },
+        // registerAccelerator:false → renderer owns Ctrl+Alt+L / Ctrl+Shift+D
+        // so the native menu does not toggle a second time (#509).
+        { label: 'Toggle Session Sidebar', accelerator: 'Ctrl+Alt+L', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-sidebar') },
+        { label: 'Toggle Memory Debug', accelerator: 'Ctrl+Shift+D', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-memory-debug') },
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],

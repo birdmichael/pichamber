@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: Linux Export Save File dialogs fit a 1280×800 screen, so Name, filter, Cancel, and Save stay on screen.
 - Desktop: Help → Keyboard Shortcuts shows Ctrl/Cmd+K, H, matching Settings and the shortcuts dialog.
 - Desktop: Linux hamburger Pichamber → Command Palette and Help → Keyboard Shortcuts open on the first click instead of doing nothing.
+- Desktop: Linux hamburger View → Toggle Session Sidebar and Toggle Memory Debug toggle on click. Ctrl+Alt+L and Ctrl+Shift+D still toggle once.
 - Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 - Files: clicking a `.drawio` opens the diagram canvas. The preview toggle still shows XML source.
