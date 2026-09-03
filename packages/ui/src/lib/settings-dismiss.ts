@@ -86,6 +86,12 @@ function isImmediateOutsidePressAfterOpen(): boolean {
   return settingsOpenedAtMs > 0 && (Date.now() - settingsOpenedAtMs) < SETTINGS_OPEN_OUTSIDE_PRESS_GUARD_MS;
 }
 
+const SETTINGS_INTENTIONAL_CLOSE_REASONS = new Set(['close-press', 'escape-key']);
+
+export function shouldRenderSettingsWindow(isOpen: boolean, hasMountedOnce: boolean): boolean {
+  return isOpen || hasMountedOnce;
+}
+
 export function shouldBlockSettingsDismiss(
   nextOpen: boolean,
   details?: SettingsDismissDetails,
@@ -104,15 +110,14 @@ export function shouldBlockSettingsDismiss(
   if (reason === 'focus-out' || reason === 'none') {
     return true;
   }
-  if (reason === 'outside-press') {
-    if (isEventInsideSettingsView(eventTargetFromDetails(details))) {
-      return true;
-    }
-    // Gear / first-click: pointerdown opens Settings, then the same click
-    // lands as an outside-press on the new dialog and would close it again.
-    if (isImmediateOutsidePressAfterOpen()) {
-      return true;
-    }
+  if (reason === 'outside-press' && isEventInsideSettingsView(eventTargetFromDetails(details))) {
+    return true;
+  }
+  // Gear / first-click: pointerdown opens Settings, then the same click can
+  // land as outside-press, trigger-press, or imperative-action on the new
+  // dialog and would close it again. Keep it open unless the user hit X/Esc.
+  if (isImmediateOutsidePressAfterOpen() && !SETTINGS_INTENTIONAL_CLOSE_REASONS.has(reason)) {
+    return true;
   }
   if (reason === 'escape-key' && (hasSettingsEscapeForm() || hasNestedSettingsDialog())) {
     return true;

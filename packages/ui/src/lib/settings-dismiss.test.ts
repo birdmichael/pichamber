@@ -10,6 +10,7 @@ import {
   resetSettingsOpenedFromTriggerForTests,
   SETTINGS_ESCAPE_FORM_EVENT,
   shouldBlockSettingsDismiss,
+  shouldRenderSettingsWindow,
 } from './settings-dismiss';
 
 test('detects a nested settings overlay', () => {
@@ -130,4 +131,19 @@ test('blocks the leftover outside-press that follows opening Settings', () => {
     reason: 'outside-press',
     event: { target: null },
   })).toBe(true);
+});
+
+test('blocks leftover trigger-press and imperative-action from the same gear click', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  markSettingsOpenedFromTrigger();
+  expect(shouldBlockSettingsDismiss(false, { reason: 'trigger-press' })).toBe(true);
+  expect(shouldBlockSettingsDismiss(false, { reason: 'imperative-action' })).toBe(true);
+  expect(shouldBlockSettingsDismiss(false, { reason: 'close-press' })).toBe(false);
+});
+
+test('renders the Settings window on the same open as the first gear click', () => {
+  expect(shouldRenderSettingsWindow(true, false)).toBe(true);
+  expect(shouldRenderSettingsWindow(false, false)).toBe(false);
+  expect(shouldRenderSettingsWindow(false, true)).toBe(true);
 });
