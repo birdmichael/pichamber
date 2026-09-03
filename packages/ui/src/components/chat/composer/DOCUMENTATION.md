@@ -156,8 +156,9 @@ mobile composer, not the collapsed pill. On Pi the thinking chip lists
 clamps the current chip onto that list. Switching models pairs the chip
 immediately from the selected model's catalog (`reasoning_options`) and
 waits for `PATCH /model` before applying GET `available`. Empty or
-`off`-only live stays on catalog; a model with no catalog levels hides
-the chip. Each send uses the chip's current model and thinking
+`off`-only live stays on catalog. Empty catalog still keeps live GET
+`available` (or the last live pin) so the chip does not vanish after
+send; an authoritative empty `available` still hides the chip. Each send uses the chip's current model and thinking
 (`resolveComposerSendThinking`). On Pi leftover OpenCode `currentVariant`
 is not sent. Session `GET /model` restores when the chat opens and
 does not overwrite a later composer pick; automatic history/fallback

@@ -461,7 +461,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             setPiThinkingLevels(undefined);
             return;
         }
-        const sessionChanged = thinkingSessionIdRef.current !== currentSessionIdForThinking;
+        const previousSessionId = thinkingSessionIdRef.current;
+        const sessionChanged = previousSessionId !== currentSessionIdForThinking;
+        const mintedSession = sessionChanged && !previousSessionId && Boolean(currentSessionIdForThinking);
         thinkingSessionIdRef.current = currentSessionIdForThinking;
         const emptyDraftCurrent = resolveEmptyDraftThinkingCurrent({
             projectVariant: emptyDraftProjectVariant,
@@ -474,7 +476,12 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 : emptyDraftCurrent,
             catalogLevels: draftThinkingLevels,
         });
-        setPiThinkingLevels(catalogPair.levels.length > 0 ? catalogPair.levels : undefined);
+        if (catalogPair.levels.length > 0) {
+            setPiThinkingLevels(catalogPair.levels);
+        } else if (!mintedSession) {
+            setPiThinkingLevels(undefined);
+        }
+        // mintedSession + empty catalog keeps live until GET (#513).
         if (!currentSessionIdForThinking) {
             if (catalogPair.thinking !== piThinking) {
                 setPiThinking(catalogPair.thinking);
@@ -501,7 +508,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         const pinSnapshot = usePiThinkingChipStore.getState();
         void (async () => {
             await sessionModelApplyRef.current;
-            if (cancelled || catalogPair.levels.length === 0) {
+            // #513: empty catalog still GET — live available keeps the chip.
+            if (cancelled) {
                 return;
             }
             const res = await runtimeFetch(`/api/session/${encodeURIComponent(sessionId)}/thinking`, { method: 'GET' }).catch(() => null);

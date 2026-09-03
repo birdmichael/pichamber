@@ -60,6 +60,12 @@ describe('mobile thinking chip', () => {
     expect(modelControlsSource).toContain('setPiThinking(undefined)');
   });
 
+  test('empty catalog still GETs live thinking so the chip can stay', () => {
+    expect(modelControlsSource).toContain('#513: empty catalog still GET');
+    expect(modelControlsSource).not.toContain('cancelled || catalogPair.levels.length === 0');
+    expect(modelControlsSource).toContain('mintedSession');
+  });
+
   test('composer thinking does not PATCH global Pi defaults', () => {
     const cycleSource = readFileSync(join(__dirname, 'cycleComposerThinking.ts'), 'utf-8');
     expect(cycleSource).not.toContain('/api/pi/defaults');
