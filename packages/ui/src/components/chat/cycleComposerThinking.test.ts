@@ -73,6 +73,15 @@ describe('cycleComposerThinking', () => {
     expect(fetchCalls).toEqual([]);
   });
 
+  test('empty drafts keep a kernel list that omitted xhigh', async () => {
+    useSessionUIStore.setState({ currentSessionId: null });
+    await applyComposerThinking('high', { levels: ['off', 'minimal', 'low', 'medium', 'high'] });
+    expect(usePiThinkingChipStore.getState().level).toBe('high');
+    expect(usePiThinkingChipStore.getState().levels).toEqual(['off', 'minimal', 'low', 'medium', 'high']);
+    expect(usePiThinkingChipStore.getState().levels).not.toContain('xhigh');
+    expect(fetchCalls).toEqual([]);
+  });
+
   test('chip follows the applied PATCH thinking, not the optimistic pick', async () => {
     useSessionUIStore.setState({ currentSessionId: 'ses_a' });
     await applyComposerThinking('xhigh', { levels: ['low', 'medium', 'high', 'xhigh'] });

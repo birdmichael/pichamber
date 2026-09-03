@@ -42,7 +42,9 @@ import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
+    parseAvailablePiThinkingLevels,
     parsePiThinkingLevel,
+    preferPiModelThinkingLevels,
     resolveEmptyDraftThinkingCurrent,
     resolvePairedPiThinking,
     resolvePiThinkingChipPresentation,
@@ -423,11 +425,18 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         if (!isPiKernel || !currentProviderId || !currentModelId) {
             return [];
         }
-        return resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId));
+        const provider = providers.find((entry) => entry.id === currentProviderId);
+        const model = Array.isArray(provider?.models)
+            ? provider.models.find((entry) => entry.id === currentModelId) as ProviderModel | undefined
+            : undefined;
+        return preferPiModelThinkingLevels(
+            model?.thinkingLevels ?? model?.availableThinkingLevels,
+            resolveCatalogThinkingLevels(getModelMetadata(currentProviderId, currentModelId)),
+        );
         // modelsMetadata is required: getModelMetadata is a stable store method
         // and would otherwise keep the empty-catalog fallback after fetch lands.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
-    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata]);
+    }, [currentModelId, currentProviderId, getModelMetadata, isPiKernel, modelsMetadata, providers]);
     const pairedThinking = React.useMemo(() => {
         if (!isPiKernel) {
             return { thinking: undefined as string | undefined, levels: [] as PiThinkingLevel[] };
@@ -582,7 +591,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             setPiThinking(applied);
         }
         if (Array.isArray(chipState.levels) && chipState.levels.length > 0) {
-            setPiThinkingLevels(chipState.levels);
+            const appliedLevels = parseAvailablePiThinkingLevels(chipState.levels);
+            if (appliedLevels.length > 0) {
+                setPiThinkingLevels(appliedLevels);
+            }
         }
     }, [currentModelId, currentProviderId, currentSessionIdForThinking, isPiKernel, setCurrentVariant, visiblePiThinkingLevels]);
 

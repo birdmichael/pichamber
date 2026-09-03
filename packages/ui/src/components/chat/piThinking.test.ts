@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
   clampPiThinkingLevel,
   isNarrowPiThinkingAvailable,
   parseAvailablePiThinkingLevels,
   parsePiThinkingLevel,
+  preferPiModelThinkingLevels,
   nextCycledPiThinkingLevel,
   resolveComposerSendThinking,
   resolveEmptyDraftThinkingCurrent,
@@ -239,6 +241,49 @@ describe('unionCurrentIntoPiThinkingLevels', () => {
       'xhigh',
       ['low', 'medium', 'high'],
     )).toEqual(['low', 'medium', 'high']);
+  });
+});
+
+describe('preferPiModelThinkingLevels', () => {
+  const grokCatalog = resolveCatalogThinkingLevels({
+    reasoning: true,
+    reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh'] }],
+  });
+
+  test('empty-draft pairing with Pi thinkingLevels does not show models.dev xhigh', () => {
+    expect(grokCatalog).toEqual(['low', 'medium', 'high', 'xhigh']);
+    const levels = preferPiModelThinkingLevels(
+      ['off', 'minimal', 'low', 'medium', 'high'],
+      grokCatalog,
+    );
+    expect(levels).toEqual(['off', 'minimal', 'low', 'medium', 'high']);
+    expect(levels).not.toContain('xhigh');
+    expect(resolvePairedPiThinking({
+      current: 'high',
+      catalogLevels: levels,
+    })).toEqual({
+      thinking: 'high',
+      levels: ['off', 'minimal', 'low', 'medium', 'high'],
+    });
+  });
+
+  test('still shows xhigh when the Pi/SDK list includes it', () => {
+    expect(preferPiModelThinkingLevels(
+      ['low', 'medium', 'high', 'xhigh'],
+      ['low', 'medium', 'high'],
+    )).toEqual(['low', 'medium', 'high', 'xhigh']);
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: ['low', 'medium', 'high', 'xhigh'],
+    })).toEqual({
+      thinking: 'xhigh',
+      levels: ['low', 'medium', 'high', 'xhigh'],
+    });
+  });
+
+  test('falls back to models.dev only when Pi omitted a list', () => {
+    expect(preferPiModelThinkingLevels(undefined, grokCatalog)).toEqual(grokCatalog);
+    expect(preferPiModelThinkingLevels([], grokCatalog)).toEqual(grokCatalog);
   });
 });
 

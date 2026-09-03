@@ -1024,6 +1024,36 @@ const readThinkingLevelsFromModel = async (model) => {
   return parseThinkingLevelList(model.thinkingLevels || model.availableThinkingLevels);
 };
 
+/** Mirror Pi `getSupportedThinkingLevels` when the SDK is not loaded yet. */
+const kernelThinkingLevelsFromModel = (model) => {
+  if (!model || typeof model !== 'object') return [];
+  if (supportedThinkingLevelsFn) {
+    try {
+      const levels = parseThinkingLevelList(supportedThinkingLevelsFn(model));
+      if (levels.length > 0) return levels;
+    } catch {
+    }
+  }
+  if (!model.reasoning) return ['off'];
+  const map = model.thinkingLevelMap && typeof model.thinkingLevelMap === 'object' && !Array.isArray(model.thinkingLevelMap)
+    ? model.thinkingLevelMap
+    : {};
+  return THINKING_LEVELS.filter((level) => {
+    const mapped = map[level];
+    if (mapped === null) return false;
+    if (level === 'xhigh' || level === 'max') return mapped !== undefined;
+    return true;
+  });
+};
+
+const readSerializedThinkingLevels = (model) => {
+  if (!model || typeof model !== 'object') return [];
+  const fromKernel = kernelThinkingLevelsFromModel(model);
+  if (!isNarrowThinkingAvailable(fromKernel)) return fromKernel;
+  const fromModel = parseThinkingLevelList(model.thinkingLevels || model.availableThinkingLevels);
+  return isNarrowThinkingAvailable(fromModel) ? [] : fromModel;
+};
+
 const widenThinkingAvailable = (live, catalog) => {
   const catalogLevels = parseThinkingLevelList(catalog);
   if (catalogLevels.length === 0) return parseThinkingLevelList(live);
@@ -1112,7 +1142,7 @@ const toProviderModelRecord = (model) => {
   const hasContext = Number.isFinite(contextWindow) && contextWindow > 0;
   const hasOutput = Number.isFinite(maxTokens) && maxTokens > 0;
   const input = readPiModelInput(enriched);
-  return {
+  const record = {
     id,
     name: typeof (enriched.name ?? model.name) === 'string' && String(enriched.name ?? model.name).trim()
       ? String(enriched.name ?? model.name).trim()
@@ -1132,6 +1162,11 @@ const toProviderModelRecord = (model) => {
       },
     } : {}),
   };
+  const thinkingLevels = readSerializedThinkingLevels(enriched);
+  if (thinkingLevels.length > 0) {
+    record.thinkingLevels = thinkingLevels;
+  }
+  return record;
 };
 
 const applyPublicProviderConfig = (provider, config) => {
@@ -1185,7 +1220,9 @@ const applyPublicProviderConfig = (provider, config) => {
     const hasContext = Number.isFinite(Number(contextWindow)) && Number(contextWindow) > 0;
     const hasOutput = Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0;
     const hasInput = Array.isArray(input) && input.length > 0;
-    if (!hasContext && !hasOutput && !hasInput && !reasoning) continue;
+    const existingThinking = parseThinkingLevelList(existing.thinkingLevels || existing.availableThinkingLevels);
+    const recordThinking = parseThinkingLevelList(record.thinkingLevels);
+    if (!hasContext && !hasOutput && !hasInput && !reasoning && recordThinking.length === 0) continue;
     provider.models[record.id] = {
       ...existing,
       ...(reasoning && !existingReasoning ? { reasoning: true } : {}),
@@ -1205,6 +1242,7 @@ const applyPublicProviderConfig = (provider, config) => {
           ...(hasOutput && !existingLimit.output ? { output: Number(maxTokens) } : {}),
         },
       } : {}),
+      ...(existingThinking.length === 0 && recordThinking.length > 0 ? { thinkingLevels: recordThinking } : {}),
     };
   }
   return provider;
@@ -3662,6 +3700,7 @@ export const createPiHost = ({
           ? await runtime.getAvailable()
           : [];
         const builtinIds = await resolvePiBuiltinCatalogIds();
+        await loadSupportedThinkingLevels();
         const providers = withoutUnconnectedBuiltinCatalogProviders(mapPiModelsToProviders(available, {
           configs: listPiProviderPublicConfigs({ home, directory: defaultDirectory }),
         }), {

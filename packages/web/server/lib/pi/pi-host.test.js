@@ -176,6 +176,31 @@ describe('mapPiModelsToProviders', () => {
     expect(kept[0].models['grok-4.6'].input).toEqual(['text', 'image']);
     expect(kept[0].models['grok-4.6'].capabilities.input.image).toBe(true);
   });
+
+  it('serializes SDK thinkingLevels for grok-like models without inventing xhigh', () => {
+    const providers = mapPiModelsToProviders([
+      { id: 'grok-4.6', name: 'Grok 4.6', provider: 'pr17test', reasoning: true },
+    ]);
+    expect(providers[0].models['grok-4.6'].thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high',
+    ]);
+    expect(providers[0].models['grok-4.6'].thinkingLevels).not.toContain('xhigh');
+  });
+
+  it('keeps xhigh when the Pi/SDK thinkingLevelMap includes it', () => {
+    const providers = mapPiModelsToProviders([
+      {
+        id: 'gpt-5.6-terra',
+        name: 'Terra',
+        provider: 'bmlab',
+        reasoning: true,
+        thinkingLevelMap: { xhigh: 'xhigh', max: 'max' },
+      },
+    ]);
+    expect(providers[0].models['gpt-5.6-terra'].thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
+    ]);
+  });
 });
 
 describe('getProviders catalog filter', () => {

@@ -136,6 +136,20 @@ export function resolveTranscriptThinkingLabel(input: {
 }
 
 /**
+ * Empty-draft menus prefer Pi kernel/SDK `thinkingLevels` on the selected
+ * provider model. models.dev is only the fallback when Pi omitted a list.
+ * Do not union catalog-only extras (xhigh) onto a real Pi list.
+ */
+export function preferPiModelThinkingLevels(
+  piLevels: unknown,
+  catalogLevels: readonly string[] = [],
+): PiThinkingLevel[] {
+  const fromPi = parseAvailablePiThinkingLevels(piLevels);
+  if (fromPi.length > 0) return fromPi;
+  return parseAvailablePiThinkingLevels(catalogLevels);
+}
+
+/**
  * Empty drafts have no GET /session/:id/thinking. Prefer the project pin,
  * then Pi defaults, then the current chip. Passing nothing stays unset —
  * never invent medium and ignore Settings / project pin.

@@ -38,6 +38,8 @@ describe('mobile thinking chip', () => {
 
   test('pairs the thinking chip to the selected model catalog immediately', () => {
     expect(modelControlsSource).toContain('resolvePairedPiThinking');
+    expect(modelControlsSource).toContain('preferPiModelThinkingLevels');
+    expect(modelControlsSource).toContain('parseAvailablePiThinkingLevels(chipState.levels)');
     expect(modelControlsSource).toContain('catalogLevels: draftThinkingLevels');
     expect(modelControlsSource).toContain('resolvePiThinkingChipPresentation(pairedThinking.thinking)');
     expect(modelControlsSource).toContain('sessionModelApplyRef');
