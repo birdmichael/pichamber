@@ -11,6 +11,8 @@ type OnboardingScreenProps = {
   onBack?: () => void;
   /** Callback when CLI becomes available */
   onCliAvailable?: () => void;
+  /** Callback when recovery Retry Local is pressed */
+  onRetry?: () => void | Promise<void>;
   /** Screen mode to render */
   mode?: OnboardingScreenMode;
   /** Recovery variant (only used when mode is 'recovery') */
@@ -29,6 +31,7 @@ type OnboardingScreenProps = {
 export function OnboardingScreen({
   onBack,
   onCliAvailable,
+  onRetry,
   mode = 'first-launch',
   recoveryVariant = 'missing-default-host',
   recoveryHostUrl,
@@ -68,6 +71,7 @@ export function OnboardingScreen({
           setRecoveryEnteredLocalSetup(true);
           onEnterLocalSetup?.();
         }}
+        onRetry={onRetry}
         localAvailable={localAvailable}
       />
     );

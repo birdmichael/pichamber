@@ -33,6 +33,17 @@ describe('isLocalKernelReady', () => {
     })).toBe(false);
   });
 
+  test('does not treat HTTP status ok as ready when kernelReady is explicitly false', () => {
+    expect(isLocalKernelReady({
+      kernel: 'pi',
+      status: 'ok',
+      kernelReady: false,
+      piRunning: false,
+      openCodeRunning: false,
+      isOpenCodeReady: false,
+    })).toBe(false);
+  });
+
   test('keeps leftover OpenCode readiness on the OpenCode kernel', () => {
     expect(isLocalKernelReady({
       kernel: 'opencode',

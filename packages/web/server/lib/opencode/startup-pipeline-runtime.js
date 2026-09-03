@@ -138,7 +138,11 @@ export const createStartupPipelineRuntime = (dependencies) => {
     });
     tunnelRuntimeContext.setActivePort(startupResult.activePort);
     scheduleOpenCodeApiDetection();
-    void bootstrapOpenCodeAtStartup();
+    try {
+      await bootstrapOpenCodeAtStartup();
+    } catch {
+      // Kernel bootstrap failure must not take down the already-listening HTTP server.
+    }
 
     serverStartupRuntime.attachProcessHandlers({ attachSignals });
 

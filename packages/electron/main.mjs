@@ -20,6 +20,7 @@ import {
 import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
+import { resolveLocalBootStatus, waitForPiKernelReady } from './pi-kernel-ready.mjs';
 import { sanitizeRuntimeRequestHeaders } from './runtime-request-headers.mjs';
 import {
   assertUpdaterCapability,
@@ -1806,7 +1807,7 @@ const syncMainWindowInitScript = (initScript = state.initScript) => {
   }
 };
 
-const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable }) => {
+const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable, localKernelReady = false }) => {
   const availability = { localAvailable };
   if (envTargetUrl) {
     const status = probe?.status === 'unreachable'
@@ -1825,9 +1826,11 @@ const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable }) => 
   }
 
   if (defaultId === LOCAL_HOST_ID) {
-    return localAvailable
-      ? { target: 'local', status: 'ok', ...availability }
-      : { target: 'local', status: 'unreachable', ...availability };
+    return {
+      target: 'local',
+      status: resolveLocalBootStatus({ localAvailable, localKernelReady }),
+      ...availability,
+    };
   }
 
   const host = config.hosts.find((entry) => entry.id === defaultId);
@@ -3139,11 +3142,15 @@ const resolveInitialUrl = async () => {
     );
   }
 
+  const localKernelReady = localUrl
+    ? await waitForPiKernelReady(localUrl)
+    : false;
   const bootOutcome = computeBootOutcome({
     envTargetUrl: envTarget || null,
     probe: remoteProbe,
     config,
     localAvailable,
+    localKernelReady,
   });
 
   return { initialUrl, localOrigin, localUiUrl, bootOutcome, apiBaseUrl, clientToken, requestHeaders };
@@ -4479,11 +4486,16 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (Object.prototype.hasOwnProperty.call(nextConfigInput, 'localClientToken') && isLocalRuntimeUrl(state.apiBaseUrl || state.sidecarUrl || state.localOrigin || '')) {
         state.clientToken = readDesktopLocalClientToken();
       }
+      const sidecar = state.sidecarUrl || state.localOrigin;
+      const localKernelReady = sidecar
+        ? await waitForPiKernelReady(sidecar, { timeoutMs: 2000, initialPollMs: 200 })
+        : false;
       state.bootOutcome = computeBootOutcome({
         envTargetUrl: envTarget || null,
         probe: null,
         config: updatedConfig,
-        localAvailable: Boolean(state.sidecarUrl || state.localOrigin),
+        localAvailable: Boolean(sidecar),
+        localKernelReady,
       });
       state.initScript = buildInitScript(state.localOrigin, state.bootOutcome, state.apiBaseUrl, state.clientToken, state.requestHeaders || {});
       syncMainWindowInitScript(state.initScript);

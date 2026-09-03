@@ -187,7 +187,10 @@ export function resolveDesktopBootView(
 
   // Recovery screens - something is wrong
   if (outcome.target === 'local' && outcome.status === 'unreachable') {
-    return { screen: 'chooser', ...availability };
+    if (outcome.localAvailable === false) {
+      return { screen: 'chooser', localAvailable: false };
+    }
+    return { screen: 'recovery', variant: 'local-unavailable', ...availability };
   }
 
   if (outcome.target === 'remote') {
@@ -264,6 +267,10 @@ export function canDismissInitialLoading(state: InitialLoadingState): boolean {
  */
 export function shouldRestartDesktopBootFlow(input: DesktopBootFlowRestartInput): boolean {
   return input.isDesktopShell && !input.isDesktopLocalOriginActive;
+}
+
+export function isLocalUnavailableBootView(view: DesktopBootView | null | undefined): boolean {
+  return Boolean(view && view.screen === 'recovery' && view.variant === 'local-unavailable');
 }
 
 /**

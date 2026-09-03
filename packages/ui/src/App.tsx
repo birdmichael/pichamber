@@ -28,9 +28,11 @@ import {
   markInitialLoadingDismissed,
   persistDesktopBootOutcome,
   shouldRestartDesktopBootFlow,
+  isLocalUnavailableBootView,
   type BootInjectionStatus,
   type DesktopBootView,
 } from '@/lib/desktopBoot';
+import { isLocalKernelReady } from '@/lib/kernelHealth';
 import type { RecoveryVariant } from '@/components/onboarding/DesktopConnectionRecovery';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { markSessionViewed } from '@/sync/notification-store';
@@ -830,6 +832,69 @@ function App({ apis }: AppProps) {
     window.location.reload();
   }, []);
 
+  const promoteLocalBootToMain = React.useCallback(() => {
+    persistDesktopBootOutcome({ target: 'local', status: 'ok', localAvailable: true });
+    setBootView({ screen: 'main' });
+  }, []);
+
+  const probeLocalKernelReady = React.useCallback(async () => {
+    const response = await runtimeFetch('/health', { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return false;
+    const health = await response.json().catch(() => null);
+    return isLocalKernelReady(health);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isDesktopRuntime || !isLocalUnavailableBootView(bootView)) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId = 0;
+    let delay = 200;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        if (await probeLocalKernelReady()) {
+          if (!cancelled) promoteLocalBootToMain();
+          return;
+        }
+      } catch {
+        // A failed fetch is not empty success; keep polling until unmount.
+      }
+      if (cancelled) return;
+      timeoutId = window.setTimeout(() => {
+        void tick();
+      }, delay);
+      delay = Math.min(delay * 1.5, 2000);
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [bootView, isDesktopRuntime, probeLocalKernelReady, promoteLocalBootToMain]);
+
+  const handleLocalRecoveryRetry = React.useCallback(async () => {
+    try {
+      if (await probeLocalKernelReady()) {
+        promoteLocalBootToMain();
+        return;
+      }
+    } catch {
+      // Fall through to restart only when the local HTTP origin is not active.
+    }
+
+    if (shouldRestartDesktopBootFlow({
+      isDesktopShell: isDesktopShell(),
+      isDesktopLocalOriginActive: isDesktopLocalOriginActive(),
+    })) {
+      await restartDesktopApp();
+    }
+  }, [probeLocalKernelReady, promoteLocalBootToMain]);
+
   const handleManualInitRetry = React.useCallback(async () => {
     if (manualInitRetrying) return;
 
@@ -893,6 +958,7 @@ function App({ apis }: AppProps) {
               recoveryHostLabel={undefined}
               localAvailable={bootView.localAvailable !== false}
               onCliAvailable={handleDesktopBootDismiss}
+              onRetry={handleLocalRecoveryRetry}
             />
           </React.Suspense>
         </div>

@@ -58,6 +58,11 @@ export function RecoveryScreen({
   }, []);
 
   const handleRecoveryRetry = React.useCallback(async () => {
+    if (onRetry) {
+      await onRetry();
+      return;
+    }
+
     // In desktop boot flow, restart the app so the native host can
     // re-evaluate the boot outcome.
     if (isDesktopShell()) {
@@ -66,7 +71,6 @@ export function RecoveryScreen({
     }
 
     await runtimeFetch('/api/config/reload', { method: 'POST' });
-    onRetry?.();
   }, [onRetry]);
 
   const handleRecoveryUseLocal = React.useCallback(async () => {

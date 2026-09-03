@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: opening the app no longer sticks on Local Pi unavailable when the in-process kernel is still starting or already running. Retry Local re-checks live health instead of restarting a healthy local kernel.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 
 ## [1.2.6] - 2026-08-30

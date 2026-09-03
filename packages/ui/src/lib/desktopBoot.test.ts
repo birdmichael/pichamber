@@ -5,6 +5,7 @@ import {
   getInjectedBootOutcome,
   getBootInjectionStatus,
   shouldRestartDesktopBootFlow,
+  isLocalUnavailableBootView,
 } from './desktopBoot';
 
 describe('resolveDesktopBootView', () => {
@@ -98,13 +99,19 @@ describe('resolveDesktopBootView', () => {
     ).toEqual({ screen: 'recovery', variant: 'remote-incompatible', hostId: 'old-host', url: 'https://old.test' });
   });
 
-  test('returns chooser for local unreachable', () => {
+  test('returns local-unavailable recovery when local HTTP is up but the kernel is not', () => {
     expect(
       resolveDesktopBootView({
         isDesktopShell: true,
         bootOutcome: { target: 'local', status: 'unreachable' },
       }),
-    ).toEqual({ screen: 'chooser' });
+    ).toEqual({ screen: 'recovery', variant: 'local-unavailable' });
+  });
+
+  test('identifies local-unavailable recovery views', () => {
+    expect(isLocalUnavailableBootView({ screen: 'recovery', variant: 'local-unavailable' })).toBe(true);
+    expect(isLocalUnavailableBootView({ screen: 'chooser' })).toBe(false);
+    expect(isLocalUnavailableBootView(null)).toBe(false);
   });
 
   test('returns remote-only chooser when local runtime is disabled', () => {
