@@ -5005,7 +5005,7 @@ const buildMacMenu = () => {
     dispatchAction('copy');
   };
 
-  return Menu.buildFromTemplate([
+  return Menu.buildFromTemplate(decorateMenuTemplateForPlatform([
     {
       label: app.name,
       submenu: [
@@ -5095,7 +5095,10 @@ const buildMacMenu = () => {
     {
       label: 'Help',
       submenu: [
-        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+.', click: () => dispatchAction('help-dialog') },
+        // registerAccelerator:false → renderer owns the Cmd+K leader chord
+        // (`open_help` is `mod+k h`). Electron cannot bind a sequential
+        // accelerator, so the catalog string is display-only (#515).
+        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Cmd+Shift+L', click: () => dispatchAction('download-logs') },
         { label: 'Toggle Developer Tools', accelerator: 'Cmd+Alt+I', click: () => openDevToolsForMenuTarget() },
         { type: 'separator' },
@@ -5107,7 +5110,7 @@ const buildMacMenu = () => {
         { label: 'Join Discord', click: () => shell.openExternal(DISCORD_INVITE_URL) },
       ],
     },
-  ]);
+  ]));
 };
 
 const buildAutoHiddenMenu = () => {
@@ -5216,7 +5219,10 @@ const buildAutoHiddenMenu = () => {
     {
       label: 'Help',
       submenu: [
-        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+.', click: () => dispatchAction('help-dialog') },
+        // registerAccelerator:false → renderer owns the Ctrl+K leader chord
+        // (`open_help` is `mod+k h`). Electron cannot bind a sequential
+        // accelerator, so the catalog string is display-only (#515).
+        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Ctrl+Shift+L', click: () => dispatchAction('download-logs') },
         { type: 'separator' },
         { label: 'Clear Cache', click: () => void handleInvoke(null, 'desktop_clear_cache') },

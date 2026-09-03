@@ -2,6 +2,10 @@
  * Linux GTK/Chromium menu chrome renders punctuation accelerators as key
  * names (`Ctrl+Comma`, `Ctrl+Period`). Keep the real Electron accelerator
  * for binding and put the human form in the label's accelerator column.
+ *
+ * Sequential catalog chords (`Ctrl+K, H`) are not valid Electron accelerators
+ * (one key code per binding). Show the catalog string in the label column and
+ * do not register a native shortcut; the renderer owns the leader chord.
  */
 
 const PUNCTUATION_DISPLAY = new Map([
@@ -29,6 +33,17 @@ const acceleratorNeedsLinuxDisplayOverride = (accelerator) => (
   /(?:^|\+)(?:,|\.|comma|period)(?:\+|$)/i.test(String(accelerator || ''))
 );
 
+const acceleratorIsSequentialChord = (accelerator) => (
+  /,\s*\S/.test(String(accelerator || ''))
+);
+
+const acceleratorNeedsLabelColumn = (accelerator, platform) => {
+  if (acceleratorIsSequentialChord(accelerator)) {
+    return true;
+  }
+  return platform === 'linux' && acceleratorNeedsLinuxDisplayOverride(accelerator);
+};
+
 const decorateMenuItemForPlatform = (item, platform = process.platform) => {
   if (!item || typeof item !== 'object') {
     return item;
@@ -41,11 +56,11 @@ const decorateMenuItemForPlatform = (item, platform = process.platform) => {
     };
   }
 
-  if (platform !== 'linux' || typeof item.accelerator !== 'string') {
+  if (typeof item.accelerator !== 'string') {
     return item;
   }
 
-  if (!acceleratorNeedsLinuxDisplayOverride(item.accelerator)) {
+  if (!acceleratorNeedsLabelColumn(item.accelerator, platform)) {
     return item;
   }
 
