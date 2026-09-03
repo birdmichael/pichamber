@@ -118,7 +118,9 @@ first-send materialize until `/plan start` is authoritative; a later
 own stored Agent or Plan.
 Send uses the same Agent materialize path. `createSession` adopts draft Plan
 onto that session before the draft closes, then `/plan start` runs before the
-prompt. Optimistic `active` does not skip that start. An already-open session
+prompt. That first user prompt is stored and shown verbatim, including a
+leading `Plan ` (space, no slash). Only a leading `/plan` slash is
+`session.command`. Optimistic `active` does not skip that start. An already-open session
 still runs `/plan start` / save / exit on that same session. If an auto-draft
 welcome cleared `currentSessionId` while `?session=` or last-active still names
 a chat, Agent→Plan still `/plan start` on that id instead of storing local
