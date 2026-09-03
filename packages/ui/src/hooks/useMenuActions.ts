@@ -12,6 +12,8 @@ import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
 import { showOpenCodeStatus } from '@/lib/openCodeStatus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
+import { pickAdjacentProject, resolveVisibleProjectId } from '@/lib/projectNavigation';
+import { opencodeClient } from '@/lib/opencode/client';
 
 const getActiveElementSelectedText = (): string => {
   if (typeof document === 'undefined') {
@@ -160,17 +162,35 @@ export const useMenuActions = (
   const navigateProject = React.useCallback((direction: -1 | 1) => {
     const { activeProjectId, projects, setActiveProject } = useProjectsStore.getState();
     if (projects.length === 0) return;
-
-    const currentIndex = projects.findIndex((project) => project.id === activeProjectId);
-    let nextIndex = direction > 0 ? 0 : projects.length - 1;
-    if (currentIndex >= 0) {
-      nextIndex = (currentIndex + direction + projects.length) % projects.length;
-    }
-    const nextProject = projects[nextIndex];
+    const directoryState = useDirectoryStore.getState();
+    const visibleProjectId = resolveVisibleProjectId({
+      projects,
+      currentDirectory: directoryState.currentDirectory,
+      homeDirectory: directoryState.homeDirectory,
+    });
+    const nextProject = pickAdjacentProject(projects, visibleProjectId, direction);
     if (!nextProject) return;
 
-    setActiveProject(nextProject.id);
-  }, []);
+    if (activeProjectId !== nextProject.id) {
+      setActiveProject(nextProject.id);
+    } else {
+      opencodeClient.setDirectory(nextProject.path);
+      directoryState.setDirectory(nextProject.path, { showOverlay: false });
+    }
+
+    const sessions = getSyncSessions(nextProject.path);
+    const nextSession = sessions[0];
+    setActiveMainTab('chat');
+    setSessionSwitcherOpen(false);
+    if (nextSession?.id) {
+      useSessionUIStore.getState().setCurrentSession(nextSession.id, nextProject.path);
+      return;
+    }
+    useSessionUIStore.getState().openNewSessionDraft({
+      selectedProjectId: nextProject.id,
+      directoryOverride: nextProject.path,
+    });
+  }, [setActiveMainTab, setSessionSwitcherOpen]);
 
   const handleAction = React.useCallback(
     (action: MenuAction) => {

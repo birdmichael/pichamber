@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Chat: Ctrl+Alt+digit switches the context rail even while the composer is focused.
 - Chat: Alt+Up / Alt+Down no longer paste the session title into the composer. Those keys stay session switching; only unmodified arrows walk message history.
+- Desktop: Go → Next/Previous Project leaves a projectless chat and opens the adjacent workspace, even when that project was already the inherited File/New default.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Sessions Default Model uses the live resolved model, not a leftover `example-provider/example-model`. Default Thinking shows for that model, and Enabled models ignore stale example-provider ids.
