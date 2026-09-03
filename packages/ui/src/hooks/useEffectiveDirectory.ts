@@ -102,3 +102,28 @@ export const useContextPanelDirectoryKey = (): string => {
         currentSessionId ? null : newSessionDraft,
     );
 };
+
+/**
+ * Click-time equivalent of `useContextPanelDirectoryKey`. Sidebar rows must
+ * not subscribe to the current session just to open a side-panel chat tab.
+ */
+export const readContextPanelDirectoryKey = (): string => {
+    const sessionUI = useSessionUIStore.getState();
+    const currentSessionId = sessionUI.currentSessionId;
+    const newSessionDraft = sessionUI.newSessionDraft;
+    const worktreeAttachment = currentSessionId
+        ? useSessionWorktreeStore.getState().getAttachment(currentSessionId)
+        : undefined;
+    const effectiveDirectory = resolveEffectiveDirectory({
+        currentSessionId,
+        sessionDirectory: sessionUI.currentSessionDirectory ?? undefined,
+        worktreeDirectory: getAttachedSessionDirectory(worktreeAttachment)
+            ?? sessionUI.worktreeMetadata.get(currentSessionId ?? '')?.path,
+        draft: newSessionDraft,
+        fallbackDirectory: useDirectoryStore.getState().currentDirectory,
+    });
+    return resolveContextPanelDirectoryKey(
+        effectiveDirectory,
+        currentSessionId ? null : newSessionDraft,
+    );
+};
