@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Sessions Default Model uses the live resolved model, not a leftover `example-provider/example-model`. Default Thinking shows for that model, and Enabled models ignore stale example-provider ids.
 - Desktop: opening the app no longer sticks on Local Pi unavailable when the in-process kernel is still starting or already running. Retry Local re-checks live health instead of restarting a healthy local kernel.
+- Desktop: Linux Export Save File dialogs fit a 1280×800 screen, so Name, filter, Cancel, and Save stay on screen.
 - Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 

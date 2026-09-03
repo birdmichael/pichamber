@@ -3986,6 +3986,19 @@ const restoreRendererKeyboardFocus = (browserWindow) => {
   return true;
 };
 
+const showConstrainedSaveDialog = async (browserWindow, options) => {
+  const linuxDialogConstrain = await beginLinuxNativeDialogConstrain({
+    browserWindow,
+    electronScreen: screen,
+  });
+  try {
+    return await dialog.showSaveDialog(browserWindow || undefined, options);
+  } finally {
+    linuxDialogConstrain.stop();
+    restoreRendererKeyboardFocus(browserWindow);
+  }
+};
+
 const handleInvoke = async (browserWindow, command, args = {}) => {
   switch (command) {
     case 'desktop_start_window_drag':
@@ -4247,7 +4260,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       const filters = command === 'desktop_save_markdown_file'
         ? [{ name: 'Markdown', extensions: ['md'] }]
         : normalizeSaveDialogFilters(args.filters);
-      const result = await dialog.showSaveDialog(browserWindow || undefined, {
+      const result = await showConstrainedSaveDialog(browserWindow, {
         defaultPath,
         ...(filters.length > 0 ? { filters } : {}),
       });
@@ -4267,7 +4280,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       }
 
       const bytes = decodeDesktopImagePayload(args);
-      const result = await dialog.showSaveDialog(browserWindow || undefined, {
+      const result = await showConstrainedSaveDialog(browserWindow, {
         defaultPath,
         filters: [{ name: 'PNG', extensions: ['png'] }],
       });

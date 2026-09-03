@@ -6,12 +6,14 @@ import {
   boundsOverflowWorkArea,
   buildLinuxDialogConstrainChildEval,
   clampBoundsToWorkArea,
+  isFileChooserTitle,
   parseXwininfoTree,
   runLinuxDialogConstrainPass,
   shouldConstrainLinuxDialogWindow,
 } from './linux-native-dialog-bounds.mjs';
 
 const WORK_AREA_800 = { x: 0, y: 0, width: 1280, height: 800 };
+const GTK_SAVE_FILE_CLIPPED = { x: 395, y: 58, width: 1124, height: 822 };
 
 test('clampBoundsToWorkArea keeps Cancel/Open on an 800px work area', () => {
   const next = clampBoundsToWorkArea({ x: 78, y: 58, width: 1124, height: 822 }, WORK_AREA_800);
@@ -23,6 +25,17 @@ test('clampBoundsToWorkArea keeps Cancel/Open on an 800px work area', () => {
   assert.ok(next.x >= WORK_AREA_800.x);
   assert.ok(next.x + next.width <= WORK_AREA_800.x + WORK_AREA_800.width);
   assert.equal(next.y, 0);
+});
+
+test('clampBoundsToWorkArea keeps Cancel/Save on a clipped GTK Save File dialog', () => {
+  assert.equal(
+    boundsOverflowWorkArea(GTK_SAVE_FILE_CLIPPED, WORK_AREA_800),
+    true,
+  );
+  const next = clampBoundsToWorkArea(GTK_SAVE_FILE_CLIPPED, WORK_AREA_800);
+  assert.deepEqual(next, { x: 156, y: 0, width: 1124, height: 800 });
+  assert.ok(next.x + next.width <= WORK_AREA_800.x + WORK_AREA_800.width);
+  assert.ok(next.y + next.height <= WORK_AREA_800.y + WORK_AREA_800.height);
 });
 
 test('clampBoundsToWorkArea fills a shorter docked work area', () => {
@@ -93,6 +106,27 @@ test('runLinuxDialogConstrainPass resizes the chooser and skips the parent', asy
   );
 });
 
+test('runLinuxDialogConstrainPass resizes a Save File dialog clipped on 1280x800', async () => {
+  const resized = [];
+  const ignore = new Set([0x2a00004]);
+  const saveWin = { xid: 0x2b00002, name: 'Save File', ...GTK_SAVE_FILE_CLIPPED };
+  assert.equal(isFileChooserTitle(saveWin.name), true);
+  assert.equal(shouldConstrainLinuxDialogWindow(saveWin, WORK_AREA_800, ignore), true);
+  const result = await runLinuxDialogConstrainPass({
+    workArea: WORK_AREA_800,
+    ignoreXids: ignore,
+    windows: [
+      { xid: 0x2a00004, name: 'audit-fix PR#368 | Pichamber', x: 0, y: 0, width: 1276, height: 747 },
+      saveWin,
+    ],
+    resizeWindow: async (xid, bounds) => { resized.push({ xid, bounds }); },
+  });
+  assert.equal(resized.length, 1);
+  assert.equal(resized[0].xid, 0x2b00002);
+  assert.deepEqual(resized[0].bounds, { x: 156, y: 0, width: 1124, height: 800 });
+  assert.deepEqual(result[0].bounds, resized[0].bounds);
+});
+
 test('beginLinuxNativeDialogConstrain is a no-op off Linux', async () => {
   const started = await beginLinuxNativeDialogConstrain({
     platform: 'darwin',
@@ -108,4 +142,5 @@ test('child constrain script clamps height against workArea', () => {
   assert.match(source, /xdotool/);
   assert.match(source, /Math.min\(Math.max\(1, Math.round\(b.height\)\), a.height\)/);
   assert.match(source, /PICHAMBER_DIALOG_CONSTRAIN/);
+  assert.match(source, /attach files\|select file\|open\|save/);
 });

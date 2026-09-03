@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-const FILE_CHOOSER_TITLE = /^(attach files|select file|select working directory|open|open file|open folder|open files|choose file|choose files|select folder|select directory)$/i;
+const FILE_CHOOSER_TITLE = /^(attach files|select file|select working directory|open|open file|open folder|open files|choose file|choose files|select folder|select directory|save|save file|save as)$/i;
 const FILE_CHOOSER_CLASS = /filechooser|xdg-desktop-portal/i;
 const APP_MAIN_TITLE = /pichamber|openchamber/i;
 const NAMED_WINDOW = /^\s*(0x[0-9a-fA-F]+)\s+"([^"]*)":\s+\("([^"]*)"\s+"([^"]*)"\)\s+(\d+)x(\d+)\+(-?\d+)\+(-?\d+)\s+\+(-?\d+)\+(-?\d+)/;
@@ -256,7 +256,7 @@ const pass = async () => {
   if (!workArea) return;
   for (const win of await list()) {
     if (!win.xid || ignore.has(win.xid)) continue;
-    if (/pichamber|openchamber/i.test(win.name || '') && !/^(attach files|select file|open)/i.test((win.name || '').trim())) continue;
+    if (/pichamber|openchamber/i.test(win.name || '') && !/^(attach files|select file|open|save)/i.test((win.name || '').trim())) continue;
     if (win.width < 240 || win.height < 160) continue;
     const overflows = win.width > workArea.width || win.height > workArea.height
       || win.x < workArea.x || win.y < workArea.y
