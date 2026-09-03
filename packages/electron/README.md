@@ -21,6 +21,7 @@ Desktop waits for `/health` `kernelReady` / `piRunning` after the in-process ser
 | File | Purpose |
 |------|---------|
 | `main.mjs` | Electron main process, app lifecycle, windows, menus, deep links, native IPC handlers, updates, local server startup |
+| `mini-chat-window-size.mjs` | Mini Chat initial size clamp to the display work area and Linux frameless maximize bounds |
 | `startup-url-selection.mjs` | Pure bundled/HMR startup probe and loopback connection-limit policy |
 | `preload.mjs` | Safe bridge from the rendered UI to Electron IPC |
 | `ssh-manager.mjs` | SSH host import, connection lifecycle, tunnel/port forwarding helpers |

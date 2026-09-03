@@ -51,7 +51,13 @@ import { attachRendererRecovery } from './renderer-recovery.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-text-file.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
-import { beginLinuxNativeDialogConstrain } from './linux-native-dialog-bounds.mjs';
+import { beginLinuxNativeDialogConstrain, resolveDisplayWorkArea } from './linux-native-dialog-bounds.mjs';
+import {
+  isLinuxMiniChatWorkAreaMaximized,
+  resolveMiniChatMaximizedBounds,
+  resolveMiniChatMinimumSize,
+  resolveMiniChatWindowSize,
+} from './mini-chat-window-size.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
 import { resolveAppDataDir } from '@pichamber/web/server/lib/app-data/index.js';
 
@@ -2972,6 +2978,90 @@ const getWindowRuntimeConfig = (browserWindow) => {
   };
 };
 
+const MINI_CHAT_PREFERRED_SIZE = { width: MINI_CHAT_WINDOW_WIDTH, height: MINI_CHAT_WINDOW_HEIGHT };
+const MINI_CHAT_MIN_SIZE = { width: MINI_CHAT_MIN_WINDOW_WIDTH, height: MINI_CHAT_MIN_WINDOW_HEIGHT };
+
+const rememberMiniChatRestoreBounds = (browserWindow) => {
+  if (!browserWindow || browserWindow.isDestroyed() || browserWindow.__ocMiniChatFilledWorkArea) return;
+  try {
+    const bounds = browserWindow.getBounds();
+    if (!bounds || !(bounds.width > 0) || !(bounds.height > 0)) return;
+    browserWindow.__ocMiniChatRestoreBounds = {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+    };
+  } catch {
+    // Bounds snapshot is best-effort before a Linux work-area fill.
+  }
+};
+
+const withMiniChatNativeMaximizeIgnored = (browserWindow, fn) => {
+  if (!browserWindow || browserWindow.isDestroyed()) return;
+  browserWindow.__ocMiniChatIgnoreNativeMaximize = true;
+  try {
+    fn();
+  } finally {
+    setTimeout(() => {
+      if (!browserWindow.isDestroyed()) browserWindow.__ocMiniChatIgnoreNativeMaximize = false;
+    }, 0);
+  }
+};
+
+const applyLinuxMiniChatWorkAreaFill = (browserWindow) => {
+  if (!browserWindow || browserWindow.isDestroyed()) return false;
+  const bounds = resolveMiniChatMaximizedBounds(resolveDisplayWorkArea(browserWindow, screen));
+  if (!bounds) return false;
+  if (!browserWindow.__ocMiniChatFilledWorkArea) {
+    rememberMiniChatRestoreBounds(browserWindow);
+  }
+  withMiniChatNativeMaximizeIgnored(browserWindow, () => {
+    if (typeof browserWindow.isMaximized === 'function' && browserWindow.isMaximized()) {
+      browserWindow.unmaximize();
+    }
+    browserWindow.setBounds(bounds);
+    browserWindow.__ocMiniChatFilledWorkArea = true;
+  });
+  return true;
+};
+
+const restoreLinuxMiniChatFromWorkAreaFill = (browserWindow) => {
+  if (!browserWindow || browserWindow.isDestroyed()) return false;
+  const restore = browserWindow.__ocMiniChatRestoreBounds;
+  withMiniChatNativeMaximizeIgnored(browserWindow, () => {
+    if (typeof browserWindow.isMaximized === 'function' && browserWindow.isMaximized()) {
+      browserWindow.unmaximize();
+    }
+    browserWindow.__ocMiniChatFilledWorkArea = false;
+    if (restore && restore.width > 0 && restore.height > 0) {
+      browserWindow.setBounds(restore);
+      return;
+    }
+    const resolved = resolveMiniChatWindowSize({
+      workArea: resolveDisplayWorkArea(browserWindow, screen),
+      preferred: MINI_CHAT_PREFERRED_SIZE,
+      minSize: MINI_CHAT_MIN_SIZE,
+    });
+    if (Number.isFinite(resolved.x) && Number.isFinite(resolved.y)) {
+      browserWindow.setBounds(resolved);
+    } else {
+      browserWindow.setSize(resolved.width, resolved.height);
+    }
+  });
+  return true;
+};
+
+const emitWindowMaximizedChanged = (browserWindow, maximized) => {
+  emitToWindow(browserWindow, 'openchamber:window-maximized-changed', { maximized });
+};
+
+const currentWindowMaximized = (browserWindow) => {
+  if (!browserWindow || browserWindow.isDestroyed()) return false;
+  if (isLinuxMiniChatWorkAreaMaximized(browserWindow, process.platform)) return true;
+  return typeof browserWindow.isMaximized === 'function' && browserWindow.isMaximized();
+};
+
 const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', projectId = '', runtimeConfig = {} } = {}) => {
   const effectiveRuntimeConfig = {
     apiBaseUrl: normalizeHostUrl(runtimeConfig.apiBaseUrl || state.apiBaseUrl || state.localOrigin || state.sidecarUrl || ''),
@@ -3009,7 +3099,9 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
     backgroundColor: '#151313',
     frame: usesFramelessChrome ? false : undefined,
     autoHideMenuBar: process.platform !== 'darwin',
-    titleBarStyle: process.platform === 'darwin' || usesFramelessChrome ? 'hidden' : 'default',
+    // Linux: keep frame:false but do not set titleBarStyle hidden — Electron's
+    // hidden title bar is macOS-oriented and deadens -webkit-app-region drag.
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : process.platform === 'win32' ? 'hidden' : 'default',
     trafficLightPosition: process.platform === 'darwin' ? { x: 16, y: 17 } : undefined,
     acceptFirstMouse: true,
     webPreferences: {
@@ -3037,10 +3129,28 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
   browserWindow.__ocMiniChat = true;
   browserWindow.__ocMiniChatSessionId = sessionWindowKey;
   browserWindow.__ocPinned = false;
+  browserWindow.__ocMiniChatFilledWorkArea = false;
   bindWindowBackgroundThrottling(browserWindow, {
     onChange: () => state.hiddenTrayRepeater?.sync(),
   });
   attachRendererRecovery(browserWindow, { log, label: 'mini chat' });
+
+  const workArea = resolveDisplayWorkArea(browserWindow, screen);
+  const resolvedSize = resolveMiniChatWindowSize({
+    workArea,
+    preferred: MINI_CHAT_PREFERRED_SIZE,
+    minSize: MINI_CHAT_MIN_SIZE,
+  });
+  if (workArea && (workArea.height < MINI_CHAT_MIN_WINDOW_HEIGHT || workArea.width < MINI_CHAT_MIN_WINDOW_WIDTH)) {
+    const nextMin = resolveMiniChatMinimumSize({ workArea, minSize: MINI_CHAT_MIN_SIZE });
+    browserWindow.setMinimumSize(nextMin.width, nextMin.height);
+  }
+  if (Number.isFinite(resolvedSize.x) && Number.isFinite(resolvedSize.y)) {
+    browserWindow.setBounds(resolvedSize);
+  } else {
+    browserWindow.setSize(resolvedSize.width, resolvedSize.height);
+  }
+  rememberMiniChatRestoreBounds(browserWindow);
 
   if (sessionWindowKey) {
     state.miniChatWindowsBySession.set(sessionWindowKey, browserWindow);
@@ -3053,6 +3163,28 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
         state.miniChatWindowsBySession.delete(browserWindow.__ocMiniChatSessionId);
       }
     }
+  });
+  browserWindow.on('move', () => {
+    rememberMiniChatRestoreBounds(browserWindow);
+  });
+  browserWindow.on('resize', () => {
+    rememberMiniChatRestoreBounds(browserWindow);
+  });
+  browserWindow.on('maximize', () => {
+    if (browserWindow.__ocMiniChatIgnoreNativeMaximize) return;
+    if (process.platform === 'linux') {
+      applyLinuxMiniChatWorkAreaFill(browserWindow);
+      emitWindowMaximizedChanged(browserWindow, true);
+      return;
+    }
+    emitWindowMaximizedChanged(browserWindow, true);
+  });
+  browserWindow.on('unmaximize', () => {
+    if (browserWindow.__ocMiniChatIgnoreNativeMaximize) return;
+    if (process.platform === 'linux' && browserWindow.__ocMiniChatFilledWorkArea) {
+      restoreLinuxMiniChatFromWorkAreaFill(browserWindow);
+    }
+    emitWindowMaximizedChanged(browserWindow, false);
   });
 
   if (process.platform === 'darwin') {
@@ -4946,6 +5078,16 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
 
     case 'desktop_toggle_current_window_maximized':
       if (browserWindow && !browserWindow.isDestroyed()) {
+        if (process.platform === 'linux' && browserWindow.__ocMiniChat) {
+          if (browserWindow.__ocMiniChatFilledWorkArea) {
+            restoreLinuxMiniChatFromWorkAreaFill(browserWindow);
+            emitWindowMaximizedChanged(browserWindow, false);
+          } else {
+            applyLinuxMiniChatWorkAreaFill(browserWindow);
+            emitWindowMaximizedChanged(browserWindow, true);
+          }
+          return { maximized: currentWindowMaximized(browserWindow) };
+        }
         if (browserWindow.isMaximized()) {
           browserWindow.unmaximize();
         } else {
@@ -4956,7 +5098,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       return { maximized: false };
 
     case 'desktop_get_current_window_state':
-      return { maximized: Boolean(browserWindow && !browserWindow.isDestroyed() && browserWindow.isMaximized()) };
+      return { maximized: currentWindowMaximized(browserWindow) };
 
     case 'desktop_show_app_menu': {
       if (!browserWindow || browserWindow.isDestroyed()) {
