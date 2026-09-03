@@ -1,6 +1,12 @@
 ## [Unreleased]
 
+## [1.2.10] - 2026-09-03
+
 - Switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+- Send with no model shows a toast instead of doing nothing.
+- Sidebar search keeps the query after you click a result. Reloading restores the open session and its model chip.
+- Reopening a long session no longer paints empty assistant bubbles. After reload, an existing session's model is rebound from the jsonl instead of Select model.
+- A new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium.
 
 ## [1.2.9] - 2026-09-02
 
