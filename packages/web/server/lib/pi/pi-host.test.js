@@ -1955,7 +1955,14 @@ describe('createPiHost', () => {
       provider: 'anthropic',
     });
     await new Promise((resolve) => setTimeout(resolve, 40));
-    const assistant = host.getMessages(record.id).find((entry) => entry.info.role === 'assistant');
+    const messages = host.getMessages(record.id);
+    const user = messages.find((entry) => entry.info.role === 'user');
+    const assistant = messages.find((entry) => entry.info.role === 'assistant');
+    expect(user.info).toMatchObject({
+      providerID: 'anthropic',
+      modelID: 'claude-sonnet-4-5',
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4-5' },
+    });
     expect(assistant.info).toMatchObject({
       providerID: 'anthropic',
       modelID: 'claude-sonnet-4-5',
@@ -1963,6 +1970,51 @@ describe('createPiHost', () => {
     });
     expect(assistant.info.providerID).not.toBe('pi');
     expect(assistant.info.modelID).not.toBe('pi');
+    host.dispose();
+  });
+
+  it('promptAsync stamps the send model after switching Grok → DeepSeek → Grok', async () => {
+    const host = createPiHost({ mock: true, defaultDirectory: '/tmp/project' });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Switch back' });
+
+    await host.promptAsync(record.id, {
+      messageID: 'msg_grok_1',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+      parts: [{ type: 'text', text: 'first grok' }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    await host.promptAsync(record.id, {
+      messageID: 'msg_deepseek',
+      model: { providerID: 'deepseek', modelID: 'deepseek-v4-flash' },
+      parts: [{ type: 'text', text: 'deepseek turn' }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    await host.promptAsync(record.id, {
+      messageID: 'msg_grok_2',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+      parts: [{ type: 'text', text: 'back to grok' }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    const messages = host.getMessages(record.id);
+    const users = messages.filter((entry) => entry.info.role === 'user');
+    const assistants = messages.filter((entry) => entry.info.role === 'assistant');
+    const lastUser = users[users.length - 1];
+    const lastAssistant = assistants[assistants.length - 1];
+    expect(lastUser.info).toMatchObject({
+      id: 'msg_grok_2',
+      providerID: 'xai',
+      modelID: 'grok-4.6',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+    });
+    expect(lastAssistant.info).toMatchObject({
+      providerID: 'xai',
+      modelID: 'grok-4.6',
+      model: { providerID: 'xai', modelID: 'grok-4.6' },
+    });
+    expect(lastAssistant.info.modelID).not.toBe('deepseek-v4-flash');
     host.dispose();
   });
 

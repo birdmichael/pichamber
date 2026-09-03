@@ -25,9 +25,11 @@ import { normalizeUserDisplayParts } from './message/normalizeUserDisplayParts';
 import { isHiddenUserMessage } from './message/hiddenUserMessage';
 import { flattenAssistantTextParts } from '@/lib/messages/messageText';
 import { isLikelyProviderAuthFailure, PROVIDER_AUTH_FAILURE_MESSAGE } from '@/lib/messages/providerAuthError';
+import { parseMessageModelRef } from '@/lib/messages/userModelChoice';
 import { getProviderModelDisplayName } from '@/lib/modelDisplay';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 import type { TurnGroupingContext } from './lib/turns/types';
+import { resolveAssistantFooterModel } from './assistantFooterModel';
 import { copyMarkdownToClipboard, copyTextToClipboard } from '@/lib/clipboard';
 import { FadeInOnReveal } from './message/FadeInOnReveal';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
@@ -247,8 +249,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
         const mode = getMessageInfoProp(previousMessage.info, 'mode');
         const agent = getMessageInfoProp(previousMessage.info, 'agent');
-        const providerID = getMessageInfoProp(previousMessage.info, 'providerID');
-        const modelID = getMessageInfoProp(previousMessage.info, 'modelID');
         const variant = getMessageInfoProp(previousMessage.info, 'variant');
         const thinking = getMessageInfoProp(previousMessage.info, 'thinking');
         const model = getMessageInfoProp(previousMessage.info, 'model');
@@ -259,8 +259,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             typeof mode === 'string' && mode.trim().length > 0
                 ? mode
                 : (typeof agent === 'string' && agent.trim().length > 0 ? agent : undefined);
-        const resolvedProvider = typeof providerID === 'string' && providerID.trim().length > 0 ? providerID : undefined;
-        const resolvedModel = typeof modelID === 'string' && modelID.trim().length > 0 ? modelID : undefined;
+        const parsedUserModel = parseMessageModelRef(previousMessage.info);
+        const resolvedProvider = parsedUserModel?.providerId;
+        const resolvedModel = parsedUserModel?.modelId;
         const resolvedThinking = resolveTranscriptThinkingLabel({ thinking, variant, modelVariant });
         const resolvedVariant = resolvedThinking
             ?? (typeof variant === 'string' && variant.trim().length > 0 ? variant : undefined);
@@ -329,49 +330,30 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         return savedSessionAgentSelection ?? undefined;
     }, [isUser, message.info, previousIsModeSwitchMessage, previousUserMetadata, sessionId, currentContextAgent, savedSessionAgentSelection]);
 
-    const messageProviderID = !isUser ? getMessageInfoProp(message.info, 'providerID') : null;
-    const messageModelID = !isUser ? getMessageInfoProp(message.info, 'modelID') : null;
-
-    const contextModelSelection = React.useMemo(() => {
-        if (isUser || !sessionId) return null;
-
-        if (previousUserMetadata?.providerId && previousUserMetadata?.modelId) {
-            return {
-                providerId: previousUserMetadata.providerId,
-                modelId: previousUserMetadata.modelId,
-            };
-        }
-
-        if (agentName) {
-            const agentSelection = getAgentModelForSession(sessionId, agentName);
-            if (agentSelection?.providerId && agentSelection?.modelId) {
-                return agentSelection;
-            }
-        }
-
-        const sessionSelection = getSessionModelSelection(sessionId);
-        if (sessionSelection?.providerId && sessionSelection?.modelId) {
-            return sessionSelection;
-        }
-
-        return null;
-    }, [isUser, sessionId, agentName, previousUserMetadata, getAgentModelForSession, getSessionModelSelection]);
-
-    const providerID = React.useMemo(() => {
+    const footerModel = React.useMemo(() => {
         if (isUser) return null;
-        if (typeof messageProviderID === 'string' && messageProviderID.trim().length > 0) {
-            return messageProviderID;
-        }
-        return contextModelSelection?.providerId ?? null;
-    }, [isUser, messageProviderID, contextModelSelection]);
+        const sessionSelection = sessionId ? getSessionModelSelection(sessionId) : null;
+        const agentSelection = sessionId && agentName
+            ? getAgentModelForSession(sessionId, agentName)
+            : null;
+        return resolveAssistantFooterModel({
+            assistantInfo: message.info,
+            userTurnInfo: previousMessage?.info,
+            sessionSelection,
+            agentSelection,
+        });
+    }, [
+        isUser,
+        sessionId,
+        agentName,
+        message.info,
+        previousMessage,
+        getAgentModelForSession,
+        getSessionModelSelection,
+    ]);
 
-    const modelID = React.useMemo(() => {
-        if (isUser) return null;
-        if (typeof messageModelID === 'string' && messageModelID.trim().length > 0) {
-            return messageModelID;
-        }
-        return contextModelSelection?.modelId ?? null;
-    }, [isUser, messageModelID, contextModelSelection]);
+    const providerID = footerModel?.providerId ?? null;
+    const modelID = footerModel?.modelId ?? null;
 
     const modelName = React.useMemo(() => {
         if (isUser) return undefined;
