@@ -78,6 +78,16 @@ test('File New Session keeps Cmd+N / Ctrl+N as a hint and does not register it',
   }
 });
 
+test('Linux Go menu does not steal Alt+G from files go-to-line', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  assert.match(source, /label: 'G&o'/);
+  assert.doesNotMatch(source, /label: 'Go',/);
+  const items = [...source.matchAll(/\{ label: 'Go to Line', accelerator: 'Alt\+G'[^}]*\}/g)]
+    .map((match) => match[0]);
+  assert.equal(items.length, 1, 'expected a Linux/Windows Go to Line hint');
+  assert.match(items[0], /registerAccelerator:\s*false/);
+});
+
 test('Command Palette keeps Cmd+P / Ctrl+P as a hint and does not register it', () => {
   const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
   const items = [...source.matchAll(/\{ label: 'Command Palette', accelerator: '(Cmd\+P|Ctrl\+P)'[^}]*\}/g)]

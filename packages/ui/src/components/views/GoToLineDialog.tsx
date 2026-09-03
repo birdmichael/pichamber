@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { consumeGoToLineSubmitKey } from './filesViewGoToLine';
 
 type GoToLineDialogProps = {
   open: boolean;
@@ -59,7 +60,10 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
   const [inputValue, setInputValue] = React.useState('');
   const initialCursorRef = React.useRef<CursorSnapshot | null>(null);
   const committedRef = React.useRef(false);
-  const panelRef = React.useRef<HTMLDivElement | null>(null);
+  const panelRef = React.useRef<HTMLElement | null>(null);
+  const setPanelRef = React.useCallback((node: HTMLElement | null) => {
+    panelRef.current = node;
+  }, []);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   const lineNumber = React.useMemo(
@@ -150,6 +154,10 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (consumeGoToLineSubmitKey(event)) {
+        handleSubmit();
+        return;
+      }
       if (event.key !== 'Escape') {
         return;
       }
@@ -163,7 +171,7 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
       document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [handleOpenChange, open, variant]);
+  }, [handleOpenChange, handleSubmit, open, variant]);
 
   const helperText = React.useMemo(() => {
     if (!view) {
@@ -187,9 +195,14 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
     }
 
     return (
-      <div
-        ref={panelRef}
+      <form
+        ref={setPanelRef}
         className="ml-1 flex h-6 items-center gap-1"
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          handleSubmit();
+        }}
       >
         <Input
           ref={inputRef}
@@ -200,36 +213,43 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              handleSubmit();
+            if (!consumeGoToLineSubmitKey(event)) {
+              return;
             }
+            handleSubmit();
           }}
           placeholder={t('goToLineDialog.field.linePlaceholderShort')}
           className="h-6 w-20 rounded-md border-border/70 bg-transparent px-2 typography-meta"
         />
         <Button
+          type="submit"
           variant="outline"
           size="xs"
-          onClick={handleSubmit}
           disabled={!view || lineNumber === null}
           className="h-6 px-2"
         >
           {t('goToLineDialog.actions.go')}
         </Button>
-      </div>
+      </form>
     );
   }
 
   return (
     <div
-      ref={panelRef}
+      ref={setPanelRef}
       className={cn(
         'absolute left-3 top-3 z-40 w-[min(32rem,calc(100%-1.5rem))] rounded-xl border border-[var(--interactive-border)] bg-[color:color-mix(in_srgb,var(--surface-elevated)_94%,transparent)] p-2.5 shadow-lg backdrop-blur-sm transition-all',
         open ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none -translate-y-1 opacity-0',
       )}
     >
-      <div className="min-w-0">
+      <form
+        className="min-w-0"
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          handleSubmit();
+        }}
+      >
         <Input
           ref={inputRef}
           type="number"
@@ -239,10 +259,10 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              handleSubmit();
+            if (!consumeGoToLineSubmitKey(event)) {
+              return;
             }
+            handleSubmit();
           }}
           placeholder={t('goToLineDialog.field.linePlaceholder')}
           className="h-8 w-full rounded-md border-border/70 bg-background/60 typography-ui-label"
@@ -250,7 +270,7 @@ export function GoToLineDialog({ open, onOpenChange, view, variant = 'overlay' }
         <div className="mt-2 rounded-md bg-primary/15 px-3 py-1.5 typography-ui-label text-foreground/95">
           {helperText}
         </div>
-      </div>
+      </form>
     </div>
   );
 }
