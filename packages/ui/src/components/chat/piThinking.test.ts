@@ -114,16 +114,43 @@ describe('resolvePairedPiThinking', () => {
     })).toEqual({ thinking: 'high', levels: ['low', 'medium', 'high'] });
   });
 
-  test('clears the pin when the selected model has no levels', () => {
-    expect(resolvePairedPiThinking({
-      current: 'xhigh',
-      catalogLevels: [],
-    })).toEqual({ thinking: undefined, levels: [] });
+  test('keeps the chip from live levels when the catalog is empty', () => {
     expect(resolvePairedPiThinking({
       current: 'xhigh',
       catalogLevels: [],
       liveAvailable: ['off', 'xhigh'],
+    })).toEqual({ thinking: 'xhigh', levels: ['off', 'xhigh'] });
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({
+      thinking: 'high',
+      levels: ['off', 'minimal', 'low', 'medium', 'high'],
+    });
+  });
+
+  test('empty catalog without live still hides the chip', () => {
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
     })).toEqual({ thinking: undefined, levels: [] });
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
+      liveAvailable: [],
+    })).toEqual({ thinking: undefined, levels: [] });
+  });
+
+  test('empty catalog with live and no pin stays pending instead of painting medium', () => {
+    expect(resolvePairedPiThinking({
+      current: undefined,
+      catalogLevels: [],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({
+      thinking: undefined,
+      levels: ['off', 'minimal', 'low', 'medium', 'high'],
+    });
   });
 
   test('non-narrow live is the menu, even when it is not a catalog subset', () => {

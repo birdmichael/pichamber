@@ -98,10 +98,12 @@ export function unionCurrentIntoPiThinkingLevels(
 }
 
 /**
- * Empty catalog does not invent levels. A non-narrow live list from the
- * session is the kernel's actual set (may add `off`/`minimal`). A known
- * current still unions into that live list when the catalog includes it.
- * Unset current stays pending — do not invent `medium` before GET.
+ * Empty catalog does not invent seven levels. A non-narrow live list from
+ * the session still owns the menu when catalog is silent, so the chip
+ * cannot vanish after send (#513). A leftover pin that live omitted
+ * becomes the live max, not a blank. A known current still unions into
+ * that live list when the catalog includes it. Unset current stays
+ * pending — do not invent `medium` before GET.
  */
 export function resolvePairedPiThinking(input: {
   current?: string | null;
@@ -109,10 +111,20 @@ export function resolvePairedPiThinking(input: {
   liveAvailable?: unknown;
 }): { thinking: PiThinkingLevel | undefined; levels: PiThinkingLevel[] } {
   const catalog = parseAvailablePiThinkingLevels(input.catalogLevels);
-  if (catalog.length === 0) {
-    return { thinking: undefined, levels: [] };
-  }
   const live = parseAvailablePiThinkingLevels(input.liveAvailable);
+  if (catalog.length === 0) {
+    if (isNarrowPiThinkingAvailable(live)) {
+      return { thinking: undefined, levels: [] };
+    }
+    const parsed = parsePiThinkingLevel(input.current ?? undefined);
+    if (!parsed) {
+      return { thinking: undefined, levels: [...live] };
+    }
+    return {
+      thinking: live.includes(parsed) ? parsed : live[live.length - 1],
+      levels: [...live],
+    };
+  }
   const base = !isNarrowPiThinkingAvailable(live) ? live : catalog;
   const levels = unionCurrentIntoPiThinkingLevels(base, input.current ?? undefined, catalog);
   const parsed = parsePiThinkingLevel(input.current ?? undefined);

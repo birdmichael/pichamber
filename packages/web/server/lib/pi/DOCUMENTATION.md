@@ -410,10 +410,12 @@ real `setModel` appends another `model_change`.
 The composer thinking chip renders `available`, not the full seven-level
 catalog. A new-session draft with no session id uses models.dev
 `reasoning_options` for the selected model id (same slug lookup as
-vision). Missing/empty catalog effort hides the control — do not invent
+vision). Missing/empty catalog effort still uses live GET `available`
+(or the last pin) so the chip does not vanish after send — do not invent
 seven levels. Catalog pairs immediately; live may only narrow a
 non-narrow subset after the new model is applied. GET `/thinking`
-keeps that live subset when it is non-narrow and inside catalog.
+keeps that live subset when it is non-narrow, including when catalog is
+empty. An authoritative empty `available` still hides the control.
 `setThinkingLevel` is awaited on the Node child, including live-session
 defaults during bind/`createFacadeSessionLive` and `/thinking`. Do not
 invent vendor `thinkingLevelMap` from `/v1/models`.
