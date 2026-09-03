@@ -1,3 +1,5 @@
+import { DUAL_AUTH_API_SIBLING_IDS } from './providerAuth';
+
 export const shouldLoadAvailableProviders = (isAddMode: boolean): boolean => isAddMode;
 
 /** Config-defined customs have no standalone auth panel — credentials live on the form. */
@@ -68,7 +70,10 @@ export const selectAddCatalogProviders = (
 ): AddCatalogProvider[] => {
   const builtinIds = new Set(builtins.map((provider) => provider.id).filter(Boolean));
   return mergeAddCatalogProviders(
-    available.filter((provider) => !connectedIds.has(provider.id) || builtinIds.has(provider.id)),
+    available.filter((provider) => (
+      !DUAL_AUTH_API_SIBLING_IDS.has(provider.id)
+      && (!connectedIds.has(provider.id) || builtinIds.has(provider.id))
+    )),
     builtins,
   ).sort((left, right) => (left.name || left.id).localeCompare(right.name || right.id));
 };

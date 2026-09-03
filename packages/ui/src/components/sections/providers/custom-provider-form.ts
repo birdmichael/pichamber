@@ -18,6 +18,7 @@ import {
   resolvePersistedReasoning,
   type CatalogCapabilityEntry,
 } from '@/lib/model-catalog-capabilities';
+import { isDualAuthApiSiblingId } from './providerAuth';
 
 export const CUSTOM_PROVIDER_PROTOCOLS = {
   'openai-chat': '@ai-sdk/openai-compatible',
@@ -355,6 +356,9 @@ export function isConfigDefinedCustomProvider(
   if (!sources) {
     return false;
   }
+  if (typeof provider.id === 'string' && isDualAuthApiSiblingId(provider.id)) {
+    return false;
+  }
   const inConfigLayer = Boolean(
     sources.user?.exists || sources.project?.exists || sources.custom?.exists,
   );
@@ -443,7 +447,9 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
     ? input.t('settings.providers.page.custom.error.providerID.required')
     : !PROVIDER_ID_PATTERN.test(providerID)
       ? input.t('settings.providers.page.custom.error.providerID.format')
-      : undefined;
+      : isDualAuthApiSiblingId(providerID)
+        ? input.t('settings.providers.page.custom.error.providerID.reserved')
+        : undefined;
 
   const nameError = !name
     ? input.t('settings.providers.page.custom.error.name.required')

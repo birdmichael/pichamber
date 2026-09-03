@@ -61,6 +61,38 @@ export const getOAuthAuthMethods = (methods: AuthMethod[]): OAuthAuthMethodEntry
 export const requiresOpenCodeRestartAfterOAuth = (providerId: string): boolean =>
   providerId !== 'claude-code';
 
+/** Catalog OAuth id → reserved API-key sibling. Mirrors server `pi-dual-auth.js`. */
+export const DUAL_AUTH_CATALOG = {
+  'kimi-coding': { catalogId: 'kimi-coding', apiId: 'kimi-coding-api' },
+  xai: { catalogId: 'xai', apiId: 'xai-api' },
+} as const;
+
+export type DualAuthCatalogId = keyof typeof DUAL_AUTH_CATALOG;
+
+export const DUAL_AUTH_API_SIBLING_IDS: ReadonlySet<string> = new Set(
+  Object.values(DUAL_AUTH_CATALOG).map((entry) => entry.apiId),
+);
+
+export const isDualAuthCatalogId = (providerId: string): providerId is DualAuthCatalogId =>
+  Object.prototype.hasOwnProperty.call(DUAL_AUTH_CATALOG, providerId);
+
+export const isDualAuthApiSiblingId = (providerId: string): boolean =>
+  DUAL_AUTH_API_SIBLING_IDS.has(providerId);
+
+export const dualAuthSiblingId = (providerId: string): string | null =>
+  isDualAuthCatalogId(providerId) ? DUAL_AUTH_CATALOG[providerId].apiId : null;
+
+export const dualAuthCatalogId = (providerId: string): string | null => {
+  if (isDualAuthCatalogId(providerId)) return providerId;
+  for (const spec of Object.values(DUAL_AUTH_CATALOG)) {
+    if (spec.apiId === providerId) return spec.catalogId;
+  }
+  return null;
+};
+
+export const isDualAuthSurfaceId = (providerId: string): boolean =>
+  Boolean(dualAuthCatalogId(providerId));
+
 export interface ProviderCredentialInput {
   /** Present when the kernel reports an active credential (api/env/oauth). */
   key?: string | null;
@@ -125,8 +157,13 @@ export const shouldAutoOpenAuthPanel = (input: {
    * missing` summary would be misleading. Optional for back-compat.
    */
   isEditableCustomProvider?: boolean;
+  /**
+   * Dual-auth catalog (Kimi Code / xAI): keep the panel open until both
+   * OAuth and API key are connected so saving the second method is visible.
+   */
+  dualAuthIncomplete?: boolean;
 }): boolean =>
   input.sourcesLoaded &&
-  !input.hasCredentials &&
   !input.userDismissed &&
-  !input.isEditableCustomProvider;
+  !input.isEditableCustomProvider &&
+  (Boolean(input.dualAuthIncomplete) || !input.hasCredentials);

@@ -96,6 +96,16 @@ describe('validateCustomProvider', () => {
     });
   });
 
+  test('rejects reserved dual-auth sibling ids', () => {
+    const result = validateCustomProvider({
+      form: baseForm({ providerID: 'kimi-coding-api' }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(result.result).toBeUndefined();
+    expect(result.err.providerID).toBe('settings.providers.page.custom.error.providerID.reserved');
+  });
+
   test('supports {env:VAR} credentials without writing an auth key', () => {
     const result = validateCustomProvider({
       form: baseForm({

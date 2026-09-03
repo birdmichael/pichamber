@@ -1656,6 +1656,7 @@ export const settingsDict = {
   "settings.providers.page.custom.error.providerID.required": "El ID del proveedor es obligatorio",
   "settings.providers.page.custom.error.providerID.format": "Usa minúsculas, números, guiones o guiones bajos",
   "settings.providers.page.custom.error.providerID.exists": "Ya hay un proveedor conectado con este ID",
+  "settings.providers.page.custom.error.providerID.reserved": "Este ID de proveedor está reservado",
   "settings.providers.page.custom.error.name.required": "El nombre visible es obligatorio",
   "settings.providers.page.custom.error.baseURL.required": "La URL base es obligatoria",
   "settings.providers.page.custom.error.baseURL.format": "La URL base debe empezar por http:// o https://",
@@ -1689,6 +1690,10 @@ export const settingsDict = {
   "settings.providers.page.auth.oauth.error.declined": "La autorización se rechazó o no se completó.",
   "settings.providers.page.auth.oauth.error.invalidInput": "Se rechazaron los datos introducidos.",
   "settings.providers.page.auth.connected": "Conectado",
+  "settings.providers.page.auth.oauthConnected": "OAuth conectado",
+  "settings.providers.page.auth.apiKeyConnected": "Clave API conectada",
+  "settings.providers.page.auth.oauthAndApiKeyConnected": "OAuth y clave API conectados",
+  "settings.providers.page.auth.dualHint": "El inicio de sesión OAuth y una clave API pueden permanecer conectados a la vez. Guardar uno no sustituye al otro.",
   "settings.providers.page.auth.incomplete": "Faltan credenciales",
   "settings.providers.page.auth.incompleteHint": "· Añade una clave API o {env:VAR} antes de usar este proveedor en el chat",
 
@@ -1741,6 +1746,8 @@ export const settingsDict = {
 
   "settings.providers.page.actions.disconnecting": "Desconectando...",
   "settings.providers.page.actions.disconnect": "Desconectar",
+  "settings.providers.page.actions.disconnectOAuth": "Desconectar OAuth",
+  "settings.providers.page.actions.disconnectApiKey": "Desconectar clave API",
   "settings.providers.page.actions.hideAll": "Ocultar todo",
   "settings.providers.page.actions.showAll": "Mostrar todo",
   "settings.providers.page.toast.authMethodsLoadFailed": "No se pudo cargar los métodos de autenticación del proveedor",

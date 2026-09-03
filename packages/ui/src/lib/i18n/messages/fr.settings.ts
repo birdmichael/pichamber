@@ -1571,6 +1571,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.providerID.required': 'L’ID du fournisseur est obligatoire',
   'settings.providers.page.custom.error.providerID.format': 'Utilisez des minuscules, chiffres, tirets ou underscores',
   'settings.providers.page.custom.error.providerID.exists': 'Un fournisseur avec cet ID est déjà connecté',
+  'settings.providers.page.custom.error.providerID.reserved': 'Cet ID de fournisseur est réservé',
   'settings.providers.page.custom.error.name.required': 'Le nom affiché est obligatoire',
   'settings.providers.page.custom.error.baseURL.required': 'L’URL de base est obligatoire',
   'settings.providers.page.custom.error.baseURL.format': 'L’URL de base doit commencer par http:// ou https://',
@@ -1604,6 +1605,10 @@ export const settingsDict = {
   'settings.providers.page.auth.oauth.error.declined': 'L’autorisation a été refusée ou n’a pas abouti.',
   'settings.providers.page.auth.oauth.error.invalidInput': 'Les informations saisies ont été refusées.',
   'settings.providers.page.auth.connected': 'Connecté',
+  'settings.providers.page.auth.oauthConnected': 'OAuth connecté',
+  'settings.providers.page.auth.apiKeyConnected': 'Clé API connectée',
+  'settings.providers.page.auth.oauthAndApiKeyConnected': 'OAuth et clé API connectés',
+  'settings.providers.page.auth.dualHint': 'La connexion OAuth et une clé API peuvent rester connectées en même temps. Enregistrer l’une ne remplace pas l’autre.',
   'settings.providers.page.auth.incomplete': 'Identifiants manquants',
   'settings.providers.page.auth.incompleteHint': '· Ajoutez une clé API ou {env:VAR} avant d’utiliser ce fournisseur dans le chat',
 
@@ -1656,6 +1661,8 @@ export const settingsDict = {
 
   'settings.providers.page.actions.disconnecting': 'Déconnexion...',
   'settings.providers.page.actions.disconnect': 'Déconnecter',
+  'settings.providers.page.actions.disconnectOAuth': 'Déconnecter OAuth',
+  'settings.providers.page.actions.disconnectApiKey': 'Déconnecter la clé API',
   'settings.providers.page.actions.hideAll': 'Tout cacher',
   'settings.providers.page.actions.showAll': 'Afficher tout',
   'settings.providers.page.toast.authMethodsLoadFailed': 'Échec du chargement des méthodes d\'authentification du fournisseur',

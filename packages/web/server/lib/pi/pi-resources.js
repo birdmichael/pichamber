@@ -5,6 +5,20 @@ import yaml from 'yaml';
 
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { resolveAppDataDir } from '../app-data/index.js';
+import {
+  dualAuthSpecFor,
+  dualAuthWritePlan,
+  isDualAuthApiSiblingId,
+  isDualAuthCatalogId,
+  loadDualAuthApiModels,
+  KIMI_CODING_API_PROVIDER_ID,
+  XAI_API_PROVIDER_ID,
+} from './pi-dual-auth.js';
+
+export {
+  KIMI_CODING_API_PROVIDER_ID,
+  XAI_API_PROVIDER_ID,
+} from './pi-dual-auth.js';
 
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -421,7 +435,7 @@ export const providerHasCatalogModels = (provider) => {
 export const toPiProviderListPayload = (catalog) => {
   const providers = mergeBuiltinPiCatalogProviders(
     Array.isArray(catalog?.providers) ? catalog.providers : [],
-  );
+  ).filter((provider) => !isDualAuthApiSiblingId(provider?.id));
   const defaults = catalog?.default && typeof catalog.default === 'object' && !Array.isArray(catalog.default)
     ? catalog.default
     : {};
@@ -445,7 +459,7 @@ export const getPiAuthMethods = (home = os.homedir()) => {
   ]);
   const result = {};
   for (const id of ids) {
-    if (!id) continue;
+    if (!id || isDualAuthApiSiblingId(id)) continue;
     if (id === XAI_PROVIDER_ID) {
       result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
       continue;
@@ -470,15 +484,27 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
   const providers = providerMap(readJsonObject(modelsPath));
   const projectModelsPath = directory ? path.join(directory, '.pi', 'models.json') : null;
   const projectProviders = projectModelsPath ? providerMap(readJsonObject(projectModelsPath)) : {};
+  const spec = dualAuthSpecFor(providerId);
+  const catalogStored = spec ? authEntryLooksStored(auth[spec.catalogId]) : false;
+  const siblingStored = spec ? authEntryLooksStored(auth[spec.apiId]) : false;
+  const catalogIsOAuth = spec && authMethodType(auth[spec.catalogId]) === 'oauth' && catalogStored;
+  const catalogIsApiKey = spec && authMethodType(auth[spec.catalogId]) === 'api' && catalogStored;
+  const authExists = spec && isDualAuthCatalogId(providerId)
+    ? catalogStored || siblingStored
+    : Boolean(auth[providerId]);
   return {
     sources: {
-      auth: { exists: Boolean(auth[providerId]), path: authPath },
+      auth: { exists: authExists, path: authPath },
       user: { exists: Object.prototype.hasOwnProperty.call(providers, providerId), path: modelsPath },
       project: {
         exists: Object.prototype.hasOwnProperty.call(projectProviders, providerId),
         path: projectModelsPath,
       },
       custom: { exists: false, path: null },
+      ...(spec ? {
+        oauth: { exists: Boolean(catalogIsOAuth), path: authPath },
+        apiKey: { exists: Boolean(siblingStored || catalogIsApiKey), path: authPath },
+      } : {}),
     },
   };
 };
@@ -601,17 +627,70 @@ export const normalizePiAuthCredential = (body = {}) => {
   return { type: 'api_key', key };
 };
 
+const ensureDualAuthApiProviderConfig = (home, spec) => {
+  const filePath = resolvePiModelsPath(home);
+  const current = readJsonObject(filePath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[spec.apiId] && typeof providers[spec.apiId] === 'object' && !Array.isArray(providers[spec.apiId])
+    ? providers[spec.apiId]
+    : {};
+  const previousModels = Array.isArray(previous.models) ? previous.models : [];
+  const models = previousModels.length > 0 ? previousModels : loadDualAuthApiModels(spec);
+  providers[spec.apiId] = {
+    ...previous,
+    name: typeof previous.name === 'string' && previous.name.trim() ? previous.name : spec.apiName,
+    baseUrl: typeof previous.baseUrl === 'string' && previous.baseUrl.trim() ? previous.baseUrl : spec.baseUrl,
+    api: typeof previous.api === 'string' && previous.api.trim() ? previous.api : spec.api,
+    models,
+  };
+  writeJsonFile(filePath, { ...current, providers }, 0o600);
+  return providers[spec.apiId];
+};
+
 export const writePiProviderAuth = (providerId, body, { home = os.homedir() } = {}) => {
   const id = sanitizeProviderId(providerId);
   const credential = normalizePiAuthCredential(body);
   const filePath = resolvePiAuthPath(home);
   const current = readPiAuthFile(filePath);
-  writePiAuthFile(filePath, { ...current, [id]: credential });
+  const next = { ...current };
+  const plan = dualAuthWritePlan(id, credential.type === 'oauth' ? 'oauth' : 'api');
+  let storedId = id;
+
+  if (plan) {
+    storedId = plan.authId;
+    if (plan.migrateCatalogApiKeyToSibling) {
+      const catalogEntry = next[plan.spec.catalogId];
+      if (
+        authMethodType(catalogEntry) === 'api'
+        && authEntryLooksStored(catalogEntry)
+        && !authEntryLooksStored(next[plan.spec.apiId])
+      ) {
+        next[plan.spec.apiId] = catalogEntry;
+        ensureDualAuthApiProviderConfig(home, plan.spec);
+      }
+    }
+    if (plan.clearCatalogApiKey) {
+      const catalogEntry = next[plan.spec.catalogId];
+      if (authMethodType(catalogEntry) === 'api' && authEntryLooksStored(catalogEntry)) {
+        delete next[plan.spec.catalogId];
+      }
+    }
+    if (plan.ensureApiProvider) {
+      ensureDualAuthApiProviderConfig(home, plan.spec);
+    }
+    next[storedId] = credential;
+  } else {
+    next[id] = credential;
+  }
+
+  writePiAuthFile(filePath, next);
   const methodType = authMethodType(credential);
+  const methodsId = plan ? plan.spec.catalogId : id;
   return {
     providerId: id,
+    storedProviderId: storedId,
     type: methodType,
-    methods: [{ type: methodType, label: authMethodLabel(methodType) }],
+    methods: getPiAuthMethods(home)[methodsId] || [{ type: methodType, label: authMethodLabel(methodType) }],
   };
 };
 
@@ -619,11 +698,16 @@ export const removePiProviderAuth = (providerId, { home = os.homedir() } = {}) =
   const id = sanitizeProviderId(providerId);
   const filePath = resolvePiAuthPath(home);
   const current = readPiAuthFile(filePath);
-  const removed = Object.prototype.hasOwnProperty.call(current, id);
+  let removed = Object.prototype.hasOwnProperty.call(current, id);
   if (removed) {
     const next = { ...current };
     delete next[id];
     writePiAuthFile(filePath, next);
+  }
+  const spec = dualAuthSpecFor(id);
+  if (spec && id === spec.apiId) {
+    const configRemoved = deletePiProviderConfig({ home, providerId: spec.apiId, scope: 'user' }).removed;
+    removed = removed || configRemoved;
   }
   return { providerId: id, removed };
 };
@@ -902,6 +986,9 @@ export const upsertPiProviderConfig = ({
   hasStoredAuth = false,
 } = {}) => {
   const id = sanitizeProviderId(providerId);
+  if (isDualAuthApiSiblingId(id)) {
+    throw httpError(400, 'Provider ID is reserved');
+  }
   const mapped = mapOpenCodeProviderToPi(config);
   const storedAuth = hasStoredAuth || hasPiStoredAuth(home, id);
   if (!mapped.apiKey && !storedAuth) {

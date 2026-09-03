@@ -15,7 +15,11 @@ import {
   shouldLoadAvailableProviders,
 } from './providerAvailability';
 import {
+  dualAuthCatalogId,
+  dualAuthSiblingId,
   getOAuthAuthMethods,
+  isDualAuthApiSiblingId,
+  isDualAuthCatalogId,
   normalizeAuthType,
   parseAuthPayload,
   providerHasCredentials,
@@ -24,6 +28,7 @@ import {
   shouldShowApiKeyAuth,
   shouldShowModelsSection,
 } from './providerAuth';
+import { isConfigDefinedCustomProvider } from './custom-provider-form';
 
 describe('ProvidersPage available provider loading', () => {
   test('loads available providers only in add-provider mode', () => {
@@ -83,6 +88,19 @@ describe('ProvidersPage available provider loading', () => {
     expect(shouldAutoSelectCustomProvider(true, true, 0, '')).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, false, 1, '')).toBe(false);
     expect(shouldAutoSelectCustomProvider(true, false, 0, 'xai')).toBe(false);
+    expect(selectAddCatalogProviders(
+      [{ id: 'kimi-coding-api', name: 'Kimi Code API' }, { id: 'xai-api', name: 'xAI API' }],
+      new Set(['kimi-coding', 'kimi-coding-api']),
+    ).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+    expect(shouldAutoSelectCustomProvider(
+      true,
+      false,
+      selectAddCatalogProviders(
+        [{ id: 'kimi-coding-api', name: 'Kimi Code API' }],
+        new Set(['kimi-coding', 'kimi-coding-api', 'xai']),
+      ).length,
+      '',
+    )).toBe(false);
   });
 
   test('skips the standalone auth panel for config-defined custom providers', () => {
@@ -263,6 +281,29 @@ describe('provider credential state helpers', () => {
     })).toBe(false);
   });
 
+  test('dual-auth catalog stays open until OAuth and API key are both connected', () => {
+    expect(isDualAuthCatalogId('kimi-coding')).toBe(true);
+    expect(dualAuthSiblingId('kimi-coding')).toBe('kimi-coding-api');
+    expect(dualAuthCatalogId('kimi-coding-api')).toBe('kimi-coding');
+    expect(isDualAuthApiSiblingId('kimi-coding-api')).toBe(true);
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials: true,
+      userDismissed: false,
+      dualAuthIncomplete: true,
+    })).toBe(true);
+    expect(shouldAutoOpenAuthPanel({
+      sourcesLoaded: true,
+      hasCredentials: true,
+      userDismissed: false,
+      dualAuthIncomplete: false,
+    })).toBe(false);
+    expect(isConfigDefinedCustomProvider(
+      { id: 'kimi-coding-api', options: { baseURL: 'https://api.moonshot.ai/v1' } },
+      { user: { exists: true }, project: { exists: false }, custom: { exists: false } },
+    )).toBe(false);
+  });
+
   test('models stay visible while sources are still loading', () => {
     expect(shouldShowModelsSection({
       modelCount: 4,
@@ -283,6 +324,12 @@ describe('ProvidersPage Kimi Usage mount', () => {
     expect(providersPageSource).toContain("selectedProvider.id === 'kimi-coding' && hasCredentials");
     expect(providersPageSource).toContain('<ProviderKimiUsage />');
     expect(providersPageSource).not.toContain('/api/quota');
+  });
+
+  test('dual-auth catalog can disconnect OAuth and API key separately', () => {
+    expect(providersPageSource).toContain("t('settings.providers.page.actions.disconnectOAuth')");
+    expect(providersPageSource).toContain("t('settings.providers.page.actions.disconnectApiKey')");
+    expect(providersPageSource).toContain('dualAuthSiblingId');
   });
 });
 

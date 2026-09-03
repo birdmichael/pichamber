@@ -1465,6 +1465,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.providerID.required': '供應商 ID 為必填',
   'settings.providers.page.custom.error.providerID.format': '請使用小寫字母、數字、連字號或底線',
   'settings.providers.page.custom.error.providerID.exists': '已連線具有此 ID 的供應商',
+  'settings.providers.page.custom.error.providerID.reserved': '此供應商 ID 為保留 ID',
   'settings.providers.page.custom.error.name.required': '顯示名稱為必填',
   'settings.providers.page.custom.error.baseURL.required': '基礎 URL 為必填',
   'settings.providers.page.custom.error.baseURL.format': '基礎 URL 必須以 http:// 或 https:// 開頭',
@@ -1498,6 +1499,10 @@ export const settingsDict = {
   'settings.providers.page.auth.oauth.error.declined': '授權遭拒或未完成。',
   'settings.providers.page.auth.oauth.error.invalidInput': '輸入的資訊遭拒。',
   'settings.providers.page.auth.connected': '已連線',
+  'settings.providers.page.auth.oauthConnected': 'OAuth 已連線',
+  'settings.providers.page.auth.apiKeyConnected': 'API Key 已連線',
+  'settings.providers.page.auth.oauthAndApiKeyConnected': 'OAuth 與 API Key 均已連線',
+  'settings.providers.page.auth.dualHint': 'OAuth 登入與 API Key 可以同時保留。儲存其中一種不會覆蓋另一種。',
   'settings.providers.page.auth.incomplete': '缺少憑證',
   'settings.providers.page.auth.incompleteHint': '· 在聊天中使用此提供者之前，請新增 API 金鑰或 {env:VAR}',
 
@@ -1550,6 +1555,8 @@ export const settingsDict = {
 
   'settings.providers.page.actions.disconnecting': '中斷連線中...',
   'settings.providers.page.actions.disconnect': '中斷連線',
+  'settings.providers.page.actions.disconnectOAuth': '中斷 OAuth',
+  'settings.providers.page.actions.disconnectApiKey': '中斷 API Key',
   'settings.providers.page.actions.hideAll': '全部隱藏',
   'settings.providers.page.actions.showAll': '全部顯示',
   'settings.providers.page.toast.authMethodsLoadFailed': '載入供應商驗證方式失敗',

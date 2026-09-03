@@ -1656,6 +1656,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.providerID.required': '提供商 ID 为必填项',
   'settings.providers.page.custom.error.providerID.format': '请使用小写字母、数字、连字符或下划线',
   'settings.providers.page.custom.error.providerID.exists': '已连接具有此 ID 的提供商',
+  'settings.providers.page.custom.error.providerID.reserved': '此提供商 ID 为保留 ID',
   'settings.providers.page.custom.error.name.required': '显示名称为必填项',
   'settings.providers.page.custom.error.baseURL.required': '基础 URL 为必填项',
   'settings.providers.page.custom.error.baseURL.format': '基础 URL 必须以 http:// 或 https:// 开头',
@@ -1689,6 +1690,10 @@ export const settingsDict = {
   'settings.providers.page.auth.oauth.error.declined': '授权被拒绝或未完成。',
   'settings.providers.page.auth.oauth.error.invalidInput': '输入的信息被拒绝。',
   'settings.providers.page.auth.connected': '已连接',
+  'settings.providers.page.auth.oauthConnected': 'OAuth 已连接',
+  'settings.providers.page.auth.apiKeyConnected': 'API Key 已连接',
+  'settings.providers.page.auth.oauthAndApiKeyConnected': 'OAuth 和 API Key 均已连接',
+  'settings.providers.page.auth.dualHint': 'OAuth 登录和 API Key 可以同时保留。保存其中一种不会覆盖另一种。',
   'settings.providers.page.auth.incomplete': '缺少凭据',
   'settings.providers.page.auth.incompleteHint': '· 在聊天中使用此提供商之前，请添加 API 密钥或 {env:VAR}',
 
@@ -1741,6 +1746,8 @@ export const settingsDict = {
 
   'settings.providers.page.actions.disconnecting': '断开连接中...',
   'settings.providers.page.actions.disconnect': '断开连接',
+  'settings.providers.page.actions.disconnectOAuth': '断开 OAuth',
+  'settings.providers.page.actions.disconnectApiKey': '断开 API Key',
   'settings.providers.page.actions.hideAll': '全部隐藏',
   'settings.providers.page.actions.showAll': '全部显示',
   'settings.providers.page.toast.authMethodsLoadFailed': '加载提供商认证方式失败',
