@@ -1,4 +1,4 @@
-type KernelHealthSnapshot = {
+export type KernelHealthSnapshot = {
   kernel?: unknown;
   status?: unknown;
   kernelReady?: unknown;
@@ -6,6 +6,8 @@ type KernelHealthSnapshot = {
   openCodeRunning?: unknown;
   isOpenCodeReady?: unknown;
   lastOpenCodeError?: unknown;
+  piBinaryResolved?: unknown;
+  piBinarySource?: unknown;
 };
 
 export const isLocalKernelReady = (

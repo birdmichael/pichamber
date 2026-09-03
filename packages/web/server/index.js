@@ -49,6 +49,7 @@ import {
 import { createFsSearchRuntime as createFsSearchRuntimeFactory } from './lib/fs/search.js';
 import { createOpenCodeLifecycleRuntime } from './lib/opencode/lifecycle.js';
 import { buildHealthSnapshot, createPiKernel, isPiKernelEnabled, isPiMockEnabled } from './lib/pi/index.js';
+import { resolvePiCliPath } from './lib/pi/pi-cli-path.js';
 import { describeNodeKernelFailure } from './lib/pi/node-runtime.js';
 import { createPichamberControlTool } from './lib/pi/pichamber-control-tool.js';
 import { createPichamberWebTool } from './lib/pi/pichamber-web-tool.js';
@@ -1633,6 +1634,14 @@ async function main(options = {}) {
       const launchSpec = resolvedOpencodeBinary && !useWslForOpencode
         ? resolveManagedOpenCodeLaunchSpec(resolvedOpencodeBinary)
         : null;
+      let piCli = null;
+      if (piKernelEnabled) {
+        try {
+          piCli = resolvePiCliPath();
+        } catch {
+          piCli = null;
+        }
+      }
       return buildHealthSnapshot({
         kernel: piKernelEnabled ? 'pi' : 'opencode',
         piMock: Boolean(piKernel?.mock),
@@ -1658,6 +1667,8 @@ async function main(options = {}) {
           opencodeWslBinary: resolvedWslBinary || null,
           opencodeWslPath: resolvedWslOpencodePath || null,
           opencodeWslDistro: resolvedWslDistro || null,
+          piBinaryResolved: piCli?.path || null,
+          piBinarySource: piCli?.source || null,
           nodeBinaryResolved: resolvedNodeBinary || null,
           bunBinaryResolved: resolvedBunBinary || null,
           desktopNotifyEnabled: ENV_DESKTOP_NOTIFY,

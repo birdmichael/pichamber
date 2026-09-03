@@ -14,7 +14,7 @@ Same-origin session-chat iframes complete an authenticated parent-frame handshak
 
 The preload bridge exposes desktop-only APIs to the web UI through `window.__OPENCHAMBER_DESKTOP__`. Privileged commands are checked in `main.mjs`, not only in the UI. Preload also exposes a read-only `__OPENCHAMBER_DESKTOP_BOOT_OUTCOME_SEED__` from the `--openchamber-boot-outcome` window switch so splash can dismiss if the later `dom-ready` inject fails after a remount. The writable `__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__` still comes from the main-process init script so host switches can refresh it.
 
-Desktop waits for `/health` `kernelReady` / `piRunning` after the in-process server is listening. A still-starting Node kernel child (`PI_SDK_UNAVAILABLE`, `ok: false`) is not a hard boot failure. Retry Local re-probes live health and only restarts when the local HTTP origin is not active.
+Desktop waits for `/health` `kernelReady` / `piRunning` after the in-process server is listening. A still-starting Node kernel child (`PI_SDK_UNAVAILABLE`, `ok: false`) is not a hard boot failure. Retry Local re-probes live health and only restarts when the local HTTP origin is not active. Chooser/local-setup on the Pi kernel shows Pi install/docs and `piBinaryResolved` from that health payload; it does not search for or spawn `opencode`. Desktop still does not spawn PATH `pi`.
 
 ## Main Files
 
