@@ -8,6 +8,7 @@ import { useAutoReviewStore } from '@/stores/useAutoReviewStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useHasPendingPiExtensionUiPrompt } from '@/sync/pi-extension-ui-store';
 import { classifyComposerSubmitError } from './composerSubmitError';
+import { composerHistoryStepFromKey } from './composerHistoryKeys';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useInputStore } from '@/sync/input-store';
 import {
@@ -1849,7 +1850,8 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             }
         }
 
-        if (e.key === 'ArrowUp' && canNavigateHistoryUp) {
+        const historyStep = composerHistoryStepFromKey(e);
+        if (historyStep === 'older' && canNavigateHistoryUp) {
             e.preventDefault();
             const recalled = messageHistory.older(message);
             if (recalled !== null) {
@@ -1861,7 +1863,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
-        if (e.key === 'ArrowDown' && canNavigateHistoryDown) {
+        if (historyStep === 'newer' && canNavigateHistoryDown) {
             e.preventDefault();
             const recalled = messageHistory.newer();
             if (recalled !== null) setMessage(recalled);
