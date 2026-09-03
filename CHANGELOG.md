@@ -4,10 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Chat: a new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium. The thinking menu uses the session's live levels (`off` / `minimal` when the kernel lists them) instead of leftover catalog `xhigh`.
+## [1.2.10] - 2026-09-03
 
-- Desktop: the context rail no longer shows the **配置面板** equalizer. Rail icons stay; hiding surfaces is not a sidebar control.
+- **Desktop:** first launch stays on Chooser when the Pi kernel cannot start. A returning user with a dead kernel sees Recovery instead of the main chat.
+- **Desktop:** `/api/opencode/health` is unhealthy when the Pi kernel is down. A slow custom Node no longer latches as failed after 15s if the child is still starting.
+- Chat: Send with no model shows a toast instead of doing nothing.
+- Sessions: sidebar search keeps the query after you click a result. Ctrl+R restores the open session and its model chip.
+- Chat: reopening a long session no longer paints empty assistant bubbles. After reload, an existing session's model is rebound from the jsonl instead of Select model.
+- Chat: a new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium. The thinking menu uses the session's live levels (`off` / `minimal` when the kernel lists them) instead of leftover catalog `xhigh`.
 - Chat: switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
+- Desktop: the context rail no longer shows the **配置面板** equalizer. Rail icons stay; hiding surfaces is not a sidebar control.
+- Desktop: host agent tools `pichamber` / `pichamber_web` are opt-in, which cuts send-path input tokens.
 
 ## [1.2.9] - 2026-09-02
 
