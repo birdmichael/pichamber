@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Chat: Alt+Up / Alt+Down no longer paste the session title into the composer. Those keys stay session switching; only unmodified arrows walk message history.
 - Desktop: Go → Next/Previous Project leaves a projectless chat and opens the adjacent workspace, even when that project was already the inherited File/New default.
 - Chat: picking a thinking level such as xhigh then sending no longer hides the thinking chip. If that level is not live, the chip shows a live level instead of going blank.
+- Sessions: ⋯ Open in Side Panel opens that chat in the right panel, including when the main view is New session or another chat.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Esc closes the Settings window from any section. Nested dialogs, menus, and in-pane drafts still take Esc first.

@@ -71,3 +71,41 @@ export const openSubagentChildSession = (input: OpenSubagentChildSessionInput): 
   });
   return true;
 };
+
+type OpenSessionInSidePanelTab = {
+  mode: 'chat';
+  dedupeKey: string;
+  label: string;
+  sessionTitleFallback?: string;
+  sessionScope?: string | null;
+};
+
+type OpenSessionInSidePanelInput = {
+  sessionID?: string | null;
+  label: string;
+  sessionDirectory?: string | null;
+  currentSessionID?: string | null;
+  currentDirectoryKey?: string | null;
+  openContextPanelTab: (directory: string, options: OpenSessionInSidePanelTab) => void;
+};
+
+/**
+ * Sidebar ⋯ Open in Side Panel. Chat tabs merge from `session:<currentId>`
+ * (or the current draft directory when there is no session), so the tab must
+ * not be stored only under the clicked row's chats directory.
+ */
+export const openSessionInSidePanel = (input: OpenSessionInSidePanelInput): boolean => {
+  const sessionID = input.sessionID?.trim() || '';
+  const directory = (input.currentDirectoryKey?.trim() || input.sessionDirectory?.trim()) || '';
+  if (!sessionID || !directory) {
+    return false;
+  }
+  input.openContextPanelTab(directory, {
+    mode: 'chat',
+    dedupeKey: `session:${sessionID}`,
+    label: input.label,
+    sessionTitleFallback: input.label,
+    sessionScope: contextChatScopeKey(input.currentSessionID),
+  });
+  return true;
+};

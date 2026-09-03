@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   canOpenSubagentChildSession,
   contextChatScopeKey,
+  openSessionInSidePanel,
   openSubagentChildSession,
   resolveParentDirectoryForChildIdle,
   resolveSubagentChildDirectory,
@@ -89,6 +90,91 @@ describe('openSubagentChildSession', () => {
       setCurrentSession: () => {
         opened += 1;
       },
+      openContextPanelTab: () => {
+        opened += 1;
+      },
+    })).toBe(false);
+    expect(opened).toBe(0);
+  });
+});
+
+describe('openSessionInSidePanel', () => {
+  test('stores the chat tab on the current window session scope, not the row directory', () => {
+    const opened: Array<Record<string, unknown>> = [];
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: '/chats/token-tip',
+      currentSessionID: 'ses_current',
+      currentDirectoryKey: '/repo',
+      openContextPanelTab: (directory, options) => {
+        opened.push({ directory, ...options });
+      },
+    })).toBe(true);
+    expect(opened).toEqual([{
+      directory: '/repo',
+      mode: 'chat',
+      dedupeKey: 'session:ses_token_tip',
+      label: 'token-tip',
+      sessionTitleFallback: 'token-tip',
+      sessionScope: 'session:ses_current',
+    }]);
+  });
+
+  test('writes onto the current draft directory when the main view has no session', () => {
+    const opened: Array<Record<string, unknown>> = [];
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: '/chats/token-tip',
+      currentSessionID: null,
+      currentDirectoryKey: 'openchamber:chats',
+      openContextPanelTab: (directory, options) => {
+        opened.push({ directory, ...options });
+      },
+    })).toBe(true);
+    expect(opened).toEqual([{
+      directory: 'openchamber:chats',
+      mode: 'chat',
+      dedupeKey: 'session:ses_token_tip',
+      label: 'token-tip',
+      sessionTitleFallback: 'token-tip',
+      sessionScope: '',
+    }]);
+  });
+
+  test('falls back to the row directory when the current panel has no key', () => {
+    const opened: Array<Record<string, unknown>> = [];
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: '/chats/token-tip',
+      currentSessionID: 'ses_current',
+      currentDirectoryKey: '',
+      openContextPanelTab: (directory, options) => {
+        opened.push({ directory, ...options });
+      },
+    })).toBe(true);
+    expect(opened[0]?.directory).toBe('/chats/token-tip');
+    expect(opened[0]?.sessionScope).toBe('session:ses_current');
+  });
+
+  test('does not open when the row has no session id or directory', () => {
+    let opened = 0;
+    expect(openSessionInSidePanel({
+      sessionID: null,
+      label: 'token-tip',
+      sessionDirectory: '/chats/token-tip',
+      currentDirectoryKey: '/repo',
+      openContextPanelTab: () => {
+        opened += 1;
+      },
+    })).toBe(false);
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: '',
+      currentDirectoryKey: '',
       openContextPanelTab: () => {
         opened += 1;
       },

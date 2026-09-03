@@ -1,11 +1,36 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { mergeContextPanelChatScope } from '../lib/browser/scope';
 import { CHAT_DRAFT_PROJECT_ID } from '../lib/chatDirectories';
-import { CONTEXT_SURFACES, sortContextSurfaces } from '../lib/surfaces/registry';
+import { CONTEXT_SURFACES, getVisibleContextRailSurfaces, sortContextSurfaces } from '../lib/surfaces/registry';
+import { contextChatScopeKey, openSessionInSidePanel } from '../lib/subagents/childSession';
 import { useDirectoryStore } from './useDirectoryStore';
 import { useProjectsStore } from './useProjectsStore';
-import { bindSessionStoreForBrowserScope, useUIStore } from './useUIStore';
+import { bindSessionStoreForBrowserScope, useUIStore, type ContextPanelMode } from './useUIStore';
 
 let currentSessionId: string | null = null;
+
+const railOptions = {
+  railOrder: [],
+  planModeEnabled: true,
+  isVSCode: false,
+  screenWidth: 1200,
+  isGitRepo: false,
+} as const;
+
+const mergedPanel = (directoryKey: string, sessionId: string | null) => {
+  const byDirectory = useUIStore.getState().contextPanelByDirectory;
+  const chatScopeKey = contextChatScopeKey(sessionId);
+  return mergeContextPanelChatScope(
+    directoryKey,
+    byDirectory[directoryKey],
+    chatScopeKey,
+    chatScopeKey ? byDirectory[chatScopeKey] : undefined,
+  );
+};
+
+const railShowsChat = (tabs: ReadonlyArray<{ mode: ContextPanelMode }>): boolean => (
+  getVisibleContextRailSurfaces({ ...railOptions, tabs }).some((surface) => surface.id === 'chat')
+);
 
 beforeEach(() => {
   currentSessionId = null;
@@ -62,6 +87,118 @@ describe('useUIStore context panel tabs', () => {
     expect(byDirectory[directory]?.tabs.some((tab) => tab.mode === 'chat')).toBe(false);
     expect(byDirectory[directory]?.isOpen).toBe(true);
     expect(byDirectory[directory]?.activeTabId).toBe('chat:session:child-b');
+  });
+
+  test('a chat tab stored only on a non-current row directory is invisible in the current rail', () => {
+    currentSessionId = 'ses_current';
+    const currentDirectory = '/repo';
+    const rowDirectory = '/Users/tester/.config/openchamber/chats/2026-08-25/token-tip';
+
+    useUIStore.getState().openContextPanelTab(rowDirectory, {
+      mode: 'chat',
+      dedupeKey: 'session:ses_token_tip',
+      label: 'token-tip',
+    });
+
+    const merged = mergedPanel(currentDirectory, currentSessionId);
+    expect(merged?.tabs.some((tab) => tab.mode === 'chat')).toBeFalsy();
+    expect(railShowsChat(merged?.tabs ?? [])).toBe(false);
+    expect(useUIStore.getState().contextPanelByDirectory[rowDirectory]?.tabs.map((tab) => tab.id)).toEqual([
+      'chat:session:ses_token_tip',
+    ]);
+  });
+
+  test('Open in Side Panel for a non-current session is visible on the current rail', () => {
+    currentSessionId = 'ses_current';
+    const currentDirectory = '/repo';
+    const rowDirectory = '/Users/tester/.config/openchamber/chats/2026-08-25/token-tip';
+
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: rowDirectory,
+      currentSessionID: currentSessionId,
+      currentDirectoryKey: currentDirectory,
+      openContextPanelTab: (directory, options) => {
+        useUIStore.getState().openContextPanelTab(directory, options);
+      },
+    })).toBe(true);
+
+    const merged = mergedPanel(currentDirectory, currentSessionId);
+    expect(merged?.isOpen).toBe(true);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual(['chat:session:ses_token_tip']);
+    expect(merged?.activeTabId).toBe('chat:session:ses_token_tip');
+    expect(railShowsChat(merged?.tabs ?? [])).toBe(true);
+    expect(useUIStore.getState().contextPanelByDirectory[rowDirectory]?.tabs.some((tab) => tab.mode === 'chat')).toBeFalsy();
+    expect(useUIStore.getState().contextPanelByDirectory['session:ses_current']?.tabs.map((tab) => tab.id)).toEqual([
+      'chat:session:ses_token_tip',
+    ]);
+  });
+
+  test('Open in Side Panel from a New session draft writes onto the draft panel key', () => {
+    currentSessionId = null;
+    const rowDirectory = '/Users/tester/.config/openchamber/chats/2026-08-25/token-tip';
+
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: rowDirectory,
+      currentSessionID: null,
+      currentDirectoryKey: CHAT_DRAFT_PROJECT_ID,
+      openContextPanelTab: (directory, options) => {
+        useUIStore.getState().openContextPanelTab(directory, options);
+      },
+    })).toBe(true);
+
+    const merged = mergedPanel(CHAT_DRAFT_PROJECT_ID, null);
+    expect(merged?.isOpen).toBe(true);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual(['chat:session:ses_token_tip']);
+    expect(railShowsChat(merged?.tabs ?? [])).toBe(true);
+    expect(useUIStore.getState().contextPanelByDirectory[rowDirectory]?.tabs.some((tab) => tab.mode === 'chat')).toBeFalsy();
+  });
+
+  test('Open in Side Panel on the current session still docks a chat tab', () => {
+    currentSessionId = 'ses_current';
+    const currentDirectory = '/repo';
+
+    expect(openSessionInSidePanel({
+      sessionID: 'ses_current',
+      label: 'current',
+      sessionDirectory: currentDirectory,
+      currentSessionID: currentSessionId,
+      currentDirectoryKey: currentDirectory,
+      openContextPanelTab: (directory, options) => {
+        useUIStore.getState().openContextPanelTab(directory, options);
+      },
+    })).toBe(true);
+
+    const merged = mergedPanel(currentDirectory, currentSessionId);
+    expect(merged?.isOpen).toBe(true);
+    expect(merged?.tabs.map((tab) => tab.id)).toEqual(['chat:session:ses_current']);
+    expect(railShowsChat(merged?.tabs ?? [])).toBe(true);
+  });
+
+  test('closing the side-panel chat tab hides the has-content chat rail', () => {
+    currentSessionId = 'ses_current';
+    const currentDirectory = '/repo';
+
+    openSessionInSidePanel({
+      sessionID: 'ses_token_tip',
+      label: 'token-tip',
+      sessionDirectory: '/chats/token-tip',
+      currentSessionID: currentSessionId,
+      currentDirectoryKey: currentDirectory,
+      openContextPanelTab: (directory, options) => {
+        useUIStore.getState().openContextPanelTab(directory, options);
+      },
+    });
+
+    useUIStore.getState().closeContextPanelTab(currentDirectory, 'chat:session:ses_token_tip');
+
+    const merged = mergedPanel(currentDirectory, currentSessionId);
+    expect(merged?.tabs.some((tab) => tab.mode === 'chat')).toBeFalsy();
+    expect(merged?.isOpen).toBeFalsy();
+    expect(railShowsChat(merged?.tabs ?? [])).toBe(false);
   });
 
   test('opening a worktree child focuses the parent-scoped chat tab', () => {

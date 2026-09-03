@@ -76,6 +76,10 @@ so a delayed or lost handshake cannot hide an already-materialized transcript
 
 Browser *tabs* follow the open conversation (`session:<id>`), the same scope
 as subagent chat tabs, so two sessions in one project do not share a page.
+Sidebar ⋯ Open in Side Panel writes that chat tab onto the current
+conversation's `session:<id>` (or the current draft directory key when there
+is no session), not the clicked row's chats directory, so the merged rail can
+show it.
 Files / Git / notes stay on the session directory. Address-bar *history* in
 `useBrowserHistoryStore` still collapses isolated chat dirs and home-as-chat
 onto `openchamber:chats` so suggestions stay useful across projectless chats;

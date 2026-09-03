@@ -20,4 +20,10 @@ describe('SessionNodeItem parentID tree', () => {
     expect(source).not.toMatch(/handleRowSelect[\s\S]{0,400}openContextPanelTab/);
     expect(source).not.toContain('openSubagentChildSession');
   });
+
+  test('Open in Side Panel uses the current window session scope', () => {
+    expect(source).toContain('openSessionInSidePanel');
+    expect(source).toContain('readContextPanelDirectoryKey');
+    expect(source).toContain('currentSessionID: useSessionUIStore.getState().currentSessionId');
+  });
 });

@@ -45,7 +45,9 @@ import { useHasSessionActivityDuration } from '@/sync/session-activity-timing';
 import { SessionActivityDuration } from '@/components/session/SessionActivityDuration';
 import { useSessionMultiSelectStore } from '@/stores/useSessionMultiSelectStore';
 import { useI18n } from '@/lib/i18n';
+import { readContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { useShiftKeyHeld } from '@/hooks/useShiftKeyHeld';
+import { openSessionInSidePanel } from '@/lib/subagents/childSession';
 import { sessionHasPiGoalMarker } from '@/lib/piGoal';
 import { getSessionGoal } from '@/lib/sessionGoalMetadata';
 import { sessionGoalStatusColor, sessionGoalStatusLabelKey } from '@/lib/sessionGoalPresentation';
@@ -108,7 +110,7 @@ type Props = {
   removeSessionFromFolder: (scopeKey: string, sessionId: string) => void;
   addSessionToFolder: (scopeKey: string, folderId: string, sessionId: string) => void;
   createFolderAndStartRename: (scopeKey: string, parentId?: string | null) => { id: string } | null;
-  openContextPanelTab: (directory: string, options: { mode: 'chat'; dedupeKey: string; label: string; sessionTitleFallback?: string; readOnly?: boolean }) => void;
+  openContextPanelTab: (directory: string, options: { mode: 'chat'; dedupeKey: string; label: string; sessionTitleFallback?: string; readOnly?: boolean; sessionScope?: string | null }) => void;
   handleDeleteSession: (session: Session, source?: { archivedBucket?: boolean; hardDelete?: boolean; skipConfirm?: boolean }) => void;
   handleRestoreSession: (session: Session) => void;
   mobileVariant: boolean;
@@ -1259,11 +1261,13 @@ function SessionNodeItemComponent(props: Props): React.ReactNode {
           disabled={!sessionDirectory}
           onClick={() => {
             if (!sessionDirectory) return;
-            openContextPanelTab(sessionDirectory, {
-              mode: 'chat',
-              dedupeKey: `session:${session.id}`,
+            openSessionInSidePanel({
+              sessionID: session.id,
               label: sessionTitle,
-              sessionTitleFallback: sessionTitle,
+              sessionDirectory,
+              currentSessionID: useSessionUIStore.getState().currentSessionId,
+              currentDirectoryKey: readContextPanelDirectoryKey(),
+              openContextPanelTab,
             });
           }}
           className="[&>svg]:mr-1"
