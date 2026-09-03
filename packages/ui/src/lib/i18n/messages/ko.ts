@@ -2400,6 +2400,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.snippetAutocomplete.footer': '↑↓ 이동 • Enter 선택 • Esc 닫기',
   'snippets.source.global': '전역',
   'snippets.source.project': '프로젝트',
+  'chat.chatInput.toast.modelRequired': '보내기 전에 모델을 선택하세요. 목록이 비어 있으면 설정에서 공급자를 추가하세요.',
   'chat.chatInput.toast.compactFailed': '세션 압축 실패',
   'chat.chatInput.toast.summaryFailed': '요약 생성 실패',
   'chat.messageBody.actions.sendReviewFeedback': '리뷰 피드백을 변경 구현 에이전트에게 보내기',

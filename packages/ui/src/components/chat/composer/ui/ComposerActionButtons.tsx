@@ -47,19 +47,15 @@ export const ComposerActionButtons = React.memo(function ComposerActionButtons(p
 
     const sendButton = (
         <button
-            type={isMobile ? 'button' : 'submit'}
-            disabled={!canSend || (!currentSessionId && !newSessionDraftOpen)}
+            type="button"
+            disabled={!canSend}
             onClick={(event) => {
-                if (!isMobile) {
-                    return;
-                }
-
                 event.preventDefault();
                 onPrimaryAction();
             }}
             className={cn(
                 footerIconButtonClass,
-                canSend && (currentSessionId || newSessionDraftOpen)
+                canSend
                     ? 'text-primary hover:text-primary'
                     : 'opacity-30'
             )}

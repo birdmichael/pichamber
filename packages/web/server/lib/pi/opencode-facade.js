@@ -98,6 +98,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/health', handle(async (_req, res) => {
+    const ready = typeof host?.isReady === 'function' ? host.isReady() === true : true;
+    if (!ready) {
+      json(res, 503, { healthy: false, kernel: 'pi' });
+      return;
+    }
     json(res, 200, { healthy: true, kernel: 'pi' });
   }));
 

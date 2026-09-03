@@ -999,8 +999,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 const providerId = typeof payload.providerID === 'string' ? payload.providerID.trim() : '';
                 const modelId = typeof payload.modelID === 'string' ? payload.modelID.trim() : '';
                 if (!providerId || !modelId) {
-                    restoredSessionModelRef.current = sessionId;
-                    return;
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
                 }
                 if (composerPickedModelRef.current) {
                     restoredSessionModelRef.current = sessionId;
@@ -1013,7 +1013,8 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                     return;
                 }
                 if (result === 'provider-missing' || result === 'model-missing') {
-                    return;
+                    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+                    continue;
                 }
                 restoredSessionModelRef.current = sessionId;
                 return;

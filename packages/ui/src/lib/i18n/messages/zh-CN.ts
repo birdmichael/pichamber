@@ -2366,6 +2366,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.snippetAutocomplete.footer': '↑↓ 导航 • Enter 选择 • Esc 关闭',
   'snippets.source.global': '全局',
   'snippets.source.project': '项目',
+  'chat.chatInput.toast.modelRequired': '请先选择模型再发送。如果列表是空的，请到设置里登录或添加供应商。',
   'chat.chatInput.toast.compactFailed': '压缩会话失败',
   'chat.chatInput.toast.summaryFailed': '生成总结失败',
   'chat.messageBody.actions.sendReviewFeedback': '将审查反馈发送给实现更改的代理',

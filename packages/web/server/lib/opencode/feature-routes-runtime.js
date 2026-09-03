@@ -155,6 +155,7 @@ export const createFeatureRoutesRuntime = (dependencies) => {
       refreshOpenCodeAfterConfigChange,
       buildOpenCodeUrl,
       getOpenCodeAuthHeaders,
+      getPiHost,
     });
 
     registerProjectIconRoutes(app, {

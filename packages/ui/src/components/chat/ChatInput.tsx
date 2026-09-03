@@ -1166,22 +1166,29 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             return;
         }
 
-        if (queuedOnly) {
-            if (queuedMessagesToSend.length === 0 || !currentSessionId) return;
-        } else if ((!inputSnapshot.hasContent && !hasQueuedMessages) || (!currentSessionId && !newSessionDraftOpen)) {
-            return;
-        }
-
-        closeAutocomplete();
-
         const capturedSendConfig = queuedOnly ? queuedMessagesToSend[0]?.sendConfig : undefined;
         const providerIdToSend = capturedSendConfig?.providerID ?? currentProviderId;
         const modelIdToSend = capturedSendConfig?.modelID ?? currentModelId;
         const agentNameToSend = capturedSendConfig?.agent ?? currentAgentName;
         const variantToSend = capturedSendConfig?.variant ?? thinkingToSend;
 
+        // Toast before the session/draft gate: empty New session (no draft flag)
+        // used to return silently and swallow Send when the model chip is empty.
+        if (!queuedOnly && (inputSnapshot.hasContent || hasQueuedMessages) && (!providerIdToSend || !modelIdToSend)) {
+            toast.error(t('chat.chatInput.toast.modelRequired'));
+            return;
+        }
+
+        if (queuedOnly) {
+            if (queuedMessagesToSend.length === 0 || !currentSessionId) return;
+        } else if ((!inputSnapshot.hasContent && !hasQueuedMessages) || (!currentSessionId && !newSessionDraftOpen && !emptySessionWelcome)) {
+            return;
+        }
+
+        closeAutocomplete();
+
         if (!providerIdToSend || !modelIdToSend) {
-            console.warn('Cannot send message: provider or model not selected');
+            toast.error(t('chat.chatInput.toast.modelRequired'));
             return;
         }
 

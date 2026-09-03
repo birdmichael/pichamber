@@ -531,13 +531,20 @@ export const createNodeKernelClient = ({
     if (started) return started;
     started = new Promise((resolve, reject) => {
       try {
-        spawnChild();
+        if (!child) {
+          spawnChild();
+        }
       } catch (error) {
         started = null;
         reject(error);
         return;
       }
       const timer = setTimeout(() => {
+        if (child?.connected) {
+          console.warn('[pi-host] Pi node kernel still starting after 15s; waiting for ready');
+          return;
+        }
+        started = null;
         reject(new Error('Pi node kernel did not become ready'));
       }, 15000);
       const onReady = (message) => {

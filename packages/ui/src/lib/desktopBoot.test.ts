@@ -98,22 +98,22 @@ describe('resolveDesktopBootView', () => {
     ).toEqual({ screen: 'recovery', variant: 'remote-incompatible', hostId: 'old-host', url: 'https://old.test' });
   });
 
-  test('returns chooser for local unreachable', () => {
+  test('returns recovery for local unreachable', () => {
     expect(
       resolveDesktopBootView({
         isDesktopShell: true,
         bootOutcome: { target: 'local', status: 'unreachable' },
       }),
-    ).toEqual({ screen: 'chooser' });
+    ).toEqual({ screen: 'recovery', variant: 'local-unavailable' });
   });
 
-  test('returns remote-only chooser when local runtime is disabled', () => {
+  test('returns recovery when local runtime is disabled', () => {
     expect(
       resolveDesktopBootView({
         isDesktopShell: true,
         bootOutcome: { target: 'local', status: 'unreachable', localAvailable: false },
       }),
-    ).toEqual({ screen: 'chooser', localAvailable: false });
+    ).toEqual({ screen: 'recovery', variant: 'local-unavailable', localAvailable: false });
   });
 
   test('returns recovery view for remote missing', () => {

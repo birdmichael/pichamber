@@ -4974,9 +4974,25 @@ export const createPiHost = ({
     },
     async getSessionModel(sessionID) {
       const record = await ensureRecord(sessionID);
-      const entries = typeof record.sessionManager?.getEntries === 'function'
+      let entries = typeof record.sessionManager?.getEntries === 'function'
         ? record.sessionManager.getEntries()
         : [];
+      if (!Array.isArray(entries) || entries.length === 0) {
+        const file = typeof record.sessionFile === 'string' && record.sessionFile
+          ? record.sessionFile
+          : (typeof record.piSession?.sessionFile === 'string' ? record.piSession.sessionFile : '');
+        if (file) {
+          try {
+            const text = fs.readFileSync(file, 'utf8');
+            entries = text.split('\n').map((line) => {
+              const trimmed = line.trim();
+              if (!trimmed) return null;
+              try { return JSON.parse(trimmed); } catch { return null; }
+            }).filter(Boolean);
+          } catch {
+          }
+        }
+      }
       applySessionRuntimeFromEntries(record.piSession, entries);
       const usable = resolveUsableFacadeModel(
         lastModelChangeFromEntries(entries),

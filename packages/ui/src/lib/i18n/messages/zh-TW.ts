@@ -2370,6 +2370,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.snippetAutocomplete.footer': '↑↓ 導航 • Enter 選擇 • Esc 關閉',
   'snippets.source.global': '全局',
   'snippets.source.project': '項目',
+  'chat.chatInput.toast.modelRequired': '請先選擇模型再傳送。如果列表是空的，請到設定裡登入或新增供應商。',
   'chat.chatInput.toast.compactFailed': '壓縮會話失敗',
   'chat.chatInput.toast.summaryFailed': '生成總結失敗',
   'chat.messageBody.actions.sendReviewFeedback': '將審查回饋傳送給實作變更的代理',

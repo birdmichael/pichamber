@@ -2366,6 +2366,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.snippetAutocomplete.footer": "↑↓ навігація • Enter вибрати • Esc закрити",
   "snippets.source.global": "глобальний",
   "snippets.source.project": "проєкт",
+  "chat.chatInput.toast.modelRequired": "Оберіть модель перед надсиланням. Додайте постачальника в Налаштуваннях, якщо список порожній.",
   "chat.chatInput.toast.compactFailed": "Не вдалося стиснути сесію",
   "chat.chatInput.toast.summaryFailed": "Не вдалося створити підсумок",
   "chat.messageBody.actions.sendReviewFeedback": "Надіслати фідбек ревʼю агенту, який реалізує зміни",
