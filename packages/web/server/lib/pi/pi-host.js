@@ -950,7 +950,9 @@ const applySessionThinkingLevel = async (piSession, level) => {
 const pairSessionThinkingToAvailable = async (piSession, available) => {
   const snapshot = readSessionThinking(piSession);
   const levels = Array.isArray(available) && available.length > 0 ? available : snapshot.available;
-  const next = clampThinkingOntoAvailable(snapshot.thinking, levels);
+  const next = snapshot.thinking && THINKING_LEVELS.includes(snapshot.thinking)
+    ? snapshot.thinking
+    : clampThinkingOntoAvailable(snapshot.thinking, levels);
   if (!next) {
     return { thinking: next, available: levels };
   }
@@ -5078,13 +5080,23 @@ export const createPiHost = ({
       } else {
         available = unionCatalogLevelOntoAvailable(available, catalog, level);
       }
-      const next = clampThinkingOntoAvailable(level, available);
+      if (THINKING_LEVELS.includes(level) && !available.includes(level)) {
+        available = [...available, level];
+      }
+      const next = THINKING_LEVELS.includes(level)
+        ? level
+        : clampThinkingOntoAvailable(level, available);
       if (!next) {
         const error = new Error("Invalid thinking level");
         error.status = 400;
         throw error;
       }
+      const defaultsBefore = readPiDefaults(home).thinking;
       await applySessionThinkingLevel(record.piSession, next);
+      const defaultsAfter = readPiDefaults(home).thinking;
+      if (defaultsAfter !== defaultsBefore) {
+        writePiDefaults(home, { thinking: defaultsBefore });
+      }
       const appliedThinking = readSessionThinking(record.piSession).thinking || next;
       return { applied: true, thinking: appliedThinking, available };
     },
