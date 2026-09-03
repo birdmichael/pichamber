@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Chat: hovering the assistant footer timestamp shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0.
+- Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 
 ## [1.2.11] - 2026-09-03
 
