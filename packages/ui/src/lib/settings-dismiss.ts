@@ -20,8 +20,18 @@ export function hasOpenSettingsOverlay(root?: ParentNode | null): boolean {
   return Boolean(resolveRoot(root)?.querySelector(OPEN_SETTINGS_OVERLAY_SELECTOR));
 }
 
+const NESTED_SETTINGS_DIALOG_SELECTOR = [
+  '[data-slot="dialog-content"]',
+  '[data-nested-dialog-open]',
+].join(',');
+
+/**
+ * Nested Settings overlays (shared Dialog popups, Base UI nested dialogs).
+ * Do not count every `[role="dialog"]` in the document — Settings itself is a
+ * dialog, and unrelated chrome (btw, dictation) also uses that role.
+ */
 function hasNestedSettingsDialog(root?: ParentNode | null): boolean {
-  return (resolveRoot(root)?.querySelectorAll('[role="dialog"]').length ?? 0) > 1;
+  return Boolean(resolveRoot(root)?.querySelector(NESTED_SETTINGS_DIALOG_SELECTOR));
 }
 
 export const SETTINGS_ESCAPE_FORM_EVENT = 'settings-escape-form';
@@ -48,6 +58,21 @@ function hasClosest(target: EventTarget | null): target is EventTarget & { close
 
 export function isEventInsideSettingsView(target: EventTarget | null): boolean {
   return hasClosest(target) && Boolean(target.closest('[data-settings-view="true"]'));
+}
+
+/** True when Esc landed on the Settings window, including its focused popup. */
+export function isInsideSettingsDialog(target: EventTarget | null): boolean {
+  if (!hasClosest(target)) {
+    return false;
+  }
+  if (target.closest('[data-settings-view="true"]')) {
+    return true;
+  }
+  const dialog = target.closest('[role="dialog"]');
+  if (!dialog || typeof (dialog as { querySelector?: unknown }).querySelector !== 'function') {
+    return false;
+  }
+  return Boolean((dialog as ParentNode).querySelector('[data-settings-view="true"]'));
 }
 
 export type SettingsDismissDetails = {

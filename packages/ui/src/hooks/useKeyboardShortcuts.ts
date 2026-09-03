@@ -44,6 +44,7 @@ import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus'
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
+import { isInsideSettingsDialog, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
 const dropdownTargetSelector = [
@@ -384,8 +385,10 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
+      const insideForeignDialog = Boolean(target?.closest('[role="dialog"]'))
+        && !isInsideSettingsDialog(target);
       if (
-        target?.closest('[role="dialog"]')
+        insideForeignDialog
         || isTerminalEventTarget(target)
         || dropdownOpen
       ) {
@@ -399,6 +402,10 @@ export const useKeyboardShortcuts = () => {
         return;
       }
       if (state.isSettingsDialogOpen) {
+        if (shouldBlockSettingsDismiss(false, { reason: 'escape-key', event })) {
+          resetAbortPriming();
+          return;
+        }
         event.preventDefault();
         state.setSettingsDialogOpen(false);
         resetAbortPriming();
