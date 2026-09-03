@@ -12,7 +12,8 @@ test('Escape on Archive, Scheduled, and Worktrees uses closeMainSurfaces after n
   expect(handler).toContain("target?.closest('[role=\"dialog\"]')");
   expect(handler).toContain('isTerminalEventTarget(target)');
   expect(handler).toContain('dropdownOpen');
-  expect(handler.indexOf("target?.closest('[role=\"dialog\"]')")).toBeLessThan(handler.indexOf('shouldCloseMainSurfaceOnEscape'));
+  expect(handler.indexOf("target?.closest('[role=\"dialog\"]')")).toBeLessThan(handler.indexOf('shouldYieldFilesPanelEscape'));
+  expect(handler.indexOf('shouldYieldFilesPanelEscape')).toBeLessThan(handler.indexOf('shouldCloseMainSurfaceOnEscape'));
   expect(handler.indexOf('shouldCloseMainSurfaceOnEscape')).toBeLessThan(handler.indexOf('closeMainSurfaces'));
   expect(handler).toContain('isMultiRunLauncherOpen');
   expect(handler).toContain('multiRunCompareGroup');

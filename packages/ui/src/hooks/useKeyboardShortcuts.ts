@@ -42,6 +42,7 @@ import { cycleComposerThinking } from '@/components/chat/cycleComposerThinking';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
+import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
 import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
@@ -404,6 +405,10 @@ export const useKeyboardShortcuts = () => {
         return;
       }
       if (document.querySelector('[data-settings-view="true"]')) {
+        resetAbortPriming();
+        return;
+      }
+      if (shouldYieldFilesPanelEscape(event, document.querySelector('[data-context-panel="true"]'))) {
         resetAbortPriming();
         return;
       }

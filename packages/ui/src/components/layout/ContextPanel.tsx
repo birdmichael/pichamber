@@ -61,6 +61,7 @@ import {
   clampEditorTreeWidth,
   editorTreeWidthFromDrag,
 } from '@/lib/surfaces/editorSplit';
+import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -723,13 +724,10 @@ export const ContextPanel: React.FC = () => {
       return;
     }
 
-    // Markdown preview find owns Escape while the bar is open (same as X).
-    // Capture here would close the Files panel first (issue #414).
-    const eventTarget = event.target;
-    if (eventTarget instanceof Element && eventTarget.closest('[data-md-preview-find]')) {
-      return;
-    }
-    if (event.currentTarget.querySelector('[data-md-preview-find]')) {
+    // Find/Replace owns the first Escape (same as ×). Capture here would
+    // close the Files panel first (issues #414, #512). Tree context-menu
+    // yield is issue #517 and is not included in this helper yet.
+    if (shouldYieldFilesPanelEscape(event, event.currentTarget)) {
       return;
     }
 

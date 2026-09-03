@@ -91,11 +91,11 @@ describe('issue #414: Escape closes Markdown preview find, not the Files panel',
     const handler = contextPanelSource.slice(start, end);
 
     const terminalIndex = handler.indexOf('isTerminalEventTarget(event.target)');
-    const findIndex = handler.indexOf('[data-md-preview-find]');
+    const yieldIndex = handler.indexOf('shouldYieldFilesPanelEscape');
     const preventIndex = handler.indexOf('event.preventDefault()');
     expect(terminalIndex).toBeGreaterThan(-1);
-    expect(findIndex).toBeGreaterThan(terminalIndex);
-    expect(preventIndex).toBeGreaterThan(findIndex);
+    expect(yieldIndex).toBeGreaterThan(terminalIndex);
+    expect(preventIndex).toBeGreaterThan(yieldIndex);
     expect(handler).toContain('handleClose()');
   });
 });
