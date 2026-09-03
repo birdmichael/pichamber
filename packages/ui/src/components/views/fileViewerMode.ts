@@ -6,12 +6,7 @@ export function isMarkdownFile(path: string): boolean {
   return ext === 'md' || ext === 'markdown';
 }
 
-/**
- * Markdown files open as a rendered preview unless this path or a stored
- * last-used mode already chose edit. The generic "open previewable files in
- * preview" setting must not flip markdown to source on first open.
- */
-export function resolveMarkdownViewMode(input: {
+function resolvePreferredPreviewViewMode(input: {
   pathMode?: PreviewViewMode;
   storedMode?: string | null;
 }): PreviewViewMode {
@@ -22,4 +17,28 @@ export function resolveMarkdownViewMode(input: {
     return input.storedMode;
   }
   return 'preview';
+}
+
+/**
+ * Markdown files open as a rendered preview unless this path or a stored
+ * last-used mode already chose edit. The generic "open previewable files in
+ * preview" setting must not flip markdown to source on first open.
+ */
+export function resolveMarkdownViewMode(input: {
+  pathMode?: PreviewViewMode;
+  storedMode?: string | null;
+}): PreviewViewMode {
+  return resolvePreferredPreviewViewMode(input);
+}
+
+/**
+ * Draw.io files open as the diagram canvas unless this path or a stored
+ * last-used mode already chose XML source. The generic "open previewable
+ * files in preview" setting must not flip diagrams to source on first open.
+ */
+export function resolveDrawioViewMode(input: {
+  pathMode?: PreviewViewMode;
+  storedMode?: string | null;
+}): PreviewViewMode {
+  return resolvePreferredPreviewViewMode(input);
 }

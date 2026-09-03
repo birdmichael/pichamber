@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: Help → Keyboard Shortcuts shows Ctrl/Cmd+K, H, matching Settings and the shortcuts dialog.
 - Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
+- Files: clicking a `.drawio` opens the diagram canvas. The preview toggle still shows XML source.
 
 ## [1.2.11] - 2026-09-03
 
