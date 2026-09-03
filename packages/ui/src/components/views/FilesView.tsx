@@ -26,6 +26,11 @@ import { CodeMirrorEditor } from '@/components/ui/CodeMirrorEditor';
 import { GoToLineDialog } from './GoToLineDialog';
 import { MarkdownPreviewSearch } from './MarkdownPreviewSearch';
 import { isMarkdownFile, resolveDrawioViewMode, resolveMarkdownViewMode, type PreviewViewMode } from './fileViewerMode';
+import {
+  resolveFilesGoToLineFocus,
+  shouldOpenFilesGoToLine,
+  shouldOpenFilesGoToLineWithoutFocus,
+} from './filesViewGoToLine';
 import { PreviewToggleButton } from './PreviewToggleButton';
 import { JsonTreeView } from '@/components/ui/JsonTreeView';
 import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -2977,20 +2982,33 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     };
   }, [isMobile, nudgeEditorSelectionAboveKeyboard]);
 
-  useKeybind('open_go_to_line', (event) => {
-    if (!canEdit || textViewMode !== 'edit' || isMobile) {
-      return false;
+  const revealGoToLineField = React.useCallback(() => {
+    if (!settingsExpandedEditorToolbar && !isMobile) {
+      setIsFloatingToolbarOpen(true);
     }
-
-    const target = event.target as Element | null;
-    if (target?.closest('[role="dialog"]')) return false;
-    if (!(target instanceof Node) || !editorWrapperRef.current?.contains(target)) return false;
-
-    const isEditorTarget = Boolean(target?.closest('.cm-editor'));
-    const isTypingTarget = Boolean(target?.closest('input, textarea, [contenteditable="true"], [role="textbox"]'));
-    if (isTypingTarget && !isEditorTarget) return false;
-
     setIsGoToLineOpen(true);
+  }, [isMobile, settingsExpandedEditorToolbar]);
+
+  useKeybind('open_go_to_line', (event) => {
+    const editorRoot = editorWrapperRef.current;
+    const eventFocus = resolveFilesGoToLineFocus(event.target, editorRoot);
+    const activeFocus = resolveFilesGoToLineFocus(document.activeElement, editorRoot);
+    const focus = eventFocus.inEditor && eventFocus.inEditorRoot ? eventFocus : activeFocus;
+    if (shouldOpenFilesGoToLine({ canEdit, textViewMode, isMobile, focus })) {
+      revealGoToLineField();
+      return;
+    }
+    if (shouldOpenFilesGoToLineWithoutFocus({
+      canEdit,
+      textViewMode,
+      isMobile,
+      hasEditor: Boolean(editorViewRef.current),
+      eventTarget: event.target,
+    })) {
+      revealGoToLineField();
+      return;
+    }
+    return false;
   });
 
   const editorFontSize = useUIStore((state) => state.editorFontSize);
@@ -3937,7 +3955,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
             ref={floatingToolbarRef}
             className="flex shrink-0 justify-end overflow-x-auto px-3 py-1.5"
             onMouseLeave={() => {
-              if (toolbarDropdownOpenCountRef.current > 0) return;
+              if (toolbarDropdownOpenCountRef.current > 0 || isGoToLineOpen) return;
               setIsFloatingToolbarOpen(false);
             }}
           >

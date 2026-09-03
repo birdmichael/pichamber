@@ -14,6 +14,7 @@ import { showOpenCodeStatus } from '@/lib/openCodeStatus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { pickAdjacentProject, resolveVisibleProjectId } from '@/lib/projectNavigation';
 import { opencodeClient } from '@/lib/opencode/client';
+import { shortcutRegistry } from '@/lib/shortcuts';
 
 const getActiveElementSelectedText = (): string => {
   if (typeof document === 'undefined') {
@@ -89,6 +90,7 @@ type MenuAction =
   | 'toggle-memory-debug'
   | 'go-back'
   | 'go-forward'
+  | 'go-to-line'
   | 'previous-session'
   | 'next-session'
   | 'previous-project'
@@ -319,6 +321,10 @@ export const useMenuActions = (
 
         case 'go-forward':
           useDirectoryStore.getState().goForward();
+          break;
+
+        case 'go-to-line':
+          shortcutRegistry.invoke('open_go_to_line');
           break;
 
         case 'previous-session':

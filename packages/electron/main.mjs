@@ -5215,7 +5215,9 @@ const buildAutoHiddenMenu = () => {
       ],
     },
     {
-      label: 'Go',
+      // G&o → mnemonic Alt+O. A plain "Go" title lets GTK steal Alt+G
+      // before the Files editor open_go_to_line shortcut (#503).
+      label: 'G&o',
       submenu: [
         { label: 'Back', accelerator: 'Ctrl+[', click: () => dispatchAction('go-back') },
         { label: 'Forward', accelerator: 'Ctrl+]', click: () => dispatchAction('go-forward') },
@@ -5225,6 +5227,10 @@ const buildAutoHiddenMenu = () => {
         { type: 'separator' },
         { label: 'Previous Project', accelerator: 'Ctrl+Alt+Up', click: () => dispatchAction('previous-project') },
         { label: 'Next Project', accelerator: 'Ctrl+Alt+Down', click: () => dispatchAction('next-project') },
+        { type: 'separator' },
+        // registerAccelerator:false → show Alt+G but let the renderer own
+        // the (customizable) files go-to-line chord.
+        { label: 'Go to Line', accelerator: 'Alt+G', registerAccelerator: false, click: () => dispatchAction('go-to-line') },
       ],
     },
     {

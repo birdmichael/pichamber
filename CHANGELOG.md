@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: Linux hamburger View → Toggle Session Sidebar and Toggle Memory Debug toggle on click. Ctrl+Alt+L and Ctrl+Shift+D still toggle once.
 - Chat: hovering the assistant footer duration (hourglass) shows that turn's recorded input, output, reasoning, and cache tokens. Cost appears only when the kernel reported spend greater than 0. The clock timestamp stays time-only.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
+- Files: Alt+G in the editor opens the Line field. Enter jumps to that line instead of closing the toolbar.
 - Files: clicking a `.drawio` opens the diagram canvas. The preview toggle still shows XML source.
 - Files: Escape on the file tree context menu closes only the menu, not the Files panel. Create File and Delete still cancel with Escape.
 
