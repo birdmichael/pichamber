@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.2.11] - 2026-09-03
+
+- Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.
+- Restoring a session no longer paints thinking as Medium. The composer menu only lists levels the kernel can apply (no catalog-only `xhigh` on Grok). Chip, send, and the transcript footer use the applied level.
+- Changing the session thinking chip no longer writes Pi global defaults, so a new projectless chat still follows Settings.
+
 ## [1.2.10] - 2026-09-03
 
 - Switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
