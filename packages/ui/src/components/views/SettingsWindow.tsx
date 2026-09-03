@@ -5,7 +5,12 @@ import { useI18n } from '@/lib/i18n';
 import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { focusDesktopWindow } from '@/lib/desktop';
-import { SettingsView } from './SettingsView';
+import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
+
+// SettingsView pulls CodeMirror / vim / theme tooling; load it only when open.
+const SettingsView = lazyWithChunkRecovery(() =>
+  import('./SettingsView').then((m) => ({ default: m.SettingsView })),
+);
 
 interface SettingsWindowProps {
   open: boolean;
@@ -82,7 +87,9 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
             </Dialog.Description>
             {open ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+                <React.Suspense fallback={null}>
+                  <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+                </React.Suspense>
               </div>
             ) : null}
           </Dialog.Popup>
