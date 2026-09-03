@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Files: clicking a `.drawio` opens the diagram canvas. The preview toggle still shows XML source.
 - Files: Escape on the file tree context menu closes only the menu, not the Files panel. Create File and Delete still cancel with Escape.
 - Files: Escape on the editor Find/Replace bar closes only the bar, not the Files panel.
+- Desktop: File → New Window no longer keeps the previous project in the OS title while that window is still an empty Choose project session.
 
 ## [1.2.11] - 2026-09-03
 
