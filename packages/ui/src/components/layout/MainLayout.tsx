@@ -25,11 +25,11 @@ import { useDeviceInfo } from '@/lib/device';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
-import { shouldRenderSettingsWindow } from '@/lib/settings-dismiss';
 
 import { ChatView } from '@/components/views/ChatView';
 import { GitViewFallback } from '@/components/views/GitViewFallback';
 import { PlanViewFallback } from '@/components/views/PlanViewFallback';
+import { SettingsWindow } from '@/components/views/SettingsWindow';
 
 // Keep TerminalView eager: the bottom dock reserves its height immediately, so
 // suspending here leaves a large blank panel on slower machines.
@@ -42,7 +42,6 @@ const DiffView = lazyWithChunkRecovery(() => import('@/components/views/DiffView
 const FilesView = lazyWithChunkRecovery(() => import('@/components/views/FilesView').then(m => ({ default: m.FilesView })));
 const DiagramView = lazyWithChunkRecovery(() => import('@/components/views/DiagramView').then(m => ({ default: m.DiagramView })));
 const SettingsView = lazyWithChunkRecovery(() => import('@/components/views/SettingsView').then(m => ({ default: m.SettingsView })));
-const SettingsWindow = lazyWithChunkRecovery(() => import('@/components/views/SettingsWindow').then(m => ({ default: m.SettingsWindow })));
 const ArchiveView = lazyWithChunkRecovery(() => import('@/components/views/ArchiveView').then(m => ({ default: m.ArchiveView })));
 const WorktreesView = lazyWithChunkRecovery(() => import('@/components/views/WorktreesView').then(m => ({ default: m.WorktreesView })));
 const MultiRunCompareView = lazyWithChunkRecovery(() => import('@/components/multirun').then(m => ({ default: m.MultiRunCompareView })));
@@ -55,26 +54,10 @@ export const MainLayout: React.FC = () => {
     const isSessionSwitcherOpen = useUIStore((state) => state.isSessionSwitcherOpen);
     const isSettingsDialogOpen = useUIStore((state) => state.isSettingsDialogOpen);
     const setSettingsDialogOpen = useUIStore((state) => state.setSettingsDialogOpen);
-    // Mount the windowed settings dialog only after its first open: rendering
-    // the lazy component (even closed) makes React fetch the SettingsView
-    // chunk graph (CodeMirror editor, vim mode, theme tooling) on startup.
-    // Once opened it stays mounted so the close animation and state behave as
-    // before.
-    const [settingsWindowMounted, setSettingsWindowMounted] = React.useState(false);
-    React.useEffect(() => {
-        if (isSettingsDialogOpen) {
-            setSettingsWindowMounted(true);
-        }
-    }, [isSettingsDialogOpen]);
-    const settingsWindowShouldRender = shouldRenderSettingsWindow(
-        isSettingsDialogOpen,
-        settingsWindowMounted,
-    );
     const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
     const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
-    // Same first-open mount as Settings: rendering the lazy component fetches
-    // Archive / Worktrees / multi-run chunks. Keep them mounted after first
-    // open so local search/filter state survives close.
+    // Rendering the lazy Archive / Worktrees components fetches their chunks.
+    // Keep them mounted after first open so local search/filter state survives close.
     const [archiveViewMounted, setArchiveViewMounted] = React.useState(false);
     const [worktreesViewMounted, setWorktreesViewMounted] = React.useState(false);
     React.useEffect(() => {
@@ -539,15 +522,12 @@ export const MainLayout: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Desktop settings: windowed dialog with blur */}
-                    {settingsWindowShouldRender ? (
-                        <React.Suspense fallback={null}>
-                            <SettingsWindow
-                                open={isSettingsDialogOpen}
-                                onOpenChange={setSettingsDialogOpen}
-                            />
-                        </React.Suspense>
-                    ) : null}
+                    {/* Desktop settings: keep Dialog.Root mounted (even closed)
+                        so leftover pointerup from the sidebar gear can cancel. */}
+                    <SettingsWindow
+                        open={isSettingsDialogOpen}
+                        onOpenChange={setSettingsDialogOpen}
+                    />
                 </>
             )}
 
