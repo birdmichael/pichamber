@@ -5085,7 +5085,8 @@ export const createPiHost = ({
         throw error;
       }
       await applySessionThinkingLevel(record.piSession, next);
-      return { applied: true, thinking: next, available };
+      const appliedThinking = readSessionThinking(record.piSession).thinking || next;
+      return { applied: true, thinking: appliedThinking, available };
     },
     async setSessionModel(sessionID, modelRef) {
       const record = await ensureLiveRecord(await ensureRecord(sessionID));

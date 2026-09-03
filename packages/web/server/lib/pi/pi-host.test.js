@@ -2610,6 +2610,33 @@ describe('session thinking levels', () => {
     host.dispose();
   });
 
+  it('returns the kernel-applied thinking when setThinkingLevel clamps', async () => {
+    const host = createPiHost({
+      mock: true,
+      defaultDirectory: '/tmp/project',
+      createModelRuntime: async () => ({
+        getAvailable: async () => [{
+          id: 'example-4.6',
+          provider: 'example',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+        }],
+      }),
+    });
+    const record = await host.createSession({ directory: '/tmp/project', title: 'Kernel clamp' });
+    record.sessionManager = record.piSession.sessionManager;
+    record.sessionManager.appendEntry({ type: 'model_change', provider: 'example', modelId: 'example-4.6' });
+    record.piSession.getAvailableThinkingLevels = () => ['low', 'medium', 'high'];
+    record.piSession.thinkingLevel = 'high';
+    record.piSession.setThinkingLevel = (level) => {
+      record.piSession.thinkingLevel = level === 'xhigh' ? 'medium' : level;
+    };
+
+    const applied = await host.setSessionThinking(record.id, 'xhigh');
+    expect(applied.thinking).toBe('medium');
+    expect(record.piSession.thinkingLevel).toBe('medium');
+    host.dispose();
+  });
+
   it('keeps a live non-narrow thinking subset instead of replacing it with catalog', async () => {
     const host = createPiHost({
       mock: true,
