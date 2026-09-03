@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { CodeMirrorEditor } from '@/components/ui/CodeMirrorEditor';
 import { GoToLineDialog } from './GoToLineDialog';
 import { MarkdownPreviewSearch } from './MarkdownPreviewSearch';
-import { isMarkdownFile, resolveMarkdownViewMode, type PreviewViewMode } from './fileViewerMode';
+import { isMarkdownFile, resolveDrawioViewMode, resolveMarkdownViewMode, type PreviewViewMode } from './fileViewerMode';
 import { PreviewToggleButton } from './PreviewToggleButton';
 import { JsonTreeView } from '@/components/ui/JsonTreeView';
 import { SimpleMarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -2510,7 +2510,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       // Ignore localStorage errors
     }
     setHtmlViewMode(htmlViewModeByPathRef.current[selectedPath] ?? htmlDefault);
-    setDrawioViewMode(drawioViewModeByPathRef.current[selectedPath] ?? (settingsDefaultFileViewerPreview ? 'preview' : 'edit'));
+    // Draw.io defaults to the diagram canvas. A per-path choice still wins;
+    // the generic preview setting does not force XML source on first open.
+    setDrawioViewMode(resolveDrawioViewMode({
+      pathMode: drawioViewModeByPathRef.current[selectedPath],
+    }));
 
     let jsonDefault: 'tree' | 'text' = settingsDefaultFileViewerPreview ? 'tree' : 'text';
     try {
