@@ -2453,6 +2453,14 @@ const dispatchMenuAction = (action) => {
   dispatchDomEventToWindow(target, 'openchamber:menu-action', action);
 };
 
+// Toggle/dialog menu actions must reach the renderer exactly once. Dual IPC+DOM
+// delivery (dispatchMenuAction) would open then immediately close the overlay
+// because useMenuActions listens on both IPC and the window CustomEvent.
+const dispatchMenuActionOnce = (action) => {
+  const target = getMenuTargetWindow();
+  if (target) emitToWindow(target, 'openchamber:menu-action', action);
+};
+
 // Append-style menu actions must reach the renderer exactly once. Dual IPC+DOM
 // delivery (dispatchMenuAction) would insert the selection twice.
 const dispatchAddSelectionToChat = () => {
@@ -5020,7 +5028,7 @@ const buildMacMenu = () => {
         { label: 'Restart', click: () => relaunchFromMenu() },
         // registerAccelerator:false → renderer owns Cmd+P so the native
         // menu does not toggle a second palette on top of Shortcuts (#379).
-        { label: 'Command Palette', accelerator: 'Cmd+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
+        { label: 'Command Palette', accelerator: 'Cmd+P', registerAccelerator: false, click: () => dispatchMenuActionOnce('command-palette') },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -5099,6 +5107,7 @@ const buildMacMenu = () => {
         // (`open_help` is `mod+k h`). Electron cannot bind a sequential
         // accelerator, so the catalog string is display-only (#515).
         { label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
+        { label: 'Keyboard Shortcuts', accelerator: 'Cmd+.', click: () => dispatchMenuActionOnce('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Cmd+Shift+L', click: () => dispatchAction('download-logs') },
         { label: 'Toggle Developer Tools', accelerator: 'Cmd+Alt+I', click: () => openDevToolsForMenuTarget() },
         { type: 'separator' },
@@ -5135,7 +5144,7 @@ const buildAutoHiddenMenu = () => {
         { label: 'Restart', click: () => relaunchFromMenu() },
         // registerAccelerator:false → renderer owns Ctrl+P so the native
         // menu does not toggle a second palette on top of Shortcuts (#379).
-        { label: 'Command Palette', accelerator: 'Ctrl+P', registerAccelerator: false, click: () => dispatchAction('command-palette') },
+        { label: 'Command Palette', accelerator: 'Ctrl+P', registerAccelerator: false, click: () => dispatchMenuActionOnce('command-palette') },
         { type: 'separator' },
         { role: 'quit' },
       ],
@@ -5223,6 +5232,7 @@ const buildAutoHiddenMenu = () => {
         // (`open_help` is `mod+k h`). Electron cannot bind a sequential
         // accelerator, so the catalog string is display-only (#515).
         { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => dispatchAction('help-dialog') },
+        { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+.', click: () => dispatchMenuActionOnce('help-dialog') },
         { label: 'Show Diagnostics', accelerator: 'Ctrl+Shift+L', click: () => dispatchAction('download-logs') },
         { type: 'separator' },
         { label: 'Clear Cache', click: () => void handleInvoke(null, 'desktop_clear_cache') },

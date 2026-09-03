@@ -112,4 +112,37 @@ test('Help Keyboard Shortcuts advertises Cmd+K, H / Ctrl+K, H and does not regis
     0,
     'leftover Ctrl+. must not be advertised on Keyboard Shortcuts',
   );
+const readConstArrowFn = (source, name) => {
+  const match = source.match(new RegExp(`const ${name} = \\([^)]*\\) => \\{([\\s\\S]*?)\\n\\};`));
+  assert.ok(match, `expected ${name}`);
+  return match[1];
+};
+
+test('Command Palette and Keyboard Shortcuts menu clicks are single-delivery', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+
+  const dual = readConstArrowFn(source, 'dispatchMenuAction');
+  assert.match(dual, /emitToWindow\(/);
+  assert.match(dual, /dispatchDomEventToWindow\(/);
+
+  const once = readConstArrowFn(source, 'dispatchMenuActionOnce');
+  assert.match(once, /emitToWindow\(/);
+  assert.doesNotMatch(once, /dispatchDomEventToWindow/);
+  assert.equal([...once.matchAll(/emitToWindow\(/g)].length, 1);
+
+  const paletteItems = [...source.matchAll(/\{ label: 'Command Palette'[^}]*\}/g)].map((match) => match[0]);
+  assert.equal(paletteItems.length, 2, 'expected darwin and Linux/Windows Command Palette items');
+  for (const item of paletteItems) {
+    assert.match(item, /click: \(\) => dispatchMenuActionOnce\('command-palette'\)/);
+    assert.doesNotMatch(item, /dispatchAction\(/);
+    assert.doesNotMatch(item, /dispatchMenuAction\(/);
+  }
+
+  const helpItems = [...source.matchAll(/\{ label: 'Keyboard Shortcuts'[^}]*\}/g)].map((match) => match[0]);
+  assert.equal(helpItems.length, 2, 'expected darwin and Linux/Windows Keyboard Shortcuts items');
+  for (const item of helpItems) {
+    assert.match(item, /click: \(\) => dispatchMenuActionOnce\('help-dialog'\)/);
+    assert.doesNotMatch(item, /dispatchAction\(/);
+    assert.doesNotMatch(item, /dispatchMenuAction\(/);
+  }
 });
