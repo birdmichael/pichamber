@@ -26,6 +26,15 @@ export function isEditableEventTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest(EDITABLE_SELECTOR));
 }
 
+/** Session-tab digits (mod+digit) yield to typing. Context-surface digits (mod+alt+digit) do not. */
+export function shouldYieldHeldDigitShortcutToEditor(options: {
+  isEditableTarget: boolean;
+  requiresAlternateModifier: boolean;
+}): boolean {
+  if (!options.isEditableTarget) return false;
+  return !options.requiresAlternateModifier;
+}
+
 /** Unmodified typing in a *different* editable field than the leader press is not a chord. */
 export function shouldClearShortcutPrefixForTyping(
   event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'target'>,

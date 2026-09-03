@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from 'bun:test';
 
-import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping } from './keyboard-shortcut-dom';
+import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
 test('does not treat an unrelated visible listbox as an open dropdown', () => {
   const promptNavigator = {} as Element;
@@ -93,6 +93,21 @@ test('treats a nested span inside a contenteditable or CodeMirror parent as edit
   const cmContent = new StubHTMLElement('DIV', false, { className: 'cm-content' });
   const cmLine = new StubHTMLElement('SPAN', false, { className: 'cm-line', parent: cmContent });
   expect(isEditableEventTarget(cmLine as unknown as HTMLElement)).toBe(true);
+});
+
+test('Ctrl+Alt+digit still switches the context rail while the composer is focused', () => {
+  expect(shouldYieldHeldDigitShortcutToEditor({
+    isEditableTarget: true,
+    requiresAlternateModifier: true,
+  })).toBe(false);
+  expect(shouldYieldHeldDigitShortcutToEditor({
+    isEditableTarget: true,
+    requiresAlternateModifier: false,
+  })).toBe(true);
+  expect(shouldYieldHeldDigitShortcutToEditor({
+    isEditableTarget: false,
+    requiresAlternateModifier: true,
+  })).toBe(false);
 });
 
 test('keeps a composer-armed Ctrl+K leader so the second key is not typed', () => {
