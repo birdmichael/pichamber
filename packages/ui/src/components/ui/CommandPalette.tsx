@@ -35,7 +35,7 @@ import { getContextFileOpenFailureMessage, validateContextFileOpen } from '@/lib
 import { toast } from '@/components/ui';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import type { Session } from '@opencode-ai/sdk/v2';
-import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
+import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
 import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
@@ -186,7 +186,7 @@ export const CommandPalette: React.FC = () => {
         shortcutId: 'new_chat_worktree',
         searchText: t('commandPalette.item.newWorktreeDraft'),
         onSelect: run(() => {
-          void createWorktreeSession();
+          void openNewWorktreeDialog();
         }),
       },
       {

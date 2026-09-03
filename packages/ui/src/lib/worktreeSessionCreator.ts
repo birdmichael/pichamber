@@ -1,12 +1,13 @@
 /**
  * Utilities for creating worktrees and, when needed, sessions bound to them.
- * This is a standalone entrypoint for keyboard shortcuts, menu actions,
- * and other non-hook contexts.
+ * File menu, shortcut, and command palette open NewWorktreeDialog. Instant
+ * draft creation remains for the composer New control.
  */
 
 import { toast } from '@/components/ui';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useProjectsStore } from '@/stores/useProjectsStore';
+import { useUIStore } from '@/stores/useUIStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useContextStore } from '@/stores/contextStore';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
@@ -85,7 +86,42 @@ export const createQuickWorktree = async (
 // Track if a worktree creation flow is already running
 let isCreatingWorktreeSession = false;
 
+const resolveActiveGitProjectForWorktree = async (): Promise<ProjectRef | null> => {
+  const activeProject = useProjectsStore.getState().getActiveProject();
+  if (!activeProject?.path) {
+    toast.error('No active project', {
+      description: 'Please select a project first.',
+    });
+    return null;
+  }
 
+  let isGitRepo = false;
+  try {
+    isGitRepo = await checkIsGitRepository(activeProject.path);
+  } catch {
+    // Ignore errors, treat as not a git repo
+  }
+
+  if (!isGitRepo) {
+    toast.error('Not a Git repository', {
+      description: 'Worktrees can only be created in Git repositories.',
+    });
+    return null;
+  }
+
+  return { id: activeProject.id, path: activeProject.path };
+};
+
+/**
+ * Open the shared New worktree dialog. Does not create a worktree; Esc/Cancel
+ * leaves the repository unchanged. Non-git projects toast instead of opening.
+ */
+export async function openNewWorktreeDialog(): Promise<boolean> {
+  const project = await resolveActiveGitProjectForWorktree();
+  if (!project) return false;
+  useUIStore.getState().setNewWorktreeDialogOpen(true);
+  return true;
+}
 
 const applyDefaultAgentAndModelSelection = (sessionId: string, configState = useConfigStore.getState()) => {
   try {
@@ -185,34 +221,14 @@ const createInstantWorktreeDraft = async (options?: {
     return null;
   }
 
-  const activeProject = useProjectsStore.getState().getActiveProject();
-  if (!activeProject?.path) {
-    toast.error('No active project', {
-      description: 'Please select a project first.',
-    });
-    return null;
-  }
-
-  const projectDirectory = activeProject.path;
-
-  let isGitRepo = false;
-  try {
-    isGitRepo = await checkIsGitRepository(projectDirectory);
-  } catch {
-    // Ignore errors, treat as not a git repo
-  }
-
-  if (!isGitRepo) {
-    toast.error('Not a Git repository', {
-      description: 'Worktrees can only be created in Git repositories.',
-    });
+  const projectRef = await resolveActiveGitProjectForWorktree();
+  if (!projectRef) {
     return null;
   }
 
   isCreatingWorktreeSession = true;
 
   try {
-    const projectRef: ProjectRef = { id: activeProject.id, path: projectDirectory };
     const pendingRequestId = createPendingDraftWorktreeRequest();
 
     // Lock the draft immediately so no React effect can reset it to the project
