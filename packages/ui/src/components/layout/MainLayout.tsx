@@ -25,6 +25,7 @@ import { useDeviceInfo } from '@/lib/device';
 import { resolveDesktopActiveMainTab } from '@/lib/surfaces/planRail';
 import { cn } from '@/lib/utils';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
+import { shouldRenderSettingsWindow } from '@/lib/settings-dismiss';
 
 import { ChatView } from '@/components/views/ChatView';
 import { GitViewFallback } from '@/components/views/GitViewFallback';
@@ -65,6 +66,10 @@ export const MainLayout: React.FC = () => {
             setSettingsWindowMounted(true);
         }
     }, [isSettingsDialogOpen]);
+    const settingsWindowShouldRender = shouldRenderSettingsWindow(
+        isSettingsDialogOpen,
+        settingsWindowMounted,
+    );
     const isArchivePageOpen = useUIStore((state) => state.isArchivePageOpen);
     const worktreesPageProjectId = useUIStore((state) => state.worktreesPageProjectId);
     // Same first-open mount as Settings: rendering the lazy component fetches
@@ -535,7 +540,7 @@ export const MainLayout: React.FC = () => {
                     </div>
 
                     {/* Desktop settings: windowed dialog with blur */}
-                    {settingsWindowMounted ? (
+                    {settingsWindowShouldRender ? (
                         <React.Suspense fallback={null}>
                             <SettingsWindow
                                 open={isSettingsDialogOpen}
