@@ -94,6 +94,9 @@ function collectStartupEnv(options = {}) {
   if (options.apiOnly === true) {
     env.OPENCHAMBER_API_ONLY = 'true';
   }
+  if (typeof process.env.PICHAMBER_DATA_DIR === 'string' && process.env.PICHAMBER_DATA_DIR.trim().length > 0) {
+    env.PICHAMBER_DATA_DIR = path.resolve(process.env.PICHAMBER_DATA_DIR.trim());
+  }
   if (typeof process.env.OPENCHAMBER_DATA_DIR === 'string' && process.env.OPENCHAMBER_DATA_DIR.trim().length > 0) {
     env.OPENCHAMBER_DATA_DIR = path.resolve(process.env.OPENCHAMBER_DATA_DIR.trim());
   }

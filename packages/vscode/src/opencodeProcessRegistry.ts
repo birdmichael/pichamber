@@ -18,9 +18,9 @@
 // is provably gone (reparented to pid 1, or recorded owner pid dead).
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { resolveAppDataDir } from './appDataDir';
 
 type ManagedProcessEntry = {
   pid: number;
@@ -34,7 +34,7 @@ type ManagedProcessEntry = {
 const resolveRegistryDir = (): string => {
   const override = process.env.OPENCHAMBER_MANAGED_PROCESS_REGISTRY;
   if (override && override.trim()) return override.trim();
-  return path.join(os.homedir(), '.config', 'openchamber', 'managed-opencode');
+  return path.join(resolveAppDataDir(), 'managed-opencode');
 };
 
 const entryFilePath = (pid: number): string => path.join(resolveRegistryDir(), `${pid}.json`);

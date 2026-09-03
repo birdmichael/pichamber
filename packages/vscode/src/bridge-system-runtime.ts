@@ -11,6 +11,7 @@ import { getSessionActivitySnapshot } from './sessionActivityWatcher';
 import { getOpenCodeUpgradeStatus, upgradeManagedOpenCode } from './opencode-upgrade-runtime';
 import { buildDeferredRestartResponse } from './config-mutation-response';
 import type { BridgeContext, BridgeResponse } from './bridge';
+import { resolveAppDataDir } from './appDataDir';
 
 type BridgeMessageInput = {
   id: string;
@@ -46,13 +47,7 @@ const claimNotification = (key: string): boolean => {
 };
 
 
-const getOpenChamberConfigDir = (): string => {
-  if (process.platform === 'win32') {
-    const appData = process.env.APPDATA;
-    if (appData) return path.join(appData, 'openchamber');
-  }
-  return path.join(os.homedir(), '.config', 'openchamber');
-};
+const getOpenChamberConfigDir = (): string => resolveAppDataDir();
 
 const sanitizeInstallScope = (scope: string): 'vscode' | 'web' => {
   if (scope === 'vscode' || scope === 'web') return scope;

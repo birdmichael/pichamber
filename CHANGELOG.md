@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - Desktop: Help → Keyboard Shortcuts is a single menu row again (`Ctrl/Cmd+K, H`) and opens with one-shot menu delivery (repair after #531 merge conflict).
+- Desktop: app data now lives in `~/.config/pichamber`. Existing OpenChamber settings, sessions, favorite models, and relay keys are copied over on first launch. `PICHAMBER_DATA_DIR` overrides the location; `OPENCHAMBER_DATA_DIR` still works as a leftover alias.
 - Chat: Ctrl+Alt+digit switches the context rail even while the composer is focused.
 - Chat: Alt+Up / Alt+Down no longer paste the session title into the composer. Those keys stay session switching; only unmodified arrows walk message history.
 - Desktop: Go → Next/Previous Project leaves a projectless chat and opens the adjacent workspace, even when that project was already the inherited File/New default.

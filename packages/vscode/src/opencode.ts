@@ -11,6 +11,7 @@ import { normalizeWindowsDriveLetter } from './pathUtils';
 import { resolveWorkingDirectoryChange } from './workingDirectoryChange';
 import { registerManagedProcess, unregisterManagedProcess, reapOrphanedProcesses } from './opencodeProcessRegistry';
 import { applyProviderEnvAliases } from './provider-env-aliases';
+import { resolveAppDataDir } from './appDataDir';
 
 const t = vscode.l10n.t;
 
@@ -84,7 +85,7 @@ function isValidOpenCodePassword(password: string): boolean {
 }
 
 function readOpenChamberSettings(): Record<string, unknown> {
-  const settingsPath = path.join(os.homedir(), '.config', 'openchamber', 'settings.json');
+  const settingsPath = path.join(resolveAppDataDir(), 'settings.json');
   try {
     const raw = fs.readFileSync(settingsPath, 'utf8');
     const parsed = JSON.parse(raw) as unknown;

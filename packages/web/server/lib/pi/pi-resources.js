@@ -4,6 +4,7 @@ import path from 'node:path';
 import yaml from 'yaml';
 
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
+import { resolveAppDataDir } from '../app-data/index.js';
 
 export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
@@ -161,9 +162,7 @@ const walkFiles = (root, predicate, results = [], seen = new Set()) => {
 export const PI_CODING_AGENT_DIR_ENV = 'PI_CODING_AGENT_DIR';
 
 const openchamberSettingsFile = (home = os.homedir()) => path.join(
-  process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(home, '.config', 'openchamber'),
+  resolveAppDataDir({ home }),
   'settings.json',
 );
 
@@ -265,12 +264,7 @@ export const resolvePiSystemMdPath = (home = os.homedir()) => path.join(resolveP
 export const resolvePiAppendSystemMdPath = (home = os.homedir()) => path.join(resolvePiAgentDir(home), 'APPEND_SYSTEM.md');
 
 export const resolveActiveProjectDirectory = (home = os.homedir()) => {
-  const settingsFile = path.join(
-    process.env.OPENCHAMBER_DATA_DIR
-      ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-      : path.join(home, '.config', 'openchamber'),
-    'settings.json',
-  );
+  const settingsFile = path.join(resolveAppDataDir({ home }), 'settings.json');
   try {
     const settings = JSON.parse(readText(settingsFile));
     if (typeof settings.lastDirectory === 'string' && settings.lastDirectory.trim()) {

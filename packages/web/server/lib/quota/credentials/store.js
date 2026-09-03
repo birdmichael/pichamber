@@ -1,15 +1,10 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { resolveAppDataDir } from '../../app-data/index.js';
 
 const MANAGED_QUOTA_PROVIDERS = new Set(['ollama-cloud', 'cursor']);
 
-const credentialsDirectory = () => path.join(
-  process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(os.homedir(), '.config', 'openchamber'),
-  'quota',
-);
+const credentialsDirectory = () => path.join(resolveAppDataDir(), 'quota');
 
 const credentialPath = (providerId) => {
   if (!MANAGED_QUOTA_PROVIDERS.has(providerId)) throw new Error('Unsupported credential provider');

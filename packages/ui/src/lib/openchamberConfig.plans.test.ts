@@ -8,6 +8,9 @@ describe('resolveProjectPlansDirectory', () => {
       '/Users/me/code/app/.pichamber/plans',
     );
     expect(resolveProjectPlansDirectory({ id: 'proj', path: '/Users/me/code/app' })).not.toContain(
+      '.config/pichamber/projects',
+    );
+    expect(resolveProjectPlansDirectory({ id: 'proj', path: '/Users/me/code/app' })).not.toContain(
       '.config/openchamber/projects',
     );
   });

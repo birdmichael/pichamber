@@ -6,6 +6,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { createRequire } from 'module';
 import { upsertGitCredential } from './credentials.js';
+import { resolveAppDataDir } from '../app-data/index.js';
 
 const fsp = fs.promises;
 const require = createRequire(import.meta.url);
@@ -1310,7 +1311,7 @@ export async function computeIntegratePlan(input = {}) {
 }
 
 const createIntegrateTempWorktree = async (repoRoot, targetBranch) => {
-  const tmpParent = path.join(os.homedir(), '.config', 'openchamber', 'tmp');
+  const tmpParent = path.join(resolveAppDataDir(), 'tmp');
   await fsp.mkdir(tmpParent, { recursive: true });
   const tmpDir = await fsp.mkdtemp(path.join(tmpParent, 'oc-integrate-'));
   try {

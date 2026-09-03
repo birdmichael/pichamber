@@ -15,6 +15,7 @@ import { getInstanceFilePath, readInstanceOptions } from './cli-process.js';
 import { createRemoteClientAuthRuntime } from '../../server/lib/client-auth/remote-clients.js';
 import { createClientPairingRuntime } from '../../server/lib/client-auth/pairing.js';
 import { createRelayIdentityRuntime } from '../../server/lib/relay/identity.js';
+import { getDataDir } from './cli-paths.js';
 import { DEFAULT_RELAY_URL } from '../../server/lib/relay/service.js';
 import { bytesToBase64Url } from '../../server/lib/relay/e2ee.js';
 import {
@@ -56,7 +57,7 @@ function resolveRelayUrl(settings) {
 // whole object and writes it back with the relay keys added, so other settings
 // are preserved. Enough for the CLI without wiring the full settings runtime.
 function createSettingsAccessors() {
-  const settingsPath = path.join(getOpenChamberDataDir(), SETTINGS_FILE_NAME);
+  const settingsPath = path.join(getDataDir(), SETTINGS_FILE_NAME);
   const readSettingsFromDiskMigrated = async () => {
     try {
       return JSON.parse(await fs.promises.readFile(settingsPath, 'utf8'));
@@ -101,7 +102,7 @@ async function buildRelayPairingCandidate() {
 // session created here is redeemable by the live server. createPairingSession
 // only writes the store (no server needed to mint); redeem is served by the host.
 function createCliPairingRuntime() {
-  const dataDir = getOpenChamberDataDir();
+  const dataDir = getDataDir();
   const remoteClientAuthRuntime = createRemoteClientAuthRuntime({
     fsPromises: fs.promises,
     path,
@@ -204,12 +205,6 @@ function normalizeServerUrlForConnection(value) {
   } catch {
     return null;
   }
-}
-
-function getOpenChamberDataDir() {
-  return process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(os.homedir(), '.config', 'pichamber');
 }
 
 async function displayTunnelQrCode(url) {

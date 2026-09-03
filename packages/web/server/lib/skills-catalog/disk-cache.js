@@ -1,10 +1,8 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { resolveAppDataDir } from '../app-data/index.js';
 
-const resolveDataDir = () => (process.env.OPENCHAMBER_DATA_DIR
-  ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-  : path.join(os.homedir(), '.config', 'openchamber'));
+const resolveDataDir = () => resolveAppDataDir();
 
 const readJsonFile = (filePath) => {
   try {

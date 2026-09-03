@@ -4,8 +4,16 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 
 export const CHAT_DRAFT_PROJECT_ID = 'openchamber:chats';
-const MANAGED_CHATS_PATH_SEGMENT = '/.config/openchamber/chats/';
+const MANAGED_CHATS_PATH_SEGMENTS = [
+  '/.config/pichamber/chats/',
+  '/.config/openchamber/chats/',
+] as const;
 const chatsRootByRuntime = new Map<string, Promise<string>>();
+
+const matchingChatsPathSegment = (normalized: string | null | undefined): string | null => {
+  if (!normalized) return null;
+  return MANAGED_CHATS_PATH_SEGMENTS.find((segment) => normalized.includes(segment)) ?? null;
+};
 
 const joinPath = (base: string, ...parts: string[]): string => {
   const separator = base.includes('\\') ? '\\' : '/';
@@ -14,28 +22,30 @@ const joinPath = (base: string, ...parts: string[]): string => {
 
 export function isChatDirectoryForHome(directory: string | null | undefined, home: string | null | undefined): boolean {
   const normalized = normalizePath(directory ?? null);
-  if (normalized?.includes(MANAGED_CHATS_PATH_SEGMENT)) return true;
+  if (matchingChatsPathSegment(normalized)) return true;
   const normalizedHome = normalizePath(home ?? null);
   if (!normalized || !normalizedHome) return false;
-  const root = normalizePath(joinPath(normalizedHome, '.config', 'openchamber', 'chats'));
-  return Boolean(root && normalized.startsWith(`${root}/`));
+  return MANAGED_CHATS_PATH_SEGMENTS.some((segment) => {
+    const root = normalizePath(joinPath(normalizedHome, ...segment.slice(1, -1).split('/')));
+    return Boolean(root && (normalized === root || normalized.startsWith(`${root}/`)));
+  });
 }
 
 export function isChatDirectoryPath(directory: string | null | undefined): boolean {
-  return normalizePath(directory ?? null)?.includes(MANAGED_CHATS_PATH_SEGMENT) === true;
+  return matchingChatsPathSegment(normalizePath(directory ?? null)) !== null;
 }
 
 export function getChatsRootFromDirectory(directory: string | null | undefined): string | null {
   const normalized = normalizePath(directory ?? null);
-  const index = normalized?.indexOf(MANAGED_CHATS_PATH_SEGMENT) ?? -1;
-  return normalized && index >= 0
-    ? normalized.slice(0, index + MANAGED_CHATS_PATH_SEGMENT.length - 1)
-    : null;
+  const segment = matchingChatsPathSegment(normalized);
+  if (!normalized || !segment) return null;
+  const index = normalized.indexOf(segment);
+  return index >= 0 ? normalized.slice(0, index + segment.length - 1) : null;
 }
 
 export function getChatsRootForHome(home: string | null | undefined): string | null {
   const normalizedHome = normalizePath(home ?? null);
-  return normalizedHome ? normalizePath(joinPath(normalizedHome, '.config', 'openchamber', 'chats')) : null;
+  return normalizedHome ? normalizePath(joinPath(normalizedHome, '.config', 'pichamber', 'chats')) : null;
 }
 
 /**
@@ -86,7 +96,7 @@ async function getChatsRootDirectory(): Promise<string> {
 
   const pending = opencodeClient.getFilesystemHome().then((home) => {
     if (!home) throw new Error('Unable to resolve the home directory');
-    return joinPath(home, '.config', 'openchamber', 'chats');
+    return joinPath(home, '.config', 'pichamber', 'chats');
   }).catch((error) => {
     chatsRootByRuntime.delete(runtimeKey);
     throw error;

@@ -1,9 +1,9 @@
 import { spawnSync } from 'child_process';
 import crypto from 'crypto';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { resolveAppDataDir } from './app-data/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,12 +32,7 @@ function getUpdateCheckApiUrl() {
 }
 
 function getOpenChamberConfigDir() {
-  if (process.platform === 'win32') {
-    const appData = process.env.APPDATA;
-    if (appData) return path.join(appData, 'openchamber');
-  }
-
-  return path.join(os.homedir(), '.config', 'openchamber');
+  return resolveAppDataDir();
 }
 
 function sanitizeInstallScope(scope) {

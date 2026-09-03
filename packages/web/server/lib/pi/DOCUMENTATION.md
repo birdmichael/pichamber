@@ -9,7 +9,7 @@ child that loads `{agentDir}/npm`. Product behavior is documented in
 
 `resolvePiAgentDir` is the only resolver. Order:
 
-1. Non-empty persisted `settings.piAgentDir` (`~/.config/openchamber/settings.json`)
+1. Non-empty persisted `settings.piAgentDir` (`~/.config/pichamber/settings.json`)
 2. `process.env.PI_CODING_AGENT_DIR`
 3. `{home}/.pi/agent`
 
@@ -214,7 +214,7 @@ reads the electron tree.
 
 ## First-install project seed
 
-When `~/.config/openchamber/settings.json` is missing, or the file exists
+When `~/.config/pichamber/settings.json` is missing, or the file exists
 but has never persisted a `projects` key, settings migration walks
 `{agentDir}/sessions/` and seeds those cwds as open projects. Read `cwd`
 from the session jsonl header (first object). Do not decode the encoded
@@ -222,7 +222,8 @@ folder name. Keep paths that still exist as directories. Skip `/tmp`,
 `/private/tmp`, `os.tmpdir()`, any `node_modules` tree, `.cursor`
 trees, `.git/worktrees` metadata dirs, leftover Cursor/cloud
 checkout names (`cursor/desktop-…`, `cursor-desktop-…`), isolated
-`~/.config/openchamber/chats` descendants, and the exact home folder. Nested
+`~/.config/pichamber/chats` and leftover `~/.config/openchamber/chats`
+descendants, and the exact home folder. Nested
 herdr/subagent jsonl are children, not projects. `archive/`
 stays off the list. One unreadable folder or jsonl does not drop the
 rest. `activeProjectId` / `lastDirectory` are the most recently updated

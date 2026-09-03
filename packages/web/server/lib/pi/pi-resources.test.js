@@ -917,9 +917,9 @@ describe('behavior AGENTS.md', () => {
     withUnsetDataDir(() => {
       const home = makeTemp();
       const project = makeTemp();
-      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'pichamber'), { recursive: true });
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ lastDirectory: project }),
       );
       fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\nRepo rules only.\n');
@@ -951,9 +951,9 @@ describe('behavior AGENTS.md', () => {
       const userPath = resolvePiAgentsMdPath(home);
       fs.mkdirSync(path.dirname(userPath), { recursive: true });
       fs.writeFileSync(userPath, 'User global rules.\n');
-      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'pichamber'), { recursive: true });
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ lastDirectory: project }),
       );
       fs.writeFileSync(path.join(project, 'AGENTS.md'), '# Pichamber Agent Guide\n');
@@ -1011,9 +1011,9 @@ describe('resolvePiAgentDir', () => {
     const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
     delete process.env.OPENCHAMBER_DATA_DIR;
     try {
-      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'pichamber'), { recursive: true });
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ piAgentDir: custom }),
       );
       expect(resolvePiAgentDir(home, { env: {} })).toBe(custom);
@@ -1029,9 +1029,9 @@ describe('resolvePiAgentDir', () => {
     const previousDataDir = process.env.OPENCHAMBER_DATA_DIR;
     delete process.env.OPENCHAMBER_DATA_DIR;
     try {
-      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'pichamber'), { recursive: true });
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ piAgentDir: custom }),
       );
       expect(listPiSkillRoots({ home })[0].root).toBe(path.join(custom, 'skills'));
