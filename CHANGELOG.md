@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: Ctrl+Alt+digit switches the context rail even while the composer is focused.
 - Chat: Alt+Up / Alt+Down no longer paste the session title into the composer. Those keys stay session switching; only unmodified arrows walk message history.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.

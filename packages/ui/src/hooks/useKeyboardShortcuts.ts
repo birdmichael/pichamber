@@ -43,7 +43,7 @@ import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
-import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape } from './keyboard-shortcut-dom';
+import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
 const dropdownTargetSelector = [
   '[data-slot="dropdown-menu-content"]', '[data-slot="select-content"]', '[role="combobox"]',
@@ -487,7 +487,10 @@ export const useKeyboardShortcuts = () => {
         && !event.repeat
         && eventMatchesShortcutPrefix(event, switchSurfacePrefix, heldKeysRef.current)
       ) {
-        if (isEditableEventTarget(event.target)) return;
+        if (shouldYieldHeldDigitShortcutToEditor({
+          isEditableTarget: isEditableEventTarget(event.target),
+          requiresAlternateModifier: true,
+        })) return;
         const state = useUIStore.getState();
         if (!state.isMobile && panelDirectoryKey) {
           const directory = normalizeContextPanelDirectoryKey(panelDirectoryKey);
