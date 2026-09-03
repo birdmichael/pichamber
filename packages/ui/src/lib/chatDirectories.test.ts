@@ -41,30 +41,38 @@ describe('chat directories', () => {
   test('creates one isolated directory beneath the dated chats root', async () => {
     const directory = await createChatDirectory(new Date(2026, 7, 21, 12));
     expect(createdDirectories[0]).toBe(directory);
-    expect(directory.startsWith('/Users/tester/.config/openchamber/chats/2026-08-21/session-')).toBe(true);
+    expect(directory.startsWith('/Users/tester/.config/pichamber/chats/2026-08-21/session-')).toBe(true);
     expect(createdDirectories).toEqual([directory]);
     expect(createDirectoryOptions).toEqual([undefined]);
   });
 
   test('recognizes only descendants of the managed chats root', () => {
+    expect(isChatDirectoryForHome('/Users/tester/.config/pichamber/chats/2026-08-21/session-a', '/Users/tester')).toBe(true);
     expect(isChatDirectoryForHome('/Users/tester/.config/openchamber/chats/2026-08-21/session-a', '/Users/tester')).toBe(true);
     expect(isChatDirectoryForHome('/Users/tester/project', '/Users/tester')).toBe(false);
     expect(isChatDirectoryForHome('/remote/home/.config/openchamber/chats/2026-08-21/session-a', '/Users/tester')).toBe(true);
     expect(isChatDirectoryPath('/remote/home/.config/openchamber/chats/2026-08-21/session-a')).toBe(true);
+    expect(isChatDirectoryPath('/remote/home/.config/pichamber/chats/2026-08-21/session-a')).toBe(true);
     expect(getChatsRootFromDirectory('/remote/home/.config/openchamber/chats/2026-08-21/session-a')).toBe('/remote/home/.config/openchamber/chats');
+    expect(getChatsRootFromDirectory('/remote/home/.config/pichamber/chats/2026-08-21/session-a')).toBe('/remote/home/.config/pichamber/chats');
   });
 
   test('treats home as a chat only when it is not an opened project', () => {
     expect(isManagedChatDirectory('/Users/tester', '/Users/tester')).toBe(true);
     expect(isManagedChatDirectory('/Users/tester', '/Users/tester', new Set(['/Users/tester']))).toBe(false);
     expect(isManagedChatDirectory('/Users/tester/project', '/Users/tester')).toBe(false);
+    expect(isManagedChatDirectory('/Users/tester/.config/pichamber/chats/2026-08-21/session-a', '/Users/tester', new Set(['/Users/tester']))).toBe(true);
     expect(isManagedChatDirectory('/Users/tester/.config/openchamber/chats/2026-08-21/session-a', '/Users/tester', new Set(['/Users/tester']))).toBe(true);
   });
 
   test('deletes managed chat directories but leaves project directories alone', async () => {
+    await deleteChatDirectory('/Users/tester/.config/pichamber/chats/2026-08-21/session-a');
     await deleteChatDirectory('/Users/tester/.config/openchamber/chats/2026-08-21/session-a');
     await deleteChatDirectory('/Users/tester/project');
     await deleteChatDirectory('/Users/tester');
-    expect(deletedDirectories).toEqual(['/Users/tester/.config/openchamber/chats/2026-08-21/session-a']);
+    expect(deletedDirectories).toEqual([
+      '/Users/tester/.config/pichamber/chats/2026-08-21/session-a',
+      '/Users/tester/.config/openchamber/chats/2026-08-21/session-a',
+    ]);
   });
 });

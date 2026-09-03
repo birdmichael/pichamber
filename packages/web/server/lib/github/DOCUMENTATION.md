@@ -46,7 +46,7 @@
 
 ## Auth storage and config
 
-- Auth storage: `github-auth.json` under `OPENCHAMBER_DATA_DIR` or `~/.config/openchamber`.
+- Auth storage: `github-auth.json` under `PICHAMBER_DATA_DIR` (deprecated alias `OPENCHAMBER_DATA_DIR`) or `~/.config/pichamber`.
 - Writes are atomic and file mode is `0o600`.
 - New OAuth tokens are stamped with the client id that issued them. A leftover OpenChamber token (missing `clientId`, or stamped `Ov23lizomPOC3eFYo56r`) is not a Pichamber login.
 - Client ID resolution order: `PICHAMBER_GITHUB_CLIENT_ID` -> deprecated `OPENCHAMBER_GITHUB_CLIENT_ID` -> `settings.json` `githubClientId` -> Pichamber default `Ov23lit4gCvEzB2YqOuU`.

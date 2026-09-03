@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
+import { resolveAppDataDir } from '../app-data/index.js';
 
 const DEFAULT_GITHUB_CLIENT_ID = 'Ov23lit4gCvEzB2YqOuU';
 const LEGACY_OPENCHAMBER_GITHUB_CLIENT_ID = 'Ov23lizomPOC3eFYo56r';
@@ -8,9 +8,7 @@ const DEFAULT_GITHUB_SCOPES = 'repo read:org workflow read:user user:email';
 export const GH_CLI_ACCOUNT_ID = 'gh-cli';
 
 function getDataDir() {
-  return process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(os.homedir(), '.config', 'openchamber');
+  return resolveAppDataDir();
 }
 
 function getStorageFile() {

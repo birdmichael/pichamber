@@ -85,6 +85,7 @@ import { createServerStartupRuntime } from './lib/opencode/server-startup-runtim
 import { createTunnelWiringRuntime } from './lib/opencode/tunnel-wiring-runtime.js';
 import { createStartupPipelineRuntime } from './lib/opencode/startup-pipeline-runtime.js';
 import { runCliEntryIfMain } from './lib/opencode/cli-entry-runtime.js';
+import { resolveAppDataDir } from './lib/app-data/index.js';
 import { registerNotificationRoutes } from './lib/notifications/routes.js';
 import { createNotificationEmitterRuntime } from './lib/notifications/emitter-runtime.js';
 import { createNotificationTriggerRuntime } from './lib/notifications/runtime.js';
@@ -258,7 +259,7 @@ const sanitizeModelRefs = (...args) => settingsNormalizationRuntime.sanitizeMode
 const sanitizeSkillCatalogs = (...args) => settingsNormalizationRuntime.sanitizeSkillCatalogs(...args);
 const sanitizeProjects = (...args) => settingsNormalizationRuntime.sanitizeProjects(...args);
 
-const OPENCHAMBER_USER_CONFIG_ROOT = path.join(os.homedir(), '.config', 'openchamber');
+const OPENCHAMBER_USER_CONFIG_ROOT = resolveAppDataDir();
 const OPENCHAMBER_USER_THEMES_DIR = path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'themes');
 const OPENCHAMBER_PROJECTS_CONFIG_DIR = path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'projects');
 
@@ -291,9 +292,7 @@ const maybeCacheSessionInfoFromEvent = (...args) => notificationTemplateRuntime.
 const buildTemplateVariables = (...args) => notificationTemplateRuntime.buildTemplateVariables(...args);
 const getCachedZenModels = (...args) => notificationTemplateRuntime.getCachedZenModels(...args);
 
-const OPENCHAMBER_DATA_DIR = process.env.OPENCHAMBER_DATA_DIR
-  ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-  : path.join(os.homedir(), '.config', 'openchamber');
+const OPENCHAMBER_DATA_DIR = OPENCHAMBER_USER_CONFIG_ROOT;
 const SETTINGS_FILE_PATH = path.join(OPENCHAMBER_DATA_DIR, 'settings.json');
 const PUSH_SUBSCRIPTIONS_FILE_PATH = path.join(OPENCHAMBER_DATA_DIR, 'push-subscriptions.json');
 const APNS_TOKENS_FILE_PATH = path.join(OPENCHAMBER_DATA_DIR, 'apns-tokens.json');

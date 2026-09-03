@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 
+import { isManagedChatsPath } from '../app-data/index.js';
 import { SESSION_ARCHIVE_DIRNAME } from './session-archive.js';
 
 const HEADER_READ_BYTES = 8192;
@@ -69,7 +70,7 @@ export const isSkippedPiSessionProjectCwd = (cwd, options = {}) => {
     }
   }
 
-  if (normalized.includes('/.config/openchamber/chats')) return true;
+  if (isManagedChatsPath(normalized)) return true;
 
   const home = typeof options.home === 'string' && options.home.trim()
     ? pathMod.resolve(options.home)

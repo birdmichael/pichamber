@@ -638,9 +638,9 @@ describe('createPiHost', () => {
     try {
       fs.mkdirSync(first, { recursive: true });
       fs.mkdirSync(second, { recursive: true });
-      fs.mkdirSync(path.join(home, '.config', 'openchamber'), { recursive: true });
+      fs.mkdirSync(path.join(home, '.config', 'pichamber'), { recursive: true });
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ piAgentDir: first }),
       );
       const host = createPiHost({
@@ -651,7 +651,7 @@ describe('createPiHost', () => {
       expect(host.getPath('/tmp/project').config).toBe(first);
       expect(host.getKernelInfo().paths.agent).toBe(first);
       fs.writeFileSync(
-        path.join(home, '.config', 'openchamber', 'settings.json'),
+        path.join(home, '.config', 'pichamber', 'settings.json'),
         JSON.stringify({ piAgentDir: second }),
       );
       await host.reload();

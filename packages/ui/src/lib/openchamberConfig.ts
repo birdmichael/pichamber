@@ -1,6 +1,6 @@
 /**
  * OpenChamber project-level configuration service.
- * Stores per-project settings in ~/.config/openchamber/<projectId>.json.
+ * Stores per-project settings in ~/.config/pichamber/projects/<projectId>.json.
  * Migrates from legacy <project>/.openchamber/openchamber.json.
  */
 
@@ -18,7 +18,8 @@ type ProjectRef = { id: string; path: string };
 const CONFIG_FILENAME = 'openchamber.json';
 // LEGACY_PROJECT_CONFIG: legacy per-project config root inside repo.
 const LEGACY_CONFIG_DIR = '.openchamber';
-const USER_PROJECTS_DIR_SEGMENTS = ['.config', 'openchamber', 'projects'];
+const USER_PROJECTS_DIR_SEGMENTS = ['.config', 'pichamber', 'projects'];
+const LEGACY_USER_PROJECTS_DIR_SEGMENTS = ['.config', 'openchamber', 'projects'];
 
 /**
  * Get the runtime Files API if available (Desktop/VSCode).
@@ -246,6 +247,14 @@ const getUserProjectsDirectory = async (): Promise<string | null> => {
   return USER_PROJECTS_DIR_SEGMENTS.reduce((acc, segment) => joinPath(acc, segment), home);
 };
 
+const getLegacyUserProjectsDirectory = async (): Promise<string | null> => {
+  const home = await resolveHomeDirectory();
+  if (!home) {
+    return null;
+  }
+  return LEGACY_USER_PROJECTS_DIR_SEGMENTS.reduce((acc, segment) => joinPath(acc, segment), home);
+};
+
 const resolveConfigProjectId = (project: ProjectRef): string | null => {
   const projectDirectory = typeof project?.path === 'string' ? project.path.trim() : '';
   const normalizedProject = projectDirectory ? normalize(projectDirectory) : '';
@@ -255,6 +264,18 @@ const resolveConfigProjectId = (project: ProjectRef): string | null => {
 
 const getUserConfigPath = async (project: ProjectRef): Promise<string | null> => {
   const base = await getUserProjectsDirectory();
+  if (!base) {
+    return null;
+  }
+  const safeId = resolveConfigProjectId(project);
+  if (!safeId) {
+    return null;
+  }
+  return joinPath(base, `${safeId}.json`);
+};
+
+const getLegacyUserConfigPath = async (project: ProjectRef): Promise<string | null> => {
+  const base = await getLegacyUserProjectsDirectory();
   if (!base) {
     return null;
   }
@@ -576,7 +597,7 @@ async function readOpenChamberConfig(project: ProjectRef): Promise<OpenChamberCo
     }
   };
 
-  // 1) Prefer new per-user config.
+  // 1) Prefer branded per-user config.
   if (configPath) {
     const existing = parseConfig(await readText(configPath));
     if (existing) {
@@ -584,8 +605,18 @@ async function readOpenChamberConfig(project: ProjectRef): Promise<OpenChamberCo
     }
   }
 
+  // 1b) Dual-read leftover OpenChamber project configs if the branded copy
+  // is not present yet (server migration copies the tree; UI still reads both).
+  const leftoverConfigPath = await getLegacyUserConfigPath(project);
+  if (leftoverConfigPath && leftoverConfigPath !== configPath) {
+    const leftover = parseConfig(await readText(leftoverConfigPath));
+    if (leftover) {
+      return leftover;
+    }
+  }
+
   // 2) Migrate legacy <project>/.openchamber/openchamber.json.
-  // LEGACY_PROJECT_CONFIG: migrate project-local openchamber.json -> ~/.config/openchamber/projects/<projectId>.json
+  // LEGACY_PROJECT_CONFIG: migrate project-local openchamber.json -> ~/.config/pichamber/projects/<projectId>.json
   const legacyPath = getLegacyConfigPath(projectDirectory);
   const legacyConfig = parseConfig(await readText(legacyPath));
   if (!legacyConfig) {

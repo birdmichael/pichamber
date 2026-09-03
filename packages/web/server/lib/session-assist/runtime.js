@@ -9,18 +9,13 @@
 // server is running ever generate anything. No backfill, no session scans.
 
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { resolveAppDataDir } from '../app-data/index.js';
 
 import { dispatchPiSessionRequest, resolvePiHost } from '../pi/in-process-session.js';
 import { isGoalCommandUserText } from '../pi/session-plan.js';
 
-const OPENCHAMBER_SETTINGS_FILE = path.join(
-  process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(os.homedir(), '.config', 'openchamber'),
-  'settings.json',
-);
+const OPENCHAMBER_SETTINGS_FILE = path.join(resolveAppDataDir(), 'settings.json');
 
 // The Chat settings are hard generation switches (default on): when both are
 // off, no small-model calls and no metadata writes happen at all. Existing

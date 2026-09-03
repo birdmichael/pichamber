@@ -1,6 +1,6 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { resolveAppDataDir } from '../app-data/index.js';
 import { readAuthFile } from '../opencode/auth.js';
 import { readConfigLayers } from '../opencode/shared.js';
 import { getModelCatalog } from './catalog.js';
@@ -14,12 +14,7 @@ import {
   resolvePiSmallModel,
 } from './pi.js';
 
-const OPENCHAMBER_SETTINGS_FILE = path.join(
-  process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
-    : path.join(os.homedir(), '.config', 'openchamber'),
-  'settings.json',
-);
+const OPENCHAMBER_SETTINGS_FILE = path.join(resolveAppDataDir(), 'settings.json');
 
 // OpenChamber's own settings: when the user unchecks "use default small model"
 // their explicit override outranks every other resolution step.

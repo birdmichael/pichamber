@@ -8,6 +8,7 @@ import {
 import { createRealpathCache } from '../path-realpath-cache.js';
 import { DEFAULT_UPSTREAM_STALL_TIMEOUT_MS } from '../event-stream/upstream-reader.js';
 import { recordStartupPerformance } from './startup-performance.js';
+import { resolveAppDataDir } from '../app-data/index.js';
 
 const DEFAULT_SSE_HEARTBEAT_INTERVAL_MS = 20_000;
 
@@ -702,7 +703,7 @@ export const registerOpenCodeProxy = (app, deps) => {
           return null;
         });
 
-        const settingsPath = path.join(os.homedir(), '.config', 'openchamber', 'settings.json');
+        const settingsPath = path.join(resolveAppDataDir(), 'settings.json');
         let projectDirs = [];
         try {
           const settingsRaw = fs.readFileSync(settingsPath, 'utf8');

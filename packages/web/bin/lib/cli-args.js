@@ -604,7 +604,8 @@ ENVIRONMENT:
   OPENCHAMBER_HOST             Bind address (e.g. 0.0.0.0 for all interfaces)
   OPENCHAMBER_UI_PASSWORD      Alternative to --ui-password flag
   OPENCHAMBER_API_ONLY         Set to true/1 to start API routes only
-  OPENCHAMBER_DATA_DIR         Override OpenChamber data directory
+  PICHAMBER_DATA_DIR           Override Pichamber data directory (default: ~/.config/pichamber)
+  OPENCHAMBER_DATA_DIR         Deprecated alias for PICHAMBER_DATA_DIR
   OPENCODE_HOST               External OpenCode server base URL, e.g. http://hostname:4096
   OPENCODE_PORT               Port of external OpenCode server to connect to
   OPENCODE_SKIP_START          Skip starting OpenCode, use external server

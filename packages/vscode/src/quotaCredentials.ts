@@ -1,12 +1,12 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { resolveAppDataDir } from './appDataDir';
 
 export type ManagedProvider = 'ollama-cloud' | 'cursor';
 export type ManagedCredential = Record<string, string>;
 const providers = new Set<ManagedProvider>(['ollama-cloud', 'cursor']);
-const directory = () => path.join(process.env.OPENCHAMBER_DATA_DIR ? path.resolve(process.env.OPENCHAMBER_DATA_DIR) : path.join(os.homedir(), '.config', 'openchamber'), 'quota');
+const directory = () => path.join(resolveAppDataDir(), 'quota');
 const target = (provider: ManagedProvider) => {
   if (!providers.has(provider)) throw new Error('Unsupported credential provider');
   return path.join(directory(), `${provider}.json`);

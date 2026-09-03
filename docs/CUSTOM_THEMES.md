@@ -6,7 +6,7 @@ Pichamber supports user-defined themes. Drop a JSON file into the themes directo
 
 1. Create the themes directory:
    ```bash
-   mkdir -p ~/.config/openchamber/themes
+   mkdir -p ~/.config/pichamber/themes
    ```
 
 2. Create a theme JSON file (e.g., `my-theme.json`) with the format below.
@@ -19,7 +19,7 @@ Pichamber supports user-defined themes. Drop a JSON file into the themes directo
 
 | Platform | Path |
 |----------|------|
-| macOS/Linux | `~/.config/openchamber/themes/` |
+| macOS/Linux | `~/.config/pichamber/themes/` |
 
 ## Theme Format
 

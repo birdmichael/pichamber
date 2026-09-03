@@ -15,7 +15,7 @@ const joinPath = (base: string, segment: string): string => {
   return `${normalizedBase}/${cleanSegment}`;
 };
 
-/** Real project folder for Save as plan — not ~/.config/openchamber/projects. */
+/** Real project folder for Save as plan — not ~/.config/pichamber/projects. */
 export const resolveProjectPlansDirectory = (project: ProjectRef): string | null => {
   const projectDirectory = typeof project?.path === 'string' ? project.path.trim() : '';
   if (!projectDirectory) {

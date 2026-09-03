@@ -77,6 +77,8 @@ These modules hold reusable, non-presentational logic for commands.
 
 - `cli-paths.js`
   - Data, run, log, settings, tunnel profile, and managed-local config paths.
+    Data dir is `resolveAppDataDir()` (`~/.config/pichamber`, `PICHAMBER_DATA_DIR`,
+    deprecated `OPENCHAMBER_DATA_DIR`).
 
 - `cli-process.js`
   - PID files, instance registry files, process identity checks, runtime metadata checks, and process termination helpers.

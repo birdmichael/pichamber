@@ -48,6 +48,10 @@ describe('pi session project discovery', () => {
       tmpdir: '/var/tmp',
       home: '/home/box',
     })).toBe(true);
+    expect(isSkippedPiSessionProjectCwd('/home/box/.config/pichamber/chats/2026-08-21/session-a', {
+      tmpdir: '/var/tmp',
+      home: '/home/box',
+    })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/home/box', { tmpdir: '/var/tmp', home: '/home/box' })).toBe(true);
     expect(isSkippedPiSessionProjectCwd('/home/box/pichamber', { tmpdir: '/var/tmp', home: '/home/box' })).toBe(false);
     expect(projectLabelFromPath('/repo/app')).toBe('app');

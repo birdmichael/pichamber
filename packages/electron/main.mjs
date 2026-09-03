@@ -53,6 +53,7 @@ import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-t
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
 import { beginLinuxNativeDialogConstrain } from './linux-native-dialog-bounds.mjs';
 import { mintOutsideFileGrant } from '@pichamber/web/server/lib/fs/routes.js';
+import { resolveAppDataDir } from '@pichamber/web/server/lib/app-data/index.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -584,12 +585,7 @@ const refreshQuitRiskFlags = async () => {
   }
 };
 
-const settingsFilePath = () => {
-  if (typeof process.env.OPENCHAMBER_DATA_DIR === 'string' && process.env.OPENCHAMBER_DATA_DIR.trim()) {
-    return path.join(process.env.OPENCHAMBER_DATA_DIR.trim(), 'settings.json');
-  }
-  return path.join(os.homedir(), '.config', 'openchamber', 'settings.json');
-};
+const settingsFilePath = () => path.join(resolveAppDataDir(), 'settings.json');
 
 const sshManager = new ElectronSshManager({
   settingsFilePath: settingsFilePath(),
@@ -4322,7 +4318,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (!underHome && !underTmp) {
         throw new Error('File is outside the allowed workspace');
       }
-      const DENIED_SEGMENTS = ['.ssh', '.aws', '.gnupg', '.gpg', '.config/gh', '.config/openchamber/credentials'];
+      const DENIED_SEGMENTS = ['.ssh', '.aws', '.gnupg', '.gpg', '.config/gh', '.config/pichamber/credentials', '.config/openchamber/credentials'];
       const relFromHome = underHome ? filePath.slice(home.length + 1) : '';
       const relNormalized = relFromHome.split(path.sep).join('/');
       if (DENIED_SEGMENTS.some((segment) => relNormalized === segment || relNormalized.startsWith(`${segment}/`))) {
