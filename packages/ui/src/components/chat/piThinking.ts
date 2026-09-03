@@ -79,8 +79,10 @@ export function isNarrowPiThinkingAvailable(available: unknown): boolean {
 }
 
 /**
- * Empty catalog does not invent levels. Live may narrow catalog only when it
- * is a non-narrow subset (not empty / `off`-only).
+ * Empty catalog does not invent levels. A non-narrow live list from the
+ * session is the kernel's actual set (may add `off`/`minimal` or drop
+ * catalog `xhigh`). Off-only / empty live is ignored so the catalog stands
+ * until the session answers.
  */
 export function resolvePairedPiThinking(input: {
   current?: string | null;
@@ -92,13 +94,26 @@ export function resolvePairedPiThinking(input: {
     return { thinking: undefined, levels: [] };
   }
   const live = parseAvailablePiThinkingLevels(input.liveAvailable);
-  const liveMatchesCatalog = !isNarrowPiThinkingAvailable(live)
-    && live.every((level) => catalog.includes(level));
-  const levels = liveMatchesCatalog ? live : catalog;
+  const levels = !isNarrowPiThinkingAvailable(live) ? live : catalog;
   return {
     thinking: clampPiThinkingLevel(input.current ?? undefined, levels),
     levels,
   };
+}
+
+/**
+ * Empty drafts have no GET /session/:id/thinking. Prefer the project pin,
+ * then Pi defaults, then the current chip. Passing nothing clamps to
+ * medium and ignores Settings / project pin.
+ */
+export function resolveEmptyDraftThinkingCurrent(input: {
+  projectVariant?: string | null;
+  defaultsThinking?: string | null;
+  current?: string | null;
+}): PiThinkingLevel | undefined {
+  return parsePiThinkingLevel(input.projectVariant)
+    ?? parsePiThinkingLevel(input.defaultsThinking)
+    ?? parsePiThinkingLevel(input.current);
 }
 
 /** Composer send uses the Pi chip. Leftover OpenCode variant is off the Pi path. */
