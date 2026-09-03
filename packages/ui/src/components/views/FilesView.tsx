@@ -774,6 +774,27 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const floatingToolbarRef = React.useRef<HTMLDivElement | null>(null);
   const toolbarDropdownOpenCountRef = React.useRef(0);
 
+  // ContextPanel captures Escape and closes Files (issue #512). While the
+  // editor Find/Replace bar is open, consume Escape on window capture so the
+  // first Esc closes only the bar (same as ×). A later Esc can close Files.
+  React.useEffect(() => {
+    if (!isSearchOpen) {
+      return;
+    }
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setIsSearchOpen(false);
+    };
+    window.addEventListener('keydown', handleWindowKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeyDown, { capture: true });
+    };
+  }, [isSearchOpen]);
+
   const handleToolbarDropdownOpenChange = React.useCallback((open: boolean) => {
     toolbarDropdownOpenCountRef.current = Math.max(
       0,

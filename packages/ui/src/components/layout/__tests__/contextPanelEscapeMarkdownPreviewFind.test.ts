@@ -20,6 +20,7 @@ const searchSource = readFileSync(
 describe('issue #414: Escape with Markdown preview find open must not close the context panel', () => {
   test('the context panel still captures Escape at the panel level', () => {
     expect(contextPanelSource).toContain('onKeyDownCapture={handlePanelKeyDownCapture}');
+    expect(contextPanelSource).toContain("from '@/lib/files-panel-escape'");
   });
 
   test('the capture handler skips closing when preview find is open, after the terminal skip', () => {
@@ -31,17 +32,17 @@ describe('issue #414: Escape with Markdown preview find open must not close the 
 
     expect(handler).toContain("event.key !== 'Escape'");
     expect(handler).toContain('isTerminalEventTarget(event.target)');
-    expect(handler).toContain('[data-md-preview-find]');
+    expect(handler).toContain('shouldYieldFilesPanelEscape');
     expect(handler).toContain('event.preventDefault()');
     expect(handler).toContain('event.stopPropagation()');
     expect(handler).toContain('handleClose()');
 
     const terminalIndex = handler.indexOf('isTerminalEventTarget(event.target)');
-    const findIndex = handler.indexOf('[data-md-preview-find]');
+    const yieldIndex = handler.indexOf('shouldYieldFilesPanelEscape');
     const preventIndex = handler.indexOf('event.preventDefault()');
     expect(terminalIndex).toBeGreaterThan(-1);
-    expect(findIndex).toBeGreaterThan(terminalIndex);
-    expect(preventIndex).toBeGreaterThan(findIndex);
+    expect(yieldIndex).toBeGreaterThan(terminalIndex);
+    expect(preventIndex).toBeGreaterThan(yieldIndex);
   });
 
   test('the find widget consumes Escape on window capture so the panel never sees it', () => {

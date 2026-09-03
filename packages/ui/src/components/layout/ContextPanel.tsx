@@ -48,7 +48,7 @@ import {
   type EmbeddedSessionChatURLCacheEntry,
   type EmbeddedSessionRuntimeBootstrap,
 } from './contextPanelEmbeddedChat';
-import { shouldYieldFilesPanelEscape } from './contextPanelEscape';
+import { shouldYieldFilesPanelEscape as shouldYieldFilesOverlayEscape } from './contextPanelEscape';
 import { getContextSurfaceWidthFraction } from '@/lib/surfaces/registry';
 import {
   clampContextPanelLayoutWidth,
@@ -61,6 +61,7 @@ import {
   clampEditorTreeWidth,
   editorTreeWidthFromDrag,
 } from '@/lib/surfaces/editorSplit';
+import { shouldYieldFilesPanelEscape as shouldYieldFilesFindEscape } from '@/lib/files-panel-escape';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -723,19 +724,15 @@ export const ContextPanel: React.FC = () => {
       return;
     }
 
-    // Markdown preview find owns Escape while the bar is open (same as X).
-    // Capture here would close the Files panel first (issue #414).
-    const eventTarget = event.target;
-    if (eventTarget instanceof Element && eventTarget.closest('[data-md-preview-find]')) {
-      return;
-    }
-    if (event.currentTarget.querySelector('[data-md-preview-find]')) {
+    // Find/Replace owns the first Escape (same as ×). Capture here would
+    // close the Files panel first (issues #414, #512).
+    if (shouldYieldFilesFindEscape(event, event.currentTarget)) {
       return;
     }
 
     // Tree context/kebab menus and Create File / Delete dialogs own Escape.
     // Capture here would close Files as well (issue #517).
-    if (shouldYieldFilesPanelEscape({ target: event.target })) {
+    if (shouldYieldFilesOverlayEscape({ target: event.target })) {
       return;
     }
 

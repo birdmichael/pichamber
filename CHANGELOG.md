@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Settings: Pi bundled catalog providers such as Anthropic no longer appear in the Providers sidebar unless they are in `auth.json` or `models.json`. An env-only token, or Disconnect, no longer leaves a leftover row.
 - Files: clicking a `.drawio` opens the diagram canvas. The preview toggle still shows XML source.
 - Files: Escape on the file tree context menu closes only the menu, not the Files panel. Create File and Delete still cancel with Escape.
+- Files: Escape on the editor Find/Replace bar closes only the bar, not the Files panel.
 
 ## [1.2.11] - 2026-09-03
 
