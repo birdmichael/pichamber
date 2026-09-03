@@ -148,3 +148,47 @@ test('Command Palette and Keyboard Shortcuts menu clicks are single-delivery', (
     assert.doesNotMatch(item, /dispatchMenuAction\(/);
   }
 });
+
+test('View toggle menu actions use emit-only single delivery', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const helper = source.match(/const dispatchViewToggleAction = \(action\) => \{[\s\S]*?\n\};/);
+  assert.ok(helper, 'expected dispatchViewToggleAction helper');
+  assert.match(helper[0], /emitToWindow\(target, 'openchamber:menu-action', action\)/);
+  assert.doesNotMatch(helper[0], /dispatchDomEventToWindow/);
+  assert.doesNotMatch(helper[0], /dispatchMenuAction/);
+
+  const dual = source.match(/const dispatchMenuAction = \(action\) => \{[\s\S]*?\n\};/);
+  assert.ok(dual, 'expected dispatchMenuAction to remain dual-delivery for other items');
+  assert.match(dual[0], /emitToWindow/);
+  assert.match(dual[0], /dispatchDomEventToWindow/);
+
+  const sidebarItems = [...source.matchAll(
+    /\{ label: 'Toggle Session Sidebar', accelerator: '(Cmd\+Alt\+L|Ctrl\+Alt\+L)'[^}]*\}/g,
+  )].map((match) => match[0]);
+  assert.equal(sidebarItems.length, 2, 'expected darwin and Linux/Windows Toggle Session Sidebar items');
+  assert.ok(sidebarItems.some((item) => item.includes("accelerator: 'Cmd+Alt+L'")));
+  assert.ok(sidebarItems.some((item) => item.includes("accelerator: 'Ctrl+Alt+L'")));
+
+  const memoryItems = [...source.matchAll(
+    /\{ label: 'Toggle Memory Debug', accelerator: '(Cmd\+Shift\+D|Ctrl\+Shift\+D)'[^}]*\}/g,
+  )].map((match) => match[0]);
+  assert.equal(memoryItems.length, 2, 'expected darwin and Linux/Windows Toggle Memory Debug items');
+  assert.ok(memoryItems.some((item) => item.includes("accelerator: 'Cmd+Shift+D'")));
+  assert.ok(memoryItems.some((item) => item.includes("accelerator: 'Ctrl+Shift+D'")));
+
+  for (const item of [...sidebarItems, ...memoryItems]) {
+    assert.match(item, /registerAccelerator:\s*false/);
+    assert.match(item, /click:\s*\(\)\s*=>\s*dispatchViewToggleAction\(/);
+    assert.doesNotMatch(item, /dispatchAction\(/);
+    assert.doesNotMatch(item, /dispatchMenuAction\(/);
+  }
+
+  assert.match(
+    sidebarItems.join('\n'),
+    /dispatchViewToggleAction\('toggle-sidebar'\)/,
+  );
+  assert.match(
+    memoryItems.join('\n'),
+    /dispatchViewToggleAction\('toggle-memory-debug'\)/,
+  );
+});
