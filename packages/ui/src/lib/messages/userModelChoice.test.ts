@@ -142,4 +142,27 @@ describe('extractUserModelChoice', () => {
     } as Message
     expect(extractUserModelChoice(message as never)?.variant).toBe('high')
   })
+
+  test('reads top-level providerID/modelID when model is a provider/model string', () => {
+    const message = {
+      ...userMessage('u1', { providerID: 'xai', modelID: 'grok-4.6' }),
+      providerID: 'xai',
+      modelID: 'grok-4.6',
+      model: 'xai/grok-4.6',
+    }
+    expect(extractUserModelChoice(message as never)).toMatchObject({
+      providerID: 'xai',
+      modelID: 'grok-4.6',
+    })
+  })
+
+  test('ignores leftover facade pi/pi', () => {
+    const message = {
+      ...userMessage('u1', { providerID: 'pi', modelID: 'pi' }),
+      providerID: 'pi',
+      modelID: 'pi',
+    }
+    expect(extractUserModelChoice(message as never)?.providerID).toBeUndefined()
+    expect(extractUserModelChoice(message as never)?.modelID).toBeUndefined()
+  })
 })
