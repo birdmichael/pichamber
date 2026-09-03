@@ -38,6 +38,10 @@ import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import { clampPiThinkingLevel, type PiThinkingLevel } from '@/components/chat/piThinking';
 import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
+import {
+  filterPiEnabledModelsToCatalog,
+  pickPiSessionDefaultModel,
+} from './piSessionDefaultsDisplay';
 
 const getDisplayModel = (
   storedModel: string | undefined
@@ -137,6 +141,8 @@ export const DefaultsSettings: React.FC = () => {
   React.useEffect(() => {
     const loadSettings = async () => {
       try {
+        let piStored = '';
+        let piResolved = '';
         let data: {
           defaultModel?: string;
           defaultVariant?: string;
@@ -199,11 +205,11 @@ export const DefaultsSettings: React.FC = () => {
               retrySettings?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number };
               enabledModels?: unknown;
             };
-            const stored = typeof piDefaults.model === 'string' ? piDefaults.model.trim() : '';
-            const resolved = typeof piDefaults.resolvedModel === 'string' ? piDefaults.resolvedModel.trim() : '';
-            // Empty stored model means "first catalog model" — show that, not "Not selected".
-            if (stored || resolved) {
-              setDefaultModel(stored || resolved);
+            piStored = typeof piDefaults.model === 'string' ? piDefaults.model.trim() : '';
+            piResolved = typeof piDefaults.resolvedModel === 'string' ? piDefaults.resolvedModel.trim() : '';
+            const picked = pickPiSessionDefaultModel(piStored, piResolved);
+            if (picked) {
+              setDefaultModel(picked);
             }
             if (typeof piDefaults.thinking === 'string' && piDefaults.thinking.trim()) {
               setThinkingLevel(piDefaults.thinking.trim());
@@ -230,9 +236,12 @@ export const DefaultsSettings: React.FC = () => {
           if (modelsResponse.ok) {
             const items = listPiEnabledModelRows(await modelsResponse.json());
             setCatalogModels(items);
-            if (isPiKernel && items[0]?.key) {
-              setDefaultModel((current) => current && current.trim() ? current : items[0].key);
+            const catalogKeys = items.map((item) => item.key);
+            if (isPiKernel) {
+              const picked = pickPiSessionDefaultModel(piStored, piResolved, catalogKeys);
+              if (picked) setDefaultModel(picked);
             }
+            setEnabledModels((current) => filterPiEnabledModelsToCatalog(current, catalogKeys));
           }
         } catch {
           // Catalog is optional when the kernel route is unavailable.
