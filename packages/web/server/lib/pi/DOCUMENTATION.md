@@ -327,6 +327,63 @@ When the slot is on:
 Work Status Usage and the Providers xAI card share that payload. Session
 context % / cost stay in the Session block.
 
+## Built-in Kimi Code catalog and subscription login
+
+`GET /api/provider` `all` also merges the Kimi Code stub
+(`kimi-coding`) from `PI_BUILTIN_CATALOG_PROVIDERS` so Add can list
+Kimi Code before login. `connected` and `GET /api/config/providers`
+still hide a model-less stub: `withoutUnconnectedBuiltinCatalogProviders`
+drops `kimi-coding` unless `auth.json` or user/project `models.json` has
+that provider. Product login is built-in `/login kimi-coding`, not the
+Feature Plugin. `getPiAuthMethods` always reports `kimi-coding` as
+Sign in with Kimi Code OAuth first, API key second — connected or not,
+and whether the Kimi Usage slot is installed.
+
+`POST /api/provider/:id/oauth/authorize` and `/callback` accept
+`kimi-coding` in addition to `xai`. Other ids are 404. No pending
+authorize is 400. Authorize times out if `device_code` never arrives.
+The helper is Pi `kimiCodingOAuth` loaded from bundled `pi-ai`
+`dist/auth/oauth/kimi-coding.js` next to `@earendil-works/pi-coding-agent`
+via the same `findNamedPackageDir` pattern as xAI. Callback writes
+`{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
+key `kimi-coding` through `writePiProviderAuth`. Refresh uses
+`kimiCodingOAuth.refresh`, not a copied token exchange. Responses never
+echo access, refresh, or user id. Composer `/login kimi-coding` points
+at Settings → Providers.
+
+## Kimi Usage (feature-plugin slot)
+
+Gate is Feature Plugins `kimi` (`npm:pi-kimi-code-console-usage`)
+installed+enabled. Chrome follows `{agentDir}/settings.json` `packages`.
+Chamber `pichamber.json` `enabled` is ignored. Opening Feature Plugins
+never auto-installs and never runs plugin `npx` setup (that would change
+`defaultProvider`). Uninstall turns the slot off and must not delete
+`auth.json` `kimi-coding` credentials. Product login is built-in
+`/login kimi-coding`, not the Feature Plugin.
+
+When the slot is on:
+
+- `GET /api/pi/kimi-usage` (Pi kernel only) reads `auth.json`
+  `kimi-coding` (oauth first, else api key) and GETs
+  `https://api.kimi.com/coding/v1/usages`. Slot off is
+  `{ ok: false, configured: false, slotActive: false }` with no outbound
+  HTTP even if logged in. Missing credentials is
+  `{ ok: false, configured: false, slotActive: true }`. Fetch or refresh
+  failure is `{ ok: false, configured: true, usage: null, error }` and
+  must not invent `usedPercent: 0`. Success maps weekly `usage` (7 days)
+  and `limits[]` `duration===300` `TIME_UNIT_MINUTE` onto a `5h` rolling
+  window (freshly reset 5h with only `window` and no `detail` renders
+  **5h 0%**). Oauth refresh uses Pi `kimiCodingOAuth.refresh` when
+  `expires` is within 5 minutes or usages returns 401/403. The response
+  never includes the access token, refresh token, or user id. Leftover
+  `/api/quota/*` and `packages/web/server/lib/quota/providers/kimi.js`
+  stay unused. Do not hit moonshot.ai balance.
+- `GET /api/command` lists `/kimi-usage` before a session exists.
+
+Work Status Usage and the Providers Kimi Code card share that payload
+only while the slot is on and the provider is connected. Session
+context % / cost stay in the Session block.
+
 ## Tool part timing
 
 Live `tool_execution_*` events keep the first `state.time.start` for that
@@ -638,7 +695,7 @@ that project. Settings → Extensions packages lists those configured package na
   (Goal slot installed+enabled → `/goal`; Plan slot installed+enabled →
   `/plan`; Subagents slot installed+enabled → `/run`; Btw slot
   installed+enabled → `/btw`; Grok Usage slot installed+enabled →
-  `/xai-usage`).
+  `/xai-usage`; Kimi Usage slot installed+enabled → `/kimi-usage`).
   `/goal` copy is "Run a goal to completion". `/plan` copy is "Enter or
   manage Plan mode". `/run` copy is user-facing ("Run a subagent as a
   one-shot workflow"), not plugin jargon. `/btw` is listed as

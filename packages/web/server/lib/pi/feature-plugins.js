@@ -9,7 +9,7 @@ import {
 } from './pi-resources.js';
 import { wrapPackageManagerWithElectronNativeTree } from './user-extension-electron-tree.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi'];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -19,6 +19,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   btw: 'npm:@narumitw/pi-btw',
   todo: 'npm:@juicesharp/rpiv-todo',
   xai: 'npm:pi-xai',
+  kimi: 'npm:pi-kimi-code-console-usage',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
@@ -383,6 +384,14 @@ export const listFeaturePluginSlashCommands = (payload) => {
     listed.push({
       name: 'xai-usage',
       description: 'Show Grok subscription usage',
+      source: 'extension',
+    });
+  }
+  const kimi = payload?.slots?.kimi;
+  if (kimi?.installed && kimi.enabled) {
+    listed.push({
+      name: 'kimi-usage',
+      description: 'Show Kimi Code subscription usage',
       source: 'extension',
     });
   }

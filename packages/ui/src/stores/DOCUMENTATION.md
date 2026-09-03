@@ -62,6 +62,8 @@ is installed and enabled.
 
 `useXaiUsageStore` caches `GET /api/pi/xai-usage` for Work Status Usage and the Providers xAI card. A failed fetch or configured `{ ok: false }` keeps the last successful `ok` snapshot and must not become empty 0% usage. First-load failure stays an error, not "not signed in". A refresh while a request is in flight is queued so the click is not dropped. `reset()` invalidates in-flight results (runtime switch). The Grok Usage slot off hides both surfaces.
 
+`useKimiUsageStore` is the parallel cache for `GET /api/pi/kimi-usage` (Work Status Usage and the Providers Kimi Code card). Same reconcile rules: keep the last successful `ok` snapshot, never invent 0%, first-load failure is an error not "not signed in", queue in-flight refresh, `reset()` on runtime switch. The Kimi Usage slot off hides both surfaces. Pi Work Status Usage is Grok **or** Kimi slot (both installed: xAI then Kimi Code).
+
 Context-panel session chats mount only the active chat iframe. After installing
 its message listener, the iframe requests its authoritative visibility from the
 parent. The parent accepts requests only from a currently mounted chat frame and

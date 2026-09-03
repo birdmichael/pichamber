@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.
+
 ## [1.2.10] - 2026-09-03
 
 - **Desktop:** first launch stays on Chooser when the Pi kernel cannot start. A returning user with a dead kernel sees Recovery instead of the main chat.

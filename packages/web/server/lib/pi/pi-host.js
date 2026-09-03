@@ -34,15 +34,24 @@ import {
   resolvePiAgentDir,
   resolvePiAuthPath,
   resolvePiModelsPath,
+  KIMI_CODING_PROVIDER_ID,
 } from './pi-resources.js';
 import {
   authorizePiXaiOAuth,
   completePiXaiOAuth,
 } from './xai-oauth.js';
 import {
+  authorizePiKimiOAuth,
+  completePiKimiOAuth,
+} from './kimi-oauth.js';
+import {
   getPiXaiUsage,
   isXaiSlotActive,
 } from './xai-usage.js';
+import {
+  getPiKimiUsage,
+  isKimiSlotActive,
+} from './kimi-usage.js';
 import {
   createSdkPackageManager,
   createSettingsJsonPackageManager,
@@ -3619,14 +3628,22 @@ export const createPiHost = ({
       return result;
     },
     authorizeProviderOAuth(providerId) {
+      if (providerId === KIMI_CODING_PROVIDER_ID) {
+        return authorizePiKimiOAuth(providerId);
+      }
       return authorizePiXaiOAuth(providerId);
     },
     async completeProviderOAuth(providerId) {
-      const credential = await completePiXaiOAuth(providerId);
+      const credential = providerId === KIMI_CODING_PROVIDER_ID
+        ? await completePiKimiOAuth(providerId)
+        : await completePiXaiOAuth(providerId);
       return this.setProviderAuth(providerId, credential);
     },
     getXaiUsage(options = {}) {
       return getPiXaiUsage({ home, ...options });
+    },
+    getKimiUsage(options = {}) {
+      return getPiKimiUsage({ home, ...options });
     },
     removeProviderAuth(providerId) {
       const result = removePiProviderAuth(providerId, { home });
@@ -4359,6 +4376,11 @@ export const createPiHost = ({
             'Open Settings → Providers → xAI and choose Sign in with SuperGrok or X Premium. Tokens stay in ~/.pi/agent/auth.json and Pi refreshes them.',
           );
         }
+        if (target === 'kimi-coding') {
+          return reply(
+            'Open Settings → Providers → Kimi Code and choose Sign in with Kimi Code. Tokens stay in ~/.pi/agent/auth.json and Pi refreshes them.',
+          );
+        }
         return reply(
           'Pi authentication is managed in Settings → Providers and stored in ~/.pi/agent. Interactive /login is not run in this desktop UI.',
         );
@@ -4375,6 +4397,20 @@ export const createPiHost = ({
         }
         return reply(
           'Grok usage is shown in Work Status and Settings → Providers when the Grok Usage plugin is installed.',
+        );
+      }
+
+      if (name === 'kimi-usage') {
+        if (!isKimiSlotActive(this.getFeaturePlugins())) {
+          const error = new Error('Command /kimi-usage is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        if (await ensureLivePluginCommand(record, name)) {
+          return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
+        }
+        return reply(
+          'Kimi Code usage is shown in Work Status and Settings → Providers when the Kimi Usage plugin is installed.',
         );
       }
 

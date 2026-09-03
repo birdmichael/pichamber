@@ -52,6 +52,7 @@ import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
 import { ProviderXaiUsage } from './ProviderXaiUsage';
+import { ProviderKimiUsage } from './ProviderKimiUsage';
 import {
   buildAuthSetRequest,
   buildProviderUpsertRequest,
@@ -167,6 +168,7 @@ export const ProvidersPage: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
   const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
+  const kimiSlotActive = useFeaturePluginSlotActive('kimi', isPiKernel);
   const piAgentDir = useResolvedPiAgentDir();
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
@@ -1028,6 +1030,10 @@ export const ProvidersPage: React.FC = () => {
 
       {xaiSlotActive && selectedProvider.id === 'xai' && hasCredentials ? (
         <ProviderXaiUsage />
+      ) : null}
+
+      {kimiSlotActive && selectedProvider.id === 'kimi-coding' && hasCredentials ? (
+        <ProviderKimiUsage />
       ) : null}
 
       <SettingsSection
