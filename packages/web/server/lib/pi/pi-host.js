@@ -792,7 +792,8 @@ const resolveStoreRuntimeModel = (store, ...extras) => resolveUsableFacadeModel(
 );
 
 const stampAssistantStoreInfo = (info, store, extra) => {
-  const usable = resolveStoreRuntimeModel(store, extra, info);
+  if (info?.role === 'user') return info;
+  const usable = resolveStoreRuntimeModel(store, info, extra);
   if (usable) {
     return {
       ...info,
@@ -836,7 +837,9 @@ const applyEventToStore = (store, ocEvent) => {
         agent: nextInfo.agent || existing.info.agent,
         model: nextInfo.model || existing.info.model,
       };
-      const usable = resolveStoreRuntimeModel(store, existing.info);
+      const usable = nextInfo.role === 'user'
+        ? resolveUsableFacadeModel(existing.info)
+        : resolveStoreRuntimeModel(store, nextInfo, existing.info);
       if (usable) {
         existing.info.providerID = usable.providerID;
         existing.info.modelID = usable.modelID;
@@ -1090,6 +1093,14 @@ const stampUserTurnThinking = (userInfo, level) => {
   if (!THINKING_LEVELS.includes(next)) return;
   userInfo.variant = next;
   userInfo.thinking = next;
+};
+
+const stampUserTurnModel = (userInfo, model) => {
+  const usable = resolveUsableFacadeModel(model);
+  if (!userInfo || !usable) return;
+  userInfo.providerID = usable.providerID;
+  userInfo.modelID = usable.modelID;
+  userInfo.model = usable.model;
 };
 
 const pairThinkingAfterModelChange = async (piSession, model) => {
@@ -1508,8 +1519,8 @@ const appendFacadeUserMessage = (emit, record, body, userText) => {
     role: 'user',
     time: { created: Date.now() },
     agent: userAgent,
-    ...(body.model ? { model: body.model } : {}),
   };
+  stampUserTurnModel(userInfo, body.model || record.piSession?.currentModel);
   stampUserTurnThinking(
     userInfo,
     typeof body.variant === 'string' ? body.variant
@@ -3825,7 +3836,6 @@ export const createPiHost = ({
         role: 'user',
         time: { created: Date.now() },
         agent: userAgent,
-        ...(body.model ? { model: body.model } : {}),
       };
 
       const images = extractPromptImages(body.parts);
@@ -3876,6 +3886,7 @@ export const createPiHost = ({
       }
 
       const runtimeModel = resolveHostFallbackModel(record, body.model);
+      stampUserTurnModel(userInfo, runtimeModel || body.model);
       if (runtimeModel) {
         record.translator?.setFallbackModel?.(runtimeModel);
       }
