@@ -6,6 +6,7 @@ import {
   parsePiThinkingLevel,
   nextCycledPiThinkingLevel,
   resolveComposerSendThinking,
+  resolveEmptyDraftThinkingCurrent,
   resolvePairedPiThinking,
   resolvePiThinkingChipPresentation,
   resolveVisiblePiThinkingLevels,
@@ -121,17 +122,22 @@ describe('resolvePairedPiThinking', () => {
     })).toEqual({ thinking: undefined, levels: [] });
   });
 
-  test('live available may narrow the catalog, but a stale wider list is ignored', () => {
+  test('non-narrow live is the menu, even when it is not a catalog subset', () => {
     expect(resolvePairedPiThinking({
       current: 'xhigh',
       catalogLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
       liveAvailable: ['low', 'medium', 'high'],
     })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
     expect(resolvePairedPiThinking({
+      current: 'high',
+      catalogLevels: ['low', 'medium', 'high', 'xhigh'],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({ thinking: 'high', levels: ['off', 'minimal', 'low', 'medium', 'high'] });
+    expect(resolvePairedPiThinking({
       current: 'xhigh',
-      catalogLevels: ['low', 'medium', 'high'],
-      liveAvailable: ['low', 'medium', 'high', 'xhigh', 'max'],
-    })).toEqual({ thinking: 'medium', levels: ['low', 'medium', 'high'] });
+      catalogLevels: ['low', 'medium', 'high', 'xhigh'],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({ thinking: 'medium', levels: ['off', 'minimal', 'low', 'medium', 'high'] });
   });
 
   test('off-only live is narrow and keeps the catalog', () => {
@@ -143,6 +149,37 @@ describe('resolvePairedPiThinking', () => {
       catalogLevels: ['off', 'low', 'medium', 'high'],
       liveAvailable: ['off'],
     })).toEqual({ thinking: 'high', levels: ['off', 'low', 'medium', 'high'] });
+  });
+});
+
+describe('resolveEmptyDraftThinkingCurrent', () => {
+  test('project pin wins over Pi defaults and the leftover chip', () => {
+    expect(resolveEmptyDraftThinkingCurrent({
+      projectVariant: 'high',
+      defaultsThinking: 'low',
+      current: 'medium',
+    })).toBe('high');
+  });
+
+  test('Pi defaults win when the project has no pin', () => {
+    expect(resolveEmptyDraftThinkingCurrent({
+      projectVariant: undefined,
+      defaultsThinking: 'low',
+      current: 'medium',
+    })).toBe('low');
+    expect(resolveEmptyDraftThinkingCurrent({
+      projectVariant: '模型默认',
+      defaultsThinking: 'low',
+      current: 'medium',
+    })).toBe('low');
+  });
+
+  test('does not invent medium when nothing is saved', () => {
+    expect(resolveEmptyDraftThinkingCurrent({
+      projectVariant: undefined,
+      defaultsThinking: undefined,
+      current: undefined,
+    })).toBe(undefined);
   });
 });
 

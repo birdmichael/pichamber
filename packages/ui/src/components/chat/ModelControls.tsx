@@ -29,6 +29,7 @@ import { getEditModeColors } from '@/lib/permissions/editModeColors';
 import { cn, fuzzyMatch } from '@/lib/utils';
 import { useContextStore } from '@/stores/contextStore';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useSelectionStore } from '@/sync/selection-store';
 import { useSessionMessages, useSessionRenderable } from '@/sync/sync-context';
@@ -42,6 +43,7 @@ import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
     parsePiThinkingLevel,
+    resolveEmptyDraftThinkingCurrent,
     resolvePairedPiThinking,
     resolvePiThinkingChipPresentation,
     type PiThinkingLevel,
@@ -355,6 +357,34 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const getCurrentAgent = useConfigStore((state) => state.getCurrentAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
 
+    const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
+    const draftOpen = useSessionUIStore((s) => s.newSessionDraft.open);
+    const draftTarget = useSessionUIStore((s) => s.newSessionDraft.target);
+    const draftSelectedProjectId = useSessionUIStore((s) => s.newSessionDraft.selectedProjectId);
+    const activeProjectId = useProjectsStore((s) => s.activeProjectId);
+    const projects = useProjectsStore((s) => s.projects);
+    const emptyDraftProjectVariant = React.useMemo(() => {
+        if (currentSessionIdForThinking) {
+            return undefined;
+        }
+        if (draftOpen && draftTarget === 'chat') {
+            return undefined;
+        }
+        const projectId = draftOpen && draftTarget === 'project'
+            ? (draftSelectedProjectId ?? activeProjectId)
+            : activeProjectId;
+        const project = projects.find((entry) => entry.id === projectId);
+        return parsePiThinkingLevel(project?.defaultVariant);
+    }, [
+        activeProjectId,
+        currentSessionIdForThinking,
+        draftOpen,
+        draftSelectedProjectId,
+        draftTarget,
+        projects,
+    ]);
+    const [piDefaultsThinking, setPiDefaultsThinking] = React.useState<string | undefined>(undefined);
+
     React.useEffect(() => {
         if (!isPiKernel) {
             return;
@@ -366,10 +396,17 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                 if (cancelled || !payload) {
                     return;
                 }
-                const projectPin = parsePiThinkingLevel(useConfigStore.getState().currentVariant);
-                const nextThinking = projectPin ?? parsePiThinkingLevel(payload.thinking);
-                if (nextThinking) {
-                    setPiThinking(nextThinking);
+                const defaultsThinking = parsePiThinkingLevel(payload.thinking);
+                setPiDefaultsThinking(defaultsThinking);
+                if (!currentSessionIdForThinking) {
+                    const nextThinking = resolveEmptyDraftThinkingCurrent({
+                        projectVariant: emptyDraftProjectVariant,
+                        defaultsThinking,
+                        current: undefined,
+                    });
+                    if (nextThinking) {
+                        setPiThinking(nextThinking);
+                    }
                 }
                 if (Array.isArray(payload.enabledModels)) {
                     setEnabledModels(payload.enabledModels.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0));
@@ -379,9 +416,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return () => {
             cancelled = true;
         };
-    }, [isPiKernel]);
+        // Refetch when the composer is an empty draft so Settings / project pin land.
+    }, [currentSessionIdForThinking, emptyDraftProjectVariant, isPiKernel]);
 
-    const currentSessionIdForThinking = useSessionUIStore((s) => s.currentSessionId);
     const draftThinkingLevels = React.useMemo(() => {
         if (!isPiKernel || !currentProviderId || !currentModelId) {
             return [];
@@ -417,11 +454,24 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         }
         const sessionChanged = thinkingSessionIdRef.current !== currentSessionIdForThinking;
         thinkingSessionIdRef.current = currentSessionIdForThinking;
+        const emptyDraftCurrent = resolveEmptyDraftThinkingCurrent({
+            projectVariant: emptyDraftProjectVariant,
+            defaultsThinking: piDefaultsThinking,
+            current: piThinking,
+        });
         const catalogPair = resolvePairedPiThinking({
-            current: sessionChanged ? undefined : piThinking,
+            current: currentSessionIdForThinking
+                ? (sessionChanged ? undefined : piThinking)
+                : emptyDraftCurrent,
             catalogLevels: draftThinkingLevels,
         });
         setPiThinkingLevels(catalogPair.levels.length > 0 ? catalogPair.levels : undefined);
+        if (!currentSessionIdForThinking) {
+            if (catalogPair.thinking !== piThinking) {
+                setPiThinking(catalogPair.thinking);
+            }
+            return;
+        }
         const pinStillValid = Boolean(
             !sessionChanged
             && parsePiThinkingLevel(piThinking)
@@ -429,9 +479,6 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         );
         if (!pinStillValid && catalogPair.thinking !== piThinking) {
             setPiThinking(catalogPair.thinking);
-        }
-        if (!currentSessionIdForThinking) {
-            return;
         }
         let cancelled = false;
         const sessionId = currentSessionIdForThinking;
@@ -476,8 +523,9 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             cancelled = true;
         };
         // Pair on model/catalog. Chip writes bump pinGeneration instead of re-GET.
+        // Empty drafts also re-pair when Settings / project pin arrive.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [thinkingPairKey, draftThinkingLevels, isPiKernel]);
+    }, [thinkingPairKey, draftThinkingLevels, emptyDraftProjectVariant, isPiKernel, piDefaultsThinking]);
 
     const visiblePiThinkingLevels = pairedThinking.levels;
 

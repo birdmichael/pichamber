@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Chat: a new session's thinking chip follows the project pin, then Pi Settings defaults, instead of snapping to Medium. The thinking menu uses the session's live levels (`off` / `minimal` when the kernel lists them) instead of leftover catalog `xhigh`.
+
 - Desktop: the context rail no longer shows the **配置面板** equalizer. Rail icons stay; hiding surfaces is not a sidebar control.
 - Chat: switching models or chats pairs thinking to that model, and each idle send uses the composer's current model and thinking. Switching chats does not keep the previous chat's thinking pin.
 
