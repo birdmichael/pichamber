@@ -36,7 +36,7 @@ import { toast } from '@/components/ui';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import type { Session } from '@opencode-ai/sdk/v2';
 import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
-import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
+import { readInheritedNewSessionDraftOptions, readMiniChatDraftWindowArgs } from '@/lib/newSessionInherit';
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopShell, isVSCodeRuntime, isWebRuntime } from '@/lib/desktop';
 import { isCapacitorApp } from '@/lib/platform';
@@ -111,7 +111,6 @@ export const CommandPalette: React.FC = () => {
     [isCommandPaletteOpen],
   ));
   const currentDirectory = useDirectoryStore((s) => s.currentDirectory);
-  const activeProject = useProjectsStore((s) => s.getActiveProject());
   const projects = useProjectsStore((s) => s.projects);
   const effectiveDirectory = useEffectiveDirectory();
   const searchFiles = useFileSearchStore((s) => s.searchFiles);
@@ -253,10 +252,7 @@ export const CommandPalette: React.FC = () => {
         shortcutId: 'new_mini_chat',
         searchText: t('commandPalette.item.newMiniChat'),
         onSelect: run(() => {
-          void invokeDesktop('desktop_open_draft_mini_chat_window', {
-            directory: normalizePath(currentDirectory || activeProject?.path || ''),
-            projectId: activeProject?.id ?? null,
-          }).catch((error) => {
+          void invokeDesktop('desktop_open_draft_mini_chat_window', readMiniChatDraftWindowArgs()).catch((error) => {
             console.warn('[command-palette] failed to open draft mini chat window', error);
           });
         }),
@@ -275,8 +271,6 @@ export const CommandPalette: React.FC = () => {
     currentDirectory,
     openContextOverview,
     setSettingsDialogOpen,
-    activeProject?.id,
-    activeProject?.path,
   ]);
 
   // ---------------------------------------------------------------------------

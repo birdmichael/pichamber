@@ -97,3 +97,23 @@ export function readInheritedNewSessionDraftOptions(): InheritedNewSessionDraftO
     activeProjectPath: activeProject?.path ?? null,
   });
 }
+
+export type MiniChatDraftWindowArgs = {
+  directory: string;
+  projectId: string | null;
+};
+
+export function mapInheritedNewSessionDraftToMiniChatArgs(
+  inherit: InheritedNewSessionDraftOptions | undefined,
+): MiniChatDraftWindowArgs {
+  if (!inherit) return { directory: '', projectId: null };
+  return {
+    directory: inherit.directoryOverride ?? '',
+    projectId: inherit.selectedProjectId ?? null,
+  };
+}
+
+/** Mini Chat draft windows follow New Session inherit. Never mix leftover activeProject.id with a chats directory. */
+export function readMiniChatDraftWindowArgs(): MiniChatDraftWindowArgs {
+  return mapInheritedNewSessionDraftToMiniChatArgs(readInheritedNewSessionDraftOptions());
+}

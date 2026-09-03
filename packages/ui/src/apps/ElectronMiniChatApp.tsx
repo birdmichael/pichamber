@@ -169,11 +169,15 @@ const MiniChatBootstrap: React.FC<{ config: MiniChatConfig }> = ({ config }) => 
 
   React.useEffect(() => {
     if (config.mode !== 'draft' || draftOpen || currentSessionId) return;
-    openNewSessionDraft({
-      selectedProjectId: config.projectId,
-      directoryOverride: config.directory,
-      preserveDirectoryOverride: Boolean(config.directory),
-    });
+    if (config.projectId || config.directory) {
+      openNewSessionDraft({
+        selectedProjectId: config.projectId,
+        directoryOverride: config.directory || null,
+        preserveDirectoryOverride: Boolean(config.directory),
+      });
+      return;
+    }
+    openNewSessionDraft();
   }, [config, currentSessionId, draftOpen, openNewSessionDraft]);
 
   React.useEffect(() => {
@@ -323,7 +327,7 @@ export function ElectronMiniChatApp({ apis }: ElectronMiniChatAppProps) {
       <SyncProvider sdk={opencodeClient.getSdkClient()} directory={currentDirectory || config.directory || ''}>
         <RuntimeAPIProvider apis={apis}>
           <TooltipProvider delayDuration={300} skipDelayDuration={150}>
-            <div className="h-full text-foreground bg-background">
+            <div className="h-full min-h-0 overflow-hidden text-foreground bg-background">
               <ElectronMiniChatContent config={config} />
               <PiExtensionUiNotifyToasts />
               <AppLinkConfirmDialog />

@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'bun:test';
 
-import { resolveInheritedNewSessionDraftOptions } from './newSessionInherit';
+import {
+  mapInheritedNewSessionDraftToMiniChatArgs,
+  resolveInheritedNewSessionDraftOptions,
+} from './newSessionInherit';
 
 const homeDirectory = '/Users/tester';
 const projectPath = '/Users/tester/project';
@@ -104,6 +107,84 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       activeProjectId: null,
       activeProjectPath: null,
     })).toBe(undefined);
+  });
+});
+
+const miniChatArgsFromInput = (input: Parameters<typeof resolveInheritedNewSessionDraftOptions>[0]) => (
+  mapInheritedNewSessionDraftToMiniChatArgs(resolveInheritedNewSessionDraftOptions(input))
+);
+
+describe('readMiniChatDraftWindowArgs mapping', () => {
+  test('project session → that directory, no leftover project id', () => {
+    expect(miniChatArgsFromInput({
+      currentSessionId: 'ses_project',
+      currentSessionDirectory: projectPath,
+      homeDirectory,
+      openedProjectPaths,
+      activeProjectId: 'other-project',
+      activeProjectPath: '/Users/tester/other',
+    })).toEqual({ directory: projectPath, projectId: null });
+  });
+
+  test('leftover active project + chats session → inherited project path, not chats dir mixed with project id', () => {
+    expect(miniChatArgsFromInput({
+      currentSessionId: 'ses_chat',
+      currentSessionDirectory: chatDirectory,
+      homeDirectory,
+      openedProjectPaths,
+      activeProjectId: 'sess-fx',
+      activeProjectPath: projectPath,
+    })).toEqual({
+      directory: projectPath,
+      projectId: 'sess-fx',
+    });
+    expect(miniChatArgsFromInput({
+      currentSessionId: 'ses_chat',
+      currentSessionDirectory: chatDirectory,
+      homeDirectory,
+      openedProjectPaths,
+      activeProjectId: 'sess-fx',
+      activeProjectPath: projectPath,
+    }).directory).not.toBe(chatDirectory);
+  });
+
+  test('no project → empty chats draft args', () => {
+    expect(miniChatArgsFromInput({
+      currentSessionId: 'ses_chat',
+      currentSessionDirectory: chatDirectory,
+      homeDirectory,
+      openedProjectPaths,
+      activeProjectId: null,
+      activeProjectPath: null,
+    })).toEqual({ directory: '', projectId: null });
+  });
+});
+
+describe('mini-chat draft callers', () => {
+  const files = [
+    '../hooks/useKeyboardShortcuts.ts',
+    '../hooks/useMiniChatKeyboardShortcuts.ts',
+    '../App.tsx',
+    '../components/layout/Header.tsx',
+    '../components/ui/CommandPalette.tsx',
+  ];
+
+  test('open sites use readMiniChatDraftWindowArgs', () => {
+    for (const relative of files) {
+      const source = readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8');
+      expect(source).toMatch(
+        /desktop_open_draft_mini_chat_window[\s\S]{0,120}readMiniChatDraftWindowArgs\(\)/,
+      );
+    }
+  });
+
+  test('Mini Chat bootstrap uses inherit args or a bare chats draft', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../apps/ElectronMiniChatApp.tsx', import.meta.url)),
+      'utf8',
+    );
+    expect(source).toContain('if (config.projectId || config.directory)');
+    expect(source).toMatch(/openNewSessionDraft\(\);/);
   });
 });
 

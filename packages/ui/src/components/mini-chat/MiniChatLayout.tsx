@@ -6,6 +6,7 @@ import { ContextUsageDisplay } from '@/components/ui/ContextUsageDisplay';
 import { WindowsWindowControls } from '@/components/desktop/WindowsWindowControls';
 import { SessionSwitcherDropdown } from '@/components/session/SessionSwitcherDropdown';
 import { cn } from '@/lib/utils';
+import { resolveMiniChatHeaderProjectLabel } from './miniChatHeaderLabel';
 import { useI18n } from '@/lib/i18n';
 import { invokeDesktop, isElectronShell } from '@/lib/desktop';
 import { useDesktopWindowControlsLayout } from '@/hooks/useDesktopWindowControlsLayout';
@@ -52,8 +53,12 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   const draftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const draftProjectId = useSessionUIStore((state) => state.newSessionDraft?.selectedProjectId ?? null);
   const currentDirectory = useDirectoryStore((state) => state.currentDirectory);
+  const homeDirectory = useDirectoryStore((state) => state.homeDirectory);
   const projects = useProjectsStore((state) => state.projects);
   const activeProject = useProjectsStore((state) => state.getActiveProject());
+  const draftTarget = useSessionUIStore((state) => (
+    state.newSessionDraft?.open ? state.newSessionDraft.target ?? null : null
+  ));
   const getCurrentModel = useConfigStore((state) => state.getCurrentModel);
   const providers = useConfigStore((state) => state.providers);
   const sessions = useSessions();
@@ -123,14 +128,26 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
       .filter((entry) => entry.normalizedPath && (entry.normalizedPath === candidateDirectory || candidateDirectory.startsWith(`${entry.normalizedPath}/`)))
       .sort((left, right) => right.path.length - left.path.length)[0] ?? null;
   }, [openDirectory, projects, sessionWorktreeMetadata?.projectDirectory, worktreeAttachment?.worktreeRoot]);
-  const projectLabel = React.useMemo(() => {
-    const project = pathMatchedProject ?? activeProject;
-    if (!project) return directoryLabel || 'Pichamber';
-    const label = project.label?.trim();
-    if (label) return label;
-    const segments = project.path.split(/[\\/]/).filter(Boolean);
-    return segments.at(-1) ?? project.path;
-  }, [activeProject, directoryLabel, pathMatchedProject]);
+  const projectLabel = React.useMemo(() => resolveMiniChatHeaderProjectLabel({
+    pathMatchedProject,
+    activeProject,
+    directoryLabel,
+    draftTarget: draftOpen ? draftTarget : null,
+    sessionDirectory: sessionDirectory || draftDirectory || currentDirectoryNormalized,
+    homeDirectory,
+    openedProjectPaths: projects.map((project) => project.path),
+  }), [
+    activeProject,
+    currentDirectoryNormalized,
+    directoryLabel,
+    draftDirectory,
+    draftOpen,
+    draftTarget,
+    homeDirectory,
+    pathMatchedProject,
+    projects,
+    sessionDirectory,
+  ]);
   const gitBranchForDirectory = useGitBranchLabel(openDirectory || null);
   const rawBranchLabel = gitBranchForDirectory || worktreeMetadataBranch || sessionWorktreeMetadata?.branch?.trim() || worktreeAttachment?.branch?.trim() || ((draftOpen || mode === 'draft') ? null : catalogWorktreeBranch);
   const branchLabel = rawBranchLabel && rawBranchLabel !== 'HEAD' ? rawBranchLabel : null;
@@ -253,7 +270,7 @@ const MiniChatHeader: React.FC<{ mode: MiniChatMode }> = ({ mode }) => {
   return (
     <header
       className={cn(
-        'flex items-center gap-3 bg-background',
+        'app-region-drag flex shrink-0 select-none items-center gap-3 bg-background',
         usesFramelessChrome && windowControlsSide === 'right' ? 'pr-0' : 'pr-3',
         hasMacTrafficLights ? 'pl-[5.5rem]' : 'pl-3',
         usesFramelessChrome ? 'h-12' : macosHeaderSizeClass || 'min-h-14',
@@ -330,7 +347,7 @@ export const MiniChatLayout: React.FC<MiniChatLayoutProps> = ({ mode, autoOpenDr
   const { t } = useI18n();
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <MiniChatHeader mode={mode} />
       <main className="min-h-0 flex-1">
         {unavailable ? (

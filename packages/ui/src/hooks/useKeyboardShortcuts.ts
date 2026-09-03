@@ -8,7 +8,7 @@ import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUISto
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useKeybinds } from '@/hooks/useKeybind';
-import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
+import { readInheritedNewSessionDraftOptions, readMiniChatDraftWindowArgs } from '@/lib/newSessionInherit';
 import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
@@ -34,7 +34,6 @@ import { usePiSessionPlanStore } from '@/sync/pi-session-plan-store';
 import { readEmbeddedThemeSearchParams } from '@/contexts/theme-embedded-bootstrap';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useGitStore } from '@/stores/useGitStore';
-import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useFeatureFlagsStore } from '@/stores/useFeatureFlagsStore';
 import { useContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { getCycledPrimaryAgentName } from '@/components/chat/mobileControlsUtils';
@@ -60,7 +59,6 @@ export const useKeyboardShortcuts = () => {
   const currentSessionId = useSessionUIStore((s) => s.currentSessionId);
   const currentDirectory = useDirectoryStore((s) => s.currentDirectory);
   const panelDirectoryKey = useContextPanelDirectoryKey();
-  const activeProject = useProjectsStore((s) => s.getActiveProject());
   const { themeMode, setThemeMode } = useThemeSystem();
   const { phase: sessionPhase } = useCurrentSessionActivity();
   const isPiKernel = usePiKernel();
@@ -158,10 +156,7 @@ export const useKeyboardShortcuts = () => {
     },
     new_mini_chat: () => {
       if (!canUseElectronDesktopIPC()) return false;
-      void invokeDesktop('desktop_open_draft_mini_chat_window', {
-        directory: currentDirectory || activeProject?.path || '',
-        projectId: activeProject?.id ?? null,
-      }).catch((error) => {
+      void invokeDesktop('desktop_open_draft_mini_chat_window', readMiniChatDraftWindowArgs()).catch((error) => {
         console.warn('[keyboard-shortcuts] failed to open draft mini chat window', error);
       });
     },
