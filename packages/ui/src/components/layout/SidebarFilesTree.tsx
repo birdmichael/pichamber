@@ -46,6 +46,8 @@ import { getContextFileOpenFailureMessage, validateContextFileOpen } from '@/lib
 import { isBrowserClientRuntime } from '@/lib/desktop';
 import { useI18n } from '@/lib/i18n';
 import { recordFileTreeDragStart, shouldTreatFileTreeDragEndAsClick } from './fileTreeDragClick';
+import { FilesTreeEmptyPaneMenu } from './FilesTreeEmptyPaneMenu';
+import { handleFilesTreeRowContextMenu } from './filesTreeEmptyPaneContextMenu';
 
 type FileNode = {
   name: string;
@@ -238,8 +240,8 @@ const FileRow: React.FC<FileRowProps> = ({
   const [rightClickOpen, setRightClickOpen] = React.useState(false);
 
   const handleContextMenu = React.useCallback((event?: React.MouseEvent) => {
+    if (event) handleFilesTreeRowContextMenu(event);
     if (!hasMenuActions) return;
-    event?.preventDefault();
     setRightClickOpen(true);
   }, [hasMenuActions]);
 
@@ -344,7 +346,7 @@ const FileRow: React.FC<FileRowProps> = ({
 
   return (
     <ContextMenu open={rightClickOpen} onOpenChange={setRightClickOpen}>
-      <ContextMenuTrigger render={<div className="group relative flex items-center" onContextMenu={handleContextMenu} />}>
+      <ContextMenuTrigger render={<div className="group relative flex items-center" data-files-tree-row="" onContextMenu={handleContextMenu} />}>
       <button
         type="button"
         onClick={handleInteraction}
@@ -1192,6 +1194,12 @@ export const SidebarFilesTree: React.FC = () => {
         </div>
       </div>
 
+      <FilesTreeEmptyPaneMenu
+        canCreateFile={canCreateFile}
+        canCreateFolder={canCreateFolder}
+        onCreateFile={() => handleOpenDialog('createFile', { path: currentDirectory, type: 'directory' })}
+        onCreateFolder={() => handleOpenDialog('createFolder', { path: currentDirectory, type: 'directory' })}
+      >
       <ScrollableOverlay outerClassName="flex-1 min-h-0" className="p-2">
         <ul className="flex flex-col">
           {searching ? (
@@ -1207,6 +1215,8 @@ export const SidebarFilesTree: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleOpenFile(node)}
+                    data-files-tree-row=""
+                    onContextMenu={handleFilesTreeRowContextMenu}
                     draggable
                     onDragStart={(e) => {
                       recordFileTreeDragStart(e);
@@ -1253,6 +1263,7 @@ export const SidebarFilesTree: React.FC = () => {
           )}
         </ul>
       </ScrollableOverlay>
+      </FilesTreeEmptyPaneMenu>
 
       {/* CRUD dialogs (matching FilesView) */}
       <Dialog open={!!activeDialog} onOpenChange={(open) => !open && setActiveDialog(null)}>
