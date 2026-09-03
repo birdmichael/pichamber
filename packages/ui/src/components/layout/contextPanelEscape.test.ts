@@ -101,7 +101,11 @@ describe('ContextPanel Escape capture yields to Files overlays', () => {
     const handler = contextPanelSource.slice(start, end);
 
     const terminalIndex = handler.indexOf('isTerminalEventTarget(event.target)');
-    const yieldIndex = handler.indexOf('shouldYieldFilesPanelEscape');
+    const yieldIndex = Math.max(
+      handler.indexOf('shouldYieldFilesOverlayEscape'),
+      handler.indexOf('shouldYieldFilesFindEscape'),
+      handler.indexOf('shouldYieldFilesPanelEscape'),
+    );
     const preventIndex = handler.indexOf('event.preventDefault()');
     expect(terminalIndex).toBeGreaterThan(-1);
     expect(yieldIndex).toBeGreaterThan(terminalIndex);
