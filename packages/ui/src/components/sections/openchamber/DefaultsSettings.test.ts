@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
 import { clampPiThinkingLevel } from '@/components/chat/piThinking';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
+import {
+  filterPiEnabledModelsToCatalog,
+  pickPiSessionDefaultModel,
+} from './piSessionDefaultsDisplay';
 
 const threeLevelMetadata = {
   reasoning: true,
@@ -48,6 +52,40 @@ describe('Session Defaults thinking levels', () => {
     expect(clampSessionDefaultThinkingLevel('high', ['low', 'medium', 'high'])).toBe('high');
   });
 
+  test('prefers resolvedModel over a stored example-provider placeholder', () => {
+    const catalog = ['kimi-coding/k3', 'bmlab-grok/grok-4.6'];
+    expect(pickPiSessionDefaultModel(
+      'example-provider/example-model',
+      'kimi-coding/k3',
+      catalog,
+    )).toBe('kimi-coding/k3');
+    expect(pickPiSessionDefaultModel(
+      'example-provider/example-model',
+      'kimi-coding/k3',
+      [],
+    )).toBe('kimi-coding/k3');
+  });
+
+  test('keeps a stored default that is still in the live catalog', () => {
+    expect(pickPiSessionDefaultModel(
+      'bmlab-grok/grok-4.6',
+      'kimi-coding/k3',
+      ['kimi-coding/k3', 'bmlab-grok/grok-4.6'],
+    )).toBe('bmlab-grok/grok-4.6');
+  });
+
+  test('drops leftover example-provider enabledModels so live catalog rows stay checked', () => {
+    const catalog = ['kimi-coding/k3', 'bmlab-grok/grok-4.6'];
+    expect(filterPiEnabledModelsToCatalog(
+      ['example-provider/alpha', 'other/beta'],
+      catalog,
+    )).toEqual([]);
+    expect(filterPiEnabledModelsToCatalog(
+      ['example-provider/alpha', 'kimi-coding/k3'],
+      catalog,
+    )).toEqual(['kimi-coding/k3']);
+  });
+
   test('Session Defaults picker maps catalog levels and hides when empty', () => {
     const source = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), 'DefaultsSettings.tsx'),
@@ -58,6 +96,8 @@ describe('Session Defaults thinking levels', () => {
     expect(source).toContain('availableLevels.map');
     expect(source).toContain('availableLevels.length > 0');
     expect(source).toContain('clampSessionDefaultThinkingLevel');
+    expect(source).toContain('pickPiSessionDefaultModel');
+    expect(source).toContain('filterPiEnabledModelsToCatalog');
     expect(source).not.toContain('PI_THINKING_LEVELS.map');
     expect(source).not.toMatch(/import\s*\{[^}]*resolveVisiblePiThinkingLevels/);
   });
