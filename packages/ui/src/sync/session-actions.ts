@@ -1438,6 +1438,7 @@ export async function optimisticSend(input: {
   directory?: string | null
   files?: Array<{ type: "file"; mime: string; url: string; filename: string }>
   additionalParts?: Array<{ text: string; synthetic?: boolean; metadata?: ContextPartMetadata; files?: Array<{ type: "file"; mime: string; url: string; filename: string }> }>
+  variant?: string
   onOptimisticInsert?: () => void
   onMessageID?: (messageID: string) => void
   beforeOptimisticInsert?: () => void
@@ -1535,6 +1536,7 @@ export async function optimisticSend(input: {
     optimisticParts.push({ id: ascendingId("prt"), type: "text", text: input.content } as Part)
   }
 
+  const optimisticVariant = typeof input.variant === "string" ? input.variant.trim() : ""
   const optimisticMessage = {
     id: messageID,
     role: "user" as const,
@@ -1547,6 +1549,7 @@ export async function optimisticSend(input: {
     model: `${input.providerID}/${input.modelID}`,
     metadata: {} as Record<string, unknown>,
     time: { created: Date.now(), completed: 0 },
+    ...(optimisticVariant ? { variant: optimisticVariant, thinking: optimisticVariant } : {}),
   } as unknown as Message
 
   // Insert into store + register in shadow Map (for mergeOptimisticPage cleanup)

@@ -3,6 +3,7 @@ import type { Part } from '@opencode-ai/sdk/v2';
 import { LegendList, type LegendListRef } from '@legendapp/list/react';
 
 import ChatMessage from './ChatMessage';
+import { resolveTranscriptThinkingLabel } from './piThinking';
 import { areOptionalRenderRelevantMessagesEqual, areRelevantTurnGroupingContextsEqual, areRenderRelevantMessagesEqual } from './message/renderCompare';
 import TurnItem from './components/TurnItem';
 import type { ChatMessageEntry, TurnRecord, TurnGroupingContext } from './lib/turns/types';
@@ -624,11 +625,17 @@ const TurnBlock = React.memo(({
         const userCreatedAt = (turn.userMessage.info.time as { created?: number } | undefined)?.created;
         // OpenCode 1.4.0 moved variant from top-level to model.variant on UserMessage.
         // Prefer the new location, fall back to the legacy one for older servers.
-        const info = turn.userMessage.info as { variant?: unknown; model?: { variant?: unknown } } | undefined;
+        const info = turn.userMessage.info as {
+            variant?: unknown;
+            thinking?: unknown;
+            model?: { variant?: unknown };
+        } | undefined;
         const rawVariant = info?.model?.variant ?? info?.variant;
-        const userMessageVariant = typeof rawVariant === 'string' && rawVariant.trim().length > 0
-            ? rawVariant
-            : undefined;
+        const userMessageVariant = resolveTranscriptThinkingLabel({
+            thinking: info?.thinking,
+            variant: info?.variant,
+            modelVariant: info?.model?.variant,
+        }) ?? (typeof rawVariant === 'string' && rawVariant.trim().length > 0 ? rawVariant : undefined);
         return {
             turnId: turn.turnId,
             summaryBody: turn.summaryText,

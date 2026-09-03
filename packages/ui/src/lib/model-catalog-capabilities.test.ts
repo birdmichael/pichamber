@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ModelMetadata } from '@/types';
+import { preferPiModelThinkingLevels, resolvePairedPiThinking } from '@/components/chat/piThinking';
 import {
   catalogEntriesFromMetadataMap,
   findCatalogMetadata,
@@ -128,5 +129,19 @@ describe('catalog thinking levels', () => {
       reasoning: true,
       reasoning_options: [{ type: 'toggle' }],
     })).toEqual(['off', 'medium']);
+  });
+
+  test('empty-draft pairing prefers Pi thinkingLevels over catalog xhigh', () => {
+    const catalog = resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh'] }],
+    });
+    expect(catalog).toContain('xhigh');
+    const levels = preferPiModelThinkingLevels(
+      ['off', 'minimal', 'low', 'medium', 'high'],
+      catalog,
+    );
+    expect(levels).not.toContain('xhigh');
+    expect(resolvePairedPiThinking({ current: 'high', catalogLevels: levels }).levels).not.toContain('xhigh');
   });
 });

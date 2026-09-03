@@ -232,6 +232,7 @@ export function routeMessage(params: {
         files: params.files,
         beforeSend: params.beforeSend,
         onOptimisticInsert: params.onOptimisticInsert,
+        variant: params.variant,
         send: (messageID) => opencodeClient.sendCommand({
           runtimeKey: params.runtimeKey,
           id: params.sessionId,
@@ -262,6 +263,7 @@ export function routeMessage(params: {
     additionalParts: params.additionalParts,
     beforeSend: params.beforeSend,
     onOptimisticInsert: params.onOptimisticInsert,
+    variant: params.variant,
     send: (messageID) => opencodeClient.sendMessage({
       runtimeKey: params.runtimeKey,
       id: params.sessionId,

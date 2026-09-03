@@ -38,6 +38,8 @@ describe('mobile thinking chip', () => {
 
   test('pairs the thinking chip to the selected model catalog immediately', () => {
     expect(modelControlsSource).toContain('resolvePairedPiThinking');
+    expect(modelControlsSource).toContain('preferPiModelThinkingLevels');
+    expect(modelControlsSource).toContain('parseAvailablePiThinkingLevels(chipState.levels)');
     expect(modelControlsSource).toContain('catalogLevels: draftThinkingLevels');
     expect(modelControlsSource).toContain('resolvePiThinkingChipPresentation(pairedThinking.thinking)');
     expect(modelControlsSource).toContain('sessionModelApplyRef');
@@ -51,5 +53,16 @@ describe('mobile thinking chip', () => {
     expect(modelControlsSource).toContain('pinKey');
     expect(modelControlsSource).toContain('applyComposerThinking');
     expect(buttonSource).toContain('hasLevels');
+  });
+
+  test('session switch waits for GET instead of painting medium', () => {
+    expect(modelControlsSource).toContain('#488: wait for GET');
+    expect(modelControlsSource).toContain('setPiThinking(undefined)');
+  });
+
+  test('composer thinking does not PATCH global Pi defaults', () => {
+    const cycleSource = readFileSync(join(__dirname, 'cycleComposerThinking.ts'), 'utf-8');
+    expect(cycleSource).not.toContain('/api/pi/defaults');
+    expect(cycleSource).toContain('/thinking');
   });
 });

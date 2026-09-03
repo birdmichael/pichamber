@@ -6,7 +6,22 @@ const fetchCalls: Array<{ url: string; method?: string; body?: string }> = [];
 mock.module('@/lib/runtime-fetch', () => ({
   runtimeFetch: mock(async (url: string, init?: { method?: string; body?: string }) => {
     fetchCalls.push({ url: String(url), method: init?.method, body: init?.body });
-    return { ok: true, status: 200, json: async () => ({}) };
+    let thinking = 'high';
+    try {
+      thinking = JSON.parse(String(init?.body || '{}')).thinking || thinking;
+    } catch {
+      thinking = 'high';
+    }
+    const applied = thinking === 'xhigh' ? 'medium' : thinking;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        applied: true,
+        thinking: applied,
+        available: ['low', 'medium', 'high'],
+      }),
+    };
   }),
 }));
 
@@ -44,5 +59,33 @@ describe('cycleComposerThinking', () => {
     expect(pin.level).toBe('high');
     expect(pin.pinKey).toContain('ses/a b');
     expect(fetchCalls.some((call) => call.url === '/api/session/ses%2Fa%20b/thinking' && call.method === 'PATCH')).toBe(true);
+  });
+
+  test('does not PATCH global Pi defaults', async () => {
+    useSessionUIStore.setState({ currentSessionId: 'ses_a' });
+    await applyComposerThinking('high', { levels: ['low', 'medium', 'high'] });
+    expect(fetchCalls.some((call) => String(call.url).includes('/api/pi/defaults'))).toBe(false);
+  });
+
+  test('empty drafts do not PATCH anything', async () => {
+    useSessionUIStore.setState({ currentSessionId: null });
+    await applyComposerThinking('xhigh', { levels: ['low', 'medium', 'high', 'xhigh'] });
+    expect(usePiThinkingChipStore.getState().level).toBe('xhigh');
+    expect(fetchCalls).toEqual([]);
+  });
+
+  test('empty drafts keep a kernel list that omitted xhigh', async () => {
+    useSessionUIStore.setState({ currentSessionId: null });
+    await applyComposerThinking('high', { levels: ['off', 'minimal', 'low', 'medium', 'high'] });
+    expect(usePiThinkingChipStore.getState().level).toBe('high');
+    expect(usePiThinkingChipStore.getState().levels).toEqual(['off', 'minimal', 'low', 'medium', 'high']);
+    expect(usePiThinkingChipStore.getState().levels).not.toContain('xhigh');
+    expect(fetchCalls).toEqual([]);
+  });
+
+  test('chip follows the applied PATCH thinking, not the optimistic pick', async () => {
+    useSessionUIStore.setState({ currentSessionId: 'ses_a' });
+    await applyComposerThinking('xhigh', { levels: ['low', 'medium', 'high', 'xhigh'] });
+    expect(usePiThinkingChipStore.getState().level).toBe('medium');
   });
 });

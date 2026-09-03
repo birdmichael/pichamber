@@ -2238,7 +2238,13 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
   const messages = [];
   const toolPartsByCallID = new Map();
   let lastUserId = '';
+  let lastThinking = '';
   for (const entry of Array.isArray(entries) ? entries : []) {
+    if (entry?.type === 'thinking_level_change') {
+      const level = asTrimmedString(entry.thinkingLevel || entry.level);
+      if (level) lastThinking = level;
+      continue;
+    }
     if (entry?.type && entry.type !== 'message') continue;
     if (!entry?.message) continue;
     const message = entry.message;
@@ -2252,6 +2258,10 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
     if (!facade) continue;
     if (facade.info.role === 'user') {
       lastUserId = facade.info.id;
+      if (lastThinking) {
+        facade.info.variant = lastThinking;
+        facade.info.thinking = lastThinking;
+      }
     } else if (facade.info.role === 'assistant' && lastUserId) {
       // Pi jsonl parentId is the previous line (often toolResult). Chat turns
       // group assistants by parentID === the user message, same as live SSE.
