@@ -106,6 +106,11 @@ describe('live Plan starter', () => {
             draftOpen: false,
             composerText: '',
         })).toEqual({ kind: 'submit' });
+        expect(resolveDraftPlanStarterClick({
+            submitText: 'Plan a one-line hello world. Do not write code yet.',
+            draftOpen: true,
+            composerText: 'Plan a one-line hello world. Do not write code yet.',
+        })).toEqual({ kind: 'submit' });
     });
 });
 

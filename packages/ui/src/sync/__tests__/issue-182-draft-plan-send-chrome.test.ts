@@ -3,7 +3,8 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 
 const createSessionCalls: Array<string | null | undefined> = []
-const sendMessageCalls: Array<{ id?: string }> = []
+const sendMessageCalls: Array<{ id?: string; text?: string }> = []
+const sendCommandCalls: Array<{ command?: string; arguments?: string }> = []
 const planPosts: Array<{ action?: string }> = []
 let failPlanStart = false
 
@@ -25,6 +26,7 @@ mock.module('@/lib/runtime-fetch', () => ({
   }),
 }))
 
+const { emptyFeaturePluginsPayload } = await import('@/components/sections/feature-plugins/featurePlugins')
 const { opencodeClient } = await import('@/lib/opencode/client')
 const { useConfigStore } = await import('@/stores/useConfigStore')
 const { setActionRefs, setOptimisticRefs } = await import('../session-actions')
@@ -35,6 +37,10 @@ const {
   resetPiSessionPlanStore,
   usePiSessionPlanStore,
 } = await import('../pi-session-plan-store')
+const {
+  applyFeaturePluginsPayload,
+  resetPiFeaturePluginsStore,
+} = await import('../pi-feature-plugins-store')
 const { useSessionUIStore } = await import('../session-ui-store')
 type OpencodeClient = Parameters<typeof setActionRefs>[0]
 
@@ -54,6 +60,7 @@ const footerPlanSelected = () => {
 
 const resetState = () => {
   resetPiSessionPlanStore()
+  resetPiFeaturePluginsStore()
   useSessionUIStore.setState({
     currentSessionId: null,
     currentSessionDirectory: null,
@@ -64,11 +71,13 @@ const resetState = () => {
 
 describe('issue 182 draft Plan send chrome', () => {
   let originalSendMessage: typeof opencodeClient.sendMessage
+  let originalSendCommand: typeof opencodeClient.sendCommand
   let originalCreateSession: typeof opencodeClient.createSession
 
   beforeEach(() => {
     createSessionCalls.length = 0
     sendMessageCalls.length = 0
+    sendCommandCalls.length = 0
     planPosts.length = 0
     failPlanStart = false
     resetState()
@@ -86,11 +95,16 @@ describe('issue 182 draft Plan send chrome', () => {
     useConfigStore.setState({ isConnected: true })
 
     originalSendMessage = opencodeClient.sendMessage
+    originalSendCommand = opencodeClient.sendCommand
     originalCreateSession = opencodeClient.createSession
-    opencodeClient.sendMessage = (async (params: { id?: string }) => {
+    opencodeClient.sendMessage = (async (params: { id?: string; text?: string }) => {
       sendMessageCalls.push(params)
       return 'msg'
     }) as typeof opencodeClient.sendMessage
+    opencodeClient.sendCommand = (async (params: { command?: string; arguments?: string }) => {
+      sendCommandCalls.push(params)
+      return 'msg'
+    }) as typeof opencodeClient.sendCommand
     opencodeClient.createSession = (async (_params: unknown, directory?: string | null) => {
       createSessionCalls.push(directory)
       return { id: 'ses_issue_182', directory: directory ?? '/projects/alpha' }
@@ -99,6 +113,7 @@ describe('issue 182 draft Plan send chrome', () => {
 
   afterEach(() => {
     opencodeClient.sendMessage = originalSendMessage
+    opencodeClient.sendCommand = originalSendCommand
     opencodeClient.createSession = originalCreateSession
     resetState()
   })
@@ -238,5 +253,121 @@ describe('issue 182 draft Plan send chrome', () => {
     expect(planPosts).toEqual([])
     expect(footerPlanSelected()).toBe(false)
     expect(usePiSessionPlanStore.getState().plansBySession.ses_issue_182).toBe(undefined)
+  })
+})
+
+describe('issue 504 Plan-prefix first send', () => {
+  let originalSendMessage: typeof opencodeClient.sendMessage
+  let originalSendCommand: typeof opencodeClient.sendCommand
+  let originalCreateSession: typeof opencodeClient.createSession
+
+  beforeEach(() => {
+    createSessionCalls.length = 0
+    sendMessageCalls.length = 0
+    sendCommandCalls.length = 0
+    planPosts.length = 0
+    failPlanStart = false
+    resetState()
+
+    const childStore = {
+      getState: () => ({ session: [], message: {}, part: {}, session_status: {} }),
+      setState: () => {},
+    }
+    setActionRefs(opencodeClient as unknown as OpencodeClient, {
+      children: new Map(),
+      ensureChild: () => childStore,
+      getChild: () => childStore,
+    } as never, () => '/projects/alpha')
+    setOptimisticRefs(() => {}, () => {})
+    useConfigStore.setState({ isConnected: true })
+
+    originalSendMessage = opencodeClient.sendMessage
+    originalSendCommand = opencodeClient.sendCommand
+    originalCreateSession = opencodeClient.createSession
+    opencodeClient.sendMessage = (async (params: { id?: string; text?: string }) => {
+      sendMessageCalls.push(params)
+      return 'msg'
+    }) as typeof opencodeClient.sendMessage
+    opencodeClient.sendCommand = (async (params: { command?: string; arguments?: string }) => {
+      sendCommandCalls.push(params)
+      return 'msg'
+    }) as typeof opencodeClient.sendCommand
+    opencodeClient.createSession = (async (_params: unknown, directory?: string | null) => {
+      createSessionCalls.push(directory)
+      return { id: 'ses_issue_504', directory: directory ?? '/projects/alpha' }
+    }) as typeof opencodeClient.createSession
+  })
+
+  afterEach(() => {
+    opencodeClient.sendMessage = originalSendMessage
+    opencodeClient.sendCommand = originalSendCommand
+    opencodeClient.createSession = originalCreateSession
+    resetState()
+  })
+
+  const sendDraftPlanPrompt = async (content: string) => {
+    const payload = emptyFeaturePluginsPayload()
+    payload.slots.plan.installed = true
+    payload.slots.plan.enabled = true
+    applyFeaturePluginsPayload(payload)
+
+    const draftSnapshot = {
+      draftId: 1,
+      open: true,
+      directoryOverride: '/projects/alpha',
+      parentID: null,
+      planSelected: true,
+      target: 'project' as const,
+    }
+    useSessionUIStore.setState({
+      currentSessionId: null,
+      currentSessionDirectory: null,
+      newSessionDraft: draftSnapshot,
+    })
+
+    await useSessionUIStore.getState().sendMessage(
+      content,
+      'provider-a',
+      'model-a',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'normal',
+      { draftSnapshot },
+    )
+  }
+
+  test('keeps a leading Plan space on the first Plan-mode send', async () => {
+    const content = 'Plan a one-line hello world. Do not write code yet.'
+    await sendDraftPlanPrompt(content)
+
+    expect(createSessionCalls).toHaveLength(1)
+    expect(planPosts).toEqual([{ action: 'start' }])
+    expect(sendCommandCalls).toEqual([])
+    expect(sendMessageCalls).toHaveLength(1)
+    expect(sendMessageCalls[0]?.id).toBe('ses_issue_504')
+    expect(sendMessageCalls[0]?.text).toBe(content)
+  })
+
+  test('does not strip a control sentence that does not start with Plan', async () => {
+    const content = 'Write a one-line hello world. Do not write code yet.'
+    await sendDraftPlanPrompt(content)
+
+    expect(planPosts).toEqual([{ action: 'start' }])
+    expect(sendCommandCalls).toEqual([])
+    expect(sendMessageCalls).toHaveLength(1)
+    expect(sendMessageCalls[0]?.text).toBe(content)
+  })
+
+  test('still dispatches a leading /plan slash on that first send', async () => {
+    await sendDraftPlanPrompt('/plan start')
+
+    expect(planPosts).toEqual([{ action: 'start' }])
+    expect(sendMessageCalls).toEqual([])
+    expect(sendCommandCalls).toHaveLength(1)
+    expect(sendCommandCalls[0]?.command).toBe('plan')
+    expect(sendCommandCalls[0]?.arguments).toBe('start')
   })
 })
