@@ -20,6 +20,7 @@ import {
 import { resolveManagedOpenCodeCwd } from './opencode-cwd.mjs';
 import { applyDesktopKernelEnv } from './kernel-env.mjs';
 import { resolveStartupUrlProbePlan, shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
+import { resolveLocalBootStatus, waitForPiKernelReady } from './pi-kernel-ready.mjs';
 import { buildMiniChatPageUrl, isAllowedMiniChatNavigationUrl, resolveMiniChatUiBase } from './mini-chat-url.mjs';
 import { sanitizeRuntimeRequestHeaders } from './runtime-request-headers.mjs';
 import {
@@ -1106,33 +1107,6 @@ const waitForHealth = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPo
   waitForHttpOk(buildHealthUrl(url), timeoutMs, initialPollMs, maxPollMs)
 );
 
-const waitForPiKernelReady = async (url, timeoutMs = 20_000, initialPollMs = 250, maxPollMs = 2000) => {
-  const healthUrl = buildHealthUrl(url);
-  if (!healthUrl) return false;
-  const deadline = Date.now() + timeoutMs;
-  let pollMs = initialPollMs;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(Math.min(pollMs * 4, 1500)) });
-      const data = await response.json().catch(() => null);
-      if (data?.kernelReady === true || data?.piRunning === true) {
-        return true;
-      }
-      const code = data?.piNodeRuntime?.code;
-      if (code === 'PI_SDK_UNAVAILABLE' || code === 'PI_NODE_UNAVAILABLE') {
-        return false;
-      }
-      if (data?.piNodeRuntime?.ok === false) {
-        return false;
-      }
-    } catch {
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-    pollMs = Math.min(pollMs * 2, maxPollMs);
-  }
-  return false;
-};
-
 const pickUnusedPort = async (host = '127.0.0.1') => {
   const net = await import('node:net');
   return await new Promise((resolve, reject) => {
@@ -1860,7 +1834,7 @@ const syncMainWindowInitScript = (initScript = state.initScript) => {
   }
 };
 
-const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable, localKernelReady }) => {
+const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable, localKernelReady = false }) => {
   const availability = { localAvailable };
   if (envTargetUrl) {
     const status = probe?.status === 'unreachable'
@@ -1879,9 +1853,11 @@ const computeBootOutcome = ({ envTargetUrl, probe, config, localAvailable, local
   }
 
   if (defaultId === LOCAL_HOST_ID) {
-    return localKernelReady
-      ? { target: 'local', status: 'ok', ...availability }
-      : { target: 'local', status: 'unreachable', ...availability };
+    return {
+      target: 'local',
+      status: resolveLocalBootStatus({ localAvailable, localKernelReady }),
+      ...availability,
+    };
   }
 
   const host = config.hosts.find((entry) => entry.id === defaultId);
@@ -3231,9 +3207,8 @@ const resolveInitialUrl = async () => {
   }
 
   const localKernelReady = localUrl
-    ? await waitForPiKernelReady(localUrl, 20_000, 250)
+    ? await waitForPiKernelReady(localUrl)
     : false;
-
   const bootOutcome = computeBootOutcome({
     envTargetUrl: envTarget || null,
     probe: remoteProbe,
@@ -4595,7 +4570,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       }
       const sidecar = state.sidecarUrl || state.localOrigin || '';
       const localKernelReady = sidecar
-        ? await waitForPiKernelReady(sidecar, 2_000, 200)
+        ? await waitForPiKernelReady(sidecar, { timeoutMs: 2000, initialPollMs: 200 })
         : false;
       state.bootOutcome = computeBootOutcome({
         envTargetUrl: envTarget || null,

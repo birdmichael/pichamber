@@ -266,6 +266,10 @@ export function shouldRestartDesktopBootFlow(input: DesktopBootFlowRestartInput)
   return input.isDesktopShell && !input.isDesktopLocalOriginActive;
 }
 
+export function isLocalUnavailableBootView(view: DesktopBootView | null | undefined): boolean {
+  return Boolean(view && view.screen === 'recovery' && view.variant === 'local-unavailable');
+}
+
 /**
  * Read the boot outcome from the native desktop host.
  * Prefers the writable inject, then the preload seed (window switch),
