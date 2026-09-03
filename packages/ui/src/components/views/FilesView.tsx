@@ -89,6 +89,8 @@ import { isBrowserClientRuntime, openDesktopFileInApp, openDesktopPath } from '@
 import { useOpenInAppsStore } from '@/stores/useOpenInAppsStore';
 import { useKeybind, useKeybinds } from '@/hooks/useKeybind';
 import { useI18n } from '@/lib/i18n';
+import { FilesTreeEmptyPaneMenu } from '@/components/layout/FilesTreeEmptyPaneMenu';
+import { handleFilesTreeRowContextMenu } from '@/components/layout/filesTreeEmptyPaneContextMenu';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { syncScheduledTaskLoops } from '@/lib/scheduledTasksApi';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -440,10 +442,10 @@ const FileRow: React.FC<FileRowProps> = ({
   const hasMenuActions = canRename || canCreateFile || canCreateFolder || canDelete || canDownload || canRevealPath;
 
   const handleContextMenu = React.useCallback((event?: React.MouseEvent) => {
+    if (event) handleFilesTreeRowContextMenu(event);
     if (!hasMenuActions) {
       return;
     }
-    event?.preventDefault();
     setRightClickMenuPath(node.path);
   }, [hasMenuActions, node.path, setRightClickMenuPath]);
 
@@ -546,7 +548,7 @@ const FileRow: React.FC<FileRowProps> = ({
 
   return (
     <ContextMenu open={rightClickMenuPath === node.path} onOpenChange={(open) => setRightClickMenuPath(open ? node.path : null)}>
-      <ContextMenuTrigger render={<div className="group relative flex items-center" onContextMenu={!isMobile ? handleContextMenu : undefined} />}>
+      <ContextMenuTrigger render={<div className="group relative flex items-center" data-files-tree-row="" onContextMenu={!isMobile ? handleContextMenu : undefined} />}>
       <button
         type="button"
         onClick={handleInteraction}
@@ -4396,6 +4398,13 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
         </div>
       </div>
 
+      <FilesTreeEmptyPaneMenu
+        enabled={!isMobile}
+        canCreateFile={canCreateFile}
+        canCreateFolder={canCreateFolder}
+        onCreateFile={() => handleOpenDialog('createFile', { path: currentDirectory, type: 'directory' })}
+        onCreateFolder={() => handleOpenDialog('createFolder', { path: currentDirectory, type: 'directory' })}
+      >
       <ScrollableOverlay outerClassName="flex-1 min-h-0" className={cn("py-2", isMobile ? "px-3" : "px-2")}>
         <ul className="flex flex-col">
           {searching ? (
@@ -4411,6 +4420,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
                   <button
                     type="button"
                     onClick={() => void handleSelectFile(node)}
+                    data-files-tree-row=""
+                    onContextMenu={!isMobile ? handleFilesTreeRowContextMenu : undefined}
                     className={cn(
                       'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-foreground transition-colors',
                       isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40'
@@ -4443,6 +4454,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           )}
         </ul>
       </ScrollableOverlay>
+      </FilesTreeEmptyPaneMenu>
     </section>
   );
 
