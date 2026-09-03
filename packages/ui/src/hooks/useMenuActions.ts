@@ -9,7 +9,7 @@ import { useUpdateStore } from '@/stores/useUpdateStore';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { sessionEvents } from '@/lib/sessionEvents';
 import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
-import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
+import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
 import { showOpenCodeStatus } from '@/lib/openCodeStatus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { pickAdjacentProject, resolveVisibleProjectId } from '@/lib/projectNavigation';
@@ -220,7 +220,7 @@ export const useMenuActions = (
         case 'new-worktree-session':
           setActiveMainTab('chat');
           setSessionSwitcherOpen(false);
-          createWorktreeSession();
+          void openNewWorktreeDialog();
           break;
 
         case 'change-workspace':

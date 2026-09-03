@@ -9,7 +9,7 @@ import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useCurrentSessionActivity } from '@/hooks/useSessionActivity';
 import { useKeybinds } from '@/hooks/useKeybind';
 import { readInheritedNewSessionDraftOptions } from '@/lib/newSessionInherit';
-import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
+import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { canUseElectronDesktopIPC, invokeDesktop, isVSCodeRuntime } from '@/lib/desktop';
 import { showOpenCodeStatus } from '@/lib/openCodeStatus';
@@ -194,7 +194,7 @@ export const useKeyboardShortcuts = () => {
       useUIStore.getState().setActiveMainTab('chat');
       useUIStore.getState().setSessionSwitcherOpen(false);
       if (!isVSCodeRuntime()) {
-        createWorktreeSession();
+        void openNewWorktreeDialog();
         return;
       }
       openNewSessionDraft(readInheritedNewSessionDraftOptions());
