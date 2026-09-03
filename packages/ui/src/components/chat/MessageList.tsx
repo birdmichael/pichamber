@@ -137,14 +137,16 @@ const assistantHasVisibleContent = (message: ChatMessageEntry): boolean => {
     const parts = message.parts || [];
     return parts.some((part) => {
         const type = part?.type;
+        const leftover = type as string | undefined;
         if (type === 'text' || type === 'reasoning') {
             const text = typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '';
             return text.trim().length > 0;
         }
-        if (type === 'tool' || type === 'toolCall' || type === 'toolResult' || type === 'tool-invocation') {
+        // Pi parts use `tool`. Leftover OpenCode names are not in the union.
+        if (type === 'tool' || leftover === 'toolCall' || leftover === 'toolResult' || leftover === 'tool-invocation') {
             return true;
         }
-        return Boolean(type && type !== 'step-start' && type !== 'step-finish' && type !== 'step_start' && type !== 'step_finish');
+        return Boolean(leftover && leftover !== 'step-start' && leftover !== 'step-finish' && leftover !== 'step_start' && leftover !== 'step_finish');
     });
 };
 
