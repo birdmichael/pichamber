@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Desktop: Go → Next/Previous Project leaves a projectless chat and opens the adjacent workspace, even when that project was already the inherited File/New default.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
+- Settings: Esc closes the Settings window from any section. Nested dialogs, menus, and in-pane drafts still take Esc first.
 - Settings: Sessions Default Model uses the live resolved model, not a leftover `example-provider/example-model`. Default Thinking shows for that model, and Enabled models ignore stale example-provider ids.
 - Desktop: opening the app no longer sticks on Local Pi unavailable when the in-process kernel is still starting or already running. Retry Local re-checks live health instead of restarting a healthy local kernel.
 - Desktop: Linux Export Save File dialogs fit a 1280×800 screen, so Name, filter, Cancel, and Save stay on screen.

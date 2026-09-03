@@ -10,6 +10,7 @@ test('Escape on Archive, Scheduled, and Worktrees uses closeMainSurfaces after n
   const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
 
   expect(handler).toContain("target?.closest('[role=\"dialog\"]')");
+  expect(handler).toContain('isInsideSettingsDialog(target)');
   expect(handler).toContain('isTerminalEventTarget(target)');
   expect(handler).toContain('dropdownOpen');
   expect(handler.indexOf("target?.closest('[role=\"dialog\"]')")).toBeLessThan(handler.indexOf('shouldYieldFilesPanelEscape'));
@@ -17,4 +18,15 @@ test('Escape on Archive, Scheduled, and Worktrees uses closeMainSurfaces after n
   expect(handler.indexOf('shouldCloseMainSurfaceOnEscape')).toBeLessThan(handler.indexOf('closeMainSurfaces'));
   expect(handler).toContain('isMultiRunLauncherOpen');
   expect(handler).toContain('multiRunCompareGroup');
+});
+
+test('Escape inside Settings closes the window after nested overlays yield', () => {
+  const handlerStart = source.indexOf('const handleEscapeKeyDownCapture');
+  const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
+
+  expect(handler).toContain('isInsideSettingsDialog(target)');
+  expect(handler).toContain('shouldBlockSettingsDismiss(false, { reason: \'escape-key\', event })');
+  expect(handler).toContain('setSettingsDialogOpen(false)');
+  expect(handler.indexOf('isInsideSettingsDialog(target)')).toBeLessThan(handler.indexOf('shouldBlockSettingsDismiss'));
+  expect(handler.indexOf('shouldBlockSettingsDismiss')).toBeLessThan(handler.indexOf('setSettingsDialogOpen(false)'));
 });

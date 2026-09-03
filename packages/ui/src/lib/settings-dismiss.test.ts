@@ -5,6 +5,7 @@ import {
   hasOpenSettingsOverlay,
   hasSettingsEscapeForm,
   isEventInsideSettingsView,
+  isInsideSettingsDialog,
   markSettingsOpenedFromTrigger,
   notifySettingsEscapeForm,
   resetSettingsOpenedFromTriggerForTests,
@@ -12,6 +13,22 @@ import {
   shouldBlockSettingsDismiss,
   shouldRenderSettingsWindow,
 } from './settings-dismiss';
+
+function withDocument(value: unknown, run: () => void): void {
+  const originalDocument = globalThis.document;
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value,
+  });
+  try {
+    run();
+  } finally {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: originalDocument,
+    });
+  }
+}
 
 test('detects a nested settings overlay', () => {
   const overlay = {} as Element;
@@ -44,6 +61,34 @@ test('treats clicks inside the settings view as in-pane', () => {
   expect(isEventInsideSettingsView(null)).toBe(false);
 });
 
+test('treats the Settings window popup as the Settings dialog', () => {
+  const settingsView = {};
+  const popup = {
+    closest(selector: string) {
+      if (selector === '[role="dialog"]') return this;
+      return null;
+    },
+    querySelector: (selector: string) => (
+      selector === '[data-settings-view="true"]' ? settingsView : null
+    ),
+  };
+
+  expect(isInsideSettingsDialog(popup as unknown as EventTarget)).toBe(true);
+  expect(isInsideSettingsDialog({
+    closest: (selector: string) => (selector === '[data-settings-view="true"]' ? settingsView : null),
+  } as unknown as EventTarget)).toBe(true);
+});
+
+test('does not treat a nested dialog as the Settings window', () => {
+  const nested = {
+    closest: (selector: string) => (selector === '[role="dialog"]' ? nested : null),
+    querySelector: () => null,
+  };
+
+  expect(isInsideSettingsDialog(nested as unknown as EventTarget)).toBe(false);
+  expect(isInsideSettingsDialog(null)).toBe(false);
+});
+
 test('blocks dismiss while a native picker is open', () => {
   resetNativeFilePickerForTests();
   beginNativeFilePicker();
@@ -68,25 +113,57 @@ test('blocks an outside-press that originates inside the settings view', () => {
 
 test('blocks Escape when a settings-local form is open', () => {
   resetNativeFilePickerForTests();
-  const originalDocument = globalThis.document;
+  resetSettingsOpenedFromTriggerForTests();
   const form = {} as Element;
-  Object.defineProperty(globalThis, 'document', {
-    configurable: true,
-    value: {
-      querySelector: (selector: string) => (
-        selector.includes('[data-settings-escape-form]') ? form : null
-      ),
-      querySelectorAll: () => ({ length: 1 }),
-    },
-  });
-  try {
+  withDocument({
+    querySelector: (selector: string) => (
+      selector.includes('[data-settings-escape-form]') ? form : null
+    ),
+  }, () => {
     expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(true);
-  } finally {
-    Object.defineProperty(globalThis, 'document', {
-      configurable: true,
-      value: originalDocument,
-    });
-  }
+  });
+});
+
+test('allows Escape to close Settings when no nested overlay is open', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  withDocument({
+    querySelector: () => null,
+    querySelectorAll: () => ({ length: 1 }),
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(false);
+  });
+});
+
+test('does not treat leftover role=dialog chrome as a nested Settings dialog', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  withDocument({
+    querySelector: () => null,
+    querySelectorAll: () => ({ length: 2 }),
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(false);
+  });
+});
+
+test('blocks Escape when a nested Settings dialog is open', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  const nested = {} as Element;
+  withDocument({
+    querySelector: (selector: string) => (
+      selector.includes('[data-slot="dialog-content"]') ? nested : null
+    ),
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(true);
+  });
+  withDocument({
+    querySelector: (selector: string) => (
+      selector.includes('[data-nested-dialog-open]') ? nested : null
+    ),
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(true);
+  });
 });
 
 test('notifies a settings-local escape form and skips nested dialogs', () => {
@@ -101,17 +178,17 @@ test('notifies a settings-local escape form and skips nested dialogs', () => {
     querySelector: (selector: string) => (
       selector.includes('[data-settings-escape-form]') ? form : null
     ),
-    querySelectorAll: () => ({ length: 1 }),
   } as unknown as ParentNode;
 
   expect(notifySettingsEscapeForm(root)).toBe(true);
   expect(dispatched).toEqual([SETTINGS_ESCAPE_FORM_EVENT]);
 
   const nestedRoot = {
-    querySelector: (selector: string) => (
-      selector.includes('[data-settings-escape-form]') ? form : null
-    ),
-    querySelectorAll: () => ({ length: 2 }),
+    querySelector: (selector: string) => {
+      if (selector.includes('[data-slot="dialog-content"]')) return {};
+      if (selector.includes('[data-settings-escape-form]')) return form;
+      return null;
+    },
   } as unknown as ParentNode;
   expect(notifySettingsEscapeForm(nestedRoot)).toBe(false);
 });
@@ -140,6 +217,18 @@ test('blocks leftover trigger-press and imperative-action from the same gear cli
   expect(shouldBlockSettingsDismiss(false, { reason: 'trigger-press' })).toBe(true);
   expect(shouldBlockSettingsDismiss(false, { reason: 'imperative-action' })).toBe(true);
   expect(shouldBlockSettingsDismiss(false, { reason: 'close-press' })).toBe(false);
+});
+
+test('allows Escape during the leftover first-click guard', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  markSettingsOpenedFromTrigger();
+  withDocument({
+    querySelector: () => null,
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(false);
+    expect(shouldBlockSettingsDismiss(false, { reason: 'trigger-press' })).toBe(true);
+  });
 });
 
 test('renders the Settings window on the same open as the first gear click', () => {
