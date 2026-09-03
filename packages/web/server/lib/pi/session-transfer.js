@@ -2239,16 +2239,10 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
   const toolPartsByCallID = new Map();
   let lastUserId = '';
   let lastThinking = '';
-  let lastModel = resolveUsableFacadeModel(fallbackModel);
   for (const entry of Array.isArray(entries) ? entries : []) {
     if (entry?.type === 'thinking_level_change') {
       const level = asTrimmedString(entry.thinkingLevel || entry.level);
       if (level) lastThinking = level;
-      continue;
-    }
-    if (entry?.type === 'model_change') {
-      const found = resolveUsableFacadeModel(entry);
-      if (found) lastModel = found;
       continue;
     }
     if (entry?.type && entry.type !== 'message') continue;
@@ -2267,11 +2261,6 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
       if (lastThinking) {
         facade.info.variant = lastThinking;
         facade.info.thinking = lastThinking;
-      }
-      if (lastModel) {
-        facade.info.providerID = lastModel.providerID;
-        facade.info.modelID = lastModel.modelID;
-        facade.info.model = lastModel.model;
       }
     } else if (facade.info.role === 'assistant' && lastUserId) {
       // Pi jsonl parentId is the previous line (often toolResult). Chat turns

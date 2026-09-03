@@ -701,37 +701,6 @@ describe('session-transfer', () => {
     expect(piSession.thinkingLevel).toBe('high');
   });
 
-  it('stamps each hydrated user turn with the preceding model_change', () => {
-    const messages = facadeMessagesFromPiEntries([
-      { type: 'model_change', provider: 'deepseek', modelId: 'deepseek-v4-flash' },
-      {
-        type: 'message',
-        id: 'u1',
-        message: { role: 'user', content: [{ type: 'text', text: 'deepseek turn' }] },
-      },
-      { type: 'model_change', provider: 'xai', modelId: 'grok-4.6' },
-      {
-        type: 'message',
-        id: 'u2',
-        message: { role: 'user', content: [{ type: 'text', text: 'back to grok' }] },
-      },
-    ], 'ses_model');
-    expect(messages[0].info).toMatchObject({
-      id: 'u1',
-      role: 'user',
-      providerID: 'deepseek',
-      modelID: 'deepseek-v4-flash',
-      model: { providerID: 'deepseek', modelID: 'deepseek-v4-flash' },
-    });
-    expect(messages[1].info).toMatchObject({
-      id: 'u2',
-      role: 'user',
-      providerID: 'xai',
-      modelID: 'grok-4.6',
-      model: { providerID: 'xai', modelID: 'grok-4.6' },
-    });
-  });
-
   it('stamps each hydrated user turn with the preceding thinking_level_change', () => {
     const messages = facadeMessagesFromPiEntries([
       { type: 'thinking_level_change', thinkingLevel: 'high' },

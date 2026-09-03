@@ -445,11 +445,8 @@ and becomes `{ model: null, providerID: null, modelID: null }`.
 on an idle send so each turn uses the composer selection. An unsupported
 thinking pin keeps the session's current thinking. Each user turn is
 stamped with the **applied** thinking (`userInfo.variant` and
-`userInfo.thinking`) and the **applied** model (`userInfo.providerID` /
-`userInfo.modelID` / `userInfo.model`) so the transcript footer can show
-what that turn sent. Hydrate copies thinking from the preceding jsonl
-`thinking_level_change` and model from the preceding `model_change`.
-Assistant `info` uses this turn's model, not a leftover earlier pin.
+`userInfo.thinking`) so the transcript can show what that turn sent.
+Hydrate copies the same from the preceding jsonl `thinking_level_change`.
 Live/busy turns skip both `setSessionModel` and `setSessionThinking` so a
 concurrent `setModel` cannot clobber `isStreaming`. Composer chip changes
 `PATCH` session thinking only — not global `PATCH /api/pi/defaults`.

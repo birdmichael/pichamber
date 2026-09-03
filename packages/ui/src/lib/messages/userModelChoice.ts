@@ -11,61 +11,9 @@ type UserModelChoice = {
 }
 
 type MessageLike = Message & {
-  model?: { providerID?: string; modelID?: string; variant?: string } | string
-  providerID?: string
-  modelID?: string
+  model?: { providerID?: string; modelID?: string; variant?: string }
   variant?: string
   mode?: string
-}
-
-export type MessageModelRef = { providerId: string; modelId: string }
-
-const FACADE_PLACEHOLDER = 'pi'
-
-const asNonEmpty = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed.length > 0 ? trimmed : undefined
-}
-
-const asUsableRef = (providerId: string | undefined, modelId: string | undefined): MessageModelRef | null => {
-  if (!providerId || !modelId) return null
-  if (providerId === FACADE_PLACEHOLDER && modelId === FACADE_PLACEHOLDER) return null
-  return { providerId, modelId }
-}
-
-const parseProviderModelKey = (value: string): MessageModelRef | null => {
-  const slash = value.indexOf('/')
-  if (slash <= 0 || slash >= value.length - 1) return null
-  return asUsableRef(value.slice(0, slash), value.slice(slash + 1))
-}
-
-const nestedModelRecord = (value: unknown): Record<string, unknown> | null => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
-)
-
-/** Leftover facade `pi`/`pi` is not a catalog model. */
-export const parseMessageModelRef = (info: unknown): MessageModelRef | null => {
-  if (!info || typeof info !== 'object') return null
-  const record = info as Record<string, unknown>
-  const nested = nestedModelRecord(record.model)
-  if (nested) {
-    const fromNested = asUsableRef(
-      asNonEmpty(nested.providerID) ?? asNonEmpty(nested.provider),
-      asNonEmpty(nested.modelID) ?? asNonEmpty(nested.modelId) ?? asNonEmpty(nested.id),
-    )
-    if (fromNested) return fromNested
-  }
-  if (typeof record.model === 'string') {
-    const fromString = parseProviderModelKey(record.model)
-    if (fromString) return fromString
-  }
-  return asUsableRef(
-    asNonEmpty(record.providerID) ?? asNonEmpty(record.provider),
-    asNonEmpty(record.modelID) ?? asNonEmpty(record.modelId),
-  )
 }
 
 /**
@@ -76,18 +24,22 @@ export const extractUserModelChoice = (message: MessageLike): UserModelChoice | 
     return null
   }
 
-  const parsed = parseMessageModelRef(message)
+  const providerID = typeof message.model?.providerID === 'string' && message.model.providerID.trim().length > 0
+    ? message.model.providerID
+    : undefined
+  const modelID = typeof message.model?.modelID === 'string' && message.model.modelID.trim().length > 0
+    ? message.model.modelID
+    : undefined
   const agent = typeof message.agent === 'string' && message.agent.trim().length > 0
     ? message.agent
     : (typeof message.mode === 'string' && message.mode.trim().length > 0 ? message.mode : undefined)
-  const nested = nestedModelRecord(message.model)
   // OpenCode 1.4.0 moved variant from top-level to model.variant.
-  const variantCandidate = (typeof nested?.variant === 'string' ? nested.variant : undefined) ?? message.variant
+  const variantCandidate = message.model?.variant ?? message.variant
   const variant = typeof variantCandidate === 'string' && variantCandidate.trim().length > 0
     ? variantCandidate
     : undefined
 
-  return { id: message.id, agent, providerID: parsed?.providerId, modelID: parsed?.modelId, variant }
+  return { id: message.id, agent, providerID, modelID, variant }
 }
 
 /**
