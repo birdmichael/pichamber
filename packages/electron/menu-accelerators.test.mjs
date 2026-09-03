@@ -14,6 +14,8 @@ test('formats comma and period accelerators for display', () => {
   assert.equal(formatNativeMenuAcceleratorForDisplay('Ctrl+.'), 'Ctrl+.');
   assert.equal(formatNativeMenuAcceleratorForDisplay('Ctrl+Period'), 'Ctrl+.');
   assert.equal(formatNativeMenuAcceleratorForDisplay('Ctrl+P'), 'Ctrl+P');
+  assert.equal(formatNativeMenuAcceleratorForDisplay('Ctrl+K, H'), 'Ctrl+K, H');
+  assert.equal(formatNativeMenuAcceleratorForDisplay('Cmd+K, H'), 'Cmd+K, H');
 });
 
 test('Linux header menu shows Ctrl+, instead of Ctrl+Comma', () => {
@@ -42,6 +44,27 @@ test('macOS and Windows keep the source accelerator on the item', () => {
   assert.deepEqual(decorateMenuTemplateForPlatform(template, 'win32'), template);
 });
 
+test('sequential catalog chords are shown in the label column on every platform', () => {
+  const template = [
+    { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => {} },
+  ];
+
+  for (const platform of ['linux', 'darwin', 'win32']) {
+    const decorated = decorateMenuTemplateForPlatform(template, platform);
+    assert.equal(decorated[0].label, 'Keyboard Shortcuts\tCtrl+K, H', platform);
+    assert.equal(decorated[0].accelerator, undefined, platform);
+    assert.equal(decorated[0].registerAccelerator, false, platform);
+  }
+
+  const mac = decorateMenuTemplateForPlatform(
+    [{ label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => {} }],
+    'darwin',
+  );
+  assert.equal(mac[0].label, 'Keyboard Shortcuts\tCmd+K, H');
+  assert.equal(mac[0].accelerator, undefined);
+  assert.equal(mac[0].registerAccelerator, false);
+});
+
 test('File New Session keeps Cmd+N / Ctrl+N as a hint and does not register it', () => {
   const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
   const items = [...source.matchAll(/\{ label: 'New Session', accelerator: '(Cmd\+N|Ctrl\+N)'[^}]*\}/g)]
@@ -66,4 +89,27 @@ test('Command Palette keeps Cmd+P / Ctrl+P as a hint and does not register it', 
   for (const item of items) {
     assert.match(item, /registerAccelerator:\s*false/);
   }
+});
+
+test('Help Keyboard Shortcuts advertises Cmd+K, H / Ctrl+K, H and does not register it', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const items = [...source.matchAll(/\{ label: 'Keyboard Shortcuts', accelerator: '(Cmd\+K, H|Ctrl\+K, H)'[^}]*\}/g)]
+    .map((match) => match[0]);
+
+  assert.equal(items.length, 2, 'expected darwin Cmd+K, H and Linux/Windows Ctrl+K, H Keyboard Shortcuts items');
+  assert.ok(items.some((item) => item.includes("accelerator: 'Cmd+K, H'")));
+  assert.ok(items.some((item) => item.includes("accelerator: 'Ctrl+K, H'")));
+  for (const item of items) {
+    assert.match(item, /registerAccelerator:\s*false/);
+  }
+  assert.equal(
+    [...source.matchAll(/label: 'Keyboard Shortcuts', accelerator: 'Cmd\+\.'/g)].length,
+    0,
+    'leftover Cmd+. must not be advertised on Keyboard Shortcuts',
+  );
+  assert.equal(
+    [...source.matchAll(/label: 'Keyboard Shortcuts', accelerator: 'Ctrl\+\.'/g)].length,
+    0,
+    'leftover Ctrl+. must not be advertised on Keyboard Shortcuts',
+  );
 });
