@@ -2400,6 +2400,7 @@ export const dict = {
   'chat.snippetAutocomplete.footer': '↑↓ navigate • Enter select • Esc close',
   'snippets.source.global': 'global',
   'snippets.source.project': 'project',
+  'chat.chatInput.toast.modelRequired': 'Select a model before sending. Add a provider in Settings if none are listed.',
   'chat.chatInput.toast.compactFailed': 'Failed to compact session',
   'chat.chatInput.toast.summaryFailed': 'Failed to generate summary',
   'chat.messageBody.actions.sendReviewFeedback': 'Send review feedback to implementing agent',

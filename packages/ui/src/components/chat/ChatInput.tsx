@@ -1181,7 +1181,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         const variantToSend = capturedSendConfig?.variant ?? thinkingToSend;
 
         if (!providerIdToSend || !modelIdToSend) {
-            console.warn('Cannot send message: provider or model not selected');
+            toast.error(t('chat.chatInput.toast.modelRequired'));
             return;
         }
 

@@ -2366,6 +2366,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.snippetAutocomplete.footer": "↑↓ navegar • Enter seleccionar • Esc cerrar",
   "snippets.source.global": "global",
   "snippets.source.project": "proyecto",
+  "chat.chatInput.toast.modelRequired": "Selecciona un modelo antes de enviar. Añade un proveedor en Ajustes si no hay ninguno.",
   "chat.chatInput.toast.compactFailed": "No se pudo comprimir la sesión",
   "chat.chatInput.toast.summaryFailed": "No se pudo generar el resumen",
   "chat.messageBody.actions.sendReviewFeedback": "Enviar feedback de revisión al agente que implementa los cambios",

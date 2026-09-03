@@ -2396,6 +2396,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.snippetAutocomplete.footer': '↑↓ 移動 • Enter 選択 • Esc 閉じる',
   'snippets.source.global': 'グローバル',
   'snippets.source.project': 'プロジェクト',
+  'chat.chatInput.toast.modelRequired': '送信前にモデルを選択してください。一覧が空の場合は設定でプロバイダーを追加してください。',
   'chat.chatInput.toast.compactFailed': 'セッションの圧縮に失敗しました',
   'chat.chatInput.toast.summaryFailed': '要約の生成に失敗しました',
   'chat.messageBody.actions.sendReviewFeedback': 'レビューフィードバックを実装エージェントに送信',

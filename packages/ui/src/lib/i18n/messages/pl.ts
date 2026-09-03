@@ -1414,6 +1414,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.chatInput.toast.largeTextPaste.title': 'Wykryto duży tekst',
   'chat.chatInput.toast.largeTextPaste.attach': 'Dołącz jako plik',
   'chat.chatInput.toast.largeTextPaste.inline': 'Wklej w treści',
+  'chat.chatInput.toast.modelRequired': 'Wybierz model przed wysłaniem. Dodaj dostawcę w Ustawieniach, jeśli lista jest pusta.',
   'chat.chatInput.toast.compactFailed': 'Nie udało się skompaktować sesji',
   'chat.chatInput.toast.messageSendFailed': 'Nie udało się wysłać wiadomości. Załączniki zostały przywrócone.',
   'chat.chatInput.toast.unknownCommand': 'To polecenie nie jest jeszcze dostępne.',

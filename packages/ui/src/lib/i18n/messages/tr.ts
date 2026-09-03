@@ -2398,6 +2398,7 @@ export const dict = {
   'chat.snippetAutocomplete.footer': '↑↓ gezin • Enter seç • Esc kapat',
   'snippets.source.global': 'genel',
   'snippets.source.project': 'proje',
+  'chat.chatInput.toast.modelRequired': 'Göndermeden önce bir model seçin. Liste boşsa Ayarlar’dan bir sağlayıcı ekleyin.',
   'chat.chatInput.toast.compactFailed': 'Session sıkıştırılamadı',
   'chat.chatInput.toast.summaryFailed': 'Özet oluşturulamadı',
   'chat.messageBody.actions.sendReviewFeedback': 'İnceleme geri bildirimini uygulayan agent\'a gönder',

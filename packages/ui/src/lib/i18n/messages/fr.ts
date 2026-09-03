@@ -2055,6 +2055,7 @@ export const dict = {
   'chat.snippetAutocomplete.footer': '↑↓ naviguer • Entrer sélectionner • Esc fermer',
   'snippets.source.global': 'mondial',
   'snippets.source.project': 'projet',
+  'chat.chatInput.toast.modelRequired': 'Sélectionnez un modèle avant d’envoyer. Ajoutez un fournisseur dans les paramètres s’il n’y en a aucun.',
   'chat.chatInput.toast.compactFailed': 'Échec du compactage de la session',
   'chat.chatInput.toast.summaryFailed': 'Échec de la génération du résumé',
   'chat.chatInput.toast.reviewFailed': 'Échec de l\'examen des modifications',

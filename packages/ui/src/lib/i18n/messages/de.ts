@@ -2178,6 +2178,7 @@ export const dict = {
   'chat.snippetAutocomplete.footer': '↑↓ navigieren • Enter auswählen • Esc schließen',
   'snippets.source.global': 'global',
   'snippets.source.project': 'Projekt',
+  'chat.chatInput.toast.modelRequired': 'Bitte zuerst ein Modell wählen. Fügen Sie in den Einstellungen einen Anbieter hinzu, falls keiner gelistet ist.',
   'chat.chatInput.toast.compactFailed': 'Fehler beim Komprimieren der Sitzung',
   'chat.chatInput.toast.summaryFailed': 'Fehler bei der Erstellung der Zusammenfassung',
   'chat.messageBody.actions.sendReviewFeedback': 'Feedback zur Überprüfung an den implementierenden Agenten senden',

@@ -133,6 +133,21 @@ const normalizeCompactionSummaryMessage = (
     };
 };
 
+const assistantHasVisibleContent = (message: ChatMessageEntry): boolean => {
+    const parts = message.parts || [];
+    return parts.some((part) => {
+        const type = part?.type;
+        if (type === 'text' || type === 'reasoning') {
+            const text = typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '';
+            return text.trim().length > 0;
+        }
+        if (type === 'tool' || type === 'toolCall' || type === 'toolResult' || type === 'tool-invocation') {
+            return true;
+        }
+        return Boolean(type && type !== 'step-start' && type !== 'step-finish' && type !== 'step_start' && type !== 'step_finish');
+    });
+};
+
 const isAssistantMessageCompleted = (message: ChatMessageEntry): boolean => {
     const info = message.info as { time?: { completed?: unknown }; status?: unknown };
     const completed = info.time?.completed;
@@ -502,8 +517,10 @@ const TurnBlock = React.memo(({
             return turn.assistantMessages;
         }
 
-        const completed = turn.assistantMessages.filter(isAssistantMessageCompleted);
-        if (completed.length === turn.assistantMessages.length) {
+        const completed = turn.assistantMessages.filter((assistant) => (
+            isAssistantMessageCompleted(assistant) && assistantHasVisibleContent(assistant)
+        ));
+        if (completed.length === turn.assistantMessages.length && turn.assistantMessages.every(assistantHasVisibleContent)) {
             return turn.assistantMessages;
         }
 
@@ -519,7 +536,10 @@ const TurnBlock = React.memo(({
             return completed;
         }
         const firstAssistant = turn.assistantMessages[0];
-        return firstAssistant ? [firstAssistant] : [];
+        if (firstAssistant && assistantHasVisibleContent(firstAssistant)) {
+            return [firstAssistant];
+        }
+        return [];
     }, [chatRenderMode, streamingAssistantMessageId, turn.assistantMessages]);
 
     const completedAssistantMessages = React.useMemo(() => {

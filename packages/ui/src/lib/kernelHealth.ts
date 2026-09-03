@@ -13,6 +13,7 @@ export const isLocalKernelReady = (
 ): boolean => {
   if (!health || typeof health !== 'object') return false;
   if (health.kernelReady === true || health.piRunning === true) return true;
-  if (health.kernel === 'pi' && health.status === 'ok') return true;
+  // Pi `status: ok` only means the sidecar is listening, not that the kernel can chat.
+  if (health.kernel === 'pi') return false;
   return health.openCodeRunning === true || health.isOpenCodeReady === true;
 };
