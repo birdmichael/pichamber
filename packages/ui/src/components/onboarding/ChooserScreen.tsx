@@ -11,41 +11,22 @@ import { RemoteConnectionForm } from './RemoteConnectionForm';
 import { desktopHostsGet, desktopHostsSet } from '@/lib/desktopHosts';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
-import { isLocalKernelReady } from '@/lib/kernelHealth';
+import { KernelInstallCommand } from './KernelInstallCommand';
+import {
+  kernelBinaryPlaceholder,
+  localKernelSetup,
+  readLocalKernelHealth,
+  type LocalKernelName,
+  type OnboardingPlatform,
+} from './localKernelSetup';
 
-const INSTALL_COMMAND = 'curl -fsSL https://opencode.ai/install | bash';
-const DOCS_URL = 'https://opencode.ai/docs';
 const POLL_INTERVAL_MS = 2500;
-
-type OnboardingPlatform = 'macos' | 'linux' | 'windows' | 'unknown';
 
 type ChooserScreenProps = {
   /** Callback when CLI becomes available */
   onCliAvailable?: () => void;
   localAvailable?: boolean;
 };
-
-function BashCommand({ onCopy, copyTitle }: { onCopy: () => void; copyTitle: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 w-full">
-      <code className="flex-1 text-left overflow-x-auto whitespace-nowrap">
-        <span style={{ color: 'var(--syntax-keyword)' }}>curl</span>
-        <span className="text-muted-foreground"> -fsSL </span>
-        <span style={{ color: 'var(--syntax-string)' }}>https://opencode.ai/install</span>
-        <span className="text-muted-foreground"> | </span>
-        <span style={{ color: 'var(--syntax-keyword)' }}>bash</span>
-      </code>
-      <button
-        onClick={onCopy}
-        className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
-        title={copyTitle}
-        aria-label={copyTitle}
-      >
-        <Icon name="file-copy" className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
 
 export function ChooserScreen({ onCliAvailable, localAvailable = true }: ChooserScreenProps) {
   const { t } = useI18n();
@@ -54,6 +35,9 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
   const [isApplyingPath, setIsApplyingPath] = React.useState(false);
   const [isManualChecking, setIsManualChecking] = React.useState(false);
   const [opencodeBinary, setOpencodeBinary] = React.useState('');
+  const [binaryTouched, setBinaryTouched] = React.useState(false);
+  const [kernel, setKernel] = React.useState<LocalKernelName>('pi');
+  const [detectedPiBinary, setDetectedPiBinary] = React.useState<string | null>(null);
   const [platform, setPlatform] = React.useState<OnboardingPlatform>('unknown');
   const [activeTab, setActiveTab] = React.useState<'local' | 'remote'>(() => localAvailable ? 'local' : 'remote');
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
@@ -109,12 +93,28 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
     try {
       const response = await runtimeFetch('/health');
       if (!response.ok) return false;
-      const data = await response.json();
-      return isLocalKernelReady(data);
+      const data = await response.json().catch(() => null);
+      const snapshot = readLocalKernelHealth(data);
+      setKernel(snapshot.kernel);
+      if (snapshot.piBinaryResolved) {
+        setDetectedPiBinary(snapshot.piBinaryResolved);
+      }
+      return snapshot.ready;
     } catch {
       return false;
     }
   }, []);
+
+  React.useEffect(() => {
+    void checkCliAvailability();
+  }, [checkCliAvailability]);
+
+  React.useEffect(() => {
+    if (binaryTouched || opencodeBinary.trim() || kernel !== 'pi' || !detectedPiBinary) {
+      return;
+    }
+    setOpencodeBinary(detectedPiBinary);
+  }, [binaryTouched, detectedPiBinary, kernel, opencodeBinary]);
 
   const persistFirstChoice = React.useCallback(async (choice: 'local' | 'remote') => {
     if (!isDesktopApp) return;
@@ -135,7 +135,7 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
   }, [isDesktopApp, onCliAvailable, persistFirstChoice]);
 
   // Background polling: while the local tab is visible, periodically check
-  // whether the OpenCode CLI is reachable. As soon as it is, transition
+  // whether the local kernel is ready. As soon as it is, transition
   // automatically — the user doesn't have to click anything.
   React.useEffect(() => {
     if (!localAvailable || activeTab !== 'local') return;
@@ -185,6 +185,7 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
     try {
       const selected = await requestFileAccess();
       if (selected.success && selected.path && selected.path.trim().length > 0) {
+        setBinaryTouched(true);
         setOpencodeBinary(selected.path.trim());
       }
     } catch {
@@ -208,22 +209,19 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
   }, [isDesktopApp, opencodeBinary, persistFirstChoice]);
 
   const handleCopy = React.useCallback(async () => {
-    const result = await copyTextToClipboard(INSTALL_COMMAND);
+    const result = await copyTextToClipboard(localKernelSetup(kernel).installCommand);
     if (result.ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } else {
       console.error('Failed to copy:', result.error);
     }
-  }, []);
+  }, [kernel]);
 
-  const docsUrl = DOCS_URL;
-  const binaryPlaceholder =
-    platform === 'windows'
-      ? 'C:\\Users\\you\\AppData\\Roaming\\npm\\opencode.cmd'
-      : platform === 'linux'
-        ? '/home/you/.bun/bin/opencode'
-        : '/Users/you/.bun/bin/opencode';
+  const setup = localKernelSetup(kernel);
+  const docsUrl = setup.docsUrl;
+  const binaryPlaceholder = kernelBinaryPlaceholder(kernel, platform);
+  const showDetectedPi = kernel === 'pi' && Boolean(detectedPiBinary);
 
   const showLocal = localAvailable && (!isDesktopApp || activeTab === 'local');
 
@@ -304,8 +302,17 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
                   <Icon name="check" className="h-4 w-4" />
                   {t('onboarding.common.status.copiedToClipboard')}
                 </div>
+              ) : showDetectedPi ? (
+                <div className="text-left text-sm font-sans text-foreground break-all">
+                  {t('onboarding.localSetup.status.detected', { path: detectedPiBinary || '' })}
+                </div>
               ) : (
-                <BashCommand onCopy={handleCopy} copyTitle={t('onboarding.common.copyToClipboard')} />
+                <KernelInstallCommand
+                  command={setup.installCommand}
+                  onCopy={handleCopy}
+                  copyTitle={t('onboarding.common.copyToClipboard')}
+                  layout="chooser"
+                />
               )}
             </div>
 
@@ -378,7 +385,10 @@ export function ChooserScreen({ onCliAvailable, localAvailable = true }: Chooser
                 <div className="flex gap-2">
                   <Input
                     value={opencodeBinary}
-                    onChange={(e) => setOpencodeBinary(e.target.value)}
+                    onChange={(e) => {
+                      setBinaryTouched(true);
+                      setOpencodeBinary(e.target.value);
+                    }}
                     placeholder={binaryPlaceholder}
                     disabled={isApplyingPath}
                     className="flex-1 font-mono text-xs"
