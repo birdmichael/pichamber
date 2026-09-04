@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.12] - 2026-09-04
+
+- Desktop/chat/settings fixes since 1.2.11: Settings gear first click, Esc in Settings/Files, Plan leading `Plan ` kept, assistant footer model stamp, Chooser Pi-aware recovery, `~/.config/pichamber` data dir, Kimi/xAI OAuth+API key dual auth, and the merged shortcut/menu/Files batch. See root `CHANGELOG.md`.
+
 ## [1.2.11] - 2026-09-03
 
 - Feature Plugins Kimi Usage installs `pi-kimi-code-console-usage`. Providers gain Kimi Code login (always). Work Status / Providers show Kimi weekly + 5-hour usage only when that plugin is installed.

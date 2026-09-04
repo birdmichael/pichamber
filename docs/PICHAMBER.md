@@ -161,7 +161,7 @@ SVG masters and the generator live in `packages/electron/resources/icons` and `p
 
 ## Branch and version
 
-Pichamber is a new product line on this fork. Versioning starts at **1.0.0** and is independent of upstream OpenChamber version numbers. The current release is **1.2.11**. The default kernel is in-process Pi.
+Pichamber is a new product line on this fork. Versioning starts at **1.0.0** and is independent of upstream OpenChamber version numbers. The current release is **1.2.12**. The default kernel is in-process Pi.
 
 - Default branch: `main` (Pi kernel).
 - The pre-Pi OpenChamber line is preserved as `legacy/openchamber`.

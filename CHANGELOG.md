@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.12] - 2026-09-04
+
 - Desktop: connection health probes allow more time before marking Local disconnected, so a busy first send is less likely to toast `health_probe_unhealthy`.
 - Settings: Kimi Code and xAI can keep OAuth and an API key connected at the same time. Saving one no longer overwrites the other; disconnecting one leaves the other.
 - Desktop: Help → Keyboard Shortcuts is a single menu row again (`Ctrl/Cmd+K, H`) and opens with one-shot menu delivery (repair after #531 merge conflict).
