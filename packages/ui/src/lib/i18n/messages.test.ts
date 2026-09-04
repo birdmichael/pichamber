@@ -37,6 +37,27 @@ describe('i18n dictionaries', () => {
     }
   });
 
+  test('Pi onboarding detection copy is translated and does not mention OpenCode', () => {
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['onboarding.localSetup.status.detected'], locale).toContain('{path}');
+      expect(dictionary['onboarding.localSetup.status.detected'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.localSetup.hint.ensurePath'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.localSetup.windows.hintDetectionFailed'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.localSetup.hint.setEnv'], locale).toMatch(/PI_BINARY/);
+      expect(dictionary['onboarding.localSetup.hint.setEnv'], locale).not.toMatch(/OPENCODE_BINARY/);
+    }
+  });
+
+  test('startup-failed and local-unavailable recovery copy does not mention OpenCode', () => {
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['startup.initRecovery.title'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['startup.initRecovery.description'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.desktopRecovery.localUnavailable.title'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.desktopRecovery.localUnavailable.description'], locale).not.toMatch(/opencode/i);
+      expect(dictionary['onboarding.localSetup.docs.default'], locale).not.toMatch(/opencode/i);
+    }
+  });
+
   test('all locales expose language label keys', () => {
     for (const [, dictionary] of Object.entries(localeDictionaries)) {
       expect(dictionary['common.language.german']).toBeTruthy();

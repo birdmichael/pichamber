@@ -3007,6 +3007,7 @@ export const dict = {
   'onboarding.localSetup.helper.checkAndContinue': 'Click to check if Pi is available. If successful, you\'ll automatically enter the main screen.',
   'onboarding.localSetup.status.watching': 'Waiting for Pi',
   'onboarding.localSetup.status.autoContinue': "We'll continue automatically once it's detected.",
+  'onboarding.localSetup.status.detected': 'Pi found at {path}',
   'onboarding.localSetup.field.alreadyInstalled': 'Already installed? Set the Pi binary path:',
   'onboarding.localSetup.advanced.title': 'Set a custom binary path',
   'onboarding.localSetup.troubleshoot.title': 'Having trouble?',
