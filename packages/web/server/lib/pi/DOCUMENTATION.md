@@ -305,6 +305,16 @@ expires }` to `{agentDir}/auth.json` through `writePiProviderAuth`. Refresh
 uses `xaiOAuth.refresh`, not a copied token exchange. Other provider ids
 are 404. No pending authorize is 400. Responses never echo tokens.
 
+Pi `auth.json` is one credential per provider id. For xAI and Kimi Code,
+OAuth stays on the catalog id (`xai`, `kimi-coding`). An API key is stored
+on a reserved sibling (`xai-api`, `kimi-coding-api`) as
+`{ type: 'api_key', key }` plus a user `models.json` row so ModelRuntime
+lists those models. Saving one method does not overwrite the other.
+Disconnecting the catalog id removes only OAuth; disconnecting the sibling
+removes only the API key and its `models.json` row. Settings Add does not
+list the sibling — use the Kimi Code / xAI card. Custom provider create
+cannot use the reserved sibling ids.
+
 Product login is this built-in `/login xai`, not an npm xAI OAuth
 extension. Composer `/login` for `xai` points at Settings → Providers.
 
@@ -357,7 +367,9 @@ The helper is Pi `kimiCodingOAuth` loaded from bundled `pi-ai`
 `dist/auth/oauth/kimi-coding.js` next to `@earendil-works/pi-coding-agent`
 via the same `findNamedPackageDir` pattern as xAI. Callback writes
 `{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
-key `kimi-coding` through `writePiProviderAuth`. Refresh uses
+key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
+card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible
+`https://api.moonshot.ai/v1`) instead of overwriting OAuth. Refresh uses
 `kimiCodingOAuth.refresh`, not a copied token exchange. Responses never
 echo access, refresh, or user id. Composer `/login kimi-coding` points
 at Settings → Providers.

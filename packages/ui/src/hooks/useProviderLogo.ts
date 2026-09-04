@@ -27,7 +27,9 @@ const LOGO_ALIAS = new Map<string, string>([
     ['wafer-ai', 'wafer.ai'],
     ['wafer', 'wafer.ai'],
     ['kimi-coding', 'kimi-for-coding'],
+    ['kimi-coding-api', 'kimi-for-coding'],
     ['kimi', 'kimi-for-coding'],
+    ['xai-api', 'xai'],
 ]);
 
 const normalizeProviderId = (providerId: string | null | undefined) => {

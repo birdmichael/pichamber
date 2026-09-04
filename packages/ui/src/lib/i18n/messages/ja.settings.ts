@@ -1689,6 +1689,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.providerID.required': 'プロバイダー ID は必須です',
   'settings.providers.page.custom.error.providerID.format': '小文字・数字・ハイフン・アンダースコアを使ってください',
   'settings.providers.page.custom.error.providerID.exists': 'この ID のプロバイダーは既に接続されています',
+  'settings.providers.page.custom.error.providerID.reserved': 'このプロバイダー ID は予約されています',
   'settings.providers.page.custom.error.name.required': '表示名は必須です',
   'settings.providers.page.custom.error.baseURL.required': 'ベース URL は必須です',
   'settings.providers.page.custom.error.baseURL.format': 'ベース URL は http:// または https:// で始めてください',
@@ -1722,6 +1723,10 @@ export const settingsDict = {
   'settings.providers.page.auth.oauth.error.declined': '認証が拒否されたか、完了しませんでした。',
   'settings.providers.page.auth.oauth.error.invalidInput': '入力された内容は拒否されました。',
   'settings.providers.page.auth.connected': '接続済み',
+  'settings.providers.page.auth.oauthConnected': 'OAuth 接続済み',
+  'settings.providers.page.auth.apiKeyConnected': 'API キー接続済み',
+  'settings.providers.page.auth.oauthAndApiKeyConnected': 'OAuth と API キーの両方に接続済み',
+  'settings.providers.page.auth.dualHint': 'OAuth ログインと API キーは同時に接続したままにできます。一方を保存しても他方は上書きされません。',
   'settings.providers.page.auth.incomplete': '認証情報が不足しています',
   'settings.providers.page.auth.incompleteHint': '· チャットでこのプロバイダーを使う前に API キーまたは {env:VAR} を追加してください',
 
@@ -1774,6 +1779,8 @@ export const settingsDict = {
 
   'settings.providers.page.actions.disconnecting': '切断中...',
   'settings.providers.page.actions.disconnect': '切断',
+  'settings.providers.page.actions.disconnectOAuth': 'OAuth を切断',
+  'settings.providers.page.actions.disconnectApiKey': 'API キーを切断',
   'settings.providers.page.actions.hideAll': 'すべて非表示',
   'settings.providers.page.actions.showAll': 'すべて表示',
   'settings.providers.page.toast.authMethodsLoadFailed': 'Provider 認証方法の読み込みに失敗しました',

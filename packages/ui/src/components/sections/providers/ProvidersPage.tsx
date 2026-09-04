@@ -38,7 +38,12 @@ import {
   shouldLoadAvailableProviders,
 } from './providerAvailability';
 import {
+  dualAuthCatalogId,
+  dualAuthSiblingId,
   getOAuthAuthMethods,
+  isDualAuthApiSiblingId,
+  isDualAuthCatalogId,
+  isDualAuthSurfaceId,
   parseAuthPayload,
   providerHasCredentials,
   requiresOpenCodeRestartAfterOAuth,
@@ -103,6 +108,8 @@ interface ProviderSources {
   user: ProviderSourceInfo;
   project: ProviderSourceInfo;
   custom?: ProviderSourceInfo;
+  oauth?: ProviderSourceInfo;
+  apiKey?: ProviderSourceInfo;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -401,12 +408,15 @@ export const ProvidersPage: React.FC = () => {
     const isEditableCustomProvider = Boolean(
       provider && isConfigDefinedCustomProvider(provider, sources),
     );
+    const dualAuthIncomplete = isDualAuthSurfaceId(selectedProviderId)
+      && !(sources.oauth?.exists === true && sources.apiKey?.exists === true);
     if (
       shouldAutoOpenAuthPanel({
         sourcesLoaded: true,
         hasCredentials: hasCreds,
         userDismissed: authPanelDismissedForId === selectedProviderId,
         isEditableCustomProvider,
+        dualAuthIncomplete,
       })
     ) {
       setShowAuthPanel(true);
@@ -484,7 +494,8 @@ export const ProvidersPage: React.FC = () => {
         recordDeferredOpenCodeRestart('providers', { id: providerId });
       }
       await loadProviders({ directory: settingsDirectory, source: 'settings:api-key-save' });
-      setSelectedProvider(providerId);
+      const siblingId = dualAuthSiblingId(providerId);
+      setSelectedProvider(siblingId && isDualAuthCatalogId(providerId) ? siblingId : providerId);
       setProviderSourceEpoch((n) => n + 1);
     } catch (error) {
       console.error('Failed to save API key:', error);
@@ -562,12 +573,14 @@ export const ProvidersPage: React.FC = () => {
 
   const handleOAuthConnected = async (providerId: string) => {
     setAuthPanelDismissedForId(null);
-    setShowAuthPanel(false);
+    if (!isDualAuthSurfaceId(providerId)) {
+      setShowAuthPanel(false);
+    }
     if (!isPiKernel && requiresOpenCodeRestartAfterOAuth(providerId)) {
       recordDeferredOpenCodeRestart('providers', { id: providerId });
     }
     await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
-    setSelectedProvider(providerId);
+    setSelectedProvider(dualAuthCatalogId(providerId) ?? providerId);
     setProviderSourceEpoch((n) => n + 1);
   };
 
@@ -860,7 +873,11 @@ export const ProvidersPage: React.FC = () => {
   }
 
   const providerModels = Array.isArray(selectedProvider.models) ? selectedProvider.models : [];
-  const providerAuthMethods = authMethodsByProvider[selectedProvider.id] ?? [];
+  const dualCatalogId = dualAuthCatalogId(selectedProvider.id);
+  const isDualAuthSurface = Boolean(dualCatalogId);
+  const oauthProviderId = dualCatalogId ?? selectedProvider.id;
+  const apiKeyProviderId = dualAuthSiblingId(oauthProviderId) ?? selectedProvider.id;
+  const providerAuthMethods = authMethodsByProvider[oauthProviderId] ?? authMethodsByProvider[selectedProvider.id] ?? [];
   const oauthAuthMethods = toOAuthMethods(
     getOAuthAuthMethods(providerAuthMethods),
     oauthMethodFallbackLabel,
@@ -869,12 +886,14 @@ export const ProvidersPage: React.FC = () => {
   const sourcesLoaded = Boolean(selectedSources);
   const isEditableCustomProvider = sourcesLoaded
     && isConfigDefinedCustomProvider(selectedProvider, selectedSources);
+  const oauthConnected = selectedSources?.oauth?.exists === true;
+  const apiKeyConnected = selectedSources?.apiKey?.exists === true;
   const hasCredentials = providerHasCredentials({
     key: (selectedProvider as { key?: string | null }).key,
     authSourceExists: selectedSources?.auth.exists,
     optionsApiKey: (selectedProvider as { options?: { apiKey?: string | null } }).options?.apiKey ?? null,
     envDeclared: providerDeclaresEnv(selectedProvider),
-  });
+  }) || (isDualAuthSurface && (oauthConnected || apiKeyConnected));
   const authStatusIncomplete = requiresProviderAuth(
     sourcesLoaded,
     hasCredentials,
@@ -886,9 +905,22 @@ export const ProvidersPage: React.FC = () => {
     hasCredentials,
     isEditableCustomProvider,
   });
-  const incompleteAuthHint = !showApiKeyAuth && oauthAuthMethods.length > 0
-    ? t('settings.providers.page.auth.useReconnectHint')
-    : t('settings.providers.page.auth.incompleteHint');
+  const connectedStatusLabel = isDualAuthSurface && oauthConnected && apiKeyConnected
+    ? t('settings.providers.page.auth.oauthAndApiKeyConnected')
+    : isDualAuthSurface && oauthConnected
+      ? t('settings.providers.page.auth.oauthConnected')
+      : isDualAuthSurface && apiKeyConnected
+        ? t('settings.providers.page.auth.apiKeyConnected')
+        : t('settings.providers.page.auth.connected');
+  const incompleteAuthHint = isDualAuthSurface
+    ? t('settings.providers.page.auth.dualHint')
+    : !showApiKeyAuth && oauthAuthMethods.length > 0
+      ? t('settings.providers.page.auth.useReconnectHint')
+      : t('settings.providers.page.auth.incompleteHint');
+  const connectedAuthHint = isDualAuthSurface
+    ? t('settings.providers.page.auth.dualHint')
+    : t('settings.providers.page.auth.useReconnectHint');
+  const apiKeyBusyId = isDualAuthCatalogId(selectedProvider.id) ? selectedProvider.id : apiKeyProviderId;
 
   const filteredModels = rankByQuery(providerModels, modelQuery, (model) => [
     typeof model?.name === 'string' ? model.name : '',
@@ -977,8 +1009,8 @@ export const ProvidersPage: React.FC = () => {
               ) : (
                 <div className="flex items-center gap-1.5 py-1.5">
                   <Icon name="check" className="w-4 h-4 text-[var(--status-success)] shrink-0" />
-                  <span className="typography-ui-label text-foreground">{t('settings.providers.page.auth.connected')}</span>
-                  <SettingsInfoHint>{t('settings.providers.page.auth.useReconnectHint')}</SettingsInfoHint>
+                  <span className="typography-ui-label text-foreground">{connectedStatusLabel}</span>
+                  <SettingsInfoHint>{connectedAuthHint}</SettingsInfoHint>
                 </div>
               )
             ) : authLoading ? (
@@ -986,28 +1018,47 @@ export const ProvidersPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {oauthAuthMethods.length > 0 && (
-                  <ProviderOAuthMethods
-                    key={selectedProvider.id}
-                    providerId={selectedProvider.id}
-                    methods={oauthAuthMethods}
-                    onConnected={() => handleOAuthConnected(selectedProvider.id)}
-                  />
+                  <div className="space-y-3">
+                    <ProviderOAuthMethods
+                      key={oauthProviderId}
+                      providerId={oauthProviderId}
+                      methods={oauthAuthMethods}
+                      onConnected={() => handleOAuthConnected(oauthProviderId)}
+                    />
+                    {isDualAuthSurface && oauthConnected ? (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)]"
+                        onClick={() => handleDisconnectProvider(oauthProviderId)}
+                        disabled={authBusyKey === `disconnect:${oauthProviderId}`}
+                      >
+                        {authBusyKey === `disconnect:${oauthProviderId}`
+                          ? t('settings.providers.page.actions.disconnecting')
+                          : t('settings.providers.page.actions.disconnectOAuth')}
+                      </Button>
+                    ) : null}
+                  </div>
                 )}
 
                 {showApiKeyAuth ? (
                   <div className={cn('py-1.5', oauthAuthMethods.length > 0 && 'border-t border-[var(--surface-subtle)] pt-2')}>
                     <label className="typography-ui-label text-foreground flex items-center gap-1.5">
                       {t('settings.providers.page.auth.apiKeyLabel')}
-                      <SettingsInfoHint>{t('settings.providers.page.auth.apiKeyTooltip')}</SettingsInfoHint>
+                      <SettingsInfoHint>
+                        {isDualAuthSurface
+                          ? t('settings.providers.page.auth.dualHint')
+                          : t('settings.providers.page.auth.apiKeyTooltip')}
+                      </SettingsInfoHint>
                     </label>
                     <div className="flex flex-col @xl:flex-row @xl:items-center gap-2 mt-1.5">
                       <Input
                         type="password"
-                        value={apiKeyInputs[selectedProvider.id] ?? ''}
+                        value={apiKeyInputs[apiKeyBusyId] ?? ''}
                         onChange={(event) =>
                           setApiKeyInputs((prev) => ({
                             ...prev,
-                            [selectedProvider.id]: event.target.value,
+                            [apiKeyBusyId]: event.target.value,
                           }))
                         }
                         placeholder={t('settings.providers.page.auth.apiKeyPlaceholder')}
@@ -1016,12 +1067,27 @@ export const ProvidersPage: React.FC = () => {
                       <Button
                         size="xs"
                         className="!font-normal shrink-0"
-                        onClick={() => handleSaveApiKey(selectedProvider.id)}
-                        disabled={authBusyKey === `api:${selectedProvider.id}`}
+                        onClick={() => handleSaveApiKey(isDualAuthApiSiblingId(selectedProvider.id) ? selectedProvider.id : oauthProviderId)}
+                        disabled={authBusyKey === `api:${isDualAuthApiSiblingId(selectedProvider.id) ? selectedProvider.id : oauthProviderId}`}
                       >
-                        {authBusyKey === `api:${selectedProvider.id}` ? t('settings.providers.page.actions.saving') : t('settings.providers.page.actions.saveKey')}
+                        {authBusyKey === `api:${isDualAuthApiSiblingId(selectedProvider.id) ? selectedProvider.id : oauthProviderId}`
+                          ? t('settings.providers.page.actions.saving')
+                          : t('settings.providers.page.actions.saveKey')}
                       </Button>
                     </div>
+                    {isDualAuthSurface && apiKeyConnected ? (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)] mt-2"
+                        onClick={() => handleDisconnectProvider(apiKeyProviderId)}
+                        disabled={authBusyKey === `disconnect:${apiKeyProviderId}`}
+                      >
+                        {authBusyKey === `disconnect:${apiKeyProviderId}`
+                          ? t('settings.providers.page.actions.disconnecting')
+                          : t('settings.providers.page.actions.disconnectApiKey')}
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -1057,15 +1123,48 @@ export const ProvidersPage: React.FC = () => {
                 )}
               </div>
 
-              <Button
-                variant="ghost"
-                size="xs"
-                className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)]"
-                onClick={() => handleDisconnectProvider(selectedProvider.id)}
-                disabled={authBusyKey === `disconnect:${selectedProvider.id}`}
-              >
-                {authBusyKey === `disconnect:${selectedProvider.id}` ? t('settings.providers.page.actions.disconnecting') : t('settings.providers.page.actions.disconnect')}
-              </Button>
+              {isDualAuthSurface && oauthConnected && apiKeyConnected ? (
+                <div className="flex flex-wrap items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)]"
+                    onClick={() => handleDisconnectProvider(oauthProviderId)}
+                    disabled={authBusyKey === `disconnect:${oauthProviderId}`}
+                  >
+                    {authBusyKey === `disconnect:${oauthProviderId}`
+                      ? t('settings.providers.page.actions.disconnecting')
+                      : t('settings.providers.page.actions.disconnectOAuth')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)]"
+                    onClick={() => handleDisconnectProvider(apiKeyProviderId)}
+                    disabled={authBusyKey === `disconnect:${apiKeyProviderId}`}
+                  >
+                    {authBusyKey === `disconnect:${apiKeyProviderId}`
+                      ? t('settings.providers.page.actions.disconnecting')
+                      : t('settings.providers.page.actions.disconnectApiKey')}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="!font-normal text-[var(--status-error)] hover:text-[var(--status-error)]"
+                  onClick={() => handleDisconnectProvider(
+                    isDualAuthSurface && apiKeyConnected && !oauthConnected
+                      ? apiKeyProviderId
+                      : selectedProvider.id,
+                  )}
+                  disabled={authBusyKey === `disconnect:${isDualAuthSurface && apiKeyConnected && !oauthConnected ? apiKeyProviderId : selectedProvider.id}`}
+                >
+                  {authBusyKey === `disconnect:${isDualAuthSurface && apiKeyConnected && !oauthConnected ? apiKeyProviderId : selectedProvider.id}`
+                    ? t('settings.providers.page.actions.disconnecting')
+                    : t('settings.providers.page.actions.disconnect')}
+                </Button>
+              )}
             </div>
       </SettingsSection>
 

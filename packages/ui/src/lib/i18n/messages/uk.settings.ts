@@ -1656,6 +1656,7 @@ export const settingsDict = {
   "settings.providers.page.custom.error.providerID.required": "ID провайдера обов’язковий",
   "settings.providers.page.custom.error.providerID.format": "Використовуйте малі літери, цифри, дефіси або підкреслення",
   "settings.providers.page.custom.error.providerID.exists": "Провайдер із цим ID уже підключено",
+  "settings.providers.page.custom.error.providerID.reserved": "Цей ID провайдера зарезервовано",
   "settings.providers.page.custom.error.name.required": "Відображувана назва обов’язкова",
   "settings.providers.page.custom.error.baseURL.required": "Базова URL-адреса обов’язкова",
   "settings.providers.page.custom.error.baseURL.format": "Базова URL-адреса має починатися з http:// або https://",
@@ -1689,6 +1690,10 @@ export const settingsDict = {
   "settings.providers.page.auth.oauth.error.declined": "Авторизацію відхилено або не завершено.",
   "settings.providers.page.auth.oauth.error.invalidInput": "Введені дані відхилено.",
   "settings.providers.page.auth.connected": "Підключено",
+  "settings.providers.page.auth.oauthConnected": "OAuth підключено",
+  "settings.providers.page.auth.apiKeyConnected": "API-ключ підключено",
+  "settings.providers.page.auth.oauthAndApiKeyConnected": "OAuth і API-ключ підключено",
+  "settings.providers.page.auth.dualHint": "Вхід через OAuth і API-ключ можуть залишатися підключеними одночасно. Збереження одного не замінює інший.",
   "settings.providers.page.auth.incomplete": "Облікові дані відсутні",
   "settings.providers.page.auth.incompleteHint": "· Додайте API-ключ або {env:VAR} перед використанням цього провайдера в чаті",
 
@@ -1741,6 +1746,8 @@ export const settingsDict = {
 
   "settings.providers.page.actions.disconnecting": "Відключення...",
   "settings.providers.page.actions.disconnect": "Відключити",
+  "settings.providers.page.actions.disconnectOAuth": "Від’єднати OAuth",
+  "settings.providers.page.actions.disconnectApiKey": "Від’єднати API-ключ",
   "settings.providers.page.actions.hideAll": "Сховати все",
   "settings.providers.page.actions.showAll": "Показати все",
   "settings.providers.page.toast.authMethodsLoadFailed": "Не вдалося завантажити методи автентифікації провайдера",

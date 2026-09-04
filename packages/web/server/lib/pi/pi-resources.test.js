@@ -23,6 +23,8 @@ import {
   hydrateKnownModelCapabilities,
   writePiProviderAuth,
   removePiProviderAuth,
+  KIMI_CODING_API_PROVIDER_ID,
+  XAI_API_PROVIDER_ID,
   upsertPiProviderConfig,
   deletePiProviderConfig,
   listPiExtensions,
@@ -739,6 +741,136 @@ description: >
     expect(after['other-provider']).toEqual({ type: 'api_key', key: 'sk-keep-me' });
     expect(getPiProviderSources('example-provider', { home }).sources.auth.exists).toBe(false);
     expect(removePiProviderAuth('example-provider', { home }).removed).toBe(false);
+  });
+
+  it('keeps Kimi Code OAuth and an API key on a reserved sibling without overwrite', () => {
+    const home = makeTemp();
+    const oauth = {
+      type: 'oauth',
+      access: 'kimi-access',
+      refresh: 'kimi-refresh',
+      expires: 1_900_000_000_000,
+    };
+    writePiProviderAuth('kimi-coding', oauth, { home });
+    const savedApi = writePiProviderAuth('kimi-coding', { type: 'api', key: 'sk-kimi-api' }, { home });
+    expect(savedApi.providerId).toBe('kimi-coding');
+    expect(savedApi.storedProviderId).toBe(KIMI_CODING_API_PROVIDER_ID);
+    expect(savedApi.type).toBe('api');
+    expect(JSON.stringify(savedApi)).not.toContain('sk-kimi');
+    expect(JSON.stringify(savedApi)).not.toContain('kimi-access');
+
+    const authPath = path.join(home, '.pi', 'agent', 'auth.json');
+    const stored = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    expect(stored['kimi-coding']).toEqual(oauth);
+    expect(stored[KIMI_CODING_API_PROVIDER_ID]).toEqual({ type: 'api_key', key: 'sk-kimi-api' });
+
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].baseUrl).toBe('https://api.moonshot.ai/v1');
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].api).toBe('openai-completions');
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].name).toBe('Kimi Code API');
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].models.length).toBeGreaterThan(0);
+    expect(JSON.stringify(models)).not.toContain('sk-kimi');
+
+    const methods = getPiAuthMethods(home);
+    expect(methods['kimi-coding']).toEqual([
+      { type: 'oauth', label: 'Sign in with Kimi Code' },
+      { type: 'api', label: 'API Key' },
+    ]);
+    expect(methods[KIMI_CODING_API_PROVIDER_ID]).toBeUndefined();
+    expect(JSON.stringify(methods)).not.toContain('sk-kimi');
+
+    const catalogSources = getPiProviderSources('kimi-coding', { home });
+    expect(catalogSources.sources.oauth.exists).toBe(true);
+    expect(catalogSources.sources.apiKey.exists).toBe(true);
+    expect(catalogSources.sources.auth.exists).toBe(true);
+
+    expect(toPiProviderListPayload({
+      providers: [
+        { id: 'kimi-coding', name: 'Kimi Code', models: { k3: { id: 'k3' } } },
+        { id: KIMI_CODING_API_PROVIDER_ID, name: 'Kimi Code API', models: { 'kimi-k2.6': { id: 'kimi-k2.6' } } },
+      ],
+      default: {},
+    }).all.map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+  });
+
+  it('writes Kimi Code OAuth without deleting an existing API sibling', () => {
+    const home = makeTemp();
+    writePiProviderAuth('kimi-coding', { type: 'api', key: 'sk-kimi-api' }, { home });
+    const afterApi = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+    expect(afterApi['kimi-coding']).toBeUndefined();
+    expect(afterApi[KIMI_CODING_API_PROVIDER_ID]).toEqual({ type: 'api_key', key: 'sk-kimi-api' });
+
+    const oauth = {
+      type: 'oauth',
+      access: 'kimi-access',
+      refresh: 'kimi-refresh',
+      expires: 1_900_000_000_000,
+    };
+    writePiProviderAuth('kimi-coding', oauth, { home });
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+    expect(stored['kimi-coding']).toEqual(oauth);
+    expect(stored[KIMI_CODING_API_PROVIDER_ID]).toEqual({ type: 'api_key', key: 'sk-kimi-api' });
+    expect(getPiAuthMethods(home)['kimi-coding']).toEqual([
+      { type: 'oauth', label: 'Sign in with Kimi Code' },
+      { type: 'api', label: 'API Key' },
+    ]);
+  });
+
+  it('disconnects Kimi Code OAuth or API key independently', () => {
+    const home = makeTemp();
+    const oauth = {
+      type: 'oauth',
+      access: 'kimi-access',
+      refresh: 'kimi-refresh',
+      expires: 1_900_000_000_000,
+    };
+    writePiProviderAuth('kimi-coding', oauth, { home });
+    writePiProviderAuth('kimi-coding', { type: 'api', key: 'sk-kimi-api' }, { home });
+
+    expect(removePiProviderAuth('kimi-coding', { home })).toEqual({ providerId: 'kimi-coding', removed: true });
+    const afterOAuth = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+    expect(afterOAuth['kimi-coding']).toBeUndefined();
+    expect(afterOAuth[KIMI_CODING_API_PROVIDER_ID]).toEqual({ type: 'api_key', key: 'sk-kimi-api' });
+    expect(JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'))
+      .providers[KIMI_CODING_API_PROVIDER_ID].baseUrl).toBe('https://api.moonshot.ai/v1');
+
+    writePiProviderAuth('kimi-coding', oauth, { home });
+    expect(removePiProviderAuth(KIMI_CODING_API_PROVIDER_ID, { home }).removed).toBe(true);
+    const afterApi = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+    expect(afterApi['kimi-coding']).toEqual(oauth);
+    expect(afterApi[KIMI_CODING_API_PROVIDER_ID]).toBeUndefined();
+    expect(fs.existsSync(path.join(home, '.pi', 'agent', 'models.json'))).toBe(false);
+  });
+
+  it('keeps xAI OAuth and an API key on the shared sibling helper', () => {
+    const home = makeTemp();
+    const oauth = {
+      type: 'oauth',
+      access: 'xai-access',
+      refresh: 'xai-refresh',
+      expires: 1_900_000_000_000,
+    };
+    writePiProviderAuth('xai', oauth, { home });
+    writePiProviderAuth('xai', { type: 'api', key: 'sk-xai-api' }, { home });
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
+    expect(stored.xai).toEqual(oauth);
+    expect(stored[XAI_API_PROVIDER_ID]).toEqual({ type: 'api_key', key: 'sk-xai-api' });
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(models.providers[XAI_API_PROVIDER_ID].baseUrl).toBe('https://api.x.ai/v1');
+    expect(models.providers[XAI_API_PROVIDER_ID].api).toBe('openai-completions');
+    expect(getPiAuthMethods(home).xai).toEqual([
+      { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
+      { type: 'api', label: 'API Key' },
+    ]);
+    expect(() => upsertPiProviderConfig({
+      home,
+      providerId: KIMI_CODING_API_PROVIDER_ID,
+      config: {
+        name: 'Nope',
+        options: { baseURL: 'https://api.moonshot.ai/v1' },
+        models: { x: { name: 'X' } },
+      },
+    })).toThrow(/reserved/);
   });
 
   it('rejects empty provider ids and missing API keys without creating auth.json', () => {

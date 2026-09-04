@@ -1656,6 +1656,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.providerID.required': '제공자 ID는 필수입니다',
   'settings.providers.page.custom.error.providerID.format': '소문자, 숫자, 하이픈, 밑줄을 사용하세요',
   'settings.providers.page.custom.error.providerID.exists': '이 ID의 제공자가 이미 연결되어 있습니다',
+  'settings.providers.page.custom.error.providerID.reserved': '이 제공자 ID는 예약되어 있습니다',
   'settings.providers.page.custom.error.name.required': '표시 이름은 필수입니다',
   'settings.providers.page.custom.error.baseURL.required': '기본 URL은 필수입니다',
   'settings.providers.page.custom.error.baseURL.format': '기본 URL은 http:// 또는 https://로 시작해야 합니다',
@@ -1689,6 +1690,10 @@ export const settingsDict = {
   'settings.providers.page.auth.oauth.error.declined': '인증이 거부되었거나 완료되지 않았습니다.',
   'settings.providers.page.auth.oauth.error.invalidInput': '입력한 정보가 거부되었습니다.',
   'settings.providers.page.auth.connected': '연결됨',
+  'settings.providers.page.auth.oauthConnected': 'OAuth 연결됨',
+  'settings.providers.page.auth.apiKeyConnected': 'API 키 연결됨',
+  'settings.providers.page.auth.oauthAndApiKeyConnected': 'OAuth와 API 키가 모두 연결됨',
+  'settings.providers.page.auth.dualHint': 'OAuth 로그인과 API 키를 동시에 연결해 둘 수 있습니다. 하나를 저장해도 다른 쪽을 덮어쓰지 않습니다.',
   'settings.providers.page.auth.incomplete': '자격 증명 없음',
   'settings.providers.page.auth.incompleteHint': '· 채팅에서 이 공급자를 사용하기 전에 API 키 또는 {env:VAR}을(를) 추가하세요',
 
@@ -1741,6 +1746,8 @@ export const settingsDict = {
 
   'settings.providers.page.actions.disconnecting': '연결 해제 중...',
   'settings.providers.page.actions.disconnect': '연결 해제',
+  'settings.providers.page.actions.disconnectOAuth': 'OAuth 연결 해제',
+  'settings.providers.page.actions.disconnectApiKey': 'API 키 연결 해제',
   'settings.providers.page.actions.hideAll': '모두 숨기기',
   'settings.providers.page.actions.showAll': '모두 표시',
   'settings.providers.page.toast.authMethodsLoadFailed': '프로바이더 인증 방식을 로드하지 못했습니다',
