@@ -17,6 +17,7 @@ import type { Session, Part, Message, TextPart } from "@opencode-ai/sdk/v2/clien
 import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import type { AttachedFile, SessionContextUsage, SessionWorktreeAttachment } from "@/stores/types/sessionTypes"
 import type { WorktreeMetadata } from "@/types/worktree"
+import { parseSlashCommand } from "@/components/chat/composer/submit/slashCommands"
 import { opencodeClient } from "@/lib/opencode/client"
 import { shouldDispatchFeaturePluginSlash } from "@/lib/featurePlugins/slotStatus"
 import { runtimeFetch } from "@/lib/runtime-fetch"
@@ -180,12 +181,12 @@ export function routeMessage(params: {
   }
 
   // Slash commands — fire and forget, SSE delivers messages and status.
-  // Match ChatInput parseSlashCommand: trim, first whitespace-separated token,
-  // lowercase. A pasted `/plan\n` must not become cmdName `plan\n` (chat).
-  const trimmedSlashContent = params.content.trim()
-  if (trimmedSlashContent.startsWith("/")) {
-    const [head, ...tail] = trimmedSlashContent.split(/\s+/)
-    const cmdName = head.slice(1).toLowerCase()
+  // parseSlashCommand requires a leading `/`. Plan-mode prose that starts with
+  // `Plan ` (space, no slash) is a normal prompt, not session.command `plan`
+  // plus the remainder. A pasted `/plan\n` is still command `plan`.
+  const parsedSlash = parseSlashCommand(params.content)
+  if (parsedSlash) {
+    const cmdName = parsedSlash.name
 
     const dirState = getDirectoryState(requestDirectory)
     const syncCommands = dirState?.command ?? []
@@ -239,7 +240,7 @@ export function routeMessage(params: {
           providerID: params.providerID,
           modelID: params.modelID,
           command: cmdName,
-          arguments: tail.join(" "),
+          arguments: parsedSlash.argument,
           agent: params.agent,
           variant: params.variant,
           files: params.files,
