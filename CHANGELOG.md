@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Desktop: connection health probes allow more time before marking Local disconnected, so a busy first send is less likely to toast `health_probe_unhealthy`.
 - Desktop: Help → Keyboard Shortcuts is a single menu row again (`Ctrl/Cmd+K, H`) and opens with one-shot menu delivery (repair after #531 merge conflict).
 - Desktop: app data now lives in `~/.config/pichamber`. Existing OpenChamber settings, sessions, favorite models, and relay keys are copied over on first launch. `PICHAMBER_DATA_DIR` overrides the location; `OPENCHAMBER_DATA_DIR` still works as a leftover alias.
 - Chat: Ctrl+Alt+digit switches the context rail even while the composer is focused.
@@ -13,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Sessions: ⋯ Open in Side Panel opens that chat in the right panel, including when the main view is New session or another chat.
 - Desktop: Mini Chat fits the display work area, keeps its composer and window controls visible when maximized on Linux, can be moved from the title bar, and opens under the project shown in the subtitle.
 - Desktop: when local Pi is not ready, Chooser, local setup, and the startup-failed recovery screen show Pi install/docs and detect a `pi` binary on PATH instead of the OpenCode curl installer.
+- Chat: the assistant footer model name is the model that sent that turn, not a leftover pin such as DeepSeek after switching back to Grok.
 - Chat: Ctrl+K then a letter from the composer is a shortcut chord, not typed text. Esc still cancels the leader.
 - Settings: the sidebar gear opens Settings on the first click. A leftover dialog dismiss from that same click no longer eats the press.
 - Settings: Esc closes the Settings window from any section. Nested dialogs, menus, and in-pane drafts still take Esc first.
