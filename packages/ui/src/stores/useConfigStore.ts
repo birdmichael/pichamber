@@ -703,7 +703,7 @@ const ensureModelsMetadataFetch = (
 };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const CONNECTION_PROBE_TIMEOUT_MS = 800;
+const CONNECTION_PROBE_TIMEOUT_MS = 5000;
 
 const probeOpenCodeHealth = async (timeoutMs = CONNECTION_PROBE_TIMEOUT_MS): Promise<boolean> => {
     return Promise.race([
