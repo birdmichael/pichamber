@@ -5,6 +5,7 @@ import { getSyncSessions } from '@/sync/sync-refs';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { normalizeContextPanelDirectoryKey, useUIStore } from '@/stores/useUIStore';
+import { readContextPanelDirectoryKey } from '@/hooks/useEffectiveDirectory';
 import { useUpdateStore } from '@/stores/useUpdateStore';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { sessionEvents } from '@/lib/sessionEvents';
@@ -226,7 +227,7 @@ export const useMenuActions = (
         // Legacy right-sidebar menu items now target the context surfaces
         // that replaced the sidebar's tabs.
         case 'toggle-right-sidebar': {
-          const directory = useDirectoryStore.getState().currentDirectory;
+          const directory = readContextPanelDirectoryKey() || useDirectoryStore.getState().currentDirectory;
           if (!directory) break;
           const uiState = useUIStore.getState();
           const directoryKey = normalizeContextPanelDirectoryKey(directory);
@@ -242,28 +243,30 @@ export const useMenuActions = (
         }
 
         case 'open-right-sidebar-git': {
-          const directory = useDirectoryStore.getState().currentDirectory;
+          const directory = readContextPanelDirectoryKey() || useDirectoryStore.getState().currentDirectory;
           if (!directory) break;
           useUIStore.getState().openContextSurface(normalizeContextPanelDirectoryKey(directory), 'git');
           break;
         }
 
         case 'open-right-sidebar-files': {
-          const directory = useDirectoryStore.getState().currentDirectory;
+          // Prefer the session/project directory (same key ContextPanel reads),
+          // not the leftover Settings currentDirectory (#578).
+          const directory = readContextPanelDirectoryKey() || useDirectoryStore.getState().currentDirectory;
           if (!directory) break;
           useUIStore.getState().openContextSurface(normalizeContextPanelDirectoryKey(directory), 'file');
           break;
         }
 
         case 'toggle-terminal': {
-          const directory = useDirectoryStore.getState().currentDirectory;
+          const directory = readContextPanelDirectoryKey() || useDirectoryStore.getState().currentDirectory;
           if (!directory) break;
           useUIStore.getState().openContextSurface(normalizeContextPanelDirectoryKey(directory), 'terminal');
           break;
         }
 
         case 'toggle-terminal-expanded': {
-          const directory = useDirectoryStore.getState().currentDirectory;
+          const directory = readContextPanelDirectoryKey() || useDirectoryStore.getState().currentDirectory;
           if (!directory) break;
           const key = normalizeContextPanelDirectoryKey(directory);
           const uiState = useUIStore.getState();

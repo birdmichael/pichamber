@@ -22,6 +22,7 @@ import { ProjectContextPanel } from './RightSidebarTabs';
 import { SidebarFilesTree } from './SidebarFilesTree';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { useContextPanelDirectoryKey, useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
+import { resolveFilesPanelTreeLayout } from '@/lib/filesPanelTreeLayout';
 import { useMergedContextPanel } from '@/hooks/useMergedContextPanel';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
@@ -1218,18 +1219,26 @@ export const ContextPanel: React.FC = () => {
       <div className={cn('relative min-h-0 flex-1 overflow-hidden', isResizing && 'pointer-events-none')}>
         {hasFileTabs ? (
           <div className={cn('absolute inset-0 flex', isFileTabActive ? 'flex' : 'hidden')}>
-            <div className="h-full min-w-0 flex-1">
-              {hasOpenEditorFile ? (
-                <React.Suspense fallback={null}><FilesView mode="editor-only" /></React.Suspense>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                  <Icon name="file-code" className="h-12 w-12 text-muted-foreground/50" />
-                  <div className="typography-ui-header text-foreground">{t('contextPanel.editorEmpty.title')}</div>
-                  <div className="max-w-sm typography-micro text-muted-foreground">{t('contextPanel.editorEmpty.description')}</div>
+            {resolveFilesPanelTreeLayout({
+              hasFileTabs,
+              hasOpenEditorFile,
+              isFileTabActive,
+            }).kind === 'tree-only' ? (
+              // No editor file yet: show the project tree full-width so Open
+              // Files Sidebar is usable on a project session (#578). The empty
+              // "No file open" editor placeholder hid the tree when the side
+              // column was toggled off or crushed.
+              <div className="h-full min-w-0 w-full border-l-0 bg-background">
+                <SidebarFilesTree />
+              </div>
+            ) : (
+              <>
+                <div className="h-full min-w-0 flex-1">
+                  <React.Suspense fallback={null}><FilesView mode="editor-only" /></React.Suspense>
                 </div>
-              )}
-            </div>
-            <EditorTreeColumn visible={contextEditorTreeVisible} panelWidth={width} />
+                <EditorTreeColumn visible={contextEditorTreeVisible} panelWidth={width} />
+              </>
+            )}
           </div>
         ) : null}
         {activeChatTab && activeChatSessionID && activeChatSrc ? (
