@@ -206,12 +206,26 @@ const facadeUsageFromPiMessage = (message) => {
   };
 };
 
-/** Copy Pi assistant provider/model/usage onto the live SSE `info` shape. */
+const facadeErrorFromPiMessage = (message) => {
+  const text = asTrimmedString(message?.errorMessage);
+  if (!text) return {};
+  const stopReason = asTrimmedString(message?.stopReason);
+  return {
+    error: {
+      name: stopReason === 'error' ? 'ProviderError' : 'Error',
+      message: text,
+      data: { message: text },
+    },
+  };
+};
+
+/** Copy Pi assistant provider/model/usage/error onto the live SSE `info` shape. */
 const facadeAssistantInfoFromPiMessage = (message, fallbackModel) => {
   if (!isRecord(message) || message.role !== 'assistant') return {};
   return {
     ...facadeModelFromPiMessage(message, fallbackModel),
     ...facadeUsageFromPiMessage(message),
+    ...facadeErrorFromPiMessage(message),
   };
 };
 
@@ -265,9 +279,13 @@ const facadeMessageTimeFromPi = (message, created) => {
   if (!isFinishedPiAssistantMessage(message)) {
     return { time: { created } };
   }
+  const stopReason = asTrimmedString(message?.stopReason);
+  const finish = stopReason === 'error' || asTrimmedString(message?.errorMessage)
+    ? 'error'
+    : 'stop';
   return {
     time: { created, completed: completedMillisFromPiAssistant(message, created) },
-    finish: 'stop',
+    finish,
   };
 };
 

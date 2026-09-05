@@ -23,6 +23,7 @@ import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 import { useSessionParts } from '@/sync/sync-context';
 import type { ReviewTransferDirection } from '@/lib/reviewFlow';
 import { resolveChatListAnchoredEndSpace, resolveTimelineIsAtEnd } from './lib/scroll/timelineScrollAnchoring';
+import { assistantHasVisibleContent } from './assistantHasVisibleContent';
 import {
     USER_SHELL_MARKER,
     isUserShellMarkerMessage,
@@ -134,22 +135,7 @@ const normalizeCompactionSummaryMessage = (
     };
 };
 
-const assistantHasVisibleContent = (message: ChatMessageEntry): boolean => {
-    const parts = message.parts || [];
-    return parts.some((part) => {
-        const type = part?.type;
-        const leftover = type as string | undefined;
-        if (type === 'text' || type === 'reasoning') {
-            const text = typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '';
-            return text.trim().length > 0;
-        }
-        // Pi parts use `tool`. Leftover OpenCode names are not in the union.
-        if (type === 'tool' || leftover === 'toolCall' || leftover === 'toolResult' || leftover === 'tool-invocation') {
-            return true;
-        }
-        return Boolean(leftover && leftover !== 'step-start' && leftover !== 'step-finish' && leftover !== 'step_start' && leftover !== 'step_finish');
-    });
-};
+
 
 const isAssistantMessageCompleted = (message: ChatMessageEntry): boolean => {
     const info = message.info as { time?: { completed?: unknown }; status?: unknown };
