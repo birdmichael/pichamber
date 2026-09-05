@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildRemoteModelListUrls,
   fetchRemoteProviderModels,
+  mergeRemoteModelsIntoCatalog,
   parseRemoteModelsPayload,
+  syncCustomProviderRemoteModels,
 } from './remote-provider-models.js';
 
 const tempDirs = [];
@@ -307,4 +309,187 @@ describe('remote-provider-models', () => {
     expect(urls[0]).toBe('https://ai.example.test/anthropic/v1/models');
     expect(result.models[0].id).toBe('grok-4.6');
   });
+
+  it('merges remote catalog without overwriting local overrides or deleting local-only ids', () => {
+    const merged = mergeRemoteModelsIntoCatalog(
+      [
+        { id: 'local-only', name: 'Local', contextWindow: 8_000, compat: { thinking: true } },
+        { id: 'shared', name: 'User Name', contextWindow: 32_000, input: ['text'], reasoning: true },
+      ],
+      [
+        { id: 'shared', name: 'Upstream Name', contextWindow: 64_000, input: ['text', 'image'] },
+        { id: 'new-remote', name: 'New Remote', contextWindow: 16_000 },
+      ],
+    );
+    expect(merged.added).toBe(1);
+    expect(merged.changed).toBe(true);
+    expect(merged.models).toEqual([
+      { id: 'local-only', name: 'Local', contextWindow: 8_000, compat: { thinking: true } },
+      { id: 'shared', name: 'User Name', contextWindow: 32_000, input: ['text'], reasoning: true },
+      { id: 'new-remote', name: 'New Remote', contextWindow: 16_000 },
+    ]);
+  });
+
+  it('keeps the previous catalog when the remote list is empty', () => {
+    const local = [{ id: 'kept', name: 'Kept' }];
+    expect(mergeRemoteModelsIntoCatalog(local, [])).toEqual({
+      models: local,
+      added: 0,
+      changed: false,
+    });
+  });
+
+  it('syncs upstream models into models.json and preserves hide-state fields on existing rows', async () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'auth.json'),
+      JSON.stringify({ relay: { type: 'api_key', key: 'sk-sync-do-not-leak' } }),
+    );
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'models.json'),
+      JSON.stringify({
+        providers: {
+          relay: {
+            name: 'Relay',
+            baseUrl: 'https://ai.example.test/v1',
+            api: 'anthropic-messages',
+            models: [
+              { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000 },
+            ],
+          },
+        },
+      }),
+    );
+
+    const result = await syncCustomProviderRemoteModels({
+      home,
+      providerId: 'relay',
+      scope: 'user',
+    }, {
+      fetchImpl: async (url, init) => {
+        expect(url).toBe('https://ai.example.test/v1/models');
+        expect(init.headers.Authorization).toBe('Bearer sk-sync-do-not-leak');
+        return jsonResponse(200, {
+          data: [
+            { id: 'claude-opus-5', name: 'Upstream Opus' },
+            { id: 'gpt-junk', name: 'GPT Junk' },
+            { id: 'grok-extra', name: 'Grok Extra' },
+          ],
+        });
+      },
+    });
+
+    expect(result.synced).toBe(true);
+    expect(result.added).toBe(2);
+    expect(JSON.stringify(result)).not.toContain('sk-sync');
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(stored.providers.relay.models).toEqual([
+      { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000 },
+      { id: 'gpt-junk', name: 'GPT Junk' },
+      { id: 'grok-extra', name: 'Grok Extra' },
+    ]);
+  });
+
+  it('skips builtin provider ids and leaves models.json untouched on fetch failure', async () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    const modelsPath = path.join(home, '.pi', 'agent', 'models.json');
+    const before = {
+      providers: {
+        relay: {
+          name: 'Relay',
+          baseUrl: 'https://ai.example.test/v1',
+          models: [{ id: 'only-local', name: 'Only Local' }],
+        },
+      },
+    };
+    fs.writeFileSync(modelsPath, JSON.stringify(before));
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'auth.json'),
+      JSON.stringify({ relay: { type: 'api_key', key: 'sk-bad' } }),
+    );
+
+    const skipped = await syncCustomProviderRemoteModels({
+      home,
+      providerId: 'xai',
+      scope: 'user',
+    });
+    expect(skipped).toMatchObject({ synced: false, skipped: true, reason: 'builtin' });
+
+    await expect(syncCustomProviderRemoteModels({
+      home,
+      providerId: 'relay',
+      scope: 'user',
+    }, {
+      fetchImpl: async () => jsonResponse(401, { error: { message: 'unauthorized' } }),
+    })).rejects.toMatchObject({ status: 401, code: 'unauthorized' });
+
+    expect(JSON.parse(fs.readFileSync(modelsPath, 'utf8'))).toEqual(before);
+  });
+
+  it('does not wipe local models when upstream returns an empty list', async () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'auth.json'),
+      JSON.stringify({ relay: { type: 'api_key', key: 'sk-ok' } }),
+    );
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'models.json'),
+      JSON.stringify({
+        providers: {
+          relay: {
+            name: 'Relay',
+            baseUrl: 'https://ai.example.test/v1',
+            models: [{ id: 'kept', name: 'Kept' }],
+          },
+        },
+      }),
+    );
+    const result = await syncCustomProviderRemoteModels({
+      home,
+      providerId: 'relay',
+      scope: 'user',
+    }, {
+      fetchImpl: async () => jsonResponse(200, { data: [] }),
+    });
+    expect(result).toMatchObject({ synced: false, reason: 'empty' });
+    expect(result.models).toEqual([{ id: 'kept', name: 'Kept' }]);
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(stored.providers.relay.models).toEqual([{ id: 'kept', name: 'Kept' }]);
+  });
+
+
+  it('syncs an env-backed custom provider using models.json $VAR without auth.json', async () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'models.json'),
+      JSON.stringify({
+        providers: {
+          relay: {
+            name: 'Relay',
+            baseUrl: 'https://ai.example.test/v1',
+            apiKey: '$RELAY_KEY',
+            models: [{ id: 'seed', name: 'Seed' }],
+          },
+        },
+      }),
+    );
+    const result = await syncCustomProviderRemoteModels({
+      home,
+      providerId: 'relay',
+      scope: 'user',
+      env: { RELAY_KEY: 'sk-env-sync-do-not-leak' },
+    }, {
+      fetchImpl: async (_url, init) => {
+        expect(init.headers.Authorization).toBe('Bearer sk-env-sync-do-not-leak');
+        return jsonResponse(200, { data: [{ id: 'seed' }, { id: 'extra' }] });
+      },
+    });
+    expect(result.added).toBe(1);
+    expect(JSON.stringify(result)).not.toContain('sk-env');
+  });
+
 });

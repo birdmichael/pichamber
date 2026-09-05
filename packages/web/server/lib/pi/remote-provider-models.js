@@ -480,3 +480,230 @@ export const handleFetchRemoteProviderModels = async (req, res, { home = os.home
     });
   }
 };
+
+
+/** Builtin catalogs must not use the custom OpenAI-compat list-models sync path. */
+const BUILTIN_SKIP_SYNC_IDS = new Set(['xai', 'kimi-coding', 'deepseek', 'anthropic', 'openai', 'google', 'openrouter']);
+
+const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;
+
+const readJsonObjectFile = (filePath) => {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeJsonObjectFile = (filePath, data) => {
+  const directory = path.dirname(filePath);
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const payload = `${JSON.stringify(data, null, 2)}\n`;
+  const tempPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, payload, { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tempPath, filePath);
+  } catch (error) {
+    try { fs.unlinkSync(tempPath); } catch { /* ignore */ }
+    throw error;
+  }
+};
+
+const providerMapFromModels = (models) => (
+  models?.providers && typeof models.providers === 'object' && !Array.isArray(models.providers)
+    ? models.providers
+    : {}
+);
+
+/**
+ * Merge upstream list-models ids into the local models.json catalog.
+ * Existing rows keep user overrides (name / contextWindow / input / reasoning / compat).
+ * Local-only ids are kept. Empty remote lists do not wipe the catalog.
+ */
+export const mergeRemoteModelsIntoCatalog = (localModels, remoteModels) => {
+  const local = Array.isArray(localModels) ? localModels : [];
+  const remote = Array.isArray(remoteModels) ? remoteModels : [];
+  if (remote.length === 0) {
+    return { models: local, added: 0, changed: false };
+  }
+
+  const next = [];
+  const seen = new Set();
+  for (const model of local) {
+    if (!model || typeof model !== 'object' || Array.isArray(model)) continue;
+    const id = typeof model.id === 'string' ? model.id.trim() : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    next.push(model);
+  }
+
+  let added = 0;
+  for (const model of remote) {
+    if (!model || typeof model !== 'object' || Array.isArray(model)) continue;
+    const id = typeof model.id === 'string' ? model.id.trim() : '';
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const name = typeof model.name === 'string' && model.name.trim() ? model.name.trim() : id;
+    const entry = { id, name };
+    if (model.contextWindow !== undefined) entry.contextWindow = model.contextWindow;
+    if (Array.isArray(model.input) && model.input.length > 0) entry.input = model.input;
+    if (model.reasoning === true) entry.reasoning = true;
+    next.push(entry);
+    added += 1;
+  }
+
+  return { models: next, added, changed: added > 0 };
+};
+
+const resolveModelsFileForSync = ({ home, directory, scope } = {}) => {
+  if (scope === 'project') {
+    if (typeof directory !== 'string' || !directory.trim()) {
+      throw httpError(400, 'Working directory is required for project scope', 'invalid');
+    }
+    return path.join(directory.trim(), '.pi', 'models.json');
+  }
+  return resolvePiModelsPath(home);
+};
+
+const findProviderModelsFile = ({ home, directory, providerId, scope } = {}) => {
+  if (scope === 'user' || scope === 'project') {
+    return resolveModelsFileForSync({ home, directory, scope });
+  }
+  if (typeof directory === 'string' && directory.trim()) {
+    const projectPath = path.join(directory.trim(), '.pi', 'models.json');
+    const projectProviders = providerMapFromModels(readJsonObjectFile(projectPath));
+    if (Object.prototype.hasOwnProperty.call(projectProviders, providerId)) {
+      return projectPath;
+    }
+  }
+  return resolvePiModelsPath(home);
+};
+
+/**
+ * Fetch upstream /v1/models for a custom provider and persist new ids into models.json.
+ * Non-destructive on failure or empty list. Does not touch hiddenModels.
+ */
+export const syncCustomProviderRemoteModels = async ({
+  home = os.homedir(),
+  directory,
+  providerId,
+  scope,
+  apiKey,
+  headers,
+  env = process.env,
+} = {}, { fetchImpl = globalThis.fetch } = {}) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  if (!id || !PROVIDER_ID_PATTERN.test(id)) {
+    throw httpError(400, 'Provider ID must match /^[a-z0-9][a-z0-9-_]*$/', 'invalid');
+  }
+  if (BUILTIN_SKIP_SYNC_IDS.has(id)) {
+    return { synced: false, skipped: true, reason: 'builtin', providerId: id, models: [] };
+  }
+
+  const filePath = findProviderModelsFile({ home, directory, providerId: id, scope });
+  const current = readJsonObjectFile(filePath);
+  const providers = { ...providerMapFromModels(current) };
+  const provider = providers[id];
+  if (!provider || typeof provider !== 'object' || Array.isArray(provider)) {
+    throw httpError(404, 'Custom provider not found in models.json', 'invalid');
+  }
+  const baseURL = typeof provider.baseUrl === 'string' ? provider.baseUrl.trim() : '';
+  if (!baseURL) {
+    return { synced: false, skipped: true, reason: 'not-custom', providerId: id, models: Array.isArray(provider.models) ? provider.models : [] };
+  }
+
+  const localModels = Array.isArray(provider.models) ? provider.models : [];
+  // Prefer an explicit key; otherwise reuse models.json `$VAR` / `{env:VAR}` so
+  // env-backed custom providers sync without an auth.json row.
+  let resolvedApiKey = typeof apiKey === 'string' && apiKey.trim() ? apiKey.trim() : '';
+  if (!resolvedApiKey && typeof provider.apiKey === 'string' && provider.apiKey.trim()) {
+    const stored = provider.apiKey.trim();
+    if (stored.startsWith('$') && stored.length > 1) {
+      resolvedApiKey = `{env:${stored.slice(1)}}`;
+    } else if (stored.startsWith('{env:')) {
+      resolvedApiKey = stored;
+    }
+  }
+  let remote;
+  try {
+    remote = await fetchRemoteProviderModels({
+      home,
+      baseURL,
+      apiKey: resolvedApiKey || undefined,
+      headers: headers || provider.headers,
+      providerID: id,
+      env,
+    }, { fetchImpl });
+  } catch (error) {
+    const status = Number(error?.status) || 502;
+    const code = error?.code || 'upstream';
+    const err = httpError(status, error?.message || 'Could not sync models', code);
+    err.previousModels = localModels;
+    throw err;
+  }
+
+  const remoteModels = Array.isArray(remote?.models) ? remote.models : [];
+  if (remoteModels.length === 0) {
+    return {
+      synced: false,
+      skipped: false,
+      reason: 'empty',
+      providerId: id,
+      models: localModels,
+      path: filePath,
+    };
+  }
+
+  const merged = mergeRemoteModelsIntoCatalog(localModels, remoteModels);
+  if (merged.changed) {
+    providers[id] = { ...provider, models: merged.models };
+    writeJsonObjectFile(filePath, { ...current, providers });
+  }
+
+  return {
+    synced: true,
+    skipped: false,
+    providerId: id,
+    models: merged.models,
+    added: merged.added,
+    changed: merged.changed,
+    path: filePath,
+  };
+};
+
+export const handleSyncCustomProviderRemoteModels = async (req, res, {
+  home = os.homedir(),
+  directory,
+  providerId,
+  fetchImpl,
+} = {}) => {
+  try {
+    const id = providerId
+      || req.params?.providerId
+      || req.params?.providerID
+      || req.body?.providerID
+      || req.body?.providerId;
+    const result = await syncCustomProviderRemoteModels({
+      home,
+      directory,
+      providerId: id,
+      scope: typeof req.body?.scope === 'string' ? req.body.scope
+        : (typeof req.query?.scope === 'string' ? req.query.scope : undefined),
+      apiKey: req.body?.apiKey,
+      headers: req.body?.headers,
+    }, { fetchImpl });
+    res.status(200).json({
+      success: true,
+      ...result,
+      // Never echo credentials
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({
+      error: error.code || 'upstream',
+      message: error.message || 'Could not sync models',
+    });
+  }
+};

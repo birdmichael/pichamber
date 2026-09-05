@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { syncCustomProviderRemoteModels } from './remote-provider-models.js';
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { createEventId, createMessageId, createPartId, createSessionId } from './ids.js';
 import { createEventTranslator, extractPromptImages, extractPromptText } from './event-translator.js';
@@ -3671,6 +3672,21 @@ export const createPiHost = ({
         hasStoredAuth: options.hasStoredAuth,
       });
       invalidateModelRuntime();
+      return result;
+    },
+    async syncProviderModels(providerId, options = {}) {
+      const result = await syncCustomProviderRemoteModels({
+        home,
+        directory: options.directory || defaultDirectory,
+        providerId,
+        scope: options.scope,
+        apiKey: options.apiKey,
+        headers: options.headers,
+        env: options.env,
+      }, { fetchImpl: options.fetchImpl });
+      if (result?.changed) {
+        invalidateModelRuntime();
+      }
       return result;
     },
     deleteProvider(providerId, options = {}) {

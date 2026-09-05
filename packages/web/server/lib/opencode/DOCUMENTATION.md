@@ -91,6 +91,7 @@ This module provides OpenCode server integration utilities for the web server ru
   - `POST /api/opencode/directory` (validates and activates an existing project directory; `{ create: true }` explicitly creates the requested project directory before activation, including outside the previously active workspace)
   - `GET /api/provider/:providerId/source`
   - `POST /api/provider/models` (lists remote OpenAI-compatible models from the form `baseURL` + API key or a stored Pi key; stored keys are only sent to the saved provider origin; does not follow redirects; never returns credentials. Failure is distinct from an empty list.)
+  - `POST /api/provider/:providerId/sync-models` (Pi custom providers: GET upstream `/v1/models`, merge new ids into that provider’s `models.json` without wiping local overrides or `hiddenModels`; connect/reconnect and Settings open trigger this. Failure keeps the previous catalog.)
   - `PUT /api/provider` (OpenCode kernel only: create/update custom provider config in OpenCode user/project/custom layers via `scope`, using `@ai-sdk/openai-compatible`, `@ai-sdk/openai`, or `@ai-sdk/anthropic`; secrets stay in auth via the OpenCode auth API. Pi kernel uses the facade and `~/.pi/agent` instead.)
   - `DELETE /api/provider/:providerId/auth` (OpenCode kernel only; Pi kernel uses the facade)
 - Owns lazy auth library loading for provider auth checks/removal.

@@ -64,6 +64,7 @@ import {
   CUSTOM_PROVIDER_ID,
   isConfigDefinedCustomProvider,
   providerToCustomFormState,
+  fetchRemoteModelsErrorKey,
   resolveProviderConfigScope,
   type CustomProviderFormState,
   type CustomProviderPersistPlan,
@@ -213,6 +214,8 @@ export const ProvidersPage: React.FC = () => {
   const [editingCustomScope, setEditingCustomScope] = React.useState<ProviderConfigScope | null>(null);
   const [customAuthFailureHint, setCustomAuthFailureHint] = React.useState<string | null>(null);
   const [lastCustomPersistId, setLastCustomPersistId] = React.useState<string | null>(null);
+  const [customModelsSyncBusy, setCustomModelsSyncBusy] = React.useState(false);
+  const customModelsSyncedForRef = React.useRef<string | null>(null);
   const isAddMode = selectedProviderId === ADD_PROVIDER_ID;
   const isCustomCreateMode = isAddMode && candidateProviderId === CUSTOM_PROVIDER_ID;
   const isCustomEditMode = Boolean(
@@ -466,6 +469,92 @@ export const ProvidersPage: React.FC = () => {
     };
   }, [selectedProviderId, settingsDirectory, t, providerSourceEpoch]);
 
+  const syncCustomProviderModels = React.useCallback(async (
+    providerId: string,
+    options?: { scope?: ProviderConfigScope; silent?: boolean },
+  ) => {
+    if (!providerId || customModelsSyncBusy) {
+      return false;
+    }
+    setCustomModelsSyncBusy(true);
+    try {
+      const params = new URLSearchParams();
+      if (settingsDirectory) {
+        params.set('directory', settingsDirectory);
+      }
+      if (options?.scope) {
+        params.set('scope', options.scope);
+      }
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const response = await runtimeFetch(
+        `/api/provider/${encodeURIComponent(providerId)}/sync-models${query}`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(options?.scope ? { scope: options.scope } : {}),
+        },
+      );
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (!options?.silent) {
+          const key = fetchRemoteModelsErrorKey(
+            response.status,
+            typeof payload?.error === 'string' ? payload.error : undefined,
+          );
+          toast.error(t(key as Parameters<typeof t>[0]));
+        }
+        return false;
+      }
+      if (payload?.reason === 'empty' && !options?.silent) {
+        toast.error(t('settings.providers.page.custom.toast.modelsEmpty'));
+        return false;
+      }
+      await loadProviders({ directory: settingsDirectory, source: 'settings:custom-provider-models-sync' });
+      if (!options?.silent && typeof payload?.added === 'number' && payload.added > 0) {
+        toast.success(t('settings.providers.page.custom.toast.modelsSynced', { count: String(payload.added) }));
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to sync custom provider models:', error);
+      if (!options?.silent) {
+        toast.error(t('settings.providers.page.custom.error.fetch.failed'));
+      }
+      return false;
+    } finally {
+      setCustomModelsSyncBusy(false);
+    }
+  }, [customModelsSyncBusy, loadProviders, settingsDirectory, t]);
+
+  React.useEffect(() => {
+    if (!selectedProviderId || selectedProviderId === ADD_PROVIDER_ID) {
+      return;
+    }
+    const sources = providerSources[selectedProviderId];
+    if (!sources) {
+      return;
+    }
+    const provider = providers.find((entry) => entry.id === selectedProviderId);
+    if (!provider || !isConfigDefinedCustomProvider(provider, sources)) {
+      return;
+    }
+    const hasAuth = sources.auth?.exists === true;
+    const hasEnv = Array.isArray(provider.env) && provider.env.some((name) => typeof name === 'string' && name.trim().length > 0);
+    if (!hasAuth && !hasEnv) {
+      return;
+    }
+    if (customModelsSyncedForRef.current === selectedProviderId) {
+      return;
+    }
+    customModelsSyncedForRef.current = selectedProviderId;
+    void syncCustomProviderModels(selectedProviderId, {
+      scope: resolveProviderConfigScope(sources),
+      silent: true,
+    });
+  }, [selectedProviderId, providerSources, providers, syncCustomProviderModels]);
+
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
 
@@ -547,6 +636,16 @@ export const ProvidersPage: React.FC = () => {
       }
 
       toast.success(t('settings.providers.page.toast.customProviderSaved', { provider: plan.name }));
+      if (payload?.modelsSync && payload.modelsSync.ok === false) {
+        const key = fetchRemoteModelsErrorKey(
+          502,
+          typeof payload.modelsSync.error === 'string' ? payload.modelsSync.error : undefined,
+        );
+        toast.error(t(key as Parameters<typeof t>[0]));
+      } else if (payload?.modelsSync?.reason === 'empty') {
+        toast.error(t('settings.providers.page.custom.toast.modelsEmpty'));
+      }
+      customModelsSyncedForRef.current = plan.providerID;
       await loadProviders({ directory: settingsDirectory, source: 'settings:custom-provider-save' });
       setCandidateProviderId('');
       setEditingCustomProviderId(null);
@@ -1178,6 +1277,24 @@ export const ProvidersPage: React.FC = () => {
         }
         headerAction={(
           <div className="flex items-center gap-1">
+            {isEditableCustomProvider ? (
+              <Button
+                variant="outline"
+                size="xs"
+                className="!font-normal"
+                disabled={customModelsSyncBusy || !hasCredentials}
+                onClick={() => {
+                  customModelsSyncedForRef.current = null;
+                  void syncCustomProviderModels(selectedProvider.id, {
+                    scope: resolveProviderConfigScope(selectedSources),
+                  });
+                }}
+              >
+                {customModelsSyncBusy
+                  ? t('settings.providers.page.actions.syncingModels')
+                  : t('settings.providers.page.actions.syncModels')}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               size="xs"
