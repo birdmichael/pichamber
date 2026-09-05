@@ -1,7 +1,11 @@
 import express from 'express';
 import { resolveActiveProjectDirectory, resolvePiDefaultModel, toPiProviderListPayload } from './pi-resources.js';
 import { findProjectFiles } from './find-files.js';
-import { handleFetchRemoteProviderModels } from './remote-provider-models.js';
+import {
+  handleFetchRemoteProviderModels,
+  handleSyncCustomProviderRemoteModels,
+  syncCustomProviderRemoteModels,
+} from './remote-provider-models.js';
 import { applySessionListQuery } from './session-list-query.js';
 import { resolveListedSessionTitle } from './pi-host.js';
 import { getPiUpgradeStatus } from './pi-upgrade-status.js';
@@ -271,10 +275,36 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     const providerID = typeof req.body?.providerID === 'string'
       ? req.body.providerID
       : (typeof req.body?.providerId === 'string' ? req.body.providerId : '');
+    const directory = resolveDirectory(req);
+    const scope = typeof req.body?.scope === 'string' ? req.body.scope : 'user';
     const result = host.upsertProvider(providerID, req.body?.config, {
-      directory: resolveDirectory(req),
-      scope: typeof req.body?.scope === 'string' ? req.body.scope : 'user',
+      directory,
+      scope,
     });
+    let modelsSync = null;
+    try {
+      const sync = typeof host.syncProviderModels === 'function'
+        ? await host.syncProviderModels(providerID, { directory, scope })
+        : await syncCustomProviderRemoteModels({
+          home: host.getPath().home,
+          directory,
+          providerId: providerID,
+          scope,
+        });
+      modelsSync = {
+        ok: true,
+        synced: Boolean(sync?.synced),
+        added: Number(sync?.added) || 0,
+        reason: sync?.reason,
+        skipped: Boolean(sync?.skipped),
+      };
+    } catch (error) {
+      modelsSync = {
+        ok: false,
+        error: error.code || 'upstream',
+        message: error.message || 'Could not sync models',
+      };
+    }
     json(res, 200, {
       success: true,
       kernel: 'pi',
@@ -284,6 +314,38 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       providerId: result.providerId,
       path: result.path,
       config: result.config,
+      modelsSync,
+    });
+  }));
+
+  app.post('/api/provider/:providerId/sync-models', parseJson, handle(async (req, res) => {
+    const providerId = req.params.providerId;
+    const directory = resolveDirectory(req);
+    const scope = typeof req.body?.scope === 'string'
+      ? req.body.scope
+      : (typeof req.query?.scope === 'string' ? req.query.scope : undefined);
+    if (typeof host.syncProviderModels === 'function') {
+      try {
+        const result = await host.syncProviderModels(providerId, {
+          directory,
+          scope,
+          apiKey: req.body?.apiKey,
+          headers: req.body?.headers,
+        });
+        json(res, 200, { success: true, ...result });
+      } catch (error) {
+        const status = Number(error?.status) || 500;
+        json(res, status, {
+          error: error.code || 'upstream',
+          message: error.message || 'Could not sync models',
+        });
+      }
+      return;
+    }
+    await handleSyncCustomProviderRemoteModels(req, res, {
+      home: host.getPath().home,
+      directory,
+      providerId,
     });
   }));
 
