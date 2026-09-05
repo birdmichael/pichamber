@@ -3014,10 +3014,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
   useKeybind('open_go_to_line', (event) => {
     const editorRoot = editorWrapperRef.current;
+    const hasEditor = Boolean(editorViewRef.current);
     const eventFocus = resolveFilesGoToLineFocus(event.target, editorRoot);
     const activeFocus = resolveFilesGoToLineFocus(document.activeElement, editorRoot);
     const focus = eventFocus.inEditor && eventFocus.inEditorRoot ? eventFocus : activeFocus;
-    if (shouldOpenFilesGoToLine({ canEdit, textViewMode, isMobile, focus })) {
+    if (shouldOpenFilesGoToLine({ canEdit, textViewMode, isMobile, focus, hasEditor })) {
       revealGoToLineField();
       return;
     }
@@ -3025,8 +3026,9 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       canEdit,
       textViewMode,
       isMobile,
-      hasEditor: Boolean(editorViewRef.current),
+      hasEditor,
       eventTarget: event.target,
+      isTrusted: event.isTrusted,
     })) {
       revealGoToLineField();
       return;

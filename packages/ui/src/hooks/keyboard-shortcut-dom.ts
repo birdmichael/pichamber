@@ -35,6 +35,19 @@ export function shouldYieldHeldDigitShortcutToEditor(options: {
   return !options.requiresAlternateModifier;
 }
 
+function getEditableRoot(target: EventTarget | null): Element | null {
+  if (!(target instanceof HTMLElement)) return null;
+  if (
+    target.isContentEditable
+    || target.tagName === 'INPUT'
+    || target.tagName === 'TEXTAREA'
+    || target.tagName === 'SELECT'
+  ) {
+    return target;
+  }
+  return target.closest(EDITABLE_SELECTOR);
+}
+
 /** Unmodified typing in a *different* editable field than the leader press is not a chord. */
 export function shouldClearShortcutPrefixForTyping(
   event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'target'>,
@@ -42,5 +55,11 @@ export function shouldClearShortcutPrefixForTyping(
 ): boolean {
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
   if (!isEditableEventTarget(event.target)) return false;
-  return event.target !== prefixTarget;
+  if (event.target === prefixTarget) return false;
+  // CodeMirror / contenteditable may retarget nested spans between chords;
+  // same editable root still means a deliberate sequence completion.
+  const eventRoot = getEditableRoot(event.target);
+  const prefixRoot = getEditableRoot(prefixTarget);
+  if (eventRoot && prefixRoot && eventRoot === prefixRoot) return false;
+  return true;
 }
