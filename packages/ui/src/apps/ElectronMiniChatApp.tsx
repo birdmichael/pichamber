@@ -177,7 +177,8 @@ const MiniChatBootstrap: React.FC<{ config: MiniChatConfig }> = ({ config }) => 
       });
       return;
     }
-    openNewSessionDraft();
+    // Explicit projectless chats draft — do not inherit leftover activeProject chrome (#555).
+    openNewSessionDraft({ target: 'chat' });
   }, [config, currentSessionId, draftOpen, openNewSessionDraft]);
 
   React.useEffect(() => {

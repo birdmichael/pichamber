@@ -34,6 +34,19 @@ describe('resolveMiniChatHeaderProjectLabel', () => {
     })).toBe('Pichamber');
   });
 
+  test('ignores path-matched leftover project for a projectless chats draft', () => {
+    expect(resolveMiniChatHeaderProjectLabel({
+      pathMatchedProject: sessFx,
+      activeProject: sessFx,
+      directoryLabel: 'sess-fx',
+      draftTarget: 'chat',
+      draftSelectedProjectId: null,
+      sessionDirectory: projectPath,
+      homeDirectory,
+      openedProjectPaths: [projectPath],
+    })).toBe('Pichamber');
+  });
+
   test('does not fall back to leftover activeProject for a managed-chat session', () => {
     expect(resolveMiniChatHeaderProjectLabel({
       pathMatchedProject: null,
@@ -51,10 +64,24 @@ describe('resolveMiniChatHeaderProjectLabel', () => {
       activeProject: sessFx,
       directoryLabel: '',
       draftTarget: 'project',
+      draftSelectedProjectId: 'sess-fx',
       sessionDirectory: projectPath,
       homeDirectory,
       openedProjectPaths: [projectPath],
     })).toBe('sess-fx');
+  });
+
+  test('project draft with no selectedProjectId stays projectless (no leftover active)', () => {
+    expect(resolveMiniChatHeaderProjectLabel({
+      pathMatchedProject: null,
+      activeProject: sessFx,
+      directoryLabel: 'sess-fx',
+      draftTarget: 'project',
+      draftSelectedProjectId: null,
+      sessionDirectory: projectPath,
+      homeDirectory,
+      openedProjectPaths: [projectPath],
+    })).toBe('Pichamber');
   });
 });
 

@@ -228,7 +228,7 @@ describe('mini-chat draft callers', () => {
       'utf8',
     );
     expect(source).toContain('if (config.projectId || config.directory)');
-    expect(source).toMatch(/openNewSessionDraft\(\);/);
+    expect(source).toMatch(/openNewSessionDraft\(\{\s*target:\s*'chat'\s*\}\)/);
   });
 });
 

@@ -24,7 +24,8 @@ import { formatSessionWorktreeBadge } from '@/sync/session-worktree-contract';
 import { buildSessionMessageRecordsSnapshot, useDirectoryStore, useGlobalSessionStatus, useSession, useSessionMessagesResolved } from '@/sync/sync-context';
 import { useSync } from '@/sync/use-sync';
 import { isManagedChatDirectory } from '@/lib/chatDirectories';
-import { readMiniChatDraftWindowArgs } from '@/lib/newSessionInherit';
+import { isProjectlessNewSessionDraft, readMiniChatDraftWindowArgs } from '@/lib/newSessionInherit';
+import { resolveHeaderMetaProjectLabel } from '@/lib/headerMetaProjectLabel';
 import { useDirectoryStore as useDirectoryRootStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
 import { useQuotaAutoRefresh, useQuotaStore } from '@/stores/useQuotaStore';
@@ -548,6 +549,7 @@ export const Header: React.FC<HeaderProps> = ({
   const getContextUsage = useSessionUIStore((state) => state.getContextUsage);
   const isNewSessionDraftOpen = useSessionUIStore((state) => Boolean(state.newSessionDraft?.open));
   const draftTarget = useSessionUIStore((state) => state.newSessionDraft?.target ?? 'chat');
+  const draftSelectedProjectId = useSessionUIStore((state) => state.newSessionDraft?.selectedProjectId ?? null);
   const homeDirectory = useDirectoryRootStore((state) => state.homeDirectory);
   const headerProjects = useProjectsStore((state) => state.projects);
   const openedProjectPaths = React.useMemo(
@@ -609,6 +611,26 @@ export const Header: React.FC<HeaderProps> = ({
     const pathSegments = activeProject.path.split(/[\\/]/).filter(Boolean);
     return pathSegments[pathSegments.length - 1] ?? null;
   }, [activeProject]);
+
+  const draftProjectLabel = React.useMemo(() => {
+    if (!isNewSessionDraftOpen || !draftSelectedProjectId) return null;
+    const project = headerProjects.find((candidate) => candidate.id === draftSelectedProjectId);
+    if (!project) return null;
+    const trimmedLabel = project.label?.trim();
+    if (trimmedLabel) return trimmedLabel;
+    const pathSegments = project.path.split(/[\\/]/).filter(Boolean);
+    return pathSegments[pathSegments.length - 1] ?? null;
+  }, [draftSelectedProjectId, headerProjects, isNewSessionDraftOpen]);
+
+  // Projectless New Session draft must not paint leftover activeProject (#555).
+  const headerMetaProjectLabel = React.useMemo(() => resolveHeaderMetaProjectLabel({
+    draft: isNewSessionDraftOpen
+      ? { open: true, target: draftTarget, selectedProjectId: draftSelectedProjectId }
+      : { open: false },
+    draftProjectLabel,
+    activeProjectLabel,
+  }), [activeProjectLabel, draftProjectLabel, draftSelectedProjectId, draftTarget, isNewSessionDraftOpen]);
+
   const quotaResults = useQuotaStore((state) => state.results);
   const fetchAllQuotas = useQuotaStore((state) => state.fetchAllQuotas);
   const isQuotaLoading = useQuotaStore((state) => state.isLoading);
@@ -1154,11 +1176,16 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Whether the title carries a second line under it. Hoisted because the
   // session menu's vertical alignment depends on the same answer.
+  const isProjectlessDraft = isNewSessionDraftOpen && isProjectlessNewSessionDraft({
+    open: true,
+    target: draftTarget,
+    selectedProjectId: draftSelectedProjectId,
+  });
   const isChatContext = isNewSessionDraftOpen
-    ? draftTarget === 'chat'
+    ? isProjectlessDraft
     : isManagedChatDirectory(sessionDirectory, homeDirectory, openedProjectPaths);
   const showHeaderMetaRow = !isChatContext && !workStatusPanelVisible
-    && Boolean(activeProjectLabel || currentBranchLabel || (!isNewSessionDraftOpen && worktreeBadgeKind));
+    && Boolean(headerMetaProjectLabel || currentBranchLabel || (!isNewSessionDraftOpen && worktreeBadgeKind));
 
 
   const currentSessionTitle = React.useMemo(() => {
@@ -2299,7 +2326,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
               {showHeaderMetaRow ? (
                 <span className="flex min-w-0 max-w-full items-center gap-1.5 truncate typography-micro text-[10.5px] font-normal leading-tight text-muted-foreground/75">
-                  {activeProjectLabel ? <span className="truncate">{activeProjectLabel}</span> : null}
+                  {headerMetaProjectLabel ? <span className="truncate">{headerMetaProjectLabel}</span> : null}
                   {currentBranchLabel ? (
                     <span className="inline-flex min-w-0 items-center gap-0.5">
                       <Icon name="git-branch" className="h-3 w-3 flex-shrink-0 text-muted-foreground/70" />

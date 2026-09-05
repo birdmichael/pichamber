@@ -45,6 +45,7 @@ import {
   setLinuxAutostartEnabled,
 } from './linux-autostart.mjs';
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
+import { attachModKHelpSequenceFallback } from './mod-k-help-sequence.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
 import { attachRendererRecovery } from './renderer-recovery.mjs';
@@ -2463,6 +2464,19 @@ const dispatchMenuActionOnce = (action) => {
   if (target) emitToWindow(target, 'openchamber:menu-action', action);
 };
 
+// Linux Desktop: Ctrl+K may never reach the renderer, so mod+k h never arms and
+// H inserts into the composer. Main-process before-input tracks Ctrl/Cmd+K → H
+// and fires the same help-dialog path as Help → Keyboard Shortcuts (#561).
+const attachHelpShortcutFallback = (browserWindow) => {
+  if (!browserWindow || browserWindow.isDestroyed?.()) return;
+  attachModKHelpSequenceFallback(browserWindow.webContents, {
+    onHelp: () => {
+      if (!browserWindow || browserWindow.isDestroyed?.()) return;
+      emitToWindow(browserWindow, 'openchamber:menu-action', 'help-dialog');
+    },
+  });
+};
+
 // Append-style menu actions must reach the renderer exactly once. Dual IPC+DOM
 // delivery (dispatchMenuAction) would insert the selection twice.
 const dispatchAddSelectionToChat = () => {
@@ -2780,6 +2794,8 @@ const createBrowserWindow = ({ label, restoreGeometry, url, runtimeConfig = {} }
     event.preventDefault();
     void shell.openExternal(url).catch(() => {});
   });
+
+  attachHelpShortcutFallback(browserWindow);
 
   browserWindow.webContents.setZoomFactor(1);
   browserWindow.webContents.on('zoom-changed', () => {
@@ -3235,6 +3251,8 @@ const createMiniChatWindow = async ({ mode, sessionId = '', directory = '', proj
       void browserWindow.webContents.executeJavaScript(initScript).catch(() => {});
     }
   });
+
+  attachHelpShortcutFallback(browserWindow);
 
   await navigateWindow(browserWindow, buildMiniChatUrl({ mode, sessionId, directory, projectId }));
   return browserWindow;

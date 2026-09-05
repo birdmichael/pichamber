@@ -118,6 +118,20 @@ export type OpenNewSessionDraftMiniChatInput = {
   bootstrapPendingDirectory?: string | null;
 };
 
+
+/** True when an open New Session draft is chats-/projectless (Choose project). */
+export function isProjectlessNewSessionDraft(
+  draft: OpenNewSessionDraftMiniChatInput | null | undefined,
+): boolean {
+  if (!draft?.open) return false;
+  const selectedProjectId = typeof draft.selectedProjectId === 'string'
+    ? draft.selectedProjectId.trim()
+    : '';
+  return draft.target === 'chat'
+    || !selectedProjectId
+    || selectedProjectId === CHAT_DRAFT_PROJECT_ID;
+}
+
 /**
  * When a New Session draft is open, Mini Chat must follow that draft — not
  * leftover activeProject from a previous workspace (#555).
@@ -129,16 +143,13 @@ export function mapOpenNewSessionDraftToMiniChatArgs(
 ): MiniChatDraftWindowArgs | null {
   if (!draft?.open) return null;
 
-  const selectedProjectId = typeof draft.selectedProjectId === 'string'
-    ? draft.selectedProjectId.trim()
-    : '';
-  const isProjectless = draft.target === 'chat'
-    || !selectedProjectId
-    || selectedProjectId === CHAT_DRAFT_PROJECT_ID;
-  if (isProjectless) {
+  if (isProjectlessNewSessionDraft(draft)) {
     return { directory: '', projectId: null };
   }
 
+  const selectedProjectId = typeof draft.selectedProjectId === 'string'
+    ? draft.selectedProjectId.trim()
+    : '';
   const directory = normalizePath(
     draft.bootstrapPendingDirectory ?? draft.directoryOverride ?? null,
   ) ?? '';
