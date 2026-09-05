@@ -58,17 +58,13 @@ export function shouldOpenFilesGoToLine(input: {
   if (input.focus.inDialog || input.focus.typingOutsideEditor) {
     return false;
   }
-  // Composer is also a .cm-editor — never treat it as the Files editor.
-  if (input.focus.inEditor && !input.focus.inEditorRoot) {
-    return false;
-  }
+  // Files editor caret — always open.
   if (input.focus.inEditor && input.focus.inEditorRoot) {
     return true;
   }
-  // Linux Alt can move focus to the menu bar before Alt+G is delivered, so
-  // event/active targets look "outside" even though Files edit is live. Match
-  // find_in_file: open when this session has an editor and focus is not typing
-  // elsewhere.
+  // Live Files edit session: allow open even when focus is a foreign .cm-editor
+  // (composer) or Linux Alt stole focus to the menu bar. Do not let a foreign
+  // CodeMirror hard-fail before the hasEditor fallback (#503 Desktop).
   return Boolean(input.hasEditor);
 }
 

@@ -292,9 +292,21 @@ export function resolveShortcutEventDigit(
   return event.key.length === 1 && event.key >= '0' && event.key <= '9' ? event.key : null;
 }
 
+export type EventMatchesShortcutOptions = {
+  /**
+   * Sequence completion: a bare letter without `shift` in the binding may
+   * arrive as Shift+H / key `H` from automation or some IME/caps paths.
+   * Match case-insensitively and do not require shiftKey === false.
+   * Keep strict shift matching for explicit shift+… bindings and for
+   * single-chord dispatch (leave this unset).
+   */
+  relaxShiftForBareLetter?: boolean;
+};
+
 export function eventMatchesShortcut(
   event: KeyboardEvent | React.KeyboardEvent,
   combo: ShortcutCombo,
+  options?: EventMatchesShortcutOptions,
 ): boolean {
   if (isUnassignedShortcut(combo)) return false;
   const parsed = parseShortcut(combo);
@@ -316,7 +328,11 @@ export function eventMatchesShortcut(
 
   if (expectedMod && !modMatches) return false;
   if (!expectedMod && event.metaKey) return false;
-  if (expectedShift !== event.shiftKey) return false;
+  const bareLetter = /^[a-z]$/i.test(chord.key);
+  const allowShiftOnBareLetter = Boolean(options?.relaxShiftForBareLetter)
+    && !expectedShift
+    && bareLetter;
+  if (!allowShiftOnBareLetter && expectedShift !== event.shiftKey) return false;
   if (expectedAlt !== event.altKey) return false;
   if (expectedCtrl) {
     if (!event.ctrlKey) return false;

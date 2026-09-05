@@ -6,11 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Desktop menu actions no longer double-fire through IPC+DOM, restoring Command Palette, right sidebar, and Files accelerators (#556, #559, #560, #562, #563).
-- Ctrl+K then H opens Keyboard Shortcuts from the composer: leaders arm in capture and nested CodeMirror targets stay one chord (#561).
+- Ctrl+K then H opens Keyboard Shortcuts from the composer: leaders arm in capture, nested CodeMirror targets stay one chord, and bare completion letters match Shift+H from automation/IME without requiring shiftKey === false (#561).
 - Esc closes Settings without treating unrelated dialogs as nested, and dismisses the header session switcher / actions menu (#511, #558).
-- Projectless New Mini Chat no longer keeps a leftover project subtitle (#555).
+- Projectless New Mini Chat follows the open New Session draft (not leftover activeProject), so title/subtitle stay chats-scoped (#555).
 - Help → Clear Cache confirms and clears HTTP cache only, without wiping projects (#557).
-- Files Alt+G opens the Line field in edit mode even when Linux Alt moves focus off CodeMirror; menu Go to Line still invokes once (#503, #563).
+- Files Alt+G opens the Line field in edit mode even when Linux Alt moves focus off CodeMirror or the composer CodeMirror is focused; menu Go to Line still invokes once (#503, #563).
 
 ## [1.2.12] - 2026-09-04
 

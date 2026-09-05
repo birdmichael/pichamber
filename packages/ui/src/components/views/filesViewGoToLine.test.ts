@@ -138,7 +138,7 @@ describe('shouldOpenFilesGoToLine', () => {
     })).toBe(true);
   });
 
-  test('still rejects the composer CodeMirror when Files has an editor', () => {
+  test('opens via hasEditor when the composer CodeMirror is focused (Desktop Alt+G)', () => {
     expect(shouldOpenFilesGoToLine({
       canEdit: true,
       textViewMode: 'edit',
@@ -149,6 +149,36 @@ describe('shouldOpenFilesGoToLine', () => {
         inEditor: true,
         inEditorRoot: false,
         typingOutsideEditor: false,
+      },
+    })).toBe(true);
+  });
+
+  test('still rejects foreign CodeMirror when Files has no live editor', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: false,
+      focus: {
+        inDialog: false,
+        inEditor: true,
+        inEditorRoot: false,
+        typingOutsideEditor: false,
+      },
+    })).toBe(false);
+  });
+
+  test('still rejects non-CM typing outside the editor even with hasEditor', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: true,
+      focus: {
+        inDialog: false,
+        inEditor: false,
+        inEditorRoot: false,
+        typingOutsideEditor: true,
       },
     })).toBe(false);
   });

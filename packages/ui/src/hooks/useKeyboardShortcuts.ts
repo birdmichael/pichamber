@@ -149,7 +149,8 @@ export const useKeyboardShortcuts = () => {
       state.togglePromptNavigatorPanel();
     },
     open_help: () => {
-      useUIStore.getState().toggleHelpDialog();
+      // Always open (never toggle closed) so a half-failed chord cannot leave Shortcuts closed.
+      useUIStore.getState().setHelpDialogOpen(true);
     },
     open_status: () => {
       void showOpenCodeStatus();

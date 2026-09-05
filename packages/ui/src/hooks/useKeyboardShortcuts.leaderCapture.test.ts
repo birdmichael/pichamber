@@ -22,3 +22,9 @@ test('Mini Chat also arms leaders in capture with stopPropagation', () => {
   expect(miniSource).toContain("window.addEventListener('keydown', handleKeyDown, true)");
   expect(miniSource).toContain('event.stopPropagation()');
 });
+
+test('open_help opens Shortcuts (setHelpDialogOpen true), never toggles closed', () => {
+  const source = readFileSync(join(__dirname, 'useKeyboardShortcuts.ts'), 'utf-8');
+  expect(source).toMatch(/open_help:\s*\(\)\s*=>\s*\{[\s\S]*?setHelpDialogOpen\(true\)/);
+  expect(source).not.toMatch(/open_help:\s*\(\)\s*=>\s*\{[\s\S]*?toggleHelpDialog\(\)/);
+});

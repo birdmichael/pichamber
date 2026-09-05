@@ -1,4 +1,4 @@
-import { isManagedChatDirectory } from '@/lib/chatDirectories';
+import { CHAT_DRAFT_PROJECT_ID, isManagedChatDirectory } from '@/lib/chatDirectories';
 import { normalizePath } from '@/lib/pathNormalization';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useProjectsStore } from '@/stores/useProjectsStore';
@@ -110,6 +110,44 @@ export type MiniChatDraftWindowArgs = {
   projectId: string | null;
 };
 
+export type OpenNewSessionDraftMiniChatInput = {
+  open: boolean;
+  target?: 'chat' | 'project' | null;
+  selectedProjectId?: string | null;
+  directoryOverride?: string | null;
+  bootstrapPendingDirectory?: string | null;
+};
+
+/**
+ * When a New Session draft is open, Mini Chat must follow that draft — not
+ * leftover activeProject from a previous workspace (#555).
+ * Projectless chat draft → empty args; project draft → that path/id.
+ * Returns null when no draft is open so callers can fall back to inherit.
+ */
+export function mapOpenNewSessionDraftToMiniChatArgs(
+  draft: OpenNewSessionDraftMiniChatInput | null | undefined,
+): MiniChatDraftWindowArgs | null {
+  if (!draft?.open) return null;
+
+  const selectedProjectId = typeof draft.selectedProjectId === 'string'
+    ? draft.selectedProjectId.trim()
+    : '';
+  const isProjectless = draft.target === 'chat'
+    || !selectedProjectId
+    || selectedProjectId === CHAT_DRAFT_PROJECT_ID;
+  if (isProjectless) {
+    return { directory: '', projectId: null };
+  }
+
+  const directory = normalizePath(
+    draft.bootstrapPendingDirectory ?? draft.directoryOverride ?? null,
+  ) ?? '';
+  return {
+    directory,
+    projectId: selectedProjectId,
+  };
+}
+
 export function mapInheritedNewSessionDraftToMiniChatArgs(
   inherit: InheritedNewSessionDraftOptions | undefined,
 ): MiniChatDraftWindowArgs {
@@ -120,7 +158,14 @@ export function mapInheritedNewSessionDraftToMiniChatArgs(
   };
 }
 
-/** Mini Chat draft windows follow New Session inherit. Never mix leftover activeProject.id with a chats directory. */
+/**
+ * Mini Chat draft windows follow the open New Session draft when present;
+ * otherwise session/activeProject inherit. Never mix leftover activeProject
+ * with a projectless draft (#555).
+ */
 export function readMiniChatDraftWindowArgs(): MiniChatDraftWindowArgs {
+  const draft = useSessionUIStore.getState().newSessionDraft;
+  const fromDraft = mapOpenNewSessionDraftToMiniChatArgs(draft);
+  if (fromDraft) return fromDraft;
   return mapInheritedNewSessionDraftToMiniChatArgs(readInheritedNewSessionDraftOptions());
 }

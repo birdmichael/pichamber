@@ -5,6 +5,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   mapInheritedNewSessionDraftToMiniChatArgs,
+  mapOpenNewSessionDraftToMiniChatArgs,
   resolveInheritedNewSessionDraftOptions,
 } from './newSessionInherit';
 
@@ -110,6 +111,60 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
 const miniChatArgsFromInput = (input: Parameters<typeof resolveInheritedNewSessionDraftOptions>[0]) => (
   mapInheritedNewSessionDraftToMiniChatArgs(resolveInheritedNewSessionDraftOptions(input))
 );
+
+describe('mapOpenNewSessionDraftToMiniChatArgs', () => {
+  test('projectless New Session draft ignores leftover activeProject inherit', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'chat',
+      selectedProjectId: null,
+      directoryOverride: null,
+    })).toEqual({ directory: '', projectId: null });
+  });
+
+  test('project New Session draft maps that project path and id', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'project',
+      selectedProjectId: 'project-1',
+      directoryOverride: projectPath,
+    })).toEqual({ directory: projectPath, projectId: 'project-1' });
+  });
+
+  test('closed draft returns null so inherit can run', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: false,
+      target: 'chat',
+      selectedProjectId: null,
+    })).toBe(null);
+  });
+});
+
+describe('projectless draft + leftover activeProject (Mini Chat #555)', () => {
+  test('open projectless draft wins over leftover active project inherit', () => {
+    const fromDraft = mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'chat',
+      selectedProjectId: null,
+      directoryOverride: null,
+    });
+    // Inherit alone would still see leftover activeProject when there is no session.
+    const fromInherit = mapInheritedNewSessionDraftToMiniChatArgs(
+      resolveInheritedNewSessionDraftOptions({
+        currentSessionId: null,
+        currentSessionDirectory: null,
+        homeDirectory,
+        openedProjectPaths,
+        activeProjectId: 'scan-proj',
+        activeProjectPath: projectPath,
+      }),
+    );
+    expect(fromInherit).toEqual({ directory: projectPath, projectId: 'scan-proj' });
+    expect(fromDraft).toEqual({ directory: '', projectId: null });
+    // readMiniChatDraftWindowArgs prefers the draft when open.
+    expect(fromDraft ?? fromInherit).toEqual({ directory: '', projectId: null });
+  });
+});
 
 describe('readMiniChatDraftWindowArgs mapping', () => {
   test('project session → that directory, no leftover project id', () => {
