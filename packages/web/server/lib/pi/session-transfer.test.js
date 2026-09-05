@@ -544,6 +544,39 @@ describe('session-transfer', () => {
     expect(messages[1].info.finish).toBe('stop');
   });
 
+  it('hydrates provider errorMessage onto info.error with finish error (#565)', () => {
+    const created = 1_700_000_000_300;
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        timestamp: 1_700_000_000_250,
+        message: { role: 'user', content: [{ type: 'text', text: 'hi' }], timestamp: 1_700_000_000_250 },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        timestamp: created,
+        message: {
+          role: 'assistant',
+          content: [],
+          timestamp: created,
+          stopReason: 'error',
+          errorMessage: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}',
+        },
+      },
+    ], 'ses_auth_fail');
+
+    expect(messages[1].parts).toEqual([]);
+    expect(messages[1].info.finish).toBe('error');
+    expect(messages[1].info.error).toEqual({
+      name: 'ProviderError',
+      message: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}',
+      data: { message: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}' },
+    });
+  });
+
   it('does not invent completed or finish for a still-open assistant', () => {
     const pending = facadeMessagesFromPiEntries([
       {

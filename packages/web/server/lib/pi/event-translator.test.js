@@ -847,6 +847,27 @@ describe('Pi usage mapping', () => {
     });
     expect(ended[0].properties.info.cost).toBe(0.004);
   });
+
+  it('maps message_end errorMessage onto info.error (#565)', () => {
+    const t = translator();
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    const ended = t.translate({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'error',
+        errorMessage: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}',
+      },
+    });
+    expect(ended[0].properties.info.finish).toBe('error');
+    expect(ended[0].properties.info.error).toEqual({
+      name: 'ProviderError',
+      message: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}',
+      data: { message: '401: {"message":"Invalid Authentication","type":"invalid_authentication_error"}' },
+    });
+  });
 });
 
 describe('prompt extractors', () => {

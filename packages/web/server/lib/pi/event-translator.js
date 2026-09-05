@@ -123,7 +123,7 @@ export const createEventTranslator = ({
     return assistantMessageID;
   };
 
-  const assistantInfo = ({ completed = false, model: modelOverride, usage } = {}) => {
+  const assistantInfo = ({ completed = false, model: modelOverride, usage, error, finish } = {}) => {
     ensureAssistantMessage();
     const created = assistantCreatedAt ?? now();
     const usable = resolveUsableFacadeModel(modelOverride, model, resolvedFallback);
@@ -137,6 +137,7 @@ export const createEventTranslator = ({
       assistantCompletedAt = now();
     }
     const finished = assistantCompletedAt != null;
+    const finishValue = finish || (error ? 'error' : 'stop');
     return {
       id: assistantMessageID,
       sessionID,
@@ -153,8 +154,9 @@ export const createEventTranslator = ({
       agent,
       path: { cwd, root: cwd },
       ...(mapped ? { cost: mapped.cost, tokens: mapped.tokens } : {}),
+      ...(error ? { error } : {}),
       time: finished ? { created, completed: assistantCompletedAt } : { created },
-      ...(finished ? { finish: 'stop' } : {}),
+      ...(finished ? { finish: finishValue } : {}),
     };
   };
 
@@ -470,9 +472,23 @@ export const createEventTranslator = ({
         if (!assistantMessageID) return [];
         const endedModel = resolveUsableFacadeModel(piEvent.message);
         if (endedModel) model = endedModel;
+        const errorText = typeof piEvent.message?.errorMessage === 'string'
+          ? piEvent.message.errorMessage.trim()
+          : '';
+        const stopReason = typeof piEvent.message?.stopReason === 'string'
+          ? piEvent.message.stopReason.trim()
+          : '';
+        const error = errorText
+          ? {
+            name: stopReason === 'error' ? 'ProviderError' : 'Error',
+            message: errorText,
+            data: { message: errorText },
+          }
+          : undefined;
         const events = [messageUpdated(assistantInfo({
           completed: true,
           usage: piEvent.message?.usage,
+          ...(error ? { error, finish: 'error' } : {}),
         }))];
         return events;
       }
