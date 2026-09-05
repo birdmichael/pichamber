@@ -31,8 +31,16 @@ const { registerBrowserController, registerBrowserOpener } = await import('./con
 /** Registrations are module-global, so every test unwinds its own. */
 const cleanups: Array<() => void> = [];
 
+const emitRequest = (
+  requestId: string,
+  action: string,
+  parameters: Record<string, unknown>,
+): void => {
+  listener?.({ type: 'browser-control-request', requestId, action, parameters });
+};
+
 const emitOpen = (parameters: Record<string, unknown>): void => {
-  listener?.({ type: 'browser-control-request', requestId: 'req-1', action: 'browser.open', parameters });
+  emitRequest('req-1', 'browser.open', parameters);
 };
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -78,6 +86,24 @@ describe('opening a page before any view exists', () => {
     });
   });
 
+  test('waits for the pane before handling an action after opening a tab', async () => {
+    const ran: string[] = [];
+    cleanups.push(registerBrowserOpener(() => {
+      setTimeout(() => {
+        cleanups.push(registerBrowserController({
+          run: async (action) => { ran.push(action); return {}; },
+        }));
+      }, 120);
+    }));
+
+    emitOpen({ url: 'https://example.test' });
+    emitRequest('req-2', 'browser.click', { text: 'Click Me' });
+    await wait(400);
+
+    expect(ran).toEqual(['browser.click']);
+    expect(posted.map((item) => item.requestId)).toEqual(['req-1', 'req-2']);
+  });
+
   test('does nothing at all when another client was granted the request', async () => {
     grantClaims = false;
     const opened: string[] = [];
@@ -108,6 +134,29 @@ describe('opening a page before any view exists', () => {
 
     expect(claims).toEqual(['req-1']);
     expect(ran).toEqual(['browser.click']);
+  });
+
+  test('serializes rapid actions so page mutations cannot race', async () => {
+    const ran: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const firstFinished = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    cleanups.push(registerBrowserController({
+      run: async (action) => {
+        ran.push(action);
+        if (action === 'browser.click') await firstFinished;
+        return { action };
+      },
+    }));
+
+    emitRequest('req-1', 'browser.click', { selector: '#button' });
+    emitRequest('req-2', 'browser.scroll', { direction: 'bottom' });
+    await wait(30);
+    expect(ran).toEqual(['browser.click']);
+
+    releaseFirst?.();
+    await wait(30);
+    expect(ran).toEqual(['browser.click', 'browser.scroll']);
+    expect(posted.map((item) => item.requestId)).toEqual(['req-1', 'req-2']);
   });
 
   test('does not wait for a view when no layout was requested', async () => {

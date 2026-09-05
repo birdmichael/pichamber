@@ -41,6 +41,9 @@ const VIEW_ATTACH_POLL_MS = 50;
 let activeController: BrowserController | null = null;
 let opener: BrowserOpener | null = null;
 let unsubscribe: (() => void) | null = null;
+// Browser actions mutate one page. Keep requests from rapid agent turns in
+// arrival order so an open/resize cannot race a following click or scroll.
+let requestQueue: Promise<void> = Promise.resolve();
 
 /**
  * Delivers a result to the server.
@@ -108,7 +111,11 @@ const waitForController = async (
 
 const handleRequest = async (request: BrowserControlRequest): Promise<void> => {
   const isOpen = request.action === 'browser.open';
-  const controller = activeController;
+  // `browser.open` may return as soon as the tab is created, before React has
+  // mounted its pane. Keep the next action alive for that short hand-off
+  // instead of dropping it and making the broker wait until it times out.
+  let controller = activeController;
+  if (!controller && !isOpen) controller = await waitForController();
 
   if (!controller && !(isOpen && opener)) return;
 
@@ -172,11 +179,19 @@ const handleRequest = async (request: BrowserControlRequest): Promise<void> => {
   }
 };
 
+const enqueueRequest = (request: BrowserControlRequest): void => {
+  const run = requestQueue.then(() => handleRequest(request));
+  // Keep the queue usable after a request reports an error. The request itself
+  // has already posted that error to the broker, so this rejection is only an
+  // implementation detail of the serial dispatcher.
+  requestQueue = run.catch(() => undefined);
+};
+
 const ensureSubscribed = (): void => {
   if (unsubscribe) return;
   unsubscribe = subscribeOpenchamberEvents((event) => {
     if (event.type !== 'browser-control-request') return;
-    void handleRequest({
+    enqueueRequest({
       requestId: event.requestId,
       action: event.action,
       parameters: event.parameters,

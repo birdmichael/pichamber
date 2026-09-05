@@ -137,13 +137,21 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
     setContextPanelTabTargetPath(directory, tabID, url);
   }, [directory, tabID, setContextPanelTabTargetPath]);
 
+  const history = useBrowserHistoryStore(selectBrowserHistory(directory));
+  const recordHistoryVisit = useBrowserHistoryStore((state) => state.recordVisit);
+  const forgetHistoryVisit = useBrowserHistoryStore((state) => state.forget);
+
   const navigation = useWebviewNavigation(webviewElement, {
     initialUrl: startUrl,
     onUrlChange: React.useCallback((url: string) => {
       const display = toDisplayUrl(url);
       setAddress(display);
       persistUrl(display);
-    }, [persistUrl]),
+      // did-navigate is the first reliable signal that Chromium committed the
+      // address. Recording here avoids losing fast local pages whose stop-load
+      // event can arrive before the pane's ready-state effect observes it.
+      recordHistoryVisit(directory, { url: display });
+    }, [directory, persistUrl, recordHistoryVisit]),
   });
 
   /** Set when a remote dev server could not be reached from this machine. */
@@ -151,12 +159,8 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
   const attachAnnotation = useAnnotationAttach(directory);
   const overlayLabels = useAnnotationOverlayLabels();
   const isLoading = navigation.status.kind === 'loading';
-
-  const history = useBrowserHistoryStore(selectBrowserHistory(directory));
-  const recordHistoryVisit = useBrowserHistoryStore((state) => state.recordVisit);
-  const forgetHistoryVisit = useBrowserHistoryStore((state) => state.forget);
-  // Recorded once a page has actually loaded, and with the title it reported:
-  // an address that failed to open is not somewhere to offer going back to.
+  // The committed URL is recorded above; ready adds the title once Chromium
+  // has reported it. An address that failed before commit is not remembered.
   React.useEffect(() => {
     if (navigation.status.kind !== 'ready') return;
     recordHistoryVisit(directory, {
