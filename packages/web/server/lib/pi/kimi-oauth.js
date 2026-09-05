@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { KIMI_CODING_PROVIDER_ID } from './pi-resources.js';
+import { isKimiSubscriptionId } from './pi-resources.js';
 
 const AUTHORIZE_NOTIFY_TIMEOUT_MS = 15_000;
 const KIMI_OAUTH_RELATIVE = path.join('dist', 'auth', 'oauth', 'kimi-coding.js');
@@ -80,7 +80,7 @@ export const createPiKimiOAuthController = ({
   };
 
   const authorize = async (providerId) => {
-    if (providerId !== KIMI_CODING_PROVIDER_ID) {
+    if (!isKimiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
     }
     abortPending();
@@ -109,7 +109,7 @@ export const createPiKimiOAuthController = ({
     loginPromise.catch((error) => {
       settleNotify.reject(error);
     });
-    pending = { abort, loginPromise };
+    pending = { abort, loginPromise, providerId };
 
     const timeoutMs = Number.isFinite(authorizeNotifyTimeoutMs) && authorizeNotifyTimeoutMs > 0
       ? authorizeNotifyTimeoutMs
@@ -141,10 +141,13 @@ export const createPiKimiOAuthController = ({
   };
 
   const complete = async (providerId) => {
-    if (providerId !== KIMI_CODING_PROVIDER_ID) {
+    if (!isKimiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
     }
     if (!pending) throw noPendingError();
+    if (pending.providerId && pending.providerId !== providerId) {
+      throw unsupportedProvider(providerId);
+    }
     const current = pending;
     try {
       const credential = await current.loginPromise;

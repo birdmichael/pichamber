@@ -380,20 +380,58 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     await completeProviderOAuth(req, res);
   }));
 
-  app.get('/api/pi/xai-usage', handle(async (_req, res) => {
+  app.get('/api/pi/xai-usage', handle(async (req, res) => {
     if (typeof host.getXaiUsage !== 'function') {
       json(res, 200, { ok: false, configured: false, slotActive: false });
       return;
     }
-    json(res, 200, await host.getXaiUsage());
+    const providerId = typeof req.query?.providerId === 'string' ? req.query.providerId : undefined;
+    json(res, 200, await host.getXaiUsage({ providerId }));
   }));
 
-  app.get('/api/pi/kimi-usage', handle(async (_req, res) => {
+  app.get('/api/pi/kimi-usage', handle(async (req, res) => {
     if (typeof host.getKimiUsage !== 'function') {
       json(res, 200, { ok: false, configured: false, slotActive: false });
       return;
     }
-    json(res, 200, await host.getKimiUsage());
+    const providerId = typeof req.query?.providerId === 'string' ? req.query.providerId : undefined;
+    json(res, 200, await host.getKimiUsage({ providerId }));
+  }));
+
+  app.get('/api/pi/kimi-region', handle(async (_req, res) => {
+    if (typeof host.getKimiRegion !== 'function') {
+      json(res, 200, { region: 'international' });
+      return;
+    }
+    json(res, 200, host.getKimiRegion());
+  }));
+
+  app.put('/api/pi/kimi-region', parseJson, handle(async (req, res) => {
+    if (typeof host.setKimiRegion !== 'function') {
+      json(res, 501, unsupported('kimi.region'));
+      return;
+    }
+    const region = typeof req.body?.region === 'string' ? req.body.region : '';
+    const providerId = typeof req.body?.providerId === 'string' ? req.body.providerId : undefined;
+    json(res, 200, host.setKimiRegion(region, { providerId }));
+  }));
+
+  app.post('/api/pi/subscription-clones', parseJson, handle(async (req, res) => {
+    if (typeof host.createSubscriptionClone !== 'function') {
+      json(res, 501, unsupported('subscription.clone'));
+      return;
+    }
+    const result = host.createSubscriptionClone(req.body || {});
+    json(res, 200, result);
+  }));
+
+  app.patch('/api/pi/subscription-clones/:providerId', parseJson, handle(async (req, res) => {
+    if (typeof host.patchSubscriptionClone !== 'function') {
+      json(res, 501, unsupported('subscription.patch'));
+      return;
+    }
+    const result = host.patchSubscriptionClone(req.params.providerId, req.body || {});
+    json(res, 200, result);
   }));
 
   app.delete('/api/provider/:providerId/auth', handle(async (req, res) => {

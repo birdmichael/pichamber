@@ -321,8 +321,8 @@ const providersPageSource = readFileSync(
 describe('ProvidersPage Kimi Usage mount', () => {
   test('shows the usage block only when the Kimi slot is on and kimi-coding is connected', () => {
     expect(providersPageSource).toContain("useFeaturePluginSlotActive('kimi'");
-    expect(providersPageSource).toContain("selectedProvider.id === 'kimi-coding' && hasCredentials");
-    expect(providersPageSource).toContain('<ProviderKimiUsage />');
+    expect(providersPageSource).toContain('isKimiSubscriptionId(selectedProvider.id) && hasCredentials');
+    expect(providersPageSource).toContain('<ProviderKimiUsage providerId={selectedProvider.id} />');
     expect(providersPageSource).not.toContain('/api/quota');
   });
 

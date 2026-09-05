@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
-import { SettingsSection, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
+import { SettingsSection, SettingsFieldRow, SettingsChipGroup, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { selectProvidersForDirectory, useConfigStore } from '@/stores/useConfigStore';
@@ -25,6 +25,14 @@ import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { opencodeClient } from '@/lib/opencode/client';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { reportSettingsSaveState } from '@/lib/persistence';
+import {
+  familyIsConnected,
+  isKimiSubscriptionId,
+  isOfficialSubscriptionId,
+  isXaiSubscriptionId,
+  subscriptionFamilyOf,
+} from '@/lib/pi/subscription-clones';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
 import {
@@ -196,6 +204,8 @@ export const ProvidersPage: React.FC = () => {
   const [authMethodsByProvider, setAuthMethodsByProvider] = React.useState<Record<string, AuthMethod[]>>({});
   const [authLoading, setAuthLoading] = React.useState(false);
   const [apiKeyInputs, setApiKeyInputs] = React.useState<Record<string, string>>({});
+  const [displayNameInputs, setDisplayNameInputs] = React.useState<Record<string, string>>({});
+  const [regionByProvider, setRegionByProvider] = React.useState<Record<string, 'international' | 'domestic'>>({});
   const [authBusyKey, setAuthBusyKey] = React.useState<string | null>(null);
   const [modelQuery, setModelQuery] = React.useState('');
   const [availableProviders, setAvailableProviders] = React.useState<ProviderOption[]>([]);
@@ -353,7 +363,7 @@ export const ProvidersPage: React.FC = () => {
       'xai',
       Boolean(availableError),
     );
-    if (builtinId) {
+    if (builtinId && !familyIsConnected('xai', connectedProviderIds)) {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(builtinId);
       return;
@@ -368,7 +378,7 @@ export const ProvidersPage: React.FC = () => {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(CUSTOM_PROVIDER_ID);
     }
-  }, [addCatalogProviders, availableError, availableLoading, candidateProviderId, isAddMode]);
+  }, [addCatalogProviders, availableError, availableLoading, candidateProviderId, connectedProviderIds, isAddMode]);
 
   React.useEffect(() => {
     if (selectedProviderId === ADD_PROVIDER_ID) {
@@ -558,6 +568,106 @@ export const ProvidersPage: React.FC = () => {
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
 
+  const ensureAnotherSubscription = async (family: 'xai' | 'kimi-coding') => {
+    if (!isPiKernel || !familyIsConnected(family, connectedProviderIds)) {
+      setCandidateProviderId(family);
+      return;
+    }
+    const displayName = displayNameInputs[family]?.trim();
+    const region = family === 'kimi-coding' ? (regionByProvider[family] || 'international') : undefined;
+    try {
+      const response = await runtimeFetch('/api/pi/subscription-clones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          family,
+          ...(displayName ? { displayName } : {}),
+          ...(region ? { region } : {}),
+        }),
+      });
+      const payload = await response.json().catch(() => null) as { providerId?: string } | null;
+      if (!response.ok || typeof payload?.providerId !== 'string') {
+        toast.error(t('settings.providers.page.subscription.clone.failed'));
+        return;
+      }
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-clone' });
+      setCandidateProviderId(payload.providerId);
+    } catch {
+      toast.error(t('settings.providers.page.subscription.clone.failed'));
+    }
+  };
+
+  const handleSaveDisplayName = async (providerId: string) => {
+    const displayName = displayNameInputs[providerId]?.trim();
+    if (!displayName) return;
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch(`/api/pi/subscription-clones/${encodeURIComponent(providerId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ displayName }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        toast.error(t('settings.providers.page.subscription.displayName.failed'));
+        return;
+      }
+      reportSettingsSaveState('saved');
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-name' });
+    } catch {
+      reportSettingsSaveState('error');
+      toast.error(t('settings.providers.page.subscription.displayName.failed'));
+    }
+  };
+
+  const refreshKimiRegions = React.useCallback(async () => {
+    if (!isPiKernel) return;
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => null) as {
+        rows?: Array<{ providerId?: string; region?: string }>;
+      } | null;
+      if (!Array.isArray(payload?.rows)) return;
+      const next: Record<string, 'international' | 'domestic'> = {};
+      for (const row of payload.rows) {
+        if (typeof row?.providerId !== 'string' || !row.providerId) continue;
+        next[row.providerId] = row.region === 'domestic' ? 'domestic' : 'international';
+      }
+      setRegionByProvider((prev) => ({ ...prev, ...next }));
+    } catch {
+      // Region chips stay on last known / default international.
+    }
+  }, [isPiKernel]);
+
+  React.useEffect(() => {
+    void refreshKimiRegions();
+  }, [refreshKimiRegions, providers]);
+
+  const handleSaveRegion = async (providerId: string, region: 'international' | 'domestic') => {
+    setRegionByProvider((prev) => ({ ...prev, [providerId]: region }));
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ providerId, region }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        toast.error(t('settings.providers.page.subscription.region.failed'));
+        await refreshKimiRegions();
+        return;
+      }
+      reportSettingsSaveState('saved');
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-region' });
+      await refreshKimiRegions();
+    } catch {
+      reportSettingsSaveState('error');
+      toast.error(t('settings.providers.page.subscription.region.failed'));
+      await refreshKimiRegions();
+    }
+  };
+
   const handleSaveApiKey = async (providerId: string) => {
     const apiKey = apiKeyInputs[providerId]?.trim() ?? '';
     if (!apiKey) {
@@ -677,6 +787,10 @@ export const ProvidersPage: React.FC = () => {
     }
     if (!isPiKernel && requiresOpenCodeRestartAfterOAuth(providerId)) {
       recordDeferredOpenCodeRestart('providers', { id: providerId });
+    }
+    const region = isKimiSubscriptionId(providerId) ? regionByProvider[providerId] : undefined;
+    if (region === 'domestic' || region === 'international') {
+      await handleSaveRegion(providerId, region);
     }
     await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
     setSelectedProvider(dualAuthCatalogId(providerId) ?? providerId);
@@ -826,7 +940,12 @@ export const ProvidersPage: React.FC = () => {
                                   <DropdownMenuItem
                                     key={provider.id}
                                     onSelect={() => {
-                                      setCandidateProviderId(provider.id);
+                                      const family = subscriptionFamilyOf(provider.id);
+                                      if (isPiKernel && family && family === provider.id) {
+                                        void ensureAnotherSubscription(family);
+                                      } else {
+                                        setCandidateProviderId(provider.id);
+                                      }
                                       setProviderDropdownOpen(false);
                                       setProviderSearchQuery('');
                                     }}
@@ -909,6 +1028,46 @@ export const ProvidersPage: React.FC = () => {
 
                     return (
                       <>
+                        {isPiKernel && isOfficialSubscriptionId(candidateProviderId) ? (
+                          <SettingsFieldRow
+                            label={t('settings.providers.page.subscription.displayName.label')}
+                            info={t('settings.providers.page.subscription.displayName.info')}
+                            settingsItem="providers.subscription-display-name"
+                          >
+                            <Input
+                              value={displayNameInputs[candidateProviderId] ?? ''}
+                              onChange={(event) => setDisplayNameInputs((prev) => ({
+                                ...prev,
+                                [candidateProviderId]: event.target.value,
+                              }))}
+                              onBlur={() => void handleSaveDisplayName(candidateProviderId)}
+                              placeholder={t('settings.providers.page.subscription.displayName.placeholder')}
+                              className="h-8"
+                            />
+                          </SettingsFieldRow>
+                        ) : null}
+                        {isPiKernel && kimiSlotActive && isKimiSubscriptionId(candidateProviderId) ? (
+                          <SettingsFieldRow
+                            label={t('settings.providers.page.subscription.region.label')}
+                            info={t('settings.providers.page.subscription.region.info')}
+                            settingsItem="providers.subscription-kimi-region"
+                          >
+                            <SettingsChipGroup
+                              value={regionByProvider[candidateProviderId] ?? 'international'}
+                              aria-label={t('settings.providers.page.subscription.region.aria')}
+                              onChange={(value) => {
+                                setRegionByProvider((prev) => ({ ...prev, [candidateProviderId]: value }));
+                                if (connectedProviderIds.has(candidateProviderId)) {
+                                  void handleSaveRegion(candidateProviderId, value);
+                                }
+                              }}
+                              options={[
+                                { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+                                { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+                              ]}
+                            />
+                          </SettingsFieldRow>
+                        ) : null}
                         {candidateOAuthMethods.length > 0 ? (
                           <ProviderOAuthMethods
                             key={candidateProviderId}
@@ -1193,12 +1352,50 @@ export const ProvidersPage: React.FC = () => {
             )}
       </SettingsSection>
 
-      {xaiSlotActive && selectedProvider.id === 'xai' && hasCredentials ? (
-        <ProviderXaiUsage />
+      {isPiKernel && isOfficialSubscriptionId(selectedProvider.id) ? (
+        <SettingsSection title={t('settings.providers.page.subscription.displayName.section')}>
+          <SettingsFieldRow
+            label={t('settings.providers.page.subscription.displayName.label')}
+            info={t('settings.providers.page.subscription.displayName.info')}
+            settingsItem="providers.subscription-display-name"
+          >
+            <Input
+              value={displayNameInputs[selectedProvider.id] ?? selectedProvider.name ?? ''}
+              onChange={(event) => setDisplayNameInputs((prev) => ({
+                ...prev,
+                [selectedProvider.id]: event.target.value,
+              }))}
+              onBlur={() => void handleSaveDisplayName(selectedProvider.id)}
+              placeholder={t('settings.providers.page.subscription.displayName.placeholder')}
+              className="h-8"
+            />
+          </SettingsFieldRow>
+          {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) ? (
+            <SettingsFieldRow
+              label={t('settings.providers.page.subscription.region.label')}
+              info={t('settings.providers.page.subscription.region.info')}
+              settingsItem="providers.subscription-kimi-region"
+            >
+              <SettingsChipGroup
+                value={regionByProvider[selectedProvider.id] ?? 'international'}
+                aria-label={t('settings.providers.page.subscription.region.aria')}
+                onChange={(value) => void handleSaveRegion(selectedProvider.id, value)}
+                options={[
+                  { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+                  { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+                ]}
+              />
+            </SettingsFieldRow>
+          ) : null}
+        </SettingsSection>
       ) : null}
 
-      {kimiSlotActive && selectedProvider.id === 'kimi-coding' && hasCredentials ? (
-        <ProviderKimiUsage />
+      {xaiSlotActive && isXaiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+        <ProviderXaiUsage providerId={selectedProvider.id} />
+      ) : null}
+
+      {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+        <ProviderKimiUsage providerId={selectedProvider.id} />
       ) : null}
 
       <SettingsSection

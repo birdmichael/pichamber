@@ -52,6 +52,16 @@ describe('createPiKimiOAuthController', () => {
     await expect(oauth.complete('kimi-coding')).rejects.toThrow(/No pending/);
   });
 
+  it('accepts kimi-coding-2 family ids', async () => {
+    const oauth = createPiKimiOAuthController({
+      loadKimiOAuth: async () => ({ login: deviceLogin }),
+    });
+    const authorization = await oauth.authorize('kimi-coding-2');
+    expect(authorization.url).toBe('https://auth.kimi.com/device');
+    const credential = await oauth.complete('kimi-coding-2');
+    expect(credential.access).toBe('access-secret');
+  });
+
   it('rejects non-kimi-coding providers', async () => {
     const oauth = createPiKimiOAuthController({
       loadKimiOAuth: async () => ({ login: deviceLogin }),

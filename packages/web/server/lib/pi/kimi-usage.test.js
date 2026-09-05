@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { getPiKimiUsage, mapKimiUsagesToWindows } from './kimi-usage.js';
+import { writeKimiRegion } from './pi-resources.js';
 
 const tempHomes = [];
 afterEach(() => {
@@ -238,5 +239,31 @@ describe('getPiKimiUsage', () => {
     expect(result.ok).toBe(true);
     expect(tokens).toEqual(['Bearer api-secret']);
     expect(JSON.stringify(result)).not.toContain('api-secret');
+  });
+  it('does not call Moonshot usages for China-region Kimi rows', async () => {
+    const home = makeTemp();
+    installKimiSlot(home);
+    writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
+      'kimi-coding': {
+        type: 'oauth',
+        access: 'access-secret',
+        refresh: 'refresh-secret',
+        expires: Date.now() + 60_000,
+      },
+    });
+    writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
+    let called = false;
+    const result = await getPiKimiUsage({
+      home,
+      fetchImpl: async () => {
+        called = true;
+        throw new Error('should not fetch');
+      },
+    });
+    expect(called).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.usageUnavailable).toBe(true);
+    expect(result.region).toBe('domestic');
+    expect(JSON.stringify(result)).not.toContain('access-secret');
   });
 });

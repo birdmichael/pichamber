@@ -337,8 +337,101 @@ const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API
 
 export const XAI_PROVIDER_ID = 'xai';
 export const KIMI_CODING_PROVIDER_ID = 'kimi-coding';
+export const XAI_BASE_URL = 'https://api.x.ai/v1';
+export const KIMI_CODE_BASE_URL = 'https://api.kimi.com/coding';
+/** International / Kimi Code host (issue #568). */
+export const KIMI_INTERNATIONAL_BASE_URL = KIMI_CODE_BASE_URL;
+export const KIMI_DOMESTIC_BASE_URL = 'https://api.moonshot.cn/v1';
+export const KIMI_INTERNATIONAL_API = 'anthropic-messages';
+export const KIMI_DOMESTIC_API = 'openai-completions';
 const XAI_OAUTH_LOGIN_LABEL = 'Sign in with SuperGrok or X Premium';
 const KIMI_OAUTH_LOGIN_LABEL = 'Sign in with Kimi Code';
+const SUBSCRIPTION_CLONE_PATTERN = /^[1-9]\d*$/;
+
+export const subscriptionFamilyOf = (providerId) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  if (!id) return null;
+  if (id === XAI_PROVIDER_ID || (id.startsWith(`${XAI_PROVIDER_ID}-`) && SUBSCRIPTION_CLONE_PATTERN.test(id.slice(XAI_PROVIDER_ID.length + 1)))) {
+    return XAI_PROVIDER_ID;
+  }
+  if (id === KIMI_CODING_PROVIDER_ID || (id.startsWith(`${KIMI_CODING_PROVIDER_ID}-`) && SUBSCRIPTION_CLONE_PATTERN.test(id.slice(KIMI_CODING_PROVIDER_ID.length + 1)))) {
+    return KIMI_CODING_PROVIDER_ID;
+  }
+  return null;
+};
+
+export const isXaiSubscriptionId = (providerId) => subscriptionFamilyOf(providerId) === XAI_PROVIDER_ID;
+export const isKimiSubscriptionId = (providerId) => subscriptionFamilyOf(providerId) === KIMI_CODING_PROVIDER_ID;
+
+export const nextSubscriptionCloneId = (family, existingIds) => {
+  const prefix = family === KIMI_CODING_PROVIDER_ID ? KIMI_CODING_PROVIDER_ID : XAI_PROVIDER_ID;
+  const used = new Set(
+    [...(existingIds || [])].filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()),
+  );
+  let index = 2;
+  while (used.has(`${prefix}-${index}`)) index += 1;
+  return `${prefix}-${index}`;
+};
+
+export const kimiRegionFromBaseUrl = (baseUrl) => {
+  const url = typeof baseUrl === 'string' ? baseUrl.trim().toLowerCase() : '';
+  return url.includes('moonshot.cn') ? 'domestic' : 'international';
+};
+
+export const kimiBaseUrlForRegion = (region) => (
+  region === 'domestic' ? KIMI_DOMESTIC_BASE_URL : KIMI_INTERNATIONAL_BASE_URL
+);
+
+export const kimiApiForRegion = (region) => (
+  region === 'domestic' ? KIMI_DOMESTIC_API : KIMI_INTERNATIONAL_API
+);
+
+/** Default region for a new Kimi row when none is chosen (pichamber.json). */
+export const readKimiRegion = (home = os.homedir()) => {
+  const chamber = isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {};
+  return chamber.kimiRegion === 'domestic' ? 'domestic' : 'international';
+};
+
+export const readKimiProviderRegion = (home = os.homedir(), providerId) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  if (!isKimiSubscriptionId(id)) {
+    return readKimiRegion(home);
+  }
+  const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  const entry = providers[id];
+  const baseUrl = entry && typeof entry === 'object' && !Array.isArray(entry) && typeof entry.baseUrl === 'string'
+    ? entry.baseUrl
+    : '';
+  if (baseUrl) return kimiRegionFromBaseUrl(baseUrl);
+  // Builtin kimi-coding with no overlay stays International / Kimi Code.
+  return id === KIMI_CODING_PROVIDER_ID ? 'international' : readKimiRegion(home);
+};
+
+export const listKimiProviderRegions = (home = os.homedir()) => {
+  const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  const ids = listStoredProviderIds(home)
+    .filter((id) => isKimiSubscriptionId(id))
+    .sort((a, b) => {
+      if (a === KIMI_CODING_PROVIDER_ID) return -1;
+      if (b === KIMI_CODING_PROVIDER_ID) return 1;
+      return a.localeCompare(b);
+    });
+  return ids.map((id) => {
+    const entry = providers[id] && typeof providers[id] === 'object' && !Array.isArray(providers[id])
+      ? providers[id]
+      : {};
+    const region = readKimiProviderRegion(home, id);
+    const name = typeof entry.name === 'string' && entry.name.trim()
+      ? entry.name.trim()
+      : (id === KIMI_CODING_PROVIDER_ID ? 'Kimi Code' : id);
+    return {
+      providerId: id,
+      name,
+      region,
+      baseUrl: kimiBaseUrlForRegion(region),
+    };
+  });
+};
 
 const XAI_AUTH_METHODS = [
   { type: 'oauth', label: XAI_OAUTH_LOGIN_LABEL },
@@ -460,11 +553,12 @@ export const getPiAuthMethods = (home = os.homedir()) => {
   const result = {};
   for (const id of ids) {
     if (!id || isDualAuthApiSiblingId(id)) continue;
-    if (id === XAI_PROVIDER_ID) {
+    const family = subscriptionFamilyOf(id);
+    if (family === XAI_PROVIDER_ID) {
       result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
       continue;
     }
-    if (id === KIMI_CODING_PROVIDER_ID) {
+    if (family === KIMI_CODING_PROVIDER_ID) {
       result[id] = KIMI_AUTH_METHODS.map((method) => ({ ...method }));
       continue;
     }
@@ -1041,6 +1135,92 @@ export const deletePiProviderConfig = ({
   return { removed: true, providerId: id, path: filePath };
 };
 
+export const listStoredProviderIds = (home = os.homedir()) => {
+  const auth = readJsonObject(resolvePiAuthPath(home));
+  const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  return [...new Set([...Object.keys(auth), ...Object.keys(providers)])].filter(Boolean);
+};
+
+export const mergePiProviderOverlay = ({
+  home = os.homedir(),
+  providerId,
+  overlay = {},
+} = {}) => {
+  const id = sanitizeProviderId(providerId);
+  const filePath = resolvePiModelsPath(home);
+  const current = readJsonObject(filePath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[id] && typeof providers[id] === 'object' && !Array.isArray(providers[id])
+    ? providers[id]
+    : {};
+  const next = { ...previous };
+  if (typeof overlay.name === 'string' && overlay.name.trim()) next.name = overlay.name.trim();
+  if (typeof overlay.baseUrl === 'string' && overlay.baseUrl.trim()) next.baseUrl = overlay.baseUrl.trim();
+  if (typeof overlay.api === 'string' && overlay.api.trim()) next.api = overlay.api.trim();
+  if (Array.isArray(overlay.models)) next.models = overlay.models;
+  providers[id] = next;
+  writeJsonFile(filePath, { ...current, providers }, 0o600);
+  return {
+    providerId: id,
+    path: filePath,
+    config: publicPiProviderConfig(next),
+  };
+};
+
+/**
+ * Persist 国内/国际 on one Kimi subscription row (builtin or clone).
+ * Does not touch dual-auth sibling `kimi-coding-api` (#564 path) or other rows.
+ */
+export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}) => {
+  const nextRegion = region === 'domestic' ? 'domestic' : 'international';
+  const id = typeof providerId === 'string' && providerId.trim()
+    ? providerId.trim()
+    : KIMI_CODING_PROVIDER_ID;
+  if (!isKimiSubscriptionId(id)) {
+    const error = new Error('providerId must be a Kimi subscription id');
+    error.status = 400;
+    throw error;
+  }
+  // Remember default for newly added Kimi rows when Feature Plugins sets region
+  // before a second account exists.
+  const chamberPath = resolvePiDefaultsPath(home);
+  const existing = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
+  const chamberOut = { ...existing, kimiRegion: nextRegion };
+  fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
+  fs.writeFileSync(chamberPath, `${JSON.stringify(chamberOut, null, 2)}\n`);
+
+  const modelsPath = resolvePiModelsPath(home);
+  const current = readJsonObject(modelsPath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[id] && typeof providers[id] === 'object' && !Array.isArray(providers[id])
+    ? providers[id]
+    : {};
+  const previousModels = Array.isArray(previous.models) ? previous.models : [];
+  const spec = dualAuthSpecFor(KIMI_CODING_PROVIDER_ID);
+  const regionModels = nextRegion === 'domestic' && spec
+    ? loadDualAuthApiModels(spec)
+    : previousModels;
+  const next = {
+    ...previous,
+    baseUrl: kimiBaseUrlForRegion(nextRegion),
+    api: kimiApiForRegion(nextRegion),
+  };
+  if (regionModels.length > 0) next.models = regionModels;
+  if (!next.name) {
+    next.name = typeof previous.name === 'string' && previous.name.trim()
+      ? previous.name.trim()
+      : (id === KIMI_CODING_PROVIDER_ID ? 'Kimi Code' : id);
+  }
+  providers[id] = next;
+  writeJsonFile(modelsPath, { ...current, providers }, 0o600);
+  return {
+    providerId: id,
+    region: nextRegion,
+    baseUrl: next.baseUrl,
+    api: next.api,
+    config: publicPiProviderConfig(next),
+  };
+};
 
 export const listPiSkillRoots = ({ home = os.homedir(), directory } = {}) => {
   const roots = [
@@ -1438,6 +1618,9 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
   };
   if (existingChamber.featurePlugins && typeof existingChamber.featurePlugins === 'object' && !Array.isArray(existingChamber.featurePlugins)) {
     chamberOut.featurePlugins = existingChamber.featurePlugins;
+  }
+  if (existingChamber.kimiRegion === 'domestic' || existingChamber.kimiRegion === 'international') {
+    chamberOut.kimiRegion = existingChamber.kimiRegion;
   }
   fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
   fs.writeFileSync(chamberPath, `${JSON.stringify(chamberOut, null, 2)}\n`);

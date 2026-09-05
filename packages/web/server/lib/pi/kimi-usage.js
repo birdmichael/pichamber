@@ -7,6 +7,9 @@ import {
 } from './feature-plugins.js';
 import {
   KIMI_CODING_PROVIDER_ID,
+  isKimiSubscriptionId,
+  listPiProviderPublicConfigs,
+  readKimiProviderRegion,
   resolvePiAuthPath,
   writePiProviderAuth,
 } from './pi-resources.js';
@@ -19,6 +22,16 @@ const REFRESH_SKEW_MS = 5 * 60 * 1000;
 const FIVE_HOUR_SECONDS = 5 * 60 * 60;
 const WEEKLY_SECONDS = 7 * 24 * 60 * 60;
 const PROVIDER_NAME = 'Kimi Code';
+
+const readProviderDisplayName = (home, providerId) => {
+  try {
+    const name = listPiProviderPublicConfigs({ home })[providerId]?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  } catch {
+    // Overlay is optional; fall back to the catalog name.
+  }
+  return PROVIDER_NAME;
+};
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -266,9 +279,9 @@ const withTimeout = async (work, timeoutMs = USAGE_TIMEOUT_MS) => {
   }
 };
 
-const persistRefreshedOauth = (credential, home) => {
+const persistRefreshedOauth = (credential, home, providerId = KIMI_CODING_PROVIDER_ID) => {
   try {
-    writePiProviderAuth(KIMI_CODING_PROVIDER_ID, credential, { home });
+    writePiProviderAuth(providerId, credential, { home });
   } catch {
     // Still use the refreshed access for this request.
   }
@@ -276,6 +289,7 @@ const persistRefreshedOauth = (credential, home) => {
 
 const refreshOauthCredential = async (oauth, {
   home,
+  providerId = KIMI_CODING_PROVIDER_ID,
   refreshOAuth = refreshPiKimiOAuth,
   signal,
 }) => {
@@ -285,7 +299,7 @@ const refreshOauthCredential = async (oauth, {
     refresh: oauth.refresh,
     expires: oauth.expires,
   }, { signal });
-  persistRefreshedOauth(credential, home);
+  persistRefreshedOauth(credential, home, providerId);
   const next = readOauthEntry(credential);
   if (!next?.access) {
     const error = new Error('Kimi Code OAuth refresh returned no access token');
@@ -297,12 +311,14 @@ const refreshOauthCredential = async (oauth, {
 
 export const getPiKimiUsage = async ({
   home,
+  providerId,
   fetchImpl = fetch,
   origin = KIMI_USAGE_ORIGIN,
   readFile = (filePath) => fs.readFileSync(filePath, 'utf8'),
   refreshOAuth = refreshPiKimiOAuth,
   now = Date.now(),
 } = {}) => {
+  const usageProviderId = isKimiSubscriptionId(providerId) ? providerId : KIMI_CODING_PROVIDER_ID;
   const payload = toFeaturePluginsPayload({
     plugins: readFeaturePlugins(home),
     configuredSources: listConfiguredPiPackageSources(home),
@@ -312,16 +328,33 @@ export const getPiKimiUsage = async ({
     return { ok: false, configured: false, slotActive: false };
   }
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  let oauth = readOauthEntry(auth[KIMI_CODING_PROVIDER_ID]);
-  const apiKey = readApiKey(auth[KIMI_CODING_PROVIDER_ID]);
+  let oauth = readOauthEntry(auth[usageProviderId]);
+  const apiKey = readApiKey(auth[usageProviderId]);
   if (!oauth && !apiKey) {
     return { ok: false, configured: false, slotActive: true };
+  }
+  const providerName = readProviderDisplayName(home, usageProviderId);
+  const region = readKimiProviderRegion(home, usageProviderId);
+  if (region === 'domestic') {
+    // Code usage stays on api.kimi.com; do not invent Moonshot balance/usages.
+    return {
+      ok: false,
+      configured: true,
+      slotActive: true,
+      providerId: usageProviderId,
+      providerName,
+      region: 'domestic',
+      usageUnavailable: true,
+      error: 'Kimi Code usage is not available for China region',
+      usage: null,
+      fetchedAt: Date.now(),
+    };
   }
   try {
     const { windows, membershipLevel } = await withTimeout(async (signal) => {
       if (oauth) {
         if (oauthNeedsRefresh(oauth, now)) {
-          oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
         }
         try {
           return await fetchKimiUsageWindows({
@@ -332,7 +365,7 @@ export const getPiKimiUsage = async ({
           });
         } catch (error) {
           if (!isUnauthorizedUsageError(error) || !oauth.refresh) throw error;
-          oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
           return fetchKimiUsageWindows({
             access: oauth.access,
             fetchImpl,
@@ -352,8 +385,9 @@ export const getPiKimiUsage = async ({
       ok: true,
       configured: true,
       slotActive: true,
-      providerId: KIMI_CODING_PROVIDER_ID,
-      providerName: PROVIDER_NAME,
+      providerId: usageProviderId,
+      providerName,
+      region: 'international',
       expires: oauth?.expires ?? null,
       usage: { windows },
       ...(membershipLevel ? { membershipLevel } : {}),
@@ -364,8 +398,9 @@ export const getPiKimiUsage = async ({
       ok: false,
       configured: true,
       slotActive: true,
-      providerId: KIMI_CODING_PROVIDER_ID,
-      providerName: PROVIDER_NAME,
+      providerId: usageProviderId,
+      providerName,
+      region: 'international',
       expires: oauth?.expires ?? null,
       error: error instanceof Error ? error.message : 'Kimi Code usage request failed',
       usage: null,
