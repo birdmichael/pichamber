@@ -85,6 +85,14 @@ describe('suggestions', () => {
     expect(suggestFromHistory(entries, 'docs').map((item) => item.url)).toEqual(['http://localhost:5173/docs']);
   });
 
+  test('suggests a visited loopback dev server by its port', () => {
+    const visited = recordVisit([], { url: 'http://127.0.0.1:4177/', title: 'Fixture', at: 4 });
+    expect(suggestFromHistory(visited, '4177').map((item) => item.url)).toEqual([
+      'http://127.0.0.1:4177/',
+    ]);
+  });
+
+
   test('matches the page title as well as the address', () => {
     expect(suggestFromHistory(entries, 'storefront').map((item) => item.url)).toEqual(['http://localhost:3000/']);
   });

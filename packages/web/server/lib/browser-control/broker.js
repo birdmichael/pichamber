@@ -108,7 +108,7 @@ export const createBrowserControlBroker = ({
           });
         }, boundedTimeout);
 
-        pending.set(requestId, { finish, timer, claimed: false });
+        pending.set(requestId, { finish, timer, timeoutMs: boundedTimeout, claimed: false });
       });
     },
 
@@ -124,6 +124,15 @@ export const createBrowserControlBroker = ({
       const entry = pending.get(requestId);
       if (!entry || entry.claimed) return false;
       entry.claimed = true;
+      // Queue time should not consume the action's timeout, so restart it once a client claims the request.
+      clearTimer(entry.timer);
+      entry.timer = setTimer(() => {
+        settle(requestId, {
+          ok: false,
+          message: `The in-app browser did not respond within ${Math.round(entry.timeoutMs / 1000)}s`,
+          status: 504,
+        });
+      }, entry.timeoutMs);
       return true;
     },
 
