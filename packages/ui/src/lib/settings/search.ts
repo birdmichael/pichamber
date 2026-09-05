@@ -977,6 +977,14 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
+    id: 'feature-plugins.kimi.region',
+    page: 'feature-plugins',
+    titleKey: 'settings.featurePlugins.slot.kimi.region.label',
+    descriptionKey: 'settings.featurePlugins.slot.kimi.region.info',
+    keywords: ['kimi', 'region', 'china', 'international', 'moonshot', 'api', '国内', '国际'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
     id: 'snippets.create',
     page: 'snippets',
     titleKey: 'settings.snippets.sidebar.actions.create',

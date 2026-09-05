@@ -35,8 +35,15 @@ import {
   resolvePiAgentDir,
   resolvePiAuthPath,
   resolvePiModelsPath,
-  KIMI_CODING_PROVIDER_ID,
+  readKimiRegion,
+  writeKimiRegion,
+  isKimiSubscriptionId,
 } from './pi-resources.js';
+import {
+  createSubscriptionClone,
+  patchSubscriptionClone,
+  registerSubscriptionCloneProviders,
+} from './subscription-clones.js';
 import {
   authorizePiXaiOAuth,
   completePiXaiOAuth,
@@ -1898,6 +1905,7 @@ export const createPiHost = ({
         modelsPath: resolvePiModelsPath(home),
         agentDir,
       });
+      registerSubscriptionCloneProviders(modelRuntime, { home });
     } catch (error) {
       modelRuntimeError = error;
       throw error;
@@ -3640,16 +3648,44 @@ export const createPiHost = ({
       return result;
     },
     authorizeProviderOAuth(providerId) {
-      if (providerId === KIMI_CODING_PROVIDER_ID) {
+      if (isKimiSubscriptionId(providerId)) {
         return authorizePiKimiOAuth(providerId);
       }
       return authorizePiXaiOAuth(providerId);
     },
     async completeProviderOAuth(providerId) {
-      const credential = providerId === KIMI_CODING_PROVIDER_ID
+      const credential = isKimiSubscriptionId(providerId)
         ? await completePiKimiOAuth(providerId)
         : await completePiXaiOAuth(providerId);
       return this.setProviderAuth(providerId, credential);
+    },
+    createSubscriptionClone(body = {}) {
+      const result = createSubscriptionClone({
+        home,
+        family: body.family,
+        displayName: body.displayName,
+        runtime: modelRuntime,
+      });
+      invalidateModelRuntime();
+      return result;
+    },
+    patchSubscriptionClone(providerId, body = {}) {
+      const result = patchSubscriptionClone({
+        home,
+        providerId,
+        displayName: body.displayName,
+        region: body.region,
+      });
+      invalidateModelRuntime();
+      return result;
+    },
+    getKimiRegion() {
+      return { region: readKimiRegion(home) };
+    },
+    setKimiRegion(region) {
+      const result = writeKimiRegion(home, region);
+      invalidateModelRuntime();
+      return result;
     },
     getXaiUsage(options = {}) {
       return getPiXaiUsage({ home, ...options });

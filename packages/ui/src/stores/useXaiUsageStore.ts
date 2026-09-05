@@ -10,7 +10,7 @@ type XaiUsageStore = {
   payload: XaiUsagePayload | null;
   error: string | null;
   isLoading: boolean;
-  fetchUsage: () => Promise<void>;
+  fetchUsage: (providerId?: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -26,7 +26,7 @@ export const useXaiUsageStore = create<XaiUsageStore>((set, get) => ({
     queuedRefresh = false;
     set({ payload: null, error: null, isLoading: false });
   },
-  fetchUsage: async () => {
+  fetchUsage: async (providerId) => {
     if (get().isLoading) {
       queuedRefresh = true;
       return;
@@ -34,7 +34,8 @@ export const useXaiUsageStore = create<XaiUsageStore>((set, get) => ({
     const started = fetchGeneration;
     set({ isLoading: true });
     try {
-      const response = await runtimeFetch('/api/pi/xai-usage');
+      const query = providerId ? `?providerId=${encodeURIComponent(providerId)}` : '';
+      const response = await runtimeFetch(`/api/pi/xai-usage${query}`);
       if (started !== fetchGeneration) return;
       if (!response.ok) {
         set({

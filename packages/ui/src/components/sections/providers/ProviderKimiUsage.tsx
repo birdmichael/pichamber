@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
  * Kimi Code subscription allowance on the Providers card. Only mount when the
  * Kimi Usage feature-plugin slot is on and this provider is connected.
  */
-export const ProviderKimiUsage: React.FC = () => {
+export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();
   const payload = useKimiUsageStore((state) => state.payload);
   const error = useKimiUsageStore((state) => state.error);
@@ -23,8 +23,8 @@ export const ProviderKimiUsage: React.FC = () => {
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
 
   React.useEffect(() => {
-    void fetchUsage();
-  }, [fetchUsage]);
+    void fetchUsage(providerId);
+  }, [fetchUsage, providerId]);
 
   const windows = payload?.usage?.windows ?? {};
   const rows = Object.entries(windows);
@@ -56,7 +56,7 @@ export const ProviderKimiUsage: React.FC = () => {
           size="icon"
           variant="ghost"
           className="size-7 shrink-0 text-muted-foreground"
-          onClick={() => void fetchUsage()}
+          onClick={() => void fetchUsage(providerId)}
           aria-label={t('settings.usage.sidebar.actions.refreshAria')}
           title={t('settings.usage.sidebar.actions.refreshTitle')}
           disabled={isLoading}

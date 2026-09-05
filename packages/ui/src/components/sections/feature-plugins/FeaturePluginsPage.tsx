@@ -14,8 +14,11 @@ import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLay
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import {
   SETTINGS_HELPER_CLASS,
+  SettingsChipGroup,
+  SettingsFieldRow,
   SettingsSection,
 } from '@/components/sections/shared/SettingsSection';
+import { reportSettingsSaveState } from '@/lib/persistence';
 import { refreshSessionTitleReloadLists } from '@/components/layout/headerSessionReload';
 import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
@@ -277,6 +280,7 @@ function FeaturePluginCard({
                 : t('settings.featurePlugins.actions.install')}
             </Button>
           )}
+          {slot === 'kimi' && saved.installed ? <KimiRegionField disabled={!ready || isBusy} /> : null}
           {saved.installed ? (
             <Button
               type="button"
@@ -325,5 +329,69 @@ function FeaturePluginImpactTags({ slot }: { slot: FeaturePluginSlot }) {
         );
       })}
     </ul>
+  );
+}
+
+type KimiRegion = 'international' | 'domestic';
+
+function KimiRegionField({ disabled }: { disabled: boolean }) {
+  const { t } = useI18n();
+  const [region, setRegion] = React.useState<KimiRegion>('international');
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await runtimeFetch('/api/pi/kimi-region', { headers: { Accept: 'application/json' } });
+        const payload = await response.json().catch(() => null) as { region?: string } | null;
+        if (cancelled) return;
+        setRegion(payload?.region === 'domestic' ? 'domestic' : 'international');
+      } catch {
+        if (!cancelled) setRegion('international');
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const save = async (next: KimiRegion) => {
+    setRegion(next);
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ region: next }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        return;
+      }
+      reportSettingsSaveState('saved');
+    } catch {
+      reportSettingsSaveState('error');
+    }
+  };
+
+  return (
+    <SettingsFieldRow
+      label={t('settings.featurePlugins.slot.kimi.region.label')}
+      info={t('settings.featurePlugins.slot.kimi.region.info')}
+      settingsItem="feature-plugins.kimi.region"
+    >
+      <SettingsChipGroup
+        value={region}
+        disabled={disabled || !ready}
+        aria-label={t('settings.featurePlugins.slot.kimi.region.aria')}
+        onChange={(value) => void save(value)}
+        options={[
+          { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+          { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+        ]}
+      />
+    </SettingsFieldRow>
   );
 }

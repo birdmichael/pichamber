@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
-import { SettingsSection, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
+import { SettingsSection, SettingsFieldRow, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { selectProvidersForDirectory, useConfigStore } from '@/stores/useConfigStore';
@@ -25,6 +25,14 @@ import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { opencodeClient } from '@/lib/opencode/client';
 import { usePiKernel } from '@/lib/usePiKernel';
+import { reportSettingsSaveState } from '@/lib/persistence';
+import {
+  familyIsConnected,
+  isKimiSubscriptionId,
+  isOfficialSubscriptionId,
+  isXaiSubscriptionId,
+  subscriptionFamilyOf,
+} from '@/lib/pi/subscription-clones';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
 import {
@@ -196,6 +204,7 @@ export const ProvidersPage: React.FC = () => {
   const [authMethodsByProvider, setAuthMethodsByProvider] = React.useState<Record<string, AuthMethod[]>>({});
   const [authLoading, setAuthLoading] = React.useState(false);
   const [apiKeyInputs, setApiKeyInputs] = React.useState<Record<string, string>>({});
+  const [displayNameInputs, setDisplayNameInputs] = React.useState<Record<string, string>>({});
   const [authBusyKey, setAuthBusyKey] = React.useState<string | null>(null);
   const [modelQuery, setModelQuery] = React.useState('');
   const [availableProviders, setAvailableProviders] = React.useState<ProviderOption[]>([]);
@@ -353,7 +362,7 @@ export const ProvidersPage: React.FC = () => {
       'xai',
       Boolean(availableError),
     );
-    if (builtinId) {
+    if (builtinId && !familyIsConnected('xai', connectedProviderIds)) {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(builtinId);
       return;
@@ -368,7 +377,7 @@ export const ProvidersPage: React.FC = () => {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(CUSTOM_PROVIDER_ID);
     }
-  }, [addCatalogProviders, availableError, availableLoading, candidateProviderId, isAddMode]);
+  }, [addCatalogProviders, availableError, availableLoading, candidateProviderId, connectedProviderIds, isAddMode]);
 
   React.useEffect(() => {
     if (selectedProviderId === ADD_PROVIDER_ID) {
@@ -557,6 +566,53 @@ export const ProvidersPage: React.FC = () => {
 
   const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
+
+  const ensureAnotherSubscription = async (family: 'xai' | 'kimi-coding') => {
+    if (!isPiKernel || !familyIsConnected(family, connectedProviderIds)) {
+      setCandidateProviderId(family);
+      return;
+    }
+    const displayName = displayNameInputs[family]?.trim();
+    try {
+      const response = await runtimeFetch('/api/pi/subscription-clones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ family, ...(displayName ? { displayName } : {}) }),
+      });
+      const payload = await response.json().catch(() => null) as { providerId?: string } | null;
+      if (!response.ok || typeof payload?.providerId !== 'string') {
+        toast.error(t('settings.providers.page.subscription.clone.failed'));
+        return;
+      }
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-clone' });
+      setCandidateProviderId(payload.providerId);
+    } catch {
+      toast.error(t('settings.providers.page.subscription.clone.failed'));
+    }
+  };
+
+  const handleSaveDisplayName = async (providerId: string) => {
+    const displayName = displayNameInputs[providerId]?.trim();
+    if (!displayName) return;
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch(`/api/pi/subscription-clones/${encodeURIComponent(providerId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ displayName }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        toast.error(t('settings.providers.page.subscription.displayName.failed'));
+        return;
+      }
+      reportSettingsSaveState('saved');
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-name' });
+    } catch {
+      reportSettingsSaveState('error');
+      toast.error(t('settings.providers.page.subscription.displayName.failed'));
+    }
+  };
 
   const handleSaveApiKey = async (providerId: string) => {
     const apiKey = apiKeyInputs[providerId]?.trim() ?? '';
@@ -826,7 +882,12 @@ export const ProvidersPage: React.FC = () => {
                                   <DropdownMenuItem
                                     key={provider.id}
                                     onSelect={() => {
-                                      setCandidateProviderId(provider.id);
+                                      const family = subscriptionFamilyOf(provider.id);
+                                      if (isPiKernel && family && family === provider.id) {
+                                        void ensureAnotherSubscription(family);
+                                      } else {
+                                        setCandidateProviderId(provider.id);
+                                      }
                                       setProviderDropdownOpen(false);
                                       setProviderSearchQuery('');
                                     }}
@@ -909,6 +970,24 @@ export const ProvidersPage: React.FC = () => {
 
                     return (
                       <>
+                        {isPiKernel && isOfficialSubscriptionId(candidateProviderId) ? (
+                          <SettingsFieldRow
+                            label={t('settings.providers.page.subscription.displayName.label')}
+                            info={t('settings.providers.page.subscription.displayName.info')}
+                            settingsItem="providers.subscription-display-name"
+                          >
+                            <Input
+                              value={displayNameInputs[candidateProviderId] ?? ''}
+                              onChange={(event) => setDisplayNameInputs((prev) => ({
+                                ...prev,
+                                [candidateProviderId]: event.target.value,
+                              }))}
+                              onBlur={() => void handleSaveDisplayName(candidateProviderId)}
+                              placeholder={t('settings.providers.page.subscription.displayName.placeholder')}
+                              className="h-8"
+                            />
+                          </SettingsFieldRow>
+                        ) : null}
                         {candidateOAuthMethods.length > 0 ? (
                           <ProviderOAuthMethods
                             key={candidateProviderId}
@@ -1193,12 +1272,33 @@ export const ProvidersPage: React.FC = () => {
             )}
       </SettingsSection>
 
-      {xaiSlotActive && selectedProvider.id === 'xai' && hasCredentials ? (
-        <ProviderXaiUsage />
+      {isPiKernel && isOfficialSubscriptionId(selectedProvider.id) ? (
+        <SettingsSection title={t('settings.providers.page.subscription.displayName.section')}>
+          <SettingsFieldRow
+            label={t('settings.providers.page.subscription.displayName.label')}
+            info={t('settings.providers.page.subscription.displayName.info')}
+            settingsItem="providers.subscription-display-name"
+          >
+            <Input
+              value={displayNameInputs[selectedProvider.id] ?? selectedProvider.name ?? ''}
+              onChange={(event) => setDisplayNameInputs((prev) => ({
+                ...prev,
+                [selectedProvider.id]: event.target.value,
+              }))}
+              onBlur={() => void handleSaveDisplayName(selectedProvider.id)}
+              placeholder={t('settings.providers.page.subscription.displayName.placeholder')}
+              className="h-8"
+            />
+          </SettingsFieldRow>
+        </SettingsSection>
       ) : null}
 
-      {kimiSlotActive && selectedProvider.id === 'kimi-coding' && hasCredentials ? (
-        <ProviderKimiUsage />
+      {xaiSlotActive && isXaiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+        <ProviderXaiUsage providerId={selectedProvider.id} />
+      ) : null}
+
+      {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+        <ProviderKimiUsage providerId={selectedProvider.id} />
       ) : null}
 
       <SettingsSection

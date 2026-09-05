@@ -315,6 +315,20 @@ removes only the API key and its `models.json` row. Settings Add does not
 list the sibling — use the Kimi Code / xAI card. Custom provider create
 cannot use the reserved sibling ids.
 
+A **second OAuth subscription** is a numeric clone (`xai-2`, `kimi-coding-2`),
+not a second object under `xai`. Add Grok/Kimi Code while the family is
+already connected: `POST /api/pi/subscription-clones` writes `models.json`
+for the new id (official base URL, copied catalog models, display name) and
+leaves the first `auth.json` key untouched. OAuth authorize/callback accept
+those clone ids and store tokens under the clone id. Dual-auth siblings
+`xai-api` / `kimi-coding-api` are not clones. Display name is `models.json`
+`name` via `PATCH /api/pi/subscription-clones/:id`. Kimi API **国际 / 国内**
+lives on Feature Plugins → Kimi Usage (`pichamber.json` `kimiRegion`) and
+sets `kimi-coding-api` `baseUrl` to `https://api.moonshot.ai/v1` or
+`https://api.moonshot.cn/v1`. `writePiDefaults` must keep `kimiRegion`.
+Usage `GET /api/pi/xai-usage?providerId=` / `kimi-usage?providerId=` reads
+that clone’s credential. Responses never echo tokens.
+
 Product login is this built-in `/login xai`, not an npm xAI OAuth
 extension. Composer `/login` for `xai` points at Settings → Providers.
 
@@ -368,8 +382,10 @@ The helper is Pi `kimiCodingOAuth` loaded from bundled `pi-ai`
 via the same `findNamedPackageDir` pattern as xAI. Callback writes
 `{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
 key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
-card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible
-`https://api.moonshot.ai/v1`) instead of overwriting OAuth. Refresh uses
+card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
+Feature Plugins → Kimi Usage **国际 / 国内**: `https://api.moonshot.ai/v1` or
+`https://api.moonshot.cn/v1`) instead of overwriting OAuth. Do not make the
+user type that URL. Refresh uses
 `kimiCodingOAuth.refresh`, not a copied token exchange. Responses never
 echo access, refresh, or user id. Composer `/login kimi-coding` points
 at Settings → Providers.

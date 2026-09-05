@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { XAI_PROVIDER_ID } from './pi-resources.js';
+import { isXaiSubscriptionId } from './pi-resources.js';
 
 const AUTHORIZE_NOTIFY_TIMEOUT_MS = 15_000;
 const XAI_OAUTH_RELATIVE = path.join('dist', 'auth', 'oauth', 'xai.js');
@@ -80,7 +80,7 @@ export const createPiXaiOAuthController = ({
   };
 
   const authorize = async (providerId) => {
-    if (providerId !== XAI_PROVIDER_ID) {
+    if (!isXaiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
     }
     abortPending();
@@ -109,7 +109,7 @@ export const createPiXaiOAuthController = ({
     loginPromise.catch((error) => {
       settleNotify.reject(error);
     });
-    pending = { abort, loginPromise };
+    pending = { abort, loginPromise, providerId };
 
     const timeoutMs = Number.isFinite(authorizeNotifyTimeoutMs) && authorizeNotifyTimeoutMs > 0
       ? authorizeNotifyTimeoutMs
@@ -141,10 +141,13 @@ export const createPiXaiOAuthController = ({
   };
 
   const complete = async (providerId) => {
-    if (providerId !== XAI_PROVIDER_ID) {
+    if (!isXaiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
     }
     if (!pending) throw noPendingError();
+    if (pending.providerId && pending.providerId !== providerId) {
+      throw unsupportedProvider(providerId);
+    }
     const current = pending;
     try {
       const credential = await current.loginPromise;
