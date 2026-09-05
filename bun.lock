@@ -95,7 +95,7 @@
     },
     "packages/electron": {
       "name": "@pichamber/electron",
-      "version": "1.2.12",
+      "version": "1.2.13",
       "dependencies": {
         "@pichamber/web": "workspace:*",
         "electron-context-menu": "^4.1.2",
@@ -111,7 +111,7 @@
     },
     "packages/mobile": {
       "name": "@pichamber/mobile",
-      "version": "1.2.12",
+      "version": "1.2.13",
       "dependencies": {
         "@aparajita/capacitor-secure-storage": "^8.0.0",
         "@capacitor-mlkit/barcode-scanning": "^8.1.0",
@@ -132,7 +132,7 @@
     },
     "packages/ui": {
       "name": "@pichamber/ui",
-      "version": "1.2.12",
+      "version": "1.2.13",
       "dependencies": {
         "@aparajita/capacitor-secure-storage": "^8.0.0",
         "@base-ui/react": "^1.4.0",
@@ -237,7 +237,7 @@
     },
     "packages/vscode": {
       "name": "openchamber",
-      "version": "1.2.12",
+      "version": "1.2.13",
       "dependencies": {
         "@opencode-ai/sdk": "1.18.18",
         "@pichamber/ui": "workspace:*",
@@ -260,7 +260,7 @@
     },
     "packages/web": {
       "name": "@pichamber/web",
-      "version": "1.2.12",
+      "version": "1.2.13",
       "bin": {
         "pichamber": "./bin/cli.js",
       },

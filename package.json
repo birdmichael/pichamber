@@ -1,6 +1,6 @@
 {
   "name": "pichamber",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "description": "Pichamber monorepo workspace for the Pi desktop app, shared UI, and in-process web server",
   "private": true,
   "type": "module",

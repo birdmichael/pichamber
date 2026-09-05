@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.13] - 2026-09-06
+
+- Desktop, Files, renderer, provider, and browser fixes since 1.2.12: visible provider auth errors, safer open flows, tiny-`/dev/shm` recovery, Files tree/composer Esc fixes, custom-provider model sync, dual Grok/Kimi subscriptions, and browser history/action-race fixes. See the root `CHANGELOG.md`.
+
 ## [1.2.12] - 2026-09-04
 
 - Desktop/chat/settings fixes since 1.2.11: Settings gear first click, Esc in Settings/Files, Plan leading `Plan ` kept, assistant footer model stamp, Chooser Pi-aware recovery, `~/.config/pichamber` data dir, Kimi/xAI OAuth+API key dual auth, and the merged shortcut/menu/Files batch. See root `CHANGELOG.md`.
