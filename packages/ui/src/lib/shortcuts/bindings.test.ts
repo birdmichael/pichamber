@@ -209,3 +209,30 @@ describe('platform shortcut labels from the runtime', () => {
     });
   });
 });
+
+describe('sequence completion shift relaxation', () => {
+  const event = (overrides: Partial<KeyboardEvent>): KeyboardEvent =>
+    ({ altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, key: '', code: '', ...overrides }) as KeyboardEvent;
+
+  test('bare letter completion matches Shift+H when relaxShiftForBareLetter is set', () => {
+    expect(eventMatchesShortcut(event({ key: 'H', code: 'KeyH', shiftKey: true }), 'h', {
+      relaxShiftForBareLetter: true,
+    })).toBe(true);
+    expect(eventMatchesShortcut(event({ key: 'h', code: 'KeyH' }), 'h', {
+      relaxShiftForBareLetter: true,
+    })).toBe(true);
+  });
+
+  test('without the option, Shift+H does not match a bare h binding', () => {
+    expect(eventMatchesShortcut(event({ key: 'H', code: 'KeyH', shiftKey: true }), 'h')).toBe(false);
+  });
+
+  test('explicit shift+h still requires shift even with the option', () => {
+    expect(eventMatchesShortcut(event({ key: 'h', code: 'KeyH' }), 'shift+h', {
+      relaxShiftForBareLetter: true,
+    })).toBe(false);
+    expect(eventMatchesShortcut(event({ key: 'H', code: 'KeyH', shiftKey: true }), 'shift+h', {
+      relaxShiftForBareLetter: true,
+    })).toBe(true);
+  });
+});

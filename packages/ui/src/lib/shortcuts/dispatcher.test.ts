@@ -193,6 +193,53 @@ describe('ShortcutDispatcher', () => {
     expect(calls).toEqual([]);
   });
 
+
+  test('completes mod+k h when the second chord arrives as Shift+H', () => {
+    const registry = new ShortcutRegistry();
+    const calls: string[] = [];
+    registry.register('open_help', () => { calls.push('help'); });
+    const dispatcher = new ShortcutDispatcher({
+      registry,
+      getBinding: (id) => id === 'open_help' ? 'mod+k h' : '',
+    });
+
+    expect(dispatcher.dispatch(key('k', { ctrlKey: true }))).toBe(true);
+    expect(dispatcher.dispatch(key('H', { shiftKey: true }))).toBe(true);
+    expect(calls).toEqual(['help']);
+  });
+
+  test('still requires shift for an explicit shift+ letter completion chord', () => {
+    const registry = new ShortcutRegistry();
+    const calls: string[] = [];
+    registry.register('open_help', () => { calls.push('help'); });
+    const dispatcher = new ShortcutDispatcher({
+      registry,
+      getBinding: (id) => id === 'open_help' ? 'mod+k shift+h' : '',
+    });
+
+    expect(dispatcher.dispatch(key('k', { ctrlKey: true }))).toBe(true);
+    expect(dispatcher.dispatch(key('h'))).toBe(false);
+    expect(calls).toEqual([]);
+
+    expect(dispatcher.dispatch(key('k', { ctrlKey: true }))).toBe(true);
+    expect(dispatcher.dispatch(key('H', { shiftKey: true }))).toBe(true);
+    expect(calls).toEqual(['help']);
+  });
+
+  test('single-chord bare letters still require shiftKey === false', () => {
+    const registry = new ShortcutRegistry();
+    const calls: string[] = [];
+    registry.register('open_help', () => { calls.push('help'); });
+    const dispatcher = new ShortcutDispatcher({
+      registry,
+      getBinding: () => 'h',
+    });
+
+    expect(dispatcher.dispatch(key('H', { shiftKey: true }))).toBe(false);
+    expect(dispatcher.dispatch(key('h'))).toBe(true);
+    expect(calls).toEqual(['help']);
+  });
+
   test('stops after the first handler that accepts a conflicting binding', () => {
     const registry = new ShortcutRegistry();
     const calls: string[] = [];

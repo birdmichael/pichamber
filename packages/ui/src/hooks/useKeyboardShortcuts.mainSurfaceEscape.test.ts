@@ -30,3 +30,12 @@ test('Escape inside Settings closes the window after nested overlays yield', () 
   expect(handler.indexOf('isInsideSettingsDialog(target)')).toBeLessThan(handler.indexOf('shouldBlockSettingsDismiss'));
   expect(handler.indexOf('shouldBlockSettingsDismiss')).toBeLessThan(handler.indexOf('setSettingsDialogOpen(false)'));
 });
+
+test('Escape closes the header session switcher before yielding to open menus', () => {
+  const handlerStart = source.indexOf('const handleEscapeKeyDownCapture');
+  const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
+
+  expect(handler).toContain('isSessionDropdownOpen');
+  expect(handler).toContain('setSessionDropdownOpen(false)');
+  expect(handler.indexOf('setSessionDropdownOpen(false)')).toBeLessThan(handler.indexOf('insideForeignDialog'));
+});

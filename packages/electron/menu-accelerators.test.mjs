@@ -202,3 +202,44 @@ test('View toggle menu actions use emit-only single delivery', () => {
     /dispatchViewToggleAction\('toggle-memory-debug'\)/,
   );
 });
+
+
+test('View sidebar/surface actions use once delivery and leave accelerators to the renderer', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+
+  for (const label of ['Toggle Right Sidebar', 'Open Files Sidebar', 'Open Git Sidebar', 'Toggle Terminal Dock']) {
+    const items = [...source.matchAll(new RegExp(`\\{ label: '${label}'[^}]*\\}`, 'g'))].map((m) => m[0]);
+    assert.ok(items.length >= 2, `expected darwin + linux items for ${label}, got ${items.length}`);
+    for (const item of items) {
+      assert.match(item, /registerAccelerator:\s*false/, label);
+      assert.doesNotMatch(item, /dispatchAction\(/, label);
+      assert.ok(
+        /dispatchViewToggleAction\(|dispatchMenuActionOnce\(/.test(item),
+        `${label} must use once delivery`,
+      );
+    }
+  }
+});
+
+test('Settings menu click is single-delivery and does not register the accelerator', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const items = [...source.matchAll(/\{ label: 'Settings', accelerator: '(Cmd\+,|Ctrl\+,)'[^}]*\}/g)]
+    .map((match) => match[0]);
+  assert.equal(items.length, 2, 'expected darwin Cmd+, and Linux/Windows Ctrl+, Settings items');
+  for (const item of items) {
+    assert.match(item, /registerAccelerator:\s*false/);
+    assert.match(item, /dispatchMenuActionOnce\('settings'\)/);
+  }
+});
+
+test('desktop_clear_cache confirms and clears HTTP cache only', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const start = source.indexOf("case 'desktop_clear_cache'");
+  assert.ok(start >= 0);
+  const block = source.slice(start, start + 900);
+  assert.match(block, /showMessageBox/);
+  assert.match(block, /clearCache\(\)/);
+  assert.match(block, /await session\.defaultSession\.clearCache\(\)/);
+  assert.doesNotMatch(block, /await session\.defaultSession\.clearStorageData\(\)/);
+  assert.doesNotMatch(block, /webContents\.reload\(\)/);
+});

@@ -5,6 +5,7 @@ import { describe, expect, test } from 'bun:test';
 
 import {
   mapInheritedNewSessionDraftToMiniChatArgs,
+  mapOpenNewSessionDraftToMiniChatArgs,
   resolveInheritedNewSessionDraftOptions,
 } from './newSessionInherit';
 
@@ -62,7 +63,7 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
     })).toBe(undefined);
   });
 
-  test('managed-chat current session + active project → project', () => {
+  test('managed-chat current session stays projectless even with leftover active project', () => {
     expect(resolveInheritedNewSessionDraftOptions({
       currentSessionId: 'ses_chat',
       currentSessionDirectory: chatDirectory,
@@ -70,10 +71,7 @@ describe('resolveInheritedNewSessionDraftOptions', () => {
       openedProjectPaths,
       activeProjectId: 'project-1',
       activeProjectPath: projectPath,
-    })).toEqual({
-      selectedProjectId: 'project-1',
-      directoryOverride: projectPath,
-    });
+    })).toBe(undefined);
   });
 
   test('managed-chat current session and no active project → undefined/chat', () => {
@@ -114,6 +112,60 @@ const miniChatArgsFromInput = (input: Parameters<typeof resolveInheritedNewSessi
   mapInheritedNewSessionDraftToMiniChatArgs(resolveInheritedNewSessionDraftOptions(input))
 );
 
+describe('mapOpenNewSessionDraftToMiniChatArgs', () => {
+  test('projectless New Session draft ignores leftover activeProject inherit', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'chat',
+      selectedProjectId: null,
+      directoryOverride: null,
+    })).toEqual({ directory: '', projectId: null });
+  });
+
+  test('project New Session draft maps that project path and id', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'project',
+      selectedProjectId: 'project-1',
+      directoryOverride: projectPath,
+    })).toEqual({ directory: projectPath, projectId: 'project-1' });
+  });
+
+  test('closed draft returns null so inherit can run', () => {
+    expect(mapOpenNewSessionDraftToMiniChatArgs({
+      open: false,
+      target: 'chat',
+      selectedProjectId: null,
+    })).toBe(null);
+  });
+});
+
+describe('projectless draft + leftover activeProject (Mini Chat #555)', () => {
+  test('open projectless draft wins over leftover active project inherit', () => {
+    const fromDraft = mapOpenNewSessionDraftToMiniChatArgs({
+      open: true,
+      target: 'chat',
+      selectedProjectId: null,
+      directoryOverride: null,
+    });
+    // Inherit alone would still see leftover activeProject when there is no session.
+    const fromInherit = mapInheritedNewSessionDraftToMiniChatArgs(
+      resolveInheritedNewSessionDraftOptions({
+        currentSessionId: null,
+        currentSessionDirectory: null,
+        homeDirectory,
+        openedProjectPaths,
+        activeProjectId: 'scan-proj',
+        activeProjectPath: projectPath,
+      }),
+    );
+    expect(fromInherit).toEqual({ directory: projectPath, projectId: 'scan-proj' });
+    expect(fromDraft).toEqual({ directory: '', projectId: null });
+    // readMiniChatDraftWindowArgs prefers the draft when open.
+    expect(fromDraft ?? fromInherit).toEqual({ directory: '', projectId: null });
+  });
+});
+
 describe('readMiniChatDraftWindowArgs mapping', () => {
   test('project session → that directory, no leftover project id', () => {
     expect(miniChatArgsFromInput({
@@ -126,7 +178,7 @@ describe('readMiniChatDraftWindowArgs mapping', () => {
     })).toEqual({ directory: projectPath, projectId: null });
   });
 
-  test('leftover active project + chats session → inherited project path, not chats dir mixed with project id', () => {
+  test('leftover active project + chats session → projectless mini chat args', () => {
     expect(miniChatArgsFromInput({
       currentSessionId: 'ses_chat',
       currentSessionDirectory: chatDirectory,
@@ -135,17 +187,9 @@ describe('readMiniChatDraftWindowArgs mapping', () => {
       activeProjectId: 'sess-fx',
       activeProjectPath: projectPath,
     })).toEqual({
-      directory: projectPath,
-      projectId: 'sess-fx',
+      directory: '',
+      projectId: null,
     });
-    expect(miniChatArgsFromInput({
-      currentSessionId: 'ses_chat',
-      currentSessionDirectory: chatDirectory,
-      homeDirectory,
-      openedProjectPaths,
-      activeProjectId: 'sess-fx',
-      activeProjectPath: projectPath,
-    }).directory).not.toBe(chatDirectory);
   });
 
   test('no project → empty chats draft args', () => {
@@ -184,7 +228,7 @@ describe('mini-chat draft callers', () => {
       'utf8',
     );
     expect(source).toContain('if (config.projectId || config.directory)');
-    expect(source).toMatch(/openNewSessionDraft\(\);/);
+    expect(source).toMatch(/openNewSessionDraft\(\{\s*target:\s*'chat'\s*\}\)/);
   });
 });
 

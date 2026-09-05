@@ -61,13 +61,6 @@ const copyCurrentSelectionFallback = async (): Promise<boolean> => {
 const MENU_ACTION_EVENT = 'openchamber:menu-action';
 const CHECK_FOR_UPDATES_EVENT = 'openchamber:check-for-updates';
 
-type DesktopBridgeGlobal = {
-  listen?: (
-    event: string,
-    handler: (evt: { payload?: unknown }) => void
-  ) => Promise<() => void>;
-};
-
 type MenuAction =
   | 'about'
   | 'settings'
@@ -102,9 +95,8 @@ export const useMenuActions = (
   onToggleMemoryDebug?: () => void
 ) => {
   const openNewSessionDraft = useSessionUIStore((s) => s.openNewSessionDraft);
-  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen);
-  const toggleHelpDialog = useUIStore((s) => s.toggleHelpDialog);
+  const setHelpDialogOpen = useUIStore((s) => s.setHelpDialogOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const setSessionSwitcherOpen = useUIStore((s) => s.setSessionSwitcherOpen);
   const setActiveMainTab = useUIStore((s) => s.setActiveMainTab);
@@ -206,7 +198,9 @@ export const useMenuActions = (
           break;
 
         case 'command-palette':
-          toggleCommandPalette();
+          // Menu/IPC must open, not toggle — a leftover second delivery used to
+          // open-then-close. Keyboard shortcut still toggles.
+          setCommandPaletteOpen(true);
           break;
 
         case 'quick-open':
@@ -344,7 +338,7 @@ export const useMenuActions = (
           break;
 
         case 'help-dialog':
-          toggleHelpDialog();
+          setHelpDialogOpen(true);
           break;
 
         case 'download-logs': {
@@ -365,10 +359,9 @@ export const useMenuActions = (
       setActiveMainTab,
       setSessionSwitcherOpen,
       setCommandPaletteOpen,
+      setHelpDialogOpen,
       setSettingsDialogOpen,
       setThemeMode,
-      toggleCommandPalette,
-      toggleHelpDialog,
       toggleSidebar,
     ]
   );
@@ -392,53 +385,7 @@ export const useMenuActions = (
     };
   }, [handleAction, handleCheckForUpdates]);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const desktop = (window as unknown as { __OPENCHAMBER_DESKTOP__?: DesktopBridgeGlobal }).__OPENCHAMBER_DESKTOP__;
-    const listen = desktop?.listen;
-    if (typeof listen !== 'function') return;
-
-    let unlistenMenu: null | (() => void | Promise<void>) = null;
-    let unlistenUpdate: null | (() => void | Promise<void>) = null;
-
-    listen('openchamber:menu-action', (evt) => {
-      const action = evt?.payload;
-      if (typeof action !== 'string') return;
-      handleAction(action as MenuAction);
-    })
-      .then((fn) => {
-        unlistenMenu = fn;
-      })
-      .catch(() => {
-        // ignore
-      });
-
-    listen('openchamber:check-for-updates', () => {
-      window.dispatchEvent(new Event(CHECK_FOR_UPDATES_EVENT));
-    })
-      .then((fn) => {
-        unlistenUpdate = fn;
-      })
-      .catch(() => {
-        // ignore
-      });
-
-    return () => {
-      const cleanup = async () => {
-        try {
-          const a = unlistenMenu?.();
-          if (a instanceof Promise) await a;
-        } catch {
-          // ignore
-        }
-        try {
-          const b = unlistenUpdate?.();
-          if (b instanceof Promise) await b;
-        } catch {
-          // ignore
-        }
-      };
-      void cleanup();
-    };
-  }, [handleAction]);
+  // Preload turns every main-process emit into a window CustomEvent. Do not also
+  // subscribe via desktop.listen — that double-fires toggle actions (palette,
+  // sidebars) and looks like a no-op (#559 / #556 / #560).
 };

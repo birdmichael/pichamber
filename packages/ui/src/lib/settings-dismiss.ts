@@ -20,18 +20,37 @@ export function hasOpenSettingsOverlay(root?: ParentNode | null): boolean {
   return Boolean(resolveRoot(root)?.querySelector(OPEN_SETTINGS_OVERLAY_SELECTOR));
 }
 
-const NESTED_SETTINGS_DIALOG_SELECTOR = [
-  '[data-slot="dialog-content"]',
-  '[data-nested-dialog-open]',
-].join(',');
-
 /**
  * Nested Settings overlays (shared Dialog popups, Base UI nested dialogs).
- * Do not count every `[role="dialog"]` in the document — Settings itself is a
- * dialog, and unrelated chrome (btw, dictation) also uses that role.
+ * Scope to the Settings window — a document-wide `[data-slot="dialog-content"]`
+ * match (Command Palette / Help / About, even while closing) blocked Esc (#511).
  */
+function resolveSettingsDialogRoot(root?: ParentNode | null): ParentNode | null {
+  const doc = resolveRoot(root);
+  if (!doc || typeof (doc as ParentNode).querySelector !== 'function') {
+    return null;
+  }
+  const settingsView = doc.querySelector('[data-settings-view="true"]');
+  if (!settingsView || typeof (settingsView as Element).closest !== 'function') {
+    return settingsView;
+  }
+  return (settingsView as Element).closest('[role="dialog"]') ?? settingsView;
+}
+
 function hasNestedSettingsDialog(root?: ParentNode | null): boolean {
-  return Boolean(resolveRoot(root)?.querySelector(NESTED_SETTINGS_DIALOG_SELECTOR));
+  // Explicit root (notifySettingsEscapeForm) searches that subtree. Document-wide
+  // callers scope to the Settings window so unrelated dialogs do not block Esc.
+  const settingsRoot = root ? resolveRoot(root) : resolveSettingsDialogRoot();
+  if (!settingsRoot || typeof (settingsRoot as ParentNode).querySelector !== 'function') {
+    return false;
+  }
+  if (
+    typeof (settingsRoot as Element).hasAttribute === 'function'
+    && (settingsRoot as Element).hasAttribute('data-nested-dialog-open')
+  ) {
+    return true;
+  }
+  return Boolean((settingsRoot as ParentNode).querySelector('[data-slot="dialog-content"]'));
 }
 
 export const SETTINGS_ESCAPE_FORM_EVENT = 'settings-escape-form';

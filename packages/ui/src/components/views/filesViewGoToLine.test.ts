@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   consumeGoToLineSubmitKey,
+  isUndeliveredShortcutEventTarget,
   resolveFilesGoToLineFocus,
   shouldOpenFilesGoToLine,
   shouldOpenFilesGoToLineWithoutFocus,
@@ -121,6 +122,66 @@ describe('shouldOpenFilesGoToLine', () => {
       focus: { ...openFocus, inEditorRoot: false },
     })).toBe(false);
   });
+
+  test('opens when Files edit has a live editor even if Alt stole focus to the menu bar', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: true,
+      focus: {
+        inDialog: false,
+        inEditor: false,
+        inEditorRoot: false,
+        typingOutsideEditor: false,
+      },
+    })).toBe(true);
+  });
+
+  test('opens via hasEditor when the composer CodeMirror is focused (Desktop Alt+G)', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: true,
+      focus: {
+        inDialog: false,
+        inEditor: true,
+        inEditorRoot: false,
+        typingOutsideEditor: false,
+      },
+    })).toBe(true);
+  });
+
+  test('still rejects foreign CodeMirror when Files has no live editor', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: false,
+      focus: {
+        inDialog: false,
+        inEditor: true,
+        inEditorRoot: false,
+        typingOutsideEditor: false,
+      },
+    })).toBe(false);
+  });
+
+  test('still rejects non-CM typing outside the editor even with hasEditor', () => {
+    expect(shouldOpenFilesGoToLine({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: true,
+      focus: {
+        inDialog: false,
+        inEditor: false,
+        inEditorRoot: false,
+        typingOutsideEditor: true,
+      },
+    })).toBe(false);
+  });
 });
 
 describe('resolveFilesGoToLineFocus', () => {
@@ -151,6 +212,13 @@ describe('resolveFilesGoToLineFocus', () => {
   });
 });
 
+describe('isUndeliveredShortcutEventTarget', () => {
+  test('treats null and non-Node placeholders as undelivered invoke targets', () => {
+    expect(isUndeliveredShortcutEventTarget(null)).toBe(true);
+    expect(isUndeliveredShortcutEventTarget({} as EventTarget)).toBe(true);
+  });
+});
+
 describe('shouldOpenFilesGoToLineWithoutFocus', () => {
   test('opens a synthetic menu invoke when this files editor is live', () => {
     expect(shouldOpenFilesGoToLineWithoutFocus({
@@ -162,13 +230,25 @@ describe('shouldOpenFilesGoToLineWithoutFocus', () => {
     })).toBe(true);
   });
 
-  test('does not treat a real keydown outside the editor as a menu invoke', () => {
+  test('opens an untrusted invoke even when Chromium leaves a non-null placeholder target', () => {
     expect(shouldOpenFilesGoToLineWithoutFocus({
       canEdit: true,
       textViewMode: 'edit',
       isMobile: false,
       hasEditor: true,
       eventTarget: {} as EventTarget,
+      isTrusted: false,
+    })).toBe(true);
+  });
+
+  test('does not treat a trusted real keydown as a menu invoke', () => {
+    expect(shouldOpenFilesGoToLineWithoutFocus({
+      canEdit: true,
+      textViewMode: 'edit',
+      isMobile: false,
+      hasEditor: true,
+      eventTarget: {} as EventTarget,
+      isTrusted: true,
     })).toBe(false);
   });
 });
@@ -206,6 +286,8 @@ describe('Files go-to-line wiring', () => {
   test('Alt+G reveals the kebab Line field, including editor-only FilesView', () => {
     expect(filesViewSource).toContain("useKeybind('open_go_to_line'");
     expect(filesViewSource).toContain('shouldOpenFilesGoToLine');
+    expect(filesViewSource).toContain('hasEditor');
+    expect(filesViewSource).toContain('isTrusted: event.isTrusted');
     expect(filesViewSource).toContain('revealGoToLineField');
     expect(filesViewSource).toContain('setIsFloatingToolbarOpen(true)');
     expect(filesViewSource).toContain('mode?: \'full\' | \'editor-only\'');

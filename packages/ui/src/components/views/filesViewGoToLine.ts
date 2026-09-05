@@ -49,6 +49,8 @@ export function shouldOpenFilesGoToLine(input: {
   textViewMode: 'view' | 'edit';
   isMobile: boolean;
   focus: FilesGoToLineFocus;
+  /** Live CodeMirror for this Files edit session (editor-only sidebar included). */
+  hasEditor?: boolean;
 }): boolean {
   if (!input.canEdit || input.textViewMode !== 'edit' || input.isMobile) {
     return false;
@@ -56,18 +58,43 @@ export function shouldOpenFilesGoToLine(input: {
   if (input.focus.inDialog || input.focus.typingOutsideEditor) {
     return false;
   }
-  return input.focus.inEditor && input.focus.inEditorRoot;
+  // Files editor caret — always open.
+  if (input.focus.inEditor && input.focus.inEditorRoot) {
+    return true;
+  }
+  // Live Files edit session: allow open even when focus is a foreign .cm-editor
+  // (composer) or Linux Alt stole focus to the menu bar. Do not let a foreign
+  // CodeMirror hard-fail before the hasEditor fallback (#503 Desktop).
+  return Boolean(input.hasEditor);
 }
 
-/** Menu / palette invoke dispatches a synthetic keydown with no target. */
+/**
+ * Menu/palette `shortcutRegistry.invoke` builds an undelivered KeyboardEvent.
+ * Chromium keeps `target === null`; some engines may leave a non-null placeholder.
+ * `isTrusted === false` is the reliable signal; null/non-Node target is the fallback.
+ */
+export function isUndeliveredShortcutEventTarget(target: EventTarget | null): boolean {
+  if (target == null) return true;
+  if (typeof Node !== 'undefined' && target instanceof Node) return false;
+  return true;
+}
+
+/** Menu / palette invoke — not a trusted DOM keydown in the Files editor. */
 export function shouldOpenFilesGoToLineWithoutFocus(input: {
   canEdit: boolean;
   textViewMode: 'view' | 'edit';
   isMobile: boolean;
   hasEditor: boolean;
   eventTarget: EventTarget | null;
+  /** Synthetic invoke is never trusted; real Alt+G is trusted. */
+  isTrusted?: boolean;
 }): boolean {
-  if (input.eventTarget != null) {
+  if (input.isTrusted === true) {
+    return false;
+  }
+  const undelivered = input.isTrusted === false
+    || isUndeliveredShortcutEventTarget(input.eventTarget);
+  if (!undelivered) {
     return false;
   }
   return input.canEdit && input.textViewMode === 'edit' && !input.isMobile && input.hasEditor;

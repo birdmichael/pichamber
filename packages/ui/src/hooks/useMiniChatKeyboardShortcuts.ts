@@ -91,16 +91,19 @@ export const useMiniChatKeyboardShortcuts = () => {
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (dispatcher.consumeCapturedPrefixEvent(event)) return;
-      if (dispatcher.dispatch(event)) event.preventDefault();
+      if (dispatcher.dispatch(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     };
     const handleBlur = () => dispatcher.handleBlur();
 
     window.addEventListener('keydown', handleActivePrefixKeyDownCapture, true);
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleActivePrefixKeyDownCapture, true);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('blur', handleBlur);
     };
   }, [dispatcher]);

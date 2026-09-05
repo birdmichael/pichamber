@@ -127,6 +127,20 @@ test('keeps a composer-armed Ctrl+K leader so the second key is not typed', () =
   )).toBe(false);
 });
 
+test('keeps a CodeMirror leader when the second key lands on a nested line span', () => {
+  const cmContent = new StubHTMLElement('DIV', false, { className: 'cm-content', contentEditable: 'true' });
+  const cmLine = new StubHTMLElement('SPAN', false, { className: 'cm-line', parent: cmContent });
+  expect(shouldClearShortcutPrefixForTyping(
+    { altKey: false, ctrlKey: false, metaKey: false, target: cmLine as unknown as EventTarget },
+    cmContent as unknown as EventTarget,
+  )).toBe(false);
+  const otherCm = new StubHTMLElement('DIV', false, { className: 'cm-content', contentEditable: 'true' });
+  expect(shouldClearShortcutPrefixForTyping(
+    { altKey: false, ctrlKey: false, metaKey: false, target: otherCm as unknown as EventTarget },
+    cmContent as unknown as EventTarget,
+  )).toBe(true);
+});
+
 afterAll(() => {
   if (previousHTMLElement) (globalThis as { HTMLElement: unknown }).HTMLElement = previousHTMLElement;
   else Reflect.deleteProperty(globalThis, 'HTMLElement');

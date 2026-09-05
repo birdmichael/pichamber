@@ -149,7 +149,8 @@ export const useKeyboardShortcuts = () => {
       state.togglePromptNavigatorPanel();
     },
     open_help: () => {
-      useUIStore.getState().toggleHelpDialog();
+      // Always open (never toggle closed) so a half-failed chord cannot leave Shortcuts closed.
+      useUIStore.getState().setHelpDialogOpen(true);
     },
     open_status: () => {
       void showOpenCodeStatus();
@@ -380,6 +381,13 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
+      // Header session switcher uses modal={false}; Base UI may not take Esc.
+      if (state.isSessionDropdownOpen) {
+        event.preventDefault();
+        state.setSessionDropdownOpen(false);
+        resetAbortPriming();
+        return;
+      }
       const insideForeignDialog = Boolean(target?.closest('[role="dialog"]'))
         && !isInsideSettingsDialog(target);
       if (
@@ -466,6 +474,8 @@ export const useKeyboardShortcuts = () => {
         return;
       }
       if (dispatcher.dispatchActivePrefix(event)) {
+        // Capture + stop so the composer CodeMirror never inserts the
+        // completion letter (Ctrl+K then H must open Shortcuts, not type "h").
         event.preventDefault();
         event.stopPropagation();
       }
@@ -544,7 +554,14 @@ export const useKeyboardShortcuts = () => {
         return;
       }
 
-      if (dispatcher.dispatch(event)) event.preventDefault();
+      // Capture-phase arming: preventDefault/stopPropagation before
+      // CodeMirror's target listeners see Ctrl+K (macOS standardKeymap maps
+      // Ctrl-k to deleteToLineEnd; Linux still needs the leader armed before
+      // any editor stopPropagation).
+      if (dispatcher.dispatch(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     };
     const handleKeyHoldDown = (event: KeyboardEvent) => {
       heldKeysRef.current.add(event.key.toLowerCase());
@@ -563,7 +580,8 @@ export const useKeyboardShortcuts = () => {
     window.addEventListener('keydown', handleTerminalShortcutCapture, true);
     window.addEventListener('keydown', handleEscapeKeyDownCapture, true);
     window.addEventListener('keydown', handleActivePrefixKeyDownCapture, true);
-    window.addEventListener('keydown', handleKeyDown);
+    // Capture (after prefix completion): arm leaders / run singles before editors.
+    window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyHoldDown, true);
@@ -571,7 +589,7 @@ export const useKeyboardShortcuts = () => {
       window.removeEventListener('keydown', handleTerminalShortcutCapture, true);
       window.removeEventListener('keydown', handleEscapeKeyDownCapture, true);
       window.removeEventListener('keydown', handleActivePrefixKeyDownCapture, true);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('blur', handleBlur);
     };
   }, [

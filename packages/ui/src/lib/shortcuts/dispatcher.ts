@@ -147,7 +147,8 @@ export class ShortcutDispatcher {
     return matches.filter((match) => (
       match.chords.length === 2
       && match.chords[0] === this.prefix
-      && eventMatchesShortcut(event, match.chords[1])
+      // Completion chords: bare letters may arrive as Shift+H from automation/IME.
+      && eventMatchesShortcut(event, match.chords[1], { relaxShiftForBareLetter: true })
     ));
   }
 
