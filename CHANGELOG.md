@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Settings: you can add a second Grok or Kimi Code login without overwriting the first, and set a display name on each.
+- Settings: Feature Plugins → Kimi Usage has International / China for the Kimi API key host. You do not type a URL.
+
 ## [1.2.12] - 2026-09-04
 
 - Desktop: connection health probes allow more time before marking Local disconnected, so a busy first send is less likely to toast `health_probe_unhealthy`.

@@ -7,6 +7,7 @@ import {
 } from './feature-plugins.js';
 import {
   XAI_PROVIDER_ID,
+  isXaiSubscriptionId,
   resolvePiAuthPath,
   writePiProviderAuth,
 } from './pi-resources.js';
@@ -285,9 +286,9 @@ const withTimeout = async (work, timeoutMs = USAGE_TIMEOUT_MS) => {
   }
 };
 
-const persistRefreshedOauth = (credential, home) => {
+const persistRefreshedOauth = (credential, home, providerId = XAI_PROVIDER_ID) => {
   try {
-    writePiProviderAuth(XAI_PROVIDER_ID, credential, { home });
+    writePiProviderAuth(providerId, credential, { home });
   } catch {
     // Still use the refreshed access for this request.
   }
@@ -295,6 +296,7 @@ const persistRefreshedOauth = (credential, home) => {
 
 const refreshOauthCredential = async (oauth, {
   home,
+  providerId = XAI_PROVIDER_ID,
   refreshOAuth = refreshPiXaiOAuth,
   signal,
 }) => {
@@ -304,7 +306,7 @@ const refreshOauthCredential = async (oauth, {
     refresh: oauth.refresh,
     expires: oauth.expires,
   }, { signal });
-  persistRefreshedOauth(credential, home);
+  persistRefreshedOauth(credential, home, providerId);
   const next = readOauthEntry(credential);
   if (!next?.access) {
     const error = new Error('xAI OAuth refresh returned no access token');
@@ -316,12 +318,14 @@ const refreshOauthCredential = async (oauth, {
 
 export const getPiXaiUsage = async ({
   home,
+  providerId,
   fetchImpl = fetch,
   origin = XAI_USAGE_ORIGIN,
   readFile = (filePath) => fs.readFileSync(filePath, 'utf8'),
   refreshOAuth = refreshPiXaiOAuth,
   now = Date.now(),
 } = {}) => {
+  const usageProviderId = isXaiSubscriptionId(providerId) ? providerId : XAI_PROVIDER_ID;
   const payload = toFeaturePluginsPayload({
     plugins: readFeaturePlugins(home),
     configuredSources: listConfiguredPiPackageSources(home),
@@ -331,14 +335,14 @@ export const getPiXaiUsage = async ({
     return { ok: false, configured: false, slotActive: false };
   }
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  let oauth = readOauthEntry(auth[XAI_PROVIDER_ID]);
+  let oauth = readOauthEntry(auth[usageProviderId]);
   if (!oauth) {
     return { ok: false, configured: false, slotActive: true };
   }
   try {
     const windows = await withTimeout(async (signal) => {
       if (oauthNeedsRefresh(oauth, now)) {
-        oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+        oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
       }
       try {
         return await fetchXaiBillingWindows({
@@ -349,7 +353,7 @@ export const getPiXaiUsage = async ({
         });
       } catch (error) {
         if (!isUnauthorizedUsageError(error) || !oauth.refresh) throw error;
-        oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+        oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
         return fetchXaiBillingWindows({
           access: oauth.access,
           fetchImpl,
@@ -362,7 +366,7 @@ export const getPiXaiUsage = async ({
       ok: true,
       configured: true,
       slotActive: true,
-      providerId: XAI_PROVIDER_ID,
+      providerId: usageProviderId,
       providerName: 'xAI',
       expires: oauth.expires,
       usage: { windows },
@@ -373,7 +377,7 @@ export const getPiXaiUsage = async ({
       ok: false,
       configured: true,
       slotActive: true,
-      providerId: XAI_PROVIDER_ID,
+      providerId: usageProviderId,
       providerName: 'xAI',
       expires: oauth.expires,
       error: error instanceof Error ? error.message : 'xAI usage request failed',

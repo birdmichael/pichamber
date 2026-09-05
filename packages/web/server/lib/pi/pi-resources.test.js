@@ -13,6 +13,8 @@ import {
   writePiPrompt,
   deletePiPrompt,
   getPiAuthMethods,
+  readKimiRegion,
+  writeKimiRegion,
   mergeBuiltinPiCatalogProviders,
   toPiProviderListPayload,
   providerHasFileSource,
@@ -438,6 +440,32 @@ description: >
       default: { xai: 'grok-4.6' },
       connected: ['xai'],
     });
+  });
+
+  it('keeps Kimi region across defaults writes and lists OAuth methods for xai-2', () => {
+    const home = makeTemp();
+    writePiProviderAuth('xai', {
+      type: 'oauth',
+      access: 'access-one',
+      refresh: 'refresh-one',
+      expires: Date.now() + 60_000,
+    }, { home });
+    writePiProviderAuth('xai-2', {
+      type: 'oauth',
+      access: 'access-two',
+      refresh: 'refresh-two',
+      expires: Date.now() + 60_000,
+    }, { home });
+    const methods = getPiAuthMethods(home);
+    expect(methods['xai-2']).toEqual([
+      { type: 'oauth', label: 'Sign in with SuperGrok or X Premium' },
+      { type: 'api', label: 'API Key' },
+    ]);
+    expect(JSON.stringify(methods)).not.toContain('access-two');
+    expect(readKimiRegion(home)).toBe('international');
+    expect(writeKimiRegion(home, 'domestic').baseUrl).toBe('https://api.moonshot.cn/v1');
+    writePiDefaults(home, { model: 'xai/grok-4.6' });
+    expect(readKimiRegion(home)).toBe('domestic');
   });
 
   it('hides Pi builtin catalog providers unless auth.json or models.json has them', async () => {

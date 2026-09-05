@@ -7,6 +7,7 @@ import {
 } from './feature-plugins.js';
 import {
   KIMI_CODING_PROVIDER_ID,
+  isKimiSubscriptionId,
   resolvePiAuthPath,
   writePiProviderAuth,
 } from './pi-resources.js';
@@ -266,9 +267,9 @@ const withTimeout = async (work, timeoutMs = USAGE_TIMEOUT_MS) => {
   }
 };
 
-const persistRefreshedOauth = (credential, home) => {
+const persistRefreshedOauth = (credential, home, providerId = KIMI_CODING_PROVIDER_ID) => {
   try {
-    writePiProviderAuth(KIMI_CODING_PROVIDER_ID, credential, { home });
+    writePiProviderAuth(providerId, credential, { home });
   } catch {
     // Still use the refreshed access for this request.
   }
@@ -276,6 +277,7 @@ const persistRefreshedOauth = (credential, home) => {
 
 const refreshOauthCredential = async (oauth, {
   home,
+  providerId = KIMI_CODING_PROVIDER_ID,
   refreshOAuth = refreshPiKimiOAuth,
   signal,
 }) => {
@@ -285,7 +287,7 @@ const refreshOauthCredential = async (oauth, {
     refresh: oauth.refresh,
     expires: oauth.expires,
   }, { signal });
-  persistRefreshedOauth(credential, home);
+  persistRefreshedOauth(credential, home, providerId);
   const next = readOauthEntry(credential);
   if (!next?.access) {
     const error = new Error('Kimi Code OAuth refresh returned no access token');
@@ -297,12 +299,14 @@ const refreshOauthCredential = async (oauth, {
 
 export const getPiKimiUsage = async ({
   home,
+  providerId,
   fetchImpl = fetch,
   origin = KIMI_USAGE_ORIGIN,
   readFile = (filePath) => fs.readFileSync(filePath, 'utf8'),
   refreshOAuth = refreshPiKimiOAuth,
   now = Date.now(),
 } = {}) => {
+  const usageProviderId = isKimiSubscriptionId(providerId) ? providerId : KIMI_CODING_PROVIDER_ID;
   const payload = toFeaturePluginsPayload({
     plugins: readFeaturePlugins(home),
     configuredSources: listConfiguredPiPackageSources(home),
@@ -312,8 +316,8 @@ export const getPiKimiUsage = async ({
     return { ok: false, configured: false, slotActive: false };
   }
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  let oauth = readOauthEntry(auth[KIMI_CODING_PROVIDER_ID]);
-  const apiKey = readApiKey(auth[KIMI_CODING_PROVIDER_ID]);
+  let oauth = readOauthEntry(auth[usageProviderId]);
+  const apiKey = readApiKey(auth[usageProviderId]);
   if (!oauth && !apiKey) {
     return { ok: false, configured: false, slotActive: true };
   }
@@ -321,7 +325,7 @@ export const getPiKimiUsage = async ({
     const { windows, membershipLevel } = await withTimeout(async (signal) => {
       if (oauth) {
         if (oauthNeedsRefresh(oauth, now)) {
-          oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
         }
         try {
           return await fetchKimiUsageWindows({
@@ -332,7 +336,7 @@ export const getPiKimiUsage = async ({
           });
         } catch (error) {
           if (!isUnauthorizedUsageError(error) || !oauth.refresh) throw error;
-          oauth = await refreshOauthCredential(oauth, { home, refreshOAuth, signal });
+          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
           return fetchKimiUsageWindows({
             access: oauth.access,
             fetchImpl,
@@ -352,7 +356,7 @@ export const getPiKimiUsage = async ({
       ok: true,
       configured: true,
       slotActive: true,
-      providerId: KIMI_CODING_PROVIDER_ID,
+      providerId: usageProviderId,
       providerName: PROVIDER_NAME,
       expires: oauth?.expires ?? null,
       usage: { windows },
@@ -364,7 +368,7 @@ export const getPiKimiUsage = async ({
       ok: false,
       configured: true,
       slotActive: true,
-      providerId: KIMI_CODING_PROVIDER_ID,
+      providerId: usageProviderId,
       providerName: PROVIDER_NAME,
       expires: oauth?.expires ?? null,
       error: error instanceof Error ? error.message : 'Kimi Code usage request failed',

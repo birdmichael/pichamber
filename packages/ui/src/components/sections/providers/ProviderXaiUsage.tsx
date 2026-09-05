@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
  * xAI subscription allowance on the Providers card. Only mount when the
  * Grok Usage feature-plugin slot is on and this provider is connected.
  */
-export const ProviderXaiUsage: React.FC = () => {
+export const ProviderXaiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();
   const payload = useXaiUsageStore((state) => state.payload);
   const error = useXaiUsageStore((state) => state.error);
@@ -22,8 +22,8 @@ export const ProviderXaiUsage: React.FC = () => {
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
 
   React.useEffect(() => {
-    void fetchUsage();
-  }, [fetchUsage]);
+    void fetchUsage(providerId);
+  }, [fetchUsage, providerId]);
 
   const windows = payload?.usage?.windows ?? {};
   const rows = Object.entries(windows);
@@ -48,7 +48,7 @@ export const ProviderXaiUsage: React.FC = () => {
           size="icon"
           variant="ghost"
           className="size-7 shrink-0 text-muted-foreground"
-          onClick={() => void fetchUsage()}
+          onClick={() => void fetchUsage(providerId)}
           aria-label={t('settings.usage.sidebar.actions.refreshAria')}
           title={t('settings.usage.sidebar.actions.refreshTitle')}
           disabled={isLoading}

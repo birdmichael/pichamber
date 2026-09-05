@@ -59,6 +59,17 @@ describe('createPiXaiOAuthController', () => {
     await expect(oauth.authorize('openai')).rejects.toThrow(/not supported/);
   });
 
+  it('authorizes a second Grok subscription id', async () => {
+    const oauth = createPiXaiOAuthController({
+      loadXaiOAuth: async () => ({ login: deviceLogin }),
+    });
+    const authorization = await oauth.authorize('xai-2');
+    expect(authorization.userCode).toBe('ABCD-1234');
+    const credential = await oauth.complete('xai-2');
+    expect(credential.access).toBe('access-secret');
+    await expect(oauth.complete('xai')).rejects.toThrow(/No pending|not supported/);
+  });
+
   it('loads the bundled Pi xAI helper when the package subpath is unpublished', async () => {
     await expect(refreshPiXaiOAuth({ refresh: '' })).rejects.toThrow(/refresh token is missing/);
   });
