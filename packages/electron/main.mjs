@@ -49,6 +49,12 @@ import { attachModKHelpSequenceFallback } from './mod-k-help-sequence.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
 import { attachRendererRecovery } from './renderer-recovery.mjs';
+import {
+  applyChromiumCommandLineSwitches,
+  probeLinuxShmAvailability,
+  relaunchWithLinuxDevShmUsageDisabled,
+  shouldWarnLowLinuxShm,
+} from './chromium-flags.mjs';
 import { decodeDesktopImagePayload } from './save-image-payload.mjs';
 import { normalizeSaveDialogFilters, resolveSaveDialogWritePath } from './save-text-file.mjs';
 import { registerSystemPowerMonitorListeners } from './system-power-events.mjs';
@@ -129,6 +135,12 @@ if (isDev) {
 }
 app.setAppUserModelId(APP_USER_MODEL_ID);
 app.commandLine.appendSwitch('proxy-bypass-list', '<-loopback>');
+// Linux: avoid Chromium shared-memory crashes on tiny /dev/shm (Docker/CI).
+// appendSwitch alone is too late for discardable-memory init, so also re-exec
+// once with --disable-dev-shm-usage on argv when a direct/packaged launch omitted
+// it. electron:dev already passes the flag on argv and skips the relaunch.
+applyChromiumCommandLineSwitches(app.commandLine);
+relaunchWithLinuxDevShmUsageDisabled(); // exits this process when a child is spawned
 // Lift Chromium's per-host cap only for bundled UI. Applying this to Vite HMR
 // lets the renderer request most of the module graph at once, overwhelming the
 // dev server's transform pipeline and leaving the HTML splash visible for up
@@ -5952,6 +5964,17 @@ app.whenReady().then(async () => {
     isBackgroundStart,
     loginItemSettings,
   });
+
+  const shmAvailability = probeLinuxShmAvailability();
+  if (shmAvailability && shouldWarnLowLinuxShm(shmAvailability)) {
+    log.warn('[electron] low /dev/shm free space; Chromium shared memory may crash renderers', {
+      path: shmAvailability.path,
+      freeBytes: shmAvailability.freeBytes,
+      totalBytes: shmAvailability.totalBytes,
+      mitigation: 'disable-dev-shm-usage',
+    });
+  }
+
   nativeTheme.themeSource = readThemeSource();
   applyDevDockIcon();
   registerPackagedUiProtocol();

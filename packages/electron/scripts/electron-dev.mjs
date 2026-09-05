@@ -223,6 +223,8 @@ async function main() {
     });
   }
 
+  // --disable-dev-shm-usage is also applied in main.mjs for packaged/direct launches;
+  // keep it on argv so Chromium sees it before any renderer starts in electron:dev.
   const electron = spawnProcess('npx', ['electron', './main.mjs', '--disable-dev-shm-usage', '--disable-gpu'], {
     cwd: electronDir,
     env: {

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed
+- Desktop Linux: re-exec with Chromium `--disable-dev-shm-usage` when argv omitted it (appendSwitch alone is too late), so tiny `/dev/shm` no longer SIGTRAP-crashes renderers when opening Mini Chat, Settings, or selecting sessions; recovery reloads now back off instead of stampeding dynamic imports (#572, #576).
 - Desktop menu actions no longer double-fire through IPC+DOM, restoring Command Palette, right sidebar, and Files accelerators (#556, #559, #560, #562, #563).
 - Ctrl+K then H opens Keyboard Shortcuts from the composer: leaders arm in capture, nested CodeMirror targets stay one chord, bare completion letters match Shift+H, and Electron main-process before-input falls back when the leader never reaches the renderer (#561).
 - Esc closes Settings without treating unrelated dialogs as nested, and dismisses the header session switcher / actions menu (#511, #558).
