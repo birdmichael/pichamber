@@ -23,6 +23,8 @@ Desktop waits for `/health` `kernelReady` / `piRunning` after the in-process ser
 | `main.mjs` | Electron main process, app lifecycle, windows, menus, deep links, native IPC handlers, updates, local server startup |
 | `mini-chat-window-size.mjs` | Mini Chat initial size clamp to the display work area and Linux frameless maximize bounds |
 | `startup-url-selection.mjs` | Pure bundled/HMR startup probe and loopback connection-limit policy |
+| `chromium-flags.mjs` | Linux Chromium switches (`disable-dev-shm-usage`) so tiny `/dev/shm` does not crash renderers |
+| `renderer-recovery.mjs` | Bounded, backoff reload when a BrowserWindow renderer process exits |
 | `preload.mjs` | Safe bridge from the rendered UI to Electron IPC |
 | `ssh-manager.mjs` | SSH host import, connection lifecycle, tunnel/port forwarding helpers |
 | `scripts/electron-dev.mjs` | Desktop dev launcher with Vite HMR support |

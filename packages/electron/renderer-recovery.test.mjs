@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 
-import { attachRendererRecovery, createRendererRecoveryPolicy } from './renderer-recovery.mjs';
+import {
+  attachRendererRecovery,
+  createRendererRecoveryPolicy,
+  reloadDelayForAttempt,
+} from './renderer-recovery.mjs';
 
 const createFakeWindow = () => {
   const listeners = new Map();
@@ -27,7 +31,13 @@ const createFakeWindow = () => {
 
 const createFakeLog = () => {
   const warnings = [];
-  return { warnings, warn: (message, payload) => warnings.push({ message, payload }) };
+  const errors = [];
+  return {
+    warnings,
+    errors,
+    warn: (message, payload) => warnings.push({ message, payload }),
+    error: (message, payload) => errors.push({ message, payload }),
+  };
 };
 
 test('allows a bounded number of reloads for recoverable renderer failures', () => {
@@ -73,18 +83,33 @@ test('resets the recovery budget after the recovery window', () => {
   assert.equal(policy.shouldReload('crashed'), true);
 });
 
+test('staggers reload delays across recovery attempts', () => {
+  assert.equal(reloadDelayForAttempt(1), 250);
+  assert.equal(reloadDelayForAttempt(2), 1_000);
+  assert.equal(reloadDelayForAttempt(3), 2_500);
+  assert.equal(reloadDelayForAttempt(99), 2_500);
+
+  const policy = createRendererRecoveryPolicy(() => 1_000);
+  assert.deepEqual(policy.decide('crashed'), { reload: true, attempt: 1, delayMs: 250 });
+  assert.deepEqual(policy.decide('crashed'), { reload: true, attempt: 2, delayMs: 1_000 });
+  assert.deepEqual(policy.decide('crashed'), { reload: true, attempt: 3, delayMs: 2_500 });
+  assert.deepEqual(policy.decide('crashed'), { reload: false, reason: 'budget-exhausted' });
+});
+
 test('reloads the attached window after a recoverable renderer failure', async () => {
   const browserWindow = createFakeWindow();
   const log = createFakeLog();
   attachRendererRecovery(browserWindow, { log, label: 'mini chat' });
 
   browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
-  await setTimeout(150);
+  await setTimeout(350);
 
   assert.equal(browserWindow.state.reloads, 1);
   assert.equal(log.warnings.length, 1);
   assert.equal(log.warnings[0].payload.surface, 'mini chat');
   assert.equal(log.warnings[0].payload.label, 'main');
+  assert.equal(log.warnings[0].payload.attempt, 1);
+  assert.equal(log.warnings[0].payload.delayMs, 250);
 });
 
 test('skips the reload when the window is gone or the exit is not recoverable', async () => {
@@ -94,7 +119,23 @@ test('skips the reload when the window is gone or the exit is not recoverable', 
   browserWindow.emit('render-process-gone', { reason: 'clean-exit', exitCode: 0 });
   browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
   browserWindow.destroy();
-  await setTimeout(150);
+  await setTimeout(350);
 
   assert.equal(browserWindow.state.reloads, 0);
+});
+
+test('logs when the recovery budget is exhausted', async () => {
+  const browserWindow = createFakeWindow();
+  const log = createFakeLog();
+  attachRendererRecovery(browserWindow, { log, label: 'window' });
+
+  browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
+  browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
+  browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
+  browserWindow.emit('render-process-gone', { reason: 'crashed', exitCode: 5 });
+  await setTimeout(3_000);
+
+  assert.equal(browserWindow.state.reloads, 3);
+  assert.equal(log.errors.length, 1);
+  assert.match(log.errors[0].message, /recovery budget exhausted/);
 });

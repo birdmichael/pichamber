@@ -1,10 +1,12 @@
+import { importWithChunkRecovery } from '@/lib/chunkLoadRecovery';
+
 type MarkdownRendererModule = typeof import('./MarkdownRendererImpl');
 
 let markdownRendererModulePromise: Promise<MarkdownRendererModule> | null = null;
 let markdownRendererModule: MarkdownRendererModule | null = null;
 
 export const loadMarkdownRendererModule = () => {
-  markdownRendererModulePromise ??= import('./MarkdownRendererImpl')
+  markdownRendererModulePromise ??= importWithChunkRecovery(() => import('./MarkdownRendererImpl'))
     .then((module) => {
       markdownRendererModule = module;
       return module;
