@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file.
 - Files Alt+G opens the Line field in edit mode even when Linux Alt moves focus off CodeMirror or the composer CodeMirror is focused; menu Go to Line still invokes once (#503, #563).
 
 - Settings: you can add a second Grok or Kimi Code login without overwriting the first, and set a display name on each. Work Status and Providers show usage for each of those logins.
-- Settings: Feature Plugins → Kimi Usage has International / China for the Kimi API key host. You do not type a URL.
+- Settings: Feature Plugins → Kimi Usage and Providers Add/edit Kimi offer International / China per Kimi row (api.kimi.com/coding vs api.moonshot.cn/v1). You do not type a URL.
 
 ## [1.2.12] - 2026-09-04
 

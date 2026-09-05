@@ -412,7 +412,8 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
       return;
     }
     const region = typeof req.body?.region === 'string' ? req.body.region : '';
-    json(res, 200, host.setKimiRegion(region));
+    const providerId = typeof req.body?.providerId === 'string' ? req.body.providerId : undefined;
+    json(res, 200, host.setKimiRegion(region, { providerId }));
   }));
 
   app.post('/api/pi/subscription-clones', parseJson, handle(async (req, res) => {

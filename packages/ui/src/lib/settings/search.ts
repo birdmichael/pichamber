@@ -981,7 +981,7 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'feature-plugins',
     titleKey: 'settings.featurePlugins.slot.kimi.region.label',
     descriptionKey: 'settings.featurePlugins.slot.kimi.region.info',
-    keywords: ['kimi', 'region', 'china', 'international', 'moonshot', 'api', '国内', '国际'],
+    keywords: ['kimi', 'region', 'china', 'international', 'kimi.com', 'moonshot', 'api', '国内', '国际'],
     isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
@@ -1021,6 +1021,22 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     page: 'providers',
     titleKey: 'settings.providers.page.auth.title',
     keywords: ['api key', 'oauth', 'credentials'],
+  },
+  {
+    id: 'providers.subscription-display-name',
+    page: 'providers',
+    titleKey: 'settings.providers.page.subscription.displayName.label',
+    descriptionKey: 'settings.providers.page.subscription.displayName.info',
+    keywords: ['display name', 'rename', 'grok', 'kimi', 'subscription'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
+  },
+  {
+    id: 'providers.subscription-kimi-region',
+    page: 'providers',
+    titleKey: 'settings.providers.page.subscription.region.label',
+    descriptionKey: 'settings.providers.page.subscription.region.info',
+    keywords: ['kimi', 'region', 'china', 'international', '国内', '国际', 'moonshot'],
+    isAvailable: (ctx) => Boolean(ctx.isPiKernel),
   },
   {
     id: 'providers.connection-details',

@@ -1,14 +1,16 @@
 import {
-  KIMI_CODE_BASE_URL,
   KIMI_CODING_PROVIDER_ID,
   XAI_BASE_URL,
   XAI_PROVIDER_ID,
+  isKimiSubscriptionId,
+  kimiApiForRegion,
   kimiBaseUrlForRegion,
   listStoredProviderIds,
   mergePiProviderOverlay,
   nextSubscriptionCloneId,
   readKimiRegion,
   subscriptionFamilyOf,
+  writeKimiRegion,
 } from './pi-resources.js';
 import { isDualAuthApiSiblingId, loadDualAuthApiModels, dualAuthSpecFor } from './pi-dual-auth.js';
 
@@ -38,13 +40,14 @@ const serializeRuntimeModels = (models) => {
   return next;
 };
 
-const familySeed = (family) => {
+const familySeed = (family, region = 'international') => {
   if (family === KIMI_CODING_PROVIDER_ID) {
+    const resolvedRegion = region === 'domestic' ? 'domestic' : 'international';
     const spec = dualAuthSpecFor(KIMI_CODING_PROVIDER_ID);
     return {
       name: 'Kimi Code',
-      baseUrl: KIMI_CODE_BASE_URL,
-      api: 'anthropic-messages',
+      baseUrl: kimiBaseUrlForRegion(resolvedRegion),
+      api: kimiApiForRegion(resolvedRegion),
       models: spec ? loadDualAuthApiModels(spec) : [],
     };
   }
@@ -118,6 +121,7 @@ export const createSubscriptionClone = ({
   home,
   family,
   displayName,
+  region,
   runtime,
 } = {}) => {
   const resolvedFamily = subscriptionFamilyOf(family) === family ? family : null;
@@ -134,8 +138,13 @@ export const createSubscriptionClone = ({
     throw error;
   }
   const providerId = nextSubscriptionCloneId(resolvedFamily, existing);
-  const seed = familySeed(resolvedFamily);
-  const models = modelsFromRuntime(runtime, resolvedFamily);
+  const resolvedRegion = resolvedFamily === KIMI_CODING_PROVIDER_ID
+    ? (region === 'domestic' || region === 'international' ? region : readKimiRegion(home))
+    : 'international';
+  const seed = familySeed(resolvedFamily, resolvedRegion);
+  const models = resolvedRegion === 'domestic'
+    ? seed.models
+    : modelsFromRuntime(runtime, resolvedFamily);
   const name = typeof displayName === 'string' && displayName.trim()
     ? displayName.trim()
     : `${seed.name} ${providerId.slice(resolvedFamily.length + 1)}`;
@@ -159,6 +168,7 @@ export const createSubscriptionClone = ({
     providerId,
     family: resolvedFamily,
     name,
+    region: resolvedFamily === KIMI_CODING_PROVIDER_ID ? resolvedRegion : undefined,
     baseUrl: seed.baseUrl,
     config: overlay.config,
   };
@@ -172,27 +182,46 @@ export const patchSubscriptionClone = ({
 } = {}) => {
   const id = typeof providerId === 'string' ? providerId.trim() : '';
   const family = subscriptionFamilyOf(id);
-  if (!family && id !== 'kimi-coding-api') {
+  if (!family) {
     const error = new Error('Not an official Grok or Kimi subscription');
     error.status = 400;
     throw error;
   }
-  const overlay = {};
-  if (typeof displayName === 'string' && displayName.trim()) {
-    overlay.name = displayName.trim();
-  }
-  if (id === 'kimi-coding-api' && (region === 'domestic' || region === 'international')) {
-    overlay.baseUrl = kimiBaseUrlForRegion(region);
-  }
-  if (Object.keys(overlay).length === 0) {
+  const hasRegion = region === 'domestic' || region === 'international';
+  const hasName = typeof displayName === 'string' && Boolean(displayName.trim());
+  if (!hasRegion && !hasName) {
     const error = new Error('displayName or region is required');
     error.status = 400;
     throw error;
   }
-  if (overlay.name && !overlay.baseUrl) {
-    overlay.baseUrl = family === XAI_PROVIDER_ID
-      ? XAI_BASE_URL
-      : (id === 'kimi-coding-api' ? kimiBaseUrlForRegion(readKimiRegion(home)) : familySeed(KIMI_CODING_PROVIDER_ID).baseUrl);
+  if (hasRegion) {
+    if (!isKimiSubscriptionId(id)) {
+      const error = new Error('Region applies only to Kimi subscriptions');
+      error.status = 400;
+      throw error;
+    }
+    const regionResult = writeKimiRegion(home, region, { providerId: id });
+    if (hasName) {
+      return mergePiProviderOverlay({
+        home,
+        providerId: id,
+        overlay: {
+          name: displayName.trim(),
+          baseUrl: regionResult.baseUrl,
+          api: regionResult.api,
+        },
+      });
+    }
+    return {
+      providerId: id,
+      config: regionResult.config,
+      region: regionResult.region,
+      baseUrl: regionResult.baseUrl,
+    };
+  }
+  const overlay = { name: displayName.trim() };
+  if (family === XAI_PROVIDER_ID) {
+    overlay.baseUrl = XAI_BASE_URL;
   }
   return mergePiProviderOverlay({ home, providerId: id, overlay });
 };

@@ -35,7 +35,7 @@ import {
   resolvePiAgentDir,
   resolvePiAuthPath,
   resolvePiModelsPath,
-  readKimiRegion,
+  listKimiProviderRegions,
   writeKimiRegion,
   isKimiSubscriptionId,
 } from './pi-resources.js';
@@ -3664,6 +3664,7 @@ export const createPiHost = ({
         home,
         family: body.family,
         displayName: body.displayName,
+        region: body.region,
         runtime: modelRuntime,
       });
       invalidateModelRuntime();
@@ -3680,10 +3681,15 @@ export const createPiHost = ({
       return result;
     },
     getKimiRegion() {
-      return { region: readKimiRegion(home) };
+      const rows = listKimiProviderRegions(home);
+      return {
+        rows,
+        // Convenience when only one Kimi row (or none → international default).
+        region: rows[0]?.region || 'international',
+      };
     },
-    setKimiRegion(region) {
-      const result = writeKimiRegion(home, region);
+    setKimiRegion(region, { providerId } = {}) {
+      const result = writeKimiRegion(home, region, { providerId });
       invalidateModelRuntime();
       return result;
     },

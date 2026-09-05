@@ -322,12 +322,16 @@ for the new id (official base URL, copied catalog models, display name) and
 leaves the first `auth.json` key untouched. OAuth authorize/callback accept
 those clone ids and store tokens under the clone id. Dual-auth siblings
 `xai-api` / `kimi-coding-api` are not clones. Display name is `models.json`
-`name` via `PATCH /api/pi/subscription-clones/:id`. Kimi API **国际 / 国内**
-lives on Feature Plugins → Kimi Usage (`pichamber.json` `kimiRegion`) and
-sets `kimi-coding-api` `baseUrl` to `https://api.moonshot.ai/v1` or
-`https://api.moonshot.cn/v1`. `writePiDefaults` must keep `kimiRegion`.
-Usage `GET /api/pi/xai-usage?providerId=` / `kimi-usage?providerId=` reads
-that clone’s credential. Responses never echo tokens.
+`name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is
+per Kimi subscription row (Feature Plugins → Kimi Usage and Providers
+Add/edit): International → `https://api.kimi.com/coding` (anthropic-messages);
+China → `https://api.moonshot.cn/v1` (openai-completions). No typed Base URL.
+`PUT /api/pi/kimi-region` takes `{ providerId, region }`. Default preference
+may live in `pichamber.json` `kimiRegion`; `writePiDefaults` keeps it. Do not
+route this through custom-provider `/v1/models` sync (#564). Usage
+`GET /api/pi/xai-usage?providerId=` / `kimi-usage?providerId=` reads that
+clone’s credential. China-region Kimi rows do not call Moonshot usages.
+Responses never echo tokens.
 
 Product login is this built-in `/login xai`, not an npm xAI OAuth
 extension. Composer `/login` for `xai` points at Settings → Providers.
@@ -383,12 +387,12 @@ via the same `findNamedPackageDir` pattern as xAI. Callback writes
 `{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
 key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
 card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
-Feature Plugins → Kimi Usage **国际 / 国内**: `https://api.moonshot.ai/v1` or
-`https://api.moonshot.cn/v1`) instead of overwriting OAuth. Do not make the
-user type that URL. Refresh uses
-`kimiCodingOAuth.refresh`, not a copied token exchange. Responses never
-echo access, refresh, or user id. Composer `/login kimi-coding` points
-at Settings → Providers.
+Feature Plugins → Kimi Usage and Providers show **国际 / 国内** per Kimi
+row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
+of a typed Base URL. Do not invent Moonshot balance/usages for China rows;
+Code usage stays on `api.kimi.com`. Refresh uses `kimiCodingOAuth.refresh`,
+not a copied token exchange. Responses never echo access, refresh, or user
+id. Composer `/login kimi-coding` points at Settings → Providers.
 
 ## Kimi Usage (feature-plugin slot)
 

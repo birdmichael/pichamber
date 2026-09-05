@@ -14,7 +14,12 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   readKimiRegion,
+  readKimiProviderRegion,
+  listKimiProviderRegions,
   writeKimiRegion,
+  kimiBaseUrlForRegion,
+  KIMI_INTERNATIONAL_BASE_URL,
+  KIMI_DOMESTIC_BASE_URL,
   mergeBuiltinPiCatalogProviders,
   toPiProviderListPayload,
   providerHasFileSource,
@@ -463,9 +468,28 @@ description: >
     ]);
     expect(JSON.stringify(methods)).not.toContain('access-two');
     expect(readKimiRegion(home)).toBe('international');
-    expect(writeKimiRegion(home, 'domestic').baseUrl).toBe('https://api.moonshot.cn/v1');
+    expect(KIMI_INTERNATIONAL_BASE_URL).toBe('https://api.kimi.com/coding');
+    expect(kimiBaseUrlForRegion('international')).toBe('https://api.kimi.com/coding');
+    expect(kimiBaseUrlForRegion('domestic')).toBe('https://api.moonshot.cn/v1');
+    writePiProviderAuth('kimi-coding', {
+      type: 'oauth',
+      access: 'kimi-access',
+      refresh: 'kimi-refresh',
+      expires: Date.now() + 60_000,
+    }, { home });
+    const domestic = writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
+    expect(domestic.baseUrl).toBe(KIMI_DOMESTIC_BASE_URL);
+    expect(domestic.api).toBe('openai-completions');
+    expect(readKimiProviderRegion(home, 'kimi-coding')).toBe('domestic');
+    expect(listKimiProviderRegions(home)).toEqual([
+      expect.objectContaining({ providerId: 'kimi-coding', region: 'domestic', baseUrl: KIMI_DOMESTIC_BASE_URL }),
+    ]);
     writePiDefaults(home, { model: 'xai/grok-4.6' });
     expect(readKimiRegion(home)).toBe('domestic');
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(models.providers['kimi-coding'].baseUrl).toBe('https://api.moonshot.cn/v1');
+    // Dual-auth sibling host stays moonshot.ai — not rewritten by subscription region.
+    expect(models.providers['kimi-coding-api']?.baseUrl).not.toBe('https://api.moonshot.cn/v1');
   });
 
   it('hides Pi builtin catalog providers unless auth.json or models.json has them', async () => {

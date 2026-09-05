@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { SettingsPageLayout } from '@/components/sections/shared/SettingsPageLayout';
-import { SettingsSection, SettingsFieldRow, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
+import { SettingsSection, SettingsFieldRow, SettingsChipGroup, SETTINGS_CUSTOM_TRIGGER_CLASS } from '@/components/sections/shared/SettingsSection';
 import { SettingsInfoHint } from '@/components/sections/shared/SettingsInfoHint';
 import { ProviderLogo } from '@/components/ui/ProviderLogo';
 import { selectProvidersForDirectory, useConfigStore } from '@/stores/useConfigStore';
@@ -205,6 +205,7 @@ export const ProvidersPage: React.FC = () => {
   const [authLoading, setAuthLoading] = React.useState(false);
   const [apiKeyInputs, setApiKeyInputs] = React.useState<Record<string, string>>({});
   const [displayNameInputs, setDisplayNameInputs] = React.useState<Record<string, string>>({});
+  const [regionByProvider, setRegionByProvider] = React.useState<Record<string, 'international' | 'domestic'>>({});
   const [authBusyKey, setAuthBusyKey] = React.useState<string | null>(null);
   const [modelQuery, setModelQuery] = React.useState('');
   const [availableProviders, setAvailableProviders] = React.useState<ProviderOption[]>([]);
@@ -573,11 +574,16 @@ export const ProvidersPage: React.FC = () => {
       return;
     }
     const displayName = displayNameInputs[family]?.trim();
+    const region = family === 'kimi-coding' ? (regionByProvider[family] || 'international') : undefined;
     try {
       const response = await runtimeFetch('/api/pi/subscription-clones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ family, ...(displayName ? { displayName } : {}) }),
+        body: JSON.stringify({
+          family,
+          ...(displayName ? { displayName } : {}),
+          ...(region ? { region } : {}),
+        }),
       });
       const payload = await response.json().catch(() => null) as { providerId?: string } | null;
       if (!response.ok || typeof payload?.providerId !== 'string') {
@@ -611,6 +617,54 @@ export const ProvidersPage: React.FC = () => {
     } catch {
       reportSettingsSaveState('error');
       toast.error(t('settings.providers.page.subscription.displayName.failed'));
+    }
+  };
+
+  const refreshKimiRegions = React.useCallback(async () => {
+    if (!isPiKernel) return;
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => null) as {
+        rows?: Array<{ providerId?: string; region?: string }>;
+      } | null;
+      if (!Array.isArray(payload?.rows)) return;
+      const next: Record<string, 'international' | 'domestic'> = {};
+      for (const row of payload.rows) {
+        if (typeof row?.providerId !== 'string' || !row.providerId) continue;
+        next[row.providerId] = row.region === 'domestic' ? 'domestic' : 'international';
+      }
+      setRegionByProvider((prev) => ({ ...prev, ...next }));
+    } catch {
+      // Region chips stay on last known / default international.
+    }
+  }, [isPiKernel]);
+
+  React.useEffect(() => {
+    void refreshKimiRegions();
+  }, [refreshKimiRegions, providers]);
+
+  const handleSaveRegion = async (providerId: string, region: 'international' | 'domestic') => {
+    setRegionByProvider((prev) => ({ ...prev, [providerId]: region }));
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ providerId, region }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        toast.error(t('settings.providers.page.subscription.region.failed'));
+        await refreshKimiRegions();
+        return;
+      }
+      reportSettingsSaveState('saved');
+      await loadProviders({ directory: settingsDirectory, source: 'settings:subscription-region' });
+      await refreshKimiRegions();
+    } catch {
+      reportSettingsSaveState('error');
+      toast.error(t('settings.providers.page.subscription.region.failed'));
+      await refreshKimiRegions();
     }
   };
 
@@ -733,6 +787,10 @@ export const ProvidersPage: React.FC = () => {
     }
     if (!isPiKernel && requiresOpenCodeRestartAfterOAuth(providerId)) {
       recordDeferredOpenCodeRestart('providers', { id: providerId });
+    }
+    const region = isKimiSubscriptionId(providerId) ? regionByProvider[providerId] : undefined;
+    if (region === 'domestic' || region === 'international') {
+      await handleSaveRegion(providerId, region);
     }
     await loadProviders({ directory: settingsDirectory, source: 'settings:oauth-connected' });
     setSelectedProvider(dualAuthCatalogId(providerId) ?? providerId);
@@ -985,6 +1043,28 @@ export const ProvidersPage: React.FC = () => {
                               onBlur={() => void handleSaveDisplayName(candidateProviderId)}
                               placeholder={t('settings.providers.page.subscription.displayName.placeholder')}
                               className="h-8"
+                            />
+                          </SettingsFieldRow>
+                        ) : null}
+                        {isPiKernel && kimiSlotActive && isKimiSubscriptionId(candidateProviderId) ? (
+                          <SettingsFieldRow
+                            label={t('settings.providers.page.subscription.region.label')}
+                            info={t('settings.providers.page.subscription.region.info')}
+                            settingsItem="providers.subscription-kimi-region"
+                          >
+                            <SettingsChipGroup
+                              value={regionByProvider[candidateProviderId] ?? 'international'}
+                              aria-label={t('settings.providers.page.subscription.region.aria')}
+                              onChange={(value) => {
+                                setRegionByProvider((prev) => ({ ...prev, [candidateProviderId]: value }));
+                                if (connectedProviderIds.has(candidateProviderId)) {
+                                  void handleSaveRegion(candidateProviderId, value);
+                                }
+                              }}
+                              options={[
+                                { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+                                { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+                              ]}
                             />
                           </SettingsFieldRow>
                         ) : null}
@@ -1290,6 +1370,23 @@ export const ProvidersPage: React.FC = () => {
               className="h-8"
             />
           </SettingsFieldRow>
+          {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) ? (
+            <SettingsFieldRow
+              label={t('settings.providers.page.subscription.region.label')}
+              info={t('settings.providers.page.subscription.region.info')}
+              settingsItem="providers.subscription-kimi-region"
+            >
+              <SettingsChipGroup
+                value={regionByProvider[selectedProvider.id] ?? 'international'}
+                aria-label={t('settings.providers.page.subscription.region.aria')}
+                onChange={(value) => void handleSaveRegion(selectedProvider.id, value)}
+                options={[
+                  { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+                  { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+                ]}
+              />
+            </SettingsFieldRow>
+          ) : null}
         </SettingsSection>
       ) : null}
 

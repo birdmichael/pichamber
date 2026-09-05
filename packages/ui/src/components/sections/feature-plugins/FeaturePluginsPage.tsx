@@ -334,64 +334,102 @@ function FeaturePluginImpactTags({ slot }: { slot: FeaturePluginSlot }) {
 
 type KimiRegion = 'international' | 'domestic';
 
+type KimiRegionRow = {
+  providerId: string;
+  name: string;
+  region: KimiRegion;
+};
+
 function KimiRegionField({ disabled }: { disabled: boolean }) {
   const { t } = useI18n();
-  const [region, setRegion] = React.useState<KimiRegion>('international');
+  const [rows, setRows] = React.useState<KimiRegionRow[]>([]);
   const [ready, setReady] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    try {
+      const response = await runtimeFetch('/api/pi/kimi-region', { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => null) as {
+        rows?: Array<{ providerId?: string; name?: string; region?: string }>;
+        region?: string;
+      } | null;
+      const nextRows = Array.isArray(payload?.rows)
+        ? payload.rows
+          .filter((row): row is { providerId: string; name?: string; region?: string } => typeof row?.providerId === 'string' && row.providerId.length > 0)
+          .map((row) => ({
+            providerId: row.providerId,
+            name: typeof row.name === 'string' && row.name.trim() ? row.name.trim() : row.providerId,
+            region: row.region === 'domestic' ? 'domestic' as const : 'international' as const,
+          }))
+        : [];
+      setRows(nextRows);
+    } catch {
+      setRows([]);
+    } finally {
+      setReady(true);
+    }
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      try {
-        const response = await runtimeFetch('/api/pi/kimi-region', { headers: { Accept: 'application/json' } });
-        const payload = await response.json().catch(() => null) as { region?: string } | null;
-        if (cancelled) return;
-        setRegion(payload?.region === 'domestic' ? 'domestic' : 'international');
-      } catch {
-        if (!cancelled) setRegion('international');
-      } finally {
-        if (!cancelled) setReady(true);
-      }
-    };
-    void load();
+    void (async () => {
+      await load();
+      if (cancelled) return;
+    })();
     return () => { cancelled = true; };
-  }, []);
+  }, [load]);
 
-  const save = async (next: KimiRegion) => {
-    setRegion(next);
+  const save = async (providerId: string, next: KimiRegion) => {
+    setRows((prev) => prev.map((row) => (row.providerId === providerId ? { ...row, region: next } : row)));
     reportSettingsSaveState('saving');
     try {
       const response = await runtimeFetch('/api/pi/kimi-region', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ region: next }),
+        body: JSON.stringify({ providerId, region: next }),
       });
       if (!response.ok) {
         reportSettingsSaveState('error');
+        await load();
         return;
       }
       reportSettingsSaveState('saved');
     } catch {
       reportSettingsSaveState('error');
+      await load();
     }
   };
 
+  if (ready && rows.length === 0) {
+    return (
+      <p className={SETTINGS_HELPER_CLASS}>
+        {t('settings.featurePlugins.slot.kimi.region.empty')}
+      </p>
+    );
+  }
+
   return (
-    <SettingsFieldRow
-      label={t('settings.featurePlugins.slot.kimi.region.label')}
-      info={t('settings.featurePlugins.slot.kimi.region.info')}
-      settingsItem="feature-plugins.kimi.region"
-    >
-      <SettingsChipGroup
-        value={region}
-        disabled={disabled || !ready}
-        aria-label={t('settings.featurePlugins.slot.kimi.region.aria')}
-        onChange={(value) => void save(value)}
-        options={[
-          { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
-          { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
-        ]}
-      />
-    </SettingsFieldRow>
+    <div className="flex w-full flex-col gap-3">
+      {rows.map((row) => (
+        <SettingsFieldRow
+          key={row.providerId}
+          label={rows.length > 1
+            ? t('settings.featurePlugins.slot.kimi.region.rowLabel', { name: row.name })
+            : t('settings.featurePlugins.slot.kimi.region.label')}
+          info={t('settings.featurePlugins.slot.kimi.region.info')}
+          settingsItem={row.providerId === 'kimi-coding' ? 'feature-plugins.kimi.region' : undefined}
+        >
+          <SettingsChipGroup
+            value={row.region}
+            disabled={disabled || !ready}
+            aria-label={t('settings.featurePlugins.slot.kimi.region.ariaNamed', { name: row.name })}
+            onChange={(value) => void save(row.providerId, value)}
+            options={[
+              { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
+              { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+            ]}
+          />
+        </SettingsFieldRow>
+      ))}
+    </div>
   );
 }
