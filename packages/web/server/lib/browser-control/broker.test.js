@@ -178,6 +178,36 @@ describe('one request, one performer', () => {
     await expect(pending).resolves.toEqual({ clicked: true });
   });
 
+  test('does not let queue time consume the claimed request timeout', async () => {
+    let now = 0;
+    const timers = [];
+    const { broker } = createBroker({
+      overrides: {
+        setTimer: (callback, delay) => {
+          const timer = { callback, dueAt: now + delay, cleared: false };
+          timers.push(timer);
+          return timer;
+        },
+        clearTimer: (timer) => { timer.cleared = true; },
+      },
+    });
+
+    const pendingA = broker.request('browser.open', { url: 'http://a/' }, { timeoutMs: 1_000 });
+    const pendingB = broker.request('browser.click', { selector: '#b' }, { timeoutMs: 1_000 });
+    void pendingA.catch(() => undefined);
+
+    // B waits in the client's queue past its original deadline. The expired
+    // timer callback is dispatched only after the client gets to claim B.
+    now += 1_001;
+    expect(broker.claim('req-2')).toBe(true);
+    for (const timer of timers) {
+      if (!timer.cleared && timer.dueAt <= now) timer.callback();
+    }
+
+    broker.resolve('req-2', { ok: true, data: { clicked: true } });
+    await expect(pendingB).resolves.toEqual({ clicked: true });
+  });
+
   test('refuses a claim for a request that is already over', () => {
     const broker = createBrowserControlBroker({ emitRequest: () => 1, createId: () => 'req-1' });
     const pending = broker.request('browser.click', {});
