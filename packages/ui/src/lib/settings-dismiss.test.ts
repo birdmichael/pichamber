@@ -150,19 +150,62 @@ test('blocks Escape when a nested Settings dialog is open', () => {
   resetNativeFilePickerForTests();
   resetSettingsOpenedFromTriggerForTests();
   const nested = {} as Element;
+  const settingsDialog = {
+    hasAttribute: (name: string) => name === 'data-nested-dialog-open',
+    querySelector: () => null,
+    closest: () => settingsDialog,
+  };
+  const settingsView = {
+    closest: (selector: string) => (selector === '[role="dialog"]' ? settingsDialog : null),
+  };
   withDocument({
     querySelector: (selector: string) => (
-      selector.includes('[data-slot="dialog-content"]') ? nested : null
+      selector === '[data-settings-view="true"]' ? settingsView : null
     ),
   }, () => {
     expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(true);
   });
+
+  const settingsDialogWithContent = {
+    hasAttribute: () => false,
+    querySelector: (selector: string) => (
+      selector.includes('[data-slot="dialog-content"]') ? nested : null
+    ),
+    closest: () => settingsDialogWithContent,
+  };
+  const settingsViewWithContent = {
+    closest: (selector: string) => (
+      selector === '[role="dialog"]' ? settingsDialogWithContent : null
+    ),
+  };
   withDocument({
     querySelector: (selector: string) => (
-      selector.includes('[data-nested-dialog-open]') ? nested : null
+      selector === '[data-settings-view="true"]' ? settingsViewWithContent : null
     ),
   }, () => {
     expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(true);
+  });
+});
+
+test('unrelated document dialog-content does not block Settings Escape', () => {
+  resetNativeFilePickerForTests();
+  resetSettingsOpenedFromTriggerForTests();
+  const settingsDialog = {
+    hasAttribute: () => false,
+    querySelector: () => null,
+    closest: () => settingsDialog,
+  };
+  const settingsView = {
+    closest: (selector: string) => (selector === '[role="dialog"]' ? settingsDialog : null),
+  };
+  withDocument({
+    querySelector: (selector: string) => {
+      if (selector === '[data-settings-view="true"]') return settingsView;
+      if (selector.includes('[data-slot="dialog-content"]')) return {};
+      return null;
+    },
+  }, () => {
+    expect(shouldBlockSettingsDismiss(false, { reason: 'escape-key' })).toBe(false);
   });
 });
 

@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## Unreleased
+
+### Fixed
+- Desktop menu actions no longer double-fire through IPC+DOM, restoring Command Palette, right sidebar, and Files accelerators (#556, #559, #560, #561, #562, #563).
+- Esc closes Settings without treating unrelated dialogs as nested, and dismisses the header session switcher / actions menu (#511, #558).
+- Projectless New Mini Chat no longer keeps a leftover project subtitle (#555).
+- Help → Clear Cache confirms and clears HTTP cache only, without wiping projects (#557).
+- Alt+G / Files editor shortcuts keep working with single-delivery Go to Line (#503, #563).
 
 ## [1.2.12] - 2026-09-04
 

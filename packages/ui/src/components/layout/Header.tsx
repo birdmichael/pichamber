@@ -1213,6 +1213,17 @@ export const Header: React.FC<HeaderProps> = ({
     setHeaderSessionTitleDraft('');
   }, [currentSessionId]);
 
+  React.useEffect(() => {
+    if (!isHeaderSessionMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setIsHeaderSessionMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isHeaderSessionMenuOpen]);
+
   const beginHeaderSessionRename = React.useCallback(() => {
     if (!currentSessionId) return;
     setHeaderSessionTitleDraft(currentSessionTitle);

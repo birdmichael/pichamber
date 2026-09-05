@@ -380,6 +380,13 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
+      // Header session switcher uses modal={false}; Base UI may not take Esc.
+      if (state.isSessionDropdownOpen) {
+        event.preventDefault();
+        state.setSessionDropdownOpen(false);
+        resetAbortPriming();
+        return;
+      }
       const insideForeignDialog = Boolean(target?.closest('[role="dialog"]'))
         && !isInsideSettingsDialog(target);
       if (

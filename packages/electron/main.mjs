@@ -4517,12 +4517,28 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       }
       return null;
 
-    case 'desktop_clear_cache':
-      await session.defaultSession.clearStorageData();
-      for (const browserWindow of BrowserWindow.getAllWindows()) {
-        browserWindow.webContents.reload();
-      }
-      return null;
+    case 'desktop_clear_cache': {
+      // HTTP/cache only — clearStorageData() wiped localStorage (projects) and
+      // after reload looked like "Add Project Directory" (#557).
+      const target = browserWindow && !browserWindow.isDestroyed()
+        ? browserWindow
+        : BrowserWindow.getFocusedWindow();
+      const prompt = {
+        type: 'question',
+        buttons: ['Cancel', 'Clear Cache'],
+        defaultId: 1,
+        cancelId: 0,
+        title: 'Clear Cache',
+        message: 'Clear the local app HTTP cache?',
+        detail: 'Projects, settings, and sessions are kept.',
+      };
+      const { response } = target
+        ? await dialog.showMessageBox(target, prompt)
+        : await dialog.showMessageBox(prompt);
+      if (response !== 1) return { cleared: false };
+      await session.defaultSession.clearCache();
+      return { cleared: true };
+    }
 
     case 'desktop_open_path': {
       const targetPath = typeof args.path === 'string' ? args.path.trim() : '';
@@ -5168,7 +5184,7 @@ const buildMacMenu = () => {
           click: () => dispatchCheckForUpdates(),
         },
         { type: 'separator' },
-        { label: 'Settings', accelerator: 'Cmd+,', click: () => dispatchAction('settings') },
+        { label: 'Settings', accelerator: 'Cmd+,', registerAccelerator: false, click: () => dispatchMenuActionOnce('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
         // registerAccelerator:false → renderer owns Cmd+P so the native
@@ -5219,12 +5235,14 @@ const buildMacMenu = () => {
     {
       label: 'View',
       submenu: [
-        { label: 'Toggle Right Sidebar', accelerator: 'Cmd+B', click: () => dispatchAction('toggle-right-sidebar') },
-        { label: 'Open Git Sidebar', accelerator: 'Cmd+Shift+G', click: () => dispatchAction('open-right-sidebar-git') },
-        { label: 'Open Files Sidebar', accelerator: 'Cmd+Shift+F', click: () => dispatchAction('open-right-sidebar-files') },
+        // registerAccelerator:false + once delivery — openContextSurface toggles
+        // when the mode is already active, so dual IPC+DOM looked like a no-op (#556/#560).
+        { label: 'Toggle Right Sidebar', accelerator: 'Cmd+B', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-right-sidebar') },
+        { label: 'Open Git Sidebar', accelerator: 'Cmd+Shift+G', registerAccelerator: false, click: () => dispatchMenuActionOnce('open-right-sidebar-git') },
+        { label: 'Open Files Sidebar', accelerator: 'Cmd+Shift+F', registerAccelerator: false, click: () => dispatchMenuActionOnce('open-right-sidebar-files') },
         { type: 'separator' },
-        { label: 'Toggle Terminal Dock', accelerator: 'Cmd+J', click: () => dispatchAction('toggle-terminal') },
-        { label: 'Toggle Terminal Expanded', accelerator: 'Cmd+Shift+J', click: () => dispatchAction('toggle-terminal-expanded') },
+        { label: 'Toggle Terminal Dock', accelerator: 'Cmd+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal') },
+        { label: 'Toggle Terminal Expanded', accelerator: 'Cmd+Shift+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal-expanded') },
         { type: 'separator' },
         { label: 'Light Theme', click: () => dispatchAction('theme-light') },
         { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
@@ -5286,7 +5304,7 @@ const buildAutoHiddenMenu = () => {
           click: () => dispatchCheckForUpdates(),
         },
         { type: 'separator' },
-        { label: 'Settings', accelerator: 'Ctrl+,', click: () => dispatchAction('settings') },
+        { label: 'Settings', accelerator: 'Ctrl+,', registerAccelerator: false, click: () => dispatchMenuActionOnce('settings') },
         { label: 'Reload Webview', click: () => reloadMenuTargetWindow() },
         { label: 'Restart', click: () => relaunchFromMenu() },
         // registerAccelerator:false → renderer owns Ctrl+P so the native
@@ -5333,12 +5351,14 @@ const buildAutoHiddenMenu = () => {
         { role: 'forceReload' },
         { label: 'Toggle Developer Tools', accelerator: 'Ctrl+Alt+I', click: () => openDevToolsForMenuTarget() },
         { type: 'separator' },
-        { label: 'Toggle Right Sidebar', accelerator: 'Ctrl+B', click: () => dispatchAction('toggle-right-sidebar') },
-        { label: 'Open Git Sidebar', accelerator: 'Ctrl+Shift+G', click: () => dispatchAction('open-right-sidebar-git') },
-        { label: 'Open Files Sidebar', accelerator: 'Ctrl+Shift+F', click: () => dispatchAction('open-right-sidebar-files') },
+        // registerAccelerator:false + once delivery — openContextSurface toggles
+        // when the mode is already active, so dual IPC+DOM looked like a no-op (#556/#560).
+        { label: 'Toggle Right Sidebar', accelerator: 'Ctrl+B', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-right-sidebar') },
+        { label: 'Open Git Sidebar', accelerator: 'Ctrl+Shift+G', registerAccelerator: false, click: () => dispatchMenuActionOnce('open-right-sidebar-git') },
+        { label: 'Open Files Sidebar', accelerator: 'Ctrl+Shift+F', registerAccelerator: false, click: () => dispatchMenuActionOnce('open-right-sidebar-files') },
         { type: 'separator' },
-        { label: 'Toggle Terminal Dock', accelerator: 'Ctrl+J', click: () => dispatchAction('toggle-terminal') },
-        { label: 'Toggle Terminal Expanded', accelerator: 'Ctrl+Shift+J', click: () => dispatchAction('toggle-terminal-expanded') },
+        { label: 'Toggle Terminal Dock', accelerator: 'Ctrl+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal') },
+        { label: 'Toggle Terminal Expanded', accelerator: 'Ctrl+Shift+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal-expanded') },
         { type: 'separator' },
         { label: 'Light Theme', click: () => dispatchAction('theme-light') },
         { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
@@ -5368,7 +5388,7 @@ const buildAutoHiddenMenu = () => {
         { type: 'separator' },
         // registerAccelerator:false → show Alt+G but let the renderer own
         // the (customizable) files go-to-line chord.
-        { label: 'Go to Line', accelerator: 'Alt+G', registerAccelerator: false, click: () => dispatchAction('go-to-line') },
+        { label: 'Go to Line', accelerator: 'Alt+G', registerAccelerator: false, click: () => dispatchMenuActionOnce('go-to-line') },
       ],
     },
     {

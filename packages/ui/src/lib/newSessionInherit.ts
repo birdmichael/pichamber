@@ -60,13 +60,20 @@ export function resolveInheritedNewSessionDraftOptions(
   if (
     input.currentSessionId
     && currentSessionDirectory
-    && !isManagedChatDirectory(currentSessionDirectory, input.homeDirectory, openedProjectPaths)
   ) {
+    if (isManagedChatDirectory(currentSessionDirectory, input.homeDirectory, openedProjectPaths)) {
+      // Explicit projectless / chats session: do not fall back to a leftover
+      // activeProject from a previous workspace (#555).
+      return undefined;
+    }
     // Home/`~` that is not an opened Settings project is a projectless chat.
     // Do not inherit it as a project workspace even if homeDirectory is unset.
     if (directoryBelongsToOpenedProject(currentSessionDirectory, openedProjectPaths)) {
       return { directoryOverride: currentSessionDirectory };
     }
+    // Current session directory is neither managed-chat nor an opened project
+    // (e.g. arbitrary folder). Stay projectless rather than using leftover active.
+    return undefined;
   }
 
   const activeProjectId = typeof input.activeProjectId === 'string' ? input.activeProjectId.trim() : '';
