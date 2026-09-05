@@ -4,17 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### Fixed
-- Desktop Linux: re-exec with Chromium `--disable-dev-shm-usage` when argv omitted it (appendSwitch alone is too late), so tiny `/dev/shm` no longer SIGTRAP-crashes renderers when opening Mini Chat, Settings, or selecting sessions; recovery reloads now back off instead of stampeding dynamic imports (#572, #576).
-- Desktop menu actions no longer double-fire through IPC+DOM, restoring Command Palette, right sidebar, and Files accelerators (#556, #559, #560, #562, #563).
-- Ctrl+K then H opens Keyboard Shortcuts from the composer: leaders arm in capture, nested CodeMirror targets stay one chord, bare completion letters match Shift+H, and Electron main-process before-input falls back when the leader never reaches the renderer (#561).
-- Esc closes Settings without treating unrelated dialogs as nested, and dismisses the header session switcher / actions menu (#511, #558).
-- Projectless New Session / Mini Chat header chrome no longer paints leftover activeProject (`scan-proj`); Mini Chat opens projectless drafts with `target: 'chat'`, and Desktop main-process Ctrl/Cmd+K → H opens Keyboard Shortcuts when the renderer never arms the leader (#555, #561).
-- Help → Clear Cache confirms and clears HTTP cache only, without wiping projects (#557).
-- Files Alt+G opens the Line field in edit mode even when Linux Alt moves focus off CodeMirror or the composer CodeMirror is focused; menu Go to Line still invokes once (#503, #563).
+## [1.2.13] - 2026-09-06
 
-- Settings: you can add a second Grok or Kimi Code login without overwriting the first, and set a display name on each. Work Status and Providers show usage for each of those logins.
-- Settings: Feature Plugins → Kimi Usage and Providers Add/edit Kimi offer International / China per Kimi row (api.kimi.com/coding vs api.moonshot.cn/v1). You do not type a URL.
+### Fixed
+- Provider authentication failures now stay visible as an error card instead of being hidden by an empty turn (#566).
+- Desktop open flows no longer double-fire menus or mishandle Esc, Mini Chat, Clear Cache, and related actions (#567).
+- Linux Desktop avoids renderer SIGTRAP crashes on tiny `/dev/shm` by disabling shared-memory usage (#579).
+- Project sessions now populate the Files tree, and Esc exits the expanded composer reliably (#583).
+- Browser agent click/scroll actions are serialized with claim timers to prevent races (#588).
+
+### Added
+- Custom providers automatically sync their `/v1/models` catalog into `models.json` (#569).
+- Settings support dual Grok/Kimi subscriptions, with a China/International choice per Kimi row (#571).
+- Browser address history now provides suggestions while entering a URL (#588).
 
 ## [1.2.12] - 2026-09-04
 
