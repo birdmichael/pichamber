@@ -8,6 +8,7 @@ import {
 import {
   KIMI_CODING_PROVIDER_ID,
   isKimiSubscriptionId,
+  listPiProviderPublicConfigs,
   resolvePiAuthPath,
   writePiProviderAuth,
 } from './pi-resources.js';
@@ -20,6 +21,16 @@ const REFRESH_SKEW_MS = 5 * 60 * 1000;
 const FIVE_HOUR_SECONDS = 5 * 60 * 60;
 const WEEKLY_SECONDS = 7 * 24 * 60 * 60;
 const PROVIDER_NAME = 'Kimi Code';
+
+const readProviderDisplayName = (home, providerId) => {
+  try {
+    const name = listPiProviderPublicConfigs({ home })[providerId]?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  } catch {
+    // Overlay is optional; fall back to the catalog name.
+  }
+  return PROVIDER_NAME;
+};
 
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -357,7 +368,7 @@ export const getPiKimiUsage = async ({
       configured: true,
       slotActive: true,
       providerId: usageProviderId,
-      providerName: PROVIDER_NAME,
+      providerName: readProviderDisplayName(home, usageProviderId),
       expires: oauth?.expires ?? null,
       usage: { windows },
       ...(membershipLevel ? { membershipLevel } : {}),
@@ -369,7 +380,7 @@ export const getPiKimiUsage = async ({
       configured: true,
       slotActive: true,
       providerId: usageProviderId,
-      providerName: PROVIDER_NAME,
+      providerName: readProviderDisplayName(home, usageProviderId),
       expires: oauth?.expires ?? null,
       error: error instanceof Error ? error.message : 'Kimi Code usage request failed',
       usage: null,

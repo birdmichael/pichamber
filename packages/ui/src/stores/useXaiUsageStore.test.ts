@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 let runtimeFetchImpl: () => Promise<Response> = async () => new Response('{}', { status: 500 });
 let fetchCalls = 0;
 
+let lastFetchUrl = '';
+
 mock.module('@/lib/runtime-fetch', () => ({
-  runtimeFetch: async () => {
+  runtimeFetch: async (url: string) => {
     fetchCalls += 1;
+    lastFetchUrl = url;
     return runtimeFetchImpl();
   },
 }));
@@ -34,6 +37,7 @@ const okPayload = {
 describe('useXaiUsageStore', () => {
   beforeEach(() => {
     fetchCalls = 0;
+    lastFetchUrl = '';
     runtimeFetchImpl = async () => new Response('{}', { status: 500 });
     useXaiUsageStore.getState().reset();
   });
@@ -91,5 +95,19 @@ describe('useXaiUsageStore', () => {
     expect(useXaiUsageStore.getState().payload).toBeNull();
     expect(useXaiUsageStore.getState().error).toBeNull();
     expect(useXaiUsageStore.getState().isLoading).toBe(false);
+  });
+
+  test('fetching a clone does not replace the primary xai snapshot', async () => {
+    runtimeFetchImpl = async () => new Response(JSON.stringify({
+      ...okPayload,
+      providerId: lastFetchUrl.includes('xai-2') ? 'xai-2' : 'xai',
+      providerName: lastFetchUrl.includes('xai-2') ? 'Work' : 'xAI',
+    }), { headers: { 'Content-Type': 'application/json' } });
+
+    await useXaiUsageStore.getState().fetchUsage();
+    expect(useXaiUsageStore.getState().payload?.providerId ?? 'xai').toBe('xai');
+    await useXaiUsageStore.getState().fetchUsage('xai-2');
+    expect(useXaiUsageStore.getState().payload?.providerName).toBe('xAI');
+    expect(useXaiUsageStore.getState().byId['xai-2']?.payload?.providerName).toBe('Work');
   });
 });

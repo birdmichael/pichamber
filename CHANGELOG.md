@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Settings: you can add a second Grok or Kimi Code login without overwriting the first, and set a display name on each.
+- Settings: you can add a second Grok or Kimi Code login without overwriting the first, and set a display name on each. Work Status and Providers show usage for each of those logins.
 - Settings: Feature Plugins → Kimi Usage has International / China for the Kimi API key host. You do not type a URL.
 
 ## [1.2.12] - 2026-09-04

@@ -16,15 +16,16 @@ import { cn } from '@/lib/utils';
  */
 export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();
-  const payload = useKimiUsageStore((state) => state.payload);
-  const error = useKimiUsageStore((state) => state.error);
-  const isLoading = useKimiUsageStore((state) => state.isLoading);
+  const usageId = providerId?.trim() || 'kimi-coding';
+  const payload = useKimiUsageStore((state) => state.byId[usageId]?.payload ?? (usageId === 'kimi-coding' ? state.payload : null));
+  const error = useKimiUsageStore((state) => state.byId[usageId]?.error ?? (usageId === 'kimi-coding' ? state.error : null));
+  const isLoading = useKimiUsageStore((state) => state.byId[usageId]?.isLoading ?? false);
   const fetchUsage = useKimiUsageStore((state) => state.fetchUsage);
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
 
   React.useEffect(() => {
-    void fetchUsage(providerId);
-  }, [fetchUsage, providerId]);
+    void fetchUsage(usageId);
+  }, [fetchUsage, usageId]);
 
   const windows = payload?.usage?.windows ?? {};
   const rows = Object.entries(windows);
@@ -56,7 +57,7 @@ export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerI
           size="icon"
           variant="ghost"
           className="size-7 shrink-0 text-muted-foreground"
-          onClick={() => void fetchUsage(providerId)}
+          onClick={() => void fetchUsage(usageId)}
           aria-label={t('settings.usage.sidebar.actions.refreshAria')}
           title={t('settings.usage.sidebar.actions.refreshTitle')}
           disabled={isLoading}

@@ -8,6 +8,7 @@ import {
 import {
   XAI_PROVIDER_ID,
   isXaiSubscriptionId,
+  listPiProviderPublicConfigs,
   resolvePiAuthPath,
   writePiProviderAuth,
 } from './pi-resources.js';
@@ -286,6 +287,16 @@ const withTimeout = async (work, timeoutMs = USAGE_TIMEOUT_MS) => {
   }
 };
 
+const readProviderDisplayName = (home, providerId) => {
+  try {
+    const name = listPiProviderPublicConfigs({ home })[providerId]?.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+  } catch {
+    // Overlay is optional; fall back to the catalog name.
+  }
+  return 'xAI';
+};
+
 const persistRefreshedOauth = (credential, home, providerId = XAI_PROVIDER_ID) => {
   try {
     writePiProviderAuth(providerId, credential, { home });
@@ -367,7 +378,7 @@ export const getPiXaiUsage = async ({
       configured: true,
       slotActive: true,
       providerId: usageProviderId,
-      providerName: 'xAI',
+      providerName: readProviderDisplayName(home, usageProviderId),
       expires: oauth.expires,
       usage: { windows },
       fetchedAt: Date.now(),
@@ -378,7 +389,7 @@ export const getPiXaiUsage = async ({
       configured: true,
       slotActive: true,
       providerId: usageProviderId,
-      providerName: 'xAI',
+      providerName: readProviderDisplayName(home, usageProviderId),
       expires: oauth.expires,
       error: error instanceof Error ? error.message : 'xAI usage request failed',
       usage: null,
