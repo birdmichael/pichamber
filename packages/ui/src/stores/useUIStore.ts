@@ -1422,6 +1422,11 @@ export const useUIStore = create<UIStore>()(
             // later tab in insertion order.
             const mostRecent = tabsOfMode.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best));
             state.setActiveContextPanelTab(normalizedDirectory, mostRecent.id);
+            // Opening Files must show the tree even if the user previously hid
+            // the editor side column (#578).
+            if (mode === 'file' && !state.contextEditorTreeVisible) {
+              set({ contextEditorTreeVisible: true });
+            }
             return;
           }
 
@@ -1433,6 +1438,9 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
+          if (mode === 'file' && !state.contextEditorTreeVisible) {
+            set({ contextEditorTreeVisible: true });
+          }
           state.openContextPanelTab(normalizedDirectory, { mode });
         },
 

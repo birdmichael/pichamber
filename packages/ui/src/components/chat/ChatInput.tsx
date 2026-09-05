@@ -67,6 +67,7 @@ import { focusDesktopWindow, isDesktopShell, isVSCodeRuntime, requestFilesAccess
 import { useTabletLayout } from '@/lib/device';
 import { useHardwareKeyboard } from '@/lib/hardwareKeyboard';
 import { isIMECompositionEvent } from '@/lib/ime';
+import { shouldCollapseExpandedInputOnEscape } from '@/lib/composer/expandedInputEscape';
 import { getCycledPrimaryAgentName, type MobileControlsPanel } from './mobileControlsUtils';
 import { MobileOverlayPanel } from '@/components/ui/MobileOverlayPanel';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
@@ -1797,8 +1798,14 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
             }
         }
 
-        if (isDesktopExpanded && e.key === 'Escape') {
+        if (shouldCollapseExpandedInputOnEscape({
+            key: e.key,
+            isExpandedInput: isDesktopExpanded,
+            autocompleteOpen: openAutocomplete !== null,
+            inputMode,
+        })) {
             e.preventDefault();
+            e.stopPropagation();
             setExpandedInput(false);
             return;
         }
@@ -2997,6 +3004,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         <>
         <form
             ref={composerFormRef}
+            data-composer-shell={inputMode === 'shell' ? 'true' : undefined}
             onSubmit={(e) => { e.preventDefault(); handlePrimaryAction(); }}
             className={cn(
                 "relative w-full pt-0 pb-4",

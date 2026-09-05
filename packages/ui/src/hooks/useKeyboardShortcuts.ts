@@ -43,6 +43,7 @@ import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus'
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
+import { shouldCollapseExpandedInputOnEscape } from '@/lib/composer/expandedInputEscape';
 import { isInsideSettingsDialog, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
@@ -258,8 +259,9 @@ export const useKeyboardShortcuts = () => {
     },
     toggle_right_sidebar: () => {
       const state = useUIStore.getState();
-      if (state.isMobile || !currentDirectory) return false;
-      const directory = normalizeContextPanelDirectoryKey(currentDirectory);
+      const directoryRaw = panelDirectoryKey || currentDirectory;
+      if (state.isMobile || !directoryRaw) return false;
+      const directory = normalizeContextPanelDirectoryKey(directoryRaw);
       const panelState = state.contextPanelByDirectory[directory];
       if (panelState?.isOpen) {
         state.closeContextPanel(directory);
@@ -271,13 +273,15 @@ export const useKeyboardShortcuts = () => {
     },
     open_right_sidebar_git: () => {
       const state = useUIStore.getState();
-      if (state.isMobile || !currentDirectory) return false;
-      state.openContextSurface(normalizeContextPanelDirectoryKey(currentDirectory), 'git');
+      const directoryRaw = panelDirectoryKey || currentDirectory;
+      if (state.isMobile || !directoryRaw) return false;
+      state.openContextSurface(normalizeContextPanelDirectoryKey(directoryRaw), 'git');
     },
     open_right_sidebar_files: () => {
       const state = useUIStore.getState();
-      if (state.isMobile || !currentDirectory) return false;
-      state.openContextSurface(normalizeContextPanelDirectoryKey(currentDirectory), 'file');
+      const directoryRaw = panelDirectoryKey || currentDirectory;
+      if (state.isMobile || !directoryRaw) return false;
+      state.openContextSurface(normalizeContextPanelDirectoryKey(directoryRaw), 'file');
     },
     open_model_selector: () => {
       const state = useUIStore.getState();
@@ -415,6 +419,21 @@ export const useKeyboardShortcuts = () => {
         return;
       }
       if (document.querySelector('[data-settings-view="true"]')) {
+        resetAbortPriming();
+        return;
+      }
+      // Desktop focus mode: Esc exits expand before abort-priming (#574).
+      // Yield when a composer autocomplete popup is open (ChatInput closes it).
+      if (shouldCollapseExpandedInputOnEscape({
+        key: event.key,
+        isExpandedInput: state.isExpandedInput,
+        isMobile: state.isMobile,
+        autocompleteOpen: Boolean(document.querySelector('[data-composer-autocomplete="true"]')),
+        inputMode: document.querySelector('[data-composer-shell="true"]') ? 'shell' : 'normal',
+      })) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.setExpandedInput(false);
         resetAbortPriming();
         return;
       }

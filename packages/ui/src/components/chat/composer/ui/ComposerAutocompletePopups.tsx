@@ -79,47 +79,59 @@ export function ComposerAutocompletePopups(props: ComposerAutocompletePopupsProp
 
     const style = caretStyle(open, overlayPosition);
 
-    switch (open) {
-        case 'command':
-            return (
-                <CommandAutocomplete
-                    ref={props.commandRef}
-                    searchQuery={query}
-                    onCommandSelect={props.onCommandSelect}
-                    onClose={onClose}
-                    style={style}
-                />
-            );
-        case 'skill':
-            return (
-                <SkillAutocomplete
-                    ref={props.skillRef}
-                    searchQuery={query}
-                    onSkillSelect={props.onSkillSelect}
-                    onClose={onClose}
-                    style={style}
-                />
-            );
-        case 'snippet':
-            return (
-                <SnippetAutocomplete
-                    ref={props.snippetRef}
-                    searchQuery={query}
-                    onSnippetSelect={props.onSnippetSelect}
-                    onClose={onClose}
-                    style={style}
-                />
-            );
-        case 'mention':
-            return (
-                <FileMentionAutocomplete
-                    ref={props.mentionRef}
-                    searchQuery={query}
-                    onFileSelect={props.onFileSelect}
-                    onAgentSelect={props.onAgentSelect}
-                    onClose={onClose}
-                    style={style}
-                />
-            );
-    }
+    // Marker for Esc focus-mode collapse to yield while a picker is open (#574).
+    const popup = (() => {
+        switch (open) {
+            case 'command':
+                return (
+                    <CommandAutocomplete
+                        ref={props.commandRef}
+                        searchQuery={query}
+                        onCommandSelect={props.onCommandSelect}
+                        onClose={onClose}
+                        style={style}
+                    />
+                );
+            case 'skill':
+                return (
+                    <SkillAutocomplete
+                        ref={props.skillRef}
+                        searchQuery={query}
+                        onSkillSelect={props.onSkillSelect}
+                        onClose={onClose}
+                        style={style}
+                    />
+                );
+            case 'snippet':
+                return (
+                    <SnippetAutocomplete
+                        ref={props.snippetRef}
+                        searchQuery={query}
+                        onSnippetSelect={props.onSnippetSelect}
+                        onClose={onClose}
+                        style={style}
+                    />
+                );
+            case 'mention':
+                return (
+                    <FileMentionAutocomplete
+                        ref={props.mentionRef}
+                        searchQuery={query}
+                        onFileSelect={props.onFileSelect}
+                        onAgentSelect={props.onAgentSelect}
+                        onClose={onClose}
+                        style={style}
+                    />
+                );
+            default:
+                return null;
+        }
+    })();
+
+    if (!popup) return null;
+    return (
+        <div data-composer-autocomplete="true">
+            {popup}
+        </div>
+    );
 }

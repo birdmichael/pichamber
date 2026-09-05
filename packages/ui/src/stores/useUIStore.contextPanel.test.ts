@@ -328,6 +328,14 @@ describe('useUIStore openContextSurface', () => {
     expect(state?.tabs.find((tab) => tab.mode === 'file')?.targetPath).toBe('/repo/a.ts');
   });
 
+
+  test('reveals the editor tree when opening Files with the tree previously hidden', () => {
+    useUIStore.setState({ contextEditorTreeVisible: false });
+    useUIStore.getState().openContextSurface(directory, 'file');
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+    expect(useUIStore.getState().contextPanelByDirectory[directory]?.isOpen).toBe(true);
+  });
+
   test('activates the most recently touched tab of a content-driven mode', () => {
     useUIStore.getState().openContextFile(directory, '/repo/a.ts');
     useUIStore.getState().openContextFile(directory, '/repo/b.ts');
