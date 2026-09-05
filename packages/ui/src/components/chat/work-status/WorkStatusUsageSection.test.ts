@@ -52,6 +52,8 @@ describe('Pi usage groups', () => {
     expect(source).toContain("useFeaturePluginSlotActive('kimi'");
     expect(source).toContain("providerName: payload?.providerName || 'xAI'");
     expect(source).toContain("providerName: payload?.providerName || 'Kimi Code'");
+    expect(source).toContain('fetchXaiUsage(id)');
+    expect(source).toContain('fetchKimiUsage(id)');
     expect(source.indexOf("...(xaiSlotActive ? xaiGroups : [])")).toBeLessThan(
       source.indexOf("...(kimiSlotActive ? kimiGroups : [])"),
     );
@@ -74,7 +76,7 @@ describe('Pi usage groups', () => {
   });
 
   test('kimi weekly and 5h metrics use percent without valueLabel', () => {
-    expect(body).toContain("group.providerId === 'kimi-coding' ? undefined");
+    expect(body).toContain('isKimiSubscriptionId(group.providerId) ? undefined');
   });
 });
 
