@@ -56,6 +56,25 @@ interface ActiveAssistantContext {
     thinkingLevel?: string;
 }
 
+const readMessageModel = (message: Message | undefined): ActiveAssistantModel | null => {
+    const candidate = message as Message & {
+        providerID?: unknown;
+        modelID?: unknown;
+        model?: { providerID?: unknown; modelID?: unknown };
+    } | undefined;
+    const providerId = typeof candidate?.model?.providerID === "string"
+        ? candidate.model.providerID.trim()
+        : typeof candidate?.providerID === "string"
+            ? candidate.providerID.trim()
+            : "";
+    const modelId = typeof candidate?.model?.modelID === "string"
+        ? candidate.model.modelID.trim()
+        : typeof candidate?.modelID === "string"
+            ? candidate.modelID.trim()
+            : "";
+    return providerId && modelId ? { providerId, modelId } : null;
+};
+
 const DEFAULT_WORKING: WorkingSummary = {
     activity: 'idle',
     hasWorkingContext: false,
@@ -393,6 +412,31 @@ export const getActiveAssistantContext = (messages: Message[]): ActiveAssistantC
     const thinkingLevel = readActiveAssistantThinking(messages, context.assistantId);
     return thinkingLevel ? { ...context, thinkingLevel } : context;
 };
+
+/**
+ * The optimistic user message is inserted before the assistant message for a
+ * new turn. Until the first assistant event arrives, the last assistant in
+ * the transcript is therefore still the previous turn. Once that assistant
+ * is complete, the newer user model describes the in-flight request.
+ */
+export const getActiveTurnContext = (messages: Message[]): ActiveAssistantContext => {
+    const context = getActiveAssistantContext(messages);
+    const assistantIndex = context.assistantId
+        ? messages.findIndex((message) => message?.id === context.assistantId)
+        : -1;
+    const latestUser = messages
+        .slice(assistantIndex + 1)
+        .reverse()
+        .find((message) => message?.role === 'user');
+    const assistant = assistantIndex >= 0
+        ? messages[assistantIndex] as Message & { time?: { completed?: unknown } }
+        : undefined;
+    const previousTurnComplete = !assistant || (typeof assistant.time?.completed === 'number' && assistant.time.completed > 0);
+    if (!latestUser || !previousTurnComplete) return context;
+    const model = readMessageModel(latestUser) ?? context.model;
+    const thinkingLevel = readMessageThinkingLevel(latestUser);
+    return thinkingLevel ? { ...context, model, thinkingLevel } : { ...context, model };
+};
 export function useAssistantStatus(): AssistantStatusSnapshot {
     const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
     const currentSessionDirectory = useSessionUIStore((state) => state.currentSessionDirectory);
@@ -403,7 +447,7 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
     );
 
     const activeAssistant = React.useMemo(
-        () => getActiveAssistantContext(rawSessionMessages),
+        () => getActiveTurnContext(rawSessionMessages),
         [rawSessionMessages],
     );
     const lastAssistantId = activeAssistant.assistantId;
