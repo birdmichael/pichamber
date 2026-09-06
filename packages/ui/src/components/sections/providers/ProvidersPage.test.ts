@@ -43,23 +43,25 @@ describe('ProvidersPage available provider loading', () => {
     expect(parseConnectedProviderIds({ all: [{ id: 'xai' }], connected: ['xai'], default: {} })).toEqual(['xai']);
     expect(parseConnectedProviderIds([{ id: 'xai' }])).toEqual([]);
     const catalog = mergeAddCatalogProviders([{ id: 'bmlab', name: 'bmlab' }]);
-    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding']);
+    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding', 'zai']);
     expect(catalog.find((provider) => provider.id === 'xai')?.name).toBe('xAI / Grok');
     expect(catalog.find((provider) => provider.id === 'kimi-coding')?.name).toBe('Kimi Code');
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding']))).toEqual([]);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding', 'zai']))).toEqual([]);
     expect(selectAddCatalogProviders(
       [{ id: 'bmlab', name: 'bmlab' }, { id: 'xai', name: 'xai' }],
       new Set(['bmlab', 'xai']),
     )).toEqual([
       { id: 'kimi-coding', name: 'Kimi Code' },
       { id: 'xai', name: 'xAI / Grok' },
+      { id: 'zai', name: '智谱 / Z.AI' },
     ]);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], '', 'xai', true)).toBe(null);
     expect(selectSidebarProviders([
       { id: 'xai', models: {} },
+      { id: 'zai', models: {} },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ]).map((provider) => provider.id)).toEqual(['bmlab']);
     expect(selectSidebarProviders([
@@ -69,13 +71,15 @@ describe('ProvidersPage available provider loading', () => {
     expect(selectSidebarProviders([
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
       { id: 'xai', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+      { id: 'zai', models: { 'glm-4.5': { id: 'glm-4.5' } } },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ], {
       sourcesById: {
         anthropic: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
         xai: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
+        zai: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
       },
-    }).map((provider) => provider.id)).toEqual(['bmlab']);
+    }).map((provider) => provider.id)).toEqual(['zai', 'bmlab']);
     expect(selectSidebarProviders([
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
     ], {
@@ -91,7 +95,7 @@ describe('ProvidersPage available provider loading', () => {
     expect(selectAddCatalogProviders(
       [{ id: 'kimi-coding-api', name: 'Kimi Code API' }, { id: 'xai-api', name: 'xAI API' }],
       new Set(['kimi-coding', 'kimi-coding-api']),
-    ).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+    ).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
     expect(shouldAutoSelectCustomProvider(
       true,
       false,

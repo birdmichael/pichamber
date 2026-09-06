@@ -17,6 +17,13 @@ import {
   readKimiProviderRegion,
   listKimiProviderRegions,
   writeKimiRegion,
+  writeZaiRegion,
+  readZaiRegion,
+  readZaiProviderRegion,
+  listZaiProviderRegions,
+  zaiBaseUrlForRegion,
+  ZAI_INTERNATIONAL_BASE_URL,
+  ZAI_DOMESTIC_BASE_URL,
   kimiBaseUrlForRegion,
   KIMI_INTERNATIONAL_BASE_URL,
   KIMI_DOMESTIC_BASE_URL,
@@ -379,12 +386,14 @@ description: >
     expect(mergeBuiltinPiCatalogProviders([])).toEqual([
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
       { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
+      { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
     ]);
     expect(mergeBuiltinPiCatalogProviders([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
     ])).toEqual([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
       { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
+      { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
     ]);
     expect(withoutUnconnectedBuiltinCatalogProviders([
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
@@ -426,6 +435,7 @@ description: >
       all: [
         { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
         { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
+        { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
       ],
       default: {},
       connected: [],
@@ -441,6 +451,7 @@ description: >
         { id: 'xai', name: 'xAI', models: { 'grok-4.6': { id: 'grok-4.6' } } },
         { id: 'bmlab', name: 'bmlab', models: {} },
         { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
+        { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
       ],
       default: { xai: 'grok-4.6' },
       connected: ['xai'],
@@ -490,6 +501,31 @@ description: >
     expect(models.providers['kimi-coding'].baseUrl).toBe('https://api.moonshot.cn/v1');
     // Dual-auth sibling host stays moonshot.ai — not rewritten by subscription region.
     expect(models.providers['kimi-coding-api']?.baseUrl).not.toBe('https://api.moonshot.cn/v1');
+  });
+
+  it('writes Z.AI API auth and swaps the international/China catalogs', () => {
+    const home = makeTemp();
+    writePiProviderAuth('zai', { type: 'api', key: 'sk-zai-test' }, { home });
+    expect(getPiAuthMethods(home).zai).toEqual([{ type: 'api', label: 'API Key' }]);
+    expect(zaiBaseUrlForRegion('international')).toBe(ZAI_INTERNATIONAL_BASE_URL);
+    expect(zaiBaseUrlForRegion('domestic')).toBe(ZAI_DOMESTIC_BASE_URL);
+
+    const domestic = writeZaiRegion(home, 'domestic', { providerId: 'zai' });
+    expect(domestic.baseUrl).toBe(ZAI_DOMESTIC_BASE_URL);
+    expect(domestic.api).toBe('openai-completions');
+    expect(readZaiRegion(home)).toBe('domestic');
+    expect(readZaiProviderRegion(home, 'zai')).toBe('domestic');
+    expect(listZaiProviderRegions(home)).toEqual([
+      expect.objectContaining({ providerId: 'zai', region: 'domestic', baseUrl: ZAI_DOMESTIC_BASE_URL }),
+    ]);
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(models.providers.zai.baseUrl).toBe(ZAI_DOMESTIC_BASE_URL);
+    expect(models.providers.zai.models.length).toBeGreaterThan(0);
+
+    writeZaiRegion(home, 'international', { providerId: 'zai' });
+    const international = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(international.providers.zai.baseUrl).toBe(ZAI_INTERNATIONAL_BASE_URL);
+    expect(international.providers.zai.models.length).toBeGreaterThan(0);
   });
 
   it('uses the China catalog for domestic Kimi, syncs the API sibling, and remaps k3 defaults', () => {
@@ -863,7 +899,7 @@ description: >
         { id: KIMI_CODING_API_PROVIDER_ID, name: 'Kimi Code API', models: { 'kimi-k2.6': { id: 'kimi-k2.6' } } },
       ],
       default: {},
-    }).all.map((provider) => provider.id)).toEqual(['kimi-coding', 'xai']);
+    }).all.map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
   });
 
   it('writes Kimi Code OAuth without deleting an existing API sibling', () => {

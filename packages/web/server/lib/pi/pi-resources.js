@@ -11,6 +11,7 @@ import {
   isDualAuthApiSiblingId,
   isDualAuthCatalogId,
   loadDualAuthApiModels,
+  loadPiAiCatalogModels,
   KIMI_CODING_API_PROVIDER_ID,
   XAI_API_PROVIDER_ID,
 } from './pi-dual-auth.js';
@@ -337,6 +338,7 @@ const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API
 
 export const XAI_PROVIDER_ID = 'xai';
 export const KIMI_CODING_PROVIDER_ID = 'kimi-coding';
+export const ZAI_PROVIDER_ID = 'zai';
 export const XAI_BASE_URL = 'https://api.x.ai/v1';
 export const KIMI_CODE_BASE_URL = 'https://api.kimi.com/coding';
 /** International / Kimi Code host (issue #568). */
@@ -344,6 +346,9 @@ export const KIMI_INTERNATIONAL_BASE_URL = KIMI_CODE_BASE_URL;
 export const KIMI_DOMESTIC_BASE_URL = 'https://api.moonshot.cn/v1';
 export const KIMI_INTERNATIONAL_API = 'anthropic-messages';
 export const KIMI_DOMESTIC_API = 'openai-completions';
+export const ZAI_INTERNATIONAL_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
+export const ZAI_DOMESTIC_BASE_URL = 'https://open.bigmodel.cn/api/coding/paas/v4';
+export const ZAI_API = 'openai-completions';
 const XAI_OAUTH_LOGIN_LABEL = 'Sign in with SuperGrok or X Premium';
 const KIMI_OAUTH_LOGIN_LABEL = 'Sign in with Kimi Code';
 const SUBSCRIPTION_CLONE_PATTERN = /^[1-9]\d*$/;
@@ -390,6 +395,40 @@ export const kimiApiForRegion = (region) => (
 export const readKimiRegion = (home = os.homedir()) => {
   const chamber = isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {};
   return chamber.kimiRegion === 'domestic' ? 'domestic' : 'international';
+};
+
+export const zaiRegionFromBaseUrl = (baseUrl) => {
+  const url = typeof baseUrl === 'string' ? baseUrl.trim().toLowerCase() : '';
+  return url.includes('open.bigmodel.cn') ? 'domestic' : 'international';
+};
+
+export const zaiBaseUrlForRegion = (region) => (
+  region === 'domestic' ? ZAI_DOMESTIC_BASE_URL : ZAI_INTERNATIONAL_BASE_URL
+);
+
+export const readZaiRegion = (home = os.homedir()) => {
+  const chamber = isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {};
+  return chamber.zaiRegion === 'domestic' ? 'domestic' : 'international';
+};
+
+export const readZaiProviderRegion = (home = os.homedir(), providerId = ZAI_PROVIDER_ID) => {
+  const id = typeof providerId === 'string' ? providerId.trim() : '';
+  const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
+  const entry = providers[id];
+  const baseUrl = entry && typeof entry === 'object' && !Array.isArray(entry) && typeof entry.baseUrl === 'string'
+    ? entry.baseUrl
+    : '';
+  return baseUrl ? zaiRegionFromBaseUrl(baseUrl) : readZaiRegion(home);
+};
+
+export const listZaiProviderRegions = (home = os.homedir()) => {
+  const ids = listStoredProviderIds(home).filter((id) => id === ZAI_PROVIDER_ID);
+  return ids.map((id) => ({
+    providerId: id,
+    name: 'Z.AI',
+    region: readZaiProviderRegion(home, id),
+    baseUrl: zaiBaseUrlForRegion(readZaiProviderRegion(home, id)),
+  }));
 };
 
 export const readKimiProviderRegion = (home = os.homedir(), providerId) => {
@@ -453,6 +492,7 @@ const KIMI_DOMESTIC_AUTH_METHODS = [
 export const PI_BUILTIN_CATALOG_PROVIDERS = [
   { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
   { id: KIMI_CODING_PROVIDER_ID, name: 'Kimi Code', source: 'pi', env: [], models: {} },
+  { id: ZAI_PROVIDER_ID, name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
 ];
 
 const defaultBuiltinCatalogIds = () => new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
@@ -556,6 +596,7 @@ export const getPiAuthMethods = (home = os.homedir()) => {
     ...Object.keys(providers),
     XAI_PROVIDER_ID,
     KIMI_CODING_PROVIDER_ID,
+    ZAI_PROVIDER_ID,
   ]);
   const result = {};
   for (const id of ids) {
@@ -563,6 +604,10 @@ export const getPiAuthMethods = (home = os.homedir()) => {
     const family = subscriptionFamilyOf(id);
     if (family === XAI_PROVIDER_ID) {
       result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
+      continue;
+    }
+    if (id === ZAI_PROVIDER_ID) {
+      result[id] = [{ type: 'api', label: 'API Key' }];
       continue;
     }
     if (family === KIMI_CODING_PROVIDER_ID) {
@@ -1184,10 +1229,46 @@ export const mergePiProviderOverlay = ({
   };
 };
 
+/** Persist 国内/国际 on the single Z.AI subscription-style row. */
+export const writeZaiRegion = (home = os.homedir(), region, { providerId = ZAI_PROVIDER_ID } = {}) => {
+  const nextRegion = region === 'domestic' ? 'domestic' : 'international';
+  const id = typeof providerId === 'string' && providerId.trim() ? providerId.trim() : ZAI_PROVIDER_ID;
+  if (id !== ZAI_PROVIDER_ID) {
+    const error = new Error('providerId must be zai');
+    error.status = 400;
+    throw error;
+  }
+
+  const chamberPath = resolvePiDefaultsPath(home);
+  const existing = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
+  fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
+  fs.writeFileSync(chamberPath, `${JSON.stringify({ ...existing, zaiRegion: nextRegion }, null, 2)}\n`);
+
+  const catalogFile = nextRegion === 'domestic' ? 'zai-coding-cn.json' : 'zai.json';
+  const modelsPath = resolvePiModelsPath(home);
+  const current = readJsonObject(modelsPath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[id] && typeof providers[id] === 'object' && !Array.isArray(providers[id])
+    ? providers[id]
+    : {};
+  const models = loadPiAiCatalogModels(catalogFile, ZAI_API);
+  const next = {
+    ...previous,
+    name: typeof previous.name === 'string' && previous.name.trim() ? previous.name : '智谱 / Z.AI',
+    baseUrl: zaiBaseUrlForRegion(nextRegion),
+    api: ZAI_API,
+    ...(models.length > 0 ? { models } : {}),
+  };
+  providers[id] = next;
+  writeJsonFile(modelsPath, { ...current, providers }, 0o600);
+  return { providerId: id, region: nextRegion, baseUrl: next.baseUrl, api: next.api, config: publicPiProviderConfig(next) };
+};
+
 /**
  * Persist 国内/国际 on one Kimi subscription row (builtin or clone).
  * Does not touch dual-auth sibling `kimi-coding-api` (#564 path) or other rows.
  */
+
 export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}) => {
   const nextRegion = region === 'domestic' ? 'domestic' : 'international';
   const id = typeof providerId === 'string' && providerId.trim()

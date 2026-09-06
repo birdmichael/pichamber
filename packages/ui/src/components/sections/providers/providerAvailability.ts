@@ -18,6 +18,7 @@ export type AddCatalogProvider = {
 export const BUILTIN_ADD_CATALOG_PROVIDERS: readonly AddCatalogProvider[] = [
   { id: 'xai', name: 'xAI / Grok' },
   { id: 'kimi-coding', name: 'Kimi Code' },
+  { id: 'zai', name: '智谱 / Z.AI' },
 ];
 
 export const providerHasConnectedModels = (provider: { models?: unknown }): boolean => {
@@ -114,7 +115,7 @@ export const providerHasFileSource = (sources?: ProviderFileSources | null): boo
   Boolean(sources?.auth?.exists || sources?.user?.exists || sources?.project?.exists);
 
 /** Pi bundled catalog ids the sidebar must not resurrect from a cached payload. */
-export const PI_BUILTIN_SIDEBAR_CATALOG_IDS: readonly string[] = ['xai', 'kimi-coding', 'anthropic'];
+export const PI_BUILTIN_SIDEBAR_CATALOG_IDS: readonly string[] = ['xai', 'kimi-coding', 'zai', 'anthropic'];
 
 /** Sidebar / connected list: hide Pi builtins that have no file source. */
 export const selectSidebarProviders = <T extends { id: string; models?: unknown }>(
@@ -130,6 +131,6 @@ export const selectSidebarProviders = <T extends { id: string; models?: unknown 
     if (!builtinIds.has(provider.id)) return true;
     const sources = sourcesById?.[provider.id];
     if (sources) return providerHasFileSource(sources);
-    return (provider.id !== 'xai' && provider.id !== 'kimi-coding') || providerHasConnectedModels(provider);
+    return (provider.id !== 'xai' && provider.id !== 'kimi-coding' && provider.id !== 'zai') || providerHasConnectedModels(provider);
   });
 };

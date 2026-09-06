@@ -37,6 +37,8 @@ import {
   resolvePiModelsPath,
   listKimiProviderRegions,
   writeKimiRegion,
+  listZaiProviderRegions,
+  writeZaiRegion,
   isKimiSubscriptionId,
 } from './pi-resources.js';
 import {
@@ -3690,6 +3692,15 @@ export const createPiHost = ({
     },
     setKimiRegion(region, { providerId } = {}) {
       const result = writeKimiRegion(home, region, { providerId });
+      invalidateModelRuntime();
+      return result;
+    },
+    getZaiRegion() {
+      const rows = listZaiProviderRegions(home);
+      return { rows, region: rows[0]?.region || 'international' };
+    },
+    setZaiRegion(region, { providerId } = {}) {
+      const result = writeZaiRegion(home, region, { providerId });
       invalidateModelRuntime();
       return result;
     },

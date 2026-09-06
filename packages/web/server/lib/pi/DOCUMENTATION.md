@@ -1175,3 +1175,12 @@ and both fleet lists are empty. Fork/clone `parentID` rows stay. Leftover
 OpenCode `parentID` children are not a Pi fleet. OpenCode kernel routes
 are unchanged. Do not implement `/subagents-fleet` or treat Work Status /
 Session Goal / multi-run catalog as the sidebar tree.
+
+### Z.AI / 智谱 provider
+
+Pichamber exposes the Pi `zai` catalog as **智谱 / Z.AI** in Settings → Providers. It accepts API keys only (no OAuth). The provider's 国内/国际 selector persists in `~/.pi/agent/pichamber.json` as `zaiRegion` and rewrites the `zai` overlay in `models.json` without changing the global default model:
+
+- International: `zai`, `https://api.z.ai/api/coding/paas/v4`, `openai-completions`, models from Pi's `zai.json` catalog.
+- China / 国内: `zai` row backed by Pi's `zai-coding-cn` catalog, `https://open.bigmodel.cn/api/coding/paas/v4`, `openai-completions`.
+
+Get a China key from `https://open.bigmodel.cn`; international keys are available from the Z.AI console at `https://z.ai`. Pichamber intentionally does not show the unrelated OpenCode quota endpoint as a usage card in v1.
