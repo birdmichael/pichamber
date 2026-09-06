@@ -549,11 +549,13 @@ export const ProvidersPage: React.FC = () => {
       return;
     }
     const provider = providers.find((entry) => entry.id === selectedProviderId);
-    if (!provider || !isConfigDefinedCustomProvider(provider, sources)) {
+    const isOctopusProvider = selectedProviderId === 'octopus';
+    if (!provider || (!isOctopusProvider && !isConfigDefinedCustomProvider(provider, sources))) {
       return;
     }
     const hasAuth = sources.auth?.exists === true;
-    const hasEnv = Array.isArray(provider.env) && provider.env.some((name) => typeof name === 'string' && name.trim().length > 0);
+    const hasEnv = !isOctopusProvider && Array.isArray(provider.env)
+      && provider.env.some((name) => typeof name === 'string' && name.trim().length > 0);
     if (!hasAuth && !hasEnv) {
       return;
     }
@@ -562,7 +564,7 @@ export const ProvidersPage: React.FC = () => {
     }
     customModelsSyncedForRef.current = selectedProviderId;
     void syncCustomProviderModels(selectedProviderId, {
-      scope: resolveProviderConfigScope(sources),
+      scope: isOctopusProvider ? 'user' : resolveProviderConfigScope(sources),
       silent: true,
     });
   }, [selectedProviderId, providerSources, providers, syncCustomProviderModels]);
@@ -741,6 +743,10 @@ export const ProvidersPage: React.FC = () => {
         recordDeferredOpenCodeRestart('providers', { id: providerId });
       }
       await loadProviders({ directory: settingsDirectory, source: 'settings:api-key-save' });
+      if (providerId === 'octopus') {
+        customModelsSyncedForRef.current = providerId;
+        await syncCustomProviderModels(providerId, { scope: 'user' });
+      }
       const siblingId = dualAuthSiblingId(providerId);
       setSelectedProvider(siblingId && isDualAuthCatalogId(providerId) ? siblingId : providerId);
       setProviderSourceEpoch((n) => n + 1);
@@ -1215,6 +1221,7 @@ export const ProvidersPage: React.FC = () => {
     sourcesLoaded,
     hasCredentials,
     isEditableCustomProvider,
+    allowEmptyModels: selectedProvider.id === 'octopus',
   });
   const connectedStatusLabel = isDualAuthSurface && oauthConnected && apiKeyConnected
     ? t('settings.providers.page.auth.oauthAndApiKeyConnected')
@@ -1310,6 +1317,9 @@ export const ProvidersPage: React.FC = () => {
         )}
         settingsItem="providers.auth"
       >
+            {selectedProvider.id === 'octopus' ? (
+              <p className="typography-meta mb-2 text-muted-foreground">{t('settings.providers.page.octopus.info')}</p>
+            ) : null}
             {!showAuthPanel ? (
               authStatusIncomplete ? (
                 <div className="flex items-center gap-1.5 py-1.5">
@@ -1551,7 +1561,7 @@ export const ProvidersPage: React.FC = () => {
         }
         headerAction={(
           <div className="flex items-center gap-1">
-            {isEditableCustomProvider ? (
+            {(isEditableCustomProvider || selectedProvider.id === 'octopus') ? (
               <Button
                 variant="outline"
                 size="xs"
@@ -1560,7 +1570,9 @@ export const ProvidersPage: React.FC = () => {
                 onClick={() => {
                   customModelsSyncedForRef.current = null;
                   void syncCustomProviderModels(selectedProvider.id, {
-                    scope: resolveProviderConfigScope(selectedSources),
+                    scope: selectedProvider.id === 'octopus'
+                      ? 'user'
+                      : resolveProviderConfigScope(selectedSources),
                   });
                 }}
               >

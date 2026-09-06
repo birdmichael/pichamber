@@ -143,8 +143,10 @@ export const shouldShowModelsSection = (input: {
    * Optional for back-compat; defaults to `false`.
    */
   isEditableCustomProvider?: boolean;
+  /** Builtin providers such as Octopus may start with no local models before sync. */
+  allowEmptyModels?: boolean;
 }): boolean =>
-  input.modelCount > 0 &&
+  (input.modelCount > 0 || Boolean(input.allowEmptyModels)) &&
   (!input.sourcesLoaded || input.hasCredentials || Boolean(input.isEditableCustomProvider));
 
 export const shouldAutoOpenAuthPanel = (input: {

@@ -339,6 +339,7 @@ const authMethodLabel = (methodType) => (methodType === 'oauth' ? 'OAuth' : 'API
 export const XAI_PROVIDER_ID = 'xai';
 export const KIMI_CODING_PROVIDER_ID = 'kimi-coding';
 export const ZAI_PROVIDER_ID = 'zai';
+export const OCTOPUS_PROVIDER_ID = 'octopus';
 export const XAI_BASE_URL = 'https://api.x.ai/v1';
 export const KIMI_CODE_BASE_URL = 'https://api.kimi.com/coding';
 /** International / Kimi Code host (issue #568). */
@@ -349,6 +350,8 @@ export const KIMI_DOMESTIC_API = 'openai-completions';
 export const ZAI_INTERNATIONAL_BASE_URL = 'https://api.z.ai/api/coding/paas/v4';
 export const ZAI_DOMESTIC_BASE_URL = 'https://open.bigmodel.cn/api/coding/paas/v4';
 export const ZAI_API = 'openai-completions';
+export const OCTOPUS_BASE_URL = 'https://zzone.cc.cd/v1';
+export const OCTOPUS_API = 'openai-completions';
 const XAI_OAUTH_LOGIN_LABEL = 'Sign in with SuperGrok or X Premium';
 const KIMI_OAUTH_LOGIN_LABEL = 'Sign in with Kimi Code';
 const SUBSCRIPTION_CLONE_PATTERN = /^[1-9]\d*$/;
@@ -493,6 +496,7 @@ export const PI_BUILTIN_CATALOG_PROVIDERS = [
   { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
   { id: KIMI_CODING_PROVIDER_ID, name: 'Kimi Code', source: 'pi', env: [], models: {} },
   { id: ZAI_PROVIDER_ID, name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
+  { id: OCTOPUS_PROVIDER_ID, name: '章鱼', source: 'pi', env: [], models: {} },
 ];
 
 const defaultBuiltinCatalogIds = () => new Set(PI_BUILTIN_CATALOG_PROVIDERS.map((provider) => provider.id));
@@ -597,6 +601,7 @@ export const getPiAuthMethods = (home = os.homedir()) => {
     XAI_PROVIDER_ID,
     KIMI_CODING_PROVIDER_ID,
     ZAI_PROVIDER_ID,
+    OCTOPUS_PROVIDER_ID,
   ]);
   const result = {};
   for (const id of ids) {
@@ -606,7 +611,7 @@ export const getPiAuthMethods = (home = os.homedir()) => {
       result[id] = XAI_AUTH_METHODS.map((method) => ({ ...method }));
       continue;
     }
-    if (id === ZAI_PROVIDER_ID) {
+    if (id === ZAI_PROVIDER_ID || id === OCTOPUS_PROVIDER_ID) {
       result[id] = [{ type: 'api', label: 'API Key' }];
       continue;
     }
@@ -776,6 +781,26 @@ export const normalizePiAuthCredential = (body = {}) => {
   return { type: 'api_key', key };
 };
 
+const ensureOctopusProviderConfig = (home) => {
+  const filePath = resolvePiModelsPath(home);
+  const current = readJsonObject(filePath);
+  const providers = { ...providerMap(current) };
+  const previous = providers[OCTOPUS_PROVIDER_ID]
+    && typeof providers[OCTOPUS_PROVIDER_ID] === 'object'
+    && !Array.isArray(providers[OCTOPUS_PROVIDER_ID])
+    ? providers[OCTOPUS_PROVIDER_ID]
+    : {};
+  providers[OCTOPUS_PROVIDER_ID] = {
+    ...previous,
+    name: '章鱼',
+    baseUrl: OCTOPUS_BASE_URL,
+    api: OCTOPUS_API,
+    models: Array.isArray(previous.models) ? previous.models : [],
+  };
+  writeJsonFile(filePath, { ...current, providers }, 0o600);
+  return providers[OCTOPUS_PROVIDER_ID];
+};
+
 const ensureDualAuthApiProviderConfig = (home, spec) => {
   const filePath = resolvePiModelsPath(home);
   const current = readJsonObject(filePath);
@@ -839,6 +864,9 @@ export const writePiProviderAuth = (providerId, body, { home = os.homedir() } = 
     next[id] = credential;
   }
 
+  if (id === OCTOPUS_PROVIDER_ID) {
+    ensureOctopusProviderConfig(home);
+  }
   writePiAuthFile(filePath, next);
   const methodType = authMethodType(credential);
   const methodsId = plan ? plan.spec.catalogId : id;
@@ -863,6 +891,10 @@ export const removePiProviderAuth = (providerId, { home = os.homedir() } = {}) =
   const spec = dualAuthSpecFor(id);
   if (spec && id === spec.apiId) {
     const configRemoved = deletePiProviderConfig({ home, providerId: spec.apiId, scope: 'user' }).removed;
+    removed = removed || configRemoved;
+  }
+  if (id === OCTOPUS_PROVIDER_ID) {
+    const configRemoved = deletePiProviderConfig({ home, providerId: id, scope: 'user' }).removed;
     removed = removed || configRemoved;
   }
   return { providerId: id, removed };
