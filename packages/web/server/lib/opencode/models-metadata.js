@@ -58,4 +58,7 @@ export async function getModelsMetadata({
   }
 }
 
+/** Returns the last successfully fetched catalog without triggering I/O. */
+export const getCachedModelsMetadata = () => cachedMetadata;
+
 export { MODELS_DEV_API_URL };

@@ -24,7 +24,7 @@ import {
   deletePiPrompt,
   getPiAuthMethods,
   getPiProviderSources,
-  hydrateKnownModelCapabilities,
+  hydrateKnownModelCapabilitiesAsync,
   listPiProviderPublicConfigs,
   resolvePiBuiltinCatalogIds,
   withoutUnconnectedBuiltinCatalogProviders,
@@ -1900,7 +1900,7 @@ export const createPiHost = ({
     if (mock) return modelRuntime;
     if (modelRuntimeError) throw modelRuntimeError;
     try {
-      hydrateKnownModelCapabilities({ home, directory: defaultDirectory });
+      await hydrateKnownModelCapabilitiesAsync({ home, directory: defaultDirectory });
       const pi = await loadPiSdk();
       const agentDir = resolveAgentDir();
       modelRuntime = await pi.ModelRuntime.create({

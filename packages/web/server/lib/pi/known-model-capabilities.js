@@ -1,3 +1,5 @@
+import { getCachedModelsMetadata } from '../opencode/models-metadata.js';
+
 const VENDOR_MODEL_ID_PREFIXES = [
   'x-ai/',
   'xai/',
@@ -186,10 +188,73 @@ const isDefaultTextInput = (input) => (
   Array.isArray(input) && input.length === 1 && input[0] === 'text'
 );
 
-export const enrichKnownModelEntry = (id, model = {}) => {
+const catalogVendorScore = (providerId) => (
+  new Set(['openai', 'anthropic', 'xai', 'x-ai', 'google', 'deepseek']).has(
+    String(providerId || '').trim().toLowerCase(),
+  ) ? 2 : 1
+);
+
+const normalizeCatalogModelId = (id) => normalizeKnownModelId(id);
+
+/**
+ * Find the best models.dev row for a model slug. Custom providers commonly
+ * use `vendor/model`, so matching intentionally ignores the vendor prefix.
+ */
+export const lookupCatalogModel = (id, catalog) => {
+  if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) return undefined;
+  const wanted = normalizeCatalogModelId(id);
+  if (!wanted) return undefined;
+  let best;
+  let bestScore = -1;
+  for (const [providerKey, provider] of Object.entries(catalog)) {
+    if (!provider || typeof provider !== 'object' || Array.isArray(provider)) continue;
+    const providerId = typeof provider.id === 'string' && provider.id.trim() ? provider.id : providerKey;
+    const models = provider.models;
+    if (!models || typeof models !== 'object' || Array.isArray(models)) continue;
+    for (const [modelKey, rawModel] of Object.entries(models)) {
+      if (!rawModel || typeof rawModel !== 'object' || Array.isArray(rawModel)) continue;
+      const modelId = typeof rawModel.id === 'string' && rawModel.id.trim() ? rawModel.id : modelKey;
+      if (normalizeCatalogModelId(modelId) !== wanted) continue;
+      const score = catalogVendorScore(providerId);
+      if (score > bestScore) {
+        best = rawModel;
+        bestScore = score;
+      }
+    }
+  }
+  return best;
+};
+
+const catalogInput = (entry) => {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return undefined;
+  if (Array.isArray(entry.input)) {
+    const input = entry.input.filter((value) => value === 'text' || value === 'image');
+    if (input.length > 0) return [...new Set(input)];
+  }
+  const modalities = entry.modalities?.input;
+  if (Array.isArray(modalities) && modalities.some((value) => String(value).toLowerCase() === 'image')) {
+    return ['text', 'image'];
+  }
+  if (entry.attachment === true) return ['text', 'image'];
+  return undefined;
+};
+
+const catalogReasoning = (entry) => (
+  entry && typeof entry === 'object' && !Array.isArray(entry) && typeof entry.reasoning === 'boolean'
+    ? entry.reasoning
+    : undefined
+);
+
+export const enrichKnownModelEntry = (id, model = {}, options = {}) => {
   const next = model && typeof model === 'object' && !Array.isArray(model) ? { ...model } : {};
-  const vision = lookupKnownVisionInput(id);
-  const reasoning = lookupKnownReasoning(id);
+  const hasExplicitCatalog = Object.prototype.hasOwnProperty.call(options, 'catalog');
+  const catalog = hasExplicitCatalog ? options.catalog : getCachedModelsMetadata();
+  const hasCatalog = Boolean(catalog);
+  const catalogEntry = hasCatalog ? lookupCatalogModel(id, catalog) : undefined;
+  // A fetched catalog is authoritative: hardcoded tables are only used when
+  // the catalog could not be fetched at all.
+  const vision = catalogEntry ? catalogInput(catalogEntry) : (hasCatalog ? undefined : lookupKnownVisionInput(id));
+  const reasoning = catalogEntry ? catalogReasoning(catalogEntry) : (hasCatalog ? undefined : lookupKnownReasoning(id));
   let changed = false;
   if (vision && (!Array.isArray(next.input) || isDefaultTextInput(next.input))) {
     next.input = vision;

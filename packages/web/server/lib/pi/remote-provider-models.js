@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
+import { getCachedModelsMetadata, getModelsMetadata } from '../opencode/models-metadata.js';
 import { resolvePiAuthPath, resolvePiModelsPath } from './pi-resources.js';
 
 const BASE_URL_PATTERN = /^https?:\/\//;
@@ -315,7 +316,7 @@ const readRemoteModelReasoning = (item) => {
   return undefined;
 };
 
-export const parseRemoteModelsPayload = (body) => {
+export const parseRemoteModelsPayload = (body, { catalog } = {}) => {
   const list = Array.isArray(body)
     ? body
     : Array.isArray(body?.data)
@@ -340,13 +341,16 @@ export const parseRemoteModelsPayload = (body) => {
     const contextWindow = readRemoteContextWindow(item);
     const input = readRemoteModelInput(item);
     const reasoning = readRemoteModelReasoning(item);
-    models.push(enrichKnownModelEntry(id, {
+    const baseModel = {
       id,
       name,
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(input !== undefined ? { input } : {}),
       ...(reasoning ? { reasoning: true } : {}),
-    }).model);
+    };
+    models.push((catalog === undefined || catalog === null
+      ? enrichKnownModelEntry(id, baseModel)
+      : enrichKnownModelEntry(id, baseModel, { catalog })).model);
   }
   return models;
 };
@@ -386,6 +390,7 @@ export const fetchRemoteProviderModels = async ({
   providerID,
   home = os.homedir(),
   env = process.env,
+  catalog,
 } = {}, { fetchImpl = globalThis.fetch } = {}) => {
   const url = typeof baseURL === 'string' ? baseURL.trim() : '';
   if (!url) {
@@ -418,6 +423,16 @@ export const fetchRemoteProviderModels = async ({
   const resolvedKey = resolveApiKey({ apiKey, providerID, home, env });
   const extraHeaders = normalizeHeaders(headers);
   const candidates = buildRemoteModelListUrls(url);
+  let catalogForEnrichment = catalog;
+  if (catalogForEnrichment === undefined) {
+    try {
+      catalogForEnrichment = (await getModelsMetadata()).metadata;
+    } catch {
+      // A catalog outage must not prevent remote model discovery; the parser
+      // will use the hardcoded known-model fallback instead.
+      catalogForEnrichment = null;
+    }
+  }
   let lastError = httpError(502, 'The provider did not return a usable model list', 'upstream');
 
   for (const candidate of candidates) {
@@ -462,7 +477,7 @@ export const fetchRemoteProviderModels = async ({
       lastError = httpError(502, 'The endpoint did not return an OpenAI-compatible model list', 'upstream');
       continue;
     }
-    return { models: parseRemoteModelsPayload(parsed) };
+    return { models: parseRemoteModelsPayload(parsed, { catalog: catalogForEnrichment }) };
   }
 
   throw lastError;
@@ -528,21 +543,22 @@ const providerMapFromModels = (models) => (
  * Existing rows keep user overrides (name / contextWindow / input / reasoning / compat).
  * Local-only ids are kept. Empty remote lists do not wipe the catalog.
  */
-export const mergeRemoteModelsIntoCatalog = (localModels, remoteModels) => {
+export const mergeRemoteModelsIntoCatalog = (localModels, remoteModels, { catalog } = {}) => {
   const local = Array.isArray(localModels) ? localModels : [];
   const remote = Array.isArray(remoteModels) ? remoteModels : [];
-  if (remote.length === 0) {
-    return { models: local, added: 0, changed: false };
-  }
-
   const next = [];
   const seen = new Set();
+  let changed = false;
   for (const model of local) {
     if (!model || typeof model !== 'object' || Array.isArray(model)) continue;
     const id = typeof model.id === 'string' ? model.id.trim() : '';
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    next.push(model);
+    const enriched = catalog
+      ? enrichKnownModelEntry(id, model, { catalog }).model
+      : model;
+    if (JSON.stringify(enriched) !== JSON.stringify(model)) changed = true;
+    next.push(enriched);
   }
 
   let added = 0;
@@ -560,7 +576,7 @@ export const mergeRemoteModelsIntoCatalog = (localModels, remoteModels) => {
     added += 1;
   }
 
-  return { models: next, added, changed: added > 0 };
+  return { models: next, added, changed: changed || added > 0 };
 };
 
 const resolveModelsFileForSync = ({ home, directory, scope } = {}) => {
@@ -662,7 +678,7 @@ export const syncCustomProviderRemoteModels = async ({
     };
   }
 
-  const merged = mergeRemoteModelsIntoCatalog(localModels, remoteModels);
+  const merged = mergeRemoteModelsIntoCatalog(localModels, remoteModels, { catalog: getCachedModelsMetadata() });
   if (merged.changed) {
     providers[id] = { ...provider, models: merged.models };
     writeJsonObjectFile(filePath, { ...current, providers });

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Custom provider models now hydrate vision/reasoning from models.dev for all catalog-matched model families（自定义提供商的所有目录匹配模型现在都会从 models.dev 补全视觉/推理能力）。
+
 ## [1.2.14] - 2026-09-06
 
 ### Fixed
