@@ -4,6 +4,7 @@ import type { Message } from '@opencode-ai/sdk/v2';
 import {
     ASKING_A_QUESTION_STATUS,
     getActiveAssistantContext,
+    getActiveTurnContext,
     overlayBlockingPromptStatus,
     type WorkingSummary,
 } from './useAssistantStatus';
@@ -47,6 +48,17 @@ describe('getActiveAssistantContext', () => {
             assistantId: assistant.id,
             model: { providerId: 'anthropic', modelId: 'claude-opus-4-1' },
             thinkingLevel: 'high',
+        });
+    });
+    test('uses the optimistic next-turn model after the previous assistant completed', () => {
+        const firstUser = userMessage('user_1', 'anthropic', 'claude-opus-4-1');
+        const completedAssistant = { ...assistantMessage('assistant_1', firstUser.id), time: { created: 2, completed: 3 } } as Message;
+        const nextUser = { ...userMessage('user_2', 'openai', 'gpt-5.6-sol'), thinking: 'low' } as unknown as Message;
+
+        expect(getActiveTurnContext([firstUser, completedAssistant, nextUser])).toEqual({
+            assistantId: completedAssistant.id,
+            model: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
+            thinkingLevel: 'low',
         });
     });
     test('switches models only when a newer assistant links to the newer user message', () => {
