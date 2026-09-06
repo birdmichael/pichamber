@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.15] - 2026-09-06
+
+- Custom-provider thinking, model hydration, and Cloudflare/WAF error handling improvements since 1.2.14. See the root `CHANGELOG.md`.
+
 ## [1.2.14] - 2026-09-06
 
 - Kimi China/international routing plus the Z.AI provider and built-in Z.AI Usage Feature Plugin. See the root `CHANGELOG.md`.

@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- Custom provider models now hydrate vision/reasoning from models.dev for all catalog-matched model families（自定义提供商的所有目录匹配模型现在都会从 models.dev 补全视觉/推理能力）。
+## [1.2.15] - 2026-09-06
+
+### Fixed / Improved (custom providers)
+- Custom GPT-5.5/5.6/6 models (and models.dev matches) keep thinking; Fetch/add/edit hydrate vision/reasoning; saving no longer drops the thinking map (#599).
+- Custom Sync Models reports Cloudflare/WAF `403` responses (for example, 1010) as network blocked instead of an invalid API key (#601).
+- Custom providers hydrate from models.dev for all catalog-matched model families, not only GPT (#602).
+- Removed the mistaken first-class Octopus builtin (#600).
 
 ## [1.2.14] - 2026-09-06
 
@@ -28,8 +34,6 @@ All notable changes to this project will be documented in this file.
 - Custom providers automatically sync their `/v1/models` catalog into `models.json` (#569).
 - Settings support dual Grok/Kimi subscriptions, with a China/International choice per Kimi row (#571).
 - Browser address history now provides suggestions while entering a URL (#588).
-
-- Settings: custom GPT-5.5 / GPT-5.6 / GPT-6 models (for example `gpt-6-astra`) keep thinking instead of being treated as off-only after Fetch models. Add, Edit, and Fetch models fill vision/reasoning from models.dev when the model id matches. Saving a provider no longer drops a stored thinking map.
 
 ## [1.2.12] - 2026-09-04
 
