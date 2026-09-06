@@ -3649,7 +3649,7 @@ export const createPiHost = ({
     },
     authorizeProviderOAuth(providerId) {
       if (isKimiSubscriptionId(providerId)) {
-        return authorizePiKimiOAuth(providerId);
+        return authorizePiKimiOAuth(providerId, { home });
       }
       return authorizePiXaiOAuth(providerId);
     },

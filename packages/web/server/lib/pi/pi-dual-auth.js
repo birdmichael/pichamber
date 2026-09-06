@@ -38,6 +38,16 @@ const PI_DUAL_AUTH_PROVIDERS = {
     baseUrl: 'https://api.moonshot.ai/v1',
     api: 'openai-completions',
     catalogFile: 'moonshotai.json',
+    regions: {
+      international: {
+        baseUrl: 'https://api.moonshot.ai/v1',
+        catalogFile: 'moonshotai.json',
+      },
+      domestic: {
+        baseUrl: 'https://api.moonshot.cn/v1',
+        catalogFile: 'moonshotai-cn.json',
+      },
+    },
     fallbackModels: KIMI_API_FALLBACK_MODELS,
   },
   [XAI_PROVIDER_ID]: {
@@ -154,9 +164,10 @@ const modelsFromCatalogJson = (catalog, api) => {
   return models;
 };
 
-export const loadDualAuthApiModels = (spec) => {
+export const loadDualAuthApiModels = (spec, region = 'international') => {
   if (!spec) return [];
-  const filePath = locatePiAiProviderData(spec.catalogFile);
+  const regional = spec.regions?.[region] || spec;
+  const filePath = locatePiAiProviderData(regional.catalogFile);
   if (filePath) {
     try {
       const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));

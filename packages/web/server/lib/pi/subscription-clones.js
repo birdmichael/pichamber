@@ -48,7 +48,7 @@ const familySeed = (family, region = 'international') => {
       name: 'Kimi Code',
       baseUrl: kimiBaseUrlForRegion(resolvedRegion),
       api: kimiApiForRegion(resolvedRegion),
-      models: spec ? loadDualAuthApiModels(spec) : [],
+      models: spec ? loadDualAuthApiModels(spec, resolvedRegion) : [],
     };
   }
   const spec = dualAuthSpecFor(XAI_PROVIDER_ID);

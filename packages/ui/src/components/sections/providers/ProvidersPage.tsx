@@ -1020,10 +1020,13 @@ export const ProvidersPage: React.FC = () => {
                 <>
                   {(() => {
                     const candidateAuthMethods = authMethodsByProvider[candidateProviderId] ?? [];
-                    const candidateOAuthMethods = toOAuthMethods(
-                      getOAuthAuthMethods(candidateAuthMethods),
-                      oauthMethodFallbackLabel,
-                    );
+                    const candidateOAuthMethods = isKimiSubscriptionId(candidateProviderId)
+                      && regionByProvider[candidateProviderId] === 'domestic'
+                      ? []
+                      : toOAuthMethods(
+                        getOAuthAuthMethods(candidateAuthMethods),
+                        oauthMethodFallbackLabel,
+                      );
                     const showApiKey = shouldShowApiKeyAuth(candidateAuthMethods);
 
                     return (
@@ -1057,9 +1060,9 @@ export const ProvidersPage: React.FC = () => {
                               aria-label={t('settings.providers.page.subscription.region.aria')}
                               onChange={(value) => {
                                 setRegionByProvider((prev) => ({ ...prev, [candidateProviderId]: value }));
-                                if (connectedProviderIds.has(candidateProviderId)) {
-                                  void handleSaveRegion(candidateProviderId, value);
-                                }
+                                // Persist the region before auth starts so domestic Kimi
+                                // never exposes or invokes international OAuth.
+                                void handleSaveRegion(candidateProviderId, value);
                               }}
                               options={[
                                 { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
@@ -1136,10 +1139,13 @@ export const ProvidersPage: React.FC = () => {
   const oauthProviderId = dualCatalogId ?? selectedProvider.id;
   const apiKeyProviderId = dualAuthSiblingId(oauthProviderId) ?? selectedProvider.id;
   const providerAuthMethods = authMethodsByProvider[oauthProviderId] ?? authMethodsByProvider[selectedProvider.id] ?? [];
-  const oauthAuthMethods = toOAuthMethods(
-    getOAuthAuthMethods(providerAuthMethods),
-    oauthMethodFallbackLabel,
-  );
+  const oauthAuthMethods = isKimiSubscriptionId(oauthProviderId)
+    && regionByProvider[oauthProviderId] === 'domestic'
+    ? []
+    : toOAuthMethods(
+      getOAuthAuthMethods(providerAuthMethods),
+      oauthMethodFallbackLabel,
+    );
   const showApiKeyAuth = shouldShowApiKeyAuth(providerAuthMethods);
   const sourcesLoaded = Boolean(selectedSources);
   const isEditableCustomProvider = sourcesLoaded

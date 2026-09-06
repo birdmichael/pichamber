@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { isKimiSubscriptionId } from './pi-resources.js';
+import { isKimiSubscriptionId, readKimiProviderRegion } from './pi-resources.js';
 
 const AUTHORIZE_NOTIFY_TIMEOUT_MS = 15_000;
 const KIMI_OAUTH_RELATIVE = path.join('dist', 'auth', 'oauth', 'kimi-coding.js');
+export const KIMI_DOMESTIC_API_KEY_URL = 'https://platform.moonshot.cn/console/api-keys';
 
 const toFilesystemPath = (value) => {
   const text = String(value || '');
@@ -57,6 +58,12 @@ const unsupportedProvider = (providerId) => {
   return error;
 };
 
+const domesticOAuthError = () => {
+  const error = new Error(`Domestic Kimi uses a Moonshot China API key. Create one at ${KIMI_DOMESTIC_API_KEY_URL}; Kimi Code OAuth is international-only.`);
+  error.status = 400;
+  return error;
+};
+
 const noPendingError = () => {
   const error = new Error('No pending Kimi Code authorization');
   error.status = 400;
@@ -79,9 +86,12 @@ export const createPiKimiOAuthController = ({
     pending = null;
   };
 
-  const authorize = async (providerId) => {
+  const authorize = async (providerId, { home } = {}) => {
     if (!isKimiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
+    }
+    if (home && readKimiProviderRegion(home, providerId) === 'domestic') {
+      throw domesticOAuthError();
     }
     abortPending();
     const kimiCodingOAuth = await loadKimiOAuth();
@@ -166,7 +176,7 @@ export const createPiKimiOAuthController = ({
 
 const shared = createPiKimiOAuthController();
 
-export const authorizePiKimiOAuth = (providerId) => shared.authorize(providerId);
+export const authorizePiKimiOAuth = (providerId, options = {}) => shared.authorize(providerId, options);
 export const completePiKimiOAuth = (providerId) => shared.complete(providerId);
 
 /** Refresh via Pi's helper. Do not copy leftover token-exchange code. */
