@@ -42,17 +42,11 @@ type WorkStatusSectionContext = {
    * (installed + enabled). OpenCode is unchanged.
    */
   todoSlotActive?: boolean;
-  /**
-   * Pi Usage is gated on the Grok Usage or Kimi Usage feature-plugin slot.
-   * OpenCode keeps the leftover provider-quota section.
-   */
-  xaiSlotActive?: boolean;
-  kimiSlotActive?: boolean;
 };
 
 /**
- * Provider-quota usage on Pi is the Grok Usage or Kimi Usage feature-plugin
- * slot, not the leftover OpenCode quota API. Session context % / cost stay
+ * Provider usage on Pi follows connected/authenticated Providers, not a
+ * Feature Plugin slot. Session context % / cost stay
  * in the Session block. MCP on Pi is offered only when the adapter slot is
  * installed and enabled.
  *
@@ -67,9 +61,6 @@ export const isWorkStatusSectionAvailable = (
   id: WorkStatusSectionId,
   context?: WorkStatusSectionContext,
 ): boolean => {
-  if (context?.isPiKernel && id === 'usage') {
-    return context.xaiSlotActive === true || context.kimiSlotActive === true;
-  }
   if (id === 'mcp' && context?.isPiKernel && !context.isMcpFeaturePluginActive) return false;
   if (context?.isPiKernel && id === 'subagents') return context.subagentsSlotActive === true;
   if (context?.isPiKernel && id === 'tasks') return context.todoSlotActive === true;

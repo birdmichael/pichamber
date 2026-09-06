@@ -17,7 +17,6 @@ import { UsageProgressBar } from '@/components/sections/usage/UsageProgressBar';
 import { WorkStatusRow, WorkStatusCollapsibleSection, WorkStatusValue } from './WorkStatusPrimitives';
 import { useReportWorkStatusPresence } from './presenceContext';
 import { usePiKernel } from '@/lib/usePiKernel';
-import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useXaiUsageStore } from '@/stores/useXaiUsageStore';
 import { useKimiUsageStore } from '@/stores/useKimiUsageStore';
 import { useZaiUsageStore } from '@/stores/useZaiUsageStore';
@@ -40,8 +39,8 @@ import type { UsageWindow } from '@/types';
  * belongs with the readouts that hold for the whole session rather than with
  * whatever happens to be running.
  *
- * On Pi this section mounts when the Grok Usage or Kimi Usage feature-plugin
- * slot is on (`isWorkStatusSectionAvailable`). Session context % / cost stay
+ * On Pi this section mounts when a connected subscription provider reports
+ * usage. Session context % / cost stay
  * in the Session block.
  */
 
@@ -56,11 +55,7 @@ const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {
 const connectedFamilyIds = (
   providers: ReadonlyArray<{ id: string }>,
   match: (id: string) => boolean,
-  fallback: string,
-): string[] => {
-  const ids = providers.map((provider) => provider.id).filter(match);
-  return ids.length > 0 ? ids : [fallback];
-};
+): string[] => providers.map((provider) => provider.id).filter(match);
 
 const useXaiUsageGroups = (): UsageProviderGroup[] => {
   const { t } = useI18n();
@@ -70,13 +65,14 @@ const useXaiUsageGroups = (): UsageProviderGroup[] => {
   const fallbackError = useXaiUsageStore((state) => state.error);
   const fallbackLoading = useXaiUsageStore((state) => state.isLoading);
   return React.useMemo(() => {
-    const ids = connectedFamilyIds(providers, isXaiSubscriptionId, 'xai');
+    const ids = connectedFamilyIds(providers, isXaiSubscriptionId);
     return ids.flatMap((id) => {
       const entry = byId[id];
       const payload = entry?.payload ?? (id === 'xai' ? fallbackPayload : null);
       const error = entry?.error ?? (id === 'xai' ? fallbackError : null);
       const isLoading = entry?.isLoading ?? (id === 'xai' ? fallbackLoading : false);
       const presentation = presentXaiUsage({ payload, error, isLoading });
+      if (presentation.kind === 'notConfigured') return [];
       if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
       if (payload && !payload.slotActive) return [];
       const windows = payload?.usage?.windows ?? {};
@@ -85,10 +81,8 @@ const useXaiUsageGroups = (): UsageProviderGroup[] => {
         label: formatWindowLabel(label),
         window,
       }));
-      const status = presentation.kind === 'notConfigured'
-        ? t('settings.providers.page.xaiUsage.notConfigured')
-        : presentation.kind === 'error'
-          ? (presentation.auth
+      const status = presentation.kind === 'error'
+        ? (presentation.auth
             ? t('settings.providers.page.xaiUsage.refreshFailed')
             : (presentation.message || t('settings.providers.page.xaiUsage.error')))
           : rows.length === 0
@@ -113,13 +107,14 @@ const useKimiUsageGroups = (): UsageProviderGroup[] => {
   const fallbackError = useKimiUsageStore((state) => state.error);
   const fallbackLoading = useKimiUsageStore((state) => state.isLoading);
   return React.useMemo(() => {
-    const ids = connectedFamilyIds(providers, isKimiSubscriptionId, 'kimi-coding');
+    const ids = connectedFamilyIds(providers, isKimiSubscriptionId);
     return ids.flatMap((id) => {
       const entry = byId[id];
       const payload = entry?.payload ?? (id === 'kimi-coding' ? fallbackPayload : null);
       const error = entry?.error ?? (id === 'kimi-coding' ? fallbackError : null);
       const isLoading = entry?.isLoading ?? (id === 'kimi-coding' ? fallbackLoading : false);
       const presentation = presentKimiUsage({ payload, error, isLoading });
+      if (presentation.kind === 'notConfigured') return [];
       if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
       if (payload && !payload.slotActive) return [];
       const windows = payload?.usage?.windows ?? {};
@@ -128,10 +123,8 @@ const useKimiUsageGroups = (): UsageProviderGroup[] => {
         label: formatKimiWindowLabel(label, t),
         window,
       }));
-      const status = presentation.kind === 'notConfigured'
-        ? t('settings.providers.page.kimiUsage.notConfigured')
-        : presentation.kind === 'error'
-          ? (presentation.auth
+      const status = presentation.kind === 'error'
+        ? (presentation.auth
             ? t('settings.providers.page.kimiUsage.refreshFailed')
             : (presentation.message || t('settings.providers.page.kimiUsage.error')))
           : rows.length === 0
@@ -159,15 +152,14 @@ const useZaiUsageGroups = (): UsageProviderGroup[] => {
   const error = byId.zai?.error ?? fallbackError;
   const isLoading = byId.zai?.isLoading ?? fallbackLoading;
   const presentation = presentZaiUsage({ payload, error, isLoading });
+  if (presentation.kind === 'notConfigured') return [];
   if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
   if (payload && !payload.slotActive) return [];
   const rows = Object.entries(payload?.usage?.windows ?? {}).map(([label, window]) => ({
     key: 'window-' + label, label: formatZaiWindowLabel(label, t), window,
   }));
-  const status = presentation.kind === 'notConfigured'
-    ? t('settings.providers.page.zaiUsage.notConfigured')
-    : presentation.kind === 'error'
-      ? (presentation.auth ? t('settings.providers.page.zaiUsage.refreshFailed') : (presentation.message || t('settings.providers.page.zaiUsage.error')))
+  const status = presentation.kind === 'error'
+    ? (presentation.auth ? t('settings.providers.page.zaiUsage.refreshFailed') : (presentation.message || t('settings.providers.page.zaiUsage.error')))
       : rows.length === 0 ? t('header.services.noRateLimitsReported') : null;
   if (presentation.kind === 'loading' && rows.length === 0) return [];
   return [{ providerId: 'zai', providerName: payload?.providerName || '智谱 / Z.AI', rows, status }];
@@ -175,9 +167,6 @@ const useZaiUsageGroups = (): UsageProviderGroup[] => {
 
 const PiUsageSection: React.FC = () => {
   const { t } = useI18n();
-  const xaiSlotActive = useFeaturePluginSlotActive('xai', true);
-  const kimiSlotActive = useFeaturePluginSlotActive('kimi', true);
-  const zaiSlotActive = useFeaturePluginSlotActive('zai', true);
   const xaiGroups = useXaiUsageGroups();
   const kimiGroups = useKimiUsageGroups();
   const zaiGroups = useZaiUsageGroups();
@@ -194,42 +183,39 @@ const PiUsageSection: React.FC = () => {
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const displayMode = useQuotaStore((state) => state.displayMode);
   const xaiUsageIds = React.useMemo(
-    () => connectedFamilyIds(providers, isXaiSubscriptionId, 'xai'),
+    () => connectedFamilyIds(providers, isXaiSubscriptionId),
     [providers],
   );
   const kimiUsageIds = React.useMemo(
-    () => connectedFamilyIds(providers, isKimiSubscriptionId, 'kimi-coding'),
+    () => connectedFamilyIds(providers, isKimiSubscriptionId),
     [providers],
   );
-  const zaiUsageIds = React.useMemo(() => providers.some((provider) => provider.id === 'zai') ? ['zai'] : [], [providers]);
+  const zaiUsageIds = React.useMemo(() => providers.filter((provider) => provider.id === 'zai').map((provider) => provider.id), [providers]);
 
   React.useEffect(() => {
-    if (!xaiSlotActive) return;
     for (const id of xaiUsageIds) {
       void runBackgroundNetworkTask(() => fetchXaiUsage(id));
     }
-  }, [fetchXaiUsage, xaiSlotActive, xaiUsageIds]);
+  }, [fetchXaiUsage, xaiUsageIds]);
 
   React.useEffect(() => {
-    if (!kimiSlotActive) return;
     for (const id of kimiUsageIds) {
       void runBackgroundNetworkTask(() => fetchKimiUsage(id));
     }
-  }, [fetchKimiUsage, kimiSlotActive, kimiUsageIds]);
+  }, [fetchKimiUsage, kimiUsageIds]);
 
   React.useEffect(() => {
-    if (!zaiSlotActive) return;
     for (const id of zaiUsageIds) void runBackgroundNetworkTask(() => fetchZaiUsage(id));
-  }, [fetchZaiUsage, zaiSlotActive, zaiUsageIds]);
+  }, [fetchZaiUsage, zaiUsageIds]);
 
   const groups = React.useMemo(() => [
-    ...(xaiSlotActive ? xaiGroups : []),
-    ...(kimiSlotActive ? kimiGroups : []),
-    ...(zaiSlotActive ? zaiGroups : []),
-  ], [kimiGroups, kimiSlotActive, xaiGroups, xaiSlotActive, zaiGroups, zaiSlotActive]);
-  const isLoading = (xaiSlotActive && (xaiLoading || xaiUsageIds.some((id) => xaiById[id]?.isLoading)))
-    || (kimiSlotActive && (kimiLoading || kimiUsageIds.some((id) => kimiById[id]?.isLoading)))
-    || (zaiSlotActive && (zaiLoading || zaiUsageIds.some((id) => zaiById[id]?.isLoading)));
+    ...xaiGroups,
+    ...kimiGroups,
+    ...zaiGroups,
+  ], [kimiGroups, xaiGroups, zaiGroups]);
+  const isLoading = (xaiLoading || xaiUsageIds.some((id) => xaiById[id]?.isLoading))
+    || (kimiLoading || kimiUsageIds.some((id) => kimiById[id]?.isLoading))
+    || (zaiLoading || zaiUsageIds.some((id) => zaiById[id]?.isLoading));
 
   React.useEffect(() => {
     if (groups.length === 0) return;
@@ -248,15 +234,9 @@ const PiUsageSection: React.FC = () => {
       displayMode={displayMode}
       isLoading={isLoading}
       onRefresh={() => {
-        if (xaiSlotActive) {
-          for (const id of xaiUsageIds) void fetchXaiUsage(id);
-        }
-        if (kimiSlotActive) {
-          for (const id of kimiUsageIds) void fetchKimiUsage(id);
-        }
-        if (zaiSlotActive) {
-          for (const id of zaiUsageIds) void fetchZaiUsage(id);
-        }
+        for (const id of xaiUsageIds) void fetchXaiUsage(id);
+        for (const id of kimiUsageIds) void fetchKimiUsage(id);
+        for (const id of zaiUsageIds) void fetchZaiUsage(id);
       }}
       timeFormatPreference={timeFormatPreference}
       currentProviderId={currentProviderId}

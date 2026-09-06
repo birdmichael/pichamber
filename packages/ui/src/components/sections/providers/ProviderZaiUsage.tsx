@@ -11,8 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
 
 /**
- * ZAI Code subscription allowance on the Providers card. Only mount when the
- * ZAI Usage feature-plugin slot is on and this provider is connected.
+ * ZAI Code subscription allowance on the Providers card. Mount when this connected provider has credentials.
  */
 export const ProviderZaiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();

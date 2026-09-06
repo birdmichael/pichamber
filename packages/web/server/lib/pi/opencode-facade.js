@@ -405,7 +405,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     }
     const providerId = typeof req.query?.providerId === 'string' ? req.query.providerId : undefined;
     const usage = await host.getZaiUsage({ providerId });
-    json(res, usage?.slotActive ? 200 : 404, usage);
+    json(res, 200, usage);
   }));
 
   app.get('/api/pi/kimi-region', handle(async (_req, res) => {

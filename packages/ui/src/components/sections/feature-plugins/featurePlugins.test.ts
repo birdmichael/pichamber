@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_FEATURE_PLUGIN_SOURCES,
+  FEATURE_PLUGIN_GALLERY_SLOTS,
   FEATURE_PLUGIN_SLOT_COPY,
   FEATURE_PLUGIN_SLOT_UI_IMPACT,
   FEATURE_PLUGIN_SLOTS,
@@ -189,10 +190,17 @@ describe('feature plugin payload parsing', () => {
     ]);
   });
 
+  test('does not put provider usage in the installable gallery', () => {
+    expect(FEATURE_PLUGIN_GALLERY_SLOTS).not.toContain('xai');
+    expect(FEATURE_PLUGIN_GALLERY_SLOTS).not.toContain('kimi');
+    expect(FEATURE_PLUGIN_GALLERY_SLOTS).not.toContain('zai');
+  });
+
   test('Feature Plugins page has no text inputs and anchors search on each card', () => {
     expect(pageSource.includes('<Input')).toBe(false);
-    expect(pageSource.includes('SettingsChipGroup')).toBe(true);
-    expect(pageSource.includes('feature-plugins.kimi.region')).toBe(true);
+    expect(pageSource.includes('SettingsChipGroup')).toBe(false);
+    expect(pageSource.includes('feature-plugins.kimi.region')).toBe(false);
+    expect(pageSource.includes('FEATURE_PLUGIN_GALLERY_SLOTS')).toBe(true);
     expect(pageSource.includes('settings.featurePlugins.field.source')).toBe(false);
     expect(pageSource.includes('settings.featurePlugins.field.command')).toBe(false);
     expect(pageSource.includes('@xl:grid-cols-2')).toBe(true);

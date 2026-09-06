@@ -24,16 +24,9 @@ describe('section registry', () => {
 });
 
 describe('isWorkStatusSectionAvailable', () => {
-  test('hides the OpenCode provider-quota section on Pi unless Grok or Kimi Usage is installed', () => {
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(false);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: false })).toBe(false);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, kimiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: true, kimiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: false, kimiSlotActive: false })).toBe(false);
-    expect(isWorkStatusSectionAvailable('session', { isPiKernel: true })).toBe(true);
+  test('keeps provider usage available on Pi without a Feature Plugin', () => {
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('usage', { isPiKernel: false })).toBe(true);
-    expect(isWorkStatusSectionAvailable('usage')).toBe(true);
   });
 
   test('hides Subagents on Pi unless the feature-plugin slot is installed and enabled', () => {
@@ -45,9 +38,7 @@ describe('isWorkStatusSectionAvailable', () => {
   });
 
   test('keeps session context on the available list for Pi', () => {
-    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('usage');
-    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, xaiSlotActive: true })).toContain('usage');
-    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true, kimiSlotActive: true })).toContain('usage');
+    expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('usage');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('subagents');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).not.toContain('tasks');
     expect(getAvailableWorkStatusSectionIds({ isPiKernel: true })).toContain('session');
@@ -88,11 +79,8 @@ describe('isWorkStatusSectionVisible', () => {
     expect(isWorkStatusSectionVisible(['usage'], 'tasks')).toBe(true);
   });
 
-  test('never shows provider usage on Pi until the Grok or Kimi Usage slot is on', () => {
-    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true })).toBe(false);
-    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true, kimiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionVisible([], 'session', { isPiKernel: true })).toBe(true);
+  test('keeps provider usage visible on Pi without a Feature Plugin', () => {
+    expect(isWorkStatusSectionVisible([], 'usage', { isPiKernel: true })).toBe(true);
   });
 
   test('never shows an empty Subagents header on Pi when the slot is off', () => {
@@ -131,8 +119,8 @@ describe('areAllWorkStatusSectionsHidden', () => {
     expect(areAllWorkStatusSectionsHidden(withExtra)).toBe(true);
   });
 
-  test('on Pi, ignores the unavailable provider-usage section', () => {
-    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'usage' && id !== 'mcp' && id !== 'subagents' && id !== 'tasks');
+  test('on Pi, ignores unavailable plugin sections', () => {
+    const piSections = WORK_STATUS_SECTION_IDS.filter((id) => id !== 'mcp' && id !== 'subagents' && id !== 'tasks');
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: true })).toBe(true);
     expect(areAllWorkStatusSectionsHidden(piSections, { isPiKernel: false })).toBe(false);
     expect(areAllWorkStatusSectionsHidden([], { isPiKernel: true })).toBe(false);

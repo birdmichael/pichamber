@@ -66,15 +66,9 @@ describe('MobileWorkStatusHost', () => {
     expect(metadataSource).toContain('repositoryEnabled={!isManagedChatContext}');
   });
 
-  test('hides usage quotas on Pi until the Grok or Kimi Usage slot is on', () => {
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(false);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, xaiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true, kimiSlotActive: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('session', { isPiKernel: true })).toBe(true);
-    expect(isWorkStatusSectionAvailable('repository', { isPiKernel: true })).toBe(true);
-    expect(bodySource).toContain("sectionVisible('usage')");
-    expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('xai'");
-    expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('kimi'");
+  test('keeps usage quotas available on Pi without a Feature Plugin', () => {
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(true);
+    expect(isWorkStatusSectionAvailable('usage', { isPiKernel: true })).toBe(true);
   });
 
   test('gates the MCP row on the same Feature Plugin slot as Settings MCP', () => {
@@ -100,7 +94,7 @@ describe('MobileWorkStatusHost', () => {
     expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: true, todoSlotActive: true })).toBe(true);
     expect(isWorkStatusSectionAvailable('tasks', { isPiKernel: false })).toBe(true);
     expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('todo'");
-    expect(sectionVisibilitySource).toContain("useFeaturePluginSlotActive('xai'");
+    expect(sectionVisibilitySource).not.toContain("useFeaturePluginSlotActive('xai'");
     expect(bodySource).toContain("sectionVisible('tasks')");
     expect(bodySource.indexOf("{sectionVisible('tasks') ? <WorkStatusTasksSection"))
       .toBeLessThan(bodySource.indexOf('<WorkStatusPrimaryGroup'));

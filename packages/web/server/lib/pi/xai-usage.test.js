@@ -93,7 +93,7 @@ describe('getPiXaiUsage', () => {
     expect(result).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
-  it('treats npm:pi-xai as the Grok Usage slot', async () => {
+  it('does not activate usage from a package without provider auth', async () => {
     const home = makeTemp();
     writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
       packages: ['npm:pi-xai'],
@@ -101,10 +101,10 @@ describe('getPiXaiUsage', () => {
     const result = await getPiXaiUsage({ home, fetchImpl: async () => {
       throw new Error('should not fetch');
     } });
-    expect(result).toEqual({ ok: false, configured: false, slotActive: true });
+    expect(result).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
-  it('reports not configured when the slot is on but there is no oauth', async () => {
+  it('reports not configured when the provider has no oauth', async () => {
     const home = makeTemp();
     writeJson(path.join(home, '.pi', 'agent', 'settings.json'), {
       packages: ['npm:pi-xai-oauth'],
@@ -112,7 +112,7 @@ describe('getPiXaiUsage', () => {
     const result = await getPiXaiUsage({ home, fetchImpl: async () => {
       throw new Error('should not fetch');
     } });
-    expect(result).toEqual({ ok: false, configured: false, slotActive: true });
+    expect(result).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
   it('keeps configured true and omits a 0% window when billing fetch fails', async () => {

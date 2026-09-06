@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed / Improved
+- Usage for xAI/Grok, Kimi Code, and Z.AI now follows connected Providers automatically; retired Usage Feature Plugin cards, package-install gates, and the duplicate Kimi region control. Provider OAuth/API-key, region, host, and model configuration remains the single source of truth.
+
 ## [1.2.15] - 2026-09-06
 
 ### Fixed / Improved (custom providers)

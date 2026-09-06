@@ -328,7 +328,7 @@ leaves the first `auth.json` key untouched. OAuth authorize/callback accept
 those clone ids and store tokens under the clone id. Dual-auth siblings
 `xai-api` / `kimi-coding-api` are not clones. Display name is `models.json`
 `name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is
-per Kimi subscription row (Feature Plugins → Kimi Usage and Providers
+per Kimi subscription row (Providers
 Add/edit): International → `https://api.kimi.com/coding` (anthropic-messages);
 China → `https://api.moonshot.cn/v1` (openai-completions), with models from Pi's `moonshotai-cn` catalog. No typed Base URL. Domestic Open Platform accounts use an API key from `https://platform.moonshot.cn`; Kimi Code's international device OAuth is not offered for a domestic row and never contacts `auth.kimi.com`.
 `PUT /api/pi/kimi-region` takes `{ providerId, region }`. Default preference
@@ -341,19 +341,11 @@ Responses never echo tokens.
 Product login is this built-in `/login xai`, not an npm xAI OAuth
 extension. Composer `/login` for `xai` points at Settings → Providers.
 
-## Grok Usage (feature-plugin slot)
+## Grok Usage (provider surface)
 
-Gate is Feature Plugins `xai` (`npm:pi-xai`) installed+enabled.
-Chrome follows `{agentDir}/settings.json` `packages`. Leftover
-`npm:pi-xai-oauth` still counts as this slot until uninstall. Install
-writes `npm:pi-xai` and removes leftover `pi-xai-oauth` so the two
-extensions do not conflict. Uninstall removes both aliases independently:
-a missing alias is success; the request fails if the slot is still
-installed afterward. Opening Feature Plugins never runs plugin
-`npx` setup (that would change `defaultProvider`). Do not install
-`@blockedpath/pi-xai-oauth` alongside `pi-xai`.
+Usage follows the connected xAI Provider OAuth credential; the legacy Feature Plugin package is not consulted by the usage HTTP surface.
 
-When the slot is on:
+When the provider is configured:
 
 - `GET /api/pi/xai-usage` uses the same grok billing REST surface as the
   plugin (not a chat `/xai-usage` turn). It refreshes oauth through Pi
@@ -381,7 +373,7 @@ drops `kimi-coding` unless `auth.json` or user/project `models.json` has
 that provider. Product login is built-in `/login kimi-coding`, not the
 Feature Plugin. `getPiAuthMethods` always reports `kimi-coding` as
 Sign in with Kimi Code OAuth first, API key second — connected or not,
-and whether the Kimi Usage slot is installed.
+regardless of any legacy usage package.
 
 `POST /api/provider/:id/oauth/authorize` and `/callback` accept
 `kimi-coding` in addition to `xai`. Other ids are 404. No pending
@@ -392,7 +384,7 @@ via the same `findNamedPackageDir` pattern as xAI. Callback writes
 `{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
 key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
 card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
-Feature Plugins → Kimi Usage and Providers show **国际 / 国内** per Kimi
+Providers show **国际 / 国内** per Kimi
 row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
 of a typed Base URL. Domestic rows use `moonshotai-cn` models and show the
 China API-key path (`https://platform.moonshot.cn/console/api-keys`) rather
@@ -402,24 +394,15 @@ Code usage stays on `api.kimi.com`. Refresh uses `kimiCodingOAuth.refresh`,
 not a copied token exchange. Responses never echo access, refresh, or user
 id. Composer `/login kimi-coding` points at Settings → Providers.
 
-## Kimi Usage (feature-plugin slot)
+## Kimi Usage (provider surface)
 
-Gate is Feature Plugins `kimi` (`npm:pi-kimi-code-console-usage`)
-installed+enabled. Chrome follows `{agentDir}/settings.json` `packages`.
-Chamber `pichamber.json` `enabled` is ignored. Opening Feature Plugins
-never auto-installs and never runs plugin `npx` setup (that would change
-`defaultProvider`). Uninstall turns the slot off and must not delete
-`auth.json` `kimi-coding` credentials. Product login is built-in
-`/login kimi-coding`, not the Feature Plugin.
+Usage follows connected Kimi Code Provider auth. OAuth on `kimi-coding` and the dual-auth API key on `kimi-coding-api` are both accepted; the legacy Feature Plugin package is not consulted.
 
-When the slot is on:
+When the provider is configured:
 
 - `GET /api/pi/kimi-usage` (Pi kernel only) reads `auth.json`
   `kimi-coding` (oauth first, else api key) and GETs
-  `https://api.kimi.com/coding/v1/usages`. Slot off is
-  `{ ok: false, configured: false, slotActive: false }` with no outbound
-  HTTP even if logged in. Missing credentials is
-  `{ ok: false, configured: false, slotActive: true }`. Fetch or refresh
+  `https://api.kimi.com/coding/v1/usages`. Missing credentials is `{ ok: false, configured: false, slotActive: false }` with no outbound HTTP. Fetch or refresh
   failure is `{ ok: false, configured: true, usage: null, error }` and
   must not invent `usedPercent: 0`. Success maps weekly `usage` (7 days)
   and `limits[]` `duration===300` `TIME_UNIT_MINUTE` onto a `5h` rolling
@@ -432,7 +415,7 @@ When the slot is on:
 - `GET /api/command` lists `/kimi-usage` before a session exists.
 
 Work Status Usage and the Providers Kimi Code card share that payload
-only while the slot is on and the provider is connected. Session
+when the provider is connected. Session
 context % / cost stay in the Session block.
 
 ## Tool part timing
@@ -1191,6 +1174,6 @@ Pichamber exposes the Pi `zai` catalog as **智谱 / Z.AI** in Settings → Prov
 Get a China key from `https://open.bigmodel.cn`; international keys are available from the Z.AI console at `https://z.ai`. Pichamber intentionally does not show the unrelated OpenCode quota endpoint as a usage card in v1.
 
 
-### Z.AI Usage feature plugin
+### Z.AI Usage provider surface
 
-Feature Plugins → Z.AI Usage is a first-party builtin slot (builtin:pichamber-zai-usage); enabling it does not install an npm package. GET /api/pi/zai-usage reads the zai API key from Pi auth and, for the domestic region only, calls https://open.bigmodel.cn/api/monitor/usage/quota/limit, mapping TOKENS_LIMIT to the 5-hour window and TIME_LIMIT to the MCP tools monthly window. International Z.AI usage is reported as unavailable rather than fabricated as 0%. The endpoint returns 404 while the slot is off, and /zai-usage follows the same activation rule.
+Z.AI usage follows the connected Z.AI provider API key; no Feature Plugin package or opt-in is required. GET /api/pi/zai-usage reads the zai API key from Pi auth and, for the domestic region only, calls https://open.bigmodel.cn/api/monitor/usage/quota/limit, mapping TOKENS_LIMIT to the 5-hour window and TIME_LIMIT to the MCP tools monthly window. International Z.AI usage is reported as unavailable rather than fabricated as 0%. The endpoint returns a normal not-configured payload when the provider is disconnected.

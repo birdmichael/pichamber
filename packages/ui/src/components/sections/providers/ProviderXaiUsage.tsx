@@ -10,8 +10,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
 
 /**
- * xAI subscription allowance on the Providers card. Only mount when the
- * Grok Usage feature-plugin slot is on and this provider is connected.
+ * xAI subscription allowance on the Providers card. Mount when this connected provider has credentials.
  */
 export const ProviderXaiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();

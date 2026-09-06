@@ -2,6 +2,9 @@ import type { I18nKey } from '@/lib/i18n';
 
 export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi', 'zai'] as const;
 
+/** Usage follows connected Providers and is not an installable feature plugin. */
+export const FEATURE_PLUGIN_GALLERY_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo'] as const;
+
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> = {
