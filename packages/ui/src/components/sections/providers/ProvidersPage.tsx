@@ -188,11 +188,15 @@ export const ProvidersPage: React.FC = () => {
   const kimiSlotActive = useFeaturePluginSlotActive('kimi', isPiKernel);
   const zaiSlotActive = useFeaturePluginSlotActive('zai', isPiKernel);
   const piAgentDir = useResolvedPiAgentDir();
+  const [providerSources, setProviderSources] = React.useState<Record<string, ProviderSources>>({});
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
   const settingsDirectory = useSettingsDirectory();
+  // Keep this filter in sync with ProvidersSidebar: file-backed builtins such
+  // as Octopus remain visible even before their model list is populated.
   const providers = selectSidebarProviders(
     useConfigStore((state) => selectProvidersForDirectory(state, settingsDirectory)),
+    { sourcesById: providerSources },
   );
   const selectedProviderId = useConfigStore((state) => state.selectedProviderId);
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
@@ -217,7 +221,6 @@ export const ProvidersPage: React.FC = () => {
   const [candidateProviderId, setCandidateProviderId] = React.useState('');
   const [providerSearchQuery, setProviderSearchQuery] = React.useState('');
   const [providerDropdownOpen, setProviderDropdownOpen] = React.useState(false);
-  const [providerSources, setProviderSources] = React.useState<Record<string, ProviderSources>>({});
   const [providerSourceEpoch, setProviderSourceEpoch] = React.useState(0);
   const [showAuthPanel, setShowAuthPanel] = React.useState(false);
   const [authPanelDismissedForId, setAuthPanelDismissedForId] = React.useState<string | null>(null);

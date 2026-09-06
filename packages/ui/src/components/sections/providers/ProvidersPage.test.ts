@@ -74,14 +74,18 @@ describe('ProvidersPage available provider loading', () => {
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
       { id: 'xai', models: { 'grok-4.6': { id: 'grok-4.6' } } },
       { id: 'zai', models: { 'glm-4.5': { id: 'glm-4.5' } } },
+      { id: 'octopus', models: [] },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ], {
       sourcesById: {
         anthropic: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
         xai: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
         zai: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
+        // ProvidersPage must pass its loaded sources so file-backed builtins
+        // remain visible while their model list is still empty.
+        octopus: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
       },
-    }).map((provider) => provider.id)).toEqual(['zai', 'bmlab']);
+    }).map((provider) => provider.id)).toEqual(['zai', 'octopus', 'bmlab']);
     expect(selectSidebarProviders([
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
     ], {
