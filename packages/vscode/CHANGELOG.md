@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.16] - 2026-09-07
+
+- Usage follows connected Providers, custom GPT providers stay pinned to Completions, and running status shows the active thinking level. See the root CHANGELOG.md.
+
 ## [1.2.15] - 2026-09-06
 
 - Custom-provider thinking, model hydration, and Cloudflare/WAF error handling improvements since 1.2.14. See the root `CHANGELOG.md`.

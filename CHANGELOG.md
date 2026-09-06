@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.16] - 2026-09-07
+
 ### Fixed / Improved
-- Usage for xAI/Grok, Kimi Code, and Z.AI now follows connected Providers automatically; retired Usage Feature Plugin cards, package-install gates, and the duplicate Kimi region control. Provider OAuth/API-key, region, host, and model configuration remains the single source of truth.
+- Usage now follows the connected Provider configuration automatically (#604).
+- Custom GPT providers stay pinned to the Completions API instead of Responses (#605).
+- Running status shows the active thinking level (#606).
 
 ## [1.2.15] - 2026-09-06
 
