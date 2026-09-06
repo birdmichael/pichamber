@@ -58,6 +58,10 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { eventMatchesShortcut, getEffectiveShortcutCombo, normalizeCombo } from '@/lib/shortcuts';
 import { markStartupTrace } from '@/lib/startupTrace';
+import { getRuntimeKey } from '@/lib/runtime-switch';
+import { opencodeClient } from '@/lib/opencode/client';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { SubagentRosterMenu } from './SubagentRosterMenu';
 import {
     findLatestUserModelChoice,
     shouldPreserveManualModelOverride,
@@ -319,6 +323,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
     const [piThinking, setPiThinking] = React.useState<string | undefined>(undefined);
+    const subagentsPluginAvailable = useFeaturePluginSlotActive('subagents', isPiKernel);
     const [piThinkingLevels, setPiThinkingLevels] = React.useState<PiThinkingLevel[] | undefined>(undefined);
     const [enabledModels, setEnabledModels] = React.useState<string[]>([]);
     const { isReady, isUnavailable } = useOpenCodeReadiness();
@@ -632,6 +637,11 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const saveSessionModelSelection = useSelectionStore((state) => state.saveSessionModelSelection);
     const saveSessionAgentSelection = useSelectionStore((state) => state.saveSessionAgentSelection);
     const saveAgentModelForSession = useSelectionStore((state) => state.saveAgentModelForSession);
+    const launchSubagent = React.useCallback(async (params: { role: string; providerId: string; modelId: string; thinking: string; task: string }) => {
+        if (!currentSessionId) throw new Error('Select a session before running a subagent.');
+        const directory = getDirectoryForSession(currentSessionId);
+        await opencodeClient.sendCommand({ runtimeKey: getRuntimeKey(), id: currentSessionId, providerID: params.providerId, modelID: params.modelId, command: 'run', arguments: params.role + '[model=' + params.providerId + '/' + params.modelId + ':' + params.thinking + '] ' + JSON.stringify(params.task), directory });
+    }, [currentSessionId, getDirectoryForSession]);
     const getAgentModelForSession = useSelectionStore((state) => state.getAgentModelForSession);
     const saveAgentModelVariantForSession = useSelectionStore((state) => state.saveAgentModelVariantForSession);
     const getAgentModelVariantForSession = useSelectionStore((state) => state.getAgentModelVariantForSession);
@@ -3227,6 +3237,18 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                 </DropdownMenuTrigger>
                             </TooltipTrigger>
                             <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(280px,calc(100vw-2rem))] p-0 flex flex-col">
+                                {subagentsPluginAvailable ? (
+                                    <SubagentRosterMenu
+                                        providers={providers}
+                                        currentProviderId={currentProviderId}
+                                        currentModelId={currentModelId}
+                                        currentThinking={piThinking}
+                                        sessionId={currentSessionId}
+                                        directory={currentSessionId ? getDirectoryForSession(currentSessionId) : opencodeClient.getDirectory()}
+                                        onLaunch={launchSubagent}
+                                        onClose={() => setAgentMenuOpen(false)}
+                                    />
+                                ) : (<>
                                 <div className="p-2 border-b border-border/40">
                                     <div className="relative">
                                         <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -3288,6 +3310,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                         )}
                                     </div>
                                 </ScrollableOverlay>
+                                </>)}
                             </DropdownMenuContent>
                         </DropdownMenu>
                         {renderAgentTooltipContent()}

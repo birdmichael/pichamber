@@ -1,5 +1,7 @@
 import express from 'express';
 import { resolveActiveProjectDirectory, resolvePiDefaultModel, toPiProviderListPayload } from './pi-resources.js';
+import { deletePiSubagent, getPiSubagent, listPiSubagents, writePiSubagent } from './pi-agent-roster.js';
+import { isSubagentsSlotActive } from './subagent-runs.js';
 import { findProjectFiles } from './find-files.js';
 import {
   handleFetchRemoteProviderModels,
@@ -743,6 +745,31 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
 
   app.post('/api/pi/feature-plugins/:slot/uninstall', parseJson, handle(async (req, res) => {
     json(res, 200, await host.uninstallFeaturePlugin(req.params.slot, req.body || {}));
+  }));
+
+  app.get('/api/pi/subagents', handle(async (req, res) => {
+    if (!isSubagentsSlotActive(host.getFeaturePlugins())) { json(res, 404, { error: "Subagents feature plugin is not active" }); return; }
+    const directory = resolveDirectory(req);
+    const paths = host.getPath(directory);
+    json(res, 200, { agents: listPiSubagents({ agentDir: paths.state, directory }) });
+  }));
+
+  app.get('/api/pi/subagents/:name', handle(async (req, res) => {
+    const directory = resolveDirectory(req); const paths = host.getPath(directory);
+    const agent = getPiSubagent({ agentDir: paths.state, directory, name: req.params.name });
+    if (!agent) { json(res, 404, { error: "Agent not found" }); return; }
+    json(res, 200, agent);
+  }));
+
+  app.put('/api/pi/subagents/:name', parseJson, handle(async (req, res) => {
+    const directory = resolveDirectory(req); const paths = host.getPath(directory);
+    if (!isSubagentsSlotActive(host.getFeaturePlugins())) { json(res, 404, { error: "Subagents feature plugin is not active" }); return; }
+    json(res, 200, writePiSubagent({ agentDir: paths.state, directory, name: req.params.name, scope: req.body?.scope, frontmatter: req.body?.frontmatter, body: req.body?.body }));
+  }));
+
+  app.delete('/api/pi/subagents/:name', handle(async (req, res) => {
+    const directory = resolveDirectory(req); const paths = host.getPath(directory);
+    json(res, 200, deletePiSubagent({ agentDir: paths.state, directory, name: req.params.name, scope: req.query?.scope }));
   }));
 
   app.get('/api/config/agents', handle(async (_req, res) => {
