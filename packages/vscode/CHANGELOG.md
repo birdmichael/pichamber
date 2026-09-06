@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.17] - 2026-09-07
+
+- Running status stays aligned with the active prompt model, and custom Completions providers preserve Kimi compatibility (#608, #609). See the root CHANGELOG.md.
+
 ## [1.2.16] - 2026-09-07
 
 - Usage follows connected Providers, custom GPT providers stay pinned to Completions, and running status shows the active thinking level. See the root CHANGELOG.md.
