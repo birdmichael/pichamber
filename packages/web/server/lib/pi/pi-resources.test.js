@@ -492,6 +492,27 @@ description: >
     expect(models.providers['kimi-coding-api']?.baseUrl).not.toBe('https://api.moonshot.cn/v1');
   });
 
+  it('uses the China catalog for domestic Kimi, syncs the API sibling, and remaps k3 defaults', () => {
+    const home = makeTemp();
+    writePiProviderAuth('kimi-coding', { type: 'api', key: 'sk-kimi-cn' }, { home });
+    writePiDefaults(home, { model: 'kimi-coding/k3-256k' });
+
+    writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
+
+    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    const domesticIds = models.providers['kimi-coding'].models.map((model) => model.id);
+    expect(models.providers['kimi-coding'].baseUrl).toBe(KIMI_DOMESTIC_BASE_URL);
+    expect(models.providers['kimi-coding'].api).toBe('openai-completions');
+    expect(domesticIds).toContain('kimi-k2.6');
+    expect(domesticIds).not.toContain('k3-256k');
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].baseUrl).toBe(KIMI_DOMESTIC_BASE_URL);
+    expect(models.providers[KIMI_CODING_API_PROVIDER_ID].models.map((model) => model.id)).toEqual(domesticIds);
+    expect(readPiDefaults(home).model).toBe('kimi-coding/kimi-k2.6');
+    expect(getPiAuthMethods(home)['kimi-coding']).toEqual([
+      { type: 'api', label: 'Moonshot China API Key' },
+    ]);
+  });
+
   it('hides Pi builtin catalog providers unless auth.json or models.json has them', async () => {
     const home = makeTemp();
     const project = path.join(home, 'project');

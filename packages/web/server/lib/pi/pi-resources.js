@@ -443,6 +443,13 @@ const KIMI_AUTH_METHODS = [
   { type: 'api', label: 'API Key' },
 ];
 
+// Kimi Code OAuth is an international subscription flow. Domestic Moonshot
+// accounts use Open Platform API keys instead; never offer a button that would
+// send a domestic user to auth.kimi.com.
+const KIMI_DOMESTIC_AUTH_METHODS = [
+  { type: 'api', label: 'Moonshot China API Key' },
+];
+
 export const PI_BUILTIN_CATALOG_PROVIDERS = [
   { id: XAI_PROVIDER_ID, name: 'xAI', source: 'pi', env: [], models: {} },
   { id: KIMI_CODING_PROVIDER_ID, name: 'Kimi Code', source: 'pi', env: [], models: {} },
@@ -559,7 +566,10 @@ export const getPiAuthMethods = (home = os.homedir()) => {
       continue;
     }
     if (family === KIMI_CODING_PROVIDER_ID) {
-      result[id] = KIMI_AUTH_METHODS.map((method) => ({ ...method }));
+      const methods = readKimiProviderRegion(home, id) === 'domestic'
+        ? KIMI_DOMESTIC_AUTH_METHODS
+        : KIMI_AUTH_METHODS;
+      result[id] = methods.map((method) => ({ ...method }));
       continue;
     }
     const methodType = authMethodType(auth[id]);
@@ -728,13 +738,20 @@ const ensureDualAuthApiProviderConfig = (home, spec) => {
   const previous = providers[spec.apiId] && typeof providers[spec.apiId] === 'object' && !Array.isArray(providers[spec.apiId])
     ? providers[spec.apiId]
     : {};
+  const isKimi = spec.catalogId === KIMI_CODING_PROVIDER_ID;
+  const region = isKimi ? readKimiRegion(home) : 'international';
+  const regional = spec.regions?.[region] || spec;
   const previousModels = Array.isArray(previous.models) ? previous.models : [];
-  const models = previousModels.length > 0 ? previousModels : loadDualAuthApiModels(spec);
+  const models = isKimi
+    ? loadDualAuthApiModels(spec, region)
+    : (previousModels.length > 0 ? previousModels : loadDualAuthApiModels(spec));
   providers[spec.apiId] = {
     ...previous,
     name: typeof previous.name === 'string' && previous.name.trim() ? previous.name : spec.apiName,
-    baseUrl: typeof previous.baseUrl === 'string' && previous.baseUrl.trim() ? previous.baseUrl : spec.baseUrl,
-    api: typeof previous.api === 'string' && previous.api.trim() ? previous.api : spec.api,
+    baseUrl: isKimi
+      ? regional.baseUrl
+      : (typeof previous.baseUrl === 'string' && previous.baseUrl.trim() ? previous.baseUrl : spec.baseUrl),
+    api: spec.api,
     models,
   };
   writeJsonFile(filePath, { ...current, providers }, 0o600);
@@ -1198,7 +1215,7 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
   const previousModels = Array.isArray(previous.models) ? previous.models : [];
   const spec = dualAuthSpecFor(KIMI_CODING_PROVIDER_ID);
   const regionModels = nextRegion === 'domestic' && spec
-    ? loadDualAuthApiModels(spec)
+    ? loadDualAuthApiModels(spec, 'domestic')
     : previousModels;
   const next = {
     ...previous,
@@ -1212,6 +1229,45 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
       : (id === KIMI_CODING_PROVIDER_ID ? 'Kimi Code' : id);
   }
   providers[id] = next;
+
+  // The API-key sibling shares the selected Kimi region. Keep its host and
+  // catalog in sync when it already exists; auth saves create it from the
+  // same regional spec via ensureDualAuthApiProviderConfig.
+  if (spec && id !== spec.apiId && Object.prototype.hasOwnProperty.call(providers, spec.apiId)) {
+    const sibling = providers[spec.apiId] && typeof providers[spec.apiId] === 'object' && !Array.isArray(providers[spec.apiId])
+      ? providers[spec.apiId]
+      : {};
+    const siblingModels = loadDualAuthApiModels(spec, nextRegion);
+    providers[spec.apiId] = {
+      ...sibling,
+      baseUrl: kimiBaseUrlForRegion(nextRegion),
+      api: kimiApiForRegion(nextRegion),
+      ...(siblingModels.length > 0 ? { models: siblingModels } : {}),
+    };
+  }
+
+  // Switching away from Kimi Code can leave a stale `k3-*` default pinned in
+  // pichamber.json. Pick a known regional model so the next session cannot
+  // send an international-only id to the China endpoint.
+  const defaults = readPiDefaults(home);
+  const storedModel = typeof defaults.model === 'string' ? defaults.model.trim() : '';
+  const defaultParts = storedModel.includes('/') ? storedModel.split('/', 2) : ['', storedModel];
+  const defaultProvider = defaultParts[0];
+  const defaultId = defaultParts[1] || storedModel;
+  const isKimiDefault = defaultProvider === id
+    || (id === KIMI_CODING_PROVIDER_ID
+      && (defaultProvider === KIMI_CODING_PROVIDER_ID || defaultProvider === KIMI_CODING_API_PROVIDER_ID))
+    || (!defaultProvider && /^(?:k3(?:-|$)|kimi-coding\/k3)/i.test(storedModel));
+  if (nextRegion === 'domestic' && isKimiDefault) {
+    const defaultModels = Array.isArray(next.models) ? next.models : [];
+    const modelIds = defaultModels.map((model) => model?.id).filter((modelId) => typeof modelId === 'string' && modelId);
+    const preferred = modelIds.includes('kimi-k2.6') ? 'kimi-k2.6' : modelIds[0];
+    if (preferred && (!modelIds.includes(defaultId) || /^k3(?:-|$)/i.test(defaultId))) {
+      const targetProvider = defaultProvider === KIMI_CODING_API_PROVIDER_ID ? defaultProvider : id;
+      writePiDefaults(home, { model: `${targetProvider}/${preferred}` });
+    }
+  }
+
   writeJsonFile(modelsPath, { ...current, providers }, 0o600);
   return {
     providerId: id,

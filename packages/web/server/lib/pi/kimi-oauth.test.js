@@ -1,6 +1,10 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createPiKimiOAuthController, refreshPiKimiOAuth } from './kimi-oauth.js';
+import { writeKimiRegion } from './pi-resources.js';
 
 const deviceLogin = ({ notify, signal }) => {
   notify({
@@ -60,6 +64,24 @@ describe('createPiKimiOAuthController', () => {
     expect(authorization.url).toBe('https://auth.kimi.com/device');
     const credential = await oauth.complete('kimi-coding-2');
     expect(credential.access).toBe('access-secret');
+  });
+
+  it('does not start international OAuth for a domestic Kimi row', async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kimi-oauth-domestic-'));
+    try {
+      writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
+      let loaded = false;
+      const oauth = createPiKimiOAuthController({
+        loadKimiOAuth: async () => {
+          loaded = true;
+          return { login: deviceLogin };
+        },
+      });
+      await expect(oauth.authorize('kimi-coding', { home })).rejects.toThrow(/Moonshot China API key/);
+      expect(loaded).toBe(false);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it('rejects non-kimi-coding providers', async () => {

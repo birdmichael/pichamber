@@ -325,7 +325,7 @@ those clone ids and store tokens under the clone id. Dual-auth siblings
 `name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is
 per Kimi subscription row (Feature Plugins → Kimi Usage and Providers
 Add/edit): International → `https://api.kimi.com/coding` (anthropic-messages);
-China → `https://api.moonshot.cn/v1` (openai-completions). No typed Base URL.
+China → `https://api.moonshot.cn/v1` (openai-completions), with models from Pi's `moonshotai-cn` catalog. No typed Base URL. Domestic Open Platform accounts use an API key from `https://platform.moonshot.cn`; Kimi Code's international device OAuth is not offered for a domestic row and never contacts `auth.kimi.com`.
 `PUT /api/pi/kimi-region` takes `{ providerId, region }`. Default preference
 may live in `pichamber.json` `kimiRegion`; `writePiDefaults` keeps it. Do not
 route this through custom-provider `/v1/models` sync (#564). Usage
@@ -389,7 +389,10 @@ key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
 card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
 Feature Plugins → Kimi Usage and Providers show **国际 / 国内** per Kimi
 row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
-of a typed Base URL. Do not invent Moonshot balance/usages for China rows;
+of a typed Base URL. Domestic rows use `moonshotai-cn` models and show the
+China API-key path (`https://platform.moonshot.cn/console/api-keys`) rather
+than the international Kimi Code device OAuth; domestic login never calls
+`auth.kimi.com`. Do not invent Moonshot balance/usages for China rows;
 Code usage stays on `api.kimi.com`. Refresh uses `kimiCodingOAuth.refresh`,
 not a copied token exchange. Responses never echo access, refresh, or user
 id. Composer `/login kimi-coding` points at Settings → Providers.

@@ -1057,9 +1057,9 @@ export const ProvidersPage: React.FC = () => {
                               aria-label={t('settings.providers.page.subscription.region.aria')}
                               onChange={(value) => {
                                 setRegionByProvider((prev) => ({ ...prev, [candidateProviderId]: value }));
-                                if (connectedProviderIds.has(candidateProviderId)) {
-                                  void handleSaveRegion(candidateProviderId, value);
-                                }
+                                // Persist the region before auth starts so domestic Kimi
+                                // never exposes or invokes international OAuth.
+                                void handleSaveRegion(candidateProviderId, value);
                               }}
                               options={[
                                 { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
