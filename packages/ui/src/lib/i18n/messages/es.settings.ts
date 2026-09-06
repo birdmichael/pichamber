@@ -1681,6 +1681,7 @@ export const settingsDict = {
   "settings.providers.page.custom.error.fetch.apiKey": "Introduce primero una clave API, o guarda el proveedor y obtén los modelos al editarlo",
   "settings.providers.page.custom.error.fetch.failed": "No se pudieron obtener los modelos",
   "settings.providers.page.custom.error.fetch.unauthorized": "La clave API fue rechazada",
+  'settings.providers.page.custom.error.fetch.blocked': "El endpoint del proveedor bloqueó esta solicitud (red/WAF), no por una clave API inválida.",
   "settings.providers.page.custom.error.fetch.unsupported": "Este endpoint no enumera modelos. Introduce el ID del modelo a mano.",
   "settings.providers.page.custom.authFailure.configAfterAuth": "Las credenciales se guardaron, pero no la configuración del proveedor. Corrige el error e inténtalo de nuevo, o desconéctalo para eliminar el guardado parcial.",
 

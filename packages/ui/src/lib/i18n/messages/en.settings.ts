@@ -1709,6 +1709,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': 'Enter an API key first, or save the provider and fetch while editing',
   'settings.providers.page.custom.error.fetch.failed': 'Could not fetch models',
   'settings.providers.page.custom.error.fetch.unauthorized': 'The API key was rejected',
+  'settings.providers.page.custom.error.fetch.blocked': 'The provider endpoint blocked this request (network/WAF), not an invalid API key.',
   'settings.providers.page.custom.error.fetch.unsupported': 'This endpoint does not list models. Enter a model ID by hand.',
   'settings.providers.page.custom.authFailure.configAfterAuth': 'Credentials were saved, but the provider config was not. Fix the error and try again, or disconnect to clear the partial save.',
   'settings.providers.page.auth.title': 'Authentication',

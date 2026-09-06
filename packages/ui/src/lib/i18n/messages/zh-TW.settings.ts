@@ -1476,6 +1476,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': '請先填寫 API 金鑰；或先儲存提供商，再於編輯時拉取',
   'settings.providers.page.custom.error.fetch.failed': '無法拉取模型',
   'settings.providers.page.custom.error.fetch.unauthorized': 'API 金鑰被拒絕',
+  'settings.providers.page.custom.error.fetch.blocked': '供應商端點封鎖了此請求（網路/WAF），並非 API 金鑰無效。',
   'settings.providers.page.custom.error.fetch.unsupported': '此介面不提供模型清單。請手動填寫模型 ID。',
   'settings.providers.page.custom.authFailure.configAfterAuth': '憑證已儲存，但提供者設定未儲存。請修正錯誤後再試，或中斷連線以清除部分儲存。',
 

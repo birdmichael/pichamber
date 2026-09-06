@@ -1681,6 +1681,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': '请先填写 API 密钥；或先保存提供商，再在编辑时拉取',
   'settings.providers.page.custom.error.fetch.failed': '无法拉取模型',
   'settings.providers.page.custom.error.fetch.unauthorized': 'API 密钥被拒绝',
+  'settings.providers.page.custom.error.fetch.blocked': '提供商端点阻止了此请求（网络/WAF），并非 API 密钥无效。',
   'settings.providers.page.custom.error.fetch.unsupported': '此接口不提供模型列表。请手动填写模型 ID。',
   'settings.providers.page.custom.authFailure.configAfterAuth': '凭据已保存，但提供商配置未保存。请修复错误后重试，或断开连接以清除部分保存。',
 

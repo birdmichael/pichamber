@@ -1681,6 +1681,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': '먼저 API 키를 입력하거나, 제공자를 저장한 뒤 편집할 때 가져오세요',
   'settings.providers.page.custom.error.fetch.failed': '모델을 가져오지 못했습니다',
   'settings.providers.page.custom.error.fetch.unauthorized': 'API 키가 거부되었습니다',
+  'settings.providers.page.custom.error.fetch.blocked': '프로바이더 엔드포인트가 이 요청을 차단했습니다(네트워크/WAF). API 키가 잘못된 것이 아닙니다.',
   'settings.providers.page.custom.error.fetch.unsupported': '이 엔드포인트는 모델 목록을 제공하지 않습니다. 모델 ID를 직접 입력하세요.',
   'settings.providers.page.custom.authFailure.configAfterAuth': '자격 증명은 저장되었지만 공급자 구성은 저장되지 않았습니다. 오류를 수정한 뒤 다시 시도하거나, 연결을 해제하여 부분 저장을 지우세요.',
 

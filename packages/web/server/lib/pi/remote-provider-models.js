@@ -350,9 +350,14 @@ export const parseRemoteModelsPayload = (body) => {
   return models;
 };
 
-const classifyHttpStatus = (status) => {
-  if (status === 401 || status === 403) {
+const AUTH_REJECTION_BODY_PATTERN = /(?:\bunauthorized\b|\bauthentication\s+(?:failed|error)|\binvalid[\s_-]+(?:api[\s_-]?key|credentials?|access\s+token)|\b(?:api[\s_-]?key|credentials?|access\s+token)\s+(?:was\s+)?(?:rejected|invalid|not\s+valid|expired|missing|required))/i;
+
+export const classifyHttpStatus = (status, body = '') => {
+  if (status === 401 || (status === 403 && AUTH_REJECTION_BODY_PATTERN.test(String(body)))) {
     return httpError(401, 'The API key was rejected', 'unauthorized');
+  }
+  if (status === 403) {
+    return httpError(403, 'The provider endpoint blocked this request (network/WAF), not an invalid API key.', 'blocked');
   }
   if (status === 404 || status === 405 || (status >= 300 && status < 400)) {
     return httpError(404, 'This endpoint does not list models', 'unsupported');
@@ -439,7 +444,7 @@ export const fetchRemoteProviderModels = async ({
 
     const text = await response.text().catch(() => '');
     if (!response.ok) {
-      lastError = classifyHttpStatus(response.status);
+      lastError = classifyHttpStatus(response.status, text);
       if (lastError.code === 'unauthorized' && looksLikeJson(response.headers?.get?.('content-type'), text)) {
         throw lastError;
       }

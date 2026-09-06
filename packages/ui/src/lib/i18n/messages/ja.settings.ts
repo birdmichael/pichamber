@@ -1714,6 +1714,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': '先に API キーを入力するか、保存してから編集時に取得してください',
   'settings.providers.page.custom.error.fetch.failed': 'モデルを取得できませんでした',
   'settings.providers.page.custom.error.fetch.unauthorized': 'API キーが拒否されました',
+  'settings.providers.page.custom.error.fetch.blocked': 'プロバイダーのエンドポイントがこのリクエストをブロックしました（ネットワーク/WAF）。API キーが無効なわけではありません。',
   'settings.providers.page.custom.error.fetch.unsupported': 'このエンドポイントはモデル一覧を返しません。モデル ID を手動で入力してください。',
   'settings.providers.page.custom.authFailure.configAfterAuth': '認証情報は保存されましたが、プロバイダー設定は保存されませんでした。エラーを修正して再試行するか、切断して不完全な保存を削除してください。',
 

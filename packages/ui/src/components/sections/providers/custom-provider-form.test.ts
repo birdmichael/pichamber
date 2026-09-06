@@ -808,6 +808,15 @@ describe('fetch remote models request', () => {
     expect(fetchRemoteModelsErrorKey(401, 'unauthorized')).toBe(
       'settings.providers.page.custom.error.fetch.unauthorized',
     );
+    expect(fetchRemoteModelsErrorKey(403, 'unauthorized')).toBe(
+      'settings.providers.page.custom.error.fetch.unauthorized',
+    );
+    expect(fetchRemoteModelsErrorKey(403, 'blocked')).toBe(
+      'settings.providers.page.custom.error.fetch.blocked',
+    );
+    expect(fetchRemoteModelsErrorKey(403)).toBe(
+      'settings.providers.page.custom.error.fetch.blocked',
+    );
     expect(fetchRemoteModelsErrorKey(404)).toBe(
       'settings.providers.page.custom.error.fetch.unsupported',
     );
