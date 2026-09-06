@@ -720,7 +720,14 @@ describe('OpenCode facade HTTP/SSE', () => {
       });
       expect(response.status).toBe(200);
       const payload = await response.json();
-      expect(payload).toEqual({ models: [{ id: 'grok-4.6', name: 'Grok 4.6' }] });
+      expect(payload).toEqual({
+        models: [{
+          id: 'grok-4.6',
+          name: 'Grok 4.6',
+          input: ['text', 'image'],
+          reasoning: true,
+        }],
+      });
       expect(JSON.stringify(payload)).not.toContain('sk-test');
     } finally {
       globalThis.fetch = originalFetch;
