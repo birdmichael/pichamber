@@ -190,6 +190,7 @@ import { useParentChatColumnAgentOmit } from './composer/ui/composerAgentSlotLay
 import { chatHelperPlaceholderKey, shouldUseCompactChatPlaceholder } from './composer/ui/chatPlaceholder';
 import { MobilePillComposer } from './composer/ui/MobilePillComposer';
 import { ComposerContextChips } from './composer/ui/ComposerContextChips';
+import { SubagentsComposerStrip } from './SubagentsComposerStrip';
 import { LinkedReferenceRow } from './composer/ui/LinkedReferenceRow';
 import { RevertedMessageDock } from './composer/ui/RevertedMessageDock';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
@@ -301,6 +302,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
     const { t } = useI18n();
     const isPiKernel = usePiKernel();
     const btwPluginAvailable = useFeaturePluginSlotActive('btw', isPiKernel);
+    const subagentsPluginAvailable = useFeaturePluginSlotActive('subagents', isPiKernel);
     const canUseOpenCodeSessionStubs = canOfferOpenCodeSessionStub(isPiKernel);
     // Track if we restored a draft on mount (for text selection)
     const initialDraftRef = React.useRef<string | null>(null);
@@ -464,6 +466,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         variant: currentVariant,
     });
     const currentAgentName = useConfigStore((state) => state.currentAgentName);
+    const providers = useConfigStore((state) => state.providers);
     const setAgent = useConfigStore((state) => state.setAgent);
     const getVisibleAgents = useConfigStore((state) => state.getVisibleAgents);
     const agents = getVisibleAgents();
@@ -616,6 +619,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
     }, [currentSessionId, currentDirectory, t]);
 
+    const launchSubagent = React.useCallback(async (params: { arguments: string; providerId: string; modelId: string; task: string }) => {
+        if (!currentSessionId) return;
+        await opencodeClient.sendCommand({
+            runtimeKey: activeRuntimeKey,
+            id: currentSessionId,
+            providerID: params.providerId,
+            modelID: params.modelId,
+            command: 'run',
+            arguments: params.arguments,
+            directory: currentSessionDirectoryForSync ?? currentDirectory,
+        });
+    }, [activeRuntimeKey, currentDirectory, currentSessionDirectoryForSync, currentSessionId]);
     const isDesktopExpanded = isExpandedInput && !isMobile;
     // Mobile fullscreen composer (entered via the drag handle's swipe-up).
     const isMobileExpanded = isExpandedInput && isMobile;
@@ -3152,6 +3167,20 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     />
                 ) : (
                 <>
+                {subagentsPluginAvailable && !isMobile ? (
+                    <SubagentsComposerStrip
+                        agents={agents}
+                        providers={providers}
+                        currentProviderId={currentProviderId}
+                        currentModelId={currentModelId}
+                        currentThinking={thinkingToSend}
+                        sessionId={currentSessionId}
+                        directory={currentSessionDirectoryForSync ?? currentDirectory}
+                        taskDraft={message}
+                        onLaunch={launchSubagent}
+                        onTaskConsumed={() => { messageRef.current = ''; setMessage(''); }}
+                    />
+                ) : null}
                 {!isPiKernel ? (
                 <SessionGoalRow
                     sessionId={currentSessionId}
