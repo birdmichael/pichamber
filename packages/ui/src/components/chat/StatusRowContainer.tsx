@@ -23,13 +23,19 @@ export const StatusRowContainer: React.FC = React.memo(() => {
     );
     const { activeModel, working } = useAssistantStatus();
     const currentAgentName = useConfigStore((state) => state.currentAgentName);
+    const providers = useConfigStore((state) => state.providers);
 
     const modelDisplayName = React.useMemo(() => {
         if (!activeModel) {
             return null;
         }
-        return getProviderModelRefDisplayName(activeModel.providerId, activeModel.modelId) || null;
-    }, [activeModel]);
+        const provider = providers.find((entry) => entry.id === activeModel.providerId);
+        const model = provider?.models?.find((entry) => entry.id === activeModel.modelId);
+        return getProviderModelRefDisplayName(activeModel.providerId, activeModel.modelId, {
+            providerName: provider?.name,
+            modelName: model?.name,
+        }) || null;
+    }, [activeModel, providers]);
 
     const wasAborted = Boolean(abortRecord && !abortRecord.acknowledged);
 

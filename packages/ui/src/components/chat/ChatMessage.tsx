@@ -358,8 +358,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     const modelName = React.useMemo(() => {
         if (isUser) return undefined;
 
-        return getProviderModelRefDisplayName(providerID, modelID) || undefined;
-    }, [isUser, providerID, modelID]);
+        const provider = providerID ? providers.find((entry) => entry.id === providerID) : undefined;
+        const model = provider?.models?.find((entry) => entry.id === modelID);
+        return getProviderModelRefDisplayName(providerID, modelID, {
+            providerName: provider?.name,
+            modelName: model?.name,
+        }) || undefined;
+    }, [isUser, modelID, providerID, providers]);
 
     const modelHasVariants = React.useMemo(() => {
         if (isUser) return false;

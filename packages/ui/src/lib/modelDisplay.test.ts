@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { getModelDisplayName, getProviderModelDisplayName, getProviderModelRefDisplayName, humanizeModelId } from './modelDisplay';
+import { formatProviderModelLabel, getModelDisplayName, getProviderModelDisplayName, getProviderModelRefDisplayName, humanizeModelId } from './modelDisplay';
 
 describe('modelDisplay', () => {
   test('prefers model name over ids', () => {
@@ -47,5 +47,18 @@ describe('modelDisplay', () => {
 
   test('formats provider and model ids together for ambiguous catalog entries', () => {
     expect(getProviderModelRefDisplayName('zzone_grok', 'grok-4.6')).toBe('zzone_grok/grok-4.6');
+  });
+
+  test('prefers provider and model display names without changing ids', () => {
+    expect(formatProviderModelLabel({
+      providerId: 'zzone_grok',
+      modelId: 'grok-4.6',
+      providerName: '章鱼grok',
+      modelName: 'Grok 4.6',
+    })).toBe('章鱼grok/Grok 4.6');
+    expect(getProviderModelRefDisplayName('zzone_grok', 'grok-4.6', {
+      providerName: '章鱼grok',
+      modelName: 'Grok 4.6',
+    })).toBe('章鱼grok/Grok 4.6');
   });
 });

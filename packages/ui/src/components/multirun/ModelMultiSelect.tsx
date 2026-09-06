@@ -12,6 +12,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { loadPiRuntimeModels } from '@/lib/multirun/piModels';
 import { ModelPickerList, type ModelPickerEntry, type ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
 import { markLauncherOverlay } from './launcherEscape';
+import { formatProviderModelLabel } from '@/lib/modelDisplay';
 
 /** Chip height class - shared between chips and add button */
 const CHIP_HEIGHT_CLASS = 'h-7';
@@ -39,8 +40,9 @@ const ModelChip: React.FC<{
   instanceIndex: number;
   totalSameModel: number;
   onRemove: () => void;
-}> = ({ model, instanceIndex, totalSameModel, onRemove }) => {
-  const displayName = model.displayName || `${model.providerID}/${model.modelID}`;
+  displayName?: string;
+}> = ({ model, instanceIndex, totalSameModel, onRemove, displayName: resolvedDisplayName }) => {
+  const displayName = resolvedDisplayName || model.displayName || (model.providerID + "/" + model.modelID);
   const label = totalSameModel > 1 ? `${displayName} (${instanceIndex})` : displayName;
 
   return (
@@ -239,7 +241,12 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
     const nextModel = {
       providerID: entry.providerID,
       modelID: entry.modelID,
-      displayName: entry.providerID + "/" + entry.modelID,
+      displayName: formatProviderModelLabel({
+        providerId: entry.providerID,
+        modelId: entry.modelID,
+        providerName: providers.find((provider) => provider.id === entry.providerID)?.name,
+        modelName: entry.model.name,
+      }),
       instanceId: generateInstanceId(),
     };
     if (isSingleSelect && selectedModels.length > 0 && onUpdate) {
@@ -251,7 +258,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
       setIsOpen(false);
       setSearchQuery('');
     }
-  }, [isSingleSelect, onAdd, onUpdate, selectedModels.length]);
+  }, [isSingleSelect, onAdd, onUpdate, providers, selectedModels.length]);
 
   const labels = React.useMemo(() => ({
     searchPlaceholder: t('multirun.modelMultiSelect.search.placeholder'),
@@ -342,7 +349,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
 
               const provider = providers.find((p) => p.id === model.providerID);
               const providerModel = provider?.models?.find((m: Record<string, unknown>) => (m as { id?: string }).id === model.modelID) as
-                | { variants?: Record<string, unknown> }
+                | { id?: string; name?: string; variants?: Record<string, unknown> }
                 | undefined;
               const variantKeys = providerModel?.variants ? Object.keys(providerModel.variants) : [];
               const hasVariants = variantKeys.length > 0;
@@ -356,6 +363,12 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
                     model={model}
                     instanceIndex={instanceIndex}
                     totalSameModel={totalSameModel}
+                    displayName={formatProviderModelLabel({
+                      providerId: model.providerID,
+                      modelId: model.modelID,
+                      providerName: provider?.name,
+                      modelName: providerModel?.name,
+                    })}
                     onRemove={() => onRemove(index)}
                   />
 

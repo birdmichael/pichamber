@@ -1,5 +1,6 @@
 import React from 'react';
 import { ModelSelector } from '@/components/sections/agents/ModelSelector';
+import { getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { AgentSelector } from '@/components/sections/commands/AgentSelector';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { NumberInput } from '@/components/ui/number-input';
@@ -488,7 +489,10 @@ export const DefaultsSettings: React.FC = () => {
             {' '}
             {parsedModel.providerId ? (
               <span className="text-foreground">
-                {parsedModel.providerId}/{parsedModel.modelId}
+                {getProviderModelRefDisplayName(parsedModel.providerId, parsedModel.modelId, {
+                  providerName: providers.find((provider) => provider.id === parsedModel.providerId)?.name,
+                  modelName: providers.find((provider) => provider.id === parsedModel.providerId)?.models?.find((model) => model.id === parsedModel.modelId)?.name,
+                })}
                 {!isPiKernel && supportsVariants ? ` (${defaultVariant ?? t('settings.openchamber.defaults.option.defaultLowercase')})` : ''}
               </span>
             ) : (

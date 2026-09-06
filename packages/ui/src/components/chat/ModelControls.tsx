@@ -1655,7 +1655,13 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const getCurrentModelDisplayName = () => {
         if (!currentModelId) return t('chat.modelControls.selectModel');
-        return getProviderModelRefDisplayName(currentProviderId, currentModelId, { fallbackLabel: t('chat.modelControls.selectModel') });
+        const provider = providers.find((entry) => entry.id === currentProviderId);
+        const model = provider?.models?.find((entry) => entry.id === currentModelId) as ProviderModel | undefined;
+        return getProviderModelRefDisplayName(currentProviderId, currentModelId, {
+            providerName: provider?.name,
+            modelName: currentMetadata?.name || model?.name,
+            fallbackLabel: t('chat.modelControls.selectModel'),
+        });
     };
 
     const currentModelDisplayName = getCurrentModelDisplayName();
@@ -1860,7 +1866,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                             <div className="typography-micro text-muted-foreground mb-1">{t('chat.modelControls.model')}</div>
                             {hasModelConfig && (
                                 <div className="typography-meta text-foreground font-medium mb-1">
-                                    {currentAgent.model!.providerID} / {currentAgent.model!.modelID}
+                                    {getProviderModelRefDisplayName(currentAgent.model!.providerID, currentAgent.model!.modelID, {
+                                        providerName: providers.find((entry) => entry.id === currentAgent.model!.providerID)?.name,
+                                        modelName: providers.find((entry) => entry.id === currentAgent.model!.providerID)?.models?.find((entry) => entry.id === currentAgent.model!.modelID)?.name,
+                                    })}
                                 </div>
                             )}
                             {hasTemperatureOrTopP && (
@@ -2053,7 +2062,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                         <ProviderLogo providerId={providerId} className="size-3.5 flex-shrink-0" />
                                     ) : null}
                                     <span className="typography-meta font-medium text-foreground truncate">
-                                        {getProviderModelRefDisplayName(providerId, modelId)}
+                                        {getProviderModelRefDisplayName(providerId, modelId, {
+                                            providerName: providers.find((entry) => entry.id === providerId)?.name,
+                                            modelName: model.name,
+                                        })}
                                     </span>
                                     {isSelected ? <Icon name="check" className="size-4 flex-shrink-0 text-primary" /> : null}
                                 </div>
@@ -2907,7 +2919,10 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                             <span className="typography-meta font-semibold uppercase tracking-wide text-muted-foreground/90">{t('chat.modelControls.model')}</span>
                             {hasModelConfig ? (
                                 <span className="typography-meta text-foreground">
-                                    {currentAgent.model!.providerID} / {currentAgent.model!.modelID}
+                                    {getProviderModelRefDisplayName(currentAgent.model!.providerID, currentAgent.model!.modelID, {
+                                        providerName: providers.find((entry) => entry.id === currentAgent.model!.providerID)?.name,
+                                        modelName: providers.find((entry) => entry.id === currentAgent.model!.providerID)?.models?.find((entry) => entry.id === currentAgent.model!.modelID)?.name,
+                                    })}
                                 </span>
                             ) : (
                                 <span className="typography-meta text-muted-foreground">{t('chat.modelControls.modeValue.none')}</span>

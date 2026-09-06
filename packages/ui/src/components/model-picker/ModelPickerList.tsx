@@ -689,7 +689,10 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
                   </button>
                 ) : null}
                 {showProviderLogo ? <ProviderLogo providerId={entry.providerID} className="h-3.5 w-3.5 flex-shrink-0" /> : null}
-                <span className="font-medium truncate">{getProviderModelRefDisplayName(entry.providerID, entry.modelID)}</span>
+                <span className="font-medium truncate">{getProviderModelRefDisplayName(entry.providerID, entry.modelID, {
+                  providerName: providerById.get(entry.providerID)?.name,
+                  modelName: entry.model.name || metadata?.name,
+                })}</span>
                 {contextTokens ? <span className="typography-micro text-muted-foreground flex-shrink-0">{contextTokens}</span> : null}
               </div>
               {count > 0 ? <span className="typography-micro text-muted-foreground flex-shrink-0">x{count}</span> : null}

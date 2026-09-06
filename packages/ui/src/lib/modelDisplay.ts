@@ -10,6 +10,8 @@ export type DisplayProvider = {
 type ModelDisplayOptions = {
   fallbackLabel?: string;
   maxLength?: number;
+  providerName?: string | null;
+  modelName?: string | null;
 };
 
 const normalizeString = (value: unknown): string => {
@@ -270,14 +272,34 @@ export const getProviderModelDisplayName = (
   return getModelDisplayName(model, normalizedModelId, options);
 };
 
+/** Format a disambiguating provider/model label without changing routing ids. */
+export const formatProviderModelLabel = ({
+  providerId,
+  modelId,
+  providerName,
+  modelName,
+}: {
+  providerId: string | null | undefined;
+  modelId: string | null | undefined;
+  providerName?: string | null;
+  modelName?: string | null;
+}, options: ModelDisplayOptions = {}): string => {
+  const displayProvider = normalizeString(providerName) || normalizeString(providerId);
+  const displayModel = normalizeString(modelName) || normalizeString(modelId);
+  if (!displayProvider || !displayModel) return options.fallbackLabel ?? "";
+  return truncate(displayProvider + "/" + displayModel, options.maxLength);
+};
+
 /** Display the catalog key so reused model ids remain unambiguous. */
 export const getProviderModelRefDisplayName = (
   providerId: string | null | undefined,
   modelId: string | null | undefined,
   options: ModelDisplayOptions = {},
 ): string => {
-  const provider = normalizeString(providerId);
-  const model = normalizeString(modelId);
-  if (!provider || !model) return options.fallbackLabel ?? "";
-  return truncate(provider + "/" + model, options.maxLength);
+  return formatProviderModelLabel({
+    providerId,
+    modelId,
+    providerName: options.providerName,
+    modelName: options.modelName,
+  }, options);
 };
