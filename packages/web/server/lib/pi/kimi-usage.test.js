@@ -102,28 +102,30 @@ describe('mapKimiUsagesToWindows', () => {
 });
 
 describe('getPiKimiUsage', () => {
-  it('reports slot-off without outbound fetch even when logged in', async () => {
+  it('uses provider OAuth without a usage package', async () => {
     const home = makeTemp();
     writeOauth(home);
-    let fetched = false;
     const result = await getPiKimiUsage({
       home,
-      fetchImpl: async () => {
-        fetched = true;
-        throw new Error('should not fetch');
-      },
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ usage: { limit: '100', used: '12' } }),
+      }),
     });
-    expect(result).toEqual({ ok: false, configured: false, slotActive: false });
-    expect(fetched).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.configured).toBe(true);
+    expect(result.slotActive).toBe(true);
+    expect(result.usage.windows.weekly.usedPercent).toBe(12);
   });
 
-  it('reports not configured when the slot is on but there are no credentials', async () => {
+  it('reports not configured when the provider has no credentials', async () => {
     const home = makeTemp();
     installKimiSlot(home);
     const result = await getPiKimiUsage({ home, fetchImpl: async () => {
       throw new Error('should not fetch');
     } });
-    expect(result).toEqual({ ok: false, configured: false, slotActive: true });
+    expect(result).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
   it('keeps configured true and omits a 0% window when usage fetch fails', async () => {
@@ -240,6 +242,24 @@ describe('getPiKimiUsage', () => {
     expect(tokens).toEqual(['Bearer api-secret']);
     expect(JSON.stringify(result)).not.toContain('api-secret');
   });
+  it('uses the dual-auth API sibling when the catalog OAuth is absent', async () => {
+    const home = makeTemp();
+    writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
+      'kimi-coding-api': { type: 'api_key', key: 'api-secret' },
+    });
+    const tokens = [];
+    const result = await getPiKimiUsage({
+      home,
+      fetchImpl: async (_url, init) => {
+        tokens.push(init.headers.Authorization);
+        return { ok: true, status: 200, text: async () => JSON.stringify({ usage: { limit: '100', used: '6' } }) };
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(tokens).toEqual(['Bearer api-secret']);
+    expect(JSON.stringify(result)).not.toContain('api-secret');
+  });
+
   it('does not call Moonshot usages for China-region Kimi rows', async () => {
     const home = makeTemp();
     installKimiSlot(home);

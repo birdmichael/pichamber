@@ -33,7 +33,6 @@ import {
   isXaiSubscriptionId,
   subscriptionFamilyOf,
 } from '@/lib/pi/subscription-clones';
-import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useResolvedPiAgentDir } from '@/lib/useResolvedPiAgentDir';
 import {
   parseConnectedProviderIds,
@@ -185,9 +184,6 @@ const parseProvidersPayload = (payload: unknown): ProviderOption[] => {
 export const ProvidersPage: React.FC = () => {
   const { t } = useI18n();
   const isPiKernel = usePiKernel();
-  const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
-  const kimiSlotActive = useFeaturePluginSlotActive('kimi', isPiKernel);
-  const zaiSlotActive = useFeaturePluginSlotActive('zai', isPiKernel);
   const piAgentDir = useResolvedPiAgentDir();
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
@@ -1103,7 +1099,7 @@ export const ProvidersPage: React.FC = () => {
                             />
                           </SettingsFieldRow>
                         ) : null}
-                        {isPiKernel && (kimiSlotActive && isKimiSubscriptionId(candidateProviderId) || candidateProviderId === 'zai') ? (
+                        {isPiKernel && (isKimiSubscriptionId(candidateProviderId) || candidateProviderId === 'zai') ? (
                           <SettingsFieldRow
                             label={t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.label' : 'settings.providers.page.subscription.region.label')}
                             info={t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.info' : 'settings.providers.page.subscription.region.info')}
@@ -1429,7 +1425,7 @@ export const ProvidersPage: React.FC = () => {
               className="h-8"
             />
           </SettingsFieldRow>
-          {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) ? (
+          {isKimiSubscriptionId(selectedProvider.id) ? (
             <SettingsFieldRow
               label={t('settings.providers.page.subscription.region.label')}
               info={t('settings.providers.page.subscription.region.info')}
@@ -1469,15 +1465,15 @@ export const ProvidersPage: React.FC = () => {
         </SettingsSection>
       ) : null}
 
-      {xaiSlotActive && isXaiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+      {isPiKernel && isXaiSubscriptionId(selectedProvider.id) && hasCredentials ? (
         <ProviderXaiUsage providerId={selectedProvider.id} />
       ) : null}
 
-      {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+      {isPiKernel && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
         <ProviderKimiUsage providerId={selectedProvider.id} />
       ) : null}
 
-      {zaiSlotActive && selectedProvider.id === 'zai' && hasCredentials ? (
+      {isPiKernel && selectedProvider.id === 'zai' && hasCredentials ? (
         <ProviderZaiUsage providerId={selectedProvider.id} />
       ) : null}
 

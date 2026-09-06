@@ -1,11 +1,6 @@
 import fs from 'node:fs';
 
 import {
-  listConfiguredPiPackageSources,
-  readFeaturePlugins,
-  toFeaturePluginsPayload,
-} from './feature-plugins.js';
-import {
   KIMI_CODING_PROVIDER_ID,
   isKimiSubscriptionId,
   listPiProviderPublicConfigs,
@@ -14,6 +9,7 @@ import {
   writePiProviderAuth,
 } from './pi-resources.js';
 import { refreshPiKimiOAuth } from './kimi-oauth.js';
+import { KIMI_CODING_API_PROVIDER_ID } from './pi-dual-auth.js';
 
 const KIMI_USAGE_ORIGIN = 'https://api.kimi.com';
 const MAX_USAGE_BODY_BYTES = 64 * 1024;
@@ -22,6 +18,11 @@ const REFRESH_SKEW_MS = 5 * 60 * 1000;
 const FIVE_HOUR_SECONDS = 5 * 60 * 60;
 const WEEKLY_SECONDS = 7 * 24 * 60 * 60;
 const PROVIDER_NAME = 'Kimi Code';
+
+/** Legacy slash-command compatibility; provider cards and Work Status ignore this gate. */
+export const isKimiSlotActive = (payload) => Boolean(
+  payload?.slots?.kimi?.installed && payload?.slots?.kimi?.enabled,
+);
 
 const readProviderDisplayName = (home, providerId) => {
   try {
@@ -43,10 +44,6 @@ const readJsonObject = (filePath, readFile) => {
     return {};
   }
 };
-
-export const isKimiSlotActive = (payload) => Boolean(
-  payload?.slots?.kimi?.installed && payload?.slots?.kimi?.enabled,
-);
 
 const readOauthEntry = (entry) => {
   if (!isRecord(entry) || String(entry.type || '').toLowerCase() !== 'oauth') return null;
@@ -319,19 +316,20 @@ export const getPiKimiUsage = async ({
   now = Date.now(),
 } = {}) => {
   const usageProviderId = isKimiSubscriptionId(providerId) ? providerId : KIMI_CODING_PROVIDER_ID;
-  const payload = toFeaturePluginsPayload({
-    plugins: readFeaturePlugins(home),
-    configuredSources: listConfiguredPiPackageSources(home),
-  });
-  const slotActive = isKimiSlotActive(payload);
-  if (!slotActive) {
-    return { ok: false, configured: false, slotActive: false };
-  }
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  let oauth = readOauthEntry(auth[usageProviderId]);
-  const apiKey = readApiKey(auth[usageProviderId]);
+  // The catalog provider owns the usage surface, while dual-auth stores its
+  // API key on the reserved sibling. Prefer OAuth on the catalog id, then the
+  // sibling API key, so either Provider auth method drives the same usage card.
+  const catalogAuth = auth[usageProviderId];
+  const siblingAuth = usageProviderId === KIMI_CODING_PROVIDER_ID
+    ? auth[KIMI_CODING_API_PROVIDER_ID]
+    : undefined;
+  let oauth = readOauthEntry(catalogAuth);
+  const apiKey = readApiKey(catalogAuth) || readApiKey(siblingAuth);
+  // OAuth and API-key auth are both provider configuration; neither requires
+  // the legacy pi-kimi-code-console-usage package.
   if (!oauth && !apiKey) {
-    return { ok: false, configured: false, slotActive: true };
+    return { ok: false, configured: false, slotActive: false };
   }
   const providerName = readProviderDisplayName(home, usageProviderId);
   const region = readKimiProviderRegion(home, usageProviderId);

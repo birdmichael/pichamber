@@ -112,7 +112,7 @@ Everything is read from already-warm caches. The panel adds no aggregated
 endpoint. On leftover OpenCode, quota data refreshes through the shared fixed
 three-minute quota timer, which requests only providers enabled for this panel.
 On Pi that timer and `/api/quota/*` are off. The Usage section appears when
-Feature Plugins Grok Usage (`xai`) **or** Kimi Usage (`kimi`) is installed;
+a connected/authenticated xAI, Kimi Code, or Z.AI provider is present;
 it reads `GET /api/pi/xai-usage`, `/api/pi/kimi-usage`, and/or `/api/pi/zai-usage`. Session
 context % / cost stay in the Session block.
 
@@ -124,7 +124,7 @@ context % / cost stay in the Session block.
 | PR + checks | `useFreshestPrVisualSummaryForBranch` | **read-only**; follows the freshest remote-keyed entry for the branch |
 | Subagents | Pi: host run list (live `subagent` tool-call session id, not leftover status-file ghosts). OpenCode: `useAllLiveSessions` (`parentID`) + statuses | A Pi row is a button only when a child session id and directory exist; click opens the same writable tab as the transcript card. Terminal rows without an id are omitted. Catalog / management `subagent` calls (`list`, `status`, `guide`, …) are not rows and do not mint an empty child chat. |
 | Subagent blockers | directory `permission` / `question` maps | one subscription covers every child |
-| Usage | Pi: `useXaiUsageStore` / `useKimiUsageStore` / `useZaiUsageStore` over `GET /api/pi/xai-usage?providerId=`, `GET /api/pi/kimi-usage?providerId=`, and `GET /api/pi/zai-usage?providerId=` when Feature Plugins `xai` **or** `kimi` is on (stable order xAI family then Kimi Code family, one row per connected subscription). OpenCode: `usageGroups.ts` over `useQuotaStore` | Pi shows Grok and/or Kimi Code allowance, including cloned subscriptions (`xai-2`, `kimi-coding-2`) under their display names. Either slot on shows Usage; both off hides the section. Fetch failure keeps that id’s last good snapshot or shows an error — never 0% and never "not signed in" on a failed request. Leftover `/api/quota/*` stays unregistered on Pi. Session context % / cost stay in Session. |
+| Usage | Pi: `useXaiUsageStore` / `useKimiUsageStore` / `useZaiUsageStore` over `GET /api/pi/xai-usage?providerId=`, `GET /api/pi/kimi-usage?providerId=`, and `GET /api/pi/zai-usage?providerId=` when a matching provider is connected (stable order xAI family, Kimi Code family, then Z.AI, one row per connected subscription). OpenCode: `usageGroups.ts` over `useQuotaStore` | Pi shows Grok and/or Kimi Code allowance, including cloned subscriptions (`xai-2`, `kimi-coding-2`) under their display names. Provider auth shows Usage automatically; no Feature Plugin package is required. Fetch failure keeps that id’s last good snapshot or shows an error — never 0% and never "not signed in" on a failed request. Leftover `/api/quota/*` stays unregistered on Pi. Session context % / cost stay in Session. |
 | Linked threads | `lib/linkedIssues.ts` over session metadata | written by the flows that attach an issue or PR |
 | Goal | `useSessionGoal` | respects the Settings toggle |
 | MCP | `useMcpStore` | Hidden on Pi until the MCP feature-plugin slot is installed and enabled. Presence of `.mcp.json` alone does not show this block. Connect/disconnect reuses the dropdown's actions; on Pi those persist `disabled` on `<cwd>/.pi/mcp.json` and reload the session. `cached` / not-yet-connected is a valid row, not a failure. |
@@ -217,7 +217,7 @@ todo list is the top readout when that section is offered.
    changes, PR, checks) and **Usage** — true for as long as the session is
    open. Usage sits here rather than lower down because a spent quota stops the
    work outright. On Pi the provider-quota Usage section appears when the
-   Grok Usage or Kimi Usage slot is on; the Session context meter is unchanged;
+   the matching provider is connected; the Session context meter is unchanged;
 3. **Subagents** — what is happening right now. On Pi this section exists
    only when the Subagents slot is installed and enabled;
 4. **MCP**, **Pinned messages**, **Context sources** — supporting material.
@@ -418,4 +418,4 @@ animation frame.
 - Test/build/dev-server status and LSP diagnostics — a separate track. Note
   that `state.lsp` already exists in the sync state.
 
-Z.AI Usage is the first-party builtin slot. Its Work Status row uses the domestic Z.AI quota endpoint; international Z.AI is shown as unavailable and never as a fabricated zero.
+Z.AI usage follows the connected Z.AI provider. Its Work Status row uses the domestic Z.AI quota endpoint; international Z.AI is shown as unavailable and never as a fabricated zero.

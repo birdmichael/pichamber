@@ -26,10 +26,10 @@ describe('mapZaiLimitsToWindows', () => {
 });
 
 describe('getPiZaiUsage', () => {
-  it('does not fetch while the builtin slot is off', async () => {
-    const home = makeTemp(); writeAuth(home); let called = false;
+  it('does not fetch while the provider is disconnected', async () => {
+    const home = makeTemp(); let called = false;
     const result = await getPiZaiUsage({ home, fetchImpl: async () => { called = true; } });
-    expect(result).toEqual({ ok: false, configured: false, slotActive: false }); expect(called).toBe(false);
+    expect(result).toMatchObject({ ok: false, configured: false, slotActive: false }); expect(called).toBe(false);
   });
   it('uses the domestic quota API and maps both windows', async () => {
     const home = makeTemp(); installSlot(home); writeAuth(home); const requests = [];

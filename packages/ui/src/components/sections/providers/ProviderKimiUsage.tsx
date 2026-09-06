@@ -11,8 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
 
 /**
- * Kimi Code subscription allowance on the Providers card. Only mount when the
- * Kimi Usage feature-plugin slot is on and this provider is connected.
+ * Kimi Code subscription allowance on the Providers card. Mount when this connected provider has credentials.
  */
 export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerId }) => {
   const { t } = useI18n();

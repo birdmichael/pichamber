@@ -1,11 +1,6 @@
 import fs from 'node:fs';
 
 import {
-  listConfiguredPiPackageSources,
-  readFeaturePlugins,
-  toFeaturePluginsPayload,
-} from './feature-plugins.js';
-import {
   XAI_PROVIDER_ID,
   isXaiSubscriptionId,
   listPiProviderPublicConfigs,
@@ -30,6 +25,7 @@ const readJsonObject = (filePath, readFile) => {
   }
 };
 
+/** Legacy slash-command compatibility; the HTTP usage surface below does not use this gate. */
 export const isXaiSlotActive = (payload) => Boolean(
   payload?.slots?.xai?.installed && payload?.slots?.xai?.enabled,
 );
@@ -337,18 +333,12 @@ export const getPiXaiUsage = async ({
   now = Date.now(),
 } = {}) => {
   const usageProviderId = isXaiSubscriptionId(providerId) ? providerId : XAI_PROVIDER_ID;
-  const payload = toFeaturePluginsPayload({
-    plugins: readFeaturePlugins(home),
-    configuredSources: listConfiguredPiPackageSources(home),
-  });
-  const slotActive = isXaiSlotActive(payload);
-  if (!slotActive) {
-    return { ok: false, configured: false, slotActive: false };
-  }
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
   let oauth = readOauthEntry(auth[usageProviderId]);
+  // Usage is a provider surface, not a Feature Plugin. OAuth presence is the
+  // same connection signal used by the xAI provider.
   if (!oauth) {
-    return { ok: false, configured: false, slotActive: true };
+    return { ok: false, configured: false, slotActive: false };
   }
   try {
     const windows = await withTimeout(async (signal) => {

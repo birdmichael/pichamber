@@ -549,7 +549,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       const kimiUsage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
       expect(kimiUsage).toEqual({ ok: false, configured: false, slotActive: false });
       const zaiUsage = await fetch(`${url}/api/pi/zai-usage`);
-      expect(zaiUsage.status).toBe(404);
+      expect(zaiUsage.status).toBe(200);
 
       const leftoverQuota = await fetch(`${url}/api/quota`);
       expect(leftoverQuota.status).toBe(404);
@@ -559,7 +559,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('reports xAI usage as unconfigured when the Grok Usage slot is on without oauth', async () => {
+  it('reports xAI usage as unconfigured when the provider has no oauth', async () => {
     const { url, close, kernel } = await startFacade();
     try {
       const home = kernel.host.getPath().home;
@@ -569,7 +569,7 @@ describe('OpenCode facade HTTP/SSE', () => {
         packages: ['npm:pi-xai-oauth'],
       }));
       const usage = await (await fetch(`${url}/api/pi/xai-usage`)).json();
-      expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
+      expect(usage).toEqual({ ok: false, configured: false, slotActive: false });
       expect(usage.usage).toBeUndefined();
     } finally {
       kernel.dispose();
@@ -577,7 +577,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('reports Kimi usage as unconfigured when the Kimi Usage slot is on without credentials', async () => {
+  it('reports Kimi usage as unconfigured when the provider has no credentials', async () => {
     const { url, close, kernel } = await startFacade();
     try {
       const home = kernel.host.getPath().home;
@@ -587,7 +587,7 @@ describe('OpenCode facade HTTP/SSE', () => {
         packages: ['npm:pi-kimi-code-console-usage'],
       }));
       const usage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
-      expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
+      expect(usage).toEqual({ ok: false, configured: false, slotActive: false });
       expect(usage.usage).toBeUndefined();
     } finally {
       kernel.dispose();
@@ -595,7 +595,7 @@ describe('OpenCode facade HTTP/SSE', () => {
     }
   });
 
-  it('reports Z.AI usage as unconfigured when the builtin slot is enabled', async () => {
+  it('reports Z.AI usage as unconfigured when the provider is disconnected', async () => {
     const { url, close, kernel } = await startFacade();
     try {
       const home = kernel.host.getPath().home;
@@ -604,7 +604,7 @@ describe('OpenCode facade HTTP/SSE', () => {
       fs.writeFileSync(defaults, JSON.stringify({ featurePlugins: { zai: { source: 'builtin:pichamber-zai-usage', enabled: true } } }));
       const response = await fetch(url + '/api/pi/zai-usage');
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ ok: false, configured: false, slotActive: true });
+      expect(await response.json()).toMatchObject({ ok: false, configured: false, slotActive: false });
     } finally {
       kernel.dispose();
       await close();

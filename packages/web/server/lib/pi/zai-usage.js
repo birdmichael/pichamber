@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 
-import { listConfiguredPiPackageSources, readFeaturePlugins, toFeaturePluginsPayload } from './feature-plugins.js';
 import { listPiProviderPublicConfigs, readZaiProviderRegion, resolvePiAuthPath } from './pi-resources.js';
 
 const ZAI_DOMESTIC_USAGE_ORIGIN = 'https://open.bigmodel.cn';
@@ -16,6 +15,7 @@ const readJsonObject = (filePath, readFile) => {
   try { const parsed = JSON.parse(readFile(filePath)); return isRecord(parsed) ? parsed : {}; } catch { return {}; }
 };
 
+/** Legacy slash-command compatibility; provider cards and Work Status ignore this gate. */
 export const isZaiSlotActive = (payload) => Boolean(payload?.slots?.zai?.installed && payload?.slots?.zai?.enabled);
 
 const readApiKey = (entry) => {
@@ -74,13 +74,12 @@ const withTimeout = async (work) => {
 const usageRequestFailed = (status) => { const error = new Error('Z.AI usage lookup failed (HTTP ' + status + ')'); error.status = status >= 400 && status < 600 ? status : 502; return error; };
 
 export const getPiZaiUsage = async ({ home, providerId = 'zai', fetchImpl = fetch, readFile = (filePath) => fs.readFileSync(filePath, 'utf8') } = {}) => {
-  const payload = toFeaturePluginsPayload({ plugins: readFeaturePlugins(home), configuredSources: listConfiguredPiPackageSources(home) });
-  if (!isZaiSlotActive(payload)) return { ok: false, configured: false, slotActive: false };
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
   const apiKey = readApiKey(providerId === 'zai' || !providerId ? auth.zai : auth[providerId]);
   const providerName = readProviderDisplayName(home);
   const region = readZaiProviderRegion(home, providerId);
-  if (!apiKey) return { ok: false, configured: false, slotActive: true, providerId, providerName, region };
+  // Z.AI usage follows the configured provider API key and its provider region.
+  if (!apiKey) return { ok: false, configured: false, slotActive: false, providerId, providerName, region };
   if (region !== 'domestic') return { ok: false, configured: true, slotActive: true, providerId, providerName, region: 'international', usageUnavailable: true, error: 'Z.AI usage is not available for the international region', usage: null, fetchedAt: Date.now() };
   try {
     const windows = await withTimeout(async (signal) => {

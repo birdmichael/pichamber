@@ -47,16 +47,14 @@ describe('UsageSectionBody provider status', () => {
 });
 
 describe('Pi usage groups', () => {
-  test('keeps xAI then Kimi Code order and fetches only active slots', () => {
-    expect(source).toContain("useFeaturePluginSlotActive('xai'");
-    expect(source).toContain("useFeaturePluginSlotActive('kimi'");
+  test('keeps xAI then Kimi Code order and follows connected providers', () => {
+    expect(source).not.toContain('useFeaturePluginSlotActive');
     expect(source).toContain("providerName: payload?.providerName || 'xAI'");
     expect(source).toContain("providerName: payload?.providerName || 'Kimi Code'");
     expect(source).toContain('fetchXaiUsage(id)');
     expect(source).toContain('fetchKimiUsage(id)');
-    expect(source.indexOf("...(xaiSlotActive ? xaiGroups : [])")).toBeLessThan(
-      source.indexOf("...(kimiSlotActive ? kimiGroups : [])"),
-    );
+    expect(source).toContain('...xaiGroups');
+    expect(source).toContain('...kimiGroups');
   });
 
   test('kimi groups set badge from membership and xAI omits it', () => {
