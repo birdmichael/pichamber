@@ -804,7 +804,12 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const selectableDesktopAgents = React.useMemo(() => {
         return agents.filter((agent) => isPrimaryMode(agent.mode));
     }, [agents]);
-    const showComposerAgentChip = shouldShowComposerAgentChip(selectableDesktopAgents);
+    // With Subagents installed, the Pi-only list still needs an Agent trigger:
+    // that trigger is the entry point for the plugin's roster menu.
+    const showComposerAgentChip = shouldShowComposerAgentChip(
+        selectableDesktopAgents,
+        subagentsPluginAvailable,
+    );
 
     const sortedAndFilteredAgents = React.useMemo(() => {
         const sorted = [...selectableDesktopAgents].sort((a, b) => a.name.localeCompare(b.name));
