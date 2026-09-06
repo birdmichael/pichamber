@@ -31,6 +31,7 @@ describe('status-line → finished info-row in-place handoff', () => {
   test('WorkingPlaceholder streaming line matches the turn footer model row', () => {
     expect(workingPlaceholderSource).toContain("'flex h-full items-center text-muted-foreground/60'");
     expect(workingPlaceholderSource).toContain('<span className="text-sm">');
+    expect(workingPlaceholderSource).toContain("thinkingLabel ? trimmedModelName + ' · ' + thinkingLabel : trimmedModelName");
     expect(messageBodySource).toContain(
       'flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground/60',
     );

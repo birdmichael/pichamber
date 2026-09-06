@@ -39,6 +39,16 @@ describe('getActiveAssistantContext', () => {
         });
     });
 
+    test('carries the active parent thinking level instead of a later queued selection', () => {
+        const activeParent = { ...userMessage('user_1', 'anthropic', 'claude-opus-4-1'), thinking: 'high' } as Message;
+        const assistant = assistantMessage('assistant_1', activeParent.id);
+        const laterSelection = { ...userMessage('user_2', 'openai', 'gpt-5.6-sol'), thinking: 'low' } as Message;
+        expect(getActiveAssistantContext([activeParent, assistant, laterSelection])).toEqual({
+            assistantId: assistant.id,
+            model: { providerId: 'anthropic', modelId: 'claude-opus-4-1' },
+            thinkingLevel: 'high',
+        });
+    });
     test('switches models only when a newer assistant links to the newer user message', () => {
         const firstUser = userMessage('user_1', 'anthropic', 'claude-opus-4-1');
         const firstAssistant = assistantMessage('assistant_1', firstUser.id);

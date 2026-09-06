@@ -134,6 +134,7 @@ interface StatusRowProps {
   showTodos?: boolean;
   agentName?: string;
   modelName?: string | null;
+  thinkingLevel?: string | null;
   providerId?: string | null;
   leftAccessory?: React.ReactNode;
 }
@@ -153,6 +154,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   showTodos = true,
   agentName,
   modelName,
+  thinkingLevel,
   providerId,
   leftAccessory,
 }) => {
@@ -338,6 +340,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
               retryInfo={retryInfo}
               agentName={agentName}
               modelName={modelName}
+              thinkingLevel={thinkingLevel}
               providerId={providerId}
             />
           ) : leftAccessory ? (
