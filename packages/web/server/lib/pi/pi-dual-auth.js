@@ -164,19 +164,22 @@ const modelsFromCatalogJson = (catalog, api) => {
   return models;
 };
 
+export const loadPiAiCatalogModels = (catalogFile, api = 'openai-completions') => {
+  const filePath = locatePiAiProviderData(catalogFile);
+  if (!filePath) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return modelsFromCatalogJson(parsed, api);
+  } catch {
+    return [];
+  }
+};
+
 export const loadDualAuthApiModels = (spec, region = 'international') => {
   if (!spec) return [];
   const regional = spec.regions?.[region] || spec;
-  const filePath = locatePiAiProviderData(regional.catalogFile);
-  if (filePath) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      const fromDisk = modelsFromCatalogJson(parsed, spec.api);
-      if (fromDisk.length > 0) return fromDisk;
-    } catch {
-      // Fall through to the baked-in seed.
-    }
-  }
+  const fromDisk = loadPiAiCatalogModels(regional.catalogFile, spec.api);
+  if (fromDisk.length > 0) return fromDisk;
   return spec.fallbackModels.map((model) => ({
     id: model.id,
     name: model.name,

@@ -416,6 +416,24 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, host.setKimiRegion(region, { providerId }));
   }));
 
+  app.get('/api/pi/zai-region', handle(async (_req, res) => {
+    if (typeof host.getZaiRegion !== 'function') {
+      json(res, 200, { region: 'international' });
+      return;
+    }
+    json(res, 200, host.getZaiRegion());
+  }));
+
+  app.put('/api/pi/zai-region', parseJson, handle(async (req, res) => {
+    if (typeof host.setZaiRegion !== 'function') {
+      json(res, 501, unsupported('zai.region'));
+      return;
+    }
+    const region = typeof req.body?.region === 'string' ? req.body.region : '';
+    const providerId = typeof req.body?.providerId === 'string' ? req.body.providerId : undefined;
+    json(res, 200, host.setZaiRegion(region, { providerId }));
+  }));
+
   app.post('/api/pi/subscription-clones', parseJson, handle(async (req, res) => {
     if (typeof host.createSubscriptionClone !== 'function') {
       json(res, 501, unsupported('subscription.clone'));

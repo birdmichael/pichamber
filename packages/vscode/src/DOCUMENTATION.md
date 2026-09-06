@@ -87,3 +87,7 @@ When adding new bridge route families:
 1. Prefer creating or extending a domain runtime module under `packages/vscode/src/bridge-*-runtime.ts`.
 2. Keep `bridge.ts` focused on delegation order and minimal fallthrough behavior.
 3. Inject dependencies into runtimes instead of reaching into unrelated modules directly.
+
+### Z.AI / 智谱
+
+Settings → Providers → Add Provider includes **智谱 / Z.AI**. Connect with an API key (OAuth is not offered). The 国内/国际 selector keeps the Settings id `zai` while selecting Pi's catalogs and hosts: international `zai` / `zai.json` at `https://api.z.ai/api/coding/paas/v4`; China `zai-coding-cn` models at `https://open.bigmodel.cn/api/coding/paas/v4`. Both use `openai-completions`. Region is persisted in Pi's settings; Z.AI usage is intentionally skipped in v1.

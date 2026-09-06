@@ -668,6 +668,52 @@ export const ProvidersPage: React.FC = () => {
     }
   };
 
+  const refreshZaiRegions = React.useCallback(async () => {
+    if (!isPiKernel) return;
+    try {
+      const response = await runtimeFetch('/api/pi/zai-region', { headers: { Accept: 'application/json' } });
+      const payload = await response.json().catch(() => null) as { rows?: Array<{ providerId?: string; region?: string }> } | null;
+      if (!Array.isArray(payload?.rows)) return;
+      const next: Record<string, 'international' | 'domestic'> = {};
+      for (const row of payload.rows) {
+        if (typeof row?.providerId !== 'string' || !row.providerId) continue;
+        next[row.providerId] = row.region === 'domestic' ? 'domestic' : 'international';
+      }
+      setRegionByProvider((prev) => ({ ...prev, ...next }));
+    } catch {
+      // Keep the last known / default international region.
+    }
+  }, [isPiKernel]);
+
+  React.useEffect(() => {
+    void refreshZaiRegions();
+  }, [refreshZaiRegions, providers]);
+
+  const handleSaveZaiRegion = async (providerId: string, region: 'international' | 'domestic') => {
+    setRegionByProvider((prev) => ({ ...prev, [providerId]: region }));
+    reportSettingsSaveState('saving');
+    try {
+      const response = await runtimeFetch('/api/pi/zai-region', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ providerId, region }),
+      });
+      if (!response.ok) {
+        reportSettingsSaveState('error');
+        toast.error(t('settings.providers.page.subscription.zaiRegion.failed'));
+        await refreshZaiRegions();
+        return;
+      }
+      reportSettingsSaveState('saved');
+      await loadProviders({ directory: settingsDirectory, source: 'settings:zai-region' });
+      await refreshZaiRegions();
+    } catch {
+      reportSettingsSaveState('error');
+      toast.error(t('settings.providers.page.subscription.zaiRegion.failed'));
+      await refreshZaiRegions();
+    }
+  };
+
   const handleSaveApiKey = async (providerId: string) => {
     const apiKey = apiKeyInputs[providerId]?.trim() ?? '';
     if (!apiKey) {
@@ -1049,24 +1095,23 @@ export const ProvidersPage: React.FC = () => {
                             />
                           </SettingsFieldRow>
                         ) : null}
-                        {isPiKernel && kimiSlotActive && isKimiSubscriptionId(candidateProviderId) ? (
+                        {isPiKernel && (kimiSlotActive && isKimiSubscriptionId(candidateProviderId) || candidateProviderId === 'zai') ? (
                           <SettingsFieldRow
-                            label={t('settings.providers.page.subscription.region.label')}
-                            info={t('settings.providers.page.subscription.region.info')}
-                            settingsItem="providers.subscription-kimi-region"
+                            label={t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.label' : 'settings.providers.page.subscription.region.label')}
+                            info={t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.info' : 'settings.providers.page.subscription.region.info')}
+                            settingsItem={candidateProviderId === 'zai' ? 'providers.subscription-zai-region' : 'providers.subscription-kimi-region'}
                           >
                             <SettingsChipGroup
                               value={regionByProvider[candidateProviderId] ?? 'international'}
-                              aria-label={t('settings.providers.page.subscription.region.aria')}
+                              aria-label={t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.aria' : 'settings.providers.page.subscription.region.aria')}
                               onChange={(value) => {
                                 setRegionByProvider((prev) => ({ ...prev, [candidateProviderId]: value }));
-                                // Persist the region before auth starts so domestic Kimi
-                                // never exposes or invokes international OAuth.
-                                void handleSaveRegion(candidateProviderId, value);
+                                if (candidateProviderId === 'zai') void handleSaveZaiRegion(candidateProviderId, value);
+                                else void handleSaveRegion(candidateProviderId, value);
                               }}
                               options={[
-                                { value: 'international', label: t('settings.featurePlugins.slot.kimi.region.international') },
-                                { value: 'domestic', label: t('settings.featurePlugins.slot.kimi.region.domestic') },
+                                { value: 'international', label: t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.international' : 'settings.featurePlugins.slot.kimi.region.international') },
+                                { value: 'domestic', label: t(candidateProviderId === 'zai' ? 'settings.providers.page.subscription.zaiRegion.domestic' : 'settings.featurePlugins.slot.kimi.region.domestic') },
                               ]}
                             />
                           </SettingsFieldRow>
@@ -1393,6 +1438,26 @@ export const ProvidersPage: React.FC = () => {
               />
             </SettingsFieldRow>
           ) : null}
+        </SettingsSection>
+      ) : null}
+
+      {isPiKernel && selectedProvider.id === 'zai' ? (
+        <SettingsSection title={t('settings.providers.page.subscription.zaiRegion.section')}>
+          <SettingsFieldRow
+            label={t('settings.providers.page.subscription.zaiRegion.label')}
+            info={t('settings.providers.page.subscription.zaiRegion.info')}
+            settingsItem="providers.subscription-zai-region"
+          >
+            <SettingsChipGroup
+              value={regionByProvider[selectedProvider.id] ?? 'international'}
+              aria-label={t('settings.providers.page.subscription.zaiRegion.aria')}
+              onChange={(value) => void handleSaveZaiRegion(selectedProvider.id, value)}
+              options={[
+                { value: 'international', label: t('settings.providers.page.subscription.zaiRegion.international') },
+                { value: 'domestic', label: t('settings.providers.page.subscription.zaiRegion.domestic') },
+              ]}
+            />
+          </SettingsFieldRow>
         </SettingsSection>
       ) : null}
 
