@@ -6,6 +6,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useHasPendingPiExtensionUiPrompt } from '@/sync/pi-extension-ui-store';
 import { useDirectorySync, useSessionMessages, useSessionPermissions, useSessionQuestions, useSessionStatus } from '@/sync/sync-context';
 import { isFullySyntheticMessage } from '@/lib/messages/synthetic';
+import { resolveTranscriptThinkingLabel } from '@/components/chat/piThinking';
 import { useCurrentSessionActivity } from './useSessionActivity';
 
 type AssistantActivity = 'idle' | 'streaming' | 'tooling' | 'cooldown' | 'permission';
@@ -25,6 +26,7 @@ export interface WorkingSummary {
     compactionDeadline: number | null;
     activePartType?: 'text' | 'tool' | 'reasoning' | 'editing';
     activeToolName?: string;
+    thinkingLevel?: string;
     wasAborted: boolean;
     abortActive: boolean;
     lastCompletionId: string | null;
@@ -51,6 +53,7 @@ interface ActiveAssistantModel {
 interface ActiveAssistantContext {
     assistantId: string | null;
     model: ActiveAssistantModel | null;
+    thinkingLevel?: string;
 }
 
 const DEFAULT_WORKING: WorkingSummary = {
@@ -303,7 +306,7 @@ const getToolDisplayName = (part: ToolPart): string => {
     return typeof candidate.name === 'string' ? candidate.name : 'tool';
 };
 
-export const getActiveAssistantContext = (messages: Message[]): ActiveAssistantContext => {
+const getActiveAssistantContextBase = (messages: Message[]): ActiveAssistantContext => {
     let assistantId: string | null = null;
     let parentId: string | null = null;
 
@@ -374,6 +377,22 @@ const readLastAssistantModel = (messages: Message[]): ActiveAssistantModel | nul
     return null;
 };
 
+const readMessageThinkingLevel = (message: Message | undefined): string | undefined => {
+    const candidate = message as { thinking?: unknown; variant?: unknown; model?: { variant?: unknown } } | undefined;
+    return resolveTranscriptThinkingLabel({ thinking: candidate?.thinking, variant: candidate?.variant, modelVariant: candidate?.model?.variant });
+};
+const readLastUserThinking = (messages: Message[]): string | undefined => messages.slice().reverse().filter((message) => message?.role === 'user').map(readMessageThinkingLevel).find((level): level is string => Boolean(level));
+const readActiveAssistantThinking = (messages: Message[], assistantId: string | null): string | undefined => {
+    const assistant = messages.find((message) => message?.id === assistantId) as { parentID?: unknown } | undefined;
+    const parentId = typeof assistant?.parentID === 'string' ? assistant.parentID : undefined;
+    const parent = messages.find((message) => message?.role === 'user' && message.id === parentId);
+    return parentId ? readMessageThinkingLevel(parent) : readLastUserThinking(messages);
+};
+export const getActiveAssistantContext = (messages: Message[]): ActiveAssistantContext => {
+    const context = getActiveAssistantContextBase(messages);
+    const thinkingLevel = readActiveAssistantThinking(messages, context.assistantId);
+    return thinkingLevel ? { ...context, thinkingLevel } : context;
+};
 export function useAssistantStatus(): AssistantStatusSnapshot {
     const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
     const currentSessionDirectory = useSessionUIStore((state) => state.currentSessionDirectory);
@@ -483,13 +502,14 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
             compactionDeadline: null,
             activePartType: isWorking ? parsedStatus.activePartType : undefined,
             activeToolName: isWorking ? parsedStatus.activeToolName : undefined,
+            thinkingLevel: activeAssistant.thinkingLevel,
             wasAborted: false,
             abortActive: false,
             lastCompletionId: null,
             isComplete: false,
             retryInfo,
         };
-    }, [activityPhase, isPhaseWorking, parsedStatus, abortState, sessionRetryAttempt, sessionRetryNext]);
+    }, [activityPhase, isPhaseWorking, parsedStatus, abortState, sessionRetryAttempt, sessionRetryNext, activeAssistant.thinkingLevel]);
 
     const forming = React.useMemo<FormingSummary>(() => {
         const isActive = isPhaseWorking && parsedStatus.activePartType === 'text';

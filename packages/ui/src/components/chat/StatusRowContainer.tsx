@@ -50,6 +50,7 @@ export const StatusRowContainer: React.FC = React.memo(() => {
             showTodos={false}
             agentName={currentAgentName}
             modelName={modelDisplayName}
+            thinkingLevel={working.thinkingLevel}
             providerId={activeModel?.providerId ?? null}
         />
     );

@@ -3,6 +3,7 @@ import { BusyDots } from './BusyDots';
 import { useI18n } from '@/lib/i18n';
 import { useProviderLogo } from '@/hooks/useProviderLogo';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
+import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
 
 interface WorkingPlaceholderProps {
   isWorking: boolean;
@@ -12,6 +13,7 @@ interface WorkingPlaceholderProps {
   retryInfo?: { attempt?: number; next?: number } | null;
   agentName?: string;
   modelName?: string | null;
+  thinkingLevel?: string | null;
   providerId?: string | null;
 }
 
@@ -64,6 +66,7 @@ export function WorkingPlaceholder({
   isWaitingForPermission,
   retryInfo,
   modelName,
+  thinkingLevel,
   providerId,
 }: WorkingPlaceholderProps) {
   const { t } = useI18n();
@@ -218,13 +221,16 @@ export function WorkingPlaceholder({
     );
   }
 
+  const thinkingLabel = typeof thinkingLevel === 'string' && thinkingLevel.trim().length > 0
+    ? formatEffortLabel(thinkingLevel)
+    : null;
   if (!displayedText) {
     return null;
   }
 
   const trimmedModelName = typeof modelName === 'string' ? modelName.trim() : '';
   const label = trimmedModelName.length > 0
-    ? t('chat.statusRow.modelStatus', { model: trimmedModelName, status: displayedText })
+    ? t('chat.statusRow.modelStatus', { model: thinkingLabel ? trimmedModelName + ' · ' + thinkingLabel : trimmedModelName, status: displayedText })
     : displayedText.charAt(0).toUpperCase() + displayedText.slice(1);
 
   return (
