@@ -6,6 +6,10 @@ describe('shouldShowComposerAgentChip', () => {
     expect(shouldShowComposerAgentChip([{ name: 'pi' }])).toBe(false);
   });
 
+  test('keeps the Pi trigger when the Subagents plugin owns the menu', () => {
+    expect(shouldShowComposerAgentChip([{ name: 'pi' }], true)).toBe(true);
+  });
+
   test('keeps OpenCode build, plan, and custom agents visible', () => {
     expect(shouldShowComposerAgentChip([{ name: 'build' }])).toBe(true);
     expect(shouldShowComposerAgentChip([
