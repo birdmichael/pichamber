@@ -1097,23 +1097,51 @@ const publicPiProviderConfig = (provider) => {
   return envName ? { ...safe, env: [envName] } : safe;
 };
 
-const enrichProviderModels = (provider) => {
+const enrichProviderModels = (provider, providerIdOverride = '') => {
   if (!provider || typeof provider !== 'object' || Array.isArray(provider)) {
     return { provider, changed: false };
   }
   const models = Array.isArray(provider.models) ? provider.models : [];
   // Keep the transport choice explicit on every model. Pi provider config normally supplies this default, but an explicit model api can otherwise select a different transport.
   const providerApi = typeof provider.api === 'string' && provider.api.trim() ? provider.api.trim() : '';
+  const baseUrl = typeof provider.baseUrl === 'string' ? provider.baseUrl.trim().toLowerCase() : '';
+  const rawProviderId = typeof providerIdOverride === 'string' && providerIdOverride.trim() ? providerIdOverride : provider.id;
+  const providerId = typeof rawProviderId === 'string' ? rawProviderId.trim().toLowerCase() : '';
+  const isXaiOrGrokEndpoint = providerId === 'xai'
+    || providerId.startsWith('xai-')
+    || providerId === 'grok'
+    || baseUrl.includes('grok')
+    || providerId.startsWith('grok-')
+    || /(?:^|[/:.])x\.ai(?:[/:]|$)/.test(baseUrl);
   let changed = false;
   const nextModels = models.map((model) => {
     if (!model || typeof model !== 'object' || typeof model.id !== 'string') return model;
     const enriched = enrichKnownModelEntry(model.id, model);
+    const modelId = model.id.trim().toLowerCase();
+    const modelName = typeof model.name === 'string' ? model.name.trim().toLowerCase() : '';
+    const isGrokModel = modelId.includes('grok') || modelName.includes('grok');
+    const supportsDeveloperRole = providerApi === 'openai-completions'
+      && !isXaiOrGrokEndpoint
+      && !isGrokModel;
+    let nextModel = enriched.model;
     if (enriched.changed) changed = true;
-    if (providerApi && enriched.model.api !== providerApi) {
+    if (providerApi && nextModel.api !== providerApi) {
       changed = true;
-      return { ...enriched.model, api: providerApi };
+      nextModel = { ...nextModel, api: providerApi };
     }
-    return enriched.model;
+    if (supportsDeveloperRole && nextModel.compat?.supportsDeveloperRole !== false) {
+      changed = true;
+      nextModel = {
+        ...nextModel,
+        compat: {
+          ...(nextModel.compat && typeof nextModel.compat === 'object' && !Array.isArray(nextModel.compat)
+            ? nextModel.compat
+            : {}),
+          supportsDeveloperRole: false,
+        },
+      };
+    }
+    return nextModel;
   });
   return {
     provider: changed ? { ...provider, models: nextModels } : provider,
@@ -1125,6 +1153,7 @@ const enrichProviderModels = (provider) => {
  * Fill known vision / reasoning ids on an existing models.json without a
  * Settings save. Missing or Pi-default `["text"]` is treated as empty.
  * Unknown ids and explicit non-default values stay as stored.
+ * Custom OpenAI completions models also opt out of developer role unless they target xAI/Grok.
  */
 export const hydrateKnownModelCapabilities = ({ home = os.homedir(), directory } = {}) => {
   const files = [resolvePiModelsPath(home)];
@@ -1138,7 +1167,7 @@ export const hydrateKnownModelCapabilities = ({ home = os.homedir(), directory }
     const providers = { ...providerMap(current) };
     let changed = false;
     for (const [id, provider] of Object.entries(providers)) {
-      const next = enrichProviderModels(provider);
+      const next = enrichProviderModels(provider, id);
       if (!next.changed) continue;
       providers[id] = next.provider;
       changed = true;
@@ -1179,7 +1208,7 @@ export const listPiProviderPublicConfigs = ({ home = os.homedir(), directory } =
     const project = projectProviders[id] && typeof projectProviders[id] === 'object' && !Array.isArray(projectProviders[id])
       ? projectProviders[id]
       : {};
-    result[id] = publicPiProviderConfig(enrichProviderModels({ ...user, ...project }).provider);
+    result[id] = publicPiProviderConfig(enrichProviderModels({ ...user, ...project }, id).provider);
   }
   return result;
 };

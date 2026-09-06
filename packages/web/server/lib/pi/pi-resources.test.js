@@ -735,8 +735,8 @@ description: >
       { id: 'mystery', name: 'Mystery' },
     ]);
     expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
-      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000, input: ['text', 'image'] },
-      { id: 'mystery', name: 'Mystery' },
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 128000, input: ['text', 'image'], compat: { supportsDeveloperRole: false } },
+      { id: 'mystery', name: 'Mystery', compat: { supportsDeveloperRole: false } },
     ]);
   });
 
@@ -849,7 +849,7 @@ description: >
     ]);
     expect(listPiProviderPublicConfigs({ home }).acme.models).toEqual([
       { id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
-      { id: 'mystery', name: 'Mystery' },
+      { id: 'mystery', name: 'Mystery', compat: { supportsDeveloperRole: false } },
     ]);
   });
 
@@ -898,8 +898,46 @@ description: >
 
     expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([modelsPath]);
     expect(JSON.parse(fs.readFileSync(modelsPath, 'utf8')).providers.proxy.models).toEqual([
-      { id: 'gpt-6-astra', api: 'openai-completions', input: ['text', 'image'], reasoning: true },
+      { id: 'gpt-6-astra', api: 'openai-completions', input: ['text', 'image'], reasoning: true, compat: { supportsDeveloperRole: false } },
     ]);
+  });
+
+  it('disables the developer role for non-xAI OpenAI completions during hydration', () => {
+    const home = makeTemp();
+    const modelsPath = path.join(home, '.pi', 'agent', 'models.json');
+    fs.mkdirSync(path.dirname(modelsPath), { recursive: true });
+    fs.writeFileSync(modelsPath, JSON.stringify({
+      providers: {
+        moonshot: {
+          baseUrl: 'https://api.moonshot.cn/v1',
+          api: 'openai-completions',
+          models: [{ id: 'kimi-k2.5', compat: { supportsDeveloperRole: true, keep: 'yes' } }],
+        },
+        xai: {
+          baseUrl: 'https://api.x.ai/v1',
+          api: 'openai-completions',
+          models: [{ id: 'grok-4.6' }],
+        },
+        proxy: {
+          baseUrl: 'https://grok.example.test/v1',
+          api: 'openai-completions',
+          models: [{ id: 'proxy-model' }],
+        },
+        responses: {
+          baseUrl: 'https://api.example.test/v1',
+          api: 'openai-responses',
+          models: [{ id: 'gpt-6-astra' }],
+        },
+      },
+    }, null, 2));
+
+    expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([modelsPath]);
+    const providers = JSON.parse(fs.readFileSync(modelsPath, 'utf8')).providers;
+    expect(providers.moonshot.models[0].compat).toEqual({ supportsDeveloperRole: false, keep: 'yes' });
+    expect(providers.xai.models[0].compat).toBeUndefined();
+    expect(providers.proxy.models[0].compat).toBeUndefined();
+    expect(providers.responses.models[0].compat).toBeUndefined();
+    expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([]);
   });
 
   it('writes and removes provider auth in the Pi auth.json shape', () => {
