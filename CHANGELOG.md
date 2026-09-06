@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.17] - 2026-09-07
+
+### Fixed / Improved
+- Running status stays aligned with the active prompt model without a stale model flash (#608).
+- Custom Completions providers preserve Kimi compatibility by disabling the developer role where required (#609).
+
 ## [1.2.16] - 2026-09-07
 
 ### Fixed / Improved
