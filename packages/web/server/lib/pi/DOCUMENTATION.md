@@ -275,11 +275,12 @@ Lookup uses the official `provider/model` key first, then the same
 model id in models.dev, then that table. A live or stored Pi-default
 `["text"]` is empty, not a user override. Host startup hydrates
 already-saved rows for those known ids so an existing custom proxy does
-not stay text-only / thinking-off until the next Settings save. Fetch
-`/v1/models` applies the same known-id fill; it still must not invent a
-vendor `thinkingLevelMap`. Empty on an unknown id stays omitted — do
-not invent a window or capability that pretends to be user-set. Family
-inference and the UI 200k fallback stay display-only. `toProviderModelRecord` exposes
+not stay text-only / thinking-off until the next Settings save. Settings custom add, edit, and Fetch models overlay models.dev by model
+id (`gpt-6-astra` matches `openai/gpt-6-astra`) for vision / reasoning.
+Fetch `/v1/models` still must not invent a vendor `thinkingLevelMap`.
+Empty on an unknown id stays omitted — do not invent a window or
+capability that pretends to be user-set. Family inference and the UI
+200k fallback stay display-only. `toProviderModelRecord` exposes
 `limit.context` and composer `capabilities` so modality matches Pi.
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).

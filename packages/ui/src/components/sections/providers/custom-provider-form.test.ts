@@ -374,7 +374,8 @@ describe('validateCustomProvider', () => {
         },
       }],
     });
-    expect(state.models[0]?.input).toEqual(undefined);
+    expect(state.models[0]?.input).toEqual(['text', 'image']);
+    expect(state.models[0]?.reasoning).toBe(true);
 
     const saved = validateCustomProvider({
       form: {
@@ -590,6 +591,7 @@ describe('provider edit helpers', () => {
       id: 'gpt-4o',
       name: 'GPT-4o',
       contextWindow: 128000,
+      input: ['text', 'image'],
     });
   });
 
@@ -679,7 +681,7 @@ describe('fetch remote models request', () => {
         { id: '  ', name: 'blank' },
         { name: 'missing-id' },
       ],
-    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'] }]);
+    })).toEqual([{ id: 'grok-4.6', name: 'Grok 4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true }]);
   });
 
   test('keeps a provider-reported context and prefills exact ids when the catalog is silent', () => {
@@ -696,6 +698,30 @@ describe('fetch remote models request', () => {
       { id: 'claude-unknown-99', name: 'Claude mystery', contextWindow: 200000 },
       { id: 'mystery-model', name: 'Mystery' },
     ]);
+  });
+
+  test('fills models.dev capabilities when Fetch returns a matching id', () => {
+    const catalog = [{
+      id: 'gpt-6-astra',
+      providerId: 'openai',
+      attachment: true,
+      reasoning: true,
+      modalities: { input: ['text', 'image'] },
+    }];
+    expect(parseRemoteProviderModelsPayload({
+      models: [{ id: 'gpt-6-astra' }, { id: 'mystery-llm' }],
+    }, catalog)).toEqual([
+      { id: 'gpt-6-astra', name: 'gpt-6-astra', input: ['text', 'image'], reasoning: true },
+      { id: 'mystery-llm', name: 'mystery-llm' },
+    ]);
+    const edited = providerToCustomFormState({
+      id: 'ikuncode',
+      name: 'ikuncode',
+      models: [{ id: 'gpt-6-astra', name: 'gpt-6-astra' }],
+    }, catalog);
+    expect(edited.models[0]?.id).toBe('gpt-6-astra');
+    expect(edited.models[0]?.input).toEqual(['text', 'image']);
+    expect(edited.models[0]?.reasoning).toBe(true);
   });
 
   test('filters remote models by id, name, and family without mutating the source', () => {
@@ -793,6 +819,7 @@ describe('fetch remote models request', () => {
     expect(first[0]?.name).toBe('Grok 4.6');
     expect(first[0]?.contextWindow).toBe(500000);
     expect(first[0]?.input).toEqual(['text', 'image']);
+    expect(first[0]?.reasoning).toBe(true);
     expect(first[0]?.row.startsWith('row-')).toBe(true);
 
     const appended = addRemoteModelsToForm(first, [
