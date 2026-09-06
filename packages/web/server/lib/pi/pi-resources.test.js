@@ -881,6 +881,27 @@ description: >
     expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([]);
   });
 
+  it('pins a configured provider API onto every stored model, including GPT-looking ids', () => {
+    const home = makeTemp();
+    const modelsPath = path.join(home, '.pi', 'agent', 'models.json');
+    fs.mkdirSync(path.dirname(modelsPath), { recursive: true });
+    fs.writeFileSync(modelsPath, JSON.stringify({
+      providers: {
+        proxy: {
+          name: 'Proxy',
+          baseUrl: 'https://proxy.example.test/v1',
+          api: 'openai-completions',
+          models: [{ id: 'gpt-6-astra', api: 'openai-responses' }],
+        },
+      },
+    }));
+
+    expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([modelsPath]);
+    expect(JSON.parse(fs.readFileSync(modelsPath, 'utf8')).providers.proxy.models).toEqual([
+      { id: 'gpt-6-astra', api: 'openai-completions', input: ['text', 'image'], reasoning: true },
+    ]);
+  });
+
   it('writes and removes provider auth in the Pi auth.json shape', () => {
     const home = makeTemp();
     const other = writePiProviderAuth('other-provider', { type: 'api', key: 'sk-keep-me' }, { home });

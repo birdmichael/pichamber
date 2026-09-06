@@ -1087,8 +1087,14 @@ const envNameFromApiKey = (apiKey) => {
 const publicPiProviderConfig = (provider) => {
   if (!provider || typeof provider !== 'object') return {};
   const envName = envNameFromApiKey(provider.apiKey) || firstEnvName(provider.env);
-  const { apiKey: _apiKey, env: _env, ...rest } = provider;
-  return envName ? { ...rest, env: [envName] } : rest;
+  const publicModels = Array.isArray(provider.models) ? provider.models.map((model) => {
+    if (!model || typeof model !== 'object' || Array.isArray(model)) return model;
+    const { api: _api, ...rest } = model;
+    return rest;
+  }) : undefined;
+  const { apiKey: _apiKey, env: _env, models: _models, ...rest } = provider;
+  const safe = publicModels ? { ...rest, models: publicModels } : rest;
+  return envName ? { ...safe, env: [envName] } : safe;
 };
 
 const enrichProviderModels = (provider) => {
@@ -1096,11 +1102,17 @@ const enrichProviderModels = (provider) => {
     return { provider, changed: false };
   }
   const models = Array.isArray(provider.models) ? provider.models : [];
+  // Keep the transport choice explicit on every model. Pi provider config normally supplies this default, but an explicit model api can otherwise select a different transport.
+  const providerApi = typeof provider.api === 'string' && provider.api.trim() ? provider.api.trim() : '';
   let changed = false;
   const nextModels = models.map((model) => {
     if (!model || typeof model !== 'object' || typeof model.id !== 'string') return model;
     const enriched = enrichKnownModelEntry(model.id, model);
     if (enriched.changed) changed = true;
+    if (providerApi && enriched.model.api !== providerApi) {
+      changed = true;
+      return { ...enriched.model, api: providerApi };
+    }
     return enriched.model;
   });
   return {
