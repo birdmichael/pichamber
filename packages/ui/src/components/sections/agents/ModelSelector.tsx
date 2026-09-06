@@ -109,8 +109,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         if (!providerId || !modelId) {
             return placeholder || t('settings.agents.modelSelector.notSelected');
         }
-        return getProviderModelRefDisplayName(providerId, modelId);
-    }, [modelId, placeholder, providerId, t]);
+        const provider = providers.find((entry) => entry.id === providerId);
+        const model = provider?.models?.find((entry) => entry.id === modelId);
+        return getProviderModelRefDisplayName(providerId, modelId, {
+            providerName: provider?.name,
+            modelName: model?.name,
+        });
+    }, [modelId, placeholder, providerId, providers, t]);
 
     const picker = (
         <ModelPickerList
