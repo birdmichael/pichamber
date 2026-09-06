@@ -66,6 +66,7 @@ import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
 import { ProviderXaiUsage } from './ProviderXaiUsage';
 import { ProviderKimiUsage } from './ProviderKimiUsage';
+import { ProviderZaiUsage } from './ProviderZaiUsage';
 import {
   buildAuthSetRequest,
   buildProviderUpsertRequest,
@@ -185,6 +186,7 @@ export const ProvidersPage: React.FC = () => {
   const isPiKernel = usePiKernel();
   const xaiSlotActive = useFeaturePluginSlotActive('xai', isPiKernel);
   const kimiSlotActive = useFeaturePluginSlotActive('kimi', isPiKernel);
+  const zaiSlotActive = useFeaturePluginSlotActive('zai', isPiKernel);
   const piAgentDir = useResolvedPiAgentDir();
   // Settings browses whichever project its own selector points at; the app
   // stays where it is.
@@ -1467,6 +1469,10 @@ export const ProvidersPage: React.FC = () => {
 
       {kimiSlotActive && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
         <ProviderKimiUsage providerId={selectedProvider.id} />
+      ) : null}
+
+      {zaiSlotActive && selectedProvider.id === 'zai' && hasCredentials ? (
+        <ProviderZaiUsage providerId={selectedProvider.id} />
       ) : null}
 
       <SettingsSection

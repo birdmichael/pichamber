@@ -9,7 +9,11 @@ import {
 } from './pi-resources.js';
 import { wrapPackageManagerWithElectronNativeTree } from './user-extension-electron-tree.js';
 
-const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi'];
+const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi', 'zai'];
+
+export const BUILTIN_FEATURE_PLUGIN_SOURCES = {
+  zai: 'builtin:pichamber-zai-usage',
+};
 
 export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   goal: 'npm:@narumitw/pi-goal',
@@ -20,6 +24,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES = {
   todo: 'npm:@juicesharp/rpiv-todo',
   xai: 'npm:pi-xai',
   kimi: 'npm:pi-kimi-code-console-usage',
+  zai: BUILTIN_FEATURE_PLUGIN_SOURCES.zai,
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS = {
@@ -82,6 +87,7 @@ export const featurePluginSourceIdentity = (source) => {
   ) {
     return value.replace(/\.git$/, '').split('#')[0];
   }
+  if (value.startsWith('builtin:')) return value;
   const looksLocal = value.startsWith('/')
     || value.startsWith('.')
     || value.includes('\\')
@@ -115,6 +121,10 @@ export const listConfiguredPiPackageSources = (home = os.homedir()) => {
 
 export const isFeaturePluginSourceInstalled = (source, configuredSources = []) => (
   configuredSources.some((item) => featurePluginSourcesMatch(source, item))
+);
+
+export const isBuiltinFeaturePluginSource = (source) => (
+  Object.values(BUILTIN_FEATURE_PLUGIN_SOURCES).some((item) => featurePluginSourcesMatch(source, item))
 );
 
 /** Leftover oauth package still counts as the Grok Usage slot until uninstall. */
@@ -223,6 +233,7 @@ const normalizeSlotConfig = (slot, raw) => {
   const next = {
     source: normalizeFeaturePluginSource(entry.source, defaults.source),
   };
+  if (isBuiltinFeaturePluginSource(next.source)) next.enabled = entry.enabled === true;
   if (DEFAULT_FEATURE_PLUGIN_COMMANDS[slot]) {
     next.command = normalizeGoalCommand(entry.command, defaults.command);
   }
@@ -248,7 +259,7 @@ const serializeFeaturePlugins = (plugins) => {
     const entry = normalized[slot];
     out[slot] = DEFAULT_FEATURE_PLUGIN_COMMANDS[slot]
       ? { source: entry.source, command: entry.command }
-      : { source: entry.source };
+      : { source: entry.source, ...(isBuiltinFeaturePluginSource(entry.source) && entry.enabled === true ? { enabled: true } : {}) };
   }
   return out;
 };
@@ -280,6 +291,7 @@ export const featurePluginPatchHasPersistableFields = (patch) => {
     if (typeof value !== 'object' || Array.isArray(value)) return true;
     if (Object.prototype.hasOwnProperty.call(value, 'source')) return true;
     if (Object.prototype.hasOwnProperty.call(value, 'command')) return true;
+    if (isBuiltinFeaturePluginSource(normalizeFeaturePluginSource(value?.source, DEFAULT_FEATURE_PLUGIN_SOURCES[slot])) && Object.prototype.hasOwnProperty.call(value, 'enabled')) return true;
   }
   return false;
 };
@@ -318,6 +330,9 @@ export const mergeFeaturePluginPatch = (current, patch) => {
         throw error;
       }
       merged.command = raw;
+    }
+    if (isBuiltinFeaturePluginSource(merged.source) && Object.prototype.hasOwnProperty.call(value, 'enabled')) {
+      merged.enabled = value.enabled === true;
     }
     next[slot] = merged;
   }
@@ -395,6 +410,14 @@ export const listFeaturePluginSlashCommands = (payload) => {
       source: 'extension',
     });
   }
+  const zai = payload?.slots?.zai;
+  if (zai?.installed && zai.enabled) {
+    listed.push({
+      name: 'zai-usage',
+      description: 'Show Z.AI subscription usage',
+      source: 'extension',
+    });
+  }
   return listed;
 };
 
@@ -408,7 +431,9 @@ export const toFeaturePluginsPayload = ({
     const entry = normalized[slot];
     const installed = slot === 'xai'
       ? isXaiSlotSourceInstalled(configuredSources)
-      : isFeaturePluginSourceInstalled(entry.source, configuredSources);
+      : isBuiltinFeaturePluginSource(entry.source)
+        ? entry.enabled === true
+        : isFeaturePluginSourceInstalled(entry.source, configuredSources);
     slots[slot] = {
       ...entry,
       installed,
@@ -428,12 +453,14 @@ const packageListSourceKind = (identity) => {
     return 'git';
   }
   if (identity.startsWith('local:')) return 'local';
+  if (identity.startsWith('builtin:')) return 'builtin';
   return 'npm';
 };
 
 const packageListName = (identity) => {
   if (identity.startsWith('npm:')) return identity.slice('npm:'.length);
   if (identity.startsWith('local:')) return identity.slice('local:'.length);
+  if (identity.startsWith('builtin:')) return 'Pichamber built-in';
   if (identity.startsWith('git:')) return identity.slice('git:'.length);
   return identity;
 };

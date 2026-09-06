@@ -3300,6 +3300,7 @@ export const dict = {
   'chat.workStatus.kimi.membership.professional': 'Professional',
   'chat.workStatus.kimi.membership.enterprise': 'Enterprise',
   'chat.workStatus.kimi.window.weekly': 'Wöchentlich',
+  'chat.workStatus.zai.window.mcpTools': 'MCP tools',
   'chat.workStatus.goal.open': 'Ziel verwalten',
   'chat.workStatus.goal.pause': 'Pausieren',
   'chat.workStatus.goal.resume': 'Fortsetzen',

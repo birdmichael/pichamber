@@ -1184,3 +1184,8 @@ Pichamber exposes the Pi `zai` catalog as **智谱 / Z.AI** in Settings → Prov
 - China / 国内: `zai` row backed by Pi's `zai-coding-cn` catalog, `https://open.bigmodel.cn/api/coding/paas/v4`, `openai-completions`.
 
 Get a China key from `https://open.bigmodel.cn`; international keys are available from the Z.AI console at `https://z.ai`. Pichamber intentionally does not show the unrelated OpenCode quota endpoint as a usage card in v1.
+
+
+### Z.AI Usage feature plugin
+
+Feature Plugins → Z.AI Usage is a first-party builtin slot (builtin:pichamber-zai-usage); enabling it does not install an npm package. GET /api/pi/zai-usage reads the zai API key from Pi auth and, for the domestic region only, calls https://open.bigmodel.cn/api/monitor/usage/quota/limit, mapping TOKENS_LIMIT to the 5-hour window and TIME_LIMIT to the MCP tools monthly window. International Z.AI usage is reported as unavailable rather than fabricated as 0%. The endpoint returns 404 while the slot is off, and /zai-usage follows the same activation rule.
