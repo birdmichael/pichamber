@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.14] - 2026-09-06
+
+- Kimi China/international routing plus the Z.AI provider and built-in Z.AI Usage Feature Plugin. See the root `CHANGELOG.md`.
+
 ## [1.2.13] - 2026-09-06
 
 - Desktop, Files, renderer, provider, and browser fixes since 1.2.12: visible provider auth errors, safer open flows, tiny-`/dev/shm` recovery, Files tree/composer Esc fixes, custom-provider model sync, dual Grok/Kimi subscriptions, and browser history/action-race fixes. See the root `CHANGELOG.md`.
