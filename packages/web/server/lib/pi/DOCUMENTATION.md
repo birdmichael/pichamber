@@ -263,19 +263,23 @@ the custom form. Models still come from Pi at runtime.
 ## Custom provider context windows and input
 
 Settings → Providers custom-model rows persist Pi `contextWindow`,
-`input`, and `reasoning` on that model in `{agentDir}/models.json` (and
-project `.pi/models.json`). Save must not strip a stored
-`["text", "image"]` or `reasoning: true`. Empty on a known id writes
-that id's published window (`grok-4.6` = 500k) and, when the same id is
-a known vision / thinking model, `input: ["text", "image"]` and
-`reasoning: true`. Lookup uses the official `provider/model` key first,
-then the same model id in models.dev, then the published id table. A
-live or stored Pi-default `["text"]` is empty, not a user override.
-Host startup hydrates already-saved rows for those known ids so an
-existing custom proxy does not stay text-only until the next Settings
-save. Empty on an unknown id stays omitted — do not invent a window or
-capability that pretends to be user-set. Family inference and the UI
-200k fallback stay display-only. `toProviderModelRecord` exposes
+`input`, `reasoning`, and `thinkingLevelMap` on that model in
+`{agentDir}/models.json` (and project `.pi/models.json`). Save must not
+strip a stored `["text", "image"]`, `reasoning: true`, or
+`thinkingLevelMap`. Empty on a known id writes that id's published
+window (`grok-4.6` = 500k) and, when the same id is a known vision /
+thinking model, `input: ["text", "image"]` and `reasoning: true`.
+Known thinking/vision ids include the published table plus GPT-5.5 /
+GPT-5.6 / GPT-6 families (`gpt-6-astra`, `gpt-5.6-terra`) and o1/o3/o4.
+Lookup uses the official `provider/model` key first, then the same
+model id in models.dev, then that table. A live or stored Pi-default
+`["text"]` is empty, not a user override. Host startup hydrates
+already-saved rows for those known ids so an existing custom proxy does
+not stay text-only / thinking-off until the next Settings save. Fetch
+`/v1/models` applies the same known-id fill; it still must not invent a
+vendor `thinkingLevelMap`. Empty on an unknown id stays omitted — do
+not invent a window or capability that pretends to be user-set. Family
+inference and the UI 200k fallback stay display-only. `toProviderModelRecord` exposes
 `limit.context` and composer `capabilities` so modality matches Pi.
 Pi reads the stored fields; a missing window becomes its 128k default,
 and a missing `input` becomes `["text"]` (images are omitted).

@@ -911,6 +911,21 @@ const readModelReasoning = (model) => {
   return model.reasoning === true ? true : undefined;
 };
 
+const readThinkingLevelMap = (model) => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) return undefined;
+  const map = model.thinkingLevelMap;
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return undefined;
+  const next = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(map)) {
+    if (typeof key !== 'string' || !key.trim()) continue;
+    if (value !== null && typeof value !== 'string') continue;
+    next[key.trim()] = value;
+    count += 1;
+  }
+  return count > 0 ? next : undefined;
+};
+
 const toPiModelEntry = (id, model) => {
   const name = model && typeof model === 'object' && typeof model.name === 'string' && model.name.trim()
     ? model.name.trim()
@@ -919,6 +934,7 @@ const toPiModelEntry = (id, model) => {
   const maxTokens = readModelMaxTokens(model);
   const input = readModelInput(model);
   const reasoning = readModelReasoning(model);
+  const thinkingLevelMap = readThinkingLevelMap(model);
   return {
     id,
     name,
@@ -926,7 +942,29 @@ const toPiModelEntry = (id, model) => {
     ...(maxTokens !== undefined ? { maxTokens } : {}),
     ...(input !== undefined ? { input } : {}),
     ...(reasoning ? { reasoning: true } : {}),
+    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
   };
+};
+
+/** Settings form does not edit thinkingLevelMap; keep the stored map per id. */
+const preserveStoredModelFields = (previousModels, nextModels) => {
+  if (!Array.isArray(nextModels) || nextModels.length === 0) return nextModels;
+  const previousById = new Map();
+  if (Array.isArray(previousModels)) {
+    for (const model of previousModels) {
+      const id = typeof model?.id === 'string' ? model.id.trim() : '';
+      if (id) previousById.set(id, model);
+    }
+  }
+  if (previousById.size === 0) return nextModels;
+  return nextModels.map((model) => {
+    const previous = previousById.get(model.id);
+    if (!previous || typeof previous !== 'object') return model;
+    const thinkingLevelMap = model.thinkingLevelMap || readThinkingLevelMap(previous);
+    return thinkingLevelMap && !model.thinkingLevelMap
+      ? { ...model, thinkingLevelMap }
+      : model;
+  });
 };
 
 const normalizePiModels = (models) => {
@@ -1160,6 +1198,7 @@ export const upsertPiProviderConfig = ({
   const nextProvider = {
     ...previous,
     ...mapped,
+    models: preserveStoredModelFields(previous.models, mapped.models),
   };
   if (!mapped.apiKey) {
     delete nextProvider.apiKey;

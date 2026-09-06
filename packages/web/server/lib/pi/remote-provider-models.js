@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { enrichKnownModelEntry } from './known-model-capabilities.js';
 import { resolvePiAuthPath, resolvePiModelsPath } from './pi-resources.js';
 
 const BASE_URL_PATTERN = /^https?:\/\//;
@@ -339,13 +340,13 @@ export const parseRemoteModelsPayload = (body) => {
     const contextWindow = readRemoteContextWindow(item);
     const input = readRemoteModelInput(item);
     const reasoning = readRemoteModelReasoning(item);
-    models.push({
+    models.push(enrichKnownModelEntry(id, {
       id,
       name,
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(input !== undefined ? { input } : {}),
       ...(reasoning ? { reasoning: true } : {}),
-    });
+    }).model);
   }
   return models;
 };

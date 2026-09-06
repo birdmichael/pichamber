@@ -71,6 +71,13 @@ const KNOWN_VISION_MODEL_IDS = new Set([
   'gemini-2.5-flash-lite-preview-06-17',
 ]);
 
+/** GPT-5.5/5.6/6 custom-proxy ids. Exact set still wins for older names. */
+const KNOWN_VISION_ID_PREFIXES = [
+  'gpt-6-',
+  'gpt-5.6-',
+  'gpt-5.5-',
+];
+
 const KNOWN_REASONING_MODEL_IDS = new Set([
   'claude-fable-5',
   'claude-mythos-5',
@@ -122,7 +129,28 @@ const KNOWN_REASONING_MODEL_IDS = new Set([
   'deepseek-v4-flash',
   'deepseek-v4-pro',
   'deepseek-reasoner',
+  'gpt-5.5',
+  'o1',
+  'o3',
+  'o4',
 ]);
+
+const KNOWN_REASONING_ID_PREFIXES = [
+  'gpt-6-',
+  'gpt-5.6-',
+  'gpt-5.5-',
+  'o1-',
+  'o3-',
+  'o4-',
+];
+
+const matchesKnownIdPrefix = (normalized, prefixes) => {
+  if (!normalized) return false;
+  return prefixes.some((prefix) => {
+    if (normalized.startsWith(prefix)) return true;
+    return prefix.endsWith('-') && normalized === prefix.slice(0, -1);
+  });
+};
 
 export const normalizeKnownModelId = (id) => {
   let next = typeof id === 'string' ? id.trim().toLowerCase() : '';
@@ -138,13 +166,19 @@ export const normalizeKnownModelId = (id) => {
 
 export const lookupKnownVisionInput = (id) => {
   const normalized = normalizeKnownModelId(id);
-  return normalized && KNOWN_VISION_MODEL_IDS.has(normalized) ? ['text', 'image'] : undefined;
+  if (!normalized) return undefined;
+  if (KNOWN_VISION_MODEL_IDS.has(normalized) || matchesKnownIdPrefix(normalized, KNOWN_VISION_ID_PREFIXES)) {
+    return ['text', 'image'];
+  }
+  return undefined;
 };
 
 export const lookupKnownReasoning = (id) => {
   const normalized = normalizeKnownModelId(id);
   if (!normalized) return undefined;
-  if (KNOWN_REASONING_MODEL_IDS.has(normalized)) return true;
+  if (KNOWN_REASONING_MODEL_IDS.has(normalized) || matchesKnownIdPrefix(normalized, KNOWN_REASONING_ID_PREFIXES)) {
+    return true;
+  }
   return undefined;
 };
 
