@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.14] - 2026-09-06
+
+### Fixed
+- Kimi China/international routing: domestic uses moonshot.cn + moonshotai-cn models, remaps Code ids like k3-256k, syncs kimi-coding-api, hides international OAuth for domestic (#594)
+
+### Added
+- 智谱 / Z.AI (`zai`) provider with 国内/国际 hosts and catalogs (#595)
+- Builtin Z.AI Usage Feature Plugin (domestic bigmodel quota API; international unavailable) (#596)
+
 ## [1.2.13] - 2026-09-06
 
 ### Fixed
