@@ -391,6 +391,39 @@ describe('remote-provider-models', () => {
     ]);
   });
 
+  it('syncs Octopus live models instead of treating it as a skipped Pi builtin', async () => {
+    const home = makeTemp();
+    fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'auth.json'),
+      JSON.stringify({ octopus: { type: 'api_key', key: 'octopus-sync-key' } }),
+    );
+    fs.writeFileSync(
+      path.join(home, '.pi', 'agent', 'models.json'),
+      JSON.stringify({ providers: {
+        octopus: {
+          name: '章鱼',
+          baseUrl: 'https://zzone.cc.cd/v1',
+          api: 'openai-completions',
+          models: [],
+        },
+      } }),
+    );
+    const result = await syncCustomProviderRemoteModels({
+      home,
+      providerId: 'octopus',
+      scope: 'user',
+    }, {
+      fetchImpl: async (url, init) => {
+        expect(url).toBe('https://zzone.cc.cd/v1/models');
+        expect(init.headers.Authorization).toBe('Bearer octopus-sync-key');
+        return jsonResponse(200, { data: [{ id: 'gpt-5.4-mini' }, { id: 'codex-auto-review' }] });
+      },
+    });
+    expect(result).toMatchObject({ synced: true, added: 2, providerId: 'octopus' });
+    expect(JSON.stringify(result)).not.toContain('octopus-sync-key');
+  });
+
   it('skips builtin provider ids and leaves models.json untouched on fetch failure', async () => {
     const home = makeTemp();
     fs.mkdirSync(path.join(home, '.pi', 'agent'), { recursive: true });

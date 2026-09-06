@@ -1581,6 +1581,7 @@ export const settingsDict = {
   'settings.providers.page.empty.checkOpenCodeConfiguration': '请检查 {path}/models.json 和 auth.json',
   'settings.providers.page.empty.selectProviderFromSidebar': '请从侧边栏选择提供商',
   'settings.providers.page.empty.reviewDetailsAndConfigureAuth': '查看详情并配置认证',
+  'settings.providers.page.octopus.info': '章鱼使用固定的 https://zzone.cc.cd/v1 OpenAI 兼容网关，并从 /v1/models 同步实时模型列表。',
   'settings.providers.page.connect.title': '连接提供商',
   'settings.providers.page.connect.selectProviderTitle': '选择提供商',
   'settings.providers.page.connect.providerField': '提供商',

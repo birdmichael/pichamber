@@ -1581,6 +1581,7 @@ export const settingsDict = {
   "settings.providers.page.empty.checkOpenCodeConfiguration": "Revisa {path}/models.json y auth.json",
   "settings.providers.page.empty.selectProviderFromSidebar": "Selecciona un proveedor desde el panel lateral",
   "settings.providers.page.empty.reviewDetailsAndConfigureAuth": "Revisa los detalles y configura la autenticación",
+  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   "settings.providers.page.connect.title": "Conectar proveedor",
   "settings.providers.page.connect.selectProviderTitle": "Seleccionar proveedor",
   "settings.providers.page.connect.providerField": "Proveedor",

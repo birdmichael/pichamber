@@ -356,7 +356,7 @@ export function isConfigDefinedCustomProvider(
   if (!sources) {
     return false;
   }
-  if (typeof provider.id === 'string' && isDualAuthApiSiblingId(provider.id)) {
+  if (typeof provider.id === 'string' && (isDualAuthApiSiblingId(provider.id) || provider.id === 'octopus')) {
     return false;
   }
   const inConfigLayer = Boolean(

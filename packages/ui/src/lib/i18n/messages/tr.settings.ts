@@ -1613,6 +1613,7 @@ export const settingsDict = {
   'settings.providers.page.empty.checkOpenCodeConfiguration': 'OpenCode yapılandırmanızı kontrol edin',
   'settings.providers.page.empty.selectProviderFromSidebar': 'Kenar çubuğundan bir provider seçin',
   'settings.providers.page.empty.reviewDetailsAndConfigureAuth': 'Ayrıntıları inceleyin ve kimlik doğrulamayı yapılandırın',
+  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   'settings.providers.page.connect.title': 'Provider\'ı Bağla',
   'settings.providers.page.connect.selectProviderTitle': 'Provider Seç',
   'settings.providers.page.connect.providerField': 'Provider',

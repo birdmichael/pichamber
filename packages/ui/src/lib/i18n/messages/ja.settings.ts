@@ -1614,6 +1614,7 @@ export const settingsDict = {
   'settings.providers.page.empty.checkOpenCodeConfiguration': '{path}/models.json と auth.json を確認してください',
   'settings.providers.page.empty.selectProviderFromSidebar': 'サイドバーから Provider を選択',
   'settings.providers.page.empty.reviewDetailsAndConfigureAuth': '詳細を確認し認証を設定',
+  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   'settings.providers.page.connect.title': 'Provider に接続',
   'settings.providers.page.connect.selectProviderTitle': 'Provider を選択',
   'settings.providers.page.connect.providerField': 'プロバイダー',

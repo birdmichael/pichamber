@@ -43,11 +43,11 @@ describe('ProvidersPage available provider loading', () => {
     expect(parseConnectedProviderIds({ all: [{ id: 'xai' }], connected: ['xai'], default: {} })).toEqual(['xai']);
     expect(parseConnectedProviderIds([{ id: 'xai' }])).toEqual([]);
     const catalog = mergeAddCatalogProviders([{ id: 'bmlab', name: 'bmlab' }]);
-    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding', 'zai']);
+    expect(catalog.map((provider) => provider.id)).toEqual(['bmlab', 'xai', 'kimi-coding', 'zai', 'octopus']);
     expect(catalog.find((provider) => provider.id === 'xai')?.name).toBe('xAI / Grok');
     expect(catalog.find((provider) => provider.id === 'kimi-coding')?.name).toBe('Kimi Code');
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
-    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding', 'zai']))).toEqual([]);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab'])).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai', 'octopus']);
+    expect(selectUnconnectedProviders(catalog, new Set(['bmlab', 'xai', 'kimi-coding', 'zai', 'octopus']))).toEqual([]);
     expect(selectAddCatalogProviders(
       [{ id: 'bmlab', name: 'bmlab' }, { id: 'xai', name: 'xai' }],
       new Set(['bmlab', 'xai']),
@@ -55,6 +55,7 @@ describe('ProvidersPage available provider loading', () => {
       { id: 'kimi-coding', name: 'Kimi Code' },
       { id: 'xai', name: 'xAI / Grok' },
       { id: 'zai', name: '智谱 / Z.AI' },
+      { id: 'octopus', name: '章鱼' },
     ]);
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai', name: 'xAI / Grok' }], '')).toBe('xai');
     expect(shouldAutoSelectBuiltinAddProvider(true, false, [{ id: 'xai' }], 'xai')).toBe(null);
@@ -62,6 +63,7 @@ describe('ProvidersPage available provider loading', () => {
     expect(selectSidebarProviders([
       { id: 'xai', models: {} },
       { id: 'zai', models: {} },
+      { id: 'octopus', models: {} },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ]).map((provider) => provider.id)).toEqual(['bmlab']);
     expect(selectSidebarProviders([
@@ -72,14 +74,18 @@ describe('ProvidersPage available provider loading', () => {
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
       { id: 'xai', models: { 'grok-4.6': { id: 'grok-4.6' } } },
       { id: 'zai', models: { 'glm-4.5': { id: 'glm-4.5' } } },
+      { id: 'octopus', models: [] },
       { id: 'bmlab', models: [{ id: 'grok-4.6' }] },
     ], {
       sourcesById: {
         anthropic: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
         xai: { auth: { exists: false }, user: { exists: false }, project: { exists: false } },
         zai: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
+        // ProvidersPage must pass its loaded sources so file-backed builtins
+        // remain visible while their model list is still empty.
+        octopus: { auth: { exists: true }, user: { exists: false }, project: { exists: false } },
       },
-    }).map((provider) => provider.id)).toEqual(['zai', 'bmlab']);
+    }).map((provider) => provider.id)).toEqual(['zai', 'octopus', 'bmlab']);
     expect(selectSidebarProviders([
       { id: 'anthropic', models: [{ id: 'claude-sonnet-4-5' }] },
     ], {
@@ -95,7 +101,7 @@ describe('ProvidersPage available provider loading', () => {
     expect(selectAddCatalogProviders(
       [{ id: 'kimi-coding-api', name: 'Kimi Code API' }, { id: 'xai-api', name: 'xAI API' }],
       new Set(['kimi-coding', 'kimi-coding-api']),
-    ).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
+    ).map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai', 'octopus']);
     expect(shouldAutoSelectCustomProvider(
       true,
       false,
@@ -240,6 +246,20 @@ describe('provider credential state helpers', () => {
       sourcesLoaded: true,
       hasCredentials: false,
       isEditableCustomProvider: false,
+    })).toBe(false);
+  });
+
+  test('Octopus keeps an empty models section available for explicit sync', () => {
+    expect(shouldShowModelsSection({
+      modelCount: 0,
+      sourcesLoaded: true,
+      hasCredentials: true,
+      allowEmptyModels: true,
+    })).toBe(true);
+    expect(shouldShowModelsSection({
+      modelCount: 0,
+      sourcesLoaded: true,
+      hasCredentials: true,
     })).toBe(false);
   });
 

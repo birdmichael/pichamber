@@ -1189,3 +1189,8 @@ Get a China key from `https://open.bigmodel.cn`; international keys are availabl
 ### Z.AI Usage feature plugin
 
 Feature Plugins → Z.AI Usage is a first-party builtin slot (builtin:pichamber-zai-usage); enabling it does not install an npm package. GET /api/pi/zai-usage reads the zai API key from Pi auth and, for the domestic region only, calls https://open.bigmodel.cn/api/monitor/usage/quota/limit, mapping TOKENS_LIMIT to the 5-hour window and TIME_LIMIT to the MCP tools monthly window. International Z.AI usage is reported as unavailable rather than fabricated as 0%. The endpoint returns 404 while the slot is off, and /zai-usage follows the same activation rule.
+
+
+### 章鱼 / Octopus provider
+
+The first-class `octopus` provider is API-key-only and uses the fixed `https://zzone.cc.cd/v1` base URL with Pi's `openai-completions` API. Saving the key writes `{ type: 'api_key', key }` under `auth.json`, creates the provider overlay in `models.json`, and reuses `remote-provider-models.js` to merge live `/v1/models` results on connect/save and explicit Settings sync.
