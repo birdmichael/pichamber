@@ -227,3 +227,5 @@ quality. Done in-repo vs. to-do at release time:
 - **Guideline 4.2 (minimum functionality)** — WebView-wrapper apps can be scrutinized; cite the
   native features (push, widgets, Control Center, QR pairing) in the review notes.
 - Signing/upload as covered in the CI section above (all three iOS targets; signed Android AAB).
+
+Z.AI Usage follows the desktop Work Status host when the builtin Feature Plugin slot is enabled; no mobile-specific quota chrome is needed.

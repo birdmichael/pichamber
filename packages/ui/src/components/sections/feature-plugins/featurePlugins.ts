@@ -1,6 +1,6 @@
 import type { I18nKey } from '@/lib/i18n';
 
-export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi'] as const;
+export const FEATURE_PLUGIN_SLOTS = ['goal', 'plan', 'mcp', 'subagents', 'btw', 'todo', 'xai', 'kimi', 'zai'] as const;
 
 export type FeaturePluginSlot = (typeof FEATURE_PLUGIN_SLOTS)[number];
 
@@ -13,6 +13,7 @@ export const DEFAULT_FEATURE_PLUGIN_SOURCES: Record<FeaturePluginSlot, string> =
   todo: 'npm:@juicesharp/rpiv-todo',
   xai: 'npm:pi-xai',
   kimi: 'npm:pi-kimi-code-console-usage',
+  zai: 'builtin:pichamber-zai-usage',
 };
 
 const DEFAULT_FEATURE_PLUGIN_COMMANDS: Partial<Record<FeaturePluginSlot, string>> = {
@@ -70,6 +71,7 @@ export const FEATURE_PLUGIN_SLOT_UI_IMPACT: Record<FeaturePluginSlot, readonly F
   todo: ['workStatus'],
   xai: ['workStatus', 'settings', 'commands'],
   kimi: ['workStatus', 'settings', 'commands'],
+  zai: ['workStatus', 'settings', 'commands'],
 };
 
 const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
@@ -111,6 +113,11 @@ const FEATURE_PLUGIN_SURFACE_TOOLTIP_KEY: Record<
     workStatus: 'settings.featurePlugins.slot.kimi.surface.workStatus.tooltip',
     settings: 'settings.featurePlugins.slot.kimi.surface.settings.tooltip',
     commands: 'settings.featurePlugins.slot.kimi.surface.commands.tooltip',
+  },
+  zai: {
+    workStatus: 'settings.featurePlugins.slot.zai.surface.workStatus.tooltip',
+    settings: 'settings.featurePlugins.slot.zai.surface.settings.tooltip',
+    commands: 'settings.featurePlugins.slot.zai.surface.commands.tooltip',
   },
 };
 
@@ -202,6 +209,12 @@ export const FEATURE_PLUGIN_SLOT_COPY: Record<FeaturePluginSlot, {
     infoHintKey: 'settings.featurePlugins.slot.kimi.infoHint',
     settingsItem: 'feature-plugins.kimi',
   },
+  zai: {
+    titleKey: 'settings.featurePlugins.slot.zai.title',
+    infoKey: 'settings.featurePlugins.slot.zai.info',
+    infoHintKey: 'settings.featurePlugins.slot.zai.infoHint',
+    settingsItem: 'feature-plugins.zai',
+  },
 };
 
 function emptyFeaturePluginSlot(slot: FeaturePluginSlot): FeaturePluginSlotState {
@@ -257,6 +270,7 @@ export function parseFeaturePluginsPayload(value: unknown): FeaturePluginsPayloa
 }
 
 export function presetSourceLabel(source: string): string {
+  if (source.startsWith('builtin:')) return 'Pichamber built-in';
   return source.replace(/^npm:/, '');
 }
 

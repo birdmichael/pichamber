@@ -3303,6 +3303,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.kimi.membership.professional': 'Profesional',
   'chat.workStatus.kimi.membership.enterprise': 'Empresa',
   'chat.workStatus.kimi.window.weekly': 'Semanal',
+  'chat.workStatus.zai.window.mcpTools': 'MCP tools',
   'chat.workStatus.goal.open': 'Gestionar objetivo',
   'chat.workStatus.goal.pause': 'Pausar',
   'chat.workStatus.goal.resume': 'Reanudar',

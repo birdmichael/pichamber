@@ -49,6 +49,7 @@ describe('feature plugin payload parsing', () => {
     expect(payload.slots.xai.source).toBe('npm:pi-xai');
     expect(payload.slots.kimi.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.kimi);
     expect(payload.slots.kimi.source).toBe('npm:pi-kimi-code-console-usage');
+    expect(payload.slots.zai.source).toBe(DEFAULT_FEATURE_PLUGIN_SOURCES.zai);
     expect(payload.slots.goal.installed).toBe(false);
     expect(payload.slots.goal.command).toBe('goal');
     expect(payload.slots.btw.command).toBe('btw');
@@ -62,7 +63,7 @@ describe('feature plugin payload parsing', () => {
     expect(parseFeaturePluginsPayload({ slots: { goal: { source: 'npm:@narumitw/pi-goal' } } })).toBeNull();
   });
 
-  test('accepts a complete eight-slot payload', () => {
+  test('accepts a complete nine-slot payload', () => {
     const parsed = parseFeaturePluginsPayload({
       slots: {
         goal: {
@@ -100,6 +101,7 @@ describe('feature plugin payload parsing', () => {
           installed: true,
           presets: [{ id: 'default', source: 'npm:pi-kimi-code-console-usage' }],
         },
+        zai: { source: 'builtin:pichamber-zai-usage', enabled: true, installed: true, presets: [{ id: 'default', source: 'builtin:pichamber-zai-usage' }] },
       },
     });
     expect(parsed?.slots.goal.installed).toBe(true);
@@ -170,9 +172,10 @@ describe('feature plugin payload parsing', () => {
     expect(featurePluginPackageLabel('todo')).toBe('@juicesharp/rpiv-todo');
     expect(featurePluginPackageLabel('xai')).toBe('pi-xai');
     expect(featurePluginPackageLabel('kimi')).toBe('pi-kimi-code-console-usage');
+    expect(featurePluginPackageLabel('zai')).toBe('Pichamber built-in');
   });
 
-  test('keeps Settings search IDs on the eight slot cards', () => {
+  test('keeps Settings search IDs on the nine slot cards', () => {
     expect(FEATURE_PLUGIN_SLOTS.map((slot) => FEATURE_PLUGIN_SLOT_COPY[slot].settingsItem)).toEqual([
       'feature-plugins.goal',
       'feature-plugins.plan',
@@ -182,6 +185,7 @@ describe('feature plugin payload parsing', () => {
       'feature-plugins.todo',
       'feature-plugins.xai',
       'feature-plugins.kimi',
+      'feature-plugins.zai',
     ]);
   });
 
@@ -206,6 +210,7 @@ describe('feature plugin payload parsing', () => {
     expect(pageSource.includes('<FeaturePluginImpactTags slot={slot} />')).toBe(true);
     expect(FEATURE_PLUGIN_SLOT_COPY.xai.infoHintKey).toBe('settings.featurePlugins.slot.xai.infoHint');
     expect(FEATURE_PLUGIN_SLOT_COPY.kimi.infoHintKey).toBe('settings.featurePlugins.slot.kimi.infoHint');
+    expect(FEATURE_PLUGIN_SLOT_COPY.zai.infoHintKey).toBe('settings.featurePlugins.slot.zai.infoHint');
     expect(enDict['settings.featurePlugins.slot.kimi.info']).toContain('Providers');
     expect(pageSource.includes('copy.infoHintKey')).toBe(true);
     expect(pageSource.indexOf('t(copy.infoKey)')).toBeLessThan(pageSource.indexOf('<FeaturePluginImpactTags slot={slot} />'));

@@ -13,7 +13,7 @@ export type UsageLimitRow = {
 };
 
 export type UsageProviderGroup = {
-  providerId: QuotaProviderId | 'kimi-coding';
+  providerId: QuotaProviderId | 'kimi-coding' | 'zai';
   providerName: string;
   rows: UsageLimitRow[];
   /** Provider-level message: a fetch error, or "nothing reported". */

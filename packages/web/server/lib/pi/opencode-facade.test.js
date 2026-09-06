@@ -548,6 +548,8 @@ describe('OpenCode facade HTTP/SSE', () => {
       expect(usage).not.toMatchObject({ usage: { windows: expect.anything() } });
       const kimiUsage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
       expect(kimiUsage).toEqual({ ok: false, configured: false, slotActive: false });
+      const zaiUsage = await fetch(`${url}/api/pi/zai-usage`);
+      expect(zaiUsage.status).toBe(404);
 
       const leftoverQuota = await fetch(`${url}/api/quota`);
       expect(leftoverQuota.status).toBe(404);
@@ -587,6 +589,39 @@ describe('OpenCode facade HTTP/SSE', () => {
       const usage = await (await fetch(`${url}/api/pi/kimi-usage`)).json();
       expect(usage).toEqual({ ok: false, configured: false, slotActive: true });
       expect(usage.usage).toBeUndefined();
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('reports Z.AI usage as unconfigured when the builtin slot is enabled', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const home = kernel.host.getPath().home;
+      const defaults = path.join(home, '.pi', 'agent', 'pichamber.json');
+      fs.mkdirSync(path.dirname(defaults), { recursive: true });
+      fs.writeFileSync(defaults, JSON.stringify({ featurePlugins: { zai: { source: 'builtin:pichamber-zai-usage', enabled: true } } }));
+      const response = await fetch(url + '/api/pi/zai-usage');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ok: false, configured: false, slotActive: true });
+    } finally {
+      kernel.dispose();
+      await close();
+    }
+  });
+
+  it('enables the builtin Z.AI slot without writing an npm package', async () => {
+    const { url, close, kernel } = await startFacade();
+    try {
+      const response = await fetch(url + '/api/pi/feature-plugins/zai/install', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) });
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload.slots.zai).toMatchObject({ installed: true, enabled: true, source: 'builtin:pichamber-zai-usage' });
+      const home = kernel.host.getPath().home;
+      const settings = fs.existsSync(path.join(home, '.pi', 'agent', 'settings.json'))
+        ? JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'settings.json'), 'utf8')) : {};
+      expect(settings.packages || []).not.toContain('builtin:pichamber-zai-usage');
     } finally {
       kernel.dispose();
       await close();

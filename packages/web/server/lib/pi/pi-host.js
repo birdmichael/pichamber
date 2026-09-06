@@ -62,11 +62,13 @@ import {
   getPiKimiUsage,
   isKimiSlotActive,
 } from './kimi-usage.js';
+import { getPiZaiUsage, isZaiSlotActive } from './zai-usage.js';
 import {
   createSdkPackageManager,
   createSettingsJsonPackageManager,
   DEFAULT_FEATURE_PLUGIN_SOURCES,
   isFeaturePluginSlot,
+  isBuiltinFeaturePluginSource,
   listConfiguredPiPackageSources,
   removeXaiConflictingOauthSource,
   removeXaiSlotSources,
@@ -3710,6 +3712,9 @@ export const createPiHost = ({
     getKimiUsage(options = {}) {
       return getPiKimiUsage({ home, ...options });
     },
+    getZaiUsage(options = {}) {
+      return getPiZaiUsage({ home, ...options });
+    },
     removeProviderAuth(providerId) {
       const result = removePiProviderAuth(providerId, { home });
       invalidateModelRuntime();
@@ -4494,6 +4499,20 @@ export const createPiHost = ({
         );
       }
 
+      if (name === 'zai-usage') {
+        if (!isZaiSlotActive(this.getFeaturePlugins())) {
+          const error = new Error('Command /zai-usage is not available on this session');
+          error.status = 404;
+          throw error;
+        }
+        if (await ensureLivePluginCommand(record, name)) {
+          return dispatchLiveSessionCommand(findLiveSessionCommand(record.piSession, name));
+        }
+        return reply(
+          'Z.AI usage is shown in Work Status and Settings → Providers when the Z.AI Usage plugin is enabled.',
+        );
+      }
+
       const goalCommand = readFeaturePlugins(home).goal?.command || 'goal';
       if (name === goalCommand) {
         if (!argument) {
@@ -5031,8 +5050,8 @@ export const createPiHost = ({
         throw error;
       }
       const current = readFeaturePlugins(home);
-      const source = slot === 'xai'
-        ? DEFAULT_FEATURE_PLUGIN_SOURCES.xai
+      const source = slot === 'xai' || slot === 'zai'
+        ? DEFAULT_FEATURE_PLUGIN_SOURCES[slot]
         : (typeof body.source === 'string' && body.source.trim()
           ? body.source.trim()
           : current[slot].source);
@@ -5041,22 +5060,32 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      const manager = await this.resolveFeaturePackageManager();
-      const persist = typeof manager.installAndPersist === 'function'
+      const manager = isBuiltinFeaturePluginSource(source)
+        ? createSettingsJsonPackageManager({ home })
+        : await this.resolveFeaturePackageManager();
+      const persist = isBuiltinFeaturePluginSource(source)
+        ? null
+        : typeof manager.installAndPersist === 'function'
         ? manager.installAndPersist.bind(manager)
         : typeof manager.install === 'function'
           ? manager.install.bind(manager)
           : null;
-      if (!persist) {
+      if (!persist && !isBuiltinFeaturePluginSource(source)) {
         const error = new Error('Pi package install is unavailable');
         error.status = 503;
         throw error;
       }
-      await persist(source);
+      if (isBuiltinFeaturePluginSource(source)) {
+        writeFeaturePlugins(home, { [slot]: { source, enabled: true } });
+      } else {
+        await persist(source);
+      }
       if (slot === 'xai' && typeof manager.removeAndPersist === 'function') {
         await removeXaiConflictingOauthSource({ manager, home });
       }
-      const next = writeFeaturePlugins(home, { [slot]: { source } });
+      const next = isBuiltinFeaturePluginSource(source)
+        ? readFeaturePlugins(home)
+        : writeFeaturePlugins(home, { [slot]: { source } });
       const reload = await this.reloadIdleSessions();
       return {
         ...toFeaturePluginsPayload({
@@ -5072,11 +5101,14 @@ export const createPiHost = ({
         error.status = 400;
         throw error;
       }
-      const manager = await this.resolveFeaturePackageManager();
+      const current = readFeaturePlugins(home);
+      const builtin = isBuiltinFeaturePluginSource(current[slot]?.source);
+      const manager = builtin ? null : await this.resolveFeaturePackageManager();
       if (slot === 'xai') {
         await removeXaiSlotSources({ manager, home });
+      } else if (builtin) {
+        writeFeaturePlugins(home, { [slot]: { source: current[slot].source, enabled: false } });
       } else {
-        const current = readFeaturePlugins(home);
         const source = typeof body.source === 'string' && body.source.trim()
           ? body.source.trim()
           : current[slot].source;

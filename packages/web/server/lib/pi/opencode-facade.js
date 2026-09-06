@@ -398,6 +398,16 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, await host.getKimiUsage({ providerId }));
   }));
 
+  app.get('/api/pi/zai-usage', handle(async (req, res) => {
+    if (typeof host.getZaiUsage !== 'function') {
+      json(res, 404, { ok: false, configured: false, slotActive: false });
+      return;
+    }
+    const providerId = typeof req.query?.providerId === 'string' ? req.query.providerId : undefined;
+    const usage = await host.getZaiUsage({ providerId });
+    json(res, usage?.slotActive ? 200 : 404, usage);
+  }));
+
   app.get('/api/pi/kimi-region', handle(async (_req, res) => {
     if (typeof host.getKimiRegion !== 'function') {
       json(res, 200, { region: 'international' });
