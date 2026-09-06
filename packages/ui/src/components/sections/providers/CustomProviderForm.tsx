@@ -34,6 +34,7 @@ import {
   createModelRow,
   fetchRemoteModelsErrorKey,
   isInferredModelContext,
+  mergeCatalogIntoModelRow,
   parseRemoteProviderModelsPayload,
   prepareRemoteModelPicker,
   remoteModelAlreadyAdded,
@@ -147,11 +148,37 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
       return;
     }
     seededEditProviderIdRef.current = isEdit ? initialValues.providerID : null;
-    setForm(initialValues);
+    setForm({
+      ...initialValues,
+      models: initialValues.models.map((row) => mergeCatalogIntoModelRow(row, catalog)),
+    });
     setErr({});
     setModelErrors([]);
     setHeaderErrors([]);
+    // catalog overlay is a separate effect so metadata arrival cannot reset edits.
   }, [initialValues, isEdit]);
+
+  React.useEffect(() => {
+    if (catalog.length === 0) {
+      return;
+    }
+    setForm((prev) => {
+      let changed = false;
+      const models = prev.models.map((row) => {
+        const next = mergeCatalogIntoModelRow(row, catalog);
+        if (
+          next.reasoning !== row.reasoning
+          || next.contextWindow !== row.contextWindow
+          || JSON.stringify(next.input ?? null) !== JSON.stringify(row.input ?? null)
+        ) {
+          changed = true;
+          return next;
+        }
+        return row;
+      });
+      return changed ? { ...prev, models } : prev;
+    });
+  }, [catalog]);
 
   const setField = (key: keyof Pick<CustomProviderFormState, 'providerID' | 'name' | 'baseURL' | 'apiKey'>, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -165,7 +192,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
         if (rowIndex !== index) {
           return row;
         }
-        return key === 'id' ? applyModelIdChange(row, value) : { ...row, [key]: value };
+        return key === 'id' ? applyModelIdChange(row, value, catalog) : { ...row, [key]: value };
       }),
     }));
     setModelErrors((prev) => {
@@ -272,7 +299,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
           : undefined;
         throw new Error(t(fetchRemoteModelsErrorKey(response.status, code) as Parameters<typeof t>[0]));
       }
-      const models = parseRemoteProviderModelsPayload(payload);
+      const models = parseRemoteProviderModelsPayload(payload, catalog);
       if (!models) {
         throw new Error(t('settings.providers.page.custom.error.fetch.failed'));
       }
@@ -312,7 +339,7 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
   const addRemoteModel = (model: RemoteProviderModel) => {
     setForm((prev) => ({
       ...prev,
-      models: addRemoteModelsToForm(prev.models, [model]),
+      models: addRemoteModelsToForm(prev.models, [model], catalog),
     }));
     setModelErrors([]);
   };

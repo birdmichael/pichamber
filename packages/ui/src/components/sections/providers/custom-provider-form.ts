@@ -49,6 +49,8 @@ export type ModelRow = {
   contextTouched?: boolean;
   /** Persisted Pi `input`. Not a Settings control — save must not strip it. */
   input?: PiModelInputType[];
+  /** Persisted Pi `reasoning`. Filled from models.dev / published ids. */
+  reasoning?: true;
 };
 
 export type HeaderRow = {
@@ -162,6 +164,62 @@ export const createModelRow = (): ModelRow => ({
   name: '',
 });
 
+/** models.dev / published-id fill for add, edit, and Fetch models. */
+export function catalogFieldsForModelId(
+  id: string,
+  source: {
+    catalog?: readonly CatalogCapabilityEntry[];
+    contextWindow?: unknown;
+    input?: unknown;
+    reasoning?: unknown;
+    contextTouched?: boolean;
+  } = {},
+): Pick<ModelRow, 'contextWindow' | 'input' | 'reasoning'> {
+  const trimmed = id.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const resolved = source.contextTouched
+    ? { contextWindow: readPositiveContextWindow(source.contextWindow) }
+    : resolveContextWindow({
+        id: trimmed,
+        catalogContextWindow: source.contextWindow,
+      });
+  const input = resolvePersistedImageInput({
+    id: trimmed,
+    input: source.input,
+    catalog: source.catalog,
+  });
+  const reasoning = resolvePersistedReasoning({
+    id: trimmed,
+    reasoning: source.reasoning,
+    catalog: source.catalog,
+  });
+  return {
+    ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
+    ...(input ? { input } : {}),
+    ...(reasoning ? { reasoning: true as const } : {}),
+  };
+}
+
+export function mergeCatalogIntoModelRow(
+  row: ModelRow,
+  catalog?: readonly CatalogCapabilityEntry[],
+): ModelRow {
+  const fields = catalogFieldsForModelId(row.id, {
+    catalog,
+    contextWindow: row.contextWindow,
+    input: row.input,
+    reasoning: row.reasoning,
+    contextTouched: row.contextTouched,
+  });
+  return {
+    ...row,
+    ...fields,
+    ...(row.contextTouched ? { contextWindow: row.contextWindow } : {}),
+  };
+}
+
 const readModelContextWindow = (model: unknown): number | undefined => {
   if (!model || typeof model !== 'object' || Array.isArray(model)) {
     return undefined;
@@ -206,17 +264,18 @@ const readModelInput = (model: unknown): PiModelInputType[] | undefined => {
   return undefined;
 };
 
-export const applyModelIdChange = (row: ModelRow, id: string): ModelRow => {
+export const applyModelIdChange = (
+  row: ModelRow,
+  id: string,
+  catalog?: readonly CatalogCapabilityEntry[],
+): ModelRow => {
   const next: ModelRow = { ...row, id };
   delete next.input;
-  if (row.contextTouched) {
-    return next;
+  delete next.reasoning;
+  if (!row.contextTouched) {
+    delete next.contextWindow;
   }
-  const resolved = resolveContextWindow({ id });
-  return {
-    ...next,
-    contextWindow: resolved.contextWindow,
-  };
+  return mergeCatalogIntoModelRow(next, catalog);
 };
 
 export const applyModelContextChange = (
@@ -381,7 +440,10 @@ export function resolveProviderConfigScope(
   return 'user';
 }
 
-export function providerToCustomFormState(provider: ProviderLikeForCustomForm): CustomProviderFormState {
+export function providerToCustomFormState(
+  provider: ProviderLikeForCustomForm,
+  catalog?: readonly CatalogCapabilityEntry[],
+): CustomProviderFormState {
   const options = provider.options && typeof provider.options === 'object' ? provider.options : {};
   const baseURL = typeof options.baseURL === 'string' ? options.baseURL : '';
   const headersRaw = options.headers && typeof options.headers === 'object' && !Array.isArray(options.headers)
@@ -407,13 +469,14 @@ export function providerToCustomFormState(provider: ProviderLikeForCustomForm): 
   const models = modelEntries.length > 0
     ? modelEntries.map((model) => {
         const input = readModelInput(model);
-        return {
+        const id = typeof model?.id === 'string' ? model.id : '';
+        return mergeCatalogIntoModelRow({
           row: nextRow(),
-          id: typeof model?.id === 'string' ? model.id : '',
-          name: typeof model?.name === 'string' ? model.name : (typeof model?.id === 'string' ? model.id : ''),
+          id,
+          name: typeof model?.name === 'string' ? model.name : id,
           contextWindow: readModelContextWindow(model) ?? (typeof model?.contextWindow === 'number' ? model.contextWindow : undefined),
           ...(input ? { input } : {}),
-        };
+        }, catalog);
       })
     : [createModelRow()];
 
@@ -506,6 +569,7 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
       });
       const reasoning = resolvePersistedReasoning({
         id,
+        reasoning: model.reasoning,
         catalog: input.catalog,
       });
       return [
@@ -604,6 +668,7 @@ export type RemoteProviderModel = {
   name: string;
   contextWindow?: number;
   input?: PiModelInputType[];
+  reasoning?: true;
 };
 
 export type FetchRemoteModelsRequest = {
@@ -653,7 +718,10 @@ export function buildFetchRemoteModelsRequest(
   };
 }
 
-export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProviderModel[] | null {
+export function parseRemoteProviderModelsPayload(
+  payload: unknown,
+  catalog?: readonly CatalogCapabilityEntry[],
+): RemoteProviderModel[] | null {
   if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { models?: unknown }).models)) {
     return null;
   }
@@ -670,19 +738,15 @@ export function parseRemoteProviderModelsPayload(payload: unknown): RemoteProvid
     seen.add(id);
     const rawName = (item as { name?: unknown }).name;
     const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim() : id;
-    const resolved = resolveContextWindow({
-      id,
-      catalogContextWindow: item,
-    });
-    const modelInput = resolvePersistedImageInput({
-      id,
+    const fields = catalogFieldsForModelId(id, {
+      catalog,
+      contextWindow: item,
       input: (item as { input?: unknown }).input,
     });
     models.push({
       id,
       name,
-      ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
-      ...(modelInput !== undefined ? { input: modelInput } : {}),
+      ...fields,
     });
   }
   return models;
@@ -858,16 +922,17 @@ export function collapseRemoteModels(
         catalogContextWindow: catalog?.contextWindow,
       });
       const catalogInput = group.find((model) => readPersistedModelInput(model.input) !== undefined);
-      const modelInput = resolvePersistedImageInput({
-        id,
+      const reasoned = group.find((model) => model.reasoning === true);
+      const fields = catalogFieldsForModelId(id, {
+        contextWindow: catalog?.contextWindow ?? resolved.contextWindow,
         input: catalogInput?.input,
+        reasoning: reasoned?.reasoning,
       });
       return {
         id,
         name: named?.name.trim() || group.find((model) => model.id === id)?.name || id,
         aliases: ids.filter((alias) => alias !== id).sort((left, right) => left.localeCompare(right)),
-        ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
-        ...(modelInput !== undefined ? { input: modelInput } : {}),
+        ...fields,
       };
     })
     .sort((left, right) => left.id.localeCompare(right.id));
@@ -943,6 +1008,7 @@ const isBlankModelRow = (row: ModelRow): boolean => (
 export function addRemoteModelsToForm(
   current: readonly ModelRow[],
   selected: readonly RemoteProviderModel[],
+  catalog?: readonly CatalogCapabilityEntry[],
 ): ModelRow[] {
   const added: ModelRow[] = [];
   const seen = current.map((row) => ({ ...row }));
@@ -951,20 +1017,17 @@ export function addRemoteModelsToForm(
     if (!id || remoteModelAlreadyAdded(seen, id) || remoteModelAlreadyAdded(added, id)) {
       continue;
     }
-    const resolved = resolveContextWindow({
-      id,
-      catalogContextWindow: model.contextWindow,
-    });
-    const modelInput = resolvePersistedImageInput({
-      id,
+    const fields = catalogFieldsForModelId(id, {
+      catalog,
+      contextWindow: model.contextWindow,
       input: model.input,
+      reasoning: model.reasoning,
     });
     const row = {
       row: nextRow(),
       id,
       name: model.name.trim() || id,
-      ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
-      ...(modelInput !== undefined ? { input: modelInput } : {}),
+      ...fields,
     };
     added.push(row);
     seen.push(row);

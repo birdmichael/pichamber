@@ -740,6 +740,66 @@ description: >
     ]);
   });
 
+  it('keeps a stored thinkingLevelMap when Settings save omits it', () => {
+    const home = makeTemp();
+    writePiProviderAuth('ikuncode', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
+    const thinkingLevelMap = {
+      off: 'none',
+      minimal: null,
+      low: 'low',
+      medium: 'medium',
+      high: 'high',
+      xhigh: 'xhigh',
+      max: 'max',
+    };
+    upsertPiProviderConfig({
+      home,
+      providerId: 'ikuncode',
+      config: {
+        npm: '@ai-sdk/openai',
+        name: 'ikuncode',
+        options: { baseURL: 'https://api.ikuncode.cc/v1' },
+        models: {
+          'gpt-5.6-terra': {
+            name: 'GPT-5.6 Terra',
+            reasoning: true,
+            thinkingLevelMap,
+          },
+        },
+      },
+    });
+
+    const saved = upsertPiProviderConfig({
+      home,
+      providerId: 'ikuncode',
+      config: {
+        npm: '@ai-sdk/openai',
+        name: 'ikuncode',
+        options: { baseURL: 'https://api.ikuncode.cc/v1' },
+        models: {
+          'gpt-5.6-terra': { name: 'GPT-5.6 Terra', reasoning: true },
+        },
+      },
+    });
+    expect(saved.config.models).toEqual([
+      {
+        id: 'gpt-5.6-terra',
+        name: 'GPT-5.6 Terra',
+        reasoning: true,
+        thinkingLevelMap,
+      },
+    ]);
+    const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
+    expect(stored.providers.ikuncode.models).toEqual([
+      {
+        id: 'gpt-5.6-terra',
+        name: 'GPT-5.6 Terra',
+        reasoning: true,
+        thinkingLevelMap,
+      },
+    ]);
+  });
+
   it('round-trips input on models.json and does not strip an existing value', () => {
     const home = makeTemp();
     writePiProviderAuth('acme', { type: 'api', key: 'sk-test-do-not-leak' }, { home });
@@ -804,6 +864,7 @@ description: >
           baseUrl: 'https://ai.example.test/v1',
           models: [
             { id: 'grok-4.6', name: 'grok-4.6', contextWindow: 500000 },
+            { id: 'gpt-6-astra', name: 'gpt-6-astra' },
             { id: 'mystery', name: 'Mystery' },
           ],
         },
@@ -814,6 +875,7 @@ description: >
     expect(result.paths).toEqual([modelsPath]);
     expect(JSON.parse(fs.readFileSync(modelsPath, 'utf8')).providers.bmlab.models).toEqual([
       { id: 'grok-4.6', name: 'grok-4.6', contextWindow: 500000, input: ['text', 'image'], reasoning: true },
+      { id: 'gpt-6-astra', name: 'gpt-6-astra', input: ['text', 'image'], reasoning: true },
       { id: 'mystery', name: 'Mystery' },
     ]);
     expect(hydrateKnownModelCapabilities({ home }).paths).toEqual([]);

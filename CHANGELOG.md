@@ -27,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - Settings support dual Grok/Kimi subscriptions, with a China/International choice per Kimi row (#571).
 - Browser address history now provides suggestions while entering a URL (#588).
 
+- Settings: custom GPT-5.5 / GPT-5.6 / GPT-6 models (for example `gpt-6-astra`) keep thinking instead of being treated as off-only after Fetch models. Add, Edit, and Fetch models fill vision/reasoning from models.dev when the model id matches. Saving a provider no longer drops a stored thinking map.
+
 ## [1.2.12] - 2026-09-04
 
 - Desktop: connection health probes allow more time before marking Local disconnected, so a busy first send is less likely to toast `health_probe_unhealthy`.

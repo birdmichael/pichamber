@@ -62,6 +62,7 @@ import {
   type OAuthAuthMethodEntry,
 } from './providerAuth';
 import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
+import { catalogEntriesFromMetadataMap } from '@/lib/model-catalog-capabilities';
 import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
 import { ProviderXaiUsage } from './ProviderXaiUsage';
@@ -198,6 +199,11 @@ export const ProvidersPage: React.FC = () => {
   const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
   const loadProviders = useConfigStore((state) => state.loadProviders);
   const getModelMetadata = useConfigStore((state) => state.getModelMetadata);
+  const modelsMetadata = useConfigStore((state) => state.modelsMetadata);
+  const catalog = React.useMemo(
+    () => catalogEntriesFromMetadataMap(modelsMetadata),
+    [modelsMetadata],
+  );
   const hiddenModels = useUIStore((state) => state.hiddenModels);
   const toggleHiddenModel = useUIStore((state) => state.toggleHiddenModel);
   const hideAllModels = useUIStore((state) => state.hideAllModels);
@@ -1286,7 +1292,7 @@ export const ProvidersPage: React.FC = () => {
                 className="!font-normal"
                 onClick={() => {
                   setCustomAuthFailureHint(null);
-                  setEditingCustomFormInitial(providerToCustomFormState(selectedProvider));
+                  setEditingCustomFormInitial(providerToCustomFormState(selectedProvider, catalog));
                   setEditingCustomScope(resolveProviderConfigScope(selectedSources));
                   setEditingCustomProviderId(selectedProvider.id);
                 }}

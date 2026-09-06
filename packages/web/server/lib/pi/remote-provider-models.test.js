@@ -68,8 +68,17 @@ describe('remote-provider-models', () => {
         'plain-id',
       ],
     })).toEqual([
-      { id: 'grok-4.6', name: 'Grok 4.6' },
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
       { id: 'plain-id', name: 'plain-id' },
+    ]);
+  });
+
+  it('fills known GPT-6 reasoning when upstream only returns id and name', () => {
+    expect(parseRemoteModelsPayload({
+      data: [{ id: 'gpt-6-astra' }, { id: 'mystery-llm' }],
+    })).toEqual([
+      { id: 'gpt-6-astra', name: 'gpt-6-astra', input: ['text', 'image'], reasoning: true },
+      { id: 'mystery-llm', name: 'mystery-llm' },
     ]);
   });
 
@@ -82,7 +91,7 @@ describe('remote-provider-models', () => {
         { id: 'zeroed', context_length: 0 },
       ],
     })).toEqual([
-      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000 },
+      { id: 'gpt-4o', name: 'GPT-4o', contextWindow: 64000, input: ['text', 'image'] },
       { id: 'local-llm', name: 'local-llm', contextWindow: 8192 },
       { id: 'other', name: 'other', contextWindow: 256000 },
       { id: 'zeroed', name: 'zeroed' },
@@ -103,7 +112,7 @@ describe('remote-provider-models', () => {
         },
       ],
     })).toEqual([
-      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'] },
+      { id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true },
       { id: 'local-llm', name: 'local-llm', input: ['text', 'image'] },
       { id: 'empty', name: 'empty' },
       { id: 'plain', name: 'plain' },
@@ -127,7 +136,9 @@ describe('remote-provider-models', () => {
       url: 'https://ai.example.test/v1/models',
       auth: 'Bearer sk-test-do-not-leak',
     }]);
-    expect(result).toEqual({ models: [{ id: 'grok-4.6', name: 'Grok 4.6' }] });
+    expect(result).toEqual({
+      models: [{ id: 'grok-4.6', name: 'Grok 4.6', input: ['text', 'image'], reasoning: true }],
+    });
     expect(JSON.stringify(result)).not.toContain('sk-test');
   });
 
@@ -155,7 +166,9 @@ describe('remote-provider-models', () => {
         return jsonResponse(200, { data: [{ id: 'grok-4.6' }] });
       },
     });
-    expect(result.models).toEqual([{ id: 'grok-4.6', name: 'grok-4.6' }]);
+    expect(result.models).toEqual([
+      { id: 'grok-4.6', name: 'grok-4.6', input: ['text', 'image'], reasoning: true },
+    ]);
     expect(JSON.stringify(result)).not.toContain('sk-stored');
 
     const calls = [];
