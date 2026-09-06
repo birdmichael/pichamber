@@ -16,6 +16,7 @@ import { dropdownTriggerVariants } from '@/components/ui/dropdown-trigger';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { ModelPickerList, type ModelPickerEntry, type ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
+import { getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 
 interface ModelSelectorProps {
     providerId: string;
@@ -103,15 +104,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     }), [placeholder, t]);
 
     const selectedModel = providerId && modelId ? { providerID: providerId, modelID: modelId } : null;
-    // Show the model's display name (as in the picker list), not the raw provider/model id.
+    // Keep the provider/model pair visible so duplicate model ids cannot be confused.
     const triggerLabel = React.useMemo(() => {
         if (!providerId || !modelId) {
             return placeholder || t('settings.agents.modelSelector.notSelected');
         }
-        const provider = providers.find((entry) => entry.id === providerId);
-        const model = provider?.models?.find((entry) => entry.id === modelId);
-        return (typeof model?.name === 'string' && model.name.trim()) || modelId;
-    }, [modelId, placeholder, providerId, providers, t]);
+        return getProviderModelRefDisplayName(providerId, modelId);
+    }, [modelId, placeholder, providerId, t]);
 
     const picker = (
         <ModelPickerList

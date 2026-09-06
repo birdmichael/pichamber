@@ -26,7 +26,7 @@ import { isHiddenUserMessage } from './message/hiddenUserMessage';
 import { flattenAssistantTextParts } from '@/lib/messages/messageText';
 import { isLikelyProviderAuthFailure, PROVIDER_AUTH_FAILURE_MESSAGE } from '@/lib/messages/providerAuthError';
 import { parseMessageModelRef } from '@/lib/messages/userModelChoice';
-import { getProviderModelDisplayName } from '@/lib/modelDisplay';
+import { getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 import type { TurnGroupingContext } from './lib/turns/types';
 import { resolveAssistantFooterModel } from './assistantFooterModel';
@@ -358,11 +358,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     const modelName = React.useMemo(() => {
         if (isUser) return undefined;
 
-        const provider = providerID && providers.length > 0
-            ? providers.find((p) => p.id === providerID)
-            : undefined;
-        return getProviderModelDisplayName(provider, modelID) || undefined;
-    }, [isUser, providerID, modelID, providers]);
+        return getProviderModelRefDisplayName(providerID, modelID) || undefined;
+    }, [isUser, providerID, modelID]);
 
     const modelHasVariants = React.useMemo(() => {
         if (isUser) return false;

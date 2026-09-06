@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { getModelDisplayName, getProviderModelDisplayName, humanizeModelId } from './modelDisplay';
+import { getModelDisplayName, getProviderModelDisplayName, getProviderModelRefDisplayName, humanizeModelId } from './modelDisplay';
 
 describe('modelDisplay', () => {
   test('prefers model name over ids', () => {
@@ -43,5 +43,9 @@ describe('modelDisplay', () => {
   test('humanizes alias and custom model ids without provider data', () => {
     expect(humanizeModelId('~openai/gpt-mini-latest')).toBe('GPT Mini Latest');
     expect(humanizeModelId('my-custom_provider/myAwesomeModel-v2-fast')).toBe('My Awesome Model V2 Fast');
+  });
+
+  test('formats provider and model ids together for ambiguous catalog entries', () => {
+    expect(getProviderModelRefDisplayName('zzone_grok', 'grok-4.6')).toBe('zzone_grok/grok-4.6');
   });
 });

@@ -506,3 +506,25 @@ describe('Pi schedule actions stay on the scheduled-task service', () => {
     });
   });
 });
+
+describe('provider-qualified Pi routing', () => {
+  it('keeps duplicate model ids bound to the selected provider', async () => {
+    const { service, host } = createPiService({
+      host: {
+        getProviders: vi.fn(async () => ({
+          providers: [
+            { id: 'xai', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+            { id: 'zzone_grok', models: { 'grok-4.6': { id: 'grok-4.6' } } },
+          ],
+        })),
+      },
+    });
+    await service.execute('session.create', {
+      directory: '/repo',
+      prompt: 'use custom grok',
+      model: 'zzone_grok/grok-4.6',
+    });
+    expect(host.setSessionModel).toHaveBeenCalledWith('ses_1', 'zzone_grok/grok-4.6');
+    expect(host.promptAsync).toHaveBeenCalledWith('ses_1', expect.objectContaining({ model: 'zzone_grok/grok-4.6' }));
+  });
+});
