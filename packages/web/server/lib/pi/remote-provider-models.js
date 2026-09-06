@@ -482,7 +482,7 @@ export const handleFetchRemoteProviderModels = async (req, res, { home = os.home
 };
 
 
-/** Builtin catalogs must not use the custom list-models path, except first-class remote catalogs such as Octopus. */
+/** Builtin catalogs must not use the custom OpenAI-compat list-models sync path. */
 const BUILTIN_SKIP_SYNC_IDS = new Set(['xai', 'kimi-coding', 'deepseek', 'anthropic', 'openai', 'google', 'openrouter']);
 
 const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9-_]*$/;

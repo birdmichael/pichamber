@@ -171,8 +171,3 @@ Pichamber is a new product line on this fork. Versioning starts at **1.0.0** and
 ### Z.AI / 智谱
 
 Pi users can connect **智谱 / Z.AI** from Settings → Providers → Add Provider with an API key. The provider id remains `zai` for auth and Settings, while the 国内/国际 chip selects Pi's real catalogs: international uses `zai` / `zai.json` at `https://api.z.ai/api/coding/paas/v4`; China uses `zai-coding-cn` models at `https://open.bigmodel.cn/api/coding/paas/v4`. Both use `openai-completions`. The selected region is persisted and model/base URL overlays are refreshed automatically. No OAuth or usage card is offered for Z.AI in v1.
-
-
-### 章鱼 / Octopus provider
-
-Pi users can connect **章鱼** from Settings → Providers → Add Provider with an API key. Pichamber stores the stable `octopus` id in `auth.json`, uses the fixed `https://zzone.cc.cd/v1` base URL with `openai-completions`, and syncs live models from `/v1/models` on connect/save or with Sync models.

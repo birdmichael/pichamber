@@ -1581,7 +1581,6 @@ export const settingsDict = {
   "settings.providers.page.empty.checkOpenCodeConfiguration": "Перевірте {path}/models.json і auth.json",
   "settings.providers.page.empty.selectProviderFromSidebar": "Виберіть провайдера на бічній панелі",
   "settings.providers.page.empty.reviewDetailsAndConfigureAuth": "Перегляньте деталі та налаштуйте авторизацію",
-  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   "settings.providers.page.connect.title": "Підключити провайдера",
   "settings.providers.page.connect.selectProviderTitle": "Вибрати провайдера",
   "settings.providers.page.connect.providerField": "Провайдер",

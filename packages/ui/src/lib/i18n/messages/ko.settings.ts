@@ -1581,7 +1581,6 @@ export const settingsDict = {
   'settings.providers.page.empty.checkOpenCodeConfiguration': '{path}/models.json 및 auth.json을 확인하세요',
   'settings.providers.page.empty.selectProviderFromSidebar': '사이드바에서 프로바이더를 선택하세요',
   'settings.providers.page.empty.reviewDetailsAndConfigureAuth': '세부 정보를 확인하고 인증을 설정하세요',
-  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   'settings.providers.page.connect.title': '프로바이더 연결',
   'settings.providers.page.connect.selectProviderTitle': '프로바이더 선택',
   'settings.providers.page.connect.providerField': '프로바이더',

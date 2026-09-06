@@ -1794,7 +1794,6 @@ export const settingsDict = {
   'settings.providers.page.connect.searchProvidersPlaceholder': 'Szukaj...',
   'settings.providers.page.connect.selectProviderPlaceholder': 'Wybierz dostawcę',
   'settings.providers.page.connect.selectProviderTitle': 'Wybierz dostawcę',
-  'settings.providers.page.octopus.info': '章鱼 uses the fixed https://zzone.cc.cd/v1 OpenAI-compatible gateway and syncs live models from /v1/models.',
   'settings.providers.page.connect.title': 'Połącz dostawcę',
   'settings.providers.page.connectionDetails.configuredIn': 'Skonfigurowano w:',
   'settings.providers.page.connectionDetails.noActiveSource': 'Brak aktywnego źródła konfiguracji',

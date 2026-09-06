@@ -24,9 +24,6 @@ import {
   zaiBaseUrlForRegion,
   ZAI_INTERNATIONAL_BASE_URL,
   ZAI_DOMESTIC_BASE_URL,
-  OCTOPUS_PROVIDER_ID,
-  OCTOPUS_BASE_URL,
-  OCTOPUS_API,
   kimiBaseUrlForRegion,
   KIMI_INTERNATIONAL_BASE_URL,
   KIMI_DOMESTIC_BASE_URL,
@@ -390,7 +387,6 @@ description: >
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
       { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
       { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
-      { id: 'octopus', name: '章鱼', source: 'pi', env: [], models: {} },
     ]);
     expect(mergeBuiltinPiCatalogProviders([
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
@@ -398,7 +394,6 @@ description: >
       { id: 'xai', name: 'xAI Connected', source: 'pi', env: [], models: { 'grok-4.6': { id: 'grok-4.6' } } },
       { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
       { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
-      { id: 'octopus', name: '章鱼', source: 'pi', env: [], models: {} },
     ]);
     expect(withoutUnconnectedBuiltinCatalogProviders([
       { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
@@ -441,7 +436,6 @@ description: >
         { id: 'xai', name: 'xAI', source: 'pi', env: [], models: {} },
         { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
         { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
-        { id: 'octopus', name: '章鱼', source: 'pi', env: [], models: {} },
       ],
       default: {},
       connected: [],
@@ -458,7 +452,6 @@ description: >
         { id: 'bmlab', name: 'bmlab', models: {} },
         { id: 'kimi-coding', name: 'Kimi Code', source: 'pi', env: [], models: {} },
         { id: 'zai', name: '智谱 / Z.AI', source: 'pi', env: [], models: {} },
-        { id: 'octopus', name: '章鱼', source: 'pi', env: [], models: {} },
       ],
       default: { xai: 'grok-4.6' },
       connected: ['xai'],
@@ -533,22 +526,6 @@ description: >
     const international = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
     expect(international.providers.zai.baseUrl).toBe(ZAI_INTERNATIONAL_BASE_URL);
     expect(international.providers.zai.models.length).toBeGreaterThan(0);
-  });
-
-  it('writes Octopus API auth with its fixed OpenAI-compatible config', () => {
-    const home = makeTemp();
-    writePiProviderAuth(OCTOPUS_PROVIDER_ID, { type: 'api', key: 'octopus-test-key' }, { home });
-    expect(getPiAuthMethods(home).octopus).toEqual([{ type: 'api', label: 'API Key' }]);
-    const auth = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'auth.json'), 'utf8'));
-    expect(auth.octopus).toEqual({ type: 'api_key', key: 'octopus-test-key' });
-    const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
-    expect(models.providers.octopus).toMatchObject({
-      name: '章鱼',
-      baseUrl: OCTOPUS_BASE_URL,
-      api: OCTOPUS_API,
-      models: [],
-    });
-    expect(JSON.stringify(models)).not.toContain('octopus-test-key');
   });
 
   it('uses the China catalog for domestic Kimi, syncs the API sibling, and remaps k3 defaults', () => {
@@ -922,7 +899,7 @@ description: >
         { id: KIMI_CODING_API_PROVIDER_ID, name: 'Kimi Code API', models: { 'kimi-k2.6': { id: 'kimi-k2.6' } } },
       ],
       default: {},
-    }).all.map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai', 'octopus']);
+    }).all.map((provider) => provider.id)).toEqual(['kimi-coding', 'xai', 'zai']);
   });
 
   it('writes Kimi Code OAuth without deleting an existing API sibling', () => {
