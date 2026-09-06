@@ -1647,6 +1647,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': 'Zuerst einen API-Schlüssel eingeben oder den Anbieter speichern und beim Bearbeiten abrufen',
   'settings.providers.page.custom.error.fetch.failed': 'Modelle konnten nicht abgerufen werden',
   'settings.providers.page.custom.error.fetch.unauthorized': 'Der API-Schlüssel wurde abgelehnt',
+  'settings.providers.page.custom.error.fetch.blocked': 'Der Anbieter-Endpunkt hat diese Anfrage blockiert (Netzwerk/WAF), nicht wegen eines ungültigen API-Schlüssels.',
   'settings.providers.page.custom.error.fetch.unsupported': 'Dieser Endpunkt liefert keine Modellliste. Modell-ID manuell eingeben.',
   'settings.providers.page.custom.authFailure.configAfterAuth': 'Anmeldedaten wurden gespeichert, aber die Anbieterkonfiguration nicht. Beheben Sie den Fehler und versuchen Sie es erneut, oder trennen Sie die Verbindung, um den teilweisen Speichervorgang zu löschen.',
   'settings.providers.page.auth.title': 'Authentifizierung',

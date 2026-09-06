@@ -1596,6 +1596,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': 'Saisissez d’abord une clé API, ou enregistrez le fournisseur puis récupérez les modèles en modification',
   'settings.providers.page.custom.error.fetch.failed': 'Impossible de récupérer les modèles',
   'settings.providers.page.custom.error.fetch.unauthorized': 'La clé API a été refusée',
+  'settings.providers.page.custom.error.fetch.blocked': 'Le point de terminaison du fournisseur a bloqué cette requête (réseau/WAF), et non une clé API invalide.',
   'settings.providers.page.custom.error.fetch.unsupported': 'Cet endpoint n’envoie pas de liste de modèles. Saisissez l’ID du modèle à la main.',
   'settings.providers.page.custom.authFailure.configAfterAuth': 'Les identifiants ont été enregistrés, mais pas la configuration du fournisseur. Corrigez l\'erreur et réessayez, ou déconnectez pour effacer l\'enregistrement partiel.',
 

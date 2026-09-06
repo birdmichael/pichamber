@@ -1783,6 +1783,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': 'Najpierw podaj klucz API albo zapisz dostawcę i pobierz modele podczas edycji',
   'settings.providers.page.custom.error.fetch.failed': 'Nie udało się pobrać modeli',
   'settings.providers.page.custom.error.fetch.unauthorized': 'Klucz API został odrzucony',
+  'settings.providers.page.custom.error.fetch.blocked': 'Punkt końcowy dostawcy zablokował to żądanie (sieć/WAF), a klucz API nie jest nieprawidłowy.',
   'settings.providers.page.custom.error.fetch.unsupported': 'Ten endpoint nie zwraca listy modeli. Wpisz ID modelu ręcznie.',
   'settings.providers.page.custom.authFailure.configAfterAuth': 'Poświadczenia zostały zapisane, ale konfiguracja dostawcy nie. Napraw błąd i spróbuj ponownie albo rozłącz, aby usunąć częściowy zapis.',
 

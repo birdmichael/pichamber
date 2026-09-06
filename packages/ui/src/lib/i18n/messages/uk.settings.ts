@@ -1681,6 +1681,7 @@ export const settingsDict = {
   "settings.providers.page.custom.error.fetch.apiKey": "Спочатку вкажіть API-ключ або збережіть постачальника й отримайте моделі під час редагування",
   "settings.providers.page.custom.error.fetch.failed": "Не вдалося отримати моделі",
   "settings.providers.page.custom.error.fetch.unauthorized": "API-ключ відхилено",
+  'settings.providers.page.custom.error.fetch.blocked': "Кінцева точка провайдера заблокувала цей запит (мережа/WAF), а ключ API не є недійсним.",
   "settings.providers.page.custom.error.fetch.unsupported": "Цей endpoint не повертає список моделей. Введіть ID моделі вручну.",
   "settings.providers.page.custom.authFailure.configAfterAuth": "Облікові дані збережено, але конфігурацію провайдера — ні. Виправте помилку й спробуйте знову або від’єднайте, щоб очистити часткове збереження.",
 

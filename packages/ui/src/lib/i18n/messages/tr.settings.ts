@@ -1709,6 +1709,7 @@ export const settingsDict = {
   'settings.providers.page.custom.error.fetch.apiKey': 'Önce bir API anahtarı girin ya da provider\'ı kaydedip düzenlerken getirin',
   'settings.providers.page.custom.error.fetch.failed': 'Modeller getirilemedi',
   'settings.providers.page.custom.error.fetch.unauthorized': 'API anahtarı reddedildi',
+  'settings.providers.page.custom.error.fetch.blocked': 'Sağlayıcı uç noktası bu isteği engelledi (ağ/WAF); bu geçersiz bir API anahtarı değildir.',
   'settings.providers.page.custom.error.fetch.unsupported': 'Bu uç nokta modelleri listelemiyor. Model kimliğini elle girin.',
   'settings.providers.page.custom.authFailure.configAfterAuth': 'Kimlik bilgileri kaydedildi ancak provider yapılandırması kaydedilmedi. Hatayı düzeltip yeniden deneyin ya da kısmi kaydı temizlemek için bağlantıyı kesin.',
   'settings.providers.page.auth.title': 'Kimlik doğrulama',

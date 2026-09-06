@@ -1681,6 +1681,7 @@ export const settingsDict = {
   "settings.providers.page.custom.error.fetch.apiKey": "Informe primeiro uma chave de API, ou salve o provedor e busque ao editar",
   "settings.providers.page.custom.error.fetch.failed": "Não foi possível buscar os modelos",
   "settings.providers.page.custom.error.fetch.unauthorized": "A chave de API foi recusada",
+  'settings.providers.page.custom.error.fetch.blocked': "O endpoint do provedor bloqueou esta solicitação (rede/WAF), não por uma chave de API inválida.",
   "settings.providers.page.custom.error.fetch.unsupported": "Este endpoint não lista modelos. Informe o ID do modelo manualmente.",
   "settings.providers.page.custom.authFailure.configAfterAuth": "As credenciais foram salvas, mas a configuração do provedor não. Corrija o erro e tente novamente, ou desconecte para limpar o salvamento parcial.",
 

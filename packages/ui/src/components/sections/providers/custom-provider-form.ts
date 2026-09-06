@@ -978,8 +978,11 @@ export function addRemoteModelsToForm(
 }
 
 export function fetchRemoteModelsErrorKey(status: number, code?: string): string {
-  if (code === 'unauthorized' || status === 401 || status === 403) {
+  if (code === 'unauthorized' || status === 401) {
     return 'settings.providers.page.custom.error.fetch.unauthorized';
+  }
+  if (code === 'blocked' || status === 403) {
+    return 'settings.providers.page.custom.error.fetch.blocked';
   }
   if (code === 'unsupported' || status === 404 || status === 405) {
     return 'settings.providers.page.custom.error.fetch.unsupported';

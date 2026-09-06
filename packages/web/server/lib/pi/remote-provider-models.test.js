@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildRemoteModelListUrls,
+  classifyHttpStatus,
   fetchRemoteProviderModels,
   mergeRemoteModelsIntoCatalog,
   parseRemoteModelsPayload,
@@ -213,6 +214,38 @@ describe('remote-provider-models', () => {
       fetchImpl: async () => jsonResponse(200, { data: [] }),
     });
     expect(empty).toEqual({ models: [] });
+  });
+
+  it('classifies only auth-shaped 403 responses as rejected keys', () => {
+    expect(classifyHttpStatus(401, 'server error')).toMatchObject({
+      status: 401,
+      code: 'unauthorized',
+    });
+    expect(classifyHttpStatus(403, JSON.stringify({ error: { message: 'invalid_api_key' } }))).toMatchObject({
+      status: 401,
+      code: 'unauthorized',
+    });
+    expect(classifyHttpStatus(403, '<html><title>Error 1010</title>error code: 1010</html>')).toMatchObject({
+      status: 403,
+      code: 'blocked',
+    });
+    expect(classifyHttpStatus(404, 'not found')).toMatchObject({
+      status: 404,
+      code: 'unsupported',
+    });
+  });
+
+  it('reports a Cloudflare 1010 response as blocked rather than unauthorized', async () => {
+    await expect(fetchRemoteProviderModels({
+      baseURL: 'https://ai.example.test/v1',
+      apiKey: 'sk-ok',
+    }, {
+      fetchImpl: async () => jsonResponse(403, '<html>error code: 1010</html>', 'text/html'),
+    })).rejects.toMatchObject({
+      status: 403,
+      code: 'blocked',
+      message: expect.stringContaining('network/WAF'),
+    });
   });
 
   it('tries the next candidate when the first response is HTML', async () => {
