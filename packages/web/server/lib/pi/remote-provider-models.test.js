@@ -401,7 +401,7 @@ describe('remote-provider-models', () => {
             baseUrl: 'https://ai.example.test/v1',
             api: 'anthropic-messages',
             models: [
-              { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000 },
+              { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000, input: ['text', 'image'], reasoning: true },
             ],
           },
         },
@@ -431,7 +431,7 @@ describe('remote-provider-models', () => {
     expect(JSON.stringify(result)).not.toContain('sk-sync');
     const stored = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
     expect(stored.providers.relay.models).toEqual([
-      { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000 },
+      { id: 'claude-opus-5', name: 'Opus Override', contextWindow: 200_000, input: ['text', 'image'], reasoning: true },
       { id: 'gpt-junk', name: 'GPT Junk' },
       { id: 'grok-extra', name: 'Grok Extra' },
     ]);

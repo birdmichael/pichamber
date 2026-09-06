@@ -4,6 +4,7 @@ import path from 'node:path';
 import yaml from 'yaml';
 
 import { enrichKnownModelEntry } from './known-model-capabilities.js';
+import { getModelsMetadata } from '../opencode/models-metadata.js';
 import { resolveAppDataDir } from '../app-data/index.js';
 import {
   dualAuthSpecFor,
@@ -1135,6 +1136,16 @@ export const hydrateKnownModelCapabilities = ({ home = os.homedir(), directory }
     hydrated.push(filePath);
   }
   return { paths: hydrated };
+};
+
+/** Fetch the shared models.dev catalog before startup hydration. */
+export const hydrateKnownModelCapabilitiesAsync = async (options = {}) => {
+  try {
+    await getModelsMetadata();
+  } catch {
+    // Offline startup keeps the hardcoded known-model fallback.
+  }
+  return hydrateKnownModelCapabilities(options);
 };
 
 /**
