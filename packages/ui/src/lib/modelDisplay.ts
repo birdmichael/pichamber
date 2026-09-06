@@ -269,3 +269,15 @@ export const getProviderModelDisplayName = (
   const model = getProviderModel(provider, normalizedModelId);
   return getModelDisplayName(model, normalizedModelId, options);
 };
+
+/** Display the catalog key so reused model ids remain unambiguous. */
+export const getProviderModelRefDisplayName = (
+  providerId: string | null | undefined,
+  modelId: string | null | undefined,
+  options: ModelDisplayOptions = {},
+): string => {
+  const provider = normalizeString(providerId);
+  const model = normalizeString(modelId);
+  if (!provider || !model) return options.fallbackLabel ?? "";
+  return truncate(provider + "/" + model, options.maxLength);
+};

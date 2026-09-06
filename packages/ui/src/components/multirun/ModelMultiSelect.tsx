@@ -239,7 +239,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
     const nextModel = {
       providerID: entry.providerID,
       modelID: entry.modelID,
-      displayName: (entry.model.name as string) || entry.modelID,
+      displayName: entry.providerID + "/" + entry.modelID,
       instanceId: generateInstanceId(),
     };
     if (isSingleSelect && selectedModels.length > 0 && onUpdate) {

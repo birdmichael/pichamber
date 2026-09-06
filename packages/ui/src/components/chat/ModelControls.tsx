@@ -24,7 +24,7 @@ import { isDesktopShell } from '@/lib/desktop';
 import { getAgentColor } from '@/lib/agentColors';
 import { useDeviceInfo } from '@/lib/device';
 import { mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
-import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
+import { getModelDisplayName as getSharedModelDisplayName, getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { getEditModeColors } from '@/lib/permissions/editModeColors';
 import { cn, fuzzyMatch } from '@/lib/utils';
 import { useContextStore } from '@/stores/contextStore';
@@ -1655,8 +1655,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     const getCurrentModelDisplayName = () => {
         if (!currentModelId) return t('chat.modelControls.selectModel');
-        const currentModel = models.find((m: ProviderModel) => m.id === currentModelId);
-        return getModelDisplayName(currentModel, currentModelId) || t('chat.modelControls.selectModel');
+        return getProviderModelRefDisplayName(currentProviderId, currentModelId, { fallbackLabel: t('chat.modelControls.selectModel') });
     };
 
     const currentModelDisplayName = getCurrentModelDisplayName();
@@ -2054,7 +2053,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                         <ProviderLogo providerId={providerId} className="size-3.5 flex-shrink-0" />
                                     ) : null}
                                     <span className="typography-meta font-medium text-foreground truncate">
-                                        {getModelDisplayName(model)}
+                                        {getProviderModelRefDisplayName(providerId, modelId)}
                                     </span>
                                     {isSelected ? <Icon name="check" className="size-4 flex-shrink-0 text-primary" /> : null}
                                 </div>

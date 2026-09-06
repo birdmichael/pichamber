@@ -17,7 +17,7 @@ import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getCurrentIntlLocale } from '@/lib/i18n';
 import { formatModelContextTokens, lookupModelMetadata, mergeModelMetadataWithLiveModel } from '@/lib/modelMetadata';
-import { getModelDisplayName as getSharedModelDisplayName } from '@/lib/modelDisplay';
+import { getModelDisplayName as getSharedModelDisplayName, getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { matchesRankQuery } from '@/lib/search/fuzzySearch';
 import { cn } from '@/lib/utils';
 import { useModelPickerSectionsStore } from '@/stores/useModelPickerSectionsStore';
@@ -689,7 +689,7 @@ export const ModelPickerList: React.FC<ModelPickerListProps> = ({
                   </button>
                 ) : null}
                 {showProviderLogo ? <ProviderLogo providerId={entry.providerID} className="h-3.5 w-3.5 flex-shrink-0" /> : null}
-                <span className="font-medium truncate">{getModelDisplayName(entry.model)}</span>
+                <span className="font-medium truncate">{getProviderModelRefDisplayName(entry.providerID, entry.modelID)}</span>
                 {contextTokens ? <span className="typography-micro text-muted-foreground flex-shrink-0">{contextTokens}</span> : null}
               </div>
               {count > 0 ? <span className="typography-micro text-muted-foreground flex-shrink-0">x{count}</span> : null}
