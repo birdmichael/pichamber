@@ -3,11 +3,11 @@ import path from 'node:path';
 import yaml from 'yaml';
 
 const BUILTIN_SUBAGENTS = [
-  { name: 'edit', description: 'Make focused edits to the current workspace.' },
-  { name: 'scout', description: 'Explore the workspace and report useful findings.' },
-  { name: 'worker', description: 'Implement a focused task in the current workspace.' },
-  { name: 'reviewer', description: 'Review changes and report risks or improvements.' },
-  { name: 'researcher', description: 'Research a question and summarize the evidence.' },
+  { name: 'edit', description: 'Focused implementation agent for small, bounded edits', tools: ['read', 'grep', 'find', 'ls', 'bash', 'edit', 'write', 'contact_supervisor'], systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, body: 'Make the smallest correct change requested and verify it.' },
+  { name: 'scout', description: 'Fast codebase recon that returns compressed context for handoff', tools: ['read', 'grep', 'find', 'ls', 'bash', 'write'], thinking: 'low', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, output: 'context.md', defaultProgress: true, body: 'Explore the codebase and return concise evidence-backed context.' },
+  { name: 'worker', description: 'Implementation agent for normal tasks and approved oracle handoffs', tools: ['read', 'grep', 'find', 'ls', 'bash', 'edit', 'write', 'contact_supervisor'], thinking: 'high', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, defaultContext: 'fork', defaultReads: ['context.md', 'plan.md'], defaultProgress: true, body: 'Implement the assigned task with narrow edits and verify the result.' },
+  { name: 'reviewer', description: 'Versatile review specialist for code diffs, plans, proposed solutions, codebase health, and PR/issue validation', tools: ['read', 'grep', 'find', 'ls'], thinking: 'high', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, body: 'Review with evidence and report concrete findings without modifying code.' },
+  { name: 'researcher', description: 'Autonomous web researcher — searches, evaluates, and synthesizes a focused research brief', tools: ['read', 'write', 'web_search', 'fetch_content', 'get_search_content'], thinking: 'medium', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, output: 'research.md', defaultProgress: true, body: 'Run focused web research and produce a concise, well-sourced brief.' },
 ];
 const isDirectory = (v) => { try { return fs.statSync(v).isDirectory(); } catch { return false; } };
 const isFile = (v) => { try { return fs.statSync(v).isFile(); } catch { return false; } };
@@ -23,9 +23,9 @@ const parseAgentMarkdown = (source) => {
   try { const parsed = yaml.parse(match[1]); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) frontmatter = parsed; } catch {}
   return { frontmatter, body: match[2].trim() };
 };
-const asAgent = ({ name, scope, filePath, source, readOnly = false, description }) => {
-  const parsed = parseAgentMarkdown(source); const frontmatter = parsed.frontmatter || {};
-  return { id: name, name, description: typeof frontmatter.description === 'string' ? frontmatter.description : (description || ''), model: typeof frontmatter.model === 'string' ? frontmatter.model.trim() : '', thinking: typeof frontmatter.thinking === 'string' ? frontmatter.thinking.trim() : '', tools: frontmatter.tools ?? frontmatter.capabilities ?? [], scope, readOnly, path: filePath || null, frontmatter, body: parsed.body };
+const asAgent = ({ name, scope, filePath, source, readOnly = false, description, ...builtin }) => {
+  const parsed = parseAgentMarkdown(source); const frontmatter = source ? parsed.frontmatter || {} : { name, ...builtin, description };
+  return { id: name, name, description: typeof frontmatter.description === 'string' ? frontmatter.description : (description || ''), model: typeof frontmatter.model === 'string' ? frontmatter.model.trim() : '', thinking: typeof frontmatter.thinking === 'string' ? frontmatter.thinking.trim() : '', tools: frontmatter.tools ?? frontmatter.capabilities ?? [], scope, readOnly, path: filePath || null, frontmatter, body: source ? parsed.body : (builtin.body || '') };
 };
 const readDirectoryAgents = (root, scope) => {
   if (!isDirectory(root)) return []; let entries = [];

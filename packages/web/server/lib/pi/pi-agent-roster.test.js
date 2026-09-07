@@ -16,7 +16,9 @@ describe('Pi agent roster', () => {
     const agents = listPiSubagents({ agentDir: home, directory: project });
     expect(agents.find((agent) => agent.name === 'reviewer')).toMatchObject({ scope: 'user', model: 'openai/gpt-5', thinking: 'high', body: 'Review body' });
     expect(agents.find((agent) => agent.name === 'worker')).toMatchObject({ scope: 'project' });
-    expect(agents.find((agent) => agent.name === 'scout')).toMatchObject({ readOnly: true, scope: 'builtin' });
+    expect(agents.find((agent) => agent.name === 'scout')).toMatchObject({ readOnly: true, scope: 'builtin', tools: ['read', 'grep', 'find', 'ls', 'bash', 'write'] });
+    expect(agents.find((agent) => agent.name === 'edit').tools).toContain('edit');
+    expect(agents.find((agent) => agent.name === 'researcher').tools).toEqual(['read', 'write', 'web_search', 'fetch_content', 'get_search_content']);
   });
   it('writes a new markdown file while retaining unknown frontmatter', () => {
     const root = tempRoot(); const home = path.join(root, 'home'); const project = path.join(root, 'project'); const saved = writePiSubagent({ agentDir: home, directory: project, name: 'custom', scope: 'user', frontmatter: { description: 'Custom', inheritSkills: true, tools: ['read'] }, body: 'Prompt' });
