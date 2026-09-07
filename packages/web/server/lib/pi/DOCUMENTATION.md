@@ -387,7 +387,7 @@ card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
 Providers show **国际 / 国内** per Kimi
 row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
 of a typed Base URL. Domestic rows use `moonshotai-cn` models and show the
-China API-key path (`https://platform.moonshot.cn/console/api-keys`) rather
+China sign-in entry and API-key path (`https://platform.moonshot.cn/console/api-keys`) rather
 than the international Kimi Code device OAuth; domestic login never calls
 `auth.kimi.com`. Do not invent Moonshot balance/usages for China rows;
 Code usage stays on `api.kimi.com`. Refresh uses `kimiCodingOAuth.refresh`,

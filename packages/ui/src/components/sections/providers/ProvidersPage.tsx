@@ -64,6 +64,7 @@ import { matchesRankQuery, rankByQuery } from '@/lib/search/fuzzySearch';
 import { catalogEntriesFromMetadataMap } from '@/lib/model-catalog-capabilities';
 import { CustomProviderForm } from './CustomProviderForm';
 import { ProviderOAuthMethods, type ProviderOAuthMethod } from './ProviderOAuthMethods';
+import { ProviderKimiDomesticLogin } from './ProviderKimiDomesticLogin';
 import { ProviderXaiUsage } from './ProviderXaiUsage';
 import { ProviderKimiUsage } from './ProviderKimiUsage';
 import { ProviderZaiUsage } from './ProviderZaiUsage';
@@ -1120,6 +1121,9 @@ export const ProvidersPage: React.FC = () => {
                             />
                           </SettingsFieldRow>
                         ) : null}
+                        {isKimiSubscriptionId(candidateProviderId) && regionByProvider[candidateProviderId] === 'domestic' ? (
+                          <ProviderKimiDomesticLogin />
+                        ) : null}
                         {candidateOAuthMethods.length > 0 ? (
                           <ProviderOAuthMethods
                             key={candidateProviderId}
@@ -1330,6 +1334,9 @@ export const ProvidersPage: React.FC = () => {
               <div className="py-1.5 typography-meta text-muted-foreground">{t('settings.providers.page.auth.loadingMethods')}</div>
             ) : (
               <div className="space-y-4">
+                {isKimiSubscriptionId(oauthProviderId) && regionByProvider[oauthProviderId] === 'domestic' ? (
+                  <ProviderKimiDomesticLogin />
+                ) : null}
                 {oauthAuthMethods.length > 0 && (
                   <div className="space-y-3">
                     <ProviderOAuthMethods
