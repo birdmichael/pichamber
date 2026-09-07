@@ -14,7 +14,9 @@ import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useI18n } from '@/lib/i18n';
 import { getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { cn } from '@/lib/utils';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { useSelectionStore } from '@/sync/selection-store';
 import { dispatchSessionPlanAction } from '@/sync/pi-session-plan-store';
 
 type ModelOption = {
@@ -29,6 +31,9 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
   const providers = useConfigStore((state) => state.providers);
   const currentProviderId = useConfigStore((state) => state.currentProviderId);
   const currentModelId = useConfigStore((state) => state.currentModelId);
+  const setProvider = useConfigStore((state) => state.setProvider);
+  const setModel = useConfigStore((state) => state.setModel);
+  const saveSessionModelSelection = useSelectionStore((state) => state.saveSessionModelSelection);
   const [picked, setPicked] = React.useState<ModelOption | null>(null);
   const [pending, setPending] = React.useState(false);
 
@@ -58,11 +63,29 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
   if (!chrome.showBuildRow && !chrome.implementing) return null;
   if (!chrome.available) return null;
 
+  const selectModel = (model: ModelOption) => {
+    setPicked(model);
+    // Keep Plan Build on the same session selection path as the main composer.
+    // This updates the chip immediately; the request below makes the Pi session
+    // authoritative before Build starts.
+    setProvider(model.providerID);
+    setModel(model.modelID);
+    if (chrome.sessionID) {
+      saveSessionModelSelection(chrome.sessionID, model.providerID, model.modelID);
+      void runtimeFetch(`/api/session/${encodeURIComponent(chrome.sessionID)}/model`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: `${model.providerID}/${model.modelID}` }),
+      }).catch(() => undefined);
+    }
+  };
+
   if (chrome.implementing) {
     return (
       <div className={cn('flex items-center gap-2 min-w-0', className)}>
         <Button type="button" size="sm" disabled>
           {t('chat.piPlan.building')}
+          {selected ? ` · ${selected.label}` : ''}
         </Button>
       </div>
     );
@@ -74,12 +97,11 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
     if (!chrome.sessionID || !selected) return;
     setPending(true);
     try {
-      const currentRef = currentProviderId && currentModelId
-        ? `${currentProviderId}/${currentModelId}`
-        : '';
       const pickedRef = `${selected.providerID}/${selected.modelID}`;
       const next = await dispatchSessionPlanAction(chrome.sessionID, 'implement', {
-        model: pickedRef !== currentRef ? pickedRef : undefined,
+        // Always send the Build choice, even when another update has not yet
+        // reached the session model endpoint.
+        model: pickedRef,
       });
       if (!next) {
         toast.error(t('chat.piPlan.buildFailed'));
@@ -110,7 +132,7 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
             return (
               <DropdownMenuItem
                 key={key}
-                onClick={() => setPicked(model)}
+                onClick={() => selectModel(model)}
                 aria-checked={isSelected}
               >
                 {model.label}
