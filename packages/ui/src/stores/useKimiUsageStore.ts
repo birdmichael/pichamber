@@ -5,6 +5,7 @@ import {
   reconcileKimiUsageState,
   type KimiUsagePayload,
 } from '@/lib/pi/kimi-usage';
+import { isKimiSubscriptionId } from '@/lib/pi/subscription-clones';
 
 export type KimiUsageEntry = {
   payload: KimiUsagePayload | null;
@@ -43,6 +44,8 @@ export const useKimiUsageStore = create<KimiUsageStore>((set, get) => ({
     set({ payload: null, error: null, isLoading: false, byId: {} });
   },
   fetchUsage: async (providerId) => {
+    const requestedId = typeof providerId === 'string' ? providerId.trim() : '';
+    if (requestedId && !isKimiSubscriptionId(requestedId)) return;
     const id = resolveUsageId(providerId);
     const current = get().byId[id] ?? emptyEntry();
     if (current.isLoading) {

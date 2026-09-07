@@ -38,6 +38,11 @@ describe('useKimiUsageStore', () => {
     useKimiUsageStore.getState().reset();
   });
 
+  test("does not fetch the dual-auth API sibling", async () => {
+    await useKimiUsageStore.getState().fetchUsage("kimi-coding-api");
+    expect(fetchCalls).toBe(0);
+  });
+
   test('queues a refresh clicked while a fetch is in flight', async () => {
     let releaseFirst: (() => void) | undefined;
     const firstHold = new Promise<void>((resolve) => {

@@ -90,6 +90,18 @@ describe('parseKimiUsagePayload', () => {
       membershipLevel: '   ',
     })?.membershipLevel).toBeUndefined();
   });
+  test("preserves domestic unavailability without usage windows", () => {
+    expect(parseKimiUsagePayload({
+      ok: false,
+      configured: true,
+      slotActive: true,
+      region: "domestic",
+      usageUnavailable: true,
+      error: "Kimi Code usage is not available for China region",
+      usage: null,
+    })).toMatchObject({ region: "domestic", usageUnavailable: true, usage: null });
+  });
+
 });
 
 
@@ -196,16 +208,25 @@ describe('reconcileKimiUsageState', () => {
     });
   });
 
-  test('keeps the last snapshot when the HTTP request fails', () => {
+  test("keeps the last snapshot when the HTTP request fails", () => {
     expect(reconcileKimiUsageState(
       { payload: okPayload },
-      { type: 'fetch-error', message: 'Kimi Code usage failed (502)' },
+      { type: "fetch-error", message: "Kimi Code usage failed (502)" },
     )).toEqual({
       payload: okPayload,
-      error: 'Kimi Code usage failed (502)',
+      error: "Kimi Code usage failed (502)",
     });
   });
 
+  test("replaces stale international rows when domestic usage becomes unavailable", () => {
+    expect(reconcileKimiUsageState(
+      { payload: okPayload },
+      { type: "parsed", payload: { ok: false, configured: true, slotActive: true, region: "domestic", usageUnavailable: true, usage: null } },
+    )).toEqual({
+      payload: { ok: false, configured: true, slotActive: true, region: "domestic", usageUnavailable: true, usage: null },
+      error: null,
+    });
+  });
   test('replaces state when the slot turns off', () => {
     expect(reconcileKimiUsageState(
       { payload: okPayload },

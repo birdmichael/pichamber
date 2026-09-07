@@ -12,6 +12,8 @@ export type KimiUsagePayload = {
   providerId?: string;
   providerName?: string;
   membershipLevel?: string;
+  region?: 'domestic' | 'international';
+  usageUnavailable?: boolean;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -105,6 +107,8 @@ export const parseKimiUsagePayload = (value: unknown): KimiUsagePayload | null =
     ...(typeof value.providerId === 'string' ? { providerId: value.providerId } : {}),
     ...(typeof value.providerName === 'string' ? { providerName: value.providerName } : {}),
     ...(membershipLevel ? { membershipLevel } : {}),
+    ...(value.region === 'domestic' || value.region === 'international' ? { region: value.region } : {}),
+    ...(value.usageUnavailable === true ? { usageUnavailable: true } : {}),
   };
 };
 
@@ -152,7 +156,7 @@ export const reconcileKimiUsageState = (
     };
   }
   const next = incoming.payload;
-  if (!next.slotActive) {
+  if (!next.slotActive || next.region === 'domestic' || next.usageUnavailable) {
     return { payload: next, error: null };
   }
   if (!next.ok && next.configured && current.payload?.ok) {

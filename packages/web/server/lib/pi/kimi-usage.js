@@ -9,7 +9,6 @@ import {
   writePiProviderAuth,
 } from './pi-resources.js';
 import { refreshPiKimiOAuth } from './kimi-oauth.js';
-import { KIMI_CODING_API_PROVIDER_ID } from './pi-dual-auth.js';
 
 const KIMI_USAGE_ORIGIN = 'https://api.kimi.com';
 const MAX_USAGE_BODY_BYTES = 64 * 1024;
@@ -315,17 +314,16 @@ export const getPiKimiUsage = async ({
   refreshOAuth = refreshPiKimiOAuth,
   now = Date.now(),
 } = {}) => {
+  if (typeof providerId === 'string' && providerId.trim() === 'kimi-coding-api') {
+    return { ok: false, configured: false, slotActive: false };
+  }
   const usageProviderId = isKimiSubscriptionId(providerId) ? providerId : KIMI_CODING_PROVIDER_ID;
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  // The catalog provider owns the usage surface, while dual-auth stores its
-  // API key on the reserved sibling. Prefer OAuth on the catalog id, then the
-  // sibling API key, so either Provider auth method drives the same usage card.
+  // Usage belongs to Kimi Code subscriptions on the catalog provider. The
+  // dual-auth API sibling is intentionally not a usage source.
   const catalogAuth = auth[usageProviderId];
-  const siblingAuth = usageProviderId === KIMI_CODING_PROVIDER_ID
-    ? auth[KIMI_CODING_API_PROVIDER_ID]
-    : undefined;
   let oauth = readOauthEntry(catalogAuth);
-  const apiKey = readApiKey(catalogAuth) || readApiKey(siblingAuth);
+  const apiKey = readApiKey(catalogAuth);
   // OAuth and API-key auth are both provider configuration; neither requires
   // the legacy pi-kimi-code-console-usage package.
   if (!oauth && !apiKey) {

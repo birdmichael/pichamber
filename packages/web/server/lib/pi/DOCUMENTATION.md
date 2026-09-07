@@ -396,7 +396,7 @@ id. Composer `/login kimi-coding` points at Settings → Providers.
 
 ## Kimi Usage (provider surface)
 
-Usage follows connected Kimi Code Provider auth. OAuth on `kimi-coding` and the dual-auth API key on `kimi-coding-api` are both accepted; the legacy Feature Plugin package is not consulted.
+Usage follows connected Kimi Code Provider auth. OAuth or a catalog-provider API key on `kimi-coding` is accepted; the dual-auth API sibling is excluded; the legacy Feature Plugin package is not consulted.
 
 When the provider is configured:
 
