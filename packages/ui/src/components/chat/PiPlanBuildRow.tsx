@@ -12,6 +12,7 @@ import { toast } from '@/components/ui';
 import { Icon } from '@/components/icon/Icon';
 import { usePiPlanChrome } from '@/hooks/usePiPlanChrome';
 import { useI18n } from '@/lib/i18n';
+import { getProviderModelRefDisplayName } from '@/lib/modelDisplay';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { dispatchSessionPlanAction } from '@/sync/pi-session-plan-store';
@@ -39,8 +40,12 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
       return list.flatMap((model) => {
         const modelID = typeof model?.id === 'string' ? model.id : '';
         if (!modelID) return [];
-        const name = typeof model?.name === 'string' && model.name.trim() ? model.name : modelID;
-        return [{ providerID, modelID, label: name }];
+        const modelName = typeof model?.name === 'string' && model.name.trim() ? model.name : undefined;
+        const label = getProviderModelRefDisplayName(providerID, modelID, {
+          providerName: provider.name,
+          modelName,
+        });
+        return [{ providerID, modelID, label }];
       });
     });
   }, [providers]);
