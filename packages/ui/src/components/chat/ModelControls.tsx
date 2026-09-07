@@ -735,6 +735,12 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         setAgentMenuOpen(false);
         closeMobilePanel();
     }, [setSelectedProvider, setSettingsPage, setSettingsDialogOpen, setAgentMenuOpen, closeMobilePanel]);
+    const openAgentManagement = React.useCallback(() => {
+        setSettingsPage('agents');
+        setSettingsDialogOpen(true);
+        setAgentMenuOpen(false);
+        closeMobilePanel();
+    }, [setSettingsPage, setSettingsDialogOpen, setAgentMenuOpen, closeMobilePanel]);
     const [desktopModelQuery, setDesktopModelQuery] = React.useState('');
     const keyboardOwnsModelSelectionRef = React.useRef(false);
     const lastModelPointerPositionRef = React.useRef<{ x: number; y: number } | null>(null);
@@ -3266,6 +3272,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                         directory={currentSessionId ? getDirectoryForSession(currentSessionId) : opencodeClient.getDirectory()}
                                         onLaunch={launchSubagent}
                                         onClose={() => setAgentMenuOpen(false)}
+                                        onManage={openAgentManagement}
                                     />
                                 ) : (<>
                                 <div className="p-2 border-b border-border/40">

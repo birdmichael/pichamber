@@ -755,6 +755,7 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.get('/api/pi/subagents/:name', handle(async (req, res) => {
+    if (!isSubagentsSlotActive(host.getFeaturePlugins())) { json(res, 404, { error: "Subagents feature plugin is not active" }); return; }
     const directory = resolveDirectory(req); const paths = host.getPath(directory);
     const agent = getPiSubagent({ agentDir: paths.state, directory, name: req.params.name });
     if (!agent) { json(res, 404, { error: "Agent not found" }); return; }
@@ -762,13 +763,24 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
   }));
 
   app.put('/api/pi/subagents/:name', parseJson, handle(async (req, res) => {
-    const directory = resolveDirectory(req); const paths = host.getPath(directory);
     if (!isSubagentsSlotActive(host.getFeaturePlugins())) { json(res, 404, { error: "Subagents feature plugin is not active" }); return; }
+    const directory = resolveDirectory(req); const paths = host.getPath(directory);
+    const existing = getPiSubagent({ agentDir: paths.state, directory, name: req.params.name });
+    if (existing?.readOnly) {
+      const frontmatter = req.body?.frontmatter && typeof req.body.frontmatter === 'object' ? req.body.frontmatter : {};
+      const unsupported = Object.keys(frontmatter).filter((key) => key !== 'name' && key !== 'description');
+      if (unsupported.length > 0 || typeof frontmatter.description !== 'string' || String(req.body?.body || '').trim()) {
+        json(res, 409, { error: "Built-in agents only allow saving a description" }); return;
+      }
+    }
     json(res, 200, writePiSubagent({ agentDir: paths.state, directory, name: req.params.name, scope: req.body?.scope, frontmatter: req.body?.frontmatter, body: req.body?.body }));
   }));
 
   app.delete('/api/pi/subagents/:name', handle(async (req, res) => {
+    if (!isSubagentsSlotActive(host.getFeaturePlugins())) { json(res, 404, { error: "Subagents feature plugin is not active" }); return; }
     const directory = resolveDirectory(req); const paths = host.getPath(directory);
+    const existing = getPiSubagent({ agentDir: paths.state, directory, name: req.params.name });
+    if (existing?.readOnly) { json(res, 409, { error: "Built-in agents are read-only" }); return; }
     json(res, 200, deletePiSubagent({ agentDir: paths.state, directory, name: req.params.name, scope: req.query?.scope }));
   }));
 

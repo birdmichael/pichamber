@@ -799,12 +799,17 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
     try {
       if (isPiKernelEnabled()) {
         const resolved = readBehaviorAgentsMd();
+        const directory = typeof _req.query?.directory === 'string' ? _req.query.directory.trim() : '';
+        const projectPath = directory ? path.join(directory, 'AGENTS.md') : '';
+        const projectExists = projectPath ? await fs.promises.access(projectPath).then(() => true).catch(() => false) : false;
+        const projectContent = projectExists ? await fs.promises.readFile(projectPath, 'utf8') : '';
         return res.json({
           content: resolved.content,
           exists: resolved.exists,
           kernel: 'pi',
           path: resolved.path,
           scope: resolved.scope,
+          project: { content: projectContent, exists: projectExists, path: projectPath, scope: 'project' },
         });
       }
       try {
@@ -828,7 +833,14 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
         return res.status(413).json({ error: `Content exceeds maximum size of ${MAX_BEHAVIOR_PROMPT_SIZE} bytes` });
       }
 
-      const filePath = isPiKernelEnabled() ? resolvePiAgentsMdPath() : OPENCODE_AGENTS_MD_PATH;
+      const requestedScope = req.body?.scope === 'project' ? 'project' : 'user';
+      const requestedDirectory = typeof req.body?.directory === 'string' ? req.body.directory.trim() : '';
+      if (isPiKernelEnabled() && requestedScope === 'project' && !requestedDirectory) {
+        return res.status(400).json({ error: 'A project directory is required for project AGENTS.md' });
+      }
+      const filePath = isPiKernelEnabled() && requestedScope === 'project'
+        ? path.join(requestedDirectory, 'AGENTS.md')
+        : (isPiKernelEnabled() ? resolvePiAgentsMdPath() : OPENCODE_AGENTS_MD_PATH);
       const parentDir = path.dirname(filePath);
       try {
         await fs.promises.access(parentDir);
@@ -848,7 +860,7 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
           requiresReload: false,
           reloaded: true,
           path: filePath,
-          scope: 'user',
+          scope: requestedScope,
           message: 'Pi AGENTS.md saved',
         });
       }

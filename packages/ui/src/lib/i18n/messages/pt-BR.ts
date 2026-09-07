@@ -2521,6 +2521,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.agentRoster.pi': 'Pi (current session)',
   'chat.agentRoster.currentSession': 'Current session',
   'chat.agentRoster.subagents': 'Subagents',
+  'chat.agentRoster.manage': 'Manage',
   'chat.agentRoster.new': 'New',
   'chat.agentRoster.name': 'Name',
   'chat.agentRoster.description': 'Description',
