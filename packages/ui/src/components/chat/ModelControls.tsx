@@ -62,6 +62,7 @@ import { getRuntimeKey } from '@/lib/runtime-switch';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { SubagentRosterMenu } from './SubagentRosterMenu';
+import { buildSubagentRunArguments } from './subagentLaunch';
 import {
     findLatestUserModelChoice,
     shouldPreserveManualModelOverride,
@@ -640,7 +641,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
     const launchSubagent = React.useCallback(async (params: { role: string; providerId: string; modelId: string; thinking: string; task: string }) => {
         if (!currentSessionId) throw new Error('Select a session before running a subagent.');
         const directory = getDirectoryForSession(currentSessionId);
-        await opencodeClient.sendCommand({ runtimeKey: getRuntimeKey(), id: currentSessionId, providerID: params.providerId, modelID: params.modelId, command: 'run', arguments: params.role + '[model=' + params.providerId + '/' + params.modelId + ':' + params.thinking + '] ' + JSON.stringify(params.task), directory });
+        await opencodeClient.sendCommand({ runtimeKey: getRuntimeKey(), id: currentSessionId, providerID: params.providerId, modelID: params.modelId, command: 'run', arguments: buildSubagentRunArguments(params), directory });
     }, [currentSessionId, getDirectoryForSession]);
     const getAgentModelForSession = useSelectionStore((state) => state.getAgentModelForSession);
     const saveAgentModelVariantForSession = useSelectionStore((state) => state.saveAgentModelVariantForSession);

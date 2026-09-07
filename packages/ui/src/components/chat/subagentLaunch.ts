@@ -12,6 +12,20 @@ export const parseSubagentModelRef = (value: string | null | undefined): Subagen
   return providerId && modelId ? { providerId, modelId } : null;
 };
 
+export const buildSubagentRunArguments = ({
+  role,
+  providerId,
+  modelId,
+  thinking,
+  task,
+}: {
+  role: string;
+  providerId: string;
+  modelId: string;
+  thinking: string;
+  task: string;
+}): string => `${role}[model=${providerId}/${modelId}:${thinking}] ${JSON.stringify(task)} --bg`;
+
 export const canLaunchSubagent = ({
   task,
   sessionId,
