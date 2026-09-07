@@ -10,6 +10,7 @@ import {
   resolveWorkStatusSubagentOpen,
   countExportableWorkStatusRows,
   formatWorkStatusSubagentSummary,
+  formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
@@ -234,6 +235,18 @@ describe('buildWorkStatusSubagentRows', () => {
       },
     );
     expect(rows[0]?.status).toBe('permission');
+  });
+});
+
+describe('formatWorkStatusSubagentModelLabel', () => {
+  test('uses display names when available and ids as a non-blank fallback', () => {
+    expect(formatWorkStatusSubagentModelLabel({
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet',
+      providerName: 'Anthropic',
+      modelName: 'Claude Sonnet',
+    })).toBe('Anthropic/Claude Sonnet');
+    expect(formatWorkStatusSubagentModelLabel({ providerId: 'provider', modelId: 'model' })).toBe('provider/model');
   });
 });
 

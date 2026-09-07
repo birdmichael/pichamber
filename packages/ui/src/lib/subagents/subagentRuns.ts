@@ -10,6 +10,8 @@ export type SubagentRun = {
   toolCallId?: string | null;
   name: string;
   role: string;
+  providerId?: string;
+  modelId?: string;
   mode: SubagentRunMode;
   state: SubagentRunState;
   title: string;
@@ -33,6 +35,8 @@ const parseSubagentRun = (value: unknown): SubagentRun | null => {
   const sessionID = asTrimmed(record.sessionID) || null;
   const directory = asTrimmed(record.directory) || null;
   const toolCallId = asTrimmed(record.toolCallId) || null;
+  const providerId = asTrimmed(record.providerId || record.providerID);
+  const modelId = asTrimmed(record.modelId || record.modelID);
   const blocker = asTrimmed(record.blocker);
   return {
     runId,
@@ -42,6 +46,7 @@ const parseSubagentRun = (value: unknown): SubagentRun | null => {
     toolCallId,
     name,
     role: asTrimmed(record.role) || name,
+    ...(providerId || modelId ? { ...(providerId ? { providerId } : {}), ...(modelId ? { modelId } : {}) } : {}),
     mode,
     state,
     title: asTrimmed(record.title) || name,

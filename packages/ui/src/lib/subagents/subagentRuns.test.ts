@@ -58,3 +58,15 @@ describe('parseSubagentRunsPayload', () => {
     expect(parsed?.[0]?.openable).toBe(false);
   });
 });
+
+
+describe('provider/model metadata', () => {
+  test('keeps provider and model ids for work-status display resolution', () => {
+    const [run] = parseSubagentRunsPayload({ runs: [{
+      runId: 'run_model', parentID: 'parent', sessionID: 'child', directory: '/repo',
+      name: 'scout', role: 'scout', providerId: 'anthropic', modelId: 'claude-sonnet',
+      mode: 'foreground', state: 'running', title: 'Inspect', openable: true,
+    }] })!;
+    expect(run).toMatchObject({ providerId: 'anthropic', modelId: 'claude-sonnet' });
+  });
+});

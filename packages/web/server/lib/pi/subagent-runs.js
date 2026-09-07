@@ -15,6 +15,27 @@ const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Arra
 
 const asTrimmedString = (value) => (typeof value === 'string' && value.trim() ? value.trim() : '');
 
+const readProviderModel = (...sources) => {
+  let providerId = '';
+  let modelId = '';
+  for (const source of sources) {
+    if (!isRecord(source)) continue;
+    const modelValue = source.model;
+    const modelRecord = isRecord(modelValue) ? modelValue : null;
+    providerId ||= asTrimmedString(source.providerId || source.providerID || source.provider || modelRecord?.providerId || modelRecord?.providerID || modelRecord?.provider);
+    modelId ||= asTrimmedString(source.modelId || source.modelID || (modelRecord ? modelRecord.id || modelRecord.modelId || modelRecord.modelID : ''));
+    if (typeof modelValue === 'string' && !modelId) {
+      const slash = modelValue.indexOf('/');
+      if (slash > 0 && slash < modelValue.length - 1) {
+        providerId ||= modelValue.slice(0, slash).trim();
+        modelId ||= modelValue.slice(slash + 1).trim();
+      }
+    }
+    if (providerId && modelId) return { providerId, modelId };
+  }
+  return { providerId, modelId };
+};
+
 const asChildSessionId = (sessionID, parentID) => {
   const child = asTrimmedString(sessionID);
   const parent = asTrimmedString(parentID);
@@ -264,6 +285,7 @@ export const mapStatusToSubagentRun = (status, {
   const mode = normalizeSubagentRunMode(status.mode, sessionFile ? 'background' : 'foreground');
   if (!mode) return null;
   const blocker = readStatusBlocker(status);
+  const { providerId, modelId } = readProviderModel(status, adapterSteps(status)[0], status.modelSelection, status.execution);
   return {
     runId,
     parentID: asTrimmedString(parentID),
@@ -272,6 +294,7 @@ export const mapStatusToSubagentRun = (status, {
     directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(status.cwd || status.directory) || null,
     name: agent,
     role: asTrimmedString(status.role) || agent,
+    ...(providerId || modelId ? { providerId, modelId } : {}),
     mode,
     state,
     title: asTrimmedString(status.goal || status.task) || firstStepLabel(status) || agent,
@@ -300,6 +323,7 @@ const mapStepToSubagentRun = (status, step, {
   const title = asTrimmedString(step.label || step.workflowKey || step.task) || name;
   const state = normalizeSubagentRunState(step.status || step.state || status.state);
   const blocker = readStatusBlocker(status, step);
+  const { providerId, modelId } = readProviderModel(step);
   const stepRunId = asTrimmedString(step.runId);
   const next = {
     ...base,
@@ -310,6 +334,7 @@ const mapStepToSubagentRun = (status, step, {
     sessionID: sessionID || null,
     name,
     role: asTrimmedString(step.role) || name,
+    ...(providerId || modelId ? { providerId, modelId } : {}),
     state,
     title,
     startedAt: typeof step.startedAt === 'number' ? step.startedAt : base.startedAt,
@@ -799,6 +824,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     input.async === true ? 'background' : 'foreground',
   );
   if (!mode) return null;
+  const { providerId, modelId } = readProviderModel(input, details, metadata, output);
   return {
     runId,
     parentID: asTrimmedString(parentID),
@@ -807,6 +833,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     directory: readSessionCwdFromSessionFile(sessionFile) || null,
     name: agent,
     role: asTrimmedString(input.role) || agent,
+    ...(providerId || modelId ? { providerId, modelId } : {}),
     mode,
     state: normalizeSubagentRunState(stateFromOutput || (running ? 'running' : 'done')),
     title: asTrimmedString(input.task || input.description || details.goal || hints.label) || agent,
@@ -857,6 +884,8 @@ const mergeRunFields = (existing, run) => ({
   toolCallId: run.toolCallId || existing.toolCallId,
   name: run.name && run.name !== 'subagent' ? run.name : existing.name,
   role: run.role && run.role !== 'subagent' ? run.role : existing.role,
+  providerId: run.providerId || existing.providerId || '',
+  modelId: run.modelId || existing.modelId || '',
   title: run.title && run.title !== run.name && run.title !== 'subagent'
     ? run.title
     : (existing.title && existing.title !== 'subagent' ? existing.title : run.title || existing.title),
@@ -910,6 +939,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
         if (!mode) continue;
         const hints = readWorkflowScriptHints(args.workflowScript);
         const agent = asTrimmedString(args.agent || args.role || args.subagent_type || hints.agent) || 'subagent';
+        const { providerId, modelId } = readProviderModel(args);
         upsertSubagentRun(byId, {
           runId,
           parentID: asTrimmedString(parentID),
@@ -918,6 +948,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
           directory: readSessionCwdFromSessionFile(sessionFile) || null,
           name: agent,
           role: asTrimmedString(args.role || args.agent || hints.agent) || agent,
+          ...(providerId || modelId ? { providerId, modelId } : {}),
           mode,
           state: 'running',
           title: asTrimmedString(args.task || args.description || args.goal || hints.label) || agent,
@@ -963,6 +994,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
     }
     const hints = readWorkflowScriptHints(details.workflowScript);
     const agent = asTrimmedString(details.agent || details.role || hints.agent) || 'subagent';
+    const { providerId, modelId } = readProviderModel(details);
     upsertSubagentRun(byId, {
       runId,
       parentID: asTrimmedString(parentID),
@@ -977,6 +1009,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       directory: readSessionCwdFromSessionFile(sessionFile) || asTrimmedString(details.cwd || details.directory) || null,
       name: agent,
       role: asTrimmedString(details.role || details.agent || hints.agent) || agent,
+      ...(providerId || modelId ? { providerId, modelId } : {}),
       mode,
       state: normalizeSubagentRunState(details.state || (message.isError ? 'failed' : 'done')),
       title: asTrimmedString(details.goal || details.task || hints.label) || agent,
@@ -1091,6 +1124,12 @@ export const toPublicSubagentRun = (run) => {
     ...(toolCallId ? { toolCallId } : {}),
     name: run.name,
     role: run.role,
+    ...(asTrimmedString(run.providerId) || asTrimmedString(run.modelId)
+      ? {
+        ...(asTrimmedString(run.providerId) ? { providerId: asTrimmedString(run.providerId) } : {}),
+        ...(asTrimmedString(run.modelId) ? { modelId: asTrimmedString(run.modelId) } : {}),
+      }
+      : {}),
     mode: run.mode,
     state: run.state,
     title: run.title,

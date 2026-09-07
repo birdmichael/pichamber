@@ -3260,8 +3260,6 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                 {subagentsPluginAvailable ? (
                                     <SubagentRosterMenu
                                         providers={providers}
-                                        currentProviderId={currentProviderId}
-                                        currentModelId={currentModelId}
                                         currentThinking={piThinking}
                                         sessionId={currentSessionId}
                                         directory={currentSessionId ? getDirectoryForSession(currentSessionId) : opencodeClient.getDirectory()}

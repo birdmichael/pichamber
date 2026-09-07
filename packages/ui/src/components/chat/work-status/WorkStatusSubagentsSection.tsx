@@ -2,6 +2,7 @@ import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { useAllLiveSessions, useAllSessionStatuses, useChildStoreManager, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
+import { useConfigStore } from '@/stores/useConfigStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
@@ -21,6 +22,7 @@ import {
   resolveWorkStatusSubagentLabel,
   resolveWorkStatusSubagentOpen,
   formatWorkStatusSubagentSummary,
+  formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
@@ -47,6 +49,7 @@ type ChildRow = WorkStatusSubagentRow;
 export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directory }) => {
   const { t } = useI18n();
   const isMobile = useUIStore((state) => state.isMobile);
+  const providers = useConfigStore((state) => state.providers);
   const isPiKernel = usePiKernel();
   const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
   const effectiveDirectory = useEffectiveDirectory() ?? null;
@@ -196,7 +199,16 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       summary={summary}
     >
       <div className="max-h-56 overflow-y-auto">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const provider = row.providerId ? providers.find((entry) => entry.id === row.providerId) : undefined;
+          const model = provider?.models?.find((entry) => entry.id === row.modelId);
+          const modelLabel = formatWorkStatusSubagentModelLabel({
+            providerId: row.providerId,
+            modelId: row.modelId,
+            providerName: provider?.name,
+            modelName: model?.name,
+          });
+          return (
           <WorkStatusRow
             key={row.id}
             onClick={row.openable ? () => openChildSession(row) : undefined}
@@ -206,11 +218,16 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
             ariaLabel={row.openable
               ? t('chat.workStatus.action.openSubagent', { name: row.label })
               : row.label}
-            label={row.mode === 'background'
-              ? t('chat.workStatus.subagent.namedBackground', { name: row.label })
-              : row.mode === 'foreground'
-                ? t('chat.workStatus.subagent.namedForeground', { name: row.label })
-                : row.label}
+            label={(
+              <>
+                {row.mode === 'background'
+                  ? t('chat.workStatus.subagent.namedBackground', { name: row.label })
+                  : row.mode === 'foreground'
+                    ? t('chat.workStatus.subagent.namedForeground', { name: row.label })
+                    : row.label}
+                {modelLabel ? <span className="text-muted-foreground"> · {modelLabel}</span> : null}
+              </>
+            )}
             value={row.status === 'permission' ? (
               <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
             ) : row.status === 'question' ? (
@@ -231,7 +248,8 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
               <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
             )}
           />
-        ))}
+          );
+        })}
       </div>
     </WorkStatusCollapsibleSection>
   );
