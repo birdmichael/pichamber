@@ -242,22 +242,21 @@ describe('getPiKimiUsage', () => {
     expect(tokens).toEqual(['Bearer api-secret']);
     expect(JSON.stringify(result)).not.toContain('api-secret');
   });
-  it('uses the dual-auth API sibling when the catalog OAuth is absent', async () => {
+  it('ignores the dual-auth API sibling instead of querying usage', async () => {
     const home = makeTemp();
     writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
       'kimi-coding-api': { type: 'api_key', key: 'api-secret' },
     });
-    const tokens = [];
-    const result = await getPiKimiUsage({
-      home,
-      fetchImpl: async (_url, init) => {
-        tokens.push(init.headers.Authorization);
-        return { ok: true, status: 200, text: async () => JSON.stringify({ usage: { limit: '100', used: '6' } }) };
-      },
-    });
-    expect(result.ok).toBe(true);
-    expect(tokens).toEqual(['Bearer api-secret']);
-    expect(JSON.stringify(result)).not.toContain('api-secret');
+    let called = false;
+    const fetchImpl = async () => {
+      called = true;
+      throw new Error('should not fetch');
+    };
+    const defaultResult = await getPiKimiUsage({ home, fetchImpl });
+    const siblingResult = await getPiKimiUsage({ home, providerId: 'kimi-coding-api', fetchImpl });
+    expect(called).toBe(false);
+    expect(defaultResult).toEqual({ ok: false, configured: false, slotActive: false });
+    expect(siblingResult).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
   it('does not call Moonshot usages for China-region Kimi rows', async () => {
