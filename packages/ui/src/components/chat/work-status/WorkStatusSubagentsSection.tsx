@@ -27,6 +27,7 @@ import {
   formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
   summarizeSubagentTranscript,
+  buildSubagentParentSendOptions,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
 import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
@@ -82,7 +83,18 @@ const SubagentSummaryControl: React.FC<SummaryControlProps> = ({ row, parentSess
     setPosting(true);
     try {
       const body = summary || t('chat.workStatus.subagent.noSummary');
-      await sendMessage(`子智能体「${row.label}」结果（请作为上下文参考）：\n${body}`, providerId, modelId, getSessionAgentSelection(parentSessionId) ?? undefined);
+      await sendMessage(
+        `子智能体「${row.label}」结果（请作为上下文参考）：\n${body}`,
+        providerId,
+        modelId,
+        getSessionAgentSelection(parentSessionId) ?? undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'normal',
+        buildSubagentParentSendOptions(parentSessionId, parentDirectory),
+      );
       toast.success(t('chat.workStatus.subagent.summaryPosted'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('chat.workStatus.subagent.summaryFailed'));

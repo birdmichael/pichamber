@@ -260,6 +260,16 @@ const readTranscriptText = (value: unknown): string => {
   return '';
 };
 
+/** Keep parent handoff sends pinned to the parent even when the Work Status panel
+ * is rendered from an embedded/child chat whose current-session state differs. */
+export const buildSubagentParentSendOptions = (
+  parentSessionId: string,
+  parentDirectory: string | null | undefined,
+): { sessionId: string; directory?: string } => ({
+  sessionId: parentSessionId,
+  ...(parentDirectory ? { directory: parentDirectory } : {}),
+});
+
 /** Pick the latest useful assistant text for the Work Status parent handoff. */
 export const summarizeSubagentTranscript = (
   messages: Array<{ info?: { role?: unknown }; parts?: unknown[] }> | null | undefined,

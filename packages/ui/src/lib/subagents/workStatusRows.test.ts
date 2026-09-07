@@ -13,6 +13,7 @@ import {
   formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
   summarizeSubagentTranscript,
+  buildSubagentParentSendOptions,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
 
@@ -309,5 +310,20 @@ describe('summarizeSubagentTranscript', () => {
     expect(summarizeSubagentTranscript([
       { info: { role: 'user' }, parts: [{ type: 'text', text: 'child output' }] },
     ])).toBe('child output');
+  });
+});
+
+describe('subagent parent handoff target', () => {
+  test('pins the post to the parent session and preserves its directory', () => {
+    expect(buildSubagentParentSendOptions('parent-session', '/workspace/project')).toEqual({
+      sessionId: 'parent-session',
+      directory: '/workspace/project',
+    });
+  });
+
+  test('omits an unknown directory instead of sending null to the message API', () => {
+    expect(buildSubagentParentSendOptions('parent-session', null)).toEqual({
+      sessionId: 'parent-session',
+    });
   });
 });
