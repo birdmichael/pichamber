@@ -426,6 +426,26 @@ describe('child-session directory plumbing', () => {
 });
 
 
+describe('provider/model metadata', () => {
+  it('preserves explicit provider/model ids from a tool call', () => {
+    const run = extractSubagentRunFromToolPart({
+      tool: 'subagent', callID: 'call_model', state: {
+        status: 'running',
+        input: { agent: 'scout', task: 'Inspect', providerID: 'anthropic', modelID: 'claude-sonnet' },
+      },
+    }, 'parent-1');
+    expect(toPublicSubagentRun(run)).toMatchObject({ providerId: 'anthropic', modelId: 'claude-sonnet' });
+  });
+
+  it('reads a provider/model pair from a single adapter step', () => {
+    const run = mapStatusToSubagentRun({
+      runId: 'run_step_model', sessionId: 'parent-1', mode: 'async', state: 'running',
+      steps: [{ agent: 'scout', status: 'running', providerID: 'google', modelID: 'gemini-pro' }],
+    }, { parentID: 'parent-1' });
+    expect(toPublicSubagentRun(run)).toMatchObject({ providerId: 'google', modelId: 'gemini-pro' });
+  });
+});
+
 describe('tool-part extraction', () => {
   it('reads a foreground subagent tool call from the parent transcript', () => {
     const run = extractSubagentRunFromToolPart({

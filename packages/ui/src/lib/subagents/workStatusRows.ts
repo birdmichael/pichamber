@@ -3,6 +3,7 @@ import { readTaskSessionIdFromOutput, readTaskSessionIdFromRecord } from '@/comp
 import { canOpenSubagentChildSession, resolveSubagentChildDirectory } from './childSession';
 import { readSubagentChildSessionId } from './subagentTool';
 import type { SubagentRun } from './subagentRuns';
+import { formatProviderModelLabel } from '@/lib/modelDisplay';
 
 export type WorkStatusSubagentRow = {
   id: string;
@@ -10,6 +11,8 @@ export type WorkStatusSubagentRow = {
   sessionID: string | null;
   directory: string | null;
   openable: boolean;
+  providerId?: string;
+  modelId?: string;
   status: 'permission' | 'question' | 'working' | 'queued' | 'blocked' | 'failed' | 'paused' | 'stopped' | 'done';
   mode?: 'foreground' | 'background';
 };
@@ -176,6 +179,10 @@ export const buildWorkStatusSubagentRows = ({
       sessionID: opened.sessionID,
       directory: opened.directory,
       openable: opened.openable,
+      ...(run.providerId || run.modelId ? {
+        ...(run.providerId ? { providerId: run.providerId } : {}),
+        ...(run.modelId ? { modelId: run.modelId } : {}),
+      } : {}),
       mode: run.mode,
       status,
     };
@@ -211,6 +218,24 @@ export const overlayWorkStatusSubagentRow = (
   if (overlays.question || overlays.uiPrompt) return { ...row, status: 'question' };
   return row;
 };
+
+
+export const formatWorkStatusSubagentModelLabel = ({
+  providerId,
+  modelId,
+  providerName,
+  modelName,
+}: {
+  providerId?: string | null;
+  modelId?: string | null;
+  providerName?: string | null;
+  modelName?: string | null;
+}): string => formatProviderModelLabel({ providerId, modelId, providerName, modelName })
+  || modelName?.trim()
+  || modelId?.trim()
+  || providerName?.trim()
+  || providerId?.trim()
+  || '';
 
 export const resolveWorkStatusSubagentLabel = (
   run: Pick<SubagentRun, 'title' | 'name'>,

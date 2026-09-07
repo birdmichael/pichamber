@@ -4566,13 +4566,24 @@ export const createPiHost = ({
           type: 'session.status',
           properties: { sessionID: record.id, status: { type: 'busy' } },
         });
-        const findOpenableChild = async () => {
+        // Desktop launches `/run` as a background workflow so the adapter writes
+        // a live status row before the child session is persisted. Treat that
+        // new live row as proof of launch; requiring a child session id here
+        // races foreground/background startup and reports a valid run as failed.
+        let initialRunIds = new Set();
+        try {
+          const initial = await this.listSubagentRuns(record.id);
+          initialRunIds = new Set((initial?.runs || []).map((run) => run?.runId).filter(Boolean));
+        } catch {
+          // The first poll below remains authoritative if the snapshot failed.
+        }
+        const findStartedRun = async () => {
           const { runs } = await this.listSubagentRuns(record.id);
-          return (runs || []).find((run) => (
-            typeof run.sessionID === 'string'
-            && run.sessionID
-            && run.sessionID !== record.id
-          ));
+          return (runs || []).find((run) => {
+            if (!run?.runId || initialRunIds.has(run.runId)) return false;
+            if (run.sessionID && run.sessionID !== record.id) return true;
+            return ['queued', 'running', 'blocked', 'waiting'].includes(run.state);
+          });
         };
         const missingChildReply = () => completeLocalReply(
           record,
@@ -4594,7 +4605,7 @@ export const createPiHost = ({
           const started = Date.now();
           try {
             while (true) {
-              const child = await findOpenableChild();
+              const child = await findStartedRun();
               if (child) {
                 forceSettleRecord(record);
                 return;
@@ -4613,7 +4624,7 @@ export const createPiHost = ({
                 sleep(Math.min(50, remaining)).then(() => 'wait'),
               ]);
               if (outcome === 'done') {
-                if (!await findOpenableChild()) missingChildReply();
+                if (!await findStartedRun()) missingChildReply();
                 return;
               }
             }

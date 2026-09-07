@@ -495,6 +495,36 @@ describe('Pi host subagent runs', () => {
     host.dispose();
   });
 
+  it('accepts a newly-created live adapter run before its child session is persisted', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createPiHost({
+      home,
+      defaultDirectory: '/tmp/project',
+      mock: true,
+      createSession: async () => createInMemoryPiSession(),
+    });
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Parent' });
+    parent.piSession.registerCommand('run', async () => {}, {
+      description: 'Run one subagent through workflowScript',
+    });
+    let snapshots = 0;
+    host.listSubagentRuns = async () => {
+      snapshots += 1;
+      return snapshots === 1
+        ? { runs: [] }
+        : { runs: [{ runId: 'live-run', sessionID: null, state: 'running' }] };
+    };
+    await host.runCommand(parent.id, { command: 'run', arguments: 'scout say ok --bg' });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const texts = host.getMessages(parent.id).flatMap((entry) => (
+      (entry.parts || []).map((part) => part.text).filter(Boolean)
+    ));
+    expect(texts.some((text) => text.includes('Could not start a subagent run'))).toBe(false);
+    expect(host.getStatus()[parent.id]).toBeUndefined();
+    host.dispose();
+  });
+
   it('surfaces an error when /run finishes without creating a child', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);
