@@ -31,9 +31,12 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
   const providers = useConfigStore((state) => state.providers);
   const currentProviderId = useConfigStore((state) => state.currentProviderId);
   const currentModelId = useConfigStore((state) => state.currentModelId);
+  const currentAgentName = useConfigStore((state) => state.currentAgentName);
   const setProvider = useConfigStore((state) => state.setProvider);
   const setModel = useConfigStore((state) => state.setModel);
   const saveSessionModelSelection = useSelectionStore((state) => state.saveSessionModelSelection);
+  const getSessionAgentSelection = useSelectionStore((state) => state.getSessionAgentSelection);
+  const saveAgentModelForSession = useSelectionStore((state) => state.saveAgentModelForSession);
   const [picked, setPicked] = React.useState<ModelOption | null>(null);
   const [pending, setPending] = React.useState(false);
 
@@ -63,15 +66,20 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
   if (!chrome.showBuildRow && !chrome.implementing) return null;
   if (!chrome.available) return null;
 
-  const selectModel = (model: ModelOption) => {
+  const applyModelSelection = (model: ModelOption) => {
     setPicked(model);
     // Keep Plan Build on the same session selection path as the main composer.
     // This updates the chip immediately; the request below makes the Pi session
-    // authoritative before Build starts.
+    // authoritative before Build starts. Agent-specific selections must also be
+    // updated because ModelControls restores those before the session fallback.
     setProvider(model.providerID);
     setModel(model.modelID);
     if (chrome.sessionID) {
       saveSessionModelSelection(chrome.sessionID, model.providerID, model.modelID);
+      const agentName = getSessionAgentSelection(chrome.sessionID) ?? currentAgentName;
+      if (agentName) {
+        saveAgentModelForSession(chrome.sessionID, agentName, model.providerID, model.modelID);
+      }
       void runtimeFetch(`/api/session/${encodeURIComponent(chrome.sessionID)}/model`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -98,6 +106,9 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
     setPending(true);
     try {
       const pickedRef = `${selected.providerID}/${selected.modelID}`;
+      // Re-apply at Build time too: a selection made immediately before
+      // Build must update the composer and persisted agent/session choices.
+      applyModelSelection(selected);
       const next = await dispatchSessionPlanAction(chrome.sessionID, 'implement', {
         // Always send the Build choice, even when another update has not yet
         // reached the session model endpoint.
@@ -132,7 +143,7 @@ export function PiPlanBuildRow({ className }: { className?: string }) {
             return (
               <DropdownMenuItem
                 key={key}
-                onClick={() => selectModel(model)}
+                onClick={() => applyModelSelection(model)}
                 aria-checked={isSelected}
               >
                 {model.label}
