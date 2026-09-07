@@ -17,6 +17,67 @@ export type WorkStatusSubagentRow = {
   mode?: 'foreground' | 'background';
 };
 
+export type WorkStatusSubagentTreeNode = {
+  id: string;
+  row: WorkStatusSubagentRow | null;
+  children: WorkStatusSubagentTreeNode[];
+};
+
+/**
+ * Build the fan-out rooted at the currently displayed session. The status API
+ * normally returns direct children only, but parentByRowId also lets the UI
+ * preserve deeper relationships when an adapter supplies them.
+ *
+ * Unknown or missing parent ids intentionally attach to the root. That keeps
+ * the tree useful during the short window where a child session has been
+ * created but its relationship metadata has not arrived yet.
+ */
+export const buildWorkStatusSubagentTree = ({
+  rows,
+  rootId,
+  parentByRowId,
+}: {
+  rows: WorkStatusSubagentRow[];
+  rootId?: string | null;
+  parentByRowId?: Readonly<Record<string, string | null | undefined>>;
+}): WorkStatusSubagentTreeNode | null => {
+  const normalizedRootId = rootId?.trim() || '';
+  if (!normalizedRootId || rows.length === 0) return null;
+
+  const nodes = rows.map((row) => ({
+    id: row.sessionID?.trim() || row.id,
+    row,
+    children: [] as WorkStatusSubagentTreeNode[],
+  }));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const root: WorkStatusSubagentTreeNode = { id: normalizedRootId, row: null, children: [] };
+  const parentIds = new Map(nodes.map((node) => {
+    const requested = parentByRowId?.[node.row.id]?.trim() || normalizedRootId;
+    return [node.id, byId.has(requested) ? requested : normalizedRootId] as const;
+  }));
+
+  for (const node of nodes) {
+    const directParentId = parentIds.get(node.id) || normalizedRootId;
+    let cursor = node.id;
+    const seen = new Set<string>();
+    let cycle = false;
+    while (cursor !== normalizedRootId) {
+      if (seen.has(cursor)) {
+        cycle = true;
+        break;
+      }
+      seen.add(cursor);
+      cursor = parentIds.get(cursor) || normalizedRootId;
+    }
+    // A malformed adapter payload must not make a row disappear or create a
+    // self-referential tree. It is safest to keep that row visible at root.
+    const parentId = cycle ? normalizedRootId : directParentId;
+    (parentId === normalizedRootId ? root : byId.get(parentId) || root).children.push(node);
+  }
+
+  return root;
+};
+
 export const resolveWorkStatusSubagentOpen = ({
   sessionID,
   directory,
