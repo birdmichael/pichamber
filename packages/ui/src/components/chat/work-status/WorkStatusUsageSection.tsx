@@ -114,7 +114,6 @@ const useKimiUsageGroups = (): UsageProviderGroup[] => {
       const error = entry?.error ?? (id === 'kimi-coding' ? fallbackError : null);
       const isLoading = entry?.isLoading ?? (id === 'kimi-coding' ? fallbackLoading : false);
       const presentation = presentKimiUsage({ payload, error, isLoading });
-      if (payload?.region === 'domestic' || payload?.usageUnavailable) return [];
       if (presentation.kind === 'notConfigured') return [];
       if (presentation.kind === 'loading' && !payload?.usage?.windows) return [];
       if (payload && !payload.slotActive) return [];

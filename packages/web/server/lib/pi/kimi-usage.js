@@ -331,21 +331,6 @@ export const getPiKimiUsage = async ({
   }
   const providerName = readProviderDisplayName(home, usageProviderId);
   const region = readKimiProviderRegion(home, usageProviderId);
-  if (region === 'domestic') {
-    // Code usage stays on api.kimi.com; do not invent Moonshot balance/usages.
-    return {
-      ok: false,
-      configured: true,
-      slotActive: true,
-      providerId: usageProviderId,
-      providerName,
-      region: 'domestic',
-      usageUnavailable: true,
-      error: 'Kimi Code usage is not available for China region',
-      usage: null,
-      fetchedAt: Date.now(),
-    };
-  }
   try {
     const { windows, membershipLevel } = await withTimeout(async (signal) => {
       if (oauth) {
@@ -383,7 +368,7 @@ export const getPiKimiUsage = async ({
       slotActive: true,
       providerId: usageProviderId,
       providerName,
-      region: 'international',
+      region,
       expires: oauth?.expires ?? null,
       usage: { windows },
       ...(membershipLevel ? { membershipLevel } : {}),
@@ -396,7 +381,7 @@ export const getPiKimiUsage = async ({
       slotActive: true,
       providerId: usageProviderId,
       providerName,
-      region: 'international',
+      region,
       expires: oauth?.expires ?? null,
       error: error instanceof Error ? error.message : 'Kimi Code usage request failed',
       usage: null,
