@@ -37,4 +37,11 @@ describe('sidebar Settings gear first click', () => {
     expect(settingsViewIndex).toBeGreaterThan(openGateIndex);
     expect(settingsWindowSource).not.toMatch(/if\s*\(\s*!open\s*\)\s*\{?\s*return\s+null/);
   });
+
+  test("SettingsView failures never leave an empty popup", () => {
+    expect(settingsWindowSource).not.toContain("React.Suspense fallback={null}");
+    expect(settingsWindowSource).toContain("fallback={<SettingsWindowLoading");
+    expect(settingsWindowSource).toContain("<ErrorBoundary");
+    expect(settingsWindowSource).toContain("<SettingsWindowError");
+  });
 });

@@ -6,10 +6,41 @@ import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { focusDesktopWindow } from '@/lib/desktop';
 import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 // SettingsView pulls CodeMirror / vim / theme tooling; load it only when open.
 const SettingsView = lazyWithChunkRecovery(() =>
   import('./SettingsView').then((m) => ({ default: m.SettingsView })),
+);
+
+/** Keep the dialog useful while the SettingsView chunk is being fetched. */
+const SettingsWindowLoading: React.FC<{ label: string }> = ({ label }) => (
+  <div className="flex h-full min-h-0 flex-1 bg-[var(--surface-background)] text-[var(--surface-foreground)]" aria-busy="true" aria-label={label}>
+    <div className="flex w-64 shrink-0 flex-col gap-3 border-r border-border bg-sidebar p-4">
+      <div className="h-8 animate-pulse rounded-md bg-muted" />
+      <div className="flex flex-col gap-2 pt-2">
+        {Array.from({ length: 8 }, (_, index) => (
+          <div key={index} className="h-8 animate-pulse rounded-md bg-muted/70" />
+        ))}
+      </div>
+    </div>
+    <div className="flex min-w-0 flex-1 items-center justify-center bg-background">
+      <div className="flex items-center gap-2 typography-ui text-muted-foreground">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+        <span>{label}</span>
+      </div>
+    </div>
+  </div>
+);
+
+const SettingsWindowError: React.FC<{ onClose: () => void; title: string; description: string; closeLabel: string }> = ({ onClose, title, description, closeLabel }) => (
+  <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-background p-6">
+    <div className="max-w-md space-y-3 text-center">
+      <h2 className="typography-ui-label text-foreground">{title}</h2>
+      <p className="typography-ui text-muted-foreground">{description}</p>
+      <button type="button" onClick={onClose} className="rounded-md border border-border px-3 py-1.5 typography-ui text-foreground hover:bg-interactive-hover">{closeLabel}</button>
+    </div>
+  </div>
 );
 
 interface SettingsWindowProps {
@@ -87,8 +118,12 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
             </Dialog.Description>
             {open ? (
               <div className="flex min-h-0 flex-1 flex-col">
-                <React.Suspense fallback={null}>
-                  <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+                <React.Suspense fallback={<SettingsWindowLoading label={t("common.loading")} />}>
+                  <ErrorBoundary
+                    fallback={<SettingsWindowError onClose={() => onOpenChange(false)} title={t("errorBoundary.title")} description={t("errorBoundary.description")} closeLabel={t("settings.view.actions.closeSettings")} />}
+                  >
+                    <SettingsView onClose={() => onOpenChange(false)} isWindowed />
+                  </ErrorBoundary>
                 </React.Suspense>
               </div>
             ) : null}
