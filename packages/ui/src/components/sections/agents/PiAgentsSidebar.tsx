@@ -38,7 +38,7 @@ export const PiAgentsSidebar: React.FC<Props> = ({ onItemSelect }) => {
       <SettingsProjectSelector className="mb-3" />
       <div className="flex items-center justify-between">
         <span className="typography-meta text-muted-foreground">{t('settings.piAgents.count', { count: user.length + project.length })}</span>
-        <Button size="sm" variant="ghost" className="h-7 w-7 px-0 text-muted-foreground" onClick={startCreating} disabled={!active} aria-label={t('settings.piAgents.create')}><Icon name="add" className="h-3.5 w-3.5" /></Button>
+        <Button size="sm" variant="ghost" className="h-7 w-7 px-0 text-muted-foreground" onClick={() => { startCreating(); onItemSelect?.(); }} disabled={!active} aria-label={t('settings.piAgents.create')}><Icon name="add" className="h-3.5 w-3.5" /></Button>
       </div>
     </div>
     {!active ? <div className="p-4 typography-meta text-muted-foreground">{t('settings.piAgents.pluginRequired')}</div> : <ScrollableOverlay outerClassName="min-h-0 flex-1" className="space-y-1 px-3 py-2">
