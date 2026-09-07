@@ -259,30 +259,27 @@ describe('getPiKimiUsage', () => {
     expect(siblingResult).toEqual({ ok: false, configured: false, slotActive: false });
   });
 
-  it('does not call Moonshot usages for China-region Kimi rows', async () => {
+  it('uses the international Code usages endpoint for domestic Kimi rows', async () => {
     const home = makeTemp();
     installKimiSlot(home);
-    writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
-      'kimi-coding': {
-        type: 'oauth',
-        access: 'access-secret',
-        refresh: 'refresh-secret',
-        expires: Date.now() + 60_000,
-      },
-    });
+    writeOauth(home);
     writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
-    let called = false;
+    const requested = [];
     const result = await getPiKimiUsage({
       home,
-      fetchImpl: async () => {
-        called = true;
-        throw new Error('should not fetch');
+      fetchImpl: async (url) => {
+        requested.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ usage: { limit: '100', used: '17' } }),
+        };
       },
     });
-    expect(called).toBe(false);
-    expect(result.ok).toBe(false);
-    expect(result.usageUnavailable).toBe(true);
+    expect(result.ok).toBe(true);
     expect(result.region).toBe('domestic');
+    expect(result.usage.windows.weekly.usedPercent).toBe(17);
+    expect(requested).toEqual(['https://api.kimi.com/coding/v1/usages']);
     expect(JSON.stringify(result)).not.toContain('access-secret');
   });
 });

@@ -90,18 +90,6 @@ describe('parseKimiUsagePayload', () => {
       membershipLevel: '   ',
     })?.membershipLevel).toBeUndefined();
   });
-  test("preserves domestic unavailability without usage windows", () => {
-    expect(parseKimiUsagePayload({
-      ok: false,
-      configured: true,
-      slotActive: true,
-      region: "domestic",
-      usageUnavailable: true,
-      error: "Kimi Code usage is not available for China region",
-      usage: null,
-    })).toMatchObject({ region: "domestic", usageUnavailable: true, usage: null });
-  });
-
 });
 
 
@@ -218,15 +206,6 @@ describe('reconcileKimiUsageState', () => {
     });
   });
 
-  test("replaces stale international rows when domestic usage becomes unavailable", () => {
-    expect(reconcileKimiUsageState(
-      { payload: okPayload },
-      { type: "parsed", payload: { ok: false, configured: true, slotActive: true, region: "domestic", usageUnavailable: true, usage: null } },
-    )).toEqual({
-      payload: { ok: false, configured: true, slotActive: true, region: "domestic", usageUnavailable: true, usage: null },
-      error: null,
-    });
-  });
   test('replaces state when the slot turns off', () => {
     expect(reconcileKimiUsageState(
       { payload: okPayload },
