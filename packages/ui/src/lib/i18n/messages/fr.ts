@@ -2190,6 +2190,7 @@ export const dict = {
   'chat.agentRoster.pi': 'Pi (current session)',
   'chat.agentRoster.currentSession': 'Current session',
   'chat.agentRoster.subagents': 'Subagents',
+  'chat.agentRoster.manage': 'Manage',
   'chat.agentRoster.new': 'New',
   'chat.agentRoster.name': 'Name',
   'chat.agentRoster.description': 'Description',

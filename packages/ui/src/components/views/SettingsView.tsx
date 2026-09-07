@@ -14,6 +14,8 @@ import { useConfigStore } from '@/stores/useConfigStore';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { AgentsSidebar } from '@/components/sections/agents/AgentsSidebar';
 import { AgentsPage } from '@/components/sections/agents/AgentsPage';
+import { PiAgentsSidebar } from '@/components/sections/agents/PiAgentsSidebar';
+import { PiAgentsPage } from '@/components/sections/agents/PiAgentsPage';
 import { resolvePiDefaultAgentSelection } from '@/components/sections/agents/piAgentSelection';
 import { BehaviorPage } from '@/components/sections/behavior/BehaviorPage';
 import { ExtensionsPage } from '@/components/sections/extensions/ExtensionsPage';
@@ -655,7 +657,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       case 'projects':
         return <ProjectsSidebar onItemSelect={opts.onItemSelect} />;
       case 'agents':
-        return <AgentsSidebar onItemSelect={opts.onItemSelect} />;
+        return runtimeCtx.isPiKernel ? <PiAgentsSidebar onItemSelect={opts.onItemSelect} /> : <AgentsSidebar onItemSelect={opts.onItemSelect} />;
       case 'commands':
         return <CommandsSidebar onItemSelect={opts.onItemSelect} />;
       case 'mcp':
@@ -675,7 +677,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       default:
         return null;
     }
-  }, []);
+  }, [runtimeCtx.isPiKernel]);
 
   const renderPageContent = React.useCallback((slug: SettingsPageSlug) => {
     const meta = getSettingsPageMeta(slug);
@@ -689,7 +691,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
       case 'remote-instances':
         return <RemoteInstancesPage />;
       case 'agents':
-        return <AgentsPage />;
+        return runtimeCtx.isPiKernel ? <PiAgentsPage /> : <AgentsPage />;
       case 'behavior':
         return <BehaviorPage />;
       case 'commands':

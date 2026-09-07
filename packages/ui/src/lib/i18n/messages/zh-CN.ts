@@ -2517,6 +2517,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.agentRoster.pi': 'Pi（当前会话）',
   'chat.agentRoster.currentSession': '当前会话',
   'chat.agentRoster.subagents': '子代理',
+  'chat.agentRoster.manage': '管理',
   'chat.agentRoster.new': '新建',
   'chat.agentRoster.name': '名称',
   'chat.agentRoster.description': '描述',
