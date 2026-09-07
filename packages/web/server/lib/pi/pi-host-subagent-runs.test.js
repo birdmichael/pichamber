@@ -176,6 +176,32 @@ describe('Pi host subagent runs', () => {
     }
   });
 
+
+  it("marks background children stopped and releases active markers on parent abort", async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const tmpdir = path.join(home, "tmp");
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: "/tmp/project", title: "Parent" });
+    const run = writeAdapterChildRun({ home, parentID: parent.id, runId: "run_abort", childId: "abort-child" });
+    const activeRoot = path.join(path.dirname(path.dirname(run.childFile)), ".active-runs");
+    fs.mkdirSync(path.join(activeRoot, "tool-calls", "call"), { recursive: true });
+    fs.writeFileSync(path.join(activeRoot, path.basename(path.dirname(run.childFile))), "");
+    fs.writeFileSync(path.join(activeRoot, "tool-calls", "call", path.basename(path.dirname(run.childFile))), "");
+    try {
+      expect((await host.listSubagentRuns(parent.id)).runs[0]).toMatchObject({ state: "running" });
+      await host.abort(parent.id);
+      expect((await host.listSubagentRuns(parent.id)).runs[0]).toMatchObject({ state: "stopped", error: "父会话已停止" });
+      expect(JSON.parse(fs.readFileSync(path.join(path.dirname(run.childFile), "status.json"), "utf8"))).toMatchObject({ state: "stopped" });
+      expect(fs.existsSync(path.join(activeRoot, path.basename(path.dirname(run.childFile))))).toBe(false);
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
   it('fills sessionID from the live subagent tool and drops leftover ghost files', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);

@@ -1077,6 +1077,11 @@ export const registerPiFacade = (app, { host, bus, defaultDirectory = process.cw
     json(res, 200, payload);
   }));
 
+  app.post('/api/session/:sessionID/subagent-runs/:runID/stop', parseJson, handle(async (req, res) => {
+    if (typeof host.stopSubagentRun !== 'function') { json(res, 404, { error: '无法停止子代理' }); return; }
+    json(res, 200, await host.stopSubagentRun(req.params.sessionID, req.params.runID, { state: 'stopped', error: '已从工作状态停止' }));
+  }));
+
   app.get('/api/session/:sessionID/children', handle(async (req, res) => {
     const children = typeof host.listSessionChildren === 'function'
       ? await host.listSessionChildren(req.params.sessionID, resolveDirectory(req))

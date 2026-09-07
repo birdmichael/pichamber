@@ -213,10 +213,22 @@ export const isLiveRunState = (state) => (
  * Workflow `status.json` often stays `complete` after the parent tool detaches
  * while a child step is still running or waiting on the supervisor.
  */
+const readRunError = (source) => {
+  if (!isRecord(source)) return "";
+  const direct = asTrimmedString(source.error || source.errorMessage || source.message);
+  if (direct) return direct;
+  for (const item of [...(Array.isArray(source.steps) ? source.steps : []), ...(Array.isArray(source.results) ? source.results : [])]) {
+    const error = asTrimmedString(item?.error || item?.errorMessage);
+    if (error) return error;
+  }
+  return "";
+};
+
 export const readAdapterLifecycleState = (status) => {
   const stepStates = adapterSteps(status).map((step) => (
     normalizeSubagentRunState(step?.status || step?.state)
   ));
+  if (readRunError(status)) return "failed";
   const live = stepStates.find((state) => isLiveRunState(state));
   if (live) return live;
   if (stepStates.includes('failed')) return 'failed';
@@ -303,6 +315,7 @@ export const mapStatusToSubagentRun = (status, {
     startedAt: typeof status.startedAt === 'number' ? status.startedAt : null,
     endedAt: typeof status.endedAt === 'number' ? status.endedAt : null,
     ...(blocker ? { blocker } : {}),
+    ...(readRunError(status) ? { error: readRunError(status) } : {}),
   };
 };
 
@@ -342,6 +355,9 @@ const mapStepToSubagentRun = (status, step, {
   };
   if (blocker) next.blocker = blocker;
   else delete next.blocker;
+  const error = readRunError(step) || readRunError(status);
+  if (error) next.error = error;
+  else delete next.error;
   return next;
 };
 
@@ -836,6 +852,7 @@ export const extractSubagentRunFromToolPart = (part, parentID) => {
     ...(providerId || modelId ? { providerId, modelId } : {}),
     mode,
     state: normalizeSubagentRunState(stateFromOutput || (running ? 'running' : 'done')),
+    ...(details.error || details.errorMessage || part.error ? { error: asTrimmedString(details.error || details.errorMessage || part.error) } : {}),
     title: asTrimmedString(input.task || input.description || details.goal || hints.label) || agent,
     toolCallId: asTrimmedString(part.callID || part.id) || null,
     asyncDir: null,
@@ -890,6 +907,7 @@ const mergeRunFields = (existing, run) => ({
     ? run.title
     : (existing.title && existing.title !== 'subagent' ? existing.title : run.title || existing.title),
   blocker: run.blocker || existing.blocker,
+  error: run.error || existing.error,
 });
 
 const upsertSubagentRun = (byId, run) => {
@@ -1012,6 +1030,7 @@ export const extractRunsFromPiEntries = (entries, parentID) => {
       ...(providerId || modelId ? { providerId, modelId } : {}),
       mode,
       state: normalizeSubagentRunState(details.state || (message.isError ? 'failed' : 'done')),
+      ...(message.isError || details.error || details.errorMessage ? { error: asTrimmedString(details.error || details.errorMessage || rawContent) } : {}),
       title: asTrimmedString(details.goal || details.task || hints.label) || agent,
       toolCallId: asTrimmedString(message.toolCallId || entry.id) || null,
       asyncDir: asTrimmedString(details.asyncDir) || null,
@@ -1135,6 +1154,7 @@ export const toPublicSubagentRun = (run) => {
     title: run.title,
     openable: Boolean(sessionID),
     ...(blocker === 'question' || blocker === 'permission' ? { blocker } : {}),
+    ...(asTrimmedString(run.error) ? { error: asTrimmedString(run.error) } : {}),
   };
 };
 
@@ -1143,4 +1163,36 @@ export const findAdapterRunByChildSessionId = (sessionID, options = {}) => {
   if (!id) return null;
   const runs = listAdapterRunsFromFiles(options);
   return runs.find((run) => run.sessionID === id) || null;
+};
+
+/** Terminalize a detached adapter run when its owning parent is stopped. */
+export const writeAdapterRunTerminalState = (run, { state = "stopped", error } = {}) => {
+  const asyncDir = asTrimmedString(run?.asyncDir);
+  if (!asyncDir) return false;
+  const statusPath = path.join(asyncDir, STATUS_FILE);
+  const current = readJsonFile(statusPath);
+  if (!current || !isRecord(current)) return false;
+  const now = Date.now();
+  const next = { ...current, state, endedAt: typeof current.endedAt === "number" ? current.endedAt : now, lastUpdate: now, ...(asTrimmedString(error) ? { error: asTrimmedString(error) } : {}) };
+  if (Array.isArray(current.steps)) next.steps = current.steps.map((step) => {
+    if (!isRecord(step)) return step;
+    const stepState = normalizeSubagentRunState(step.status || step.state);
+    return isLiveRunState(stepState) ? { ...step, status: state, endedAt: typeof step.endedAt === "number" ? step.endedAt : now, ...(asTrimmedString(error) ? { error: asTrimmedString(error) } : {}) } : step;
+  });
+  try {
+    const temporary = `${statusPath}.${process.pid}.${now}.tmp`;
+    fs.writeFileSync(temporary, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    fs.renameSync(temporary, statusPath);
+    const activeRoot = path.join(path.dirname(asyncDir), ".active-runs");
+    fs.rmSync(path.join(activeRoot, path.basename(asyncDir)), { force: true });
+    const toolCallsRoot = path.join(activeRoot, "tool-calls");
+    for (const entry of fs.readdirSync(toolCallsRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      fs.rmSync(path.join(toolCallsRoot, entry.name, path.basename(asyncDir)), { force: true });
+      try { fs.rmdirSync(path.join(toolCallsRoot, entry.name)); } catch {}
+    }
+    return true;
+  } catch {
+    return false;
+  }
 };

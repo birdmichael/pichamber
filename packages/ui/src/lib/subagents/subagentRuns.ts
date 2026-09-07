@@ -17,6 +17,7 @@ export type SubagentRun = {
   title: string;
   openable: boolean;
   blocker?: SubagentRunBlocker;
+  error?: string | null;
 };
 
 const STATES = new Set<SubagentRunState>(['queued', 'running', 'blocked', 'paused', 'done', 'failed', 'stopped']);
@@ -52,6 +53,7 @@ const parseSubagentRun = (value: unknown): SubagentRun | null => {
     title: asTrimmed(record.title) || name,
     openable: record.openable === true && Boolean(sessionID),
     ...(blocker === 'question' || blocker === 'permission' ? { blocker } : {}),
+    ...(asTrimmed(record.error) ? { error: asTrimmed(record.error) } : {}),
   };
 };
 

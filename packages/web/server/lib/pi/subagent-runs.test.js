@@ -976,3 +976,8 @@ describe('mapStatusToSubagentRun', () => {
     expect(mapped.map((run) => run.title)).toEqual(['a', 'b']);
   });
 });
+
+it('classifies adapter provider errors as failed', () => {
+  const run = mapStatusToSubagentRun({ runId: 'run-error', state: 'complete', mode: 'async', error: 'Provider unavailable', steps: [] }, { parentID: 'parent' });
+  expect(run).toMatchObject({ state: "failed", error: 'Provider unavailable' });
+});
