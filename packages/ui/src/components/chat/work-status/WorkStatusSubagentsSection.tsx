@@ -1,9 +1,11 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
+import { toast } from '@/components/ui';
 import { useAllLiveSessions, useAllSessionStatuses, useChildStoreManager, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { useSelectionStore } from '@/sync/selection-store';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
 import { WorkStatusCollapsibleSection, WorkStatusRow, WorkStatusValue } from './WorkStatusPrimitives';
@@ -24,6 +26,7 @@ import {
   formatWorkStatusSubagentSummary,
   formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
+  summarizeSubagentTranscript,
   type WorkStatusSubagentRow,
 } from '@/lib/subagents/workStatusRows';
 import { usePiExtensionUiStore } from '@/sync/pi-extension-ui-store';
@@ -46,6 +49,57 @@ type ChildRow = WorkStatusSubagentRow;
  * On Pi the adapter run list is the source of truth. Leftover OpenCode
  * parentID children are not shown as a fleet.
  */
+const SUMMARYABLE_STATUSES = new Set<ChildRow['status']>(['done', 'failed', 'stopped']);
+
+type SummaryControlProps = {
+  row: ChildRow;
+  parentSessionId: string | null;
+  parentDirectory: string | null;
+  providers: ReadonlyArray<{ id?: string | null; models?: Array<{ id?: string | null }> | null }>;
+};
+
+const SubagentSummaryControl: React.FC<SummaryControlProps> = ({ row, parentSessionId, parentDirectory, providers }) => {
+  const { t } = useI18n();
+  const eligible = Boolean(parentSessionId && row.sessionID && SUMMARYABLE_STATUSES.has(row.status));
+  const messages = useSessionMessageRecords(row.sessionID ?? '', row.directory ?? parentDirectory ?? undefined, { enabled: eligible });
+  const sendMessage = useSessionUIStore((state) => state.sendMessage);
+  const getSessionModelSelection = useSelectionStore((state) => state.getSessionModelSelection);
+  const getSessionAgentSelection = useSelectionStore((state) => state.getSessionAgentSelection);
+  const [posting, setPosting] = React.useState(false);
+  const summary = React.useMemo(() => summarizeSubagentTranscript(messages), [messages]);
+
+  if (!eligible) return null;
+
+  const postSummary = async () => {
+    if (!parentSessionId || posting) return;
+    const selection = getSessionModelSelection(parentSessionId);
+    const providerId = selection?.providerId || providers[0]?.id || '';
+    const modelId = selection?.modelId || providers[0]?.models?.[0]?.id || '';
+    if (!providerId || !modelId) {
+      toast.error(t('chat.agentRoster.missingRunFields'));
+      return;
+    }
+    setPosting(true);
+    try {
+      const body = summary || t('chat.workStatus.subagent.noSummary');
+      await sendMessage(`子智能体「${row.label}」结果（请作为上下文参考）：\n${body}`, providerId, modelId, getSessionAgentSelection(parentSessionId) ?? undefined);
+      toast.success(t('chat.workStatus.subagent.summaryPosted'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('chat.workStatus.subagent.summaryFailed'));
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  return (
+    <div className="flex justify-end pl-7">
+      <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-primary hover:bg-primary/10 disabled:opacity-50" onClick={() => void postSummary()} disabled={posting}>
+        {posting ? t('chat.workStatus.subagent.summarizing') : t('chat.workStatus.subagent.summarize')}
+      </button>
+    </div>
+  );
+};
+
 export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directory }) => {
   const { t } = useI18n();
   const isMobile = useUIStore((state) => state.isMobile);
@@ -209,6 +263,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
             modelName: model?.name,
           });
           return (
+          <React.Fragment key={row.id}>
           <WorkStatusRow
             key={row.id}
             onClick={row.openable ? () => openChildSession(row) : undefined}
@@ -248,6 +303,8 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
               <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
             )}
           />
+          <SubagentSummaryControl row={row} parentSessionId={sessionId} parentDirectory={directory || effectiveDirectory} providers={providers} />
+          </React.Fragment>
           );
         })}
       </div>
