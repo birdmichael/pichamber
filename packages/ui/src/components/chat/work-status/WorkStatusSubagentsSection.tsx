@@ -14,6 +14,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
 import { useSubagentRuns } from '@/hooks/useSubagentRuns';
+import { useSubagentSessionUsage } from '@/hooks/useSubagentSessionUsage';
 import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
 import {
   buildWorkStatusSubagentRows,
@@ -27,6 +28,8 @@ import {
   formatWorkStatusSubagentSummary,
   formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
+  aggregateWorkStatusSubagentUsage,
+  formatWorkStatusSubagentUsage,
   summarizeSubagentTranscript,
   buildSubagentParentSendOptions,
   type WorkStatusSubagentRow,
@@ -223,6 +226,19 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     });
   }, [blockers, directory, effectiveDirectory, isPiKernel, liveSessions, openCodeChildren, parentMessages, promptsBySession, runs, statuses, t]);
 
+  const usageTargets = React.useMemo(
+    () => rows.flatMap((row) => row.sessionID ? [{ sessionID: row.sessionID, directory: row.directory }] : []),
+    [rows],
+  );
+  const usageBySession = useSubagentSessionUsage(usageTargets, isPiKernel && subagentsSlotActive);
+  const rowsWithUsage = React.useMemo(
+    () => rows.map((row) => ({
+      ...row,
+      ...(row.sessionID && usageBySession[row.sessionID] ? { usage: usageBySession[row.sessionID] } : {}),
+    })),
+    [rows, usageBySession],
+  );
+
   const parentByRowId = React.useMemo(() => {
     const entries = isPiKernel
       ? runs.map((run) => [run.runId, run.parentID] as const)
@@ -230,8 +246,8 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     return Object.fromEntries(entries);
   }, [isPiKernel, openCodeChildren, runs, sessionId]);
   const tree = React.useMemo(
-    () => buildWorkStatusSubagentTree({ rows, rootId: sessionId, parentByRowId }),
-    [parentByRowId, rows, sessionId],
+    () => buildWorkStatusSubagentTree({ rows: rowsWithUsage, rootId: sessionId, parentByRowId }),
+    [parentByRowId, rowsWithUsage, sessionId],
   );
   const parentLabel = liveSessions.find((session) => session.id === sessionId)?.title?.trim()
     || t('chat.workStatus.section.session');
@@ -260,17 +276,40 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     if (opened) onNavigate?.();
   }, [directory, effectiveDirectory, isMobile, isPiKernel, onNavigate, openContextPanelTab, sessionId, setCurrentSession]);
 
-  useReportWorkStatusPresence('subagents', rows.length > 0);
+  useReportWorkStatusPresence('subagents', rowsWithUsage.length > 0);
 
   if (isPiKernel && !subagentsSlotActive) return null;
-  if (rows.length === 0) return null;
+  if (rowsWithUsage.length === 0) return null;
 
-  const summary = formatWorkStatusSubagentSummary(summarizeWorkStatusSubagentRows(rows), {
+  const summary = formatWorkStatusSubagentSummary(summarizeWorkStatusSubagentRows(rowsWithUsage), {
     queued: t('chat.workStatus.subagent.queued'),
     done: t('chat.workStatus.subagent.done'),
   });
 
+  const parentUsage = aggregateWorkStatusSubagentUsage(rowsWithUsage);
+  const parentUsageLabel = formatWorkStatusSubagentUsage(parentUsage) ?? '—';
+
   const renderChildRow = (row: ChildRow) => {
+    const usageLabel = formatWorkStatusSubagentUsage(row.usage);
+    const statusLabel = row.status === 'permission' ? (
+      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
+    ) : row.status === 'question' ? (
+      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
+    ) : row.status === 'blocked' ? (
+      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.blocked')}</WorkStatusValue>
+    ) : row.status === 'paused' ? (
+      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
+    ) : row.status === 'failed' ? (
+      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+    ) : row.status === 'queued' ? (
+      <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
+    ) : row.status === 'stopped' ? (
+      <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
+    ) : row.status === 'working' ? (
+      <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
+    ) : (
+      <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
+    );
     const provider = row.providerId ? providers.find((entry) => entry.id === row.providerId) : undefined;
     const model = provider?.models?.find((entry) => entry.id === row.modelId);
     const modelLabel = formatWorkStatusSubagentModelLabel({
@@ -299,24 +338,11 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
               {modelLabel ? <span className="text-muted-foreground"> · {modelLabel}</span> : null}
             </>
           )}
-          value={row.status === 'permission' ? (
-            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
-          ) : row.status === 'question' ? (
-            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
-          ) : row.status === 'blocked' ? (
-            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.blocked')}</WorkStatusValue>
-          ) : row.status === 'paused' ? (
-            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
-          ) : row.status === 'failed' ? (
-            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
-          ) : row.status === 'queued' ? (
-            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
-          ) : row.status === 'stopped' ? (
-            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
-          ) : row.status === 'working' ? (
-            <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
-          ) : (
-            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
+          value={(
+            <span className="inline-flex min-w-0 items-center justify-end gap-1.5">
+              {statusLabel}
+              <WorkStatusValue tone="muted">{usageLabel ?? '—'}</WorkStatusValue>
+            </span>
           )}
         />
         <SubagentSummaryControl row={row} parentSessionId={sessionId} parentDirectory={directory || effectiveDirectory} providers={providers} />
@@ -350,13 +376,17 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
             <WorkStatusRow
               icon="git-branch"
               label={parentLabel}
-              value={<WorkStatusValue tone="muted">{t('chat.workStatus.section.session')}</WorkStatusValue>}
+              value={(
+                <WorkStatusValue tone="muted">
+                  {parentUsageLabel}
+                </WorkStatusValue>
+              )}
             />
             <div className="ml-3 border-l border-[var(--interactive-border)] pl-2">
               {renderTreeNodes(tree.children)}
             </div>
           </div>
-        ) : rows.map(renderChildRow)}
+        ) : rowsWithUsage.map(renderChildRow)}
       </div>
     </WorkStatusCollapsibleSection>
   );

@@ -12,6 +12,8 @@ import {
   countExportableWorkStatusRows,
   formatWorkStatusSubagentSummary,
   formatWorkStatusSubagentModelLabel,
+  aggregateWorkStatusSubagentUsage,
+  formatWorkStatusSubagentUsage,
   summarizeWorkStatusSubagentRows,
   summarizeSubagentTranscript,
   buildSubagentParentSendOptions,
@@ -274,6 +276,24 @@ describe('buildWorkStatusSubagentRows', () => {
       },
     );
     expect(rows[0]?.status).toBe('permission');
+  });
+});
+
+describe('work status subagent usage', () => {
+  test('aggregates reported child dimensions without inventing missing values', () => {
+    const rows = [
+      { ...statusRow('a', 'ses_a'), usage: { tokens: 1200, cost: 0.003 } },
+      { ...statusRow('b', 'ses_b'), usage: { tokens: 800 } },
+      { ...statusRow('c', 'ses_c'), usage: null },
+    ];
+    expect(aggregateWorkStatusSubagentUsage(rows)).toEqual({ tokens: 2000, cost: 0.003 });
+    expect(aggregateWorkStatusSubagentUsage([statusRow('missing', 'ses_missing')])).toBeNull();
+  });
+
+  test('formats compact tokens and USD, while missing usage stays absent', () => {
+    expect(formatWorkStatusSubagentUsage({ tokens: 12_345, cost: 0.0042 })).toBe('12.3k tokens · $0.0042');
+    expect(formatWorkStatusSubagentUsage({ tokens: 0, cost: 0 })).toBe('0 tokens · $0');
+    expect(formatWorkStatusSubagentUsage(undefined)).toBeNull();
   });
 });
 

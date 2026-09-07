@@ -5,6 +5,13 @@ import { readSubagentChildSessionId } from './subagentTool';
 import type { SubagentRun } from './subagentRuns';
 import { formatProviderModelLabel } from '@/lib/modelDisplay';
 
+export type WorkStatusSubagentUsage = {
+  /** Cumulative billed tokens, not the current context-window snapshot. */
+  tokens?: number | null;
+  /** Cumulative USD spend. Pichamber always renders this with `$`. */
+  cost?: number | null;
+};
+
 export type WorkStatusSubagentRow = {
   id: string;
   label: string;
@@ -15,6 +22,7 @@ export type WorkStatusSubagentRow = {
   modelId?: string;
   status: 'permission' | 'question' | 'working' | 'queued' | 'blocked' | 'failed' | 'paused' | 'stopped' | 'done';
   mode?: 'foreground' | 'background';
+  usage?: WorkStatusSubagentUsage | null;
 };
 
 export type WorkStatusSubagentTreeNode = {
@@ -378,6 +386,62 @@ export const summarizeWorkStatusSubagentRows = (rows: WorkStatusSubagentRow[]): 
   )).length,
   total: rows.length,
 });
+
+const finiteNonNegative = (value: unknown): number | null => (
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+);
+
+/** Sum only usage dimensions reported by at least one child. */
+export const aggregateWorkStatusSubagentUsage = (
+  rows: readonly WorkStatusSubagentRow[],
+): WorkStatusSubagentUsage | null => {
+  let tokens = 0;
+  let cost = 0;
+  let hasTokens = false;
+  let hasCost = false;
+  for (const row of rows) {
+    const rowTokens = finiteNonNegative(row.usage?.tokens);
+    const rowCost = finiteNonNegative(row.usage?.cost);
+    if (rowTokens !== null) {
+      tokens += rowTokens;
+      hasTokens = true;
+    }
+    if (rowCost !== null) {
+      cost += rowCost;
+      hasCost = true;
+    }
+  }
+  if (!hasTokens && !hasCost) return null;
+  return {
+    ...(hasTokens ? { tokens } : {}),
+    ...(hasCost ? { cost } : {}),
+  };
+};
+
+const formatTokenCount = (tokens: number): string => {
+  if (tokens < 1000) return String(Math.round(tokens));
+  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(tokens < 100_000 ? 1 : 0).replace(/\.0$/, '')}k`;
+  return `${(tokens / 1_000_000).toFixed(tokens < 10_000_000 ? 1 : 0).replace(/\.0$/, '')}M`;
+};
+
+const formatUsageCost = (cost: number): string => {
+  const fixed = cost.toFixed(4);
+  return `$${fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed}`;
+};
+
+/** Compact, readable child-row usage. Null means the API has no usage yet. */
+export const formatWorkStatusSubagentUsage = (
+  usage: WorkStatusSubagentUsage | null | undefined,
+  labels: { tokens?: string } = {},
+): string | null => {
+  if (!usage) return null;
+  const parts: string[] = [];
+  const tokens = finiteNonNegative(usage.tokens);
+  const cost = finiteNonNegative(usage.cost);
+  if (tokens !== null) parts.push(`${formatTokenCount(tokens)} ${labels.tokens ?? 'tokens'}`);
+  if (cost !== null) parts.push(formatUsageCost(cost));
+  return parts.length > 0 ? parts.join(' · ') : null;
+};
 
 export const formatWorkStatusSubagentSummary = (
   summary: WorkStatusSubagentSummary,

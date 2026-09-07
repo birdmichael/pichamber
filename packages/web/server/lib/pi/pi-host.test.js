@@ -257,7 +257,26 @@ describe('normalizePiSessionUsage', () => {
       tokens: 1500,
       contextLimit: 128000,
       percent: 1.171875,
+      sessionTokens: 3,
     });
+  });
+
+  it('returns cumulative session tokens and cost separately from context tokens', () => {
+    expect(normalizePiSessionUsage(
+      { tokens: 900, contextWindow: 128000, percent: 0.7 },
+      { tokens: { input: 1200, output: 80, cacheRead: 20, cacheWrite: 0, total: 1300 }, cost: 0.0042 },
+    )).toMatchObject({
+      tokens: 900,
+      sessionTokens: 1300,
+      cost: 0.0042,
+    });
+  });
+
+  it('does not expose zeroed fresh-session stats as usage', () => {
+    expect(normalizePiSessionUsage(undefined, {
+      tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      cost: 0,
+    })).toEqual({ available: true, tokens: null, contextLimit: 0, contextWindow: undefined, percent: null });
   });
 
   it('does not invent token counts when Pi reports unknown usage', () => {

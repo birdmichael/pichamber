@@ -1299,12 +1299,34 @@ export const normalizePiSessionUsage = (contextUsage, sessionStats) => {
     ? rawPercent
     : (tokens != null && contextLimit > 0 ? (tokens / contextLimit) * 100 : null);
 
+  // Context tokens are a snapshot of the current window. Session totals are
+  // cumulative billing data and must stay separate so consumers do not sum a
+  // context window as if it were spend. Pi returns zeroed stats for a fresh
+  // session; expose null until there is actual usage instead of inventing a
+  // zero-cost child row.
+  const statsTokens = sessionStats?.tokens && typeof sessionStats.tokens === 'object'
+    ? sessionStats.tokens
+    : undefined;
+  const rawSessionTokens = statsTokens?.total;
+  const sessionTokens = typeof rawSessionTokens === 'number'
+    && Number.isFinite(rawSessionTokens)
+    && rawSessionTokens >= 0
+    ? rawSessionTokens
+    : null;
+  const rawCost = sessionStats?.cost;
+  const cost = typeof rawCost === 'number' && Number.isFinite(rawCost) && rawCost >= 0 ? rawCost : null;
+  const hasSessionUsage = (sessionTokens != null && sessionTokens > 0) || (cost != null && cost > 0);
+
   return {
     available: true,
     tokens,
     contextLimit,
     contextWindow: contextLimit || undefined,
     percent,
+    ...(hasSessionUsage ? {
+      sessionTokens,
+      cost,
+    } : {}),
   };
 };
 
