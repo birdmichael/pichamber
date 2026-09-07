@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   assignTranscriptSessionIds,
   buildWorkStatusSubagentRows,
+  buildWorkStatusSubagentTree,
   collectTranscriptSubagentSessionIds,
   overlayWorkStatusChildBlockers,
   overlayWorkStatusSubagentRow,
@@ -16,6 +17,7 @@ import {
   buildSubagentParentSendOptions,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
+import type { WorkStatusSubagentRow } from './workStatusRows';
 
 const run = (overrides: Partial<SubagentRun> = {}): SubagentRun => ({
   runId: 'run_1',
@@ -29,6 +31,41 @@ const run = (overrides: Partial<SubagentRun> = {}): SubagentRun => ({
   title: 'List the README filename',
   openable: false,
   ...overrides,
+});
+
+const statusRow = (id: string, sessionID: string): WorkStatusSubagentRow => ({
+  id,
+  label: id,
+  sessionID,
+  directory: '/repo',
+  openable: true,
+  status: 'working',
+});
+
+describe('buildWorkStatusSubagentTree', () => {
+  test('keeps parallel children under the parent and nests a child when metadata provides it', () => {
+    const tree = buildWorkStatusSubagentTree({
+      rootId: 'ses_parent',
+      rows: [
+        statusRow('run_a', 'ses_a'),
+        statusRow('run_b', 'ses_b'),
+        statusRow('run_c', 'ses_c'),
+      ],
+      parentByRowId: {
+        run_a: 'ses_parent',
+        run_b: 'ses_parent',
+        run_c: 'ses_a',
+      },
+    });
+
+    expect(tree?.id).toBe('ses_parent');
+    expect(tree?.children.map((node) => node.id)).toEqual(['ses_a', 'ses_b']);
+    expect(tree?.children[0]?.children.map((node) => node.id)).toEqual(['ses_c']);
+  });
+
+  test('returns no tree without a parent session so callers can keep the flat fallback', () => {
+    expect(buildWorkStatusSubagentTree({ rows: [statusRow('run_a', 'ses_a')] })).toBeNull();
+  });
 });
 
 describe('resolveWorkStatusSubagentOpen', () => {

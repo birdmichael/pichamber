@@ -17,6 +17,7 @@ import { useSubagentRuns } from '@/hooks/useSubagentRuns';
 import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
 import {
   buildWorkStatusSubagentRows,
+  buildWorkStatusSubagentTree,
   collectSessionBlockers,
   collectTranscriptSubagentSessionIds,
   overlayWorkStatusChildBlockers,
@@ -222,6 +223,19 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     });
   }, [blockers, directory, effectiveDirectory, isPiKernel, liveSessions, openCodeChildren, parentMessages, promptsBySession, runs, statuses, t]);
 
+  const parentByRowId = React.useMemo(() => {
+    const entries = isPiKernel
+      ? runs.map((run) => [run.runId, run.parentID] as const)
+      : openCodeChildren.map((child) => [child.id, child.parentID ?? sessionId] as const);
+    return Object.fromEntries(entries);
+  }, [isPiKernel, openCodeChildren, runs, sessionId]);
+  const tree = React.useMemo(
+    () => buildWorkStatusSubagentTree({ rows, rootId: sessionId, parentByRowId }),
+    [parentByRowId, rows, sessionId],
+  );
+  const parentLabel = liveSessions.find((session) => session.id === sessionId)?.title?.trim()
+    || t('chat.workStatus.section.session');
+
   const hadChildren = React.useRef(rows.length > 0);
   React.useEffect(() => {
     const present = rows.length > 0;
@@ -256,6 +270,72 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     done: t('chat.workStatus.subagent.done'),
   });
 
+  const renderChildRow = (row: ChildRow) => {
+    const provider = row.providerId ? providers.find((entry) => entry.id === row.providerId) : undefined;
+    const model = provider?.models?.find((entry) => entry.id === row.modelId);
+    const modelLabel = formatWorkStatusSubagentModelLabel({
+      providerId: row.providerId,
+      modelId: row.modelId,
+      providerName: provider?.name,
+      modelName: model?.name,
+    });
+    return (
+      <React.Fragment key={row.id}>
+        <WorkStatusRow
+          onClick={row.openable ? () => openChildSession(row) : undefined}
+          actionLabel={row.openable ? t('chat.workStatus.action.open') : undefined}
+          disabled={!row.openable}
+          title={row.openable ? undefined : t('chat.workStatus.subagent.unopenableTooltip')}
+          ariaLabel={row.openable
+            ? t('chat.workStatus.action.openSubagent', { name: row.label })
+            : row.label}
+          label={(
+            <>
+              {row.mode === 'background'
+                ? t('chat.workStatus.subagent.namedBackground', { name: row.label })
+                : row.mode === 'foreground'
+                  ? t('chat.workStatus.subagent.namedForeground', { name: row.label })
+                  : row.label}
+              {modelLabel ? <span className="text-muted-foreground"> · {modelLabel}</span> : null}
+            </>
+          )}
+          value={row.status === 'permission' ? (
+            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
+          ) : row.status === 'question' ? (
+            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
+          ) : row.status === 'blocked' ? (
+            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.blocked')}</WorkStatusValue>
+          ) : row.status === 'paused' ? (
+            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
+          ) : row.status === 'failed' ? (
+            <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+          ) : row.status === 'queued' ? (
+            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
+          ) : row.status === 'stopped' ? (
+            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
+          ) : row.status === 'working' ? (
+            <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
+          ) : (
+            <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
+          )}
+        />
+        <SubagentSummaryControl row={row} parentSessionId={sessionId} parentDirectory={directory || effectiveDirectory} providers={providers} />
+      </React.Fragment>
+    );
+  };
+
+  const renderTreeNodes = (nodes: NonNullable<typeof tree>['children']): React.ReactNode => nodes.map((node) => (
+    <div key={node.id} className="relative">
+      <span aria-hidden className="pointer-events-none absolute -left-2.5 top-3.5 h-px w-2 bg-[var(--interactive-border)]" />
+      {renderChildRow(node.row!)}
+      {node.children.length > 0 ? (
+        <div className="ml-3 border-l border-[var(--interactive-border)] pl-2">
+          {renderTreeNodes(node.children)}
+        </div>
+      ) : null}
+    </div>
+  ));
+
   return (
     <WorkStatusCollapsibleSection
       id={SECTION_ID}
@@ -265,60 +345,18 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       summary={summary}
     >
       <div className="max-h-56 overflow-y-auto">
-        {rows.map((row) => {
-          const provider = row.providerId ? providers.find((entry) => entry.id === row.providerId) : undefined;
-          const model = provider?.models?.find((entry) => entry.id === row.modelId);
-          const modelLabel = formatWorkStatusSubagentModelLabel({
-            providerId: row.providerId,
-            modelId: row.modelId,
-            providerName: provider?.name,
-            modelName: model?.name,
-          });
-          return (
-          <React.Fragment key={row.id}>
-          <WorkStatusRow
-            key={row.id}
-            onClick={row.openable ? () => openChildSession(row) : undefined}
-            actionLabel={row.openable ? t('chat.workStatus.action.open') : undefined}
-            disabled={!row.openable}
-            title={row.openable ? undefined : t('chat.workStatus.subagent.unopenableTooltip')}
-            ariaLabel={row.openable
-              ? t('chat.workStatus.action.openSubagent', { name: row.label })
-              : row.label}
-            label={(
-              <>
-                {row.mode === 'background'
-                  ? t('chat.workStatus.subagent.namedBackground', { name: row.label })
-                  : row.mode === 'foreground'
-                    ? t('chat.workStatus.subagent.namedForeground', { name: row.label })
-                    : row.label}
-                {modelLabel ? <span className="text-muted-foreground"> · {modelLabel}</span> : null}
-              </>
-            )}
-            value={row.status === 'permission' ? (
-              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
-            ) : row.status === 'question' ? (
-              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.askedQuestion')}</WorkStatusValue>
-            ) : row.status === 'blocked' ? (
-              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.blocked')}</WorkStatusValue>
-            ) : row.status === 'paused' ? (
-              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
-            ) : row.status === 'failed' ? (
-              <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
-            ) : row.status === 'queued' ? (
-              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
-            ) : row.status === 'stopped' ? (
-              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.stopped')}</WorkStatusValue>
-            ) : row.status === 'working' ? (
-              <WorkStatusValue tone="info">{t('chat.workStatus.subagent.working')}</WorkStatusValue>
-            ) : (
-              <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.done')}</WorkStatusValue>
-            )}
-          />
-          <SubagentSummaryControl row={row} parentSessionId={sessionId} parentDirectory={directory || effectiveDirectory} providers={providers} />
-          </React.Fragment>
-          );
-        })}
+        {tree ? (
+          <div role="tree" aria-label={t('chat.workStatus.section.subagents')}>
+            <WorkStatusRow
+              icon="git-branch"
+              label={parentLabel}
+              value={<WorkStatusValue tone="muted">{t('chat.workStatus.section.session')}</WorkStatusValue>}
+            />
+            <div className="ml-3 border-l border-[var(--interactive-border)] pl-2">
+              {renderTreeNodes(tree.children)}
+            </div>
+          </div>
+        ) : rows.map(renderChildRow)}
       </div>
     </WorkStatusCollapsibleSection>
   );
