@@ -4,6 +4,7 @@ let pendingFetch: {
   resolve: (plan: { status: string; planMarkdown: string }) => void;
 } | null = null;
 const uiReplies: Array<{ url: string; body: string }> = [];
+const planRequests: Array<{ url: string; body: string }> = [];
 
 mock.module('@/lib/runtime-fetch', () => ({
   runtimeFetch: mock(async (url: string, init?: { body?: string }) => {
@@ -12,6 +13,7 @@ mock.module('@/lib/runtime-fetch', () => ({
       uiReplies.push({ url: href, body: String(init?.body || '') });
       return { ok: true, status: 200, json: async () => true };
     }
+    planRequests.push({ url: href, body: String(init?.body || '') });
     const plan = await new Promise<{ status: string; planMarkdown: string }>((resolve) => {
       pendingFetch = { resolve };
     });
@@ -41,6 +43,7 @@ afterEach(() => {
   resetPiExtensionUiStore();
   pendingFetch = null;
   uiReplies.length = 0;
+  planRequests.length = 0;
 });
 
 describe('pi session plan store', () => {
@@ -96,6 +99,28 @@ describe('pi session plan store', () => {
     expect(again?.status).toBe('implementing');
     expect(uiReplies).toHaveLength(0);
     expect(pendingFetch).toBeNull();
+  });
+
+  test('model-qualified Build posts the selected model instead of answering the prompt locally', async () => {
+    applySessionPlan('ses_plan', { status: 'ready', planMarkdown: '# Ready' });
+    applyPiExtensionUiPrompt({
+      id: 'pui_ready',
+      sessionID: 'ses_plan',
+      kind: 'select',
+      title: 'Proposed plan ready. What next?',
+      options: ['Implement here', 'Start fresh and implement'],
+      status: 'pending',
+    });
+
+    const request = dispatchSessionPlanAction('ses_plan', 'implement', { model: 'xai/grok-4.1' });
+    await Promise.resolve();
+    expect(uiReplies).toHaveLength(0);
+    expect(planRequests).toHaveLength(1);
+    expect(planRequests[0]?.body).toContain('"model":"xai/grok-4.1"');
+
+    pendingFetch?.resolve({ status: 'implementing', planMarkdown: '# Ready' });
+    const next = await request;
+    expect(next?.status).toBe('implementing');
   });
 
   test('Q&A reply Implement here writes implementing; GET off does not restore ready', async () => {
