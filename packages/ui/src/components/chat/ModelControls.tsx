@@ -3257,7 +3257,7 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
                                     </div>
                                 </DropdownMenuTrigger>
                             </TooltipTrigger>
-                            <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(280px,calc(100vw-2rem))] p-0 flex flex-col">
+                            <DropdownMenuContent align="end" alignOffset={-40} className="w-[min(420px,calc(100vw-2rem))] p-0 flex flex-col">
                                 {subagentsPluginAvailable ? (
                                     <SubagentRosterMenu
                                         providers={providers}

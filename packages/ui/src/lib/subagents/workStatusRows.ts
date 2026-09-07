@@ -249,6 +249,51 @@ export const resolveWorkStatusSubagentLabel = (
   return run.name?.trim() || untitledLabel;
 };
 
+const asTranscriptRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' ? value as Record<string, unknown> : {}
+);
+
+const readTranscriptText = (value: unknown): string => {
+  const record = asTranscriptRecord(value);
+  if (record.type === 'text' && typeof record.text === 'string') return record.text;
+  if (typeof record.text === 'string') return record.text;
+  return '';
+};
+
+/** Keep parent handoff sends pinned to the parent even when the Work Status panel
+ * is rendered from an embedded/child chat whose current-session state differs. */
+export const buildSubagentParentSendOptions = (
+  parentSessionId: string,
+  parentDirectory: string | null | undefined,
+): { sessionId: string; directory?: string } => ({
+  sessionId: parentSessionId,
+  ...(parentDirectory ? { directory: parentDirectory } : {}),
+});
+
+/** Pick the latest useful assistant text for the Work Status parent handoff. */
+export const summarizeSubagentTranscript = (
+  messages: Array<{ info?: { role?: unknown }; parts?: unknown[] }> | null | undefined,
+  maxLength = 600,
+): string => {
+  const candidates = (Array.isArray(messages) ? messages : [])
+    .slice()
+    .reverse()
+    .flatMap((message) => {
+      const text = (Array.isArray(message.parts) ? message.parts : []).map(readTranscriptText).join(' ').replace(/\s+/g, ' ').trim();
+      return text && message.info?.role === 'assistant' ? [text] : [];
+    });
+  const fallback = (Array.isArray(messages) ? messages : [])
+    .slice()
+    .reverse()
+    .flatMap((message) => {
+      const text = (Array.isArray(message.parts) ? message.parts : []).map(readTranscriptText).join(' ').replace(/\s+/g, ' ').trim();
+      return text ? [text] : [];
+    });
+  const text = candidates[0] || fallback[0] || '';
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(1, maxLength - 1)).trimEnd()}…`;
+};
+
 export const countExportableWorkStatusRows = (rows: WorkStatusSubagentRow[]): number => (
   rows.filter((row) => row.openable).length
 );

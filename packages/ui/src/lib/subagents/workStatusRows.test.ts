@@ -12,6 +12,8 @@ import {
   formatWorkStatusSubagentSummary,
   formatWorkStatusSubagentModelLabel,
   summarizeWorkStatusSubagentRows,
+  summarizeSubagentTranscript,
+  buildSubagentParentSendOptions,
 } from './workStatusRows';
 import type { SubagentRun } from './subagentRuns';
 
@@ -290,5 +292,38 @@ describe('exportable work status rows', () => {
     expect(summary.openable).toBe(3);
     expect(summary.total).toBe(4);
     expect(formatWorkStatusSubagentSummary(summary, { queued: 'queued', done: 'done' })).toBe('1 queued · 3 done');
+  });
+});
+
+describe('summarizeSubagentTranscript', () => {
+  test('uses the latest assistant text and keeps the parent handoff concise', () => {
+    expect(summarizeSubagentTranscript([
+      { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'older result' }] },
+      { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'latest   result' }] },
+    ])).toBe('latest result');
+    expect(summarizeSubagentTranscript([
+      { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'a'.repeat(700) }] },
+    ])).toHaveLength(600);
+  });
+
+  test('falls back to useful text when the child has no assistant turn', () => {
+    expect(summarizeSubagentTranscript([
+      { info: { role: 'user' }, parts: [{ type: 'text', text: 'child output' }] },
+    ])).toBe('child output');
+  });
+});
+
+describe('subagent parent handoff target', () => {
+  test('pins the post to the parent session and preserves its directory', () => {
+    expect(buildSubagentParentSendOptions('parent-session', '/workspace/project')).toEqual({
+      sessionId: 'parent-session',
+      directory: '/workspace/project',
+    });
+  });
+
+  test('omits an unknown directory instead of sending null to the message API', () => {
+    expect(buildSubagentParentSendOptions('parent-session', null)).toEqual({
+      sessionId: 'parent-session',
+    });
   });
 });
