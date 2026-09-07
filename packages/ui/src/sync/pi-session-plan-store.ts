@@ -193,8 +193,12 @@ export const refreshSessionPlan = async (sessionID: string): Promise<SessionPlan
 const answerPendingPlanReadyPrompt = async (
   sessionID: string,
   action: SessionPlanAction,
+  model?: string,
 ): Promise<boolean> => {
   if (action !== 'implement' && action !== 'save' && action !== 'exit') return false;
+  // A model-qualified Build must go through the Plan endpoint so the host can
+  // apply that model before settling the live prompt.
+  if (action === 'implement' && model) return false;
   const prompts = usePiExtensionUiStore.getState().promptsBySession[sessionID] ?? [];
   for (let index = prompts.length - 1; index >= 0; index -= 1) {
     const prompt = prompts[index];
@@ -216,7 +220,7 @@ export const dispatchSessionPlanAction = async (
     return usePiSessionPlanStore.getState().plansBySession[sessionID] ?? null;
   }
   try {
-    if (await answerPendingPlanReadyPrompt(sessionID, action)) {
+    if (await answerPendingPlanReadyPrompt(sessionID, action, options.model)) {
       if (action === 'exit') {
         clearPendingDraftPlan(sessionID);
         clearPlanImplemented(sessionID);
