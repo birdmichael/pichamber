@@ -4,16 +4,17 @@ import { toast } from '@/components/ui';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
+import { getProviderModelDisplayName } from '@/lib/modelDisplay';
 import type { PiThinkingLevel } from './piThinking';
 import { canLaunchSubagent, parseSubagentModelRef } from './subagentLaunch';
 
-type Provider = { id?: string | null; models?: Array<{ id?: string | null }> | null };
+type Provider = { id?: string | null; name?: string | null; models?: Array<{ id?: string | null; name?: string | null }> | null };
 type RosterAgent = { id: string; name: string; description?: string; model?: string; thinking?: string; tools?: unknown; scope: 'user' | 'project' | 'builtin'; readOnly?: boolean; frontmatter?: Record<string, unknown>; body?: string };
 type LaunchArgs = { role: string; providerId: string; modelId: string; thinking: PiThinkingLevel; task: string };
 type Props = { providers: ReadonlyArray<Provider>; currentThinking?: string; sessionId?: string | null; directory?: string | null; onLaunch: (args: LaunchArgs) => Promise<void>; onClose: () => void; onManage: () => void };
 const LEVELS: PiThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 const control = 'h-7 w-full rounded border border-border/70 bg-background px-2 text-xs outline-none focus:border-primary';
-const modelsFor = (providers: ReadonlyArray<Provider>) => providers.flatMap((provider) => (provider.models || []).flatMap((model) => provider.id && model.id ? [{ providerId: provider.id, modelId: model.id }] : []));
+const modelsFor = (providers: ReadonlyArray<Provider>) => providers.flatMap((provider) => (provider.models || []).flatMap((model) => provider.id && model.id ? [{ providerId: provider.id, modelId: model.id, providerName: provider.name || provider.id, modelName: model.name || getProviderModelDisplayName({ models: provider.models ?? undefined }, model.id) }] : []));
 
 export const SubagentRosterMenu: React.FC<Props> = (props) => {
   const { t } = useI18n();
@@ -57,13 +58,22 @@ export const SubagentRosterMenu: React.FC<Props> = (props) => {
       <div className='max-h-32 overflow-y-auto'>{agents.map((agent) => <button type='button' key={agent.name} className={cn('flex w-full items-start gap-2 rounded px-2 py-1.5 text-left hover:bg-muted/60', selected?.name === agent.name && 'bg-muted')} onClick={() => selectAgent(agent)}><Icon name={agent.readOnly ? 'lock' : 'ai-agent'} className='mt-0.5 size-3.5 shrink-0 text-muted-foreground' /><span className='min-w-0'><span className='block font-medium'>{agent.name}{agent.readOnly ? ' · ' + t('chat.agentRoster.builtin') : ''}</span><span className='block truncate text-muted-foreground'>{agent.description || t('chat.agentRoster.noDescription')}</span></span></button>)}</div>
     </div>
     {isEditing && <div className='mt-2 space-y-2 border-t border-border/50 pt-2'>
+      <div className='rounded-md border border-border/60 bg-muted/20 p-2'>
+        <div className='mb-1.5 text-[11px] font-semibold text-muted-foreground'>{t('chat.agentRoster.launchForm')}</div>
+        <div className='mb-2 flex items-center gap-2 text-xs'><Icon name='ai-agent' className='size-3.5 text-primary' /><span className='text-muted-foreground'>{t('chat.agentRoster.role')}</span><span className='font-medium'>{selected?.name || t('chat.agentRoster.role')}</span></div>
+        <label className='mb-1 block text-[11px] text-muted-foreground' htmlFor='subagent-model'>{t('chat.agentRoster.model')}</label>
+        <select id='subagent-model' className={control} aria-label={t('chat.agentRoster.model')} value={model} onChange={(event) => { setModel(event.target.value); setModelConfirmed(Boolean(event.target.value)); }}><option value=''>{t('chat.agentRoster.chooseModel')}</option>{models.map((entry) => <option key={entry.providerId + '/' + entry.modelId} value={entry.providerId + '/' + entry.modelId}>{entry.providerName} · {entry.modelName}</option>)}</select>
+        <label className='mb-1 mt-2 block text-[11px] text-muted-foreground' htmlFor='subagent-thinking'>{t('chat.agentRoster.thinking')}</label>
+        <select id='subagent-thinking' className={control} aria-label={t('chat.agentRoster.thinking')} value={thinking} onChange={(event) => setThinking(event.target.value)}>{LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}</select>
+        <label className='mb-1 mt-2 block text-[11px] text-muted-foreground' htmlFor='subagent-task'>{t('chat.agentRoster.task')}</label>
+        <textarea id='subagent-task' className={cn(control, 'min-h-16 resize-y py-1')} aria-label={t('chat.agentRoster.task')} placeholder={t('chat.agentRoster.taskPlaceholder')} value={task} onChange={(event) => setTask(event.target.value)} />
+        <button type='button' className='mt-2 w-full rounded bg-primary px-2 py-1.5 font-medium text-primary-foreground disabled:opacity-50' onClick={() => void run()} disabled={running || !canRun}>{running ? t('chat.agentRoster.running') : t('chat.agentRoster.run')}</button>
+      </div>
       <div className='flex items-center gap-2'><input className={cn(control, 'flex-1')} aria-label={t('chat.agentRoster.name')} value={name} onChange={(event) => setName(event.target.value)} disabled={Boolean(selected?.readOnly)} /><select className={cn(control, 'w-24')} value={scope} onChange={(event) => setScope(event.target.value as 'user' | 'project')} disabled={Boolean(selected?.readOnly)}><option value='user'>{t('chat.agentRoster.user')}</option><option value='project'>{t('chat.agentRoster.project')}</option></select></div>
       <input className={control} aria-label={t('chat.agentRoster.description')} placeholder={t('chat.agentRoster.description')} value={description} onChange={(event) => setDescription(event.target.value)} disabled={Boolean(selected?.readOnly)} />
-      <select className={control} aria-label={t('chat.agentRoster.model')} value={model} onChange={(event) => { setModel(event.target.value); setModelConfirmed(Boolean(event.target.value)); }}><option value=''>{t('chat.agentRoster.model')}</option>{models.map((entry) => <option key={entry.providerId + '/' + entry.modelId} value={entry.providerId + '/' + entry.modelId}>{entry.providerId + ' / ' + entry.modelId}</option>)}</select>
-      <select className={control} aria-label={t('chat.agentRoster.thinking')} value={thinking} onChange={(event) => setThinking(event.target.value)}>{LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}</select>
       <input className={control} aria-label={t('chat.agentRoster.tools')} placeholder={t('chat.agentRoster.tools')} value={tools} onChange={(event) => setTools(event.target.value)} disabled={Boolean(selected?.readOnly)} />
       <textarea className={cn(control, 'min-h-16 resize-y py-1')} aria-label={t('chat.agentRoster.systemPrompt')} placeholder={t('chat.agentRoster.systemPrompt')} value={body} onChange={(event) => setBody(event.target.value)} disabled={Boolean(selected?.readOnly)} />
-      <div className='flex gap-1.5'>{!selected?.readOnly && <button type='button' className='rounded bg-primary px-2 py-1.5 font-medium text-primary-foreground disabled:opacity-50' onClick={() => void save()} disabled={saving}>{t('chat.agentRoster.save')}</button>}<input className={cn(control, 'flex-1')} aria-label={t('chat.agentRoster.task')} placeholder={t('chat.agentRoster.task')} value={task} onChange={(event) => setTask(event.target.value)} /><button type='button' className='rounded border border-primary px-2 py-1.5 font-medium text-primary disabled:opacity-50' onClick={() => void run()} disabled={running || !canRun}>{running ? t('chat.agentRoster.running') : t('chat.agentRoster.run')}</button></div>
+      <div className='flex justify-end'>{!selected?.readOnly && <button type='button' className='rounded border border-border px-2 py-1.5 font-medium disabled:opacity-50' onClick={() => void save()} disabled={saving}>{t('chat.agentRoster.save')}</button>}</div>
       {task.trim() && !canRun ? <p className='px-1 text-[11px] text-muted-foreground'>{t('chat.agentRoster.missingRunFields')}</p> : null}
     </div>}
   </div>;
