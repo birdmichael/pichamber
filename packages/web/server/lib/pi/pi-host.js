@@ -165,6 +165,7 @@ import {
   readSessionTitleFromSessionFile,
   reconcileParentSubagentRuns,
   toPublicSubagentRun,
+  writeAdapterRunTerminalState,
 } from './subagent-runs.js';
 import {
   buildSessionHtml,
@@ -1690,6 +1691,7 @@ export const createPiHost = ({
   const sessions = new Map();
   const sessionTodos = new Map();
   const hydrating = new Map();
+  const terminalSubagentRuns = new Map();
   const directoryRuntimes = new Map();
   let modelRuntime = null;
   let modelRuntimeError = null;
@@ -2079,6 +2081,16 @@ export const createPiHost = ({
         properties: { sessionID: record.id, status: { type: 'busy' } },
       });
     }
+    const providerError = piEvent?.type === "message_end" && typeof piEvent.message?.errorMessage === "string"
+      ? piEvent.message.errorMessage.trim()
+      : "";
+    if (providerError && record.subagentRun?.runId) {
+      const parentID = hydratedParentID(record);
+      const failed = { ...record.subagentRun, state: "failed", error: providerError };
+      record.subagentRun = failed;
+      if (parentID) terminalSubagentRuns.set(subagentRunKey(parentID, failed.runId), { state: "failed", error: providerError });
+      writeAdapterRunTerminalState(failed, { state: "failed", error: providerError });
+    }
     const ocEvents = record.translator.translate(piEvent);
     for (const ocEvent of ocEvents) {
       applyEventToStore(record, ocEvent);
@@ -2087,6 +2099,12 @@ export const createPiHost = ({
       if (ocEvent.type === 'todo.updated' && Array.isArray(ocEvent.properties?.todos)) {
         sessionTodos.set(record.id, ocEvent.properties.todos);
       }
+    }
+    if (providerError) {
+      record.turnActive = false;
+      record.status = { type: "idle" };
+      emit(record.directory, { id: createEventId(), type: "session.error", properties: { sessionID: record.id, error: { message: providerError } } });
+      emit(record.directory, { id: createEventId(), type: "session.idle", properties: { sessionID: record.id } });
     }
     if (
       piEvent?.type === 'compaction_end'
@@ -3025,6 +3043,8 @@ export const createPiHost = ({
     return runs;
   };
 
+  const subagentRunKey = (parentID, runId) => String(parentID) + ":" + String(runId);
+
   const collectSubagentRuns = (parent) => {
     const liveRuns = [
       ...extractRunsFromFacadeMessages(parent.messages, parent.id),
@@ -3067,6 +3087,23 @@ export const createPiHost = ({
       ...attachedRuns,
     ];
     return reconcileParentSubagentRuns(fileRuns, liveRuns);
+  };
+
+  const applySubagentTerminalOverride = (parent, run) => {
+    const override = terminalSubagentRuns.get(subagentRunKey(parent.id, run.runId));
+    return override ? { ...run, ...override } : run;
+  };
+
+  const markSubagentRunTerminal = (parent, run, state = "stopped", error = "") => {
+    if (!parent?.id || !run?.runId) return;
+    const override = { state, ...(error ? { error } : {}) };
+    terminalSubagentRuns.set(subagentRunKey(parent.id, run.runId), override);
+    writeAdapterRunTerminalState(run, { state, error });
+    const child = run.sessionID ? sessions.get(run.sessionID) : null;
+    if (child) {
+      child.subagentRun = { ...child.subagentRun, ...run, ...override };
+      forceSettleRecord(child);
+    }
   };
 
   const attachSubagentRun = async (parent, run) => {
@@ -3454,6 +3491,20 @@ export const createPiHost = ({
     }
   };
 
+  const stopSubagentRunsForParent = async (parent) => {
+    for (const rawRun of collectSubagentRuns(parent)) {
+      const run = applySubagentTerminalOverride(parent, rawRun);
+      if (run.state === "done" || run.state === "failed" || run.state === "stopped") continue;
+      markSubagentRunTerminal(parent, run, "stopped", "父会话已停止");
+      if (run.sessionID && run.sessionID !== parent.id) {
+        let child = sessions.get(run.sessionID);
+        if (!child) { try { child = await ensureRecord(run.sessionID, run.directory); } catch {} }
+        try { await child?.piSession?.abort?.(); } catch {}
+        if (child) forceSettleRecord(child);
+      }
+    }
+  };
+
   return {
     ready,
     isMock() {
@@ -3569,9 +3620,24 @@ export const createPiHost = ({
       const parent = await ensureRecord(sessionID, directory);
       const runs = [];
       for (const run of collectSubagentRuns(parent)) {
-        runs.push(toPublicSubagentRun(await attachSubagentRun(parent, run)));
+        const attached = await attachSubagentRun(parent, applySubagentTerminalOverride(parent, run));
+        runs.push(toPublicSubagentRun(applySubagentTerminalOverride(parent, attached)));
       }
       return { runs };
+    },
+    async stopSubagentRun(sessionID, runID, { state = "stopped", error = "" } = {}) {
+      const parent = await ensureRecord(sessionID);
+      const run = collectSubagentRuns(parent).find((candidate) => candidate.runId === runID);
+      if (!run) { const missing = new Error("Subagent run not found: " + runID); missing.status = 404; throw missing; }
+      const attached = applySubagentTerminalOverride(parent, await attachSubagentRun(parent, run));
+      markSubagentRunTerminal(parent, attached, state, error);
+      if (attached.sessionID && attached.sessionID !== parent.id) {
+        let child = sessions.get(attached.sessionID);
+        if (!child) { try { child = await ensureRecord(attached.sessionID, attached.directory); } catch {} }
+        try { await child?.piSession?.abort?.(); } catch {}
+        if (child) forceSettleRecord(child);
+      }
+      return { run: toPublicSubagentRun(applySubagentTerminalOverride(parent, { ...attached, state, ...(error ? { error } : {}) })) };
     },
     async listSessionChildren(sessionID, directory) {
       if (!isSubagentsSlotActive(this.getFeaturePlugins())) {
@@ -4138,6 +4204,7 @@ export const createPiHost = ({
     },
     async abort(sessionID) {
       const record = await ensureRecord(sessionID);
+      await stopSubagentRunsForParent(record);
       try {
         record.extensionUI?.cancelAll?.();
       } catch {
@@ -4629,6 +4696,7 @@ export const createPiHost = ({
             while (true) {
               const child = await findStartedRun();
               if (child) {
+                try { await record.piSession?.abort?.(); } catch {}
                 forceSettleRecord(record);
                 return;
               }

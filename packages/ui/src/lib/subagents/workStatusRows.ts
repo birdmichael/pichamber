@@ -22,6 +22,7 @@ export type WorkStatusSubagentRow = {
   modelId?: string;
   status: 'permission' | 'question' | 'working' | 'queued' | 'blocked' | 'failed' | 'paused' | 'stopped' | 'done';
   mode?: 'foreground' | 'background';
+  error?: string | null;
   usage?: WorkStatusSubagentUsage | null;
 };
 
@@ -253,6 +254,7 @@ export const buildWorkStatusSubagentRows = ({
         ...(run.modelId ? { modelId: run.modelId } : {}),
       } : {}),
       mode: run.mode,
+      ...(run.error ? { error: run.error } : {}),
       status,
     };
   });

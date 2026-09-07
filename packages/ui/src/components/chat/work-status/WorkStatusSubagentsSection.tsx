@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
+import { runtimeFetch } from '@/lib/runtime-fetch';
 import { toast } from '@/components/ui';
 import { useAllLiveSessions, useAllSessionStatuses, useChildStoreManager, useSessionMessageRecords } from '@/sync/sync-context';
 import { useUIStore } from '@/stores/useUIStore';
@@ -61,6 +62,31 @@ type SummaryControlProps = {
   parentSessionId: string | null;
   parentDirectory: string | null;
   providers: ReadonlyArray<{ id?: string | null; models?: Array<{ id?: string | null }> | null }>;
+};
+
+const SubagentStopControl: React.FC<{ row: ChildRow; parentSessionId: string | null }> = ({ row, parentSessionId }) => {
+  const { t } = useI18n();
+  const [stopping, setStopping] = React.useState(false);
+  const [stopped, setStopped] = React.useState(false);
+  const canStop = Boolean(parentSessionId && row.mode === "background" && ["working", "queued", "blocked", "paused", "permission", "question"].includes(row.status));
+  if (!canStop) return null;
+  const stop = async () => {
+    if (!parentSessionId || stopping) return;
+    setStopping(true);
+    try {
+      const response = await runtimeFetch("/api/session/" + encodeURIComponent(parentSessionId) + "/subagent-runs/" + encodeURIComponent(row.id) + "/stop", { method: "POST", headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || t("chat.workStatus.subagent.stopFailed"));
+      setStopped(true);
+      toast.success(t("chat.workStatus.subagent.stopped"));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("chat.workStatus.subagent.stopFailed"));
+    } finally { setStopping(false); }
+  };
+  return <div className="flex justify-end pl-7">
+    <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-[var(--status-error)] hover:bg-[var(--status-error)]/10 disabled:opacity-50" onClick={() => void stop()} disabled={stopping || stopped}>
+      {stopping ? t("chat.workStatus.subagent.stopping") : stopped ? t("chat.workStatus.subagent.stopped") : t("chat.workStatus.subagent.stop")}
+    </button>
+  </div>;
 };
 
 const SubagentSummaryControl: React.FC<SummaryControlProps> = ({ row, parentSessionId, parentDirectory, providers }) => {
@@ -290,7 +316,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
   const parentUsageLabel = formatWorkStatusSubagentUsage(parentUsage) ?? '—';
 
   const renderChildRow = (row: ChildRow) => {
-    const usageLabel = formatWorkStatusSubagentUsage(row.usage);
+    const usageLabel = row.status === "failed" || row.status === "stopped" ? null : formatWorkStatusSubagentUsage(row.usage);
     const statusLabel = row.status === 'permission' ? (
       <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.needsPermission')}</WorkStatusValue>
     ) : row.status === 'question' ? (
@@ -300,7 +326,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     ) : row.status === 'paused' ? (
       <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.paused')}</WorkStatusValue>
     ) : row.status === 'failed' ? (
-      <WorkStatusValue tone="warning">{t('chat.workStatus.subagent.failed')}</WorkStatusValue>
+      <WorkStatusValue tone="warning"><span title={row.error || undefined}>{t('chat.workStatus.subagent.failed')}{row.error ? " · " + row.error.slice(0, 72) : ""}</span></WorkStatusValue>
     ) : row.status === 'queued' ? (
       <WorkStatusValue tone="muted">{t('chat.workStatus.subagent.queued')}</WorkStatusValue>
     ) : row.status === 'stopped' ? (
@@ -345,6 +371,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
             </span>
           )}
         />
+        <SubagentStopControl row={row} parentSessionId={sessionId} />
         <SubagentSummaryControl row={row} parentSessionId={sessionId} parentDirectory={directory || effectiveDirectory} providers={providers} />
       </React.Fragment>
     );
