@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.18] - 2026-09-08
+
+### Added
+- Pi Agents and subagents management now includes a roster, explicit launch models, and a mobile-friendly Create agent flow (#613, #615, #617).
+- Work Status visualizes subagent fan-out and reports each subagent’s cost and usage (#616, #618, #621).
+
+### Fixed / Improved
+- Subagent launch and parent handoff are more reliable, and failed or stopped runs now settle with the correct lifecycle state (#616, #622).
+- Plan controls show provider-qualified model names, while Build keeps its model synchronized with the composer and session (#619, #620).
+- Provider-qualified model labels prefer display names without losing provider/model routing identity (#611, #614).
+- Kimi Usage excludes `kimi-coding-api`; domestic China usage now shows an honest empty state instead of fake bars (#623).
+
 ## [1.2.17] - 2026-09-07
 
 ### Fixed / Improved

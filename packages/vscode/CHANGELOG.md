@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.18] - 2026-09-08
+
+- Agents, subagent Work Status, model synchronization, and Kimi usage fixes are included; see the root CHANGELOG.md (#611, #613, #614, #615, #616, #617, #618, #619, #620, #621, #622, #623).
+
 ## [1.2.17] - 2026-09-07
 
 - Running status stays aligned with the active prompt model, and custom Completions providers preserve Kimi compatibility (#608, #609). See the root CHANGELOG.md.
