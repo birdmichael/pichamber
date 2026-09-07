@@ -3,6 +3,7 @@ import {
   isPiEnabledModelRowChecked,
   listPiEnabledModelRows,
   loadPiRuntimeModels,
+  normalizePiModelProviders,
   nextPiEnabledModels,
   toPiRuntimeModelProviders,
 } from './piModels';
@@ -98,6 +99,24 @@ describe('toPiRuntimeModelProviders', () => {
       id: 'live-provider',
       name: 'Live',
       models: [{ id: 'example-model', name: 'Example Model' }],
+    }]);
+  });
+});
+
+describe('normalizePiModelProviders', () => {
+  test('converts object-valued provider models to arrays for model editors', () => {
+    expect(normalizePiModelProviders({
+      providers: [{
+        id: 'anthropic',
+        name: 'Anthropic',
+        models: {
+          'claude-sonnet-4-5': { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5' },
+        },
+      }],
+    })).toEqual([{
+      id: 'anthropic',
+      name: 'Anthropic',
+      models: [{ id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5' }],
     }]);
   });
 });

@@ -278,7 +278,7 @@ export const nextPiEnabledModels = (
   return enabledKeys;
 };
 
-export const toPiRuntimeModelProviders = (
+export const normalizePiModelProviders = (
   catalog: unknown,
   enabledModels: string[] = [],
 ): ModelPickerProvider[] => {
@@ -302,6 +302,11 @@ export const toPiRuntimeModelProviders = (
     return [{ id, name, models }];
   });
 };
+
+export const toPiRuntimeModelProviders = (
+  catalog: unknown,
+  enabledModels: string[] = [],
+): ModelPickerProvider[] => normalizePiModelProviders(catalog, enabledModels);
 
 export const loadPiRuntimeModels = async (
   fetchFn: typeof runtimeFetch = runtimeFetch,

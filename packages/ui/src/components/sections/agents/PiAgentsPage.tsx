@@ -16,10 +16,11 @@ import { useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/stores/useConfigStore';
+import { normalizePiModelProviders } from '@/lib/multirun/piModels';
+import type { ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
 
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 const PI_TOOLS = ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'question', 'todo'];
-type Provider = { id?: string; name?: string; models?: Array<{ id?: string; name?: string }> };
 type PiSkill = { name?: string; description?: string };
 const arrayValue = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : typeof value === 'string' ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
 
@@ -27,7 +28,7 @@ export const PiAgentsPage: React.FC = () => {
   const { t } = useI18n();
   const directory = useSettingsDirectory();
   const active = useFeaturePluginSlotActive('subagents', true);
-  const providersFromConfig = useConfigStore((state) => state.providers) as Provider[];
+  const providersFromConfig = useConfigStore((state) => state.providers);
   const { agents, selectedName, isCreating, load, save, remove, cancelCreating } = usePiAgentsStore();
   const setSettingsPage = useUIStore((state) => state.setSettingsPage);
   const selected = selectedName ? agents.find((agent) => agent.name === selectedName) ?? null : null;
@@ -47,15 +48,15 @@ export const PiAgentsPage: React.FC = () => {
   const [isolation, setIsolation] = React.useState('');
   const [maxTurns, setMaxTurns] = React.useState('');
   const [skillsCatalog, setSkillsCatalog] = React.useState<PiSkill[]>([]);
-  const [models, setModels] = React.useState<Provider[]>(providersFromConfig);
+  const [models, setModels] = React.useState<ModelPickerProvider[]>(() => normalizePiModelProviders({ providers: providersFromConfig }));
   const [saving, setSaving] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
   React.useEffect(() => { if (active) void load(directory); }, [active, directory, load]);
-  React.useEffect(() => { setModels(providersFromConfig); }, [providersFromConfig]);
+  React.useEffect(() => { setModels(normalizePiModelProviders({ providers: providersFromConfig })); }, [providersFromConfig]);
   React.useEffect(() => {
     if (!active) return;
-    void runtimeFetch('/api/pi/models').then(async (response) => { const payload = await response.json().catch(() => null); if (response.ok && Array.isArray(payload?.providers)) setModels(payload.providers as Provider[]); }).catch(() => undefined);
+    void runtimeFetch('/api/pi/models').then(async (response) => { const payload = await response.json().catch(() => null); if (response.ok && Array.isArray(payload?.providers)) setModels(normalizePiModelProviders(payload)); }).catch(() => undefined);
     void runtimeFetch(`/api/pi/skills${directory?.trim() ? `?directory=${encodeURIComponent(directory.trim())}` : ''}`).then(async (response) => { const payload = await response.json().catch(() => null); if (response.ok && Array.isArray(payload?.skills)) setSkillsCatalog(payload.skills as PiSkill[]); }).catch(() => undefined);
   }, [active, directory]);
   React.useEffect(() => {
