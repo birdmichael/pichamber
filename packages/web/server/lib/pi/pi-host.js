@@ -3497,7 +3497,8 @@ export const createPiHost = ({
       if (run.state === "done" || run.state === "failed" || run.state === "stopped") continue;
       markSubagentRunTerminal(parent, run, "stopped", "父会话已停止");
       if (run.sessionID && run.sessionID !== parent.id) {
-        const child = sessions.get(run.sessionID);
+        let child = sessions.get(run.sessionID);
+        if (!child) { try { child = await ensureRecord(run.sessionID, run.directory); } catch {} }
         try { await child?.piSession?.abort?.(); } catch {}
         if (child) forceSettleRecord(child);
       }
@@ -3631,7 +3632,8 @@ export const createPiHost = ({
       const attached = applySubagentTerminalOverride(parent, await attachSubagentRun(parent, run));
       markSubagentRunTerminal(parent, attached, state, error);
       if (attached.sessionID && attached.sessionID !== parent.id) {
-        const child = sessions.get(attached.sessionID);
+        let child = sessions.get(attached.sessionID);
+        if (!child) { try { child = await ensureRecord(attached.sessionID, attached.directory); } catch {} }
         try { await child?.piSession?.abort?.(); } catch {}
         if (child) forceSettleRecord(child);
       }
