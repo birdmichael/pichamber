@@ -5,8 +5,8 @@ import { useI18n } from '@/lib/i18n';
 import { openExternalUrl } from '@/lib/url';
 
 /**
- * Moonshot domestic Open Platform is the China-side credential flow Pi can use.
- * It does not expose Pi's international Kimi Code device OAuth.
+ * Moonshot China Open Platform API-key flow for domestic chat baseUrl.
+ * Code OAuth remains available separately for subscription usage.
  */
 export const KIMI_DOMESTIC_API_KEY_URL = 'https://platform.moonshot.cn/console/api-keys';
 

@@ -66,7 +66,7 @@ describe('createPiKimiOAuthController', () => {
     expect(credential.access).toBe('access-secret');
   });
 
-  it('does not start international OAuth for a domestic Kimi row', async () => {
+  it('still starts Code OAuth for a domestic Kimi row (usage needs Code session)', async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kimi-oauth-domestic-'));
     try {
       writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
@@ -77,11 +77,37 @@ describe('createPiKimiOAuthController', () => {
           return { login: deviceLogin };
         },
       });
-      await expect(oauth.authorize('kimi-coding', { home })).rejects.toThrow(/Moonshot China API key/);
-      expect(loaded).toBe(false);
+      const authorization = await oauth.authorize('kimi-coding', { home });
+      expect(authorization.url).toBe('https://auth.kimi.com/device');
+      expect(loaded).toBe(true);
+      const credential = await oauth.complete('kimi-coding');
+      expect(credential.access).toBe('access-secret');
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it('passes a real AbortSignal into Pi refresh when callers omit signal', async () => {
+    let seen;
+    await refreshPiKimiOAuth(
+      { type: 'oauth', access: 'a', refresh: 'r', expires: Date.now() + 60_000 },
+      {
+        loadKimiOAuth: async () => ({
+          refresh: async (_credential, signal) => {
+            seen = signal;
+            expect(signal).toBeTruthy();
+            expect(typeof signal.aborted).toBe('boolean');
+            return {
+              type: 'oauth',
+              access: 'next-access',
+              refresh: 'next-refresh',
+              expires: Date.now() + 60_000,
+            };
+          },
+        }),
+      },
+    );
+    expect(seen).toBeTruthy();
   });
 
   it('rejects non-kimi-coding providers', async () => {

@@ -545,6 +545,7 @@ description: >
     expect(models.providers[KIMI_CODING_API_PROVIDER_ID].models.map((model) => model.id)).toEqual(domesticIds);
     expect(readPiDefaults(home).model).toBe('kimi-coding/kimi-k2.6');
     expect(getPiAuthMethods(home)['kimi-coding']).toEqual([
+      { type: 'oauth', label: 'Sign in with Kimi Code' },
       { type: 'api', label: 'Moonshot China API Key' },
     ]);
   });

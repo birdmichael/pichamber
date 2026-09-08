@@ -20,6 +20,8 @@ export type UsageProviderGroup = {
   status: string | null;
   /** Optional trailing membership / plan label on the provider header row. */
   badge?: string | null;
+  /** When true, Work Status shows an explicit Kimi Code re-login CTA. */
+  needsReauth?: boolean;
 };
 
 /**

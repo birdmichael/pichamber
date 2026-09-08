@@ -330,7 +330,7 @@ those clone ids and store tokens under the clone id. Dual-auth siblings
 `name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is
 per Kimi subscription row (Providers
 Add/edit): International → `https://api.kimi.com/coding` (anthropic-messages);
-China → `https://api.moonshot.cn/v1` (openai-completions), with models from Pi's `moonshotai-cn` catalog. No typed Base URL. Domestic Open Platform accounts use an API key from `https://platform.moonshot.cn`; Kimi Code's international device OAuth is not offered for a domestic row and never contacts `auth.kimi.com`.
+China → `https://api.moonshot.cn/v1` (openai-completions), with models from Pi's `moonshotai-cn` catalog. No typed Base URL. Domestic rows offer Moonshot China API key login for chat **and** Kimi Code device OAuth for subscription usage (`auth.kimi.com` / `api.kimi.com/coding/v1/usages`); region only switches the chat baseUrl.
 `PUT /api/pi/kimi-region` takes `{ providerId, region }`. Default preference
 may live in `pichamber.json` `kimiRegion`; `writePiDefaults` keeps it. Do not
 route this through custom-provider `/v1/models` sync (#564). Usage
@@ -387,13 +387,14 @@ card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
 Providers show **国际 / 国内** per Kimi
 row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
 of a typed Base URL. Domestic rows use `moonshotai-cn` models and show the
-China sign-in entry and API-key path (`https://platform.moonshot.cn/console/api-keys`) rather
-than the international Kimi Code device OAuth; domestic login never calls
-`auth.kimi.com`. Domestic Code rows still use the international Code usage endpoint
-`https://api.kimi.com/coding/v1/usages` when their credentials are accepted;
-do not query Moonshot balance/usages. Refresh uses `kimiCodingOAuth.refresh`,
-not a copied token exchange. Responses never echo access, refresh, or user
-id. Composer `/login kimi-coding` points at Settings → Providers.
+China sign-in entry (Moonshot API key) alongside Sign in with Kimi Code OAuth.
+Domestic chat keeps `api.moonshot.cn`; usage still uses the international Code
+endpoint `https://api.kimi.com/coding/v1/usages` with a Code OAuth token — do not
+query Moonshot balance/usages. A Moonshot API key alone cannot load Code usage;
+auth failures must surface a re-login CTA for Code OAuth. Refresh uses
+`kimiCodingOAuth.refresh` with a real AbortSignal (never undefined). Responses
+never echo access, refresh, or user id. Composer `/login kimi-coding` points at
+Settings → Providers.
 
 ## Kimi Usage (provider surface)
 
