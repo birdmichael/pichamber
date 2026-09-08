@@ -137,6 +137,7 @@ const useKimiUsageGroups = (): UsageProviderGroup[] => {
         rows,
         status,
         badge: formatKimiMembershipLabel(payload?.membershipLevel, t),
+        needsReauth: presentation.kind === 'error' && presentation.auth,
       }];
     });
   }, [byId, fallbackError, fallbackLoading, fallbackPayload, providers, t]);
@@ -180,8 +181,16 @@ const PiUsageSection: React.FC = () => {
   const fetchKimiUsage = useKimiUsageStore((state) => state.fetchUsage);
   const fetchZaiUsage = useZaiUsageStore((state) => state.fetchUsage);
   const providers = useConfigStore((state) => state.providers);
+  const setSelectedProvider = useConfigStore((state) => state.setSelectedProvider);
+  const setSettingsPage = useUIStore((state) => state.setSettingsPage);
+  const setSettingsDialogOpen = useUIStore((state) => state.setSettingsDialogOpen);
   const timeFormatPreference = useUIStore((state) => state.timeFormatPreference);
   const displayMode = useQuotaStore((state) => state.displayMode);
+  const openKimiReauth = React.useCallback((providerId: string) => {
+    setSelectedProvider(providerId);
+    setSettingsPage('providers');
+    setSettingsDialogOpen(true);
+  }, [setSelectedProvider, setSettingsDialogOpen, setSettingsPage]);
   const xaiUsageIds = React.useMemo(
     () => connectedFamilyIds(providers, isXaiSubscriptionId),
     [providers],
@@ -241,6 +250,7 @@ const PiUsageSection: React.FC = () => {
       timeFormatPreference={timeFormatPreference}
       currentProviderId={currentProviderId}
       modeLabel={displayMode === 'remaining' ? t('header.services.remaining') : t('header.services.used')}
+      onReauth={openKimiReauth}
     />
   );
 };
@@ -303,6 +313,7 @@ const UsageSectionBody: React.FC<{
   timeFormatPreference: TimeFormatPreference;
   currentProviderId: string | null;
   modeLabel: string;
+  onReauth?: (providerId: string) => void;
 }> = ({
   groups,
   displayMode,
@@ -311,6 +322,7 @@ const UsageSectionBody: React.FC<{
   timeFormatPreference,
   currentProviderId,
   modeLabel,
+  onReauth,
 }) => {
   const { t } = useI18n();
   const headline = pickUsageHeadline(groups, currentProviderId);
@@ -359,9 +371,21 @@ const UsageSectionBody: React.FC<{
             muted
           />
           {group.status ? (
-            <p className="min-w-0 px-1 pb-1 text-[13px] leading-snug text-muted-foreground whitespace-normal break-words text-wrap">
-              {group.status}
-            </p>
+            <div className="min-w-0 space-y-1.5 px-1 pb-1">
+              <p className="text-[13px] leading-snug text-muted-foreground whitespace-normal break-words text-wrap">
+                {group.status}
+              </p>
+              {group.needsReauth ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="!font-normal"
+                  onClick={() => onReauth?.(group.providerId)}
+                >
+                  {t('settings.providers.page.kimiUsage.signInAgain')}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
           {group.rows.map((row) => {
             const displayPercent = displayMode === 'remaining'

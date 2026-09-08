@@ -9,6 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { useKimiUsageStore } from '@/stores/useKimiUsageStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
+import { ProviderOAuthMethods } from './ProviderOAuthMethods';
 
 /**
  * Kimi Code subscription allowance on the Providers card. Mount when this connected provider has credentials.
@@ -40,6 +41,7 @@ export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerI
         : (presentation.message || t('settings.providers.page.kimiUsage.error')))
       : null;
   const showLoading = presentation.kind === 'loading' && rows.length === 0;
+  const showReauth = presentation.kind === 'error' && presentation.auth;
 
   const membershipLabel = formatKimiMembershipLabel(payload?.membershipLevel, t);
 
@@ -72,6 +74,19 @@ export const ProviderKimiUsage: React.FC<{ providerId?: string }> = ({ providerI
       ) : null}
       {status ? (
         <p className="py-1.5 typography-ui-label text-foreground">{status}</p>
+      ) : null}
+      {showReauth ? (
+        <div className="space-y-2 py-1.5">
+          <p className="typography-meta text-muted-foreground">
+            {t('settings.providers.page.kimiUsage.reauthHint')}
+          </p>
+          <ProviderOAuthMethods
+            key={`kimi-usage-reauth:${usageId}`}
+            providerId={usageId}
+            methods={[{ index: 0, label: t('settings.providers.page.kimiUsage.signInAgain') }]}
+            onConnected={() => void fetchUsage(usageId)}
+          />
+        </div>
       ) : null}
       {rows.map(([label, window]) => {
         const metric = formatQuotaValueLabel(undefined, window.usedPercent);

@@ -483,10 +483,11 @@ const KIMI_AUTH_METHODS = [
   { type: 'api', label: 'API Key' },
 ];
 
-// Kimi Code OAuth is an international subscription flow. Domestic Moonshot
-// accounts use Open Platform API keys instead; never offer a button that would
-// send a domestic user to auth.kimi.com.
+// Domestic rows keep Moonshot China chat (API key + baseUrl). Code OAuth stays
+// available so subscription usage can use auth.kimi.com / api.kimi.com without
+// flipping the chat region back to International.
 const KIMI_DOMESTIC_AUTH_METHODS = [
+  { type: 'oauth', label: KIMI_OAUTH_LOGIN_LABEL },
   { type: 'api', label: 'Moonshot China API Key' },
 ];
 

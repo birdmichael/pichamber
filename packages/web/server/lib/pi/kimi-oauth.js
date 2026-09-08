@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { isKimiSubscriptionId, readKimiProviderRegion } from './pi-resources.js';
+import { isKimiSubscriptionId } from './pi-resources.js';
 
 const AUTHORIZE_NOTIFY_TIMEOUT_MS = 15_000;
 const KIMI_OAUTH_RELATIVE = path.join('dist', 'auth', 'oauth', 'kimi-coding.js');
@@ -58,12 +58,6 @@ const unsupportedProvider = (providerId) => {
   return error;
 };
 
-const domesticOAuthError = () => {
-  const error = new Error(`Domestic Kimi uses a Moonshot China API key. Create one at ${KIMI_DOMESTIC_API_KEY_URL}; Kimi Code OAuth is international-only.`);
-  error.status = 400;
-  return error;
-};
-
 const noPendingError = () => {
   const error = new Error('No pending Kimi Code authorization');
   error.status = 400;
@@ -86,13 +80,12 @@ export const createPiKimiOAuthController = ({
     pending = null;
   };
 
-  const authorize = async (providerId, { home } = {}) => {
+  const authorize = async (providerId, _options = {}) => {
     if (!isKimiSubscriptionId(providerId)) {
       throw unsupportedProvider(providerId);
     }
-    if (home && readKimiProviderRegion(home, providerId) === 'domestic') {
-      throw domesticOAuthError();
-    }
+    // Domestic region keeps Moonshot chat baseUrl; Code OAuth remains available
+    // so subscription usage can refresh against auth.kimi.com / api.kimi.com.
     abortPending();
     const kimiCodingOAuth = await loadKimiOAuth();
     if (!kimiCodingOAuth || typeof kimiCodingOAuth.login !== 'function') {
@@ -198,10 +191,13 @@ export const refreshPiKimiOAuth = async (credential, {
     error.status = 401;
     throw error;
   }
+  // Pi's helper reads signal.aborted / AbortSignal.any([...], signal).
+  // Callers (and unit tests) may omit signal — never pass undefined.
+  const refreshSignal = signal ?? AbortSignal.timeout(30_000);
   return kimiCodingOAuth.refresh({
     type: 'oauth',
     access,
     refresh,
     expires: Number.isFinite(expires) ? expires : 0,
-  }, signal);
+  }, refreshSignal);
 };
