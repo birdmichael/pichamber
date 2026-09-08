@@ -5,7 +5,7 @@ import {
   reconcileKimiUsageState,
   type KimiUsagePayload,
 } from '@/lib/pi/kimi-usage';
-import { isKimiSubscriptionId } from '@/lib/pi/subscription-clones';
+import { isKimiApiSiblingId, isKimiCodeUsageProvider } from '@/lib/pi/subscription-clones';
 
 export type KimiUsageEntry = {
   payload: KimiUsagePayload | null;
@@ -45,7 +45,9 @@ export const useKimiUsageStore = create<KimiUsageStore>((set, get) => ({
   },
   fetchUsage: async (providerId) => {
     const requestedId = typeof providerId === 'string' ? providerId.trim() : '';
-    if (requestedId && !isKimiSubscriptionId(requestedId)) return;
+    // Completions API siblings (kimi-coding-api, or numeric clones named "… API")
+    // are not Code OAuth usage sources — never hit /api/pi/kimi-usage for them.
+    if (requestedId && (isKimiApiSiblingId(requestedId) || !isKimiCodeUsageProvider(requestedId))) return;
     const id = resolveUsageId(providerId);
     const current = get().byId[id] ?? emptyEntry();
     if (current.isLoading) {

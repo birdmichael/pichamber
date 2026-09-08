@@ -643,6 +643,17 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
   const authExists = spec && isDualAuthCatalogId(providerId)
     ? catalogStored || siblingStored
     : Boolean(auth[providerId]);
+  const cloneEntry = auth[providerId];
+  const cloneStored = authEntryLooksStored(cloneEntry);
+  const cloneMethod = authMethodType(cloneEntry);
+  // Kimi numeric clones store OAuth or API key on the clone id itself (not dual-auth).
+  // Surface oauth/apiKey so Usage can require Code OAuth and hide Completions API siblings.
+  const kimiCloneAuth = isKimiSubscriptionId(providerId) && !spec
+    ? {
+      oauth: { exists: Boolean(cloneStored && cloneMethod === 'oauth'), path: authPath },
+      apiKey: { exists: Boolean(cloneStored && cloneMethod === 'api'), path: authPath },
+    }
+    : null;
   return {
     sources: {
       auth: { exists: authExists, path: authPath },
@@ -655,7 +666,7 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
       ...(spec ? {
         oauth: { exists: Boolean(catalogIsOAuth), path: authPath },
         apiKey: { exists: Boolean(siblingStored || catalogIsApiKey), path: authPath },
-      } : {}),
+      } : (kimiCloneAuth || {})),
     },
   };
 };
