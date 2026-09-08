@@ -398,7 +398,7 @@ Settings → Providers.
 
 ## Kimi Usage (provider surface)
 
-Usage follows connected Kimi Code Provider auth. OAuth or a catalog-provider API key on `kimi-coding` is accepted; the dual-auth API sibling is excluded; the legacy Feature Plugin package is not consulted.
+Usage follows connected Kimi Code OAuth only (`/coding/v1/usages`). Dual-auth `kimi-coding-api` and Completions API-key siblings (e.g. `kimi-coding-2` named "Kimi API") are excluded from fetch and must not inherit the Code re-login CTA; the legacy Feature Plugin package is not consulted.
 
 When the provider is configured:
 

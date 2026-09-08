@@ -220,44 +220,60 @@ describe('getPiKimiUsage', () => {
     expect(calls).toBe(2);
   });
 
-  it('uses an api_key when oauth is absent', async () => {
+  it('ignores api_key Completions siblings instead of querying usage', async () => {
     const home = makeTemp();
     installKimiSlot(home);
-    writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
-      'kimi-coding': { type: 'api_key', key: 'api-secret' },
-    });
-    const tokens = [];
-    const result = await getPiKimiUsage({
-      home,
-      fetchImpl: async (_url, init) => {
-        tokens.push(init.headers.Authorization);
-        return {
-          ok: true,
-          status: 200,
-          text: async () => JSON.stringify({ usage: { limit: '100', used: '8' } }),
-        };
+    writeJson(path.join(home, '.pi', 'agent', 'models.json'), {
+      providers: {
+        'kimi-coding': { name: 'Kimi Code', baseUrl: 'https://api.moonshot.cn/v1', api: 'openai-completions', models: [] },
+        'kimi-coding-2': { name: 'Kimi API', baseUrl: 'https://api.moonshot.cn/v1', api: 'openai-completions', models: [] },
       },
     });
-    expect(result.ok).toBe(true);
-    expect(tokens).toEqual(['Bearer api-secret']);
-    expect(JSON.stringify(result)).not.toContain('api-secret');
-  });
-  it('ignores the dual-auth API sibling instead of querying usage', async () => {
-    const home = makeTemp();
     writeJson(path.join(home, '.pi', 'agent', 'auth.json'), {
-      'kimi-coding-api': { type: 'api_key', key: 'api-secret' },
+      'kimi-coding': {
+        type: 'oauth',
+        access: 'access-secret',
+        refresh: 'refresh-secret',
+        expires: 1_900_000_000_000,
+      },
+      'kimi-coding-2': { type: 'api_key', key: 'api-secret' },
+      'kimi-coding-api': { type: 'api_key', key: 'sibling-secret' },
     });
-    let called = false;
-    const fetchImpl = async () => {
-      called = true;
-      throw new Error('should not fetch');
+    const requested = [];
+    const fetchImpl = async (url) => {
+      requested.push(String(url));
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ usage: { limit: '100', used: '8' } }),
+      };
     };
-    const defaultResult = await getPiKimiUsage({ home, fetchImpl });
-    const siblingResult = await getPiKimiUsage({ home, providerId: 'kimi-coding-api', fetchImpl });
-    expect(called).toBe(false);
-    expect(defaultResult).toEqual({ ok: false, configured: false, slotActive: false });
-    expect(siblingResult).toEqual({ ok: false, configured: false, slotActive: false });
+    const code = await getPiKimiUsage({ home, providerId: 'kimi-coding', fetchImpl });
+    const apiClone = await getPiKimiUsage({ home, providerId: 'kimi-coding-2', fetchImpl });
+    const dualSibling = await getPiKimiUsage({ home, providerId: 'kimi-coding-api', fetchImpl });
+    const catalogApiOnlyHome = makeTemp();
+    writeJson(path.join(catalogApiOnlyHome, '.pi', 'agent', 'auth.json'), {
+      'kimi-coding': { type: 'api_key', key: 'api-secret' },
+    });
+    let apiOnlyCalled = false;
+    const catalogApiOnly = await getPiKimiUsage({
+      home: catalogApiOnlyHome,
+      fetchImpl: async () => {
+        apiOnlyCalled = true;
+        throw new Error('should not fetch');
+      },
+    });
+    expect(code.ok).toBe(true);
+    expect(code.providerName).toBe('Kimi Code');
+    expect(requested).toEqual(['https://api.kimi.com/coding/v1/usages']);
+    expect(apiClone).toEqual({ ok: false, configured: false, slotActive: false });
+    expect(dualSibling).toEqual({ ok: false, configured: false, slotActive: false });
+    expect(apiOnlyCalled).toBe(false);
+    expect(catalogApiOnly).toEqual({ ok: false, configured: false, slotActive: false });
+    expect(JSON.stringify(code)).not.toContain('access-secret');
+    expect(JSON.stringify(apiClone)).not.toContain('api-secret');
   });
+
 
   it('uses the international Code usages endpoint for domestic Kimi rows', async () => {
     const home = makeTemp();

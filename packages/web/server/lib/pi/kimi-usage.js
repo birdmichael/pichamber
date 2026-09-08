@@ -9,6 +9,7 @@ import {
   writePiProviderAuth,
 } from './pi-resources.js';
 import { refreshPiKimiOAuth } from './kimi-oauth.js';
+import { isDualAuthApiSiblingId } from './pi-dual-auth.js';
 
 const KIMI_USAGE_ORIGIN = 'https://api.kimi.com';
 const MAX_USAGE_BODY_BYTES = 64 * 1024;
@@ -57,16 +58,6 @@ const readOauthEntry = (entry) => {
   };
 };
 
-const readApiKey = (entry) => {
-  if (!isRecord(entry)) return '';
-  const type = String(entry.type || '').toLowerCase();
-  if (type === 'oauth') return '';
-  const key = typeof entry.key === 'string' ? entry.key.trim()
-    : typeof entry.apiKey === 'string' ? entry.apiKey.trim()
-    : typeof entry.token === 'string' ? entry.token.trim()
-    : '';
-  return key;
-};
 
 const oauthNeedsRefresh = (oauth, now) => {
   if (!oauth?.refresh) return false;
@@ -314,53 +305,46 @@ export const getPiKimiUsage = async ({
   refreshOAuth = refreshPiKimiOAuth,
   now = Date.now(),
 } = {}) => {
-  if (typeof providerId === 'string' && providerId.trim() === 'kimi-coding-api') {
+  const requestedId = typeof providerId === 'string' ? providerId.trim() : '';
+  // Dual-auth Completions sibling and any non-subscription id must not drive
+  // Code subscription usage (or inherit the Code re-login CTA).
+  if (requestedId && (requestedId === 'kimi-coding-api' || isDualAuthApiSiblingId(requestedId))) {
     return { ok: false, configured: false, slotActive: false };
   }
   const usageProviderId = isKimiSubscriptionId(providerId) ? providerId : KIMI_CODING_PROVIDER_ID;
   const auth = readJsonObject(resolvePiAuthPath(home), readFile);
-  // Usage belongs to Kimi Code subscriptions on the catalog provider. The
-  // dual-auth API sibling is intentionally not a usage source.
+  // Usage belongs only to Kimi Code OAuth subscriptions. API-key Completions
+  // siblings (kimi-coding-api, or numeric clones such as kimi-coding-2 named
+  // "Kimi API") are not usage sources and must not hit /coding/v1/usages.
   const catalogAuth = auth[usageProviderId];
   let oauth = readOauthEntry(catalogAuth);
-  const apiKey = readApiKey(catalogAuth);
-  // OAuth and API-key auth are both provider configuration; neither requires
-  // the legacy pi-kimi-code-console-usage package.
-  if (!oauth && !apiKey) {
+  if (!oauth) {
     return { ok: false, configured: false, slotActive: false };
   }
   const providerName = readProviderDisplayName(home, usageProviderId);
   const region = readKimiProviderRegion(home, usageProviderId);
   try {
     const { windows, membershipLevel } = await withTimeout(async (signal) => {
-      if (oauth) {
-        if (oauthNeedsRefresh(oauth, now)) {
-          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
-        }
-        try {
-          return await fetchKimiUsageWindows({
-            access: oauth.access,
-            fetchImpl,
-            origin,
-            signal,
-          });
-        } catch (error) {
-          if (!isUnauthorizedUsageError(error) || !oauth.refresh) throw error;
-          oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
-          return fetchKimiUsageWindows({
-            access: oauth.access,
-            fetchImpl,
-            origin,
-            signal,
-          });
-        }
+      if (oauthNeedsRefresh(oauth, now)) {
+        oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
       }
-      return fetchKimiUsageWindows({
-        access: apiKey,
-        fetchImpl,
-        origin,
-        signal,
-      });
+      try {
+        return await fetchKimiUsageWindows({
+          access: oauth.access,
+          fetchImpl,
+          origin,
+          signal,
+        });
+      } catch (error) {
+        if (!isUnauthorizedUsageError(error) || !oauth.refresh) throw error;
+        oauth = await refreshOauthCredential(oauth, { home, providerId: usageProviderId, refreshOAuth, signal });
+        return fetchKimiUsageWindows({
+          access: oauth.access,
+          fetchImpl,
+          origin,
+          signal,
+        });
+      }
     });
     return {
       ok: true,

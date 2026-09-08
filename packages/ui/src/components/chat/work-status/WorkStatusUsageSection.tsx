@@ -20,7 +20,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { useXaiUsageStore } from '@/stores/useXaiUsageStore';
 import { useKimiUsageStore } from '@/stores/useKimiUsageStore';
 import { useZaiUsageStore } from '@/stores/useZaiUsageStore';
-import { isKimiSubscriptionId, isXaiSubscriptionId } from '@/lib/pi/subscription-clones';
+import { isKimiCodeUsageProvider, isKimiSubscriptionId, isXaiSubscriptionId } from '@/lib/pi/subscription-clones';
 import { presentXaiUsage } from '@/lib/pi/xai-usage';
 import { formatKimiMembershipLabel, formatKimiWindowLabel, presentKimiUsage } from '@/lib/pi/kimi-usage';
 import { formatZaiWindowLabel, presentZaiUsage } from '@/lib/pi/zai-usage';
@@ -53,9 +53,9 @@ const windowTone = (window: UsageWindow): 'default' | 'warning' | 'error' => {
 };
 
 const connectedFamilyIds = (
-  providers: ReadonlyArray<{ id: string }>,
-  match: (id: string) => boolean,
-): string[] => providers.map((provider) => provider.id).filter(match);
+  providers: ReadonlyArray<{ id: string; name?: string | null }>,
+  match: (provider: { id: string; name?: string | null }) => boolean,
+): string[] => providers.filter(match).map((provider) => provider.id);
 
 const useXaiUsageGroups = (): UsageProviderGroup[] => {
   const { t } = useI18n();
@@ -65,7 +65,7 @@ const useXaiUsageGroups = (): UsageProviderGroup[] => {
   const fallbackError = useXaiUsageStore((state) => state.error);
   const fallbackLoading = useXaiUsageStore((state) => state.isLoading);
   return React.useMemo(() => {
-    const ids = connectedFamilyIds(providers, isXaiSubscriptionId);
+    const ids = connectedFamilyIds(providers, (provider) => isXaiSubscriptionId(provider.id));
     return ids.flatMap((id) => {
       const entry = byId[id];
       const payload = entry?.payload ?? (id === 'xai' ? fallbackPayload : null);
@@ -107,7 +107,7 @@ const useKimiUsageGroups = (): UsageProviderGroup[] => {
   const fallbackError = useKimiUsageStore((state) => state.error);
   const fallbackLoading = useKimiUsageStore((state) => state.isLoading);
   return React.useMemo(() => {
-    const ids = connectedFamilyIds(providers, isKimiSubscriptionId);
+    const ids = connectedFamilyIds(providers, isKimiCodeUsageProvider);
     return ids.flatMap((id) => {
       const entry = byId[id];
       const payload = entry?.payload ?? (id === 'kimi-coding' ? fallbackPayload : null);
@@ -192,11 +192,11 @@ const PiUsageSection: React.FC = () => {
     setSettingsDialogOpen(true);
   }, [setSelectedProvider, setSettingsDialogOpen, setSettingsPage]);
   const xaiUsageIds = React.useMemo(
-    () => connectedFamilyIds(providers, isXaiSubscriptionId),
+    () => connectedFamilyIds(providers, (provider) => isXaiSubscriptionId(provider.id)),
     [providers],
   );
   const kimiUsageIds = React.useMemo(
-    () => connectedFamilyIds(providers, isKimiSubscriptionId),
+    () => connectedFamilyIds(providers, isKimiCodeUsageProvider),
     [providers],
   );
   const zaiUsageIds = React.useMemo(() => providers.filter((provider) => provider.id === 'zai').map((provider) => provider.id), [providers]);

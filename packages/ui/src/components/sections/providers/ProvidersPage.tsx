@@ -28,6 +28,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { reportSettingsSaveState } from '@/lib/persistence';
 import {
   familyIsConnected,
+  isKimiCodeUsageProvider,
   isKimiSubscriptionId,
   isOfficialSubscriptionId,
   isXaiSubscriptionId,
@@ -1470,7 +1471,10 @@ export const ProvidersPage: React.FC = () => {
         <ProviderXaiUsage providerId={selectedProvider.id} />
       ) : null}
 
-      {isPiKernel && isKimiSubscriptionId(selectedProvider.id) && hasCredentials ? (
+      {isPiKernel && isKimiCodeUsageProvider(selectedProvider) && (
+        selectedSources?.oauth?.exists === true
+        || (!sourcesLoaded && hasCredentials)
+      ) ? (
         <ProviderKimiUsage providerId={selectedProvider.id} />
       ) : null}
 

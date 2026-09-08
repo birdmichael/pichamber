@@ -43,6 +43,11 @@ describe('useKimiUsageStore', () => {
     expect(fetchCalls).toBe(0);
   });
 
+  test("does not fetch non-Kimi provider ids", async () => {
+    await useKimiUsageStore.getState().fetchUsage("xai");
+    expect(fetchCalls).toBe(0);
+  });
+
   test('queues a refresh clicked while a fetch is in flight', async () => {
     let releaseFirst: (() => void) | undefined;
     const firstHold = new Promise<void>((resolve) => {

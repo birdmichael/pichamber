@@ -55,6 +55,8 @@ describe('Pi usage groups', () => {
     expect(source).toContain('fetchKimiUsage(id)');
     expect(source).toContain('...xaiGroups');
     expect(source).toContain('...kimiGroups');
+    expect(source).toContain('isKimiCodeUsageProvider');
+    expect(source).not.toContain('connectedFamilyIds(providers, isKimiSubscriptionId)');
   });
 
   test('kimi groups set badge from membership and xAI omits it', () => {
