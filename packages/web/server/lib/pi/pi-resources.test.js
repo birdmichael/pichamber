@@ -1015,6 +1015,7 @@ description: >
     expect(catalogSources.sources.oauth.exists).toBe(true);
     expect(catalogSources.sources.apiKey.exists).toBe(true);
     expect(catalogSources.sources.auth.exists).toBe(true);
+    expect(catalogSources.sources.catalogAuth.exists).toBe(true);
 
     expect(toPiProviderListPayload({
       providers: [
@@ -1046,6 +1047,24 @@ description: >
       { type: 'oauth', label: 'Sign in with Kimi Code' },
       { type: 'api', label: 'API Key' },
     ]);
+  });
+
+  it('API-only Kimi sibling does not mark root catalogAuth stored (#643)', () => {
+    const dualHome = makeTemp();
+    writePiProviderAuth(KIMI_CODING_API_PROVIDER_ID, { type: 'api', key: 'sk-kimi-api-only' }, { home: dualHome });
+    const dualSources = getPiProviderSources('kimi-coding', { home: dualHome }).sources;
+    expect(dualSources.auth.exists).toBe(true);
+    expect(dualSources.apiKey.exists).toBe(true);
+    expect(dualSources.oauth.exists).toBe(false);
+    expect(dualSources.catalogAuth.exists).toBe(false);
+    expect(dualSources.user.exists).toBe(false);
+
+    const numericHome = makeTemp();
+    writePiProviderAuth('kimi-coding-2', { type: 'api', key: 'sk-kimi-numeric' }, { home: numericHome });
+    const numericSources = getPiProviderSources('kimi-coding', { home: numericHome }).sources;
+    expect(numericSources.auth.exists).toBe(false);
+    expect(numericSources.catalogAuth.exists).toBe(false);
+    expect(numericSources.user.exists).toBe(false);
   });
 
   it('disconnects Kimi Code OAuth or API key independently', () => {

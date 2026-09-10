@@ -3,11 +3,13 @@ import { describe, expect, test } from 'bun:test';
 import {
   familyHasRootConnected,
   familyIsConnected,
+  familyRootIsStored,
   isKimiApiSiblingDisplayName,
   isKimiApiSiblingId,
   isKimiCodeUsageProvider,
   isKimiSubscriptionId,
   isXaiSubscriptionId,
+  shouldCloneOfficialSubscription,
   subscriptionFamilyOf,
 } from './subscription-clones';
 
@@ -46,5 +48,32 @@ describe('isKimiCodeUsageProvider', () => {
     expect(isKimiCodeUsageProvider({ id: 'kimi-coding-api', name: 'Kimi Code API' })).toBe(false);
     expect(isKimiCodeUsageProvider('kimi-coding')).toBe(true);
     expect(isKimiCodeUsageProvider('kimi-coding-api')).toBe(false);
+  });
+});
+
+describe('familyRootIsStored / shouldCloneOfficialSubscription', () => {
+  test('API sibling alone does not unlock clone; root auth or models does', () => {
+    expect(familyRootIsStored({
+      catalogAuth: { exists: false },
+      user: { exists: false },
+      auth: { exists: true },
+      apiKey: { exists: true },
+      oauth: { exists: false },
+    })).toBe(false);
+    expect(shouldCloneOfficialSubscription(
+      'kimi-coding',
+      new Set(['kimi-coding', 'kimi-coding-2']),
+      { catalogAuth: { exists: false }, user: { exists: false }, auth: { exists: true } },
+    )).toBe(false);
+    expect(familyRootIsStored({ catalogAuth: { exists: true }, user: { exists: false } })).toBe(true);
+    expect(familyRootIsStored({ catalogAuth: { exists: false }, user: { exists: true } })).toBe(true);
+    expect(shouldCloneOfficialSubscription(
+      'kimi-coding',
+      new Set(['kimi-coding']),
+      { catalogAuth: { exists: true }, user: { exists: false } },
+    )).toBe(true);
+    // Without sources, fall back to root id in connected set.
+    expect(shouldCloneOfficialSubscription('kimi-coding', new Set(['kimi-coding-2']))).toBe(false);
+    expect(shouldCloneOfficialSubscription('kimi-coding', new Set(['kimi-coding']))).toBe(true);
   });
 });

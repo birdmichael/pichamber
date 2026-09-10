@@ -28,6 +28,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { reportSettingsSaveState } from '@/lib/persistence';
 import {
   familyHasRootConnected,
+  familyRootIsStored,
   isKimiCodeUsageProvider,
   isKimiSubscriptionId,
   isOfficialSubscriptionId,
@@ -117,6 +118,7 @@ interface ProviderSourceInfo {
 
 interface ProviderSources {
   auth: ProviderSourceInfo;
+  catalogAuth?: ProviderSourceInfo;
   user: ProviderSourceInfo;
   project: ProviderSourceInfo;
   custom?: ProviderSourceInfo;
@@ -575,9 +577,31 @@ export const ProvidersPage: React.FC = () => {
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
 
   const ensureAnotherSubscription = async (family: 'xai' | 'kimi-coding') => {
-    // Server createSubscriptionClone requires the root id. API-only siblings
-    // like kimi-coding-2 "Kimi API" must open Sign-in, not clone (#643).
-    if (!isPiKernel || !familyHasRootConnected(family, connectedProviderIds)) {
+    // Server createSubscriptionClone requires the root id in auth/models.
+    // Dual-auth API siblings (and numeric "Kimi API" rows) can make the catalog
+    // row look connected without a root key — those must open Sign-in (#643).
+    if (!isPiKernel) {
+      setCandidateProviderId(family);
+      return;
+    }
+    let rootStored = familyHasRootConnected(family, connectedProviderIds);
+    if (rootStored) {
+      try {
+        const query = settingsDirectory ? `?directory=${encodeURIComponent(settingsDirectory)}` : '';
+        const sourceResponse = await runtimeFetch(`/api/provider/${encodeURIComponent(family)}/source${query}`, {
+          headers: { Accept: 'application/json' },
+        });
+        const sourcePayload = await sourceResponse.json().catch(() => null) as {
+          sources?: ProviderSources;
+        } | null;
+        if (sourcePayload?.sources) {
+          rootStored = familyRootIsStored(sourcePayload.sources);
+        }
+      } catch {
+        // Keep connectedIds heuristic when source probe fails.
+      }
+    }
+    if (!rootStored) {
       setCandidateProviderId(family);
       return;
     }
@@ -593,8 +617,13 @@ export const ProvidersPage: React.FC = () => {
           ...(region ? { region } : {}),
         }),
       });
-      const payload = await response.json().catch(() => null) as { providerId?: string } | null;
+      const payload = await response.json().catch(() => null) as { providerId?: string; error?: string } | null;
       if (!response.ok || typeof payload?.providerId !== 'string') {
+        // Missing root (or stale gate): open Sign-in instead of clone toast (#643).
+        if (response.status === 400) {
+          setCandidateProviderId(family);
+          return;
+        }
         toast.error(t('settings.providers.page.subscription.clone.failed'));
         return;
       }
