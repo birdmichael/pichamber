@@ -151,10 +151,10 @@ export function ArchiveView(): React.ReactNode {
   );
 
   return (
-    // Fill <main> in normal flow so the directory column starts after the
-    // session sidebar. `absolute inset-0` can resolve to a higher containing
-    // block and paint from the window's left edge, under the sidebar.
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-background">
+    // Fill <main> like Scheduled/Worktrees. Main is `relative`, so
+    // `absolute inset-0` stays in the content column (not under the sidebar).
+    // z-10 stacks above the invisible chat layer while the surface is open.
+    <div className="absolute inset-0 z-10 flex flex-col bg-background">
       <div className="flex min-h-0 min-w-0 flex-1">
         {/* Directory filter panel */}
         <div className="flex w-64 flex-shrink-0 flex-col border-r border-border/50">
