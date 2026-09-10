@@ -321,3 +321,7 @@ on the strength of type-check and unit tests.
 
 Run tests per file (`bun test <path>`): `mock.module` is process-global, so
 suites that install module mocks are order-dependent.
+
+## Dictation start feedback
+
+`ComposerDictation` must never silent-no-op on Start dictation or `toggle_dictation` (`Ctrl+Alt+V` / host mic). Unsupported, disabled, or microphone/capture failures toast via Sonner; a successful start still enters the recording overlay. Linux/Xvfb boxes without a mic still owe that error toast (#662 / #412).

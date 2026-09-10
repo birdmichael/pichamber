@@ -13,6 +13,8 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { classifyDictationCaptureError, createDictationCaptureError } from '@/lib/dictation/dictation-capture-errors';
+
 export interface DictationAudioSourceConfig {
     onPcmSegment: (base64Pcm: string) => void;
     onError?: (error: Error) => void;
@@ -164,22 +166,30 @@ export function useDictationAudioSource(config: DictationAudioSourceConfig): Dic
             !navigator.mediaDevices ||
             typeof navigator.mediaDevices.getUserMedia !== 'function'
         ) {
-            throw new Error('Microphone capture is not supported in this environment');
+            throw createDictationCaptureError(
+                'Microphone capture is not supported in this environment',
+                'microphone_unsupported',
+            );
         }
 
         const AudioContextCtor = getAudioContextCtor();
         if (!AudioContextCtor) {
-            throw new Error('AudioContext unavailable');
+            throw createDictationCaptureError('AudioContext unavailable', 'audio_context_unavailable');
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                channelCount: 1,
-                noiseSuppression: true,
-                echoCancellation: true,
-                autoGainControl: true,
-            },
-        });
+        let stream: MediaStream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    channelCount: 1,
+                    noiseSuppression: true,
+                    echoCancellation: true,
+                    autoGainControl: true,
+                },
+            });
+        } catch (error) {
+            throw classifyDictationCaptureError(error);
+        }
 
         const context = new AudioContextCtor();
         try {
@@ -243,7 +253,7 @@ export function useDictationAudioSource(config: DictationAudioSourceConfig): Dic
                 // no-op
             }
             graphRef.current = emptyGraph();
-            throw error instanceof Error ? error : new Error(String(error));
+            throw classifyDictationCaptureError(error);
         }
     }, [emitLevel]);
 
@@ -306,7 +316,7 @@ export function useDictationAudioSource(config: DictationAudioSourceConfig): Dic
                 try {
                     await start();
                 } catch (err) {
-                    const normalized = err instanceof Error ? err : new Error(String(err));
+                    const normalized = classifyDictationCaptureError(err);
                     onErrorRef.current?.(normalized);
                     throw normalized;
                 }
