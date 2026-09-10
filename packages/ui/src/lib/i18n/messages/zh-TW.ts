@@ -991,6 +991,8 @@ export const dict: Record<I18nKey, string> = {
   'gitView.stashes.searchPlaceholder': '搜尋 stashes',
   'gitView.stashes.title': 'Stashes',
   'gitView.stashes.toast.applyFailed': 'Apply stash 失敗',
+  'gitView.stashes.toast.localChangesOverwrite': '本地變更將被覆寫（{paths}）；請先提交或暫存',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': '本地變更將被覆寫（{paths}，另有 {count} 個）；請先提交或暫存',
   'gitView.stashes.toast.applySuccess': '已 apply stash',
   'gitView.stashes.toast.createFailed': 'Stash 變更失敗',
   'gitView.stashes.toast.created': '已 stash 變更',

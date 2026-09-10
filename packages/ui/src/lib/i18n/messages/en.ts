@@ -978,6 +978,8 @@ export const dict = {
   'gitView.stashes.searchPlaceholder': 'Search stashes',
   'gitView.stashes.title': 'Stashes',
   'gitView.stashes.toast.applyFailed': 'Failed to apply stash',
+  'gitView.stashes.toast.localChangesOverwrite': 'Local changes would be overwritten ({paths}); commit or stash first',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': 'Local changes would be overwritten ({paths}, +{count} more); commit or stash first',
   'gitView.stashes.toast.applySuccess': 'Stash applied',
   'gitView.stashes.toast.createFailed': 'Failed to stash changes',
   'gitView.stashes.toast.created': 'Changes stashed',
