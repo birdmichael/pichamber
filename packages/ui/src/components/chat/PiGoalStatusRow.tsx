@@ -17,7 +17,7 @@ import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
 import { readLastActiveSession } from '@/sync/last-session-cache';
 import { useSessionUIStore } from '@/sync/session-ui-store';
-import { useDirectorySync } from '@/sync/sync-context';
+import { useDirectorySync, useSession } from '@/sync/sync-context';
 
 interface PiGoalStatusRowProps {
   sessionId: string | null;
@@ -51,12 +51,12 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
     lastActiveSessionID,
   }) || null;
 
-  const sessionGoal = useDirectorySync((state) => {
-    if (!resolvedSessionId) return null;
-    const session = state.session.find((item) => item.id === resolvedSessionId);
-    return getSessionGoal(session);
-  }, directory);
-
+  // Parse goal in render from the live session record. Never return
+  // getSessionGoal() from a useDirectorySync/useStore selector — it builds a
+  // fresh object every snapshot and trips React #185 (max update depth) via
+  // useSyncExternalStore (#637 regression after #655).
+  const session = useSession(resolvedSessionId, directory);
+  const sessionGoal = getSessionGoal(session);
   const eligibleSessionGoal = isSessionGoalVisibleInPiComposerRow(sessionGoal) ? sessionGoal : null;
   const fetchedSessionGoalObjective = useGoalObjectiveContent(
     resolvedSessionId ?? '',
