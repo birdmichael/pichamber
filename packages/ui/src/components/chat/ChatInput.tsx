@@ -171,7 +171,7 @@ import { presentPiExtensionUiNotify } from '@/sync/pi-extension-ui-store';
 import { usePiFeaturePluginsStore } from '@/sync/pi-feature-plugins-store';
 import { useAutocompletePosition } from './composer/state/useAutocompletePosition';
 import {
-    shouldDockComposerForDesktopSlashMenu,
+    shouldDockComposerForDesktopWelcome,
     shouldHideNewSessionWelcomeForDesktopSlashMenu,
 } from './slashPopupHeight';
 import { useMessageHistory } from './composer/state/useMessageHistory';
@@ -2986,18 +2986,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         };
     }, []);
 
-    const desktopSlashMenuOpen = openAutocomplete === 'command';
-    const compactNewSessionForSlash = shouldDockComposerForDesktopSlashMenu({
+    // Stable bottom-docked welcome: do not retarget layout when `/` opens (#688).
+    const compactWelcomeComposer = shouldDockComposerForDesktopWelcome({
         isMobile,
         isDesktopExpanded,
-        newSessionDraftOpen,
-        commandAutocompleteOpen: desktopSlashMenuOpen,
+        showDesktopDraftWelcomeChrome,
     });
     const hideNewSessionWelcomeForSlash = shouldHideNewSessionWelcomeForDesktopSlashMenu({
         isMobile,
         isDesktopExpanded,
         newSessionDraftOpen,
-        commandAutocompleteOpen: desktopSlashMenuOpen,
+        commandAutocompleteOpen: openAutocomplete === 'command',
+        showDesktopDraftWelcomeChrome,
     });
     const showNewSessionWelcome = showDesktopDraftWelcomeChrome && !hideNewSessionWelcomeForSlash;
 
@@ -3012,15 +3012,18 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 isDesktopExpanded && 'flex h-full min-h-0 flex-col pt-4',
                 isMobileExpanded && 'flex h-full min-h-0 flex-col pt-2',
                 isMobile && 'bottom-safe-area oc-mobile-composer',
-                compactNewSessionForSlash && 'self-end',
-                // ChatContainer's new-session column uses pb-[6vh]; eat it so
-                // the docked composer-only form can sit on the true bottom.
-                compactNewSessionForSlash && !isVSCode && !isMiniChatSurface && '-mb-[6vh]',
+                // Full-height docked welcome: hero stays in flex space above the
+                // composer so opening `/` does not jump or collapse chrome (#688).
+                compactWelcomeComposer && 'flex flex-1 min-h-0 flex-col self-stretch',
+                compactWelcomeComposer && !isVSCode && !isMiniChatSurface && '-mb-[6vh]',
             )}
             style={isMobile && inputBarOffset > 0 ? { marginBottom: `${inputBarOffset}px` } : undefined}
         >
             {showNewSessionWelcome ? (
-                <div className="chat-input-column mb-7 text-center">
+                <div className={cn(
+                    'chat-input-column text-center',
+                    compactWelcomeComposer ? 'flex flex-1 min-h-0 flex-col items-center justify-center mb-0' : 'mb-7',
+                )}>
                     <h1 className="text-balance text-2xl font-normal tracking-tight text-foreground md:text-3xl">
                         {renderDraftTitle(
                             welcomeWorkspaceLabel
@@ -3029,9 +3032,19 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                             welcomeWorkspaceLabel,
                         )}
                     </h1>
+                    {compactWelcomeComposer ? (
+                        <DraftPresetChips
+                            onSubmit={(starter) => submitPresetPrompt(starter.submitText, starter.ref.type)}
+                            className="mt-4 w-full"
+                        />
+                    ) : null}
                 </div>
             ) : null}
-            <div className={cn('chat-input-column relative overflow-visible', isComposerExpanded && 'flex flex-1 min-h-0 flex-col')}>
+            <div className={cn(
+                'chat-input-column relative overflow-visible',
+                isComposerExpanded && 'flex flex-1 min-h-0 flex-col',
+                compactWelcomeComposer && !showNewSessionWelcome && 'mt-auto',
+            )}>
                 {btwPluginAvailable && currentSessionId ? <BtwPanel parentSessionId={currentSessionId} panel={btwPanel} /> : null}
                 <AttachedFilesList onShowPopup={handleShowAttachmentPreview} />
                 <QueuedMessageChips
@@ -3399,7 +3412,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                     />
                 ) : null}
             </div>
-            {showNewSessionWelcome ? (
+            {showNewSessionWelcome && !compactWelcomeComposer ? (
                 <DraftPresetChips
                     onSubmit={(starter) => submitPresetPrompt(starter.submitText, starter.ref.type)}
                     className="chat-input-column mt-4"
