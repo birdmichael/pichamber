@@ -15,6 +15,7 @@ import {
   getGitBranches,
   getGitStatus,
   gitFetch,
+  GitDirectoriesOutsideWorkspaceError,
   GitDirectoriesUnsupportedError,
   listGitDirectories,
   merge,
@@ -411,6 +412,47 @@ describe('gitApiHttp nested git directories', () => {
     });
     restoreMocks();
     expect(error).toBeInstanceOf(GitDirectoriesUnsupportedError);
+  });
+
+  test('sends x-opencode-directory for the discovery root', async () => {
+    installWindowMock();
+    const calls = installFetchMock();
+    // Override to return a git-dirs shaped body for this call.
+    globalThis.fetch = (async (input, init) => {
+      calls.push({ input, init });
+      return new Response(JSON.stringify({ path: '/home/box', repositories: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      await listGitDirectories('/home/box');
+      expect(calls).toHaveLength(1);
+      expect(String(calls[0].input)).toContain('/api/fs/git-dirs');
+      expect(String(calls[0].input)).toContain('path=%2Fhome%2Fbox');
+      const headers = new Headers(calls[0].init?.headers);
+      expect(headers.get('x-opencode-directory')).toBe('/home/box');
+    } finally {
+      restoreMocks();
+    }
+  });
+
+  test('throws GitDirectoriesOutsideWorkspaceError on outside-workspace 400', async () => {
+    installWindowMock();
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      error: 'Path is outside of active workspace',
+    }), {
+      status: 400,
+      statusText: 'Bad Request',
+      headers: { 'Content-Type': 'application/json' },
+    })) as typeof fetch;
+    const error = await captureError(async () => {
+      await listGitDirectories('/home/box');
+    });
+    restoreMocks();
+    expect(error).toBeInstanceOf(GitDirectoriesOutsideWorkspaceError);
+    expect((error as Error).message).toBe('Path is outside of active workspace');
   });
 
   test('returns normalized repository paths', async () => {

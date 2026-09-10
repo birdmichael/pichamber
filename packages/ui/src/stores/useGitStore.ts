@@ -9,7 +9,7 @@ import type {
 } from '@/lib/api/types';
 import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { getRuntimeKey } from '@/lib/runtime-switch';
-import { GitDirectoriesUnsupportedError, listGitDirectories } from '@/lib/gitApiHttp';
+import { GitDirectoriesOutsideWorkspaceError, GitDirectoriesUnsupportedError, listGitDirectories } from '@/lib/gitApiHttp';
 import { subscribeGitStatusInvalidations } from '@/lib/gitStatusInvalidation';
 
 const LOG_STALE_THRESHOLD = 10000;
@@ -1265,6 +1265,10 @@ export const useGitStore = create<GitStore>()(
           } catch (error) {
             if (error instanceof GitDirectoriesUnsupportedError) {
               unsupported = true;
+            } else if (error instanceof GitDirectoriesOutsideWorkspaceError) {
+              // Stale discovery against a non-active root used to 400-spam the
+              // console during project hops. With the directory header this is
+              // rare; when it still happens, treat it as a quiet miss.
             } else {
               console.error('Failed to discover nested git repositories:', error);
             }
