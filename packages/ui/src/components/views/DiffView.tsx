@@ -25,6 +25,14 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/components/ui';
 
 import { ScrollableOverlay } from '@/components/ui/ScrollableOverlay';
@@ -644,6 +652,7 @@ const MultiFileDiffEntry = React.memo<MultiFileDiffEntryProps>(({
     const [diffLoadError, setDiffLoadError] = React.useState<string | null>(null);
     const [isLoading, setIsLoading] = React.useState(false);
     const [fileAction, setFileAction] = React.useState<FileDiffAction | null>(null);
+    const [discardConfirmOpen, setDiscardConfirmOpen] = React.useState(false);
     const [forceRenderLarge, setForceRenderLarge] = React.useState(false);
     const [localDiffData, setLocalDiffData] = React.useState<DiffData | null>(null);
     const [stagedDiffData, setStagedDiffData] = React.useState<DiffData | null>(null);
@@ -767,31 +776,84 @@ const MultiFileDiffEntry = React.memo<MultiFileDiffEntryProps>(({
             return;
         }
 
+        if (action === 'discard') {
+            setDiscardConfirmOpen(true);
+            return;
+        }
+
         setFileAction(action);
         try {
             if (action === 'stage') {
                 await git.stageGitFile(directory, file.path);
-            } else if (action === 'unstage') {
-                await git.unstageGitFile(directory, file.path);
             } else {
-                await git.revertGitFile(directory, file.path, { scope: 'working' });
+                await git.unstageGitFile(directory, file.path);
             }
             setDiffRetryNonce((nonce) => nonce + 1);
             await fetchStatus(directory, git);
         } catch (error) {
             const fallbackKey = action === 'unstage'
                 ? 'gitView.toast.unstageFileFailed'
-                : action === 'stage'
-                    ? 'gitView.toast.stageFileFailed'
-                    : 'gitView.toast.revertFailed';
+                : 'gitView.toast.stageFileFailed';
             toast.error(error instanceof Error ? error.message : t(fallbackKey));
         } finally {
             setFileAction((current) => (current === action ? null : current));
         }
     }, [directory, fetchStatus, file.path, fileAction, git, t]);
 
+    const confirmDiscardFile = React.useCallback(async () => {
+        if (!directory || fileAction !== null) {
+            return;
+        }
+
+        setFileAction('discard');
+        try {
+            await git.revertGitFile(directory, file.path, { scope: 'working' });
+            setDiscardConfirmOpen(false);
+            setDiffRetryNonce((nonce) => nonce + 1);
+            await fetchStatus(directory, git);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : t('gitView.toast.revertFailed'));
+        } finally {
+            setFileAction((current) => (current === 'discard' ? null : current));
+        }
+    }, [directory, fetchStatus, file.path, fileAction, git, t]);
+
     return (
         <div ref={setSectionRef} className="scroll-mt-9 border-b border-[var(--interactive-border)]/40 last:border-b-0">
+            <Dialog
+                open={discardConfirmOpen}
+                onOpenChange={(open) => {
+                    if (fileAction !== 'discard' && !open) setDiscardConfirmOpen(open);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{t('gitView.changes.revertFileDialogTitle')}</DialogTitle>
+                        <DialogDescription>
+                            {t('gitView.changes.revertFileDescription', { path: file.path })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDiscardConfirmOpen(false)}
+                            disabled={fileAction === 'discard'}
+                        >
+                            {t('gitView.common.cancel')}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => void confirmDiscardFile()}
+                            disabled={fileAction === 'discard'}
+                        >
+                            {fileAction === 'discard' ? t('gitView.changes.reverting') : t('gitView.changes.revertFile')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <div className="sticky top-0 z-30 border-b border-[var(--interactive-border)]/35 bg-[var(--surface-elevated)]/90 backdrop-blur-md supports-[backdrop-filter]:bg-[var(--surface-elevated)]/80">
                 <div
                     role="button"
