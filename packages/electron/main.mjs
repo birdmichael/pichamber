@@ -45,6 +45,7 @@ import {
   setLinuxAutostartEnabled,
 } from './linux-autostart.mjs';
 import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
+import { normalizeThemeMenuMode, themeMenuItemDescriptors } from './theme-menu-items.mjs';
 import { attachModKHelpSequenceFallback } from './mod-k-help-sequence.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
 import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
@@ -2554,6 +2555,28 @@ const readThemeSource = () => {
   return 'system';
 };
 
+// Menu radios track user intent (not nativeTheme's resolved light/dark).
+let currentThemeMenuMode = 'system';
+
+const syncThemeMenuMode = (mode) => {
+  currentThemeMenuMode = normalizeThemeMenuMode(mode);
+};
+
+const rebuildApplicationMenu = () => {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(buildMacMenu());
+  } else {
+    Menu.setApplicationMenu(buildAutoHiddenMenu());
+  }
+};
+
+const buildThemeMenuItems = (dispatchAction) => themeMenuItemDescriptors(currentThemeMenuMode).map((item) => ({
+  type: item.type,
+  label: item.label,
+  checked: item.checked,
+  click: () => dispatchAction(item.action),
+}));
+
 const getWindowIconPath = () => {
   if (process.platform !== 'win32' && process.platform !== 'linux') return undefined;
   const iconFileName = process.platform === 'linux' ? 'icon.png' : 'icon.ico';
@@ -4824,6 +4847,20 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       } else {
         nativeTheme.themeSource = 'system';
       }
+      // Keep View-menu radios in sync with renderer intent (Linux hamburger +
+      // macOS application menu share this template).
+      const intentMode = mode === 'light' || mode === 'dark' || mode === 'system'
+        ? mode
+        : (variant === 'light' || variant === 'dark' ? variant : 'system');
+      syncThemeMenuMode(intentMode);
+      void mutateSettingsRoot((root) => {
+        root.themeMode = intentMode;
+        root.useSystemTheme = intentMode === 'system';
+        if (variant === 'light' || variant === 'dark') {
+          root.themeVariant = variant;
+        }
+      });
+      rebuildApplicationMenu();
       if (canUseTitleBarOverlay(browserWindow)) {
         const useDark = nativeTheme.shouldUseDarkColors;
         browserWindow.setTitleBarOverlay({
@@ -5274,9 +5311,7 @@ const buildMacMenu = () => {
         { label: 'Toggle Terminal Dock', accelerator: 'Cmd+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal') },
         { label: 'Toggle Terminal Expanded', accelerator: 'Cmd+Shift+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal-expanded') },
         { type: 'separator' },
-        { label: 'Light Theme', click: () => dispatchAction('theme-light') },
-        { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
-        { label: 'System Theme', click: () => dispatchAction('theme-system') },
+        ...buildThemeMenuItems(dispatchAction),
         { type: 'separator' },
         // registerAccelerator:false → renderer owns Cmd+Alt+L / Cmd+Shift+D
         // so the native menu does not toggle a second time (#509).
@@ -5390,9 +5425,7 @@ const buildAutoHiddenMenu = () => {
         { label: 'Toggle Terminal Dock', accelerator: 'Ctrl+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal') },
         { label: 'Toggle Terminal Expanded', accelerator: 'Ctrl+Shift+J', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-terminal-expanded') },
         { type: 'separator' },
-        { label: 'Light Theme', click: () => dispatchAction('theme-light') },
-        { label: 'Dark Theme', click: () => dispatchAction('theme-dark') },
-        { label: 'System Theme', click: () => dispatchAction('theme-system') },
+        ...buildThemeMenuItems(dispatchAction),
         { type: 'separator' },
         // registerAccelerator:false → renderer owns Ctrl+Alt+L / Ctrl+Shift+D
         // so the native menu does not toggle a second time (#509).
@@ -5976,6 +6009,7 @@ app.whenReady().then(async () => {
   }
 
   nativeTheme.themeSource = readThemeSource();
+  syncThemeMenuMode(readThemeSource());
   applyDevDockIcon();
   registerPackagedUiProtocol();
   hardenBrowserPanelSession();
