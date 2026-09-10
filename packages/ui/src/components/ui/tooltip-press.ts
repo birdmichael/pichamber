@@ -70,6 +70,16 @@ function notifyTooltipWindowBlur(): void {
 }
 
 /**
+ * Close every hover tooltip that subscribed to window blur. Call when a
+ * full-page surface (Archive / Scheduled / Worktrees) dismisses so a leftover
+ * Base UI outside-press dismiss from an unmounted Header close control cannot
+ * eat the next sidebar session click (#682).
+ */
+export function forceCloseAllHoverTooltips(): void {
+  notifyTooltipWindowBlur();
+}
+
+/**
  * Hover tooltips must not survive window deactivation. The leftover popup
  * would otherwise dismiss on the first press after focus and eat that click.
  */

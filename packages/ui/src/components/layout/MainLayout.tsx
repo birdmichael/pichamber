@@ -19,6 +19,7 @@ import { TerminalView } from '@/components/views/TerminalView';
 import { DrawerProvider } from '@/contexts/DrawerContext';
 
 import { useUIStore } from '@/stores/useUIStore';
+import { forceCloseAllHoverTooltips } from '@/components/ui/tooltip-press';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUpdatePolling } from '@/hooks/useUpdatePolling';
 import { useDeviceInfo } from '@/lib/device';
@@ -80,6 +81,17 @@ export const MainLayout: React.FC = () => {
     // floating chrome bleeds through, and selecting a session / draft / main
     // tab anywhere closes the surface.
     const isSurfacePageOpen = isScheduledTasksPageOpen || isArchivePageOpen || Boolean(worktreesPageProjectId) || isMultiRunLauncherOpen || isMultiRunCompareOpen;
+
+    // When Archive/Scheduled/Worktrees close, the Header surface-close control
+    // unmounts. Force-close hover tooltips so a leftover Base UI outside-press
+    // dismiss cannot swallow the next sidebar session click (#682).
+    const wasSurfacePageOpenRef = React.useRef(isSurfacePageOpen);
+    React.useEffect(() => {
+        if (wasSurfacePageOpenRef.current && !isSurfacePageOpen) {
+            forceCloseAllHoverTooltips();
+        }
+        wasSurfacePageOpenRef.current = isSurfacePageOpen;
+    }, [isSurfacePageOpen]);
 
     React.useEffect(() => {
         const closeSurfacePages = () => useUIStore.getState().closeMainSurfaces();

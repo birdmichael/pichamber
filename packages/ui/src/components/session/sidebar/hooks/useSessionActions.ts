@@ -7,6 +7,7 @@ import type { MainTab } from '@/stores/useUIStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { streamPerfMark } from '@/stores/utils/streamDebug';
 import { useSessionUIStore } from '@/sync/session-ui-store';
+import { forceCloseAllHoverTooltips } from '@/components/ui/tooltip-press';
 
 type DeleteSessionConfirmSetter = React.Dispatch<React.SetStateAction<{
   session: Session;
@@ -69,7 +70,18 @@ export const useSessionActions = (args: Args) => {
       streamPerfMark('navigation.session_select');
       // Selecting a session always leaves any full-page surface, even when
       // the session is already the current one (no store transition fires).
-      useUIStore.getState().closeMainSurfaces();
+      const ui = useUIStore.getState();
+      const leavingSurface = Boolean(
+        ui.isArchivePageOpen
+        || ui.isScheduledTasksDialogOpen
+        || ui.worktreesPageProjectId
+        || ui.isMultiRunLauncherOpen
+        || ui.multiRunCompareGroup,
+      );
+      ui.closeMainSurfaces();
+      if (leavingSurface) {
+        forceCloseAllHoverTooltips();
+      }
       if (args.mobileVariant) {
         args.setActiveMainTab('chat');
         args.setSessionSwitcherOpen(false);
