@@ -46,8 +46,12 @@ export interface UseDictationResult {
 
 const DURATION_TICK_MS = 1000;
 
-const toError = (value: unknown): Error =>
-    value instanceof Error ? value : new Error(String(value));
+const toError = (value: unknown): Error => {
+    if (value instanceof Error) {
+        return value;
+    }
+    return new Error(String(value));
+};
 
 const getDictationStartOptions = (): DictationStartOptions => {
     const state = useConfigStore.getState();
@@ -243,6 +247,9 @@ export function useDictation(options: UseDictationOptions = {}): UseDictationRes
             setStatus('idle');
             statusRef.current = 'idle';
             reportError(err);
+            // Re-throw so the composer can toast — idle UI does not surface
+            // start failures (no overlay), which previously looked like a no-op.
+            throw toError(err);
         } finally {
             gate.starting = false;
         }

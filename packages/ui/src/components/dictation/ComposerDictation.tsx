@@ -21,10 +21,12 @@ import { runtimeFetch } from '@/lib/runtime-fetch';
 import { useDictation } from '@/hooks/useDictation';
 import { DictationWaveform } from '@/components/dictation/DictationWaveform';
 import { isDictationCaptureSupported } from '@/lib/dictation/use-dictation-audio-source';
+import { dictationStartErrorMessageKey } from '@/lib/dictation/dictation-capture-errors';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { formatShortcutForDisplay, getEffectiveShortcutCombo } from '@/lib/shortcuts';
+import { toast } from '@/components/ui';
 
 interface ComposerDictationProps {
     radius?: number | string;
@@ -176,12 +178,42 @@ export const ComposerDictation: React.FC<ComposerDictationProps> = ({
         onActiveChange?.(status !== 'idle');
     }, [status, onActiveChange]);
 
+    const showStartFailureToast = React.useCallback((err: unknown) => {
+        const reason = err && typeof err === 'object' && 'reasonCode' in err
+            ? String((err as { reasonCode?: unknown }).reasonCode || '')
+            : null;
+        toast.error(t(dictationStartErrorMessageKey(reason)));
+    }, [t]);
+
+    /**
+     * Start dictation or surface a clear error. Never silent: unsupported /
+     * disabled / mic failure all toast. Shared by the trigger, host buttons
+     * (via openchamber:dictation-toggle), and the keyboard shortcut.
+     */
+    const requestStartDictation = React.useCallback(async () => {
+        if (!supported) {
+            toast.error(t('chat.dictation.unsupported'));
+            return;
+        }
+        if (!dictationEnabled) {
+            toast.error(t('chat.dictation.disabled'));
+            return;
+        }
+        try {
+            await startDictation();
+        } catch (err) {
+            showStartFailureToast(err);
+        }
+    }, [supported, dictationEnabled, startDictation, showStartFailureToast, t]);
+
     // Keyboard shortcut (toggle_dictation): idle -> start recording,
     // recording -> confirm and insert. Dispatched by useKeyboardShortcuts.
+    // Listener stays registered even when the trigger is hidden so a shortcut
+    // or host mic button never no-ops without feedback.
     React.useEffect(() => {
         const onToggle = () => {
             if (statusRef.current === 'idle') {
-                void startDictation();
+                void requestStartDictation();
             } else if (statusRef.current === 'recording') {
                 pendingActionRef.current = 'insert';
                 void confirmDictation();
@@ -189,7 +221,7 @@ export const ComposerDictation: React.FC<ComposerDictationProps> = ({
         };
         window.addEventListener('openchamber:dictation-toggle', onToggle);
         return () => window.removeEventListener('openchamber:dictation-toggle', onToggle);
-    }, [startDictation, confirmDictation]);
+    }, [requestStartDictation, confirmDictation]);
 
     // While recording: Enter confirms (insert), Escape cancels. Capture-phase
     // so the composer's own Enter-to-send never fires underneath the overlay.
@@ -334,7 +366,7 @@ export const ComposerDictation: React.FC<ComposerDictationProps> = ({
                     {...keepKeyboardFocusProps}
                     className={footerIconButtonClass}
                     onClick={() => {
-                        void startDictation();
+                        void requestStartDictation();
                     }}
                     disabled={disabled || isActive}
                     title={dictationShortcut ? `${t('chat.dictation.start')} (${dictationShortcut})` : t('chat.dictation.start')}
