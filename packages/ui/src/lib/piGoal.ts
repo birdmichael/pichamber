@@ -93,6 +93,27 @@ export function resolvePiGoalTargetSession(input: {
 const PI_GOAL_USER_TEXT = /^\/goal(?::\d+)?\s+(.+)$/is;
 const PI_GOAL_COMPLETE_TEXT = /^goal complete\b/i;
 
+
+/** Active Session Goal objective for Plan "Run as goal" on Pi (composer row). */
+export function readActiveSessionGoalObjective(session: {
+  metadata?: unknown;
+} | null | undefined): string | null {
+  const metadata = session?.metadata;
+  if (!metadata || typeof metadata !== 'object') return null;
+  const namespace = (metadata as { openchamber?: unknown }).openchamber;
+  if (!namespace || typeof namespace !== 'object') return null;
+  const goal = (namespace as { goal?: unknown }).goal;
+  if (!goal || typeof goal !== 'object') return null;
+  const status = (goal as { status?: unknown }).status;
+  if (status !== 'active' && status !== 'paused' && status !== 'blocked' && status !== 'budgetLimited') {
+    return null;
+  }
+  const objective = typeof (goal as { objective?: unknown }).objective === 'string'
+    ? (goal as { objective: string }).objective.trim()
+    : '';
+  return objective || null;
+}
+
 export function isPiGoalSystemPreamble(text: string | null | undefined): boolean {
   return /^Goal mode is active\./i.test(typeof text === 'string' ? text.trim() : '');
 }

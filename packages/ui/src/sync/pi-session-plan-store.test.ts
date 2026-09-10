@@ -226,4 +226,35 @@ describe('pi session plan store', () => {
     expect(usePiSessionPlanStore.getState().plansBySession.ses_plan?.status).toBe('ready');
     expect(uiReplies).toHaveLength(0);
   });
+
+  test('Q&A Discard plan and exit clears ready chrome optimistically', async () => {
+    applySessionPlan('ses_plan', { status: 'ready', planMarkdown: '# Ready' });
+    applyPiExtensionUiPrompt({
+      id: 'pui_exit',
+      sessionID: 'ses_plan',
+      kind: 'select',
+      title: 'Proposed plan ready',
+      options: ['Implement here', 'Start fresh and implement', 'Discard plan and exit'],
+      status: 'pending',
+    });
+
+    const handled = await answerPiExtensionPlanReadyOption(
+      'ses_plan',
+      {
+        kind: 'select',
+        title: 'Proposed plan ready',
+        options: ['Implement here', 'Start fresh and implement', 'Discard plan and exit'],
+      },
+      'Discard plan and exit',
+    );
+    expect(handled).toBe(true);
+    expect(uiReplies.length).toBe(1);
+    expect(usePiSessionPlanStore.getState().plansBySession.ses_plan).toEqual({
+      status: 'off',
+      planMarkdown: '',
+    });
+    // Allow background refresh
+    pendingFetch?.resolve({ status: 'off', planMarkdown: '' });
+  });
+
 });

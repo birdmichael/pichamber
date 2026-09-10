@@ -67,6 +67,7 @@ import {
   usePiExtensionUiStore,
 } from './pi-extension-ui-store';
 import { handlePiExtensionUiEvent } from './pi-extension-ui-events';
+import { useSessionUIStore } from './session-ui-store';
 
 afterEach(() => {
   resetPiExtensionUiStore();
@@ -393,3 +394,26 @@ describe('pi extension UI store', () => {
     expect(usePiExtensionUiStore.getState().focusPromptId).toBeNull();
   });
 });
+
+describe('pi.session.activate', () => {
+  test('switches the current session for Plan start-fresh children', () => {
+    const calls: Array<{ id: string; directory: string | null }> = [];
+    const original = useSessionUIStore.getState().setCurrentSession;
+    useSessionUIStore.setState({
+      setCurrentSession: ((id: string | null, directoryHint?: string | null) => {
+        calls.push({ id: String(id), directory: directoryHint ?? null });
+      }) as typeof original,
+    });
+    try {
+      const handled = handlePiExtensionUiEvent({
+        type: 'pi.session.activate',
+        properties: { sessionID: 'ses_child', directory: '/repo' },
+      });
+      expect(handled).toBe(true);
+      expect(calls).toEqual([{ id: 'ses_child', directory: '/repo' }]);
+    } finally {
+      useSessionUIStore.setState({ setCurrentSession: original });
+    }
+  });
+});
+

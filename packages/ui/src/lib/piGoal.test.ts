@@ -13,6 +13,7 @@ import {
   isPiGoalSystemPreamble,
   sessionHasPiGoalMarker,
   isPiGoalPluginAvailable,
+  readActiveSessionGoalObjective,
   readPiGoalObjectiveFromMessages,
   readPiGoalObjectiveFromSession,
   resolvePiGoalSession,
@@ -487,5 +488,28 @@ describe('Pi Goal dialog submit', () => {
       sessionID: 'ses_existing',
       directory: '/tmp/project',
     });
+  });
+});
+
+describe('readActiveSessionGoalObjective', () => {
+  test('reads active Session Goal objective for Plan Run-as-goal on Pi', () => {
+    expect(readActiveSessionGoalObjective({
+      metadata: {
+        openchamber: {
+          goal: {
+            id: 'g1',
+            objective: 'Ship the Plan as a goal',
+            status: 'active',
+          },
+        },
+      },
+    })).toBe('Ship the Plan as a goal');
+  });
+
+  test('ignores complete and missing goals', () => {
+    expect(readActiveSessionGoalObjective({
+      metadata: { openchamber: { goal: { id: 'g1', objective: 'done', status: 'complete' } } },
+    })).toBeNull();
+    expect(readActiveSessionGoalObjective({ metadata: {} })).toBeNull();
   });
 });

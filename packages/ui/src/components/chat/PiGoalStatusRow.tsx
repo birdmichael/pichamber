@@ -4,6 +4,7 @@ import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import {
   isPiGoalComposerRowActive,
+  readActiveSessionGoalObjective,
   readPiGoalObjectiveFromSession,
   readPiGoalRouteSessionID,
   resolvePiGoalTargetSession,
@@ -21,6 +22,11 @@ interface PiGoalStatusRowProps {
   className?: string;
 }
 
+/**
+ * Pi composer "Current Goal" strip. Shows /goal plugin objectives and also
+ * Session Goal objectives from Plan "Run as goal" (#637). Session Goal
+ * create/edit chrome stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
+ */
 export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
   sessionId,
   directory,
@@ -44,8 +50,10 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
     const messages = state.message[resolvedSessionId];
     const parts = state.part;
     const session = state.session.find((item) => item.id === resolvedSessionId);
-    if (!isPiGoalComposerRowActive(messages, parts, session)) return null;
-    return readPiGoalObjectiveFromSession(messages, parts);
+    if (isPiGoalComposerRowActive(messages, parts, session)) {
+      return readPiGoalObjectiveFromSession(messages, parts);
+    }
+    return readActiveSessionGoalObjective(session);
   }, directory);
 
   if (!isPiKernel || !resolvedSessionId || !objective) return null;
