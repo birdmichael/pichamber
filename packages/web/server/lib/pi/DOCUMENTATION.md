@@ -458,10 +458,12 @@ catalog. A new-session draft with no session id uses models.dev
 `reasoning_options` for the selected model id (same slug lookup as
 vision). Missing/empty catalog effort still uses live GET `available`
 (or the last pin) so the chip does not vanish after send — do not invent
-seven levels. Catalog pairs immediately; live may only narrow a
+seven levels (#513). Catalog pairs immediately; live may only narrow a
 non-narrow subset after the new model is applied. GET `/thinking`
 keeps that live subset when it is non-narrow, including when catalog is
-empty. An authoritative empty `available` still hides the control.
+empty. When live is empty/`off` but jsonl/status still has a known level
+(Kimi Max), the composer keeps that chip (#670). An authoritative empty
+`available` with no known current still hides the control.
 `setThinkingLevel` is awaited on the Node child, including live-session
 defaults during bind/`createFacadeSessionLive` and `/thinking`. Do not
 invent vendor `thinkingLevelMap` from `/v1/models`.

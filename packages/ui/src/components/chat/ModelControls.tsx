@@ -42,6 +42,7 @@ import { shouldShowComposerAgentChip } from './composerAgentChip';
 import { PiPlanModeToggle } from './PiPlanModeToggle';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
+    isNarrowPiThinkingAvailable,
     parseAvailablePiThinkingLevels,
     parsePiThinkingLevel,
     preferPiModelThinkingLevels,
@@ -476,18 +477,32 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             defaultsThinking: piDefaultsThinking,
             current: piThinking,
         });
+        // Empty-catalog same-session / minted re-pair keeps prior live so a
+        // busy Kimi Max chip does not blank before GET (#670 / #513). Do not
+        // feed prior live when the new model has its own catalog (model switch).
+        const keepPriorLive = (
+            (mintedSession || !sessionChanged)
+            && draftThinkingLevels.length === 0
+        );
         const catalogPair = resolvePairedPiThinking({
             current: currentSessionIdForThinking
                 ? (sessionChanged ? undefined : piThinking)
                 : emptyDraftCurrent,
             catalogLevels: draftThinkingLevels,
+            liveAvailable: keepPriorLive ? piThinkingLevels : undefined,
         });
         if (catalogPair.levels.length > 0) {
             setPiThinkingLevels(catalogPair.levels);
-        } else if (!mintedSession) {
+        } else if (mintedSession) {
+            // mintedSession + empty catalog keeps live until GET (#513).
+        } else if (sessionChanged) {
             setPiThinkingLevels(undefined);
+        } else {
+            // #670: empty catalog must not wipe last non-narrow live while GET runs.
+            setPiThinkingLevels((prev) => (
+                Array.isArray(prev) && !isNarrowPiThinkingAvailable(prev) ? prev : undefined
+            ));
         }
-        // mintedSession + empty catalog keeps live until GET (#513).
         if (!currentSessionIdForThinking) {
             if (catalogPair.thinking !== piThinking) {
                 setPiThinking(catalogPair.thinking);
@@ -541,7 +556,20 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
             if (laterPin.pinKey === pairKey && laterPin.pinGeneration !== pin.pinGeneration) {
                 return;
             }
-            setPiThinkingLevels(livePair.levels.length > 0 ? livePair.levels : undefined);
+            // #670: collapsed GET available must not blank a known thinking chip.
+            setPiThinkingLevels((prev) => {
+                if (livePair.levels.length > 0) {
+                    return livePair.levels;
+                }
+                if (
+                    Array.isArray(prev)
+                    && !isNarrowPiThinkingAvailable(prev)
+                    && parsePiThinkingLevel(payload.thinking)
+                ) {
+                    return prev;
+                }
+                return undefined;
+            });
             if (chipPin && livePair.levels.includes(chipPin)) {
                 setPiThinking(chipPin);
                 return;

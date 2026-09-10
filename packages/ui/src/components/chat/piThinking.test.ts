@@ -130,16 +130,52 @@ describe('resolvePairedPiThinking', () => {
     });
   });
 
-  test('empty catalog without live still hides the chip', () => {
+  test('empty catalog without live still hides the chip when current is unset', () => {
     expect(resolvePairedPiThinking({
-      current: 'xhigh',
+      current: undefined,
       catalogLevels: [],
     })).toEqual({ thinking: undefined, levels: [] });
     expect(resolvePairedPiThinking({
-      current: 'xhigh',
+      current: undefined,
       catalogLevels: [],
       liveAvailable: [],
     })).toEqual({ thinking: undefined, levels: [] });
+    expect(resolvePairedPiThinking({
+      current: undefined,
+      catalogLevels: [],
+      liveAvailable: ['off'],
+    })).toEqual({ thinking: undefined, levels: [] });
+  });
+
+  test('empty catalog + narrow live keeps a known current so the chip cannot vanish (#670)', () => {
+    expect(resolvePairedPiThinking({
+      current: 'max',
+      catalogLevels: [],
+    })).toEqual({ thinking: 'max', levels: ['max'] });
+    expect(resolvePairedPiThinking({
+      current: 'max',
+      catalogLevels: [],
+      liveAvailable: [],
+    })).toEqual({ thinking: 'max', levels: ['max'] });
+    expect(resolvePairedPiThinking({
+      current: 'max',
+      catalogLevels: [],
+      liveAvailable: ['off'],
+    })).toEqual({ thinking: 'max', levels: ['off', 'max'] });
+    expect(resolvePairedPiThinking({
+      current: 'xhigh',
+      catalogLevels: [],
+      liveAvailable: ['off'],
+    })).toEqual({ thinking: 'xhigh', levels: ['off', 'xhigh'] });
+    // Non-narrow live still wins: show live max, not a blank (#513 / #670).
+    expect(resolvePairedPiThinking({
+      current: 'max',
+      catalogLevels: [],
+      liveAvailable: ['off', 'minimal', 'low', 'medium', 'high'],
+    })).toEqual({
+      thinking: 'high',
+      levels: ['off', 'minimal', 'low', 'medium', 'high'],
+    });
   });
 
   test('empty catalog with live and no pin stays pending instead of painting medium', () => {

@@ -100,10 +100,13 @@ export function unionCurrentIntoPiThinkingLevels(
 /**
  * Empty catalog does not invent seven levels. A non-narrow live list from
  * the session still owns the menu when catalog is silent, so the chip
- * cannot vanish after send (#513). A leftover pin that live omitted
- * becomes the live max, not a blank. A known current still unions into
- * that live list when the catalog includes it. Unset current stays
- * pending — do not invent `medium` before GET.
+ * cannot vanish after send (#513). When live collapses to empty/`off`
+ * (busy stub, Kimi catalog gap) but current is still a known level from
+ * status/jsonl, keep a visible chip (#670) — never a permanent blank
+ * while status shows Max/High. A leftover pin that live omitted becomes
+ * the live max, not a blank. A known current still unions into that live
+ * list when the catalog includes it. Unset current stays pending — do
+ * not invent `medium` before GET.
  */
 export function resolvePairedPiThinking(input: {
   current?: string | null;
@@ -114,7 +117,15 @@ export function resolvePairedPiThinking(input: {
   const live = parseAvailablePiThinkingLevels(input.liveAvailable);
   if (catalog.length === 0) {
     if (isNarrowPiThinkingAvailable(live)) {
-      return { thinking: undefined, levels: [] };
+      const parsed = parsePiThinkingLevel(input.current ?? undefined);
+      if (!parsed) {
+        return { thinking: undefined, levels: [] };
+      }
+      // Narrow live + known current (Kimi Max while busy / empty catalog).
+      if (live.length === 1 && live[0] === 'off' && parsed !== 'off') {
+        return { thinking: parsed, levels: ['off', parsed] };
+      }
+      return { thinking: parsed, levels: [parsed] };
     }
     const parsed = parsePiThinkingLevel(input.current ?? undefined);
     if (!parsed) {
