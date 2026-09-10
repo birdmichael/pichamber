@@ -1221,7 +1221,7 @@ export const GitView: React.FC<GitViewProps> = ({ isActive }) => {
       return;
     }
 
-    console.error('[git-generation][browser] generate button clicked', {
+    console.info('[git-generation][browser] generate button clicked', {
       directory: gitDirectory,
       selectedFiles: selectedFilePaths.length,
     });
