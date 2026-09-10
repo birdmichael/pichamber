@@ -195,6 +195,7 @@ import { RevertedMessageDock } from './composer/ui/RevertedMessageDock';
 import { SessionSuggestionChip } from '@/components/chat/SessionSuggestionChip';
 import { SessionGoalRow } from '@/components/chat/SessionGoalRow';
 import { PiGoalStatusRow } from '@/components/chat/PiGoalStatusRow';
+import { PiGoalDialogHost } from '@/components/chat/PiGoalDialogHost';
 import { PiPlanStatusRow } from '@/components/chat/PiPlanStatusRow';
 
 // Lazy like in ChatMessage: a static import would pull the @pierre/diffs and
@@ -3118,6 +3119,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                         onOpenPicker={setMobileDraftPicker}
                     />
                 ) : null}
+                <PiGoalDialogHost />
                 <div
                     // Desktop: layout-transparent. Mobile: positioning host for
                     // the wrapper-level dictation overlay across pill/full states.

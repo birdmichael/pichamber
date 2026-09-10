@@ -95,6 +95,10 @@ export const isPlanReadyImplementHereOption = (option: string): boolean => (
   normalizeOptionLabel(displaySelectOption(option).label) === PLAN_READY_OPTION_BY_ACTION.implement
 );
 
+export const isPlanReadyStartFreshOption = (option: string): boolean => (
+  normalizeOptionLabel(displaySelectOption(option).label) === 'start fresh and implement'
+);
+
 /** Raw ctx.ui option for a View Plan rail action, or null if that card is absent. */
 export const planReadyOptionForAction = (
   options: readonly string[] | undefined,

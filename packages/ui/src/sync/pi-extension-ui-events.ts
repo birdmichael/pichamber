@@ -11,9 +11,13 @@ import {
 import { isPlanReadyDecisionPrompt } from './pi-plan-locale';
 import { maybeOpenPlanRailOnReady } from './pi-plan-ready';
 import { refreshSessionPlan, usePiSessionPlanStore } from './pi-session-plan-store';
+import { useSessionUIStore } from './session-ui-store';
 
 export const isPiExtensionUiEventType = (type: unknown): boolean => (
-  type === 'pi.ui.asked' || type === 'pi.ui.settled' || type === 'pi.ui.notify'
+  type === 'pi.ui.asked'
+  || type === 'pi.ui.settled'
+  || type === 'pi.ui.notify'
+  || type === 'pi.session.activate'
 );
 
 const maybeResolveStashedEditor = (prompt: PiExtensionUiPrompt): void => {
@@ -30,6 +34,19 @@ const maybeResolveStashedEditor = (prompt: PiExtensionUiPrompt): void => {
 
 export const handlePiExtensionUiEvent = (payload: { type?: unknown; properties?: unknown }): boolean => {
   if (!isPiExtensionUiEventType(payload.type)) return false;
+
+  if (payload.type === 'pi.session.activate') {
+    const properties = payload.properties && typeof payload.properties === 'object'
+      ? payload.properties as { sessionID?: unknown; directory?: unknown }
+      : null;
+    const sessionID = typeof properties?.sessionID === 'string' ? properties.sessionID.trim() : '';
+    if (sessionID) {
+      const directory = typeof properties?.directory === 'string' ? properties.directory : null;
+      useSessionUIStore.getState().setCurrentSession(sessionID, directory);
+      void refreshSessionPlan(sessionID);
+    }
+    return true;
+  }
 
   if (payload.type === 'pi.ui.notify') {
     const notify = applyPiExtensionUiNotify(payload.properties) || applyPiExtensionUiNotify(payload);

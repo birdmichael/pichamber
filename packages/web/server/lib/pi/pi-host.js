@@ -2225,6 +2225,106 @@ export const createPiHost = ({
     adaptQuestionToolForDesktop(record?.piSession, record?.extensionUI?.context);
   };
 
+  const buildDesktopReplacedSessionContext = (child) => {
+    const ui = child?.extensionUI?.context;
+    const sendUserMessage = async (content) => {
+      await ensureLiveRecord(child);
+      const text = typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? content.map((block) => (block?.type === 'text' ? block.text : '')).filter(Boolean).join('\n')
+          : String(content ?? '');
+      if (typeof child.piSession?.sendUserMessage === 'function') {
+        await child.piSession.sendUserMessage(content);
+        return;
+      }
+      if (typeof child.piSession?.prompt === 'function') {
+        await child.piSession.prompt(text);
+      }
+    };
+    return {
+      mode: 'rpc',
+      sessionManager: child.sessionManager,
+      ui: ui || {
+        notify: () => {},
+        setEditorText: () => false,
+      },
+      sendUserMessage,
+      sendMessage: async () => {},
+      waitForIdle: async () => {
+        if (typeof child.piSession?.waitForIdle === 'function') {
+          await child.piSession.waitForIdle();
+        }
+      },
+      newSession: async () => ({ cancelled: true }),
+      fork: async () => ({ cancelled: true }),
+      navigateTree: async () => ({ cancelled: true }),
+      switchSession: async () => ({ cancelled: true }),
+      reload: async () => {},
+    };
+  };
+
+  const desktopNewSessionFromRecord = async (parentRecord, options = {}) => {
+    if (!parentRecord?.directory) return { cancelled: true };
+    const parentID = parentRecord.id;
+    const child = await createFacadeSession({
+      directory: parentRecord.directory,
+      parentID,
+      title: parentRecord.info?.title ? `${parentRecord.info.title} (implement)` : undefined,
+    });
+    const live = await ensureLiveRecord(child);
+    if (options.parentSession && typeof live.sessionManager?.newSession === 'function') {
+      try {
+        // Link Pi session-file parent when the manager still has a blank leaf.
+        // createPersistedSessionManager already minted a file; only call when safe.
+        const existingFile = typeof live.sessionManager.getSessionFile === 'function'
+          ? live.sessionManager.getSessionFile()
+          : undefined;
+        if (!existingFile) {
+          live.sessionManager.newSession({ parentSession: options.parentSession });
+        }
+      } catch (error) {
+        console.warn('[pi-host] child parentSession link skipped:', error?.message || error);
+      }
+    }
+    if (typeof options.setup === 'function' && live.sessionManager) {
+      await options.setup(live.sessionManager);
+      try {
+        if (typeof live.piSession?.sessionManager?.buildSessionContext === 'function') {
+          // no-op: child AgentSession owns its manager
+        }
+        const entries = typeof live.sessionManager.getEntries === 'function'
+          ? live.sessionManager.getEntries()
+          : [];
+        live.messages = hydrateFacadeMessages(entries, live.id, live);
+        if (typeof live.piSession?.agent?.state === 'object' && live.piSession.agent.state) {
+          const built = typeof live.sessionManager.buildSessionContext === 'function'
+            ? live.sessionManager.buildSessionContext()
+            : null;
+          if (built?.messages) {
+            live.piSession.agent.state.messages = built.messages;
+          }
+        }
+      } catch (error) {
+        console.warn('[pi-host] child hydrate after setup failed:', error?.message || error);
+      }
+    }
+    await bindDesktopExtensionUI(live);
+    emit(live.directory, {
+      id: createEventId(),
+      type: 'pi.session.activate',
+      properties: {
+        sessionID: live.id,
+        directory: live.directory,
+        parentID,
+      },
+    });
+    if (typeof options.withSession === 'function') {
+      await options.withSession(buildDesktopReplacedSessionContext(live));
+    }
+    return { cancelled: false };
+  };
+
   const bindDesktopExtensionUI = async (record) => {
     if (!record?.piSession || typeof record.piSession.bindExtensions !== 'function') {
       return record;
@@ -2242,6 +2342,22 @@ export const createPiHost = ({
       await record.piSession.bindExtensions({
         uiContext: record.extensionUI.context,
         mode: 'rpc',
+        commandContextActions: {
+          waitForIdle: async () => {
+            if (typeof record.piSession?.waitForIdle === 'function') {
+              await record.piSession.waitForIdle();
+            }
+          },
+          newSession: async (options) => desktopNewSessionFromRecord(record, options || {}),
+          fork: async () => ({ cancelled: true }),
+          navigateTree: async () => ({ cancelled: true }),
+          switchSession: async () => ({ cancelled: true }),
+          reload: async () => {
+            if (typeof record.piSession?.reload === 'function') {
+              await record.piSession.reload();
+            }
+          },
+        },
       });
       ensureQuestionToolAdapted(record);
       await refreshRecordCommands(record);
@@ -2294,16 +2410,10 @@ export const createPiHost = ({
     const messages = facadeMessagesFromPiEntries(entries, sessionID, {
       fallbackModel: resolveHostFallbackModel(record),
     });
-    const filtered = messages.filter((entry) => {
-      if (entry?.info?.role !== 'user') return true;
-      const text = (entry.parts || [])
-        .map((part) => (part?.type === 'text' && typeof part.text === 'string' ? part.text : ''))
-        .join('')
-        .trim();
-      return !isGoalSystemPreamble(text);
-    });
+    // Keep Goal system preamble users so assistants that parentID them are not
+    // orphaned on reopen (#639). UI hides the preamble via isHiddenUserMessage.
     const metadata = record?.info?.metadata || readPersistedSessionMetadata(entries);
-    return applyPersistedUserContext(filtered, metadata);
+    return applyPersistedUserContext(messages, metadata);
   };
 
   const createPersistedSessionManager = async (cwd, { title } = {}) => {

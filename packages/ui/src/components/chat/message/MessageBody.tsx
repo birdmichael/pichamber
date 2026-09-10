@@ -1779,8 +1779,13 @@ const AssistantMessageBody = React.memo(({
     const errorIconName = errorVariant === 'info' ? 'information' : 'error-warning';
     const shouldShowMessageActions = hasCopyableText;
     const shouldShowTurnFooter = isLastAssistantInTurn && hasTextContent && (hasStopFinish || Boolean(errorMessage));
-    const shouldRenderActionsInActivity = isSortedRenderMode;
-    const shouldShowStandaloneMessageActions = showSplitAssistantMessageActions && shouldShowMessageActions && !shouldShowTurnFooter && !shouldRenderActionsInActivity;
+    const shouldRenderActionsInActivity = isSortedRenderMode && showSplitAssistantMessageActions;
+    // Default (split off): still show copy/TTS on text-bearing assistants that do not
+    // own the turn footer — e.g. Goal-complete short replies followed by tool chrome (#638).
+    const shouldShowStandaloneMessageActions = shouldShowMessageActions
+      && !shouldShowTurnFooter
+      && !shouldRenderActionsInActivity
+      && (showSplitAssistantMessageActions || hasStopFinish || Boolean(errorMessage));
 
     const messageActionButtons = React.useMemo(() => (
         <AssistantMessageActionButtons
