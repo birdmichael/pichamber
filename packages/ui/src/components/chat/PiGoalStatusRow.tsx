@@ -1,14 +1,17 @@
 import React from 'react';
 
 import { Icon } from '@/components/icon/Icon';
+import { useGoalObjectiveContent } from '@/hooks/useSessionGoal';
 import { useI18n } from '@/lib/i18n';
 import {
   isPiGoalComposerRowActive,
-  readActiveSessionGoalObjective,
+  isSessionGoalVisibleInPiComposerRow,
   readPiGoalObjectiveFromSession,
   readPiGoalRouteSessionID,
+  resolvePiComposerSessionGoalObjective,
   resolvePiGoalTargetSession,
 } from '@/lib/piGoal';
+import { getSessionGoal } from '@/lib/sessionGoalMetadata';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { cn } from '@/lib/utils';
@@ -26,6 +29,8 @@ interface PiGoalStatusRowProps {
  * Pi composer "Current Goal" strip. Shows /goal plugin objectives and also
  * Session Goal objectives from Plan "Run as goal" (#637). Session Goal
  * create/edit chrome stays hidden on Pi (`isSessionGoalVisibleOnPiKernel`).
+ * File-backed Session Goals (`objective:""` + `objectiveFile:true`) resolve
+ * via `/api/goals/objective/:id` — metadata alone is not enough to paint the row.
  */
 export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
   sessionId,
@@ -45,7 +50,20 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
     routeSessionID,
     lastActiveSessionID,
   }) || null;
-  const objective = useDirectorySync((state) => {
+
+  const sessionGoal = useDirectorySync((state) => {
+    if (!resolvedSessionId) return null;
+    const session = state.session.find((item) => item.id === resolvedSessionId);
+    return getSessionGoal(session);
+  }, directory);
+
+  const eligibleSessionGoal = isSessionGoalVisibleInPiComposerRow(sessionGoal) ? sessionGoal : null;
+  const fetchedSessionGoalObjective = useGoalObjectiveContent(
+    resolvedSessionId ?? '',
+    eligibleSessionGoal,
+  );
+
+  const pluginObjective = useDirectorySync((state) => {
     if (!resolvedSessionId) return null;
     const messages = state.message[resolvedSessionId];
     const parts = state.part;
@@ -53,10 +71,16 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
     if (isPiGoalComposerRowActive(messages, parts, session)) {
       return readPiGoalObjectiveFromSession(messages, parts);
     }
-    return readActiveSessionGoalObjective(session);
+    return null;
   }, directory);
 
-  if (!isPiKernel || !resolvedSessionId || !objective) return null;
+  const sessionObjective = resolvePiComposerSessionGoalObjective({
+    goal: eligibleSessionGoal,
+    fetchedObjective: fetchedSessionGoalObjective,
+  });
+  const objective = pluginObjective ?? sessionObjective;
+
+  if (!isPiKernel || !resolvedSessionId || objective === null) return null;
 
   return (
     <div
@@ -66,7 +90,7 @@ export const PiGoalStatusRow: React.FC<PiGoalStatusRowProps> = React.memo(({
         className,
       )}
       aria-label={t('chat.piGoal.row.aria')}
-      title={objective}
+      title={objective || undefined}
     >
       <Icon name="target" className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden="true" />
       <span className="flex-shrink-0 typography-meta text-muted-foreground">

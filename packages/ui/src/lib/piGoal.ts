@@ -94,7 +94,21 @@ const PI_GOAL_USER_TEXT = /^\/goal(?::\d+)?\s+(.+)$/is;
 const PI_GOAL_COMPLETE_TEXT = /^goal complete\b/i;
 
 
-/** Active Session Goal objective for Plan "Run as goal" on Pi (composer row). */
+const SESSION_GOAL_COMPOSER_STATUSES = new Set(['active', 'paused', 'blocked', 'budgetLimited']);
+
+/** True when Session Goal should drive the Pi composer Current Goal row. */
+export function isSessionGoalVisibleInPiComposerRow(
+  goal: { status?: unknown } | null | undefined,
+): boolean {
+  return Boolean(goal && typeof goal.status === 'string' && SESSION_GOAL_COMPOSER_STATUSES.has(goal.status));
+}
+
+/**
+ * Active Session Goal objective for Plan "Run as goal" on Pi (composer row).
+ * Inline goals return the metadata text. File-backed goals (`objectiveFile`)
+ * store an empty metadata objective — return '' so callers can fetch content
+ * via `/api/goals/objective/:sessionId` instead of treating the goal as absent.
+ */
 export function readActiveSessionGoalObjective(session: {
   metadata?: unknown;
 } | null | undefined): string | null {
@@ -105,13 +119,36 @@ export function readActiveSessionGoalObjective(session: {
   const goal = (namespace as { goal?: unknown }).goal;
   if (!goal || typeof goal !== 'object') return null;
   const status = (goal as { status?: unknown }).status;
-  if (status !== 'active' && status !== 'paused' && status !== 'blocked' && status !== 'budgetLimited') {
+  if (!isSessionGoalVisibleInPiComposerRow({ status })) {
     return null;
   }
   const objective = typeof (goal as { objective?: unknown }).objective === 'string'
     ? (goal as { objective: string }).objective.trim()
     : '';
-  return objective || null;
+  if (objective) return objective;
+  // Plan Run-as-goal (and other large objectives) keep text server-side.
+  if ((goal as { objectiveFile?: unknown }).objectiveFile === true) return '';
+  return null;
+}
+
+/**
+ * Resolve the text shown in the Pi Current Goal row for a Session Goal.
+ * File-backed goals use `fetchedObjective` (null while loading / on failure).
+ * Returns null when the goal should not drive the row; '' while a file-backed
+ * objective is still loading so the row can mount with aria-label parity.
+ */
+export function resolvePiComposerSessionGoalObjective(input: {
+  goal: { objective: string; objectiveFile: boolean; status: string } | null | undefined;
+  fetchedObjective: string | null;
+}): string | null {
+  const goal = input.goal;
+  if (!goal || !isSessionGoalVisibleInPiComposerRow(goal)) return null;
+  if (goal.objectiveFile) {
+    if (typeof input.fetchedObjective === 'string') return input.fetchedObjective.trim();
+    return '';
+  }
+  const inline = goal.objective.trim();
+  return inline || null;
 }
 
 export function isPiGoalSystemPreamble(text: string | null | undefined): boolean {
