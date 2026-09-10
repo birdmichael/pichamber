@@ -14,6 +14,7 @@
 import React from 'react';
 
 import { Icon } from '@/components/icon/Icon';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { cn } from '@/lib/utils';
@@ -361,19 +362,26 @@ export const ComposerDictation: React.FC<ComposerDictationProps> = ({
     return (
         <>
             {renderTrigger ? (
-                <button
-                    type="button"
-                    {...keepKeyboardFocusProps}
-                    className={footerIconButtonClass}
-                    onClick={() => {
-                        void requestStartDictation();
-                    }}
-                    disabled={disabled || isActive}
-                    title={dictationShortcut ? `${t('chat.dictation.start')} (${dictationShortcut})` : t('chat.dictation.start')}
-                    aria-label={t('chat.dictation.start')}
-                >
-                    <Icon name="mic" className={cn(iconSizeClass, 'text-current')} />
-                </button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            type="button"
+                            {...keepKeyboardFocusProps}
+                            className={footerIconButtonClass}
+                            onClick={() => {
+                                void requestStartDictation();
+                            }}
+                            disabled={disabled || isActive}
+                            title={dictationShortcut ? `${t('chat.dictation.start')} (${dictationShortcut})` : t('chat.dictation.start')}
+                            aria-label={t('chat.dictation.start')}
+                        >
+                            <Icon name="mic" className={cn(iconSizeClass, 'text-current')} />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={8}>
+                        {dictationShortcut ? `${t('chat.dictation.start')} (${dictationShortcut})` : t('chat.dictation.start')}
+                    </TooltipContent>
+                </Tooltip>
             ) : null}
             {isActive ? (
                 <div
