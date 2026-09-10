@@ -151,14 +151,15 @@ const SHORTCUT_GROUPS = {
     },
     {
       id: 'cycle_favorite_model_forward',
-      defaultBinding: 'ctrl+]',
+      // Keep Go menu Ctrl+] / Ctrl+[ for directory history (#686).
+      defaultBinding: 'alt+shift+]',
       customizable: true,
       settingsLabelKey:
         'settings.openchamber.keyboardShortcuts.action.cycle_favorite_model_forward.label',
     },
     {
       id: 'cycle_favorite_model_backward',
-      defaultBinding: 'ctrl+[',
+      defaultBinding: 'alt+shift+[',
       customizable: true,
       settingsLabelKey:
         'settings.openchamber.keyboardShortcuts.action.cycle_favorite_model_backward.label',

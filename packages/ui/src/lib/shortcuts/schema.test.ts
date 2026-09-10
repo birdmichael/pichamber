@@ -74,6 +74,8 @@ describe('shortcut schema', () => {
     expect(getShortcutAction('open_right_sidebar_files')?.defaultBinding).toBe('mod+shift+f');
     expect(getShortcutAction('toggle_context_plan')?.defaultBinding).toBe('mod+shift+p');
     expect(getShortcutAction('cycle_services_tab')?.defaultBinding).toBe('mod+shift+[');
+    expect(getShortcutAction('cycle_favorite_model_forward')?.defaultBinding).toBe('alt+shift+]');
+    expect(getShortcutAction('cycle_favorite_model_backward')?.defaultBinding).toBe('alt+shift+[');
     expect(getShortcutAction('toggle_sidebar')?.defaultBinding).toBe('mod+alt+l');
   });
 
