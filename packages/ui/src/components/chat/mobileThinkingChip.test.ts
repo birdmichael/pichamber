@@ -66,6 +66,15 @@ describe('mobile thinking chip', () => {
     expect(modelControlsSource).toContain('mintedSession');
   });
 
+  test('Kimi empty-catalog busy path keeps prior live and does not wipe on narrow GET (#670)', () => {
+    expect(modelControlsSource).toContain('keepPriorLive');
+    expect(modelControlsSource).toContain('liveAvailable: keepPriorLive ? piThinkingLevels : undefined');
+    expect(modelControlsSource).toContain('draftThinkingLevels.length === 0');
+    expect(modelControlsSource).toContain('#670: empty catalog must not wipe last non-narrow live');
+    expect(modelControlsSource).toContain('#670: collapsed GET available must not blank');
+    expect(modelControlsSource).toContain('isNarrowPiThinkingAvailable');
+  });
+
   test('composer thinking does not PATCH global Pi defaults', () => {
     const cycleSource = readFileSync(join(__dirname, 'cycleComposerThinking.ts'), 'utf-8');
     expect(cycleSource).not.toContain('/api/pi/defaults');
