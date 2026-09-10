@@ -18,6 +18,13 @@ import { useSubagentRuns } from '@/hooks/useSubagentRuns';
 import { useSubagentSessionUsage } from '@/hooks/useSubagentSessionUsage';
 import { openSubagentChildSession, resolveSubagentChildDirectory } from '@/lib/subagents/childSession';
 import {
+  buildSubagentHandoffMessage,
+  markSubagentHandoffPosted,
+  shouldAutoHandoffSubagent,
+  subagentHandoffKey,
+  wasSubagentHandoffPosted,
+} from '@/lib/subagents/parentActivity';
+import {
   buildWorkStatusSubagentRows,
   buildWorkStatusSubagentTree,
   collectSessionBlockers,
@@ -57,12 +64,6 @@ type ChildRow = WorkStatusSubagentRow;
  */
 const SUMMARYABLE_STATUSES = new Set<ChildRow['status']>(['done', 'failed', 'stopped']);
 
-type SummaryControlProps = {
-  row: ChildRow;
-  parentSessionId: string | null;
-  parentDirectory: string | null;
-  providers: ReadonlyArray<{ id?: string | null; models?: Array<{ id?: string | null }> | null }>;
-};
 
 const SubagentStopControl: React.FC<{ row: ChildRow; parentSessionId: string | null }> = ({ row, parentSessionId }) => {
   const { t } = useI18n();
@@ -89,32 +90,47 @@ const SubagentStopControl: React.FC<{ row: ChildRow; parentSessionId: string | n
   </div>;
 };
 
+type SummaryControlProps = {
+  row: ChildRow;
+  parentSessionId: string | null;
+  parentDirectory: string | null;
+  providers: ReadonlyArray<{ id?: string | null; models?: Array<{ id?: string | null }> | null }>;
+};
+
 const SubagentSummaryControl: React.FC<SummaryControlProps> = ({ row, parentSessionId, parentDirectory, providers }) => {
   const { t } = useI18n();
-  const eligible = Boolean(parentSessionId && row.sessionID && SUMMARYABLE_STATUSES.has(row.status));
-  const messages = useSessionMessageRecords(row.sessionID ?? '', row.directory ?? parentDirectory ?? undefined, { enabled: eligible });
+  const terminal = Boolean(parentSessionId && row.sessionID && SUMMARYABLE_STATUSES.has(row.status));
+  const autoEligible = terminal && shouldAutoHandoffSubagent(row);
+  const messages = useSessionMessageRecords(row.sessionID ?? '', row.directory ?? parentDirectory ?? undefined, { enabled: terminal });
   const sendMessage = useSessionUIStore((state) => state.sendMessage);
   const getSessionModelSelection = useSelectionStore((state) => state.getSessionModelSelection);
   const getSessionAgentSelection = useSelectionStore((state) => state.getSessionAgentSelection);
   const [posting, setPosting] = React.useState(false);
+  const [autoPosted, setAutoPosted] = React.useState(false);
   const summary = React.useMemo(() => summarizeSubagentTranscript(messages), [messages]);
+  const handoffKey = parentSessionId && row.id ? subagentHandoffKey(parentSessionId, row.id) : '';
 
-  if (!eligible) return null;
-
-  const postSummary = async () => {
-    if (!parentSessionId || posting) return;
+  const postSummary = React.useCallback(async (opts?: { silent?: boolean }) => {
+    if (!parentSessionId || posting) return false;
     const selection = getSessionModelSelection(parentSessionId);
     const providerId = selection?.providerId || providers[0]?.id || '';
     const modelId = selection?.modelId || providers[0]?.models?.[0]?.id || '';
     if (!providerId || !modelId) {
-      toast.error(t('chat.agentRoster.missingRunFields'));
-      return;
+      if (!opts?.silent) toast.error(t('chat.agentRoster.missingRunFields'));
+      return false;
     }
     setPosting(true);
     try {
-      const body = summary || t('chat.workStatus.subagent.noSummary');
+      const body = buildSubagentHandoffMessage(
+        row.label,
+        summary,
+        {
+          withBody: t('chat.workStatus.subagent.handoffMessage'),
+          empty: t('chat.workStatus.subagent.handoffEmpty'),
+        },
+      );
       await sendMessage(
-        `子智能体「${row.label}」结果（请作为上下文参考）：\n${body}`,
+        body,
         providerId,
         modelId,
         getSessionAgentSelection(parentSessionId) ?? undefined,
@@ -125,18 +141,58 @@ const SubagentSummaryControl: React.FC<SummaryControlProps> = ({ row, parentSess
         'normal',
         buildSubagentParentSendOptions(parentSessionId, parentDirectory),
       );
-      toast.success(t('chat.workStatus.subagent.summaryPosted'));
+      if (handoffKey) markSubagentHandoffPosted(handoffKey);
+      if (!opts?.silent) toast.success(t('chat.workStatus.subagent.summaryPosted'));
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('chat.workStatus.subagent.summaryFailed'));
+      if (!opts?.silent) {
+        toast.error(error instanceof Error ? error.message : t('chat.workStatus.subagent.summaryFailed'));
+      }
+      return false;
     } finally {
       setPosting(false);
     }
-  };
+  }, [
+    getSessionAgentSelection,
+    getSessionModelSelection,
+    handoffKey,
+    parentDirectory,
+    parentSessionId,
+    posting,
+    providers,
+    row.label,
+    sendMessage,
+    summary,
+    t,
+  ]);
+
+  React.useEffect(() => {
+    if (!autoEligible || !handoffKey || autoPosted || wasSubagentHandoffPosted(handoffKey) || posting) {
+      return undefined;
+    }
+    let cancelled = false;
+    const attempt = async (allowEmpty: boolean) => {
+      if (cancelled || wasSubagentHandoffPosted(handoffKey)) return;
+      if (!summary && !allowEmpty) return;
+      // Claim before await so StrictMode / re-renders cannot double-send.
+      markSubagentHandoffPosted(handoffKey);
+      const ok = await postSummary({ silent: true });
+      if (!cancelled) setAutoPosted(ok);
+    };
+    void attempt(false);
+    const timer = window.setTimeout(() => { void attempt(true); }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [autoEligible, autoPosted, handoffKey, postSummary, posting, summary]);
+
+  if (!terminal) return null;
 
   return (
     <div className="flex justify-end pl-7">
-      <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-primary hover:bg-primary/10 disabled:opacity-50" onClick={() => void postSummary()} disabled={posting}>
-        {posting ? t('chat.workStatus.subagent.summarizing') : t('chat.workStatus.subagent.summarize')}
+      <button type="button" className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-50" onClick={() => void postSummary()} disabled={posting} title={t('chat.workStatus.subagent.summarizeAgainHint')}>
+        {posting ? t('chat.workStatus.subagent.summarizing') : t('chat.workStatus.subagent.summarizeAgain')}
       </button>
     </div>
   );
@@ -290,6 +346,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
     const opened = openSubagentChildSession({
       sessionID: row.sessionID,
       parentSessionID: sessionId,
+      parentLabel,
       directory: resolveSubagentChildDirectory(row, directory || effectiveDirectory),
       label: row.label,
       readOnly: !isPiKernel,
@@ -300,7 +357,7 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
       openContextPanelTab,
     });
     if (opened) onNavigate?.();
-  }, [directory, effectiveDirectory, isMobile, isPiKernel, onNavigate, openContextPanelTab, sessionId, setCurrentSession]);
+  }, [directory, effectiveDirectory, isMobile, isPiKernel, onNavigate, openContextPanelTab, parentLabel, sessionId, setCurrentSession]);
 
   useReportWorkStatusPresence('subagents', rowsWithUsage.length > 0);
 
@@ -350,9 +407,11 @@ export const WorkStatusSubagentsSection: React.FC<Props> = ({ sessionId, directo
           onClick={row.openable ? () => openChildSession(row) : undefined}
           actionLabel={row.openable ? t('chat.workStatus.action.open') : undefined}
           disabled={!row.openable}
-          title={row.openable ? undefined : t('chat.workStatus.subagent.unopenableTooltip')}
+          title={row.openable
+            ? t('chat.workStatus.action.openSubagentOwned', { name: row.label, parent: parentLabel })
+            : t('chat.workStatus.subagent.unopenableTooltip')}
           ariaLabel={row.openable
-            ? t('chat.workStatus.action.openSubagent', { name: row.label })
+            ? t('chat.workStatus.action.openSubagentOwned', { name: row.label, parent: parentLabel })
             : row.label}
           label={(
             <>

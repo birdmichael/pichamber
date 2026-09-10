@@ -102,6 +102,8 @@ const STATUS_SIGNATURE_SEPARATOR = '\u0000';
 const EDITING_TOOLS = new Set(['edit', 'write', 'multiedit', 'apply_patch']);
 /** Busy-line copy while a question card or Desktop `ctx.ui` prompt is waiting. */
 export const ASKING_A_QUESTION_STATUS = 'asking a question';
+/** Busy-line copy while the parent turn settled but its fleet is still working. */
+export const WAITING_FOR_SUBAGENTS_STATUS = 'waiting for subagents';
 const TOOL_STATUS_PHRASES: Record<string, string> = {
     read: 'reading file',
     write: 'writing file',
@@ -474,7 +476,8 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
         }, [currentSessionId])
     );
 
-    const { phase: activityPhase, isWorking: isPhaseWorking } = useCurrentSessionActivity();
+    const { phase: activityPhase, isWorking: isPhaseWorking, waitingForSubagents } = useCurrentSessionActivity();
+    const waitingForSubagentsOnly = Boolean(waitingForSubagents && activityPhase === 'idle');
 
     const currentSessionStatus = useSessionStatus(currentSessionId ?? '', currentSessionDirectory ?? undefined);
 
@@ -520,7 +523,9 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
 
         let activity: AssistantActivity = 'idle';
         if (isWorking) {
-            if (parsedStatus.activePartType === 'tool' || parsedStatus.activePartType === 'editing') {
+            if (waitingForSubagentsOnly) {
+                activity = 'streaming';
+            } else if (parsedStatus.activePartType === 'tool' || parsedStatus.activePartType === 'editing') {
                 activity = 'tooling';
             } else {
                 activity = isCooldown ? 'cooldown' : 'streaming';
@@ -534,18 +539,21 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
         return {
             activity,
             hasWorkingContext: isWorking,
-            hasActiveTools: parsedStatus.activePartType === 'tool' || parsedStatus.activePartType === 'editing',
+            hasActiveTools: !waitingForSubagentsOnly && (parsedStatus.activePartType === 'tool' || parsedStatus.activePartType === 'editing'),
             isWorking,
             isStreaming,
             isCooldown,
             lifecyclePhase: isStreaming ? 'streaming' : isCooldown ? 'cooldown' : null,
-            statusText: isWorking ? parsedStatus.statusText : null,
-            isGenericStatus: isWorking ? parsedStatus.isGenericStatus : true,
+            statusText: waitingForSubagentsOnly
+                ? WAITING_FOR_SUBAGENTS_STATUS
+                : (isWorking ? parsedStatus.statusText : null),
+            isGenericStatus: waitingForSubagentsOnly ? true : (isWorking ? parsedStatus.isGenericStatus : true),
             isWaitingForPermission: false,
-            canAbort: isWorking,
+            // Parent Stop does not abort the fleet; Work Status Stop does.
+            canAbort: isWorking && !waitingForSubagentsOnly,
             compactionDeadline: null,
-            activePartType: isWorking ? parsedStatus.activePartType : undefined,
-            activeToolName: isWorking ? parsedStatus.activeToolName : undefined,
+            activePartType: waitingForSubagentsOnly ? undefined : (isWorking ? parsedStatus.activePartType : undefined),
+            activeToolName: waitingForSubagentsOnly ? undefined : (isWorking ? parsedStatus.activeToolName : undefined),
             thinkingLevel: activeAssistant.thinkingLevel,
             wasAborted: false,
             abortActive: false,
@@ -553,7 +561,7 @@ export function useAssistantStatus(): AssistantStatusSnapshot {
             isComplete: false,
             retryInfo,
         };
-    }, [activityPhase, isPhaseWorking, parsedStatus, abortState, sessionRetryAttempt, sessionRetryNext, activeAssistant.thinkingLevel]);
+    }, [activityPhase, isPhaseWorking, waitingForSubagentsOnly, parsedStatus, abortState, sessionRetryAttempt, sessionRetryNext, activeAssistant.thinkingLevel]);
 
     const forming = React.useMemo<FormingSummary>(() => {
         const isActive = isPhaseWorking && parsedStatus.activePartType === 'text';

@@ -36,6 +36,7 @@ describe('openSubagentChildSession', () => {
     const openedOk = openSubagentChildSession({
       sessionID: 'ses_child',
       parentSessionID: 'ses_parent',
+      parentLabel: 'Main chat',
       directory: '/repo',
       label: 'scout',
       readOnly: false,
@@ -52,7 +53,7 @@ describe('openSubagentChildSession', () => {
       directory: '/repo',
       mode: 'chat',
       dedupeKey: 'session:ses_child',
-      label: 'scout',
+      label: 'scout · Main chat',
       readOnly: false,
       sessionScope: 'session:ses_parent',
     }]);

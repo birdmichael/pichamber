@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { idleLeftoverBusyAfterSettledAssistant } from '@/sync/event-reducer';
 import {
   isSettledAssistantMessage,
+  overlayWaitingForSubagents,
   resolveSessionActivity,
 } from './useSessionActivity';
 
@@ -21,6 +22,7 @@ describe('resolveSessionActivity', () => {
       phase: 'busy',
       isWorking: true,
       isBusy: true,
+      waitingForSubagents: false,
     });
   });
 
@@ -34,6 +36,7 @@ describe('resolveSessionActivity', () => {
       isWorking: false,
       isBusy: false,
       isCooldown: false,
+      waitingForSubagents: false,
     });
   });
 
@@ -75,6 +78,55 @@ describe('resolveSessionActivity', () => {
       phase: 'busy',
       isWorking: true,
       isBusy: true,
+    });
+  });
+
+  test('keeps the parent looking alive while subagents are still working', () => {
+    expect(resolveSessionActivity({
+      sessionId: 'ses_parent',
+      status: { type: 'idle' },
+      lastMessage: { role: 'assistant', time: { completed: 1_500 } },
+      waitingForSubagents: true,
+    })).toEqual({
+      phase: 'idle',
+      isWorking: true,
+      isBusy: false,
+      isCooldown: false,
+      waitingForSubagents: true,
+    });
+  });
+});
+
+describe('overlayWaitingForSubagents', () => {
+  test('does not fake busy phase so abort/steer stay off', () => {
+    expect(overlayWaitingForSubagents({
+      phase: 'idle',
+      isWorking: false,
+      isBusy: false,
+      isCooldown: false,
+      waitingForSubagents: false,
+    }, true)).toEqual({
+      phase: 'idle',
+      isWorking: true,
+      isBusy: false,
+      isCooldown: false,
+      waitingForSubagents: true,
+    });
+  });
+
+  test('preserves an already-busy parent turn', () => {
+    expect(overlayWaitingForSubagents({
+      phase: 'busy',
+      isWorking: true,
+      isBusy: true,
+      isCooldown: false,
+      waitingForSubagents: false,
+    }, true)).toEqual({
+      phase: 'busy',
+      isWorking: true,
+      isBusy: true,
+      isCooldown: false,
+      waitingForSubagents: true,
     });
   });
 });
