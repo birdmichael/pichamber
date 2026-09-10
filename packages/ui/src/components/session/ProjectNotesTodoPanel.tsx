@@ -1049,6 +1049,7 @@ export const ProjectNotesTodoPanel: React.FC<ProjectNotesTodoPanelProps> = ({
         target={pendingSendTarget?.kind ?? 'session'}
         projectDirectory={projectRef?.path ?? null}
         submitting={isSendDialogSubmitting}
+        allowRunAsGoal
         onConfirm={handleConfirmSend}
       />
     </div>

@@ -224,6 +224,12 @@ export const dispatchSessionPlanAction = async (
       if (action === 'exit') {
         clearPendingDraftPlan(sessionID);
         clearPlanImplemented(sessionID);
+        // Discard via ready-select replies in-kernel, but GET off must not be
+        // ignored by shouldKeepPlanAgainstOff while status is still ready.
+        const next = { status: 'off' as const, planMarkdown: '' };
+        applySessionPlan(sessionID, next);
+        void refreshSessionPlan(sessionID);
+        return next;
       }
       if (action === 'implement') {
         markPlanImplemented(sessionID);
@@ -310,7 +316,14 @@ export const answerPiExtensionPlanReadyOption = async (
 ): Promise<boolean> => {
   if (!isPlanReadyDecisionPrompt(prompt)) return false;
   const raw = typeof option === 'string' ? option : '';
-  if (!raw || !isPlanReadyImplementHereOption(raw)) return false;
-  await dispatchSessionPlanAction(sessionID, 'implement');
-  return true;
+  if (!raw) return false;
+  if (isPlanReadyImplementHereOption(raw)) {
+    await dispatchSessionPlanAction(sessionID, 'implement');
+    return true;
+  }
+  if (planReadyOptionForAction(prompt.options, 'exit') === raw) {
+    await dispatchSessionPlanAction(sessionID, 'exit');
+    return true;
+  }
+  return false;
 };
