@@ -13,6 +13,12 @@ const MAX_HISTORY = 100;
 let visitedSessionIds: string[] = [];
 let cursor = -1;
 let navigating = false;
+// After a history step, store/URL reconciliation can re-apply the restored
+// session (or briefly bounce through the previous id) once `navigating` is
+// cleared. Those follow-ups must not `recordVisit` or they truncate forward —
+// the same failure mode as a fresh sidebar click after Back (#658).
+let suppressVisitRecording = false;
+let suppressEpoch = 0;
 let boundRuntimeKey = getRuntimeKey();
 
 const resetStack = (): void => {
@@ -34,11 +40,46 @@ const recordVisit = (sessionId: string): void => {
   cursor = visitedSessionIds.length - 1;
 };
 
+const beginHistoryNavigation = (): number => {
+  navigating = true;
+  suppressVisitRecording = true;
+  return ++suppressEpoch;
+};
+
+const endHistoryNavigation = (epoch: number): void => {
+  navigating = false;
+  // Clear after the current turn + a macrotask so React effects and URL sync
+  // that re-apply the landed session cannot truncate the forward branch.
+  queueMicrotask(() => {
+    setTimeout(() => {
+      if (epoch !== suppressEpoch) return;
+      suppressVisitRecording = false;
+    }, 0);
+  });
+};
+
 useSessionUIStore.subscribe((state, previousState) => {
   if (state.currentSessionId === previousState.currentSessionId) return;
-  if (!state.currentSessionId || navigating) return;
+  if (!state.currentSessionId || navigating || suppressVisitRecording) return;
   recordVisit(state.currentSessionId);
 });
+
+const applyHistorySession = (sessionId: string, directory: string | null | undefined): void => {
+  const epoch = beginHistoryNavigation();
+  try {
+    useSessionUIStore.getState().setCurrentSession(sessionId, directory);
+  } finally {
+    endHistoryNavigation(epoch);
+  }
+};
+
+/**
+ * True while a session-history back/forward is applying, including the short
+ * settle window that absorbs store/URL sync follow-ups. URL sync should
+ * replaceState (not pushState) during this window.
+ */
+export const isSessionHistoryNavigationPending = (): boolean =>
+  navigating || suppressVisitRecording;
 
 /**
  * Steps the current session back (-1) or forward (+1) through this window's
@@ -61,12 +102,7 @@ export const navigateSessionHistory = (delta: -1 | 1): boolean => {
   if (delta < 0 && currentId !== cursorId && cursorId) {
     const session = sessionsById.get(cursorId);
     if (session) {
-      navigating = true;
-      try {
-        useSessionUIStore.getState().setCurrentSession(session.id, resolveGlobalSessionDirectory(session));
-      } finally {
-        navigating = false;
-      }
+      applyHistorySession(session.id, resolveGlobalSessionDirectory(session));
       return true;
     }
   }
@@ -75,12 +111,7 @@ export const navigateSessionHistory = (delta: -1 | 1): boolean => {
     const session = sessionsById.get(visitedSessionIds[nextCursor]);
     if (session) {
       cursor = nextCursor;
-      navigating = true;
-      try {
-        useSessionUIStore.getState().setCurrentSession(session.id, resolveGlobalSessionDirectory(session));
-      } finally {
-        navigating = false;
-      }
+      applyHistorySession(session.id, resolveGlobalSessionDirectory(session));
       return true;
     }
     // Drop the dead entry at nextCursor and keep scanning in the same
@@ -99,5 +130,25 @@ export const navigateSessionHistory = (delta: -1 | 1): boolean => {
 export const resetSessionNavigationHistoryForTests = (): void => {
   resetStack();
   navigating = false;
+  suppressVisitRecording = false;
+  suppressEpoch += 1;
   boundRuntimeKey = getRuntimeKey();
 };
+
+/** Wait until the post-navigation recordVisit suppress window has cleared. */
+export const flushSessionNavigationHistorySuppressForTests = async (): Promise<void> => {
+  await Promise.resolve();
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+};
+
+export const getSessionNavigationHistorySnapshotForTests = (): {
+  visitedSessionIds: string[];
+  cursor: number;
+  suppressVisitRecording: boolean;
+} => ({
+  visitedSessionIds: [...visitedSessionIds],
+  cursor,
+  suppressVisitRecording,
+});

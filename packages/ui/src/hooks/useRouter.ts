@@ -3,6 +3,7 @@ import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useUIStore } from '@/stores/useUIStore';
 import { parseRoute, updateBrowserURL, hasRouteParams } from '@/lib/router';
 import { openSessionFromRoute } from '@/lib/router/openSessionFromRoute';
+import { isSessionHistoryNavigationPending } from '@/lib/sessionNavigationHistory';
 import type { RouteState, AppRouteState } from '@/lib/router';
 import type { MainTab } from '@/stores/useUIStore';
 import { resolveSettingsSlug } from '@/lib/settings/metadata';
@@ -185,7 +186,10 @@ export function useRouter(): void {
       }
 
       prevSessionId = sessionId;
-      syncURLFromState();
+      // History back/forward must replace the current entry. pushState after
+      // Ctrl+Alt+Left leaves a stale ?session= entry that store/URL sync can
+      // re-apply as a fresh visit, truncating the in-memory forward stack (#658).
+      syncURLFromState({ replace: isSessionHistoryNavigationPending() });
     });
 
     return unsubscribe;

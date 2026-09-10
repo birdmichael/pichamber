@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Session } from '@opencode-ai/sdk/v2';
-import { navigateSessionHistory, resetSessionNavigationHistoryForTests } from './sessionNavigationHistory';
+import {
+  flushSessionNavigationHistorySuppressForTests,
+  getSessionNavigationHistorySnapshotForTests,
+  navigateSessionHistory,
+  resetSessionNavigationHistoryForTests,
+} from './sessionNavigationHistory';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useGlobalSessionsStore } from '@/stores/useGlobalSessionsStore';
 
@@ -40,12 +45,61 @@ describe('sessionNavigationHistory', () => {
     expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
   });
 
-  test('a fresh visit truncates the forward branch', () => {
+  test('after back, forward restores the session just left', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+    expect(navigateSessionHistory(1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+  });
+
+  test('multiple back steps can be forwarded in order', () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useSessionUIStore.setState({ currentSessionId: 's3' });
+
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+
+    expect(navigateSessionHistory(1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+    expect(navigateSessionHistory(1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s3');
+    expect(navigateSessionHistory(1)).toBe(false);
+  });
+
+  test('store/URL sync after back does not truncate the forward branch', async () => {
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    expect(navigateSessionHistory(-1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s1');
+
+    // Follow-up reconciliation after Back: stale URL may briefly re-assert the
+    // previous session, then the store settles back on the restored one. That
+    // must not recordVisit or forward is wiped (#658).
+    useSessionUIStore.setState({ currentSessionId: 's2' });
+    useSessionUIStore.setState({ currentSessionId: 's1' });
+
+    const snap = getSessionNavigationHistorySnapshotForTests();
+    expect(snap.visitedSessionIds).toEqual(['s1', 's2']);
+    expect(snap.cursor).toBe(0);
+    expect(snap.suppressVisitRecording).toBe(true);
+
+    expect(navigateSessionHistory(1)).toBe(true);
+    expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+  });
+
+  test('a fresh visit truncates the forward branch', async () => {
     useSessionUIStore.setState({ currentSessionId: 's1' });
     useSessionUIStore.setState({ currentSessionId: 's2' });
     useSessionUIStore.setState({ currentSessionId: 's3' });
     expect(navigateSessionHistory(-1)).toBe(true);
     expect(useSessionUIStore.getState().currentSessionId).toBe('s2');
+
+    await flushSessionNavigationHistorySuppressForTests();
 
     useSessionUIStore.setState({ currentSessionId: 's1' });
     expect(navigateSessionHistory(1)).toBe(false);
