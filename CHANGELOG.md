@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
-- Settings: Esc on MCP Add / Create agent abandons the nested draft and keeps Settings open (#631, #591).
+- Settings: Esc on MCP Add / Create agent (OpenCode + Pi) abandons the nested draft and keeps Settings open (#631, #591).
 - Composer: Esc dismisses the `#` snippet (and other autocomplete) menus even while a run is active (#590).
 - Composer: Esc still collapses expanded input (Ctrl+Shift+E) after pickers yield (#592).
 - Model menu: Esc dismisses the selector opened with Ctrl+Shift+M (#593).
