@@ -915,6 +915,17 @@ export const SidebarFilesTree: React.FC = () => {
     e?.preventDefault();
     if (!dialogData || !activeDialog) return;
 
+    if (activeDialog !== 'delete' && !dialogInputValue.trim()) {
+      toast.error(
+        activeDialog === 'createFolder'
+          ? t('sidebarFilesTree.toast.folderNameRequired')
+          : activeDialog === 'createFile'
+            ? t('sidebarFilesTree.toast.filenameRequired')
+            : t('sidebarFilesTree.toast.nameRequired'),
+      );
+      return;
+    }
+
     setIsDialogSubmitting(true);
     const done = () => setIsDialogSubmitting(false);
     const closeDialog = () => setActiveDialog(null);
@@ -1304,9 +1315,19 @@ export const SidebarFilesTree: React.FC = () => {
               {t('sidebarFilesTree.dialog.cancel')}
             </Button>
             <Button
-              variant={activeDialog === 'delete' ? 'destructive' : 'default'}
+              variant={
+                activeDialog === 'delete'
+                  ? 'destructive'
+                  : (!dialogInputValue.trim() ? 'outline' : 'default')
+              }
               onClick={() => void handleDialogSubmit()}
-              disabled={isDialogSubmitting || (activeDialog !== 'delete' && !dialogInputValue.trim())}
+              disabled={isDialogSubmitting}
+              aria-disabled={isDialogSubmitting || (activeDialog !== 'delete' && !dialogInputValue.trim())}
+              className={
+                activeDialog !== 'delete' && !dialogInputValue.trim()
+                  ? 'opacity-50'
+                  : undefined
+              }
             >
               {isDialogSubmitting ? <Icon name="loader-4" className="size-4 animate-spin" /> : (
                 activeDialog === 'delete' ? t('sidebarFilesTree.dialog.delete.confirm') : t('sidebarFilesTree.dialog.confirm')

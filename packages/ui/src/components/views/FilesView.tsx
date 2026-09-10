@@ -676,9 +676,19 @@ const Dialogs: React.FC<DialogsProps> = ({
             {t('filesView.dialog.cancel')}
           </Button>
           <Button
-            variant={activeDialog === 'delete' ? 'destructive' : 'default'}
+            variant={
+              activeDialog === 'delete'
+                ? 'destructive'
+                : (!dialogInputValue.trim() ? 'outline' : 'default')
+            }
             onClick={() => void onDialogSubmit()}
-            disabled={isDialogSubmitting || (activeDialog !== 'delete' && !dialogInputValue.trim())}
+            disabled={isDialogSubmitting}
+            aria-disabled={isDialogSubmitting || (activeDialog !== 'delete' && !dialogInputValue.trim())}
+            className={
+              activeDialog !== 'delete' && !dialogInputValue.trim()
+                ? 'opacity-50'
+                : undefined
+            }
           >
             {isDialogSubmitting ? <Icon name="loader-4" className="size-4 animate-spin" /> : (
                 activeDialog === 'delete' ? t('filesView.dialog.delete.confirm') : t('filesView.dialog.confirm')
@@ -1417,6 +1427,20 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const handleDialogSubmit = React.useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!dialogData || !activeDialog) return;
+
+    // Validate empty names before flipping the submitting spinner so Confirm /
+    // Enter keep the dialog open with an immediate toast (checklist HOLD
+    // files-new-folder-empty-confirm).
+    if (activeDialog !== 'delete' && !dialogInputValue.trim()) {
+      toast.error(
+        activeDialog === 'createFolder'
+          ? t('sidebarFilesTree.toast.folderNameRequired')
+          : activeDialog === 'createFile'
+            ? t('sidebarFilesTree.toast.filenameRequired')
+            : t('sidebarFilesTree.toast.nameRequired'),
+      );
+      return;
+    }
 
     setIsDialogSubmitting(true);
     const finishDialogOperation = () => {
