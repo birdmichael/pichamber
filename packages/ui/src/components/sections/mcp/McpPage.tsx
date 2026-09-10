@@ -54,6 +54,7 @@ import {
 import { Icon } from "@/components/icon/Icon";
 import { SortableTabsStrip, type SortableTabsStripItem } from '@/components/ui/sortable-tabs-strip';
 import { useI18n } from '@/lib/i18n';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 // ─────────────────────────────────────────────────────────────
 // CommandTextarea  — one arg per line, paste-friendly
@@ -991,6 +992,27 @@ export const McpPage: React.FC = () => {
     }
   };
 
+  const abandonNewDraft = React.useCallback(() => {
+    setMcpDraft(null);
+    setSelectedMcp(null);
+  }, [setMcpDraft, setSelectedMcp]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isNewServer || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isNewServer]);
+
   const requireSavedConfig = React.useCallback((): boolean => {
     if (isNewServer) {
       toast.error(t('settings.mcp.page.toast.createServerBeforeLiveActions'));
@@ -1419,8 +1441,18 @@ export const McpPage: React.FC = () => {
       ) : undefined}
       showSaveStatus={false}
     >
-
-
+      <div
+        ref={formRef}
+        data-settings-escape-form={isNewServer ? 'true' : undefined}
+        onKeyDown={(event) => {
+          if (!isNewServer || event.key !== 'Escape') {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          abandonNewDraft();
+        }}
+      >
 
         {/* Saved but queued behind Apply & Restart: dynamic status the user
             must see, or the missing action buttons read as a broken page. */}
@@ -1868,7 +1900,9 @@ export const McpPage: React.FC = () => {
               {t('settings.common.actions.delete')}
             </Button>
           )}
-        </div>      </SettingsPageLayout>
+        </div>
+      </div>
+      </SettingsPageLayout>
 
 
       {/* Import JSON dialog */}
