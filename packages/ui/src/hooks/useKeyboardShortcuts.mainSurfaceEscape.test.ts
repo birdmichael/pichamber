@@ -39,3 +39,22 @@ test('Escape closes the header session switcher before yielding to open menus', 
   expect(handler).toContain('setSessionDropdownOpen(false)');
   expect(handler.indexOf('setSessionDropdownOpen(false)')).toBeLessThan(handler.indexOf('insideForeignDialog'));
 });
+
+test('Escape closes the model menu before nested dialog yield (#593)', () => {
+  const handlerStart = source.indexOf('const handleEscapeKeyDownCapture');
+  const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
+
+  expect(handler).toContain('isModelSelectorOpen');
+  expect(handler).toContain('setModelSelectorOpen(false)');
+  expect(handler.indexOf('setModelSelectorOpen(false)')).toBeLessThan(handler.indexOf('insideForeignDialog'));
+});
+
+test('Escape yields to composer autocomplete before abort priming (#590)', () => {
+  const handlerStart = source.indexOf('const handleEscapeKeyDownCapture');
+  const handler = source.slice(handlerStart, source.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
+
+  expect(handler).toContain("[data-composer-autocomplete=\"true\"]");
+  expect(handler.indexOf("[data-composer-autocomplete=\"true\"]")).toBeLessThan(handler.indexOf('shouldCollapseExpandedInputOnEscape'));
+  expect(handler.indexOf('shouldCollapseExpandedInputOnEscape')).toBeLessThan(handler.indexOf('armAbortPrompt'));
+});
+

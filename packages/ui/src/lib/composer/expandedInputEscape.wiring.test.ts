@@ -17,5 +17,11 @@ describe('expanded input Esc wiring (#574)', () => {
     expect(shortcuts).toContain('shouldCollapseExpandedInputOnEscape');
     expect(shortcuts).toContain("setExpandedInput(false)");
     expect(popups).toContain('data-composer-autocomplete="true"');
+    // Autocomplete Esc must yield before focus-mode collapse / abort priming (#590).
+    const handlerStart = shortcuts.indexOf('const handleEscapeKeyDownCapture');
+    const handler = shortcuts.slice(handlerStart, shortcuts.indexOf('const handleActivePrefixKeyDownCapture', handlerStart));
+    expect(handler.indexOf('[data-composer-autocomplete="true"]')).toBeLessThan(
+      handler.indexOf('shouldCollapseExpandedInputOnEscape'),
+    );
   });
 });

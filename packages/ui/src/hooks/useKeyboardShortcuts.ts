@@ -392,6 +392,13 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
+      // Model menu (Ctrl+Shift+M): close even when focus stayed in the composer (#593).
+      if (state.isModelSelectorOpen) {
+        event.preventDefault();
+        state.setModelSelectorOpen(false);
+        resetAbortPriming();
+        return;
+      }
       const insideForeignDialog = Boolean(target?.closest('[role="dialog"]'))
         && !isInsideSettingsDialog(target);
       if (
@@ -422,13 +429,19 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
-      // Desktop focus mode: Esc exits expand before abort-priming (#574).
-      // Yield when a composer autocomplete popup is open (ChatInput closes it).
+      // Composer #/@/*/slash pickers: yield so ChatInput can dismiss (#590).
+      // Must run before abort-priming — otherwise preventDefault eats Esc while
+      // a run is active and the snippet menu stays open.
+      if (document.querySelector('[data-composer-autocomplete="true"]')) {
+        resetAbortPriming();
+        return;
+      }
+      // Desktop focus mode: Esc exits expand before abort-priming (#574 / #592).
       if (shouldCollapseExpandedInputOnEscape({
         key: event.key,
         isExpandedInput: state.isExpandedInput,
         isMobile: state.isMobile,
-        autocompleteOpen: Boolean(document.querySelector('[data-composer-autocomplete="true"]')),
+        autocompleteOpen: false,
         inputMode: document.querySelector('[data-composer-shell="true"]') ? 'shell' : 'normal',
       })) {
         event.preventDefault();

@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Icon } from '@/components/icon/Icon';
 import { AgentPermissionsEditor } from './AgentPermissionsEditor';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 type AgentVariantProvider = {
   id: string;
@@ -67,6 +68,7 @@ export const AgentsPage: React.FC = () => {
     updateAgent,
     agentDraft,
     setAgentDraft,
+    setSelectedAgent,
   } = useAgentsStore(useShallow((s) => ({
     selectedAgentName: s.selectedAgentName,
     getAgentByName: s.getAgentByName,
@@ -74,6 +76,7 @@ export const AgentsPage: React.FC = () => {
     updateAgent: s.updateAgent,
     agentDraft: s.agentDraft,
     setAgentDraft: s.setAgentDraft,
+    setSelectedAgent: s.setSelectedAgent,
   })));
 
   // Settings browses whichever project its own selector points at; the app
@@ -88,6 +91,26 @@ export const AgentsPage: React.FC = () => {
   const fieldsReadOnly = isPiNativeReadOnly || isPiKernel;
   useSelectPiAgentWhenUnset(isPiKernel);
 
+  const abandonNewDraft = React.useCallback(() => {
+    setAgentDraft(null);
+    setSelectedAgent(null);
+  }, [setAgentDraft, setSelectedAgent]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isNewAgent || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isNewAgent]);
 
   const [draftName, setDraftName] = React.useState('');
   const [draftScope, setDraftScope] = React.useState<AgentScope>('user');
@@ -298,6 +321,18 @@ export const AgentsPage: React.FC = () => {
           : t('settings.agents.page.subtitle.edit')}
       showSaveStatus={false}
     >
+      <div
+        ref={formRef}
+        data-settings-escape-form={isNewAgent ? 'true' : undefined}
+        onKeyDown={(event) => {
+          if (!isNewAgent || event.key !== 'Escape') {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          abandonNewDraft();
+        }}
+      >
       <SettingsSection
         title={t('settings.agents.page.section.identityRole')}
         divider={false}
@@ -560,6 +595,7 @@ export const AgentsPage: React.FC = () => {
           </Button>
         </div>
       )}
+      </div>
     </SettingsPageLayout>
   );
 };
