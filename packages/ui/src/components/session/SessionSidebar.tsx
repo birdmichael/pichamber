@@ -331,6 +331,9 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
   const [openSidebarMenuKey, setOpenSidebarMenuKey] = React.useState<string | null>(null);
   const [renamingFolderId, setRenamingFolderId] = React.useState<string | null>(null);
   const [renameFolderDraft, setRenameFolderDraft] = React.useState('');
+  // Folder id created by New folder… / bulk create-and-move that is still in
+  // provisional inline-rename. Esc/cancel must delete it (#675).
+  const [provisionalFolderId, setProvisionalFolderId] = React.useState<string | null>(null);
   const [deleteSessionConfirm, setDeleteSessionConfirm] = React.useState<DeleteSessionConfirmState>(null);
   const [deleteFolderConfirm, setDeleteFolderConfirm] = React.useState<DeleteFolderConfirmState>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = React.useState<BulkDeleteSessionsConfirmState>(null);
@@ -1026,6 +1029,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       }
 
       const newFolder = createFolder(scopeKey, t('sessions.sidebar.folder.newFolderName'), parentId);
+      setProvisionalFolderId(newFolder.id);
       setRenamingFolderId(newFolder.id);
       setRenameFolderDraft(newFolder.name);
       return newFolder;
@@ -1851,6 +1855,8 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
         renameFolderDraft={renameFolderDraft}
         setRenameFolderDraft={setRenameFolderDraft}
         setRenamingFolderId={setRenamingFolderId}
+        provisionalFolderId={provisionalFolderId}
+        setProvisionalFolderId={setProvisionalFolderId}
         pinnedSessionIds={pinnedSessionIds}
         expandedParents={projectExpandedParents}
         sessionOrderIndex={sessionOrderIndex}
@@ -1892,6 +1898,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       stableCreateFolderAndStartRename,
       renamingFolderId,
       renameFolderDraft,
+      provisionalFolderId,
       pinnedSessionIds,
       projectExpandedParents,
       sessionOrderIndex,

@@ -95,6 +95,8 @@ type Props = {
   renameFolderDraft: string;
   setRenameFolderDraft: React.Dispatch<React.SetStateAction<string>>;
   setRenamingFolderId: React.Dispatch<React.SetStateAction<string | null>>;
+  provisionalFolderId: string | null;
+  setProvisionalFolderId: React.Dispatch<React.SetStateAction<string | null>>;
   pinnedSessionIds: Set<string>;
   expandedParents: Set<string>;
   sessionOrderIndex: Map<string, number>;
@@ -276,6 +278,8 @@ const areGroupPropsEqual = (prev: Props, next: Props): boolean => {
     && prev.renameFolderDraft === next.renameFolderDraft
     && prev.setRenameFolderDraft === next.setRenameFolderDraft
     && prev.setRenamingFolderId === next.setRenamingFolderId
+    && prev.provisionalFolderId === next.provisionalFolderId
+    && prev.setProvisionalFolderId === next.setProvisionalFolderId
     && prev.onToggleCollapsedGroup === next.onToggleCollapsedGroup
     && prev.dragHandleProps === next.dragHandleProps
     && prev.scrollContainerRef === next.scrollContainerRef
@@ -318,6 +322,8 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
     renameFolderDraft,
     setRenameFolderDraft,
     setRenamingFolderId,
+    provisionalFolderId,
+    setProvisionalFolderId,
     pinnedSessionIds,
     expandedParents,
     sessionOrderIndex,
@@ -871,15 +877,26 @@ function SessionGroupSectionBase(props: Props): React.ReactNode {
             onRenameDraftChange={(value) => setRenameFolderDraft(value)}
             onRenameSave={() => {
               const trimmed = renameFolderDraft.trim();
+              const isProvisional = provisionalFolderId === folder.id;
               if (trimmed) {
                 renameFolder(scopeKey, folder.id, trimmed);
+                if (isProvisional) setProvisionalFolderId(null);
+              } else if (isProvisional) {
+                // Empty confirm on a just-created folder rolls it back.
+                deleteFolder(scopeKey, folder.id);
+                setProvisionalFolderId(null);
               }
               setRenamingFolderId(null);
               setRenameFolderDraft('');
             }}
             onRenameCancel={() => {
+              const isProvisional = provisionalFolderId === folder.id;
               setRenamingFolderId(null);
               setRenameFolderDraft('');
+              if (isProvisional) {
+                deleteFolder(scopeKey, folder.id);
+                setProvisionalFolderId(null);
+              }
             }}
             droppableRef={droppableRef}
             isDropTarget={isDropTarget}
