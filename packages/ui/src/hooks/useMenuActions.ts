@@ -14,6 +14,7 @@ import { openNewWorktreeDialog } from '@/lib/worktreeSessionCreator';
 import { showOpenCodeStatus } from '@/lib/openCodeStatus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { pickAdjacentProject, resolveVisibleProjectId } from '@/lib/projectNavigation';
+import { planDirectoryHistoryChrome } from '@/lib/directoryHistoryChrome';
 import { opencodeClient } from '@/lib/opencode/client';
 import { shortcutRegistry } from '@/lib/shortcuts';
 
@@ -187,6 +188,36 @@ export const useMenuActions = (
     });
   }, [setActiveMainTab, setSessionSwitcherOpen]);
 
+  const syncChromeAfterDirectoryHistory = React.useCallback(() => {
+    const directoryState = useDirectoryStore.getState();
+    const { projects, activeProjectId, setActiveProjectIdOnly } = useProjectsStore.getState();
+    const plan = planDirectoryHistoryChrome({
+      projects,
+      currentDirectory: directoryState.currentDirectory,
+      homeDirectory: directoryState.homeDirectory,
+      sessions: getSyncSessions(directoryState.currentDirectory),
+    });
+    if (plan.kind === 'noop') {
+      return;
+    }
+
+    // Use IdOnly — setActiveProject would push another directory history entry.
+    if (activeProjectId !== plan.projectId) {
+      setActiveProjectIdOnly(plan.projectId);
+    }
+
+    setActiveMainTab('chat');
+    setSessionSwitcherOpen(false);
+    if (plan.sessionId) {
+      useSessionUIStore.getState().setCurrentSession(plan.sessionId, plan.projectPath);
+      return;
+    }
+    useSessionUIStore.getState().openNewSessionDraft({
+      selectedProjectId: plan.projectId,
+      directoryOverride: plan.projectPath,
+    });
+  }, [setActiveMainTab, setSessionSwitcherOpen]);
+
   const handleAction = React.useCallback(
     (action: MenuAction) => {
       switch (action) {
@@ -312,13 +343,25 @@ export const useMenuActions = (
           onToggleMemoryDebug?.();
           break;
 
-        case 'go-back':
-          useDirectoryStore.getState().goBack();
+        case 'go-back': {
+          const directoryState = useDirectoryStore.getState();
+          if (directoryState.historyIndex <= 0) {
+            break;
+          }
+          directoryState.goBack();
+          syncChromeAfterDirectoryHistory();
           break;
+        }
 
-        case 'go-forward':
-          useDirectoryStore.getState().goForward();
+        case 'go-forward': {
+          const directoryState = useDirectoryStore.getState();
+          if (directoryState.historyIndex >= directoryState.directoryHistory.length - 1) {
+            break;
+          }
+          directoryState.goForward();
+          syncChromeAfterDirectoryHistory();
           break;
+        }
 
         case 'go-to-line':
           shortcutRegistry.invoke('open_go_to_line');
@@ -365,6 +408,7 @@ export const useMenuActions = (
       setHelpDialogOpen,
       setSettingsDialogOpen,
       setThemeMode,
+      syncChromeAfterDirectoryHistory,
       toggleSidebar,
     ]
   );

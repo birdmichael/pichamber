@@ -18,3 +18,13 @@ test('menu Command Palette and Shortcuts open idempotently', () => {
   expect(source).toContain('setHelpDialogOpen(true)');
   expect(source).not.toMatch(/case 'command-palette':\s*\n\s*toggleCommandPalette\(\)/);
 });
+
+test('go-back/go-forward sync project chrome after directory history moves', () => {
+  expect(source).toContain("import { planDirectoryHistoryChrome } from '@/lib/directoryHistoryChrome'");
+  expect(source).toContain('syncChromeAfterDirectoryHistory');
+  expect(source).toContain('setActiveProjectIdOnly(plan.projectId)');
+  expect(source).toMatch(/case 'go-back':[\s\S]*?goBack\(\);[\s\S]*?syncChromeAfterDirectoryHistory\(\)/);
+  expect(source).toMatch(/case 'go-forward':[\s\S]*?goForward\(\);[\s\S]*?syncChromeAfterDirectoryHistory\(\)/);
+  // Must not re-enter setActiveProject from Back/Forward (would push history).
+  expect(source).toContain('setActiveProject would push another directory history entry');
+});
