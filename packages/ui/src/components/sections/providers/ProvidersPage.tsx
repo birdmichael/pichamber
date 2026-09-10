@@ -27,7 +27,7 @@ import { opencodeClient } from '@/lib/opencode/client';
 import { usePiKernel } from '@/lib/usePiKernel';
 import { reportSettingsSaveState } from '@/lib/persistence';
 import {
-  familyIsConnected,
+  familyHasRootConnected,
   isKimiCodeUsageProvider,
   isKimiSubscriptionId,
   isOfficialSubscriptionId,
@@ -369,7 +369,7 @@ export const ProvidersPage: React.FC = () => {
       'xai',
       Boolean(availableError),
     );
-    if (builtinId && !familyIsConnected('xai', connectedProviderIds)) {
+    if (builtinId && !familyHasRootConnected('xai', connectedProviderIds)) {
       catalogAutoSelectedRef.current = true;
       setCandidateProviderId(builtinId);
       return;
@@ -575,7 +575,9 @@ export const ProvidersPage: React.FC = () => {
   const selectedSources = selectedProviderId ? providerSources[selectedProviderId] : undefined;
 
   const ensureAnotherSubscription = async (family: 'xai' | 'kimi-coding') => {
-    if (!isPiKernel || !familyIsConnected(family, connectedProviderIds)) {
+    // Server createSubscriptionClone requires the root id. API-only siblings
+    // like kimi-coding-2 "Kimi API" must open Sign-in, not clone (#643).
+    if (!isPiKernel || !familyHasRootConnected(family, connectedProviderIds)) {
       setCandidateProviderId(family);
       return;
     }

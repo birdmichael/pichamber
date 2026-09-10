@@ -8,7 +8,6 @@ import {
   removePiProviderAuth,
   subscriptionFamilyOf,
   writePiProviderAuth,
-  kimiBaseUrlForRegion,
   readKimiProviderRegion,
 } from './pi-resources.js';
 import {
@@ -107,8 +106,9 @@ describe('createSubscriptionClone', () => {
     expect(readKimiProviderRegion(home, 'kimi-coding')).toBe('domestic');
     expect(readKimiProviderRegion(home, 'kimi-coding-2')).toBe('international');
     const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
-    expect(models.providers['kimi-coding'].baseUrl).toBe(kimiBaseUrlForRegion('domestic'));
-    expect(models.providers['kimi-coding'].api).toBe('openai-completions');
+    // Code OAuth domestic preference must not move chat to moonshot.cn (#645).
+    expect(models.providers['kimi-coding'].baseUrl).toBe('https://api.kimi.com/coding');
+    expect(models.providers['kimi-coding'].api).toBe('anthropic-messages');
     expect(models.providers['kimi-coding'].name).toBe('家里');
     expect(models.providers['kimi-coding-2'].baseUrl).toBe('https://api.kimi.com/coding');
     expect(models.providers['kimi-coding-2'].name).toBe('Work');

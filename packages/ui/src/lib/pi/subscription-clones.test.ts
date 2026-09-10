@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  familyHasRootConnected,
   familyIsConnected,
   isKimiApiSiblingDisplayName,
   isKimiApiSiblingId,
@@ -20,6 +21,15 @@ describe('subscriptionFamilyOf', () => {
     expect(isKimiSubscriptionId('kimi-coding-api')).toBe(false);
     expect(familyIsConnected('xai', new Set(['xai-2']))).toBe(true);
     expect(familyIsConnected('kimi-coding', new Set(['xai']))).toBe(false);
+    expect(familyHasRootConnected('kimi-coding', new Set(['kimi-coding-2']))).toBe(false);
+    expect(familyHasRootConnected('kimi-coding', new Set(['kimi-coding']))).toBe(true);
+  });
+
+  test('API-only kimi-coding-2 does not count as family connected for clone gating', () => {
+    const providers = [{ id: 'kimi-coding-2', name: 'Kimi API' }];
+    expect(familyIsConnected('kimi-coding', new Set(['kimi-coding-2']), providers)).toBe(false);
+    expect(familyIsConnected('kimi-coding', new Set(['kimi-coding']), [{ id: 'kimi-coding', name: 'Kimi Code' }])).toBe(true);
+    expect(familyIsConnected('kimi-coding', new Set(['kimi-coding-3']), [{ id: 'kimi-coding-3', name: 'Work' }])).toBe(true);
   });
 });
 
