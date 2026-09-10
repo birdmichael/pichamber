@@ -3,8 +3,6 @@ import {
   XAI_BASE_URL,
   XAI_PROVIDER_ID,
   isKimiSubscriptionId,
-  kimiApiForRegion,
-  kimiBaseUrlForRegion,
   listStoredProviderIds,
   mergePiProviderOverlay,
   nextSubscriptionCloneId,
@@ -44,11 +42,13 @@ const familySeed = (family, region = 'international') => {
   if (family === KIMI_CODING_PROVIDER_ID) {
     const resolvedRegion = region === 'domestic' ? 'domestic' : 'international';
     const spec = dualAuthSpecFor(KIMI_CODING_PROVIDER_ID);
+    // Code subscription clones always chat on the coding host (#645).
     return {
       name: 'Kimi Code',
-      baseUrl: kimiBaseUrlForRegion(resolvedRegion),
-      api: kimiApiForRegion(resolvedRegion),
-      models: spec ? loadDualAuthApiModels(spec, resolvedRegion) : [],
+      baseUrl: 'https://api.kimi.com/coding',
+      api: 'anthropic-messages',
+      models: spec ? loadDualAuthApiModels(spec, 'international') : [],
+      region: resolvedRegion,
     };
   }
   const spec = dualAuthSpecFor(XAI_PROVIDER_ID);
@@ -142,9 +142,8 @@ export const createSubscriptionClone = ({
     ? (region === 'domestic' || region === 'international' ? region : readKimiRegion(home))
     : 'international';
   const seed = familySeed(resolvedFamily, resolvedRegion);
-  const models = resolvedRegion === 'domestic'
-    ? seed.models
-    : modelsFromRuntime(runtime, resolvedFamily);
+  // Code clones always prefer runtime/international catalog models (#645).
+  const models = modelsFromRuntime(runtime, resolvedFamily);
   const name = typeof displayName === 'string' && displayName.trim()
     ? displayName.trim()
     : `${seed.name} ${providerId.slice(resolvedFamily.length + 1)}`;
@@ -164,6 +163,9 @@ export const createSubscriptionClone = ({
     name,
     baseUrl: seed.baseUrl,
   });
+  if (resolvedFamily === KIMI_CODING_PROVIDER_ID) {
+    writeKimiRegion(home, resolvedRegion, { providerId });
+  }
   return {
     providerId,
     family: resolvedFamily,

@@ -329,14 +329,21 @@ those clone ids and store tokens under the clone id. Dual-auth siblings
 `xai-api` / `kimi-coding-api` are not clones. Display name is `models.json`
 `name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is
 per Kimi subscription row (Providers
-Add/edit): International → `https://api.kimi.com/coding` (anthropic-messages);
-China → `https://api.moonshot.cn/v1` (openai-completions), with models from Pi's `moonshotai-cn` catalog. No typed Base URL. Domestic rows offer Moonshot China API key login for chat **and** Kimi Code device OAuth for subscription usage (`auth.kimi.com` / `api.kimi.com/coding/v1/usages`); region only switches the chat baseUrl.
-`PUT /api/pi/kimi-region` takes `{ providerId, region }`. Default preference
-may live in `pichamber.json` `kimiRegion`; `writePiDefaults` keeps it. Do not
-route this through custom-provider `/v1/models` sync (#564). Usage
+Add/edit): Kimi **Code** subscriptions (OAuth / coding host) always chat on
+`https://api.kimi.com/coding` (anthropic-messages) for both International and
+China (#645). China is a per-row preference stored in `pichamber.json`
+`kimiProviderRegions` (plus default `kimiRegion`); it must not rewrite Code
+chat to `api.moonshot.cn`. `api.moonshot.cn/v1` (openai-completions,
+`moonshotai-cn` catalog) is only for Moonshot Completions API-key paths
+(dual-auth `kimi-coding-api` sibling or an API-key subscription row). Domestic
+UI offers a **Get API Key** link for Completions and **Sign in with Kimi Code**
+for subscription OAuth (`auth.kimi.com` / usages on `api.kimi.com/coding`).
+`PUT /api/pi/kimi-region` takes `{ providerId, region }`. `writePiDefaults`
+keeps `kimiRegion` / `kimiProviderRegions`. Do not route this through
+custom-provider `/v1/models` sync (#564). Usage
 `GET /api/pi/xai-usage?providerId=` / `kimi-usage?providerId=` reads that
-clone’s credential. China-region Kimi rows do not call Moonshot usages.
-Responses never echo tokens.
+clone’s credential. China-region Code rows still use Coding usages, not
+Moonshot. Responses never echo tokens.
 
 Product login is this built-in `/login xai`, not an npm xAI OAuth
 extension. Composer `/login` for `xai` points at Settings → Providers.
@@ -384,14 +391,14 @@ via the same `findNamedPackageDir` pattern as xAI. Callback writes
 `{ type: 'oauth', access, refresh, expires }` to `{agentDir}/auth.json`
 key `kimi-coding` through `writePiProviderAuth`. An API key saved on that
 card writes sibling `kimi-coding-api` (Moonshot OpenAI-compatible host from
-Providers show **国际 / 国内** per Kimi
-row (`https://api.kimi.com/coding` or `https://api.moonshot.cn/v1`) instead
-of a typed Base URL. Domestic rows use `moonshotai-cn` models and show the
-China sign-in entry (Moonshot API key) alongside Sign in with Kimi Code OAuth.
-Domestic chat keeps `api.moonshot.cn`; usage still uses the international Code
-endpoint `https://api.kimi.com/coding/v1/usages` with a Code OAuth token — do not
-query Moonshot balance/usages. A Moonshot API key alone cannot load Code usage;
-auth failures must surface a re-login CTA for Code OAuth. Refresh uses
+Providers show **国际 / 国内** per Kimi row as a preference (not a typed Base
+URL). Code OAuth chat always uses `https://api.kimi.com/coding` (#645).
+`api.moonshot.cn/v1` + `moonshotai-cn` models apply only to Completions API-key
+rows / the `kimi-coding-api` sibling. Domestic UI shows **Get API Key** for
+Completions and Sign in with Kimi Code for subscription OAuth. Usage still uses
+`https://api.kimi.com/coding/v1/usages` with a Code OAuth token — do not query
+Moonshot balance/usages. A Moonshot API key alone cannot load Code usage; auth
+failures must surface a re-login CTA for Code OAuth. Refresh uses
 `kimiCodingOAuth.refresh` with a real AbortSignal (never undefined). Responses
 never echo access, refresh, or user id. Composer `/login kimi-coding` points at
 Settings → Providers.

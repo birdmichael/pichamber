@@ -54,7 +54,28 @@ export const isKimiCodeUsageProvider = (
 export const isOfficialSubscriptionId = (providerId: string | null | undefined): boolean =>
   subscriptionFamilyOf(providerId) !== null;
 
+/**
+ * True when the family has a connected Code/OAuth subscription that can gate
+ * "add another" clone. Kimi Completions API siblings (reserved id or "… API"
+ * display name) do not count — otherwise Add → Kimi Code wrongly clones (#643).
+ */
 export const familyIsConnected = (
   family: 'xai' | 'kimi-coding',
   connectedIds: ReadonlySet<string>,
-): boolean => [...connectedIds].some((id) => subscriptionFamilyOf(id) === family);
+  providers?: ReadonlyArray<{ id?: string | null; name?: string | null }>,
+): boolean => {
+  if (family === KIMI_FAMILY) {
+    return [...connectedIds].some((id) => {
+      if (subscriptionFamilyOf(id) !== KIMI_FAMILY) return false;
+      const provider = providers?.find((row) => row.id === id);
+      return isKimiCodeUsageProvider(provider ?? { id });
+    });
+  }
+  return [...connectedIds].some((id) => subscriptionFamilyOf(id) === family);
+};
+
+/** Clone path requires the root family id (matches server hasRoot). */
+export const familyHasRootConnected = (
+  family: 'xai' | 'kimi-coding',
+  connectedIds: ReadonlySet<string>,
+): boolean => connectedIds.has(family);

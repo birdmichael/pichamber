@@ -5,8 +5,9 @@ import { useI18n } from '@/lib/i18n';
 import { openExternalUrl } from '@/lib/url';
 
 /**
- * Moonshot China Open Platform API-key flow for domestic chat baseUrl.
- * Code OAuth remains available separately for subscription usage.
+ * Moonshot China Completions API-key helper for domestic preference.
+ * Not a login CTA — Code subscription sign-in remains ProviderOAuthMethods
+ * (Sign in with Kimi Code). See #644 / #645.
  */
 export const KIMI_DOMESTIC_API_KEY_URL = 'https://platform.moonshot.cn/console/api-keys';
 
@@ -31,7 +32,7 @@ export const ProviderKimiDomesticLogin: React.FC = () => {
           onClick={() => void openExternalUrl(KIMI_DOMESTIC_API_KEY_URL)}
         >
           <Icon name="external-link" className="mr-1.5 h-3.5 w-3.5" />
-          {t('settings.providers.page.auth.kimiDomestic.signIn')}
+          {t('settings.providers.page.auth.kimiDomestic.getApiKey')}
         </Button>
       </div>
       <p className="typography-meta text-muted-foreground">

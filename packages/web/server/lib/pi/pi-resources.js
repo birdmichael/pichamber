@@ -392,6 +392,41 @@ export const kimiApiForRegion = (region) => (
   region === 'domestic' ? KIMI_DOMESTIC_API : KIMI_INTERNATIONAL_API
 );
 
+/** Code OAuth / coding-host chat always uses api.kimi.com/coding (#645). */
+export const isKimiCodeOAuthCredential = (entry) => (
+  authMethodType(entry) === 'oauth'
+  && Boolean(entry && typeof entry === 'object' && (
+    (typeof entry.access === 'string' && entry.access.length > 0)
+    || (typeof entry.refresh === 'string' && entry.refresh.length > 0)
+    || (typeof entry.token === 'string' && entry.token.length > 0)
+  ))
+);
+
+export const kimiChatBaseUrlForAuth = (region, authEntry) => (
+  isKimiCodeOAuthCredential(authEntry)
+    ? KIMI_INTERNATIONAL_BASE_URL
+    : kimiBaseUrlForRegion(region)
+);
+
+export const kimiChatApiForAuth = (region, authEntry) => (
+  isKimiCodeOAuthCredential(authEntry)
+    ? KIMI_INTERNATIONAL_API
+    : kimiApiForRegion(region)
+);
+
+const readKimiProviderRegionsMap = (chamber) => {
+  const raw = chamber && typeof chamber === 'object' && !Array.isArray(chamber)
+    ? chamber.kimiProviderRegions
+    : null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const next = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof key !== 'string' || !key.trim()) continue;
+    if (value === 'domestic' || value === 'international') next[key.trim()] = value;
+  }
+  return next;
+};
+
 /** Default region for a new Kimi row when none is chosen (pichamber.json). */
 export const readKimiRegion = (home = os.homedir()) => {
   const chamber = isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {};
@@ -437,12 +472,18 @@ export const readKimiProviderRegion = (home = os.homedir(), providerId) => {
   if (!isKimiSubscriptionId(id)) {
     return readKimiRegion(home);
   }
+  const chamber = isFile(resolvePiDefaultsPath(home)) ? readJsonObject(resolvePiDefaultsPath(home)) : {};
+  const storedRegions = readKimiProviderRegionsMap(chamber);
+  if (storedRegions[id] === 'domestic' || storedRegions[id] === 'international') {
+    return storedRegions[id];
+  }
   const providers = providerMap(readJsonObject(resolvePiModelsPath(home)));
   const entry = providers[id];
   const baseUrl = entry && typeof entry === 'object' && !Array.isArray(entry) && typeof entry.baseUrl === 'string'
     ? entry.baseUrl
     : '';
-  if (baseUrl) return kimiRegionFromBaseUrl(baseUrl);
+  // Moonshot Completions URL still implies China; coding host alone does not (#645).
+  if (baseUrl && kimiRegionFromBaseUrl(baseUrl) === 'domestic') return 'domestic';
   // Builtin kimi-coding with no overlay stays International / Kimi Code.
   return id === KIMI_CODING_PROVIDER_ID ? 'international' : readKimiRegion(home);
 };
@@ -464,11 +505,15 @@ export const listKimiProviderRegions = (home = os.homedir()) => {
     const name = typeof entry.name === 'string' && entry.name.trim()
       ? entry.name.trim()
       : (id === KIMI_CODING_PROVIDER_ID ? 'Kimi Code' : id);
+    const auth = readJsonObject(resolvePiAuthPath(home));
+    const actualBaseUrl = typeof entry.baseUrl === 'string' && entry.baseUrl.trim()
+      ? entry.baseUrl.trim()
+      : kimiChatBaseUrlForAuth(region, auth[id]);
     return {
       providerId: id,
       name,
       region,
-      baseUrl: kimiBaseUrlForRegion(region),
+      baseUrl: actualBaseUrl,
     };
   });
 };
@@ -483,9 +528,8 @@ const KIMI_AUTH_METHODS = [
   { type: 'api', label: 'API Key' },
 ];
 
-// Domestic rows keep Moonshot China chat (API key + baseUrl). Code OAuth stays
-// available so subscription usage can use auth.kimi.com / api.kimi.com without
-// flipping the chat region back to International.
+// Domestic preference: Code OAuth still chats on api.kimi.com/coding (#645).
+// Moonshot China API key is the Completions path (sibling / API-only rows).
 const KIMI_DOMESTIC_AUTH_METHODS = [
   { type: 'oauth', label: KIMI_OAUTH_LOGIN_LABEL },
   { type: 'api', label: 'Moonshot China API Key' },
@@ -1369,7 +1413,9 @@ export const writeZaiRegion = (home = os.homedir(), region, { providerId = ZAI_P
 
 /**
  * Persist 国内/国际 on one Kimi subscription row (builtin or clone).
- * Does not touch dual-auth sibling `kimi-coding-api` (#564 path) or other rows.
+ * Code OAuth chat host stays api.kimi.com/coding in both regions (#645).
+ * Moonshot Completions host is applied only for API-key Completions rows and
+ * the dual-auth `kimi-coding-api` sibling.
  */
 
 export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}) => {
@@ -1382,11 +1428,11 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
     error.status = 400;
     throw error;
   }
-  // Remember default for newly added Kimi rows when Feature Plugins sets region
-  // before a second account exists.
   const chamberPath = resolvePiDefaultsPath(home);
   const existing = isFile(chamberPath) ? readJsonObject(chamberPath) : {};
-  const chamberOut = { ...existing, kimiRegion: nextRegion };
+  const providerRegions = readKimiProviderRegionsMap(existing);
+  providerRegions[id] = nextRegion;
+  const chamberOut = { ...existing, kimiRegion: nextRegion, kimiProviderRegions: providerRegions };
   fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
   fs.writeFileSync(chamberPath, `${JSON.stringify(chamberOut, null, 2)}\n`);
 
@@ -1398,13 +1444,20 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
     : {};
   const previousModels = Array.isArray(previous.models) ? previous.models : [];
   const spec = dualAuthSpecFor(KIMI_CODING_PROVIDER_ID);
-  const regionModels = nextRegion === 'domestic' && spec
+  const auth = readJsonObject(resolvePiAuthPath(home));
+  const authEntry = auth[id];
+  // Code OAuth on this row → coding host. Otherwise Completions regional host
+  // (including no-auth Add preference and API keys migrated to the sibling).
+  const useCompletionsHost = !isKimiCodeOAuthCredential(authEntry);
+  const resolvedBaseUrl = useCompletionsHost ? kimiBaseUrlForRegion(nextRegion) : KIMI_INTERNATIONAL_BASE_URL;
+  const resolvedApi = useCompletionsHost ? kimiApiForRegion(nextRegion) : KIMI_INTERNATIONAL_API;
+  const regionModels = useCompletionsHost && nextRegion === 'domestic' && spec
     ? loadDualAuthApiModels(spec, 'domestic')
     : previousModels;
   const next = {
     ...previous,
-    baseUrl: kimiBaseUrlForRegion(nextRegion),
-    api: kimiApiForRegion(nextRegion),
+    baseUrl: resolvedBaseUrl,
+    api: resolvedApi,
   };
   if (regionModels.length > 0) next.models = regionModels;
   if (!next.name) {
@@ -1414,25 +1467,20 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
   }
   providers[id] = next;
 
-  // The API-key sibling shares the selected Kimi region. Keep its host and
-  // catalog in sync when it already exists; auth saves create it from the
-  // same regional spec via ensureDualAuthApiProviderConfig.
   if (spec && id !== spec.apiId && Object.prototype.hasOwnProperty.call(providers, spec.apiId)) {
     const sibling = providers[spec.apiId] && typeof providers[spec.apiId] === 'object' && !Array.isArray(providers[spec.apiId])
       ? providers[spec.apiId]
       : {};
+    const regional = spec.regions?.[nextRegion] || spec;
     const siblingModels = loadDualAuthApiModels(spec, nextRegion);
     providers[spec.apiId] = {
       ...sibling,
-      baseUrl: kimiBaseUrlForRegion(nextRegion),
-      api: kimiApiForRegion(nextRegion),
+      baseUrl: regional.baseUrl || spec.baseUrl,
+      api: spec.api || 'openai-completions',
       ...(siblingModels.length > 0 ? { models: siblingModels } : {}),
     };
   }
 
-  // Switching away from Kimi Code can leave a stale `k3-*` default pinned in
-  // pichamber.json. Pick a known regional model so the next session cannot
-  // send an international-only id to the China endpoint.
   const defaults = readPiDefaults(home);
   const storedModel = typeof defaults.model === 'string' ? defaults.model.trim() : '';
   const defaultParts = storedModel.includes('/') ? storedModel.split('/', 2) : ['', storedModel];
@@ -1442,7 +1490,7 @@ export const writeKimiRegion = (home = os.homedir(), region, { providerId } = {}
     || (id === KIMI_CODING_PROVIDER_ID
       && (defaultProvider === KIMI_CODING_PROVIDER_ID || defaultProvider === KIMI_CODING_API_PROVIDER_ID))
     || (!defaultProvider && /^(?:k3(?:-|$)|kimi-coding\/k3)/i.test(storedModel));
-  if (nextRegion === 'domestic' && isKimiDefault) {
+  if (useCompletionsHost && nextRegion === 'domestic' && isKimiDefault) {
     const defaultModels = Array.isArray(next.models) ? next.models : [];
     const modelIds = defaultModels.map((model) => model?.id).filter((modelId) => typeof modelId === 'string' && modelId);
     const preferred = modelIds.includes('kimi-k2.6') ? 'kimi-k2.6' : modelIds[0];
@@ -1861,6 +1909,10 @@ export const writePiDefaults = (home = os.homedir(), patch = {}) => {
   }
   if (existingChamber.kimiRegion === 'domestic' || existingChamber.kimiRegion === 'international') {
     chamberOut.kimiRegion = existingChamber.kimiRegion;
+  }
+  const providerRegions = readKimiProviderRegionsMap(existingChamber);
+  if (Object.keys(providerRegions).length > 0) {
+    chamberOut.kimiProviderRegions = providerRegions;
   }
   fs.mkdirSync(path.dirname(chamberPath), { recursive: true });
   fs.writeFileSync(chamberPath, `${JSON.stringify(chamberOut, null, 2)}\n`);

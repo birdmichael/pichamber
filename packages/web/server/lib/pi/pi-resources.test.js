@@ -489,17 +489,18 @@ description: >
       expires: Date.now() + 60_000,
     }, { home });
     const domestic = writeKimiRegion(home, 'domestic', { providerId: 'kimi-coding' });
-    expect(domestic.baseUrl).toBe(KIMI_DOMESTIC_BASE_URL);
-    expect(domestic.api).toBe('openai-completions');
+    // Code OAuth keeps api.kimi.com/coding even when region is China (#645).
+    expect(domestic.baseUrl).toBe(KIMI_INTERNATIONAL_BASE_URL);
+    expect(domestic.api).toBe('anthropic-messages');
     expect(readKimiProviderRegion(home, 'kimi-coding')).toBe('domestic');
     expect(listKimiProviderRegions(home)).toEqual([
-      expect.objectContaining({ providerId: 'kimi-coding', region: 'domestic', baseUrl: KIMI_DOMESTIC_BASE_URL }),
+      expect.objectContaining({ providerId: 'kimi-coding', region: 'domestic', baseUrl: KIMI_INTERNATIONAL_BASE_URL }),
     ]);
     writePiDefaults(home, { model: 'xai/grok-4.6' });
     expect(readKimiRegion(home)).toBe('domestic');
     const models = JSON.parse(fs.readFileSync(path.join(home, '.pi', 'agent', 'models.json'), 'utf8'));
-    expect(models.providers['kimi-coding'].baseUrl).toBe('https://api.moonshot.cn/v1');
-    // Dual-auth sibling host stays moonshot.ai — not rewritten by subscription region.
+    expect(models.providers['kimi-coding'].baseUrl).toBe('https://api.kimi.com/coding');
+    // Dual-auth sibling is not created by region alone.
     expect(models.providers['kimi-coding-api']?.baseUrl).not.toBe('https://api.moonshot.cn/v1');
   });
 
