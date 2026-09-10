@@ -132,6 +132,23 @@ export function readActiveSessionGoalObjective(session: {
 }
 
 /**
+ * Stable string key for file-backed Session Goal objective fetches.
+ * Safe as a useEffect / useSyncExternalStore dependency (primitive).
+ * Do not key off a getSessionGoal() object identity — that changes every call.
+ */
+export function sessionGoalObjectiveFetchKey(
+  sessionId: string,
+  goal: { objectiveFile?: boolean; id?: string; updatedAt?: number } | null | undefined,
+): string {
+  if (!goal || goal.objectiveFile !== true) return '';
+  const id = typeof goal.id === 'string' ? goal.id : '';
+  const updatedAt = typeof goal.updatedAt === 'number' ? goal.updatedAt : 0;
+  const sid = typeof sessionId === 'string' ? sessionId.trim() : '';
+  if (!sid || !id) return '';
+  return `${sid}:${id}:${updatedAt}`;
+}
+
+/**
  * Resolve the text shown in the Pi Current Goal row for a Session Goal.
  * File-backed goals use `fetchedObjective` (null while loading / on failure).
  * Returns null when the goal should not drive the row; '' while a file-backed

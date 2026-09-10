@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { Part } from '@opencode-ai/sdk/v2/client';
 
 import { emptyFeaturePluginsPayload } from '@/components/sections/feature-plugins/featurePlugins';
+import { getSessionGoal } from '@/lib/sessionGoalMetadata';
 import {
   buildPiGoalStartCommand,
   canSubmitPiGoalObjective,
@@ -15,6 +16,7 @@ import {
   isPiGoalPluginAvailable,
   readActiveSessionGoalObjective,
   resolvePiComposerSessionGoalObjective,
+  sessionGoalObjectiveFetchKey,
   readPiGoalObjectiveFromMessages,
   readPiGoalObjectiveFromSession,
   resolvePiGoalSession,
@@ -566,5 +568,76 @@ describe('resolvePiComposerSessionGoalObjective', () => {
       goal: { objective: '', objectiveFile: true, status: 'complete' },
       fetchedObjective: 'stale',
     })).toBeNull();
+  });
+});
+
+describe('sessionGoalObjectiveFetchKey', () => {
+  test('returns a stable primitive key for file-backed goals', () => {
+    const goal = { objectiveFile: true as const, id: 'g1', updatedAt: 42 };
+    expect(sessionGoalObjectiveFetchKey('ses_1', goal)).toBe('ses_1:g1:42');
+    expect(sessionGoalObjectiveFetchKey('ses_1', goal)).toBe(sessionGoalObjectiveFetchKey('ses_1', { ...goal }));
+  });
+
+  test('returns empty when the goal is inline or incomplete', () => {
+    expect(sessionGoalObjectiveFetchKey('ses_1', { objectiveFile: false, id: 'g1', updatedAt: 1 })).toBe('');
+    expect(sessionGoalObjectiveFetchKey('ses_1', null)).toBe('');
+    expect(sessionGoalObjectiveFetchKey('', { objectiveFile: true, id: 'g1', updatedAt: 1 })).toBe('');
+  });
+});
+
+describe('getSessionGoal store-selector safety (#637)', () => {
+  test('parses equal payloads with fresh object identity each call', () => {
+    // useSyncExternalStore treats referential inequality as a state change.
+    // Returning getSessionGoal() from a zustand/useDirectorySync selector
+    // therefore infinite-loops (React #185) whenever a Session Goal is active.
+    const session = {
+      metadata: {
+        openchamber: {
+          goal: {
+            id: 'g1',
+            objective: '',
+            objectiveFile: true,
+            status: 'active',
+            updatedAt: 100,
+          },
+        },
+      },
+    };
+    const a = getSessionGoal(session as never);
+    const b = getSessionGoal(session as never);
+    expect(a).toEqual(b);
+    expect(a).not.toBe(b);
+    expect(sessionGoalObjectiveFetchKey('ses_1', a)).toBe(sessionGoalObjectiveFetchKey('ses_1', b));
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: a ? { objective: a.objective, objectiveFile: a.objectiveFile, status: a.status } : null,
+      fetchedObjective: 'Plan body',
+    })).toBe('Plan body');
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: b ? { objective: b.objective, objectiveFile: b.objectiveFile, status: b.status } : null,
+      fetchedObjective: 'Plan body',
+    })).toBe('Plan body');
+  });
+
+  test('objective resolution stays stable across repeated parses while loading', () => {
+    const session = {
+      metadata: {
+        openchamber: {
+          goal: {
+            id: 'g1',
+            objective: '',
+            objectiveFile: true,
+            status: 'active',
+          },
+        },
+      },
+    };
+    const results = Array.from({ length: 5 }, () => {
+      const goal = getSessionGoal(session as never);
+      return resolvePiComposerSessionGoalObjective({
+        goal: goal ? { objective: goal.objective, objectiveFile: goal.objectiveFile, status: goal.status } : null,
+        fetchedObjective: null,
+      });
+    });
+    expect(results.every((value) => value === '')).toBe(true);
   });
 });
