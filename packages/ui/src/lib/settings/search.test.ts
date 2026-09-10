@@ -523,4 +523,17 @@ describe('settings search', () => {
     expect(idsFor('commands')).not.toContain('feature-plugins.mcp');
     expect(idsFor('commands')).not.toContain('feature-plugins.todo');
   });
+
+  test('Prompt Navigator search hit targets the Chat page', () => {
+    const results = buildSettingsSearchResults({
+      query: 'prompt navigator',
+      runtimeCtx: { ...runtimeCtx, isDesktop: true, isVSCode: false },
+      t: (key) => enDict[key],
+      getPageTitle: (page) => page,
+    });
+    const hit = results.find((result) => result.id === 'chat.prompt-navigator');
+    expect(hit).toBeTruthy();
+    expect(hit?.page).toBe('chat');
+  });
+
 });

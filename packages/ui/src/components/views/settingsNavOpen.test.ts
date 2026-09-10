@@ -37,4 +37,11 @@ describe('settings nav open', () => {
     expect(settingsViewSource).toContain('openPage(page.slug)');
     expect(settingsViewSource).toContain('touch-pan-y');
   });
+
+  test('Settings search results open like nav (pointerdown + click) and clear the query', () => {
+    expect(settingsViewSource).toContain('settingsSearchArmed');
+    expect(settingsViewSource).toContain('openSearchResult(result)');
+    expect(settingsViewSource).toContain("setSettingsSearchQuery('')");
+    expect(settingsViewSource).toContain('key={settingsSlug}');
+  });
 });

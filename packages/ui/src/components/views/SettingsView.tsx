@@ -572,6 +572,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     // Switch the content pane first so a draft/store failure cannot leave
     // the user on the previous page after they chose a search hit.
     openPage(result.page);
+    // Leave search mode so the left rail shows the destination page as
+    // selected (search hits only highlight the result row otherwise — #641).
+    setSettingsSearchQuery('');
     if (isMobile) {
       setMobileStage('page-content');
     }
@@ -637,6 +640,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
     return scheduleSettingsSearchHighlight({
       container: () => containerRef.current,
       targetId,
+      // Chat/OpenChamber pages are heavy; give the target row time to mount (#641).
+      attempts: 60,
       onFound: () => setPendingSearchItemId(null),
     });
   }, [pendingSearchItemId, settingsSlug]);
@@ -915,7 +920,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
                             keyboardSearchNavigationRef.current = false;
                             setActiveSearchResultIndex(currentIndex);
                           }}
-                          onClick={() => openSearchResult(result)}
+                          onPointerDown={(event) => {
+                            if (!shouldOpenSettingsNavOnPointerDown(event, { isMobile })) {
+                              return;
+                            }
+                            event.currentTarget.dataset.settingsSearchArmed = '1';
+                            openSearchResult(result);
+                          }}
+                          onClick={(event) => {
+                            if (event.currentTarget.dataset.settingsSearchArmed === '1') {
+                              delete event.currentTarget.dataset.settingsSearchArmed;
+                              return;
+                            }
+                            openSearchResult(result);
+                          }}
                           className={cn(
                             'flex w-full shrink-0 flex-col rounded-md px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                             hasDescription ? 'min-h-11 py-1.5' : 'min-h-8 py-2',
@@ -1050,7 +1068,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
         const fallback = renderPageContent(settingsSlug);
         return (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-            <ErrorBoundary>{fallback}</ErrorBoundary>
+            <ErrorBoundary key={settingsSlug}>{fallback}</ErrorBoundary>
           </div>
         );
       }
@@ -1068,7 +1086,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
 
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <ErrorBoundary>{content}</ErrorBoundary>
+        <ErrorBoundary key={settingsSlug}>{content}</ErrorBoundary>
       </div>
     );
   };
@@ -1085,7 +1103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
             <ErrorBoundary>{renderPageSidebar(settingsSlug, {})}</ErrorBoundary>
           </div>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-            <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>
+            <ErrorBoundary key={settingsSlug}>{renderPageContent(settingsSlug)}</ErrorBoundary>
           </div>
         </div>
       );
@@ -1093,7 +1111,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
 
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <ErrorBoundary>{renderPageContent(settingsSlug)}</ErrorBoundary>
+        <ErrorBoundary key={settingsSlug}>{renderPageContent(settingsSlug)}</ErrorBoundary>
       </div>
     );
   };
