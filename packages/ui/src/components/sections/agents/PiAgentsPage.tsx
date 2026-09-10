@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { useConfigStore } from '@/stores/useConfigStore';
 import { normalizePiModelProviders } from '@/lib/multirun/piModels';
 import type { ModelPickerProvider } from '@/components/model-picker/ModelPickerList';
+import { SETTINGS_ESCAPE_FORM_EVENT } from '@/lib/settings-dismiss';
 
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 type PiSkill = { name?: string; description?: string };
@@ -75,6 +76,26 @@ export const PiAgentsPage: React.FC = () => {
     setName(selected.name); setScope(selected.scope === 'project' ? 'project' : 'user'); setDescription(selected.description || ''); setDisplayName(typeof fm.display_name === 'string' ? fm.display_name : ''); setModel(selected.model || ''); setThinking(selected.thinking || ''); setTools(arrayValue(selected.tools)); setSkills(arrayValue(fm.skills)); setBody(selected.body || ''); setPromptMode(typeof fm.prompt_mode === 'string' ? fm.prompt_mode : 'append'); setExtensions(arrayValue(fm.extensions).join(', ')); setDisallowedTools(arrayValue(fm.disallowed_tools)); setMemory(typeof fm.memory === 'string' ? fm.memory : ''); setIsolation(typeof fm.isolation === 'string' ? fm.isolation : ''); setMaxTurns(typeof fm.max_turns === 'number' ? String(fm.max_turns) : '');
   }, [isCreating, selected]);
 
+  const abandonNewDraft = React.useCallback(() => {
+    cancelCreating();
+  }, [cancelCreating]);
+
+  const formRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const form = formRef.current;
+    if (!isCreating || !form) {
+      return;
+    }
+    const onAbandon = () => {
+      abandonNewDraft();
+    };
+    form.addEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    return () => {
+      form.removeEventListener(SETTINGS_ESCAPE_FORM_EVENT, onAbandon);
+    };
+  }, [abandonNewDraft, isCreating]);
+
   if (!active) return <SettingsPageLayout title={t('settings.piAgents.title')} description={t('settings.piAgents.pluginRequired')} showSaveStatus={false}><div className="rounded-lg border border-dashed p-6 typography-body text-muted-foreground">{t('settings.piAgents.pluginRequired')}</div></SettingsPageLayout>;
   if (!isCreating && !selectedName) return <SettingsPageLayout title={t('settings.piAgents.piRow')} description={t('settings.piAgents.piRowDescription')} showSaveStatus={false}><div className="space-y-4"><div className="rounded-lg border p-5"><div className="flex items-center gap-2 font-medium"><Icon name="ai-agent" className="h-4 w-4 text-primary" />{t('settings.piAgents.piRow')}</div><p className="mt-2 typography-body text-muted-foreground">{t('settings.piAgents.piExplainer')}</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setSettingsPage('behavior')}>{t('settings.piAgents.openPromptStack')}</Button></div><SystemMdSettings /><PiPromptStack /></div></SettingsPageLayout>;
 
@@ -121,7 +142,19 @@ export const PiAgentsPage: React.FC = () => {
   return (
     <>
       <SettingsPageLayout title={isCreating ? t('settings.piAgents.new') : name} description={readOnly ? t('settings.piAgents.readOnly') : t('settings.piAgents.editDescription')} showSaveStatus={false}>
-        <div className="space-y-4">
+        <div
+          ref={formRef}
+          className="space-y-4"
+          data-settings-escape-form={isCreating ? 'true' : undefined}
+          onKeyDown={(event) => {
+            if (!isCreating || event.key !== 'Escape') {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            abandonNewDraft();
+          }}
+        >
           <SettingsSection title={t('settings.piAgents.basics')} divider={false} contentClassName="space-y-3">
             <label className="block typography-ui-label">{t('settings.piAgents.name')}<Input value={name} onChange={(event) => setName(event.target.value)} disabled={disabled || !isCreating} placeholder="researcher" className="mt-1 max-w-md" /></label>
             <label className="block typography-ui-label">{t('settings.piAgents.displayName')}<Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={disabled} className="mt-1 max-w-md" /></label>
