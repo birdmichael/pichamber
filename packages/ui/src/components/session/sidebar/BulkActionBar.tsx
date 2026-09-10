@@ -124,7 +124,8 @@ export const BulkActionBar: React.FC<Props> = ({
               className={cn(destructiveIconButtonClass)}
               aria-label={destructiveLabel}
             >
-              <Icon name="delete-bin" className="h-4 w-4" />
+              {/* Active sessions archive; archived-bucket bulk delete keeps trash. */}
+              <Icon name={archivedBucket ? 'delete-bin' : 'archive'} className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}><p>{destructiveLabel}</p></TooltipContent>
