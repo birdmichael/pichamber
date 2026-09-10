@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Settings: Pi Agents Create agent no longer crashes with React #310 when hooks ran after the default explainer early return (#672).
 - Composer: Pi thinking chip stays visible for Kimi Code/Kimi K3 Max (and similar) when catalog is empty and live levels collapse while busy (#670).
 - Settings: Esc on MCP Add / Create agent (OpenCode + Pi) abandons the nested draft and keeps Settings open (#631, #591).
 - Composer: Esc dismisses the `#` snippet (and other autocomplete) menus even while a run is active (#590).

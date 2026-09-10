@@ -96,6 +96,13 @@ export const PiAgentsPage: React.FC = () => {
     };
   }, [abandonNewDraft, isCreating]);
 
+  // Must stay above early returns: Create agent toggles past the explainer path and
+  // would otherwise change hook count (React #310 / #672).
+  const toolsChecklist = React.useMemo(
+    () => mergePiToolsChecklist([...tools, ...disallowedTools]),
+    [tools, disallowedTools],
+  );
+
   if (!active) return <SettingsPageLayout title={t('settings.piAgents.title')} description={t('settings.piAgents.pluginRequired')} showSaveStatus={false}><div className="rounded-lg border border-dashed p-6 typography-body text-muted-foreground">{t('settings.piAgents.pluginRequired')}</div></SettingsPageLayout>;
   if (!isCreating && !selectedName) return <SettingsPageLayout title={t('settings.piAgents.piRow')} description={t('settings.piAgents.piRowDescription')} showSaveStatus={false}><div className="space-y-4"><div className="rounded-lg border p-5"><div className="flex items-center gap-2 font-medium"><Icon name="ai-agent" className="h-4 w-4 text-primary" />{t('settings.piAgents.piRow')}</div><p className="mt-2 typography-body text-muted-foreground">{t('settings.piAgents.piExplainer')}</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setSettingsPage('behavior')}>{t('settings.piAgents.openPromptStack')}</Button></div><SystemMdSettings /><PiPromptStack /></div></SettingsPageLayout>;
 
@@ -134,10 +141,6 @@ export const PiAgentsPage: React.FC = () => {
     }
   };
   const disabled = readOnly;
-  const toolsChecklist = React.useMemo(
-    () => mergePiToolsChecklist([...tools, ...disallowedTools]),
-    [tools, disallowedTools],
-  );
 
   return (
     <>
