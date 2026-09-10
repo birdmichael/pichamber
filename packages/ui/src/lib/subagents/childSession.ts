@@ -1,3 +1,5 @@
+import { formatSubagentOwnedLabel } from './parentActivity';
+
 type DirectorySource = {
   directory?: string | null;
 };
@@ -29,6 +31,7 @@ export const contextChatScopeKey = (parentSessionID?: string | null): string => 
 type OpenSubagentChildSessionInput = {
   sessionID?: string | null;
   parentSessionID?: string | null;
+  parentLabel?: string | null;
   directory?: string | null;
   label: string;
   readOnly: boolean;
@@ -65,7 +68,7 @@ export const openSubagentChildSession = (input: OpenSubagentChildSessionInput): 
   input.openContextPanelTab(directory, {
     mode: 'chat',
     dedupeKey: `session:${sessionID}`,
-    label: input.label,
+    label: formatSubagentOwnedLabel(input.label, input.parentLabel),
     readOnly: input.readOnly,
     sessionScope: contextChatScopeKey(input.parentSessionID),
   });

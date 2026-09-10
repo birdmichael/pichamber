@@ -1,7 +1,21 @@
 import React from 'react';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { idleLeftoverBusyAfterSettledAssistant } from '@/sync/event-reducer';
-import { useSessionStatus, useSessionMessages, useSessionPermissions, useSessionQuestions } from '@/sync/sync-context';
+import {
+  useAllLiveSessions,
+  useAllSessionStatuses,
+  useSessionStatus,
+  useSessionMessages,
+  useSessionPermissions,
+  useSessionQuestions,
+} from '@/sync/sync-context';
+import { usePiKernel } from '@/lib/usePiKernel';
+import { useFeaturePluginSlotActive } from '@/stores/useFeaturePluginSlotsStore';
+import { useSubagentRuns } from '@/hooks/useSubagentRuns';
+import {
+  hasActiveSubagentFleet,
+  openCodeChildBusy,
+} from '@/lib/subagents/parentActivity';
 
 // Mirrors OpenCode SessionStatus: busy|retry|idle.
 type SessionActivityPhase = 'idle' | 'busy' | 'retry';
@@ -11,6 +25,11 @@ export interface SessionActivityResult {
   isWorking: boolean;
   isBusy: boolean;
   isCooldown: boolean;
+  /**
+   * Parent turn settled but its Codex-owned subagent fleet is still active.
+   * Keeps the parent from looking finished without arming abort/steer.
+   */
+  waitingForSubagents: boolean;
 }
 
 const IDLE_RESULT: SessionActivityResult = {
@@ -18,6 +37,7 @@ const IDLE_RESULT: SessionActivityResult = {
   isWorking: false,
   isBusy: false,
   isCooldown: false,
+  waitingForSubagents: false,
 };
 
 export type SessionActivityMessage = {
@@ -52,9 +72,15 @@ export function resolveSessionActivity(input: {
   status?: { type?: string } | null;
   lastMessage?: SessionActivityMessage;
   hasBlockingPrompt?: boolean;
+  waitingForSubagents?: boolean;
 }): SessionActivityResult {
   if (!input.sessionId) return IDLE_RESULT;
-  if (input.hasBlockingPrompt) return IDLE_RESULT;
+  if (input.hasBlockingPrompt) {
+    return {
+      ...IDLE_RESULT,
+      waitingForSubagents: Boolean(input.waitingForSubagents),
+    };
+  }
 
   const phase: SessionActivityPhase = (input.status?.type ?? 'idle') as SessionActivityPhase;
   const lastMessage = input.lastMessage ?? null;
@@ -73,21 +99,46 @@ export function resolveSessionActivity(input: {
     && isSettledAssistantMessage(lastMessage)
     && !statusWorking
   ) {
-    return IDLE_RESULT;
+    return overlayWaitingForSubagents(IDLE_RESULT, Boolean(input.waitingForSubagents));
   }
 
   const isWorking = statusWorking || hasPendingAssistant;
 
-  if (hasAuthoritativeStatus && !statusWorking) return IDLE_RESULT;
-  if (!isWorking) return IDLE_RESULT;
+  if (hasAuthoritativeStatus && !statusWorking) {
+    return overlayWaitingForSubagents(IDLE_RESULT, Boolean(input.waitingForSubagents));
+  }
+  if (!isWorking) {
+    return overlayWaitingForSubagents(IDLE_RESULT, Boolean(input.waitingForSubagents));
+  }
 
-  return {
+  return overlayWaitingForSubagents({
     phase: statusWorking ? phase : 'busy',
     isWorking: true,
     isBusy: phase === 'busy' || (!statusWorking && hasPendingAssistant),
     isCooldown: false,
-  };
+    waitingForSubagents: false,
+  }, Boolean(input.waitingForSubagents));
 }
+
+/** Codex: unfinished children keep the parent looking alive without faking busy. */
+export const overlayWaitingForSubagents = (
+  base: SessionActivityResult,
+  waitingForSubagents: boolean,
+): SessionActivityResult => {
+  if (!waitingForSubagents) {
+    return base.waitingForSubagents ? { ...base, waitingForSubagents: false } : base;
+  }
+  if (base.isWorking) {
+    return { ...base, waitingForSubagents: true };
+  }
+  return {
+    phase: 'idle',
+    isWorking: true,
+    isBusy: false,
+    isCooldown: false,
+    waitingForSubagents: true,
+  };
+};
 
 export function useSessionActivity(sessionId: string | null | undefined, directory?: string): SessionActivityResult {
   const status = useSessionStatus(sessionId ?? '', directory);
@@ -108,5 +159,21 @@ export function useSessionActivity(sessionId: string | null | undefined, directo
 export function useCurrentSessionActivity(): SessionActivityResult {
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const currentSessionDirectory = useSessionUIStore((state) => state.currentSessionDirectory);
-  return useSessionActivity(currentSessionId, currentSessionDirectory ?? undefined);
+  const base = useSessionActivity(currentSessionId, currentSessionDirectory ?? undefined);
+  const isPiKernel = usePiKernel();
+  const subagentsSlotActive = useFeaturePluginSlotActive('subagents', isPiKernel);
+  const { runs } = useSubagentRuns(
+    currentSessionId,
+    isPiKernel && subagentsSlotActive,
+    currentSessionDirectory,
+  );
+  const liveSessions = useAllLiveSessions();
+  const statuses = useAllSessionStatuses();
+
+  return React.useMemo<SessionActivityResult>(() => {
+    const waiting = isPiKernel
+      ? hasActiveSubagentFleet(runs)
+      : openCodeChildBusy(liveSessions, currentSessionId, statuses);
+    return overlayWaitingForSubagents(base, waiting);
+  }, [base, currentSessionId, isPiKernel, liveSessions, runs, statuses]);
 }

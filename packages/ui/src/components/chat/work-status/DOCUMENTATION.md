@@ -342,6 +342,20 @@ Opening a subagent takes the same branch as the transcript's Task tool: an
 embedded panel, mobile, or VS Code navigates to the session instead of nesting
 a tab.
 
+### Codex-aligned parent ownership
+
+Subagents belong to the parent session. While any fleet row is still
+`queued` / `running` / `blocked` / `paused` / waiting on permission or a
+question, the parent's activity overlay stays `waitingForSubagents` so the
+composer status line shows "waiting for subagents" instead of looking finished.
+That overlay does **not** fake `session.status` busy, so parent Stop / steer
+stay off; stop a background child from this section instead.
+
+Background successes auto-post a concise handoff into the parent transcript.
+The manual "Resend result to parent" control is a remedy for missed or failed
+handoffs, not the normal completion path. Foreground / failed / stopped rows
+stay manual.
+
 ## Context sources
 
 Linked GitHub threads first, then skills and MCP counts.

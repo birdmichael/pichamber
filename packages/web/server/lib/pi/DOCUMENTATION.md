@@ -1167,6 +1167,11 @@ When the slot is on:
 - `GET /api/session/:id/children` returns those attached child infos. It is
   not leftover in-memory `parentID` clones.
 
+Desktop Work Status treats the fleet as owned by the parent: unfinished
+children keep the parent UI in a waiting-for-subagents state, and background
+completions auto-handoff a summary into the parent transcript (manual resend
+is remedial only). Disk isolation and `parentID` nesting are unchanged.
+
 When the slot is off, adapter children are omitted from `GET /api/session`
 and both fleet lists are empty. Fork/clone `parentID` rows stay. Leftover
 OpenCode `parentID` children are not a Pi fleet. OpenCode kernel routes
