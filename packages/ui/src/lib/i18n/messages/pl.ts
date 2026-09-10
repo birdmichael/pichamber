@@ -3234,6 +3234,8 @@ export const dict: Record<I18nKey, string> = {
   'gitView.stashes.searchPlaceholder': 'Szukaj stashy...',
   'gitView.stashes.title': 'Stashe',
   'gitView.stashes.toast.applyFailed': 'Nie udało się zastosować stasha',
+  'gitView.stashes.toast.localChangesOverwrite': 'Lokalne zmiany zostałyby nadpisane ({paths}); najpierw zrób commit lub stash',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': 'Lokalne zmiany zostałyby nadpisane ({paths}, +{count} więcej); najpierw zrób commit lub stash',
   'gitView.stashes.toast.applySuccess': 'Stash zastosowany',
   'gitView.stashes.toast.createFailed': 'Nie udało się utworzyć stasha',
   'gitView.stashes.toast.created': 'Stash utworzony',

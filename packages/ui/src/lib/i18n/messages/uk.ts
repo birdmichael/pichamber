@@ -979,6 +979,8 @@ export const dict: Record<I18nKey, string> = {
   "gitView.stashes.searchPlaceholder": "Пошук stashes",
   "gitView.stashes.title": "Stashes",
   "gitView.stashes.toast.applyFailed": "Не вдалося застосувати stash",
+  "gitView.stashes.toast.localChangesOverwrite": "Локальні зміни буде перезаписано ({paths}); спочатку зробіть commit або stash",
+  "gitView.stashes.toast.localChangesOverwriteWithMore": "Локальні зміни буде перезаписано ({paths}, ще +{count}); спочатку зробіть commit або stash",
   "gitView.stashes.toast.applySuccess": "Stash застосовано",
   "gitView.stashes.toast.createFailed": "Не вдалося сховати зміни",
   "gitView.stashes.toast.created": "Зміни сховано",

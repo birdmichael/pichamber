@@ -979,6 +979,8 @@ export const dict: Record<I18nKey, string> = {
   'gitView.stashes.searchPlaceholder': '搜索储藏',
   'gitView.stashes.title': '储藏',
   'gitView.stashes.toast.applyFailed': '应用储藏失败',
+  'gitView.stashes.toast.localChangesOverwrite': '本地更改将被覆盖（{paths}）；请先提交或储藏',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': '本地更改将被覆盖（{paths}，另有 {count} 个）；请先提交或储藏',
   'gitView.stashes.toast.applySuccess': '已应用储藏',
   'gitView.stashes.toast.createFailed': '储藏更改失败',
   'gitView.stashes.toast.created': '更改已储藏',

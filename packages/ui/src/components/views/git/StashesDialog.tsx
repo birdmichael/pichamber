@@ -10,6 +10,7 @@ import { rankByQuery } from '@/lib/search/fuzzySearch';
 import { cn } from '@/lib/utils';
 import type { GitStashEntry } from '@/lib/api/types';
 import { applyGitStash, countGitStashFiles, dropGitStash, listGitStashes, popGitStash, stashGitChanges } from '@/lib/gitApi';
+import { summarizeStashActionError } from './stashActionError';
 
 interface StashesDialogProps {
   open: boolean;
@@ -112,7 +113,11 @@ export const StashesDialog: React.FC<StashesDialogProps> = ({
       await refreshAfterChange({ affectsIndex: kind !== 'drop' });
     } catch (error) {
       const failedKey = kind === 'apply' ? 'gitView.stashes.toast.applyFailed' : kind === 'pop' ? 'gitView.stashes.toast.popFailed' : 'gitView.stashes.toast.dropFailed';
-      toast.error(error instanceof Error ? error.message : t(failedKey));
+      toast.error(summarizeStashActionError(error, {
+        fallback: t(failedKey),
+        formatOverwrite: (paths) => t('gitView.stashes.toast.localChangesOverwrite', { paths }),
+        formatOverwriteWithMore: (paths, count) => t('gitView.stashes.toast.localChangesOverwriteWithMore', { paths, count }),
+      }));
       await refreshAfterChange({ affectsIndex: kind !== 'drop' });
     } finally {
       setOperation(null);

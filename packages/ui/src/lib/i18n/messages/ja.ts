@@ -975,6 +975,8 @@ export const dict: Record<I18nKey, string> = {
   'gitView.stashes.searchPlaceholder': 'スタッシュを検索',
   'gitView.stashes.title': 'スタッシュ',
   'gitView.stashes.toast.applyFailed': 'スタッシュの適用に失敗しました',
+  'gitView.stashes.toast.localChangesOverwrite': 'ローカルの変更が上書きされます（{paths}）。先にコミットまたはスタッシュしてください',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': 'ローカルの変更が上書きされます（{paths}、他 {count} 件）。先にコミットまたはスタッシュしてください',
   'gitView.stashes.toast.applySuccess': 'スタッシュを適用しました',
   'gitView.stashes.toast.createFailed': '変更のスタッシュに失敗しました',
   'gitView.stashes.toast.created': '変更をスタッシュしました',

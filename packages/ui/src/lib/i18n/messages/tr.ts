@@ -977,6 +977,8 @@ export const dict = {
   'gitView.stashes.searchPlaceholder': 'Stash\'lerde ara',
   'gitView.stashes.title': 'Stash\'ler',
   'gitView.stashes.toast.applyFailed': 'Stash apply edilemedi',
+  'gitView.stashes.toast.localChangesOverwrite': 'Yerel değişiklikler üzerine yazılır ({paths}); önce commit veya stash yapın',
+  'gitView.stashes.toast.localChangesOverwriteWithMore': 'Yerel değişiklikler üzerine yazılır ({paths}, +{count} daha); önce commit veya stash yapın',
   'gitView.stashes.toast.applySuccess': 'Stash apply edildi',
   'gitView.stashes.toast.createFailed': 'Değişiklikler stash edilemedi',
   'gitView.stashes.toast.created': 'Değişiklikler stash edildi',
