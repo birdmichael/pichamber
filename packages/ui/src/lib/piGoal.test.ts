@@ -14,6 +14,7 @@ import {
   sessionHasPiGoalMarker,
   isPiGoalPluginAvailable,
   readActiveSessionGoalObjective,
+  resolvePiComposerSessionGoalObjective,
   readPiGoalObjectiveFromMessages,
   readPiGoalObjectiveFromSession,
   resolvePiGoalSession,
@@ -506,10 +507,64 @@ describe('readActiveSessionGoalObjective', () => {
     })).toBe('Ship the Plan as a goal');
   });
 
+  test('signals file-backed Plan Run-as-goal objectives instead of treating them as absent', () => {
+    // Large plan objectives land as objective:"" + objectiveFile:true. Readers
+    // that only inspect /goal user text or non-empty metadata miss the row (#637).
+    expect(readActiveSessionGoalObjective({
+      metadata: {
+        openchamber: {
+          goal: {
+            id: 'g1',
+            objective: '',
+            objectiveFile: true,
+            status: 'active',
+          },
+        },
+      },
+    })).toBe('');
+  });
+
   test('ignores complete and missing goals', () => {
     expect(readActiveSessionGoalObjective({
       metadata: { openchamber: { goal: { id: 'g1', objective: 'done', status: 'complete' } } },
     })).toBeNull();
+    expect(readActiveSessionGoalObjective({
+      metadata: {
+        openchamber: {
+          goal: { id: 'g1', objective: '', objectiveFile: true, status: 'complete' },
+        },
+      },
+    })).toBeNull();
     expect(readActiveSessionGoalObjective({ metadata: {} })).toBeNull();
+  });
+});
+
+describe('resolvePiComposerSessionGoalObjective', () => {
+  test('uses fetched file content for objectiveFile Session Goals', () => {
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: { objective: '', objectiveFile: true, status: 'active' },
+      fetchedObjective: 'Implement the plan end-to-end',
+    })).toBe('Implement the plan end-to-end');
+  });
+
+  test('keeps the Current Goal row mounted while file content is loading', () => {
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: { objective: '', objectiveFile: true, status: 'active' },
+      fetchedObjective: null,
+    })).toBe('');
+  });
+
+  test('returns inline objective without requiring a fetch', () => {
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: { objective: 'Ship footer', objectiveFile: false, status: 'active' },
+      fetchedObjective: null,
+    })).toBe('Ship footer');
+  });
+
+  test('hides complete goals so Goal complete can clear the row', () => {
+    expect(resolvePiComposerSessionGoalObjective({
+      goal: { objective: '', objectiveFile: true, status: 'complete' },
+      fetchedObjective: 'stale',
+    })).toBeNull();
   });
 });
