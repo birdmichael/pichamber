@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getCycledPrimaryAgentName } from '../mobileControlsUtils';
 
 const chatInputSource = readFileSync(
-  resolve(import.meta.dir, '../ChatInput.tsx'),
+  join(dirname(fileURLToPath(import.meta.url)), '../ChatInput.tsx'),
   'utf8',
 );
 
