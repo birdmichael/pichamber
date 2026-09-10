@@ -321,10 +321,13 @@ list the sibling — use the Kimi Code / xAI card. Custom provider create
 cannot use the reserved sibling ids.
 
 A **second OAuth subscription** is a numeric clone (`xai-2`, `kimi-coding-2`),
-not a second object under `xai`. Add Grok/Kimi Code while the family is
-already connected: `POST /api/pi/subscription-clones` writes `models.json`
-for the new id (official base URL, copied catalog models, display name) and
-leaves the first `auth.json` key untouched. OAuth authorize/callback accept
+not a second object under `xai`. Add Grok/Kimi Code while the **root** id is
+stored in `auth.json` / `models.json`: `POST /api/pi/subscription-clones`
+writes `models.json` for the new id (official base URL, copied catalog models,
+display name) and leaves the first `auth.json` key untouched. An API-only
+sibling (`kimi-coding-api` or a numeric row named like "Kimi API") must **not**
+count as root-connected — Settings opens Sign-in for `kimi-coding` instead of
+cloning (#643). Provider sources expose `catalogAuth.exists` for that check. OAuth authorize/callback accept
 those clone ids and store tokens under the clone id. Dual-auth siblings
 `xai-api` / `kimi-coding-api` are not clones. Display name is `models.json`
 `name` via `PATCH /api/pi/subscription-clones/:id`. Kimi **国际 / 国内** is

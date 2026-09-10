@@ -698,9 +698,15 @@ export const getPiProviderSources = (providerId, { home = os.homedir(), director
       apiKey: { exists: Boolean(cloneStored && cloneMethod === 'api'), path: authPath },
     }
     : null;
+  // catalogAuth = this provider id's own auth.json entry (not dual-auth sibling).
+  // Matches createSubscriptionClone hasRoot / listStoredProviderIds for the root id (#643).
+  const catalogAuthExists = spec
+    ? (isDualAuthCatalogId(providerId) ? catalogStored : siblingStored)
+    : Boolean(auth[providerId]);
   return {
     sources: {
       auth: { exists: authExists, path: authPath },
+      catalogAuth: { exists: Boolean(catalogAuthExists), path: authPath },
       user: { exists: Object.prototype.hasOwnProperty.call(providers, providerId), path: modelsPath },
       project: {
         exists: Object.prototype.hasOwnProperty.call(projectProviders, providerId),

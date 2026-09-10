@@ -71,6 +71,12 @@ describe('createSubscriptionClone', () => {
     expect(() => createSubscriptionClone({ home, family: 'xai' })).toThrow(/before adding another/);
   });
 
+  it('rejects clone when only Kimi API sibling remains (#643)', () => {
+    const home = makeTemp();
+    writePiProviderAuth('kimi-coding-2', { type: 'api', key: 'sk-kimi-api-only' }, { home });
+    expect(() => createSubscriptionClone({ home, family: 'kimi-coding' })).toThrow(/before adding another/);
+  });
+
   it('renames without wiping models', () => {
     const home = makeTemp();
     writePiProviderAuth('xai', {

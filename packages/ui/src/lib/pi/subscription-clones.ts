@@ -79,3 +79,35 @@ export const familyHasRootConnected = (
   family: 'xai' | 'kimi-coding',
   connectedIds: ReadonlySet<string>,
 ): boolean => connectedIds.has(family);
+
+export type FamilyRootSources = {
+  catalogAuth?: { exists?: boolean } | null;
+  user?: { exists?: boolean } | null;
+  oauth?: { exists?: boolean } | null;
+  apiKey?: { exists?: boolean } | null;
+  auth?: { exists?: boolean } | null;
+};
+
+/**
+ * True when the root family id itself is stored in auth.json or models.json.
+ * Dual-auth API siblings make `auth.exists` / connected catalog rows look live
+ * without a root key — those must NOT unlock clone (#643).
+ * Matches server `listStoredProviderIds(...).includes(family)`.
+ */
+export const familyRootIsStored = (sources?: FamilyRootSources | null): boolean => Boolean(
+  sources?.catalogAuth?.exists || sources?.user?.exists,
+);
+
+/**
+ * Whether Add → official subscription should POST /subscription-clones.
+ * Prefer `familyRootIsStored(sources)` when sources are available; connectedIds
+ * alone can be polluted by dual-auth API siblings.
+ */
+export const shouldCloneOfficialSubscription = (
+  family: 'xai' | 'kimi-coding',
+  connectedIds: ReadonlySet<string>,
+  sources?: FamilyRootSources | null,
+): boolean => {
+  if (sources) return familyRootIsStored(sources);
+  return familyHasRootConnected(family, connectedIds);
+};
