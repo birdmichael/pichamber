@@ -141,10 +141,33 @@ export class GitDirectoriesUnsupportedError extends Error {
   }
 }
 
+export class GitDirectoriesOutsideWorkspaceError extends Error {
+  constructor(message = 'Path is outside of active workspace') {
+    super(message);
+    this.name = 'GitDirectoriesOutsideWorkspaceError';
+  }
+}
+
 export async function listGitDirectories(root: string): Promise<string[]> {
-  const response = await runtimeFetch('/api/fs/git-dirs', { query: { path: root } });
+  // Scope the FS workspace to `root`. Without this header the server falls
+  // back to lastDirectory / active project and rejects discovery with 400
+  // whenever the caller asks about a different known project root (#664).
+  const response = await runtimeFetch('/api/fs/git-dirs', {
+    query: { path: root },
+    headers: root ? { 'x-opencode-directory': root } : undefined,
+  });
   if (response.status === 501) {
     throw new GitDirectoriesUnsupportedError();
+  }
+  if (response.status === 400) {
+    const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+    const message = typeof payload?.error === 'string' && payload.error.trim()
+      ? payload.error.trim()
+      : response.statusText || 'Bad Request';
+    if (/outside of active workspace/i.test(message)) {
+      throw new GitDirectoriesOutsideWorkspaceError(message);
+    }
+    throw new Error(`Failed to list git directories: ${message}`);
   }
   if (!response.ok) {
     throw new Error(`Failed to list git directories: ${response.statusText}`);

@@ -14,8 +14,15 @@ const listGitDirectoriesControl: { impl: (root: string) => Promise<string[]> } =
   },
 };
 class TestGitDirectoriesUnsupportedError extends Error {}
+class TestGitDirectoriesOutsideWorkspaceError extends Error {
+  constructor(message = 'Path is outside of active workspace') {
+    super(message);
+    this.name = 'GitDirectoriesOutsideWorkspaceError';
+  }
+}
 mock.module('@/lib/gitApiHttp', () => ({
   GitDirectoriesUnsupportedError: TestGitDirectoriesUnsupportedError,
+  GitDirectoriesOutsideWorkspaceError: TestGitDirectoriesOutsideWorkspaceError,
   listGitDirectories: (root: string) => listGitDirectoriesControl.impl(root),
 }));
 
@@ -528,6 +535,26 @@ describe('useGitStore nested repository discovery', () => {
     await useGitStore.getState().ensureNestedRepos('/root-a');
 
     expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBe('unsupported');
+  });
+
+  test('treats outside-workspace discovery as a quiet miss', async () => {
+    const errors: unknown[] = [];
+    const previousError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    try {
+      listGitDirectoriesControl.impl = async () => {
+        throw new TestGitDirectoriesOutsideWorkspaceError();
+      };
+
+      await useGitStore.getState().ensureNestedRepos('/root-a');
+
+      expect(useGitStore.getState().nestedReposByRoot.get('/root-a')).toBeNull();
+      expect(errors).toHaveLength(0);
+    } finally {
+      console.error = previousError;
+    }
   });
 
   test('unsupported does not clobber a previous successful discovery', async () => {
