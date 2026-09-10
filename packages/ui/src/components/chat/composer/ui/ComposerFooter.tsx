@@ -16,6 +16,7 @@ import React from 'react';
 import { PiGoalButton } from '@/components/chat/PiGoalButton';
 import { SessionGoalButton, SessionGoalObjectiveCounter } from '@/components/chat/SessionGoalButton';
 import { ComposerDictation } from '@/components/dictation/ComposerDictation';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { isSessionGoalVisibleOnPiKernel, usePiKernel } from '@/lib/usePiKernel';
@@ -201,26 +202,33 @@ export function ComposerFooter(props: ComposerFooterProps) {
                         </div>
                         <div className="flex items-center min-w-0 gap-x-1 justify-end">
                             <div className="flex items-center gap-x-1 flex-shrink-0">
-                                <button
-                                    type="button"
-                                    className={footerIconButtonClass}
-                                    // Keep the soft keyboard open (same guard as
-                                    // PermissionAutoAcceptButton); the recording
-                                    // engine lives in the wrapper-level
-                                    // ComposerDictation instance.
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onPointerDownCapture={(event) => {
-                                        if (event.pointerType === 'touch') {
-                                            event.preventDefault();
-                                        }
-                                    }}
-                                    onClick={onStartDictation}
-                                    disabled={dictationActive}
-                                    title={t('chat.dictation.start')}
-                                    aria-label={t('chat.dictation.start')}
-                                >
-                                    <Icon name="mic" className={cn(iconSizeClass, 'text-current')} />
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className={footerIconButtonClass}
+                                            // Keep the soft keyboard open (same guard as
+                                            // PermissionAutoAcceptButton); the recording
+                                            // engine lives in the wrapper-level
+                                            // ComposerDictation instance.
+                                            onMouseDown={(event) => event.preventDefault()}
+                                            onPointerDownCapture={(event) => {
+                                                if (event.pointerType === 'touch') {
+                                                    event.preventDefault();
+                                                }
+                                            }}
+                                            onClick={onStartDictation}
+                                            disabled={dictationActive}
+                                            title={t('chat.dictation.start')}
+                                            aria-label={t('chat.dictation.start')}
+                                        >
+                                            <Icon name="mic" className={cn(iconSizeClass, 'text-current')} />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" sideOffset={8}>
+                                        {t('chat.dictation.start')}
+                                    </TooltipContent>
+                                </Tooltip>
                                 <ComposerActionButtons
                                     isMobile={isMobile}
                                     footerIconButtonClass={footerIconButtonClass}

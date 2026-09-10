@@ -10,6 +10,7 @@ import React from 'react';
 
 import { Icon } from '@/components/icon/Icon';
 import { StopIcon } from '@/components/icons/StopIcon';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +29,22 @@ type ComposerActionButtonsProps = {
     onAbort: () => void;
 };
 
+function IconActionTooltip(props: {
+    label: string;
+    children: React.ReactElement;
+}) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                {props.children}
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+                {props.label}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
 export const ComposerActionButtons = React.memo(function ComposerActionButtons(props: ComposerActionButtonsProps) {
     const {
         isMobile,
@@ -44,25 +61,32 @@ export const ComposerActionButtons = React.memo(function ComposerActionButtons(p
     } = props;
     const { t } = useI18n();
 
+    const sendLabel = t('chat.chatInput.actions.sendMessageAria');
+    const queueLabel = t('chat.chatInput.actions.queueMessageAria');
+    const stopLabel = t('chat.chatInput.actions.stopGeneratingAria');
+
     const sendButton = (
-        <button
-            type="button"
-            disabled={!canSend}
-            onClick={(event) => {
-                event.preventDefault();
-                onPrimaryAction();
-            }}
-            className={cn(
-                footerIconButtonClass,
-                canSend
-                    ? 'text-primary hover:text-primary'
-                    : 'opacity-30'
-            )}
-            aria-label={t('chat.chatInput.actions.sendMessageAria')}
-            data-composer-send=""
-        >
-            <Icon name="send-plane-2" className={cn(sendIconSizeClass)} />
-        </button>
+        <IconActionTooltip label={sendLabel}>
+            <button
+                type="button"
+                disabled={!canSend}
+                onClick={(event) => {
+                    event.preventDefault();
+                    onPrimaryAction();
+                }}
+                className={cn(
+                    footerIconButtonClass,
+                    canSend
+                        ? 'text-primary hover:text-primary'
+                        : 'opacity-30'
+                )}
+                title={sendLabel}
+                aria-label={sendLabel}
+                data-composer-send=""
+            >
+                <Icon name="send-plane-2" className={cn(sendIconSizeClass)} />
+            </button>
+        </IconActionTooltip>
     );
 
     if (!canAbort) {
@@ -72,36 +96,42 @@ export const ComposerActionButtons = React.memo(function ComposerActionButtons(p
     return (
         <div className="relative">
             {hasContent ? (
+                <IconActionTooltip label={queueLabel}>
+                    <button
+                        type="button"
+                        disabled={!currentSessionId}
+                        onClick={(event) => {
+                            if (isMobile) {
+                                event.preventDefault();
+                            }
+                            onQueueMessage();
+                        }}
+                        className={cn(
+                            footerIconButtonClass,
+                            'absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1',
+                            currentSessionId ? 'text-primary hover:text-primary' : 'opacity-30'
+                        )}
+                        title={queueLabel}
+                        aria-label={queueLabel}
+                    >
+                        <Icon name="send-plane-2" className={cn(sendIconSizeClass, '-rotate-90')} />
+                    </button>
+                </IconActionTooltip>
+            ) : null}
+            <IconActionTooltip label={stopLabel}>
                 <button
                     type="button"
-                    disabled={!currentSessionId}
-                    onClick={(event) => {
-                        if (isMobile) {
-                            event.preventDefault();
-                        }
-                        onQueueMessage();
-                    }}
+                    onClick={onAbort}
                     className={cn(
                         footerIconButtonClass,
-                        'absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-1',
-                        currentSessionId ? 'text-primary hover:text-primary' : 'opacity-30'
+                        'text-[var(--status-error)] hover:text-[var(--status-error)]'
                     )}
-                    aria-label={t('chat.chatInput.actions.queueMessageAria')}
+                    title={stopLabel}
+                    aria-label={stopLabel}
                 >
-                    <Icon name="send-plane-2" className={cn(sendIconSizeClass, '-rotate-90')} />
+                    <StopIcon className={cn(stopIconSizeClass)} />
                 </button>
-            ) : null}
-            <button
-                type="button"
-                onClick={onAbort}
-                className={cn(
-                    footerIconButtonClass,
-                    'text-[var(--status-error)] hover:text-[var(--status-error)]'
-                )}
-                aria-label={t('chat.chatInput.actions.stopGeneratingAria')}
-            >
-                <StopIcon className={cn(stopIconSizeClass)} />
-            </button>
+            </IconActionTooltip>
         </div>
     );
 }, (prev, next) => (

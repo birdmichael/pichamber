@@ -34,6 +34,7 @@ export const FocusModeButton = React.memo(function FocusModeButton(props: FocusM
                         event.preventDefault();
                     }}
                     onClick={onToggle}
+                    title={t('chat.chatInput.focusMode.label')}
                     aria-label={t('chat.chatInput.focusMode.toggleAria')}
                     aria-pressed={isExpandedInput}
                 >

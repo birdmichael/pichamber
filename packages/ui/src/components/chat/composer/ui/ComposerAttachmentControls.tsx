@@ -16,6 +16,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -48,47 +49,68 @@ export const ComposerAttachmentControls = React.memo(function ComposerAttachment
         <div className="flex items-center gap-x-1.5">
             <div className="relative inline-flex">
                 {props.onOpenMobileSheet ? (
-                    <button
-                        type="button"
-                        className={footerIconButtonClass}
-                        onClick={props.onOpenMobileSheet}
-                        // Same guard as PermissionAutoAcceptButton: keep the tap
-                        // from dismissing the keyboard. On Android's
-                        // resizes-content viewport the keyboard-close relayout
-                        // moves this button mid-tap and the click never lands.
-                        onMouseDown={(event) => event.preventDefault()}
-                        onPointerDownCapture={(event) => {
-                            if (event.pointerType === 'touch') {
-                                event.preventDefault();
-                            }
-                        }}
-                        title={t('chat.chatInput.actions.addAttachment')}
-                        aria-label={t('chat.chatInput.actions.addAttachment')}
-                    >
-                        <Icon name="add-circle" className={cn(iconSizeClass, 'text-current')} />
-                    </button>
-                ) : isVSCode ? (
-                    <button
-                        type="button"
-                        className={footerIconButtonClass}
-                        onClick={handlePickLocalFiles}
-                        title={t('chat.chatInput.actions.attachFiles')}
-                        aria-label={t('chat.chatInput.actions.attachFiles')}
-                    >
-                        <Icon name="attachment-2" className={cn(iconSizeClass, 'text-current')} />
-                    </button>
-                ) : (
-                    <DropdownMenu onOpenChange={props.onMenuOpenChange}>
-                        <DropdownMenuTrigger asChild>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
                             <button
                                 type="button"
                                 className={footerIconButtonClass}
+                                onClick={props.onOpenMobileSheet}
+                                // Same guard as PermissionAutoAcceptButton: keep the tap
+                                // from dismissing the keyboard. On Android's
+                                // resizes-content viewport the keyboard-close relayout
+                                // moves this button mid-tap and the click never lands.
+                                onMouseDown={(event) => event.preventDefault()}
+                                onPointerDownCapture={(event) => {
+                                    if (event.pointerType === 'touch') {
+                                        event.preventDefault();
+                                    }
+                                }}
                                 title={t('chat.chatInput.actions.addAttachment')}
                                 aria-label={t('chat.chatInput.actions.addAttachment')}
                             >
                                 <Icon name="add-circle" className={cn(iconSizeClass, 'text-current')} />
                             </button>
-                        </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" sideOffset={8}>
+                            {t('chat.chatInput.actions.addAttachment')}
+                        </TooltipContent>
+                    </Tooltip>
+                ) : isVSCode ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                className={footerIconButtonClass}
+                                onClick={handlePickLocalFiles}
+                                title={t('chat.chatInput.actions.attachFiles')}
+                                aria-label={t('chat.chatInput.actions.attachFiles')}
+                            >
+                                <Icon name="attachment-2" className={cn(iconSizeClass, 'text-current')} />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" sideOffset={8}>
+                            {t('chat.chatInput.actions.attachFiles')}
+                        </TooltipContent>
+                    </Tooltip>
+                ) : (
+                    <DropdownMenu onOpenChange={props.onMenuOpenChange}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className={footerIconButtonClass}
+                                        title={t('chat.chatInput.actions.addAttachment')}
+                                        aria-label={t('chat.chatInput.actions.addAttachment')}
+                                    >
+                                        <Icon name="add-circle" className={cn(iconSizeClass, 'text-current')} />
+                                    </button>
+                                </DropdownMenuTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" sideOffset={8}>
+                                {t('chat.chatInput.actions.addAttachment')}
+                            </TooltipContent>
+                        </Tooltip>
                         <DropdownMenuContent align="start">
                             <DropdownMenuItem
                                 onSelect={() => {
@@ -120,15 +142,22 @@ export const ComposerAttachmentControls = React.memo(function ComposerAttachment
             </div>
 
             {onOpenSettings ? (
-                <button
-                    type="button"
-                    onClick={onOpenSettings}
-                    className={footerIconButtonClass}
-                    title={t('chat.chatInput.actions.modelAgentSettings')}
-                    aria-label={t('chat.chatInput.actions.modelAgentSettings')}
-                >
-                    <Icon name="ai-agent" className={cn(iconSizeClass, 'text-current')} />
-                </button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            type="button"
+                            onClick={onOpenSettings}
+                            className={footerIconButtonClass}
+                            title={t('chat.chatInput.actions.modelAgentSettings')}
+                            aria-label={t('chat.chatInput.actions.modelAgentSettings')}
+                        >
+                            <Icon name="ai-agent" className={cn(iconSizeClass, 'text-current')} />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={8}>
+                        {t('chat.chatInput.actions.modelAgentSettings')}
+                    </TooltipContent>
+                </Tooltip>
             ) : null}
         </div>
     );
