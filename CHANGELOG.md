@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed / Improved
+- UI: restore `@pichamber/ui` typecheck for publish-npm (assistant visible-content / notes tests, assistant status casts, Browser host-origin narrowing, header meta draft open) (#733) ($).
+
 ## [1.2.19] - 2026-09-11
 
 ### Fixed / Improved

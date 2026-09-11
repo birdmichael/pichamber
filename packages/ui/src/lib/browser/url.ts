@@ -177,9 +177,11 @@ export const isHostAppBrowserUrl = (
     return false;
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
-  const list = Array.isArray(origins)
+  // `Array.isArray` does not narrow `readonly string[]` away from the object
+  // branch (TS type predicate is `any[]`), so cast the HostAppBrowserOrigins path.
+  const list: readonly string[] = Array.isArray(origins)
     ? origins
-    : collectHostAppBrowserOrigins(origins);
+    : collectHostAppBrowserOrigins(origins as HostAppBrowserOrigins);
   return list.includes(parsed.origin);
 };
 
