@@ -1323,6 +1323,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.browser.device.schemeDark': '深色',
   'contextPanel.browser.device.schemeFailed': '无法更改页面外观',
   'contextPanel.browser.frameTitle': '浏览器',
+  'contextPanel.browser.hostAppBlocked': '无法在浏览器面板中打开 Pichamber 应用本身。',
   'contextPanel.browser.loadFailed': '无法加载此页面',
   'contextPanel.browser.waitingForServer': '正在等待开发服务器',
   'contextPanel.browser.waitingForServerHint': '它还没有开始接受连接。一旦可用，本页就会加载。',

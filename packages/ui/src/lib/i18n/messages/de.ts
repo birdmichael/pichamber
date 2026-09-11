@@ -1123,6 +1123,7 @@ export const dict = {
   'contextPanel.browser.device.schemeDark': 'Dunkel',
   'contextPanel.browser.device.schemeFailed': 'Das Seitenaussehen konnte nicht geändert werden',
   'contextPanel.browser.frameTitle': 'Browser',
+  'contextPanel.browser.hostAppBlocked': 'Die Pichamber-App kann nicht im Browser-Panel geöffnet werden.',
   'contextPanel.browser.loadFailed': 'Diese Seite konnte nicht geladen werden',
   'contextPanel.browser.waitingForServer': 'Warte auf den Dev-Server',
   'contextPanel.browser.waitingForServerHint': 'Er nimmt noch keine Verbindungen an. Die Seite lädt, sobald er es tut.',

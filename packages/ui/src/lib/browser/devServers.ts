@@ -6,6 +6,7 @@
  * into the same empty list.
  */
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { isHostAppBrowserUrl, readHostAppBrowserOrigins } from './url';
 
 export type DiscoveredDevServer = {
   readonly port: number;
@@ -106,12 +107,16 @@ const portOf = (url: string): number | null => {
 export const mergeDevServerCandidates = ({
   announced,
   discovered,
+  hostOrigins = readHostAppBrowserOrigins(),
 }: {
   announced: ReadonlyArray<string>;
   discovered: ReadonlyArray<DiscoveredDevServer> | null;
+  /** Origins of this Pichamber instance — never offered as Browser targets (#726). */
+  hostOrigins?: readonly string[];
 }): DevServerCandidate[] => {
   const announcedByPort = new Map<number, string>();
   for (const url of announced) {
+    if (isHostAppBrowserUrl(url, hostOrigins)) continue;
     const port = portOf(url);
     if (port !== null && !announcedByPort.has(port)) announcedByPort.set(port, url);
   }

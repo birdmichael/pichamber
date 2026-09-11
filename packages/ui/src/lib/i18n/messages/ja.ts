@@ -1319,6 +1319,7 @@ export const dict: Record<I18nKey, string> = {
   'contextPanel.browser.device.schemeDark': 'ダーク',
   'contextPanel.browser.device.schemeFailed': 'ページの外観を変更できませんでした',
   'contextPanel.browser.frameTitle': 'ブラウザ',
+  'contextPanel.browser.hostAppBlocked': 'ブラウザパネル内で Pichamber アプリ自体は開けません。',
   'contextPanel.browser.loadFailed': 'このページを読み込めませんでした',
   'contextPanel.browser.waitingForServer': '開発サーバーを待っています',
   'contextPanel.browser.waitingForServerHint': 'まだ接続を受け付けていません。受け付け次第このページを読み込みます。',
