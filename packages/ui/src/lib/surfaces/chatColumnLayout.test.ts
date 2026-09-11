@@ -19,12 +19,12 @@ describe('chat column layout', () => {
     expect(reservedMainWidthForContextPanel(true)).toBe(
       PARENT_CHAT_MIN_WIDTH + WORK_STATUS_OCCUPIED_WIDTH,
     );
-    expect(reservedMainWidthForContextPanel(true)).toBe(644);
+    expect(reservedMainWidthForContextPanel(true)).toBe(PARENT_CHAT_MIN_WIDTH + WORK_STATUS_OCCUPIED_WIDTH);
   });
 
-  test('caps the child pane so the parent cannot collapse below ~320px at a 1280 window', () => {
+  test('caps the child pane so the parent cannot collapse below the chat floor at a 1280 window', () => {
     // Live leftover: window ~1288, sidebar x≈305, child ~430, Work Status ~300,
-    // parent ~150. Chat-area is the flex parent of <main> + ContextPanel.
+    // parent was collapsing. Chat-area is the flex parent of <main> + ContextPanel.
     const chatArea = 1280 - 305;
     const desiredChild = 430;
     const clamped = clampContextPanelLayoutWidth(desiredChild, chatArea, { workStatusInline: true });
@@ -45,7 +45,7 @@ describe('chat column layout', () => {
   });
 
   test('keeps a narrower child when Work Status is closed', () => {
-    const chatArea = 800;
+    const chatArea = 1000;
     const clamped = clampContextPanelLayoutWidth(430, chatArea, { workStatusInline: false });
     expect(clamped).toBe(430);
     expect(parentChatWidthAfterLayout(chatArea, clamped, false)).toBeGreaterThanOrEqual(PARENT_CHAT_MIN_WIDTH);
@@ -53,8 +53,8 @@ describe('chat column layout', () => {
 
   test('Work Status visibility threshold is independent of the parent floor used while a child tab is open', () => {
     // Showing the card still wants a generous transcript when it is the only
-    // extra column. The child-tab clamp uses PARENT_CHAT_MIN_WIDTH (320), not
-    // this 560, so a 1280 window can keep both open.
+    // extra column. The child-tab clamp uses PARENT_CHAT_MIN_WIDTH, not
+    // this 560, so a roomy window can keep both open.
     expect(WORK_STATUS_REQUIRED_ROW_WIDTH).toBe(884);
     expect(1280 - 305).toBeGreaterThanOrEqual(WORK_STATUS_REQUIRED_ROW_WIDTH);
   });

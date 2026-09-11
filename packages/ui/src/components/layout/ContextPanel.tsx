@@ -1167,7 +1167,9 @@ export const ContextPanel: React.FC = () => {
         // animates and the panel grows leftwards from its docked position.
         isExpanded
           ? 'absolute inset-y-0 right-0 z-20 min-w-0'
-          : 'relative h-full min-w-0 shrink',
+          // shrink-0 when docked: an explicit width already caps via --oc-chat-reserved.
+          // flex-shrink + min-w-0 let Git/Changes crush the chat column below that floor.
+          : 'relative h-full min-w-0 shrink-0',
         !isOpen && 'pointer-events-none',
         'will-change-[width] motion-reduce:transition-none',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]'

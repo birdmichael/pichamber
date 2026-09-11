@@ -8,8 +8,10 @@
  * eaten by the 300px card and the first message collapsed to ~150px.
  */
 
-/** Usable floor for the parent transcript + composer. Honored in CSS, not only as a clamp hint. */
-export const PARENT_CHAT_MIN_WIDTH = 320;
+/** Usable floor for the parent transcript + composer. Honored in CSS, not only as a clamp hint.
+ *  400px keeps composer chips usable when Git + Changes (wide diff) contend at 1920×1080;
+ *  Agent still self-hides below 576px via composerAgentSlotLayout. */
+export const PARENT_CHAT_MIN_WIDTH = 400;
 
 /** Fixed Work Status card width. The panel is not user-resizable. */
 export const WORK_STATUS_PANEL_WIDTH = 300;
