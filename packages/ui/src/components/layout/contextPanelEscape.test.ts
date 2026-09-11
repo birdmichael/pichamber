@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import { shouldYieldFilesPanelEscape } from './contextPanelEscape';
 
@@ -23,6 +23,12 @@ const targetClosest = (hit: string | null): EventTarget => ({
 } as unknown as EventTarget);
 
 describe('shouldYieldFilesPanelEscape', () => {
+  afterEach(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.remove('oc-dialog-open');
+    }
+  });
+
   test('does not yield when no Files overlay is open', () => {
     expect(shouldYieldFilesPanelEscape({
       target: targetClosest(null),
@@ -75,6 +81,31 @@ describe('shouldYieldFilesPanelEscape', () => {
       target: targetClosest(null),
       root: rootWith('[data-slot="dialog-content"]'),
     })).toBe(false);
+  });
+
+
+  test('yields while a dialog layer is mounted even if focus stayed in the panel', () => {
+    // happy-dom / browser: oc-dialog-open is toggled by DialogOverlay mount.
+    // In plain bun (no document), fall back to an open dialog-content attr.
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('oc-dialog-open');
+      expect(shouldYieldFilesPanelEscape({
+        target: targetClosest(null),
+        root: rootWith(null),
+      })).toBe(true);
+    } else {
+      expect(shouldYieldFilesPanelEscape({
+        target: targetClosest(null),
+        root: rootWith('[data-slot="dialog-content"][data-open]'),
+      })).toBe(true);
+    }
+  });
+
+  test('yields for data-context-panel-escape-form nested forms', () => {
+    expect(shouldYieldFilesPanelEscape({
+      target: targetClosest(null),
+      root: rootWith('[data-context-panel-escape-form]'),
+    })).toBe(true);
   });
 
   test('does not yield for the Files editor find bar (issue #512)', () => {
