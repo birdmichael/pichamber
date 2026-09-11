@@ -41,7 +41,7 @@ import { cycleComposerThinking } from '@/components/chat/cycleComposerThinking';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 import { isQuestionAnswerTextarea } from '@/components/chat/questionAnswerFocus';
 import { addSelectionToChat } from '@/lib/addSelectionToChat';
-import { shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
+import { requestCloseFilesFind, shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
 import { shouldCollapseExpandedInputOnEscape } from '@/lib/composer/expandedInputEscape';
 import { isInsideSettingsDialog, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
@@ -451,6 +451,10 @@ export const useKeyboardShortcuts = () => {
         return;
       }
       if (shouldYieldFilesPanelEscape(event, document.querySelector('[data-context-panel="true"]'))) {
+        // Stop before ContextPanel capture closes Files; dismiss find only (#712).
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        requestCloseFilesFind();
         resetAbortPriming();
         return;
       }

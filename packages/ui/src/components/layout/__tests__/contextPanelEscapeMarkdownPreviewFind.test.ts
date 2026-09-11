@@ -32,17 +32,20 @@ describe('issue #414: Escape with Markdown preview find open must not close the 
 
     expect(handler).toContain("event.key !== 'Escape'");
     expect(handler).toContain('isTerminalEventTarget(event.target)');
-    expect(handler).toContain('shouldYieldFilesPanelEscape');
+    expect(handler).toContain('shouldYieldFilesFindEscape');
+    expect(handler).toContain('requestCloseFilesFind()');
     expect(handler).toContain('event.preventDefault()');
     expect(handler).toContain('event.stopPropagation()');
     expect(handler).toContain('handleClose()');
 
     const terminalIndex = handler.indexOf('isTerminalEventTarget(event.target)');
-    const yieldIndex = handler.indexOf('shouldYieldFilesPanelEscape');
-    const preventIndex = handler.indexOf('event.preventDefault()');
+    const yieldIndex = handler.indexOf('shouldYieldFilesFindEscape');
+    const closeFindIndex = handler.indexOf('requestCloseFilesFind()');
+    const handleCloseIndex = handler.indexOf('handleClose()');
     expect(terminalIndex).toBeGreaterThan(-1);
     expect(yieldIndex).toBeGreaterThan(terminalIndex);
-    expect(preventIndex).toBeGreaterThan(yieldIndex);
+    expect(closeFindIndex).toBeGreaterThan(yieldIndex);
+    expect(handleCloseIndex).toBeGreaterThan(closeFindIndex);
   });
 
   test('the find widget consumes Escape on window capture so the panel never sees it', () => {

@@ -51,6 +51,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import {
+  CLOSE_FILES_FIND_EVENT,
+  setFilesFindSurfaceOpen,
+} from '@/lib/files-panel-escape';
 import { useFileSearchStore } from '@/stores/useFileSearchStore';
 import { useDeviceInfo } from '@/lib/device';
 import { cn, getModifierLabel, getRevealLabelKey } from '@/lib/utils';
@@ -792,9 +796,26 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const floatingToolbarRef = React.useRef<HTMLDivElement | null>(null);
   const toolbarDropdownOpenCountRef = React.useRef(0);
 
-  // ContextPanel captures Escape and closes Files (issue #512). While the
-  // editor Find/Replace bar is open, consume Escape on window capture so the
-  // first Esc closes only the bar (same as ×). A later Esc can close Files.
+  // ContextPanel captures Escape and closes Files (issue #512 / #712). While
+  // the editor Find/Replace bar is open, consume Escape on window capture so
+  // the first Esc closes only the bar (same as ×). A later Esc can close Files.
+  // Also sync a document attribute and listen for the shared close event so
+  // shortcut/panel handlers can dismiss find without racing CodeMirror DOM.
+  React.useEffect(() => {
+    setFilesFindSurfaceOpen('files-editor', isSearchOpen);
+    return () => setFilesFindSurfaceOpen('files-editor', false);
+  }, [isSearchOpen]);
+
+  React.useEffect(() => {
+    const handleCloseFind = () => {
+      setIsSearchOpen(false);
+    };
+    window.addEventListener(CLOSE_FILES_FIND_EVENT, handleCloseFind);
+    return () => {
+      window.removeEventListener(CLOSE_FILES_FIND_EVENT, handleCloseFind);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (!isSearchOpen) {
       return;
@@ -804,7 +825,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       setIsSearchOpen(false);
     };
     window.addEventListener('keydown', handleWindowKeyDown, { capture: true });

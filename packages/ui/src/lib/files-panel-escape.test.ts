@@ -1,8 +1,10 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
   FILES_FIND_BAR_SELECTOR,
   isFilesFindBarOpen,
+  resetFilesFindOpenAttributeForTests,
+  setFilesFindSurfaceOpen,
   shouldYieldFilesPanelEscape,
 } from './files-panel-escape';
 
@@ -13,6 +15,10 @@ const closedPanel = {
 const outsideTarget = {
   closest: () => null,
 } as unknown as Element;
+
+afterEach(() => {
+  resetFilesFindOpenAttributeForTests();
+});
 
 describe('shouldYieldFilesPanelEscape', () => {
   test('yields when the event target is inside the editor find bar', () => {
@@ -40,6 +46,13 @@ describe('shouldYieldFilesPanelEscape', () => {
     } as unknown as Element;
 
     expect(shouldYieldFilesPanelEscape({ target }, closedPanel)).toBe(true);
+  });
+
+  test('yields when a Files find surface is marked open', () => {
+    setFilesFindSurfaceOpen('files-editor', true);
+    expect(shouldYieldFilesPanelEscape({ target: outsideTarget }, closedPanel)).toBe(true);
+    setFilesFindSurfaceOpen('files-editor', false);
+    expect(shouldYieldFilesPanelEscape({ target: outsideTarget }, closedPanel)).toBe(false);
   });
 
   test('does not yield when no find bar is open', () => {

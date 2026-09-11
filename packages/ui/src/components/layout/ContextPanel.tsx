@@ -62,7 +62,10 @@ import {
   clampEditorTreeWidth,
   editorTreeWidthFromDrag,
 } from '@/lib/surfaces/editorSplit';
-import { shouldYieldFilesPanelEscape as shouldYieldFilesFindEscape } from '@/lib/files-panel-escape';
+import {
+  requestCloseFilesFind,
+  shouldYieldFilesPanelEscape as shouldYieldFilesFindEscape,
+} from '@/lib/files-panel-escape';
 import { isTerminalEventTarget } from '@/lib/terminalFocus';
 
 const CONTEXT_PANEL_MIN_WIDTH = 380;
@@ -726,8 +729,11 @@ export const ContextPanel: React.FC = () => {
     }
 
     // Find/Replace owns the first Escape (same as ×). Capture here would
-    // close the Files panel first (issues #414, #512).
+    // close the Files panel first (issues #414, #512, #712).
     if (shouldYieldFilesFindEscape(event, event.currentTarget)) {
+      event.preventDefault();
+      event.stopPropagation();
+      requestCloseFilesFind();
       return;
     }
 

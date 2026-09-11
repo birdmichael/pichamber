@@ -60,10 +60,12 @@ describe('issue #414: Escape closes Markdown preview find, not the Files panel',
     expect(end).toBeGreaterThan(start);
     const effect = searchSource.slice(searchSource.lastIndexOf('React.useEffect', start), end);
 
+    expect(searchSource).toContain('setFilesFindSurfaceOpen');
+    expect(searchSource).toContain('CLOSE_FILES_FIND_EVENT');
     expect(effect).toContain('if (!open)');
     expect(effect).toContain("event.key !== 'Escape'");
     expect(effect).toContain('event.preventDefault()');
-    expect(effect).toContain('event.stopPropagation()');
+    expect(effect).toContain('event.stopImmediatePropagation()');
     expect(effect).toContain('close()');
     expect(effect).toContain("window.addEventListener('keydown', handleWindowKeyDown, { capture: true })");
     expect(effect).toContain("window.removeEventListener('keydown', handleWindowKeyDown, { capture: true })");
@@ -91,7 +93,7 @@ describe('issue #414: Escape closes Markdown preview find, not the Files panel',
     const handler = contextPanelSource.slice(start, end);
 
     const terminalIndex = handler.indexOf('isTerminalEventTarget(event.target)');
-    const yieldIndex = handler.indexOf('shouldYieldFilesPanelEscape');
+    const yieldIndex = handler.indexOf('shouldYieldFilesFindEscape');
     const preventIndex = handler.indexOf('event.preventDefault()');
     expect(terminalIndex).toBeGreaterThan(-1);
     expect(yieldIndex).toBeGreaterThan(terminalIndex);
@@ -108,6 +110,7 @@ type SimulatedEvent = {
   target: SimNode;
   preventDefault(): void;
   stopPropagation(): void;
+  stopImmediatePropagation(): void;
 };
 
 class SimNode {
@@ -146,6 +149,9 @@ class SimNode {
         event.defaultPrevented = true;
       },
       stopPropagation() {
+        event.propagationStopped = true;
+      },
+      stopImmediatePropagation() {
         event.propagationStopped = true;
       },
     };
