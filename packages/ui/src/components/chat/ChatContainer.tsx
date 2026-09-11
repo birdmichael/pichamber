@@ -221,6 +221,8 @@ type ChatViewportProps = {
     canLoadEarlierPrompts: boolean;
     isLoadingOlderPrompts: boolean;
     onLoadEarlierPrompts: () => void;
+    /** Measured status-overlay footprint so Input needed cards clear the asking banner. */
+    composerOverlayHeight: number;
 };
 
 const ChatViewport = React.memo(({
@@ -259,6 +261,7 @@ const ChatViewport = React.memo(({
     canLoadEarlierPrompts,
     isLoadingOlderPrompts,
     onLoadEarlierPrompts,
+    composerOverlayHeight,
 }: ChatViewportProps) => {
     const { t } = useI18n();
     const piExtensionPrompts = usePiExtensionUiPrompts(currentSessionId);
@@ -512,7 +515,7 @@ const ChatViewport = React.memo(({
                     anchorMessageId={anchorMessageId}
                     onAnchorReady={onAnchorReady}
                     onAnchorSizeChanged={onAnchorSizeChanged}
-                    composerOverlayHeight={0}
+                    composerOverlayHeight={composerOverlayHeight}
                     onIsAtEndChange={onIsAtEndChange}
                     onTimelineDataChange={onTimelineDataChange}
                     listHeader={listHeader}
@@ -571,7 +574,8 @@ const ChatViewport = React.memo(({
         && prev.showPromptNavigator === next.showPromptNavigator
         && prev.canLoadEarlierPrompts === next.canLoadEarlierPrompts
         && prev.isLoadingOlderPrompts === next.isLoadingOlderPrompts
-        && prev.onLoadEarlierPrompts === next.onLoadEarlierPrompts;
+        && prev.onLoadEarlierPrompts === next.onLoadEarlierPrompts
+        && prev.composerOverlayHeight === next.composerOverlayHeight;
 });
 
 ChatViewport.displayName = 'ChatViewport';
@@ -1106,7 +1110,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
             return;
         }
         const update = () => {
-            const height = node.getBoundingClientRect().height + 8;
+            // StatusRow uses mb-6; margins sit outside this node's border box.
+            // Outer wrapper also has mb-2 between overlay and composer (+8).
+            const rectHeight = node.getBoundingClientRect().height;
+            const child = node.firstElementChild as HTMLElement | null;
+            const marginBottom = child
+                ? Number.parseFloat(globalThis.getComputedStyle(child).marginBottom || '0') || 0
+                : 0;
+            const height = rectHeight + marginBottom + 8;
             setStatusOverlayHeight((prev) => (Math.abs(prev - height) < 1 ? prev : height));
         };
         const observer = new ResizeObserver(update);
@@ -1218,6 +1229,27 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     const resumeToLatestInstant = React.useCallback(() => {
         goToBottom('instant');
     }, [goToBottom]);
+    // Settings covers the chat; on close the asking StatusRow remounts/measures
+    // taller over Plan Input needed cards. Re-assert the live edge when the user
+    // was following so banner + card no longer stack (#707).
+    const isSettingsDialogOpen = useUIStore((state) => state.isSettingsDialogOpen);
+    const wasSettingsOpenRef = React.useRef(false);
+    React.useEffect(() => {
+        const wasOpen = wasSettingsOpenRef.current;
+        wasSettingsOpenRef.current = isSettingsDialogOpen;
+        if (!wasOpen || isSettingsDialogOpen || userOwnsScroll) {
+            return;
+        }
+        resumeToLatestInstant();
+    }, [isSettingsDialogOpen, resumeToLatestInstant, userOwnsScroll]);
+    // Overlay height can arrive after the card paints (Settings close, first
+    // ask). Keep the live edge clear of the floating banner while following.
+    React.useEffect(() => {
+        if (userOwnsScroll || statusOverlayHeight <= 0) {
+            return;
+        }
+        resumeToLatestInstant();
+    }, [statusOverlayHeight, resumeToLatestInstant, userOwnsScroll]);
     // Mobile loads older history via an explicit top button instead of a
     // scroll-position trigger (see handleHistoryScroll in the controller).
     const showLoadOlderButton = isMobileSurfaceRuntime()
@@ -1656,6 +1688,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 canLoadEarlierPrompts={canLoadEarlierPrompts}
                 isLoadingOlderPrompts={timelineController.isLoadingOlder}
                 onLoadEarlierPrompts={handleLoadOlderClick}
+                composerOverlayHeight={statusOverlayHeight > 0 ? composerOverlayHeight : 0}
             />
 
             <div
