@@ -3308,6 +3308,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.mcp.needsAuth': 'Entrar',
   'chat.workStatus.mcp.failed': 'Falhou',
   'chat.workStatus.pinned.unavailable': 'Mensagem fixada',
+  'chat.workStatus.pinned.empty': 'Nenhuma mensagem fixada',
   'chat.workStatus.section.session': 'Sessão',
   'chat.workStatus.section.project': 'Projeto',
   'chat.workStatus.section.subagents': 'Subagentes',

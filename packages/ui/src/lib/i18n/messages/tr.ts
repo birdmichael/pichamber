@@ -3305,6 +3305,7 @@ export const dict = {
   'chat.workStatus.mcp.needsAuth': 'Oturum aç',
   'chat.workStatus.mcp.failed': 'Başarısız',
   'chat.workStatus.pinned.unavailable': 'Sabitlenmiş mesaj',
+  'chat.workStatus.pinned.empty': 'Sabitlenmiş mesaj yok',
   'chat.workStatus.section.session': 'Session',
   'chat.workStatus.section.project': 'Proje',
   'chat.workStatus.section.subagents': 'Subagent\'ler',

@@ -80,13 +80,18 @@ export const WorkStatusPinnedSection: React.FC<Props> = ({ sessionId, directory 
     onNavigate?.();
   }, [onNavigate]);
 
-  useReportWorkStatusPresence('pinned', pinned.length > 0);
-
-  if (pinned.length === 0) return null;
+  // Section is equalizer-checked when mounted. Report presence even when empty
+  // so a checked+empty Pinned block is not treated as "nothing rendered".
+  useReportWorkStatusPresence('pinned', true);
 
   return (
     <WorkStatusSection title={t('chat.workStatus.section.pinned')}>
-      {pinned.map((entry) => (
+      {pinned.length === 0 ? (
+        <WorkStatusRow
+          muted
+          label={t('chat.workStatus.pinned.empty')}
+        />
+      ) : pinned.map((entry) => (
         <WorkStatusRow
           key={entry.id}
           leading={(
