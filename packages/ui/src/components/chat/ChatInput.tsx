@@ -1821,10 +1821,22 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
                 : 0;
 
         if (cycleAgentDirection !== 0 && openAutocomplete === null) {
-            e.preventDefault();
-            e.stopPropagation();
-            handleCycleAgent(cycleAgentDirection);
-            return;
+            // When cycling is a no-op (≤1 primary agent), do not swallow Tab —
+            // insert a real tab in the composer instead (#687).
+            const nextAgentName = getCycledPrimaryAgentName(agents, currentAgentName, cycleAgentDirection);
+            if (nextAgentName) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCycleAgent(cycleAgentDirection);
+                return;
+            }
+            if (cycleAgentDirection === 1) {
+                e.preventDefault();
+                e.stopPropagation();
+                insertTextAtSelection('\t');
+                return;
+            }
+            // Shift+Tab with nowhere to cycle: leave the event alone.
         }
 
         // Handle ArrowUp/ArrowDown for message history navigation
