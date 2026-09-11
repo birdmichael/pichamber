@@ -2133,7 +2133,8 @@ export const useUIStore = create<UIStore>()(
         setSettingsDialogOpen: (open) => {
           set((state) => {
             if (!open) {
-              return { isSettingsDialogOpen: false };
+              // Gear / Ctrl+, should reopen on General — keep last page only while open (#719).
+              return { isSettingsDialogOpen: false, settingsPage: 'home' };
             }
             markSettingsOpenedFromTrigger();
             if (state.settingsHasOpenedOnce) {

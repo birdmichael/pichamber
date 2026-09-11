@@ -209,9 +209,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onClose, forceMobile
   // every time settings reopen.
   const autoNavSlugRef = React.useRef<string | null>(initialMobileStage === 'nav' ? settingsSlug : null);
 
-  // No starter page on desktop: 'home' (fresh state) resolves to General.
-  // settingsPage persists in the UI store, so subsequent opens restore the
-  // last visited page. Mobile keeps 'home' — its entry stage is the nav list.
+  // No starter page on desktop: 'home' (fresh/closed state) resolves to General.
+  // Closing Settings resets to 'home' so gear / Ctrl+, land on General (#719).
+  // Deep-links set the page before open; in-session nav still updates settingsPage.
+  // Mobile keeps 'home' — its entry stage is the nav list.
   React.useEffect(() => {
     if (!isMobile && settingsSlug === 'home') {
       setSettingsPage('general');
