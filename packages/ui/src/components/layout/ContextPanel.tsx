@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { useBrowserFaviconStore } from '@/stores/useBrowserFaviconStore';
 import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
+
+const EMPTY_FILE_OPEN_PATHS: string[] = [];
 import { useUIStore, type ContextPanelMode, type PendingDiffScope } from '@/stores/useUIStore';
 import { markSessionViewed } from '@/sync/notification-store';
 import { setExternallyViewedSession, useDirectoryStore } from '@/sync/sync-context';
@@ -498,7 +500,13 @@ export const ContextPanel: React.FC = () => {
   }, [directoryKey, openContextBrowser]);
   const reorderContextPanelTabs = useUIStore((state) => state.reorderContextPanelTabs);
   const setSelectedFilePath = useFilesViewTabsStore((state) => state.setSelectedPath);
+  const filesOpenPaths = useFilesViewTabsStore((state) => (
+    directoryKey ? (state.byRoot[directoryKey]?.openPaths ?? EMPTY_FILE_OPEN_PATHS) : EMPTY_FILE_OPEN_PATHS
+  ));
   const contextEditorTreeVisible = useUIStore((state) => state.contextEditorTreeVisible);
+  const ensureContextEditorTreeVisibleForEmptyFiles = useUIStore(
+    (state) => state.ensureContextEditorTreeVisibleForEmptyFiles,
+  );
   const toggleContextEditorTree = useUIStore((state) => state.toggleContextEditorTree);
   const openNewContextBrowserTab = useUIStore((state) => state.openNewContextBrowserTab);
   const faviconByOrigin = useBrowserFaviconStore((state) => state.byOrigin);
@@ -1037,8 +1045,22 @@ export const ContextPanel: React.FC = () => {
     () => tabs.some((tab) => tab.mode === 'file' && tab.targetPath),
     [tabs],
   );
+  // Context-panel tabs can claim a targetPath while FilesView has nothing open
+  // (persist/isolate desync). Treat that as empty so tree-only / force-show wins (#725).
+  const hasFilesViewOpenFile = filesOpenPaths.length > 0;
+  const showEditorWithTree = hasOpenEditorFile && hasFilesViewOpenFile;
 
   const isFileTabActive = activeTab?.mode === 'file';
+
+  // Empty Files must not strand users on the placeholder with a persisted-hidden tree.
+  React.useEffect(() => {
+    if (!isOpen || !isFileTabActive) {
+      return;
+    }
+    if (!showEditorWithTree) {
+      ensureContextEditorTreeVisibleForEmptyFiles();
+    }
+  }, [ensureContextEditorTreeVisibleForEmptyFiles, isFileTabActive, isOpen, showEditorWithTree]);
 
   const header = (
     <header className="flex h-10 items-stretch border-b border-border">
@@ -1229,7 +1251,7 @@ export const ContextPanel: React.FC = () => {
           <div className={cn('absolute inset-0 flex', isFileTabActive ? 'flex' : 'hidden')}>
             {resolveFilesPanelTreeLayout({
               hasFileTabs,
-              hasOpenEditorFile,
+              hasOpenEditorFile: showEditorWithTree,
               isFileTabActive,
             }).kind === 'tree-only' ? (
               // No editor file yet: show the project tree full-width so Open

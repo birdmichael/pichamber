@@ -336,6 +336,25 @@ describe('useUIStore openContextSurface', () => {
     expect(useUIStore.getState().contextPanelByDirectory[directory]?.isOpen).toBe(true);
   });
 
+  test('ensureContextEditorTreeVisibleForEmptyFiles forces a persisted-hidden tree (#725)', () => {
+    useUIStore.setState({ contextEditorTreeVisible: false });
+    useUIStore.getState().ensureContextEditorTreeVisibleForEmptyFiles();
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+    // Idempotent when already visible.
+    useUIStore.getState().ensureContextEditorTreeVisibleForEmptyFiles();
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+  });
+
+  test('re-opening Files after switching surfaces still reveals a hidden tree (#725)', () => {
+    useUIStore.setState({ contextEditorTreeVisible: false });
+    useUIStore.getState().openContextSurface(directory, 'file');
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+    useUIStore.setState({ contextEditorTreeVisible: false });
+    useUIStore.getState().openContextSurface(directory, 'terminal');
+    useUIStore.getState().openContextSurface(directory, 'file');
+    expect(useUIStore.getState().contextEditorTreeVisible).toBe(true);
+  });
+
   test('activates the most recently touched tab of a content-driven mode', () => {
     useUIStore.getState().openContextFile(directory, '/repo/a.ts');
     useUIStore.getState().openContextFile(directory, '/repo/b.ts');

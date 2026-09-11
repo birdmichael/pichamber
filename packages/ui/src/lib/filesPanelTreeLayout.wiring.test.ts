@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-describe('Files panel tree-only wiring (#578)', () => {
+describe('Files panel tree-only wiring (#578, #725)', () => {
   test('ContextPanel renders SidebarFilesTree full-width when no editor file is open', () => {
     const panel = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), '../components/layout/ContextPanel.tsx'),
@@ -12,6 +12,8 @@ describe('Files panel tree-only wiring (#578)', () => {
     expect(panel).toContain('resolveFilesPanelTreeLayout');
     expect(panel).toContain("kind === 'tree-only'");
     expect(panel).toContain('<SidebarFilesTree />');
+    expect(panel).toContain('ensureContextEditorTreeVisibleForEmptyFiles');
+    expect(panel).toContain('showEditorWithTree');
   });
 
   test('Open Files menu/shortcuts bind to the context-panel directory key', () => {
