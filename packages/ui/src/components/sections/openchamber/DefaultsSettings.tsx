@@ -37,7 +37,7 @@ import {
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { shouldShowOpenCodeAgentPicker, usePiKernel } from '@/lib/usePiKernel';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
-import { clampPiThinkingLevel, type PiThinkingLevel } from '@/components/chat/piThinking';
+import { clampPiThinkingLevel, preferPiModelThinkingLevels, type PiThinkingLevel } from '@/components/chat/piThinking';
 import { formatEffortLabel } from '@/components/chat/mobileControlsUtils';
 import {
   filterPiEnabledModelsToCatalog,
@@ -62,12 +62,20 @@ const resolveSessionDefaultThinkingLevels = (
     providerId: string,
     modelId: string,
   ) => Parameters<typeof resolveCatalogThinkingLevels>[0],
+  /**
+   * Pi kernel/SDK levels on the selected provider model (same source as the
+   * composer chip). Prefer these over models.dev so Settings cannot orphan
+   * catalog-only xhigh when live/Pi lists omit it (#705 / thinking-xhigh).
+   */
+  piModelThinkingLevels?: unknown,
 ): PiThinkingLevel[] => {
   if (!providerId || !modelId) return [];
-  // Levels come from Pi model capabilities. Do not invent OpenCode variants
-  // or vendor lists, and do not call resolveVisiblePiThinkingLevels — an
-  // empty catalog must stay empty instead of falling back to all seven.
-  return resolveCatalogThinkingLevels(getModelMetadata(providerId, modelId));
+  // Prefer Pi model thinkingLevels (composer path). Catalog is fallback only.
+  // Do not call resolveVisiblePiThinkingLevels — empty must stay empty.
+  return preferPiModelThinkingLevels(
+    piModelThinkingLevels,
+    resolveCatalogThinkingLevels(getModelMetadata(providerId, modelId)),
+  );
 };
 
 const clampSessionDefaultThinkingLevel = (
@@ -128,15 +136,24 @@ export const DefaultsSettings: React.FC = () => {
 
   const parsedModel = React.useMemo(() => getDisplayModel(defaultModel), [defaultModel]);
   const availableLevels = React.useMemo(
-    () => resolveSessionDefaultThinkingLevels(
-      parsedModel.providerId,
-      parsedModel.modelId,
-      getModelMetadata,
-    ),
-    // modelsMetadata is required: getModelMetadata is a stable store method
-    // and would otherwise keep the empty-catalog fallback after fetch lands.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog identity, not the getter
-    [getModelMetadata, modelsMetadata, parsedModel],
+    () => {
+      const provider = providers.find((entry) => entry.id === parsedModel.providerId);
+      const model = Array.isArray(provider?.models)
+        ? provider.models.find((entry) => entry.id === parsedModel.modelId) as
+          | { thinkingLevels?: unknown; availableThinkingLevels?: unknown }
+          | undefined
+        : undefined;
+      return resolveSessionDefaultThinkingLevels(
+        parsedModel.providerId,
+        parsedModel.modelId,
+        getModelMetadata,
+        model?.thinkingLevels ?? model?.availableThinkingLevels,
+      );
+    },
+    // modelsMetadata + providers: getModelMetadata is a stable store method
+    // and would otherwise keep the empty-catalog / stale Pi list after fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- catalog/Pi identity, not the getter
+    [getModelMetadata, modelsMetadata, parsedModel, providers],
   );
 
   React.useEffect(() => {

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'bun:test';
-import { clampPiThinkingLevel } from '@/components/chat/piThinking';
+import { clampPiThinkingLevel, preferPiModelThinkingLevels } from '@/components/chat/piThinking';
 import { resolveCatalogThinkingLevels } from '@/lib/model-catalog-capabilities';
 import {
   filterPiEnabledModelsToCatalog,
@@ -52,6 +52,20 @@ describe('Session Defaults thinking levels', () => {
     expect(clampSessionDefaultThinkingLevel('high', ['low', 'medium', 'high'])).toBe('high');
   });
 
+  test('Settings Default Thinking prefers Pi model levels over catalog xhigh', () => {
+    const catalog = resolveCatalogThinkingLevels({
+      reasoning: true,
+      reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh'] }],
+    });
+    expect(catalog).toContain('xhigh');
+    const levels = preferPiModelThinkingLevels(
+      ['low', 'medium', 'high'],
+      catalog,
+    );
+    expect(levels).toEqual(['low', 'medium', 'high']);
+    expect(levels).not.toContain('xhigh');
+  });
+
   test('prefers resolvedModel over a stored example-provider placeholder', () => {
     const catalog = ['kimi-coding/k3', 'bmlab-grok/grok-4.6'];
     expect(pickPiSessionDefaultModel(
@@ -92,12 +106,14 @@ describe('Session Defaults thinking levels', () => {
       'utf-8',
     );
     expect(source).toContain('resolveCatalogThinkingLevels');
+    expect(source).toContain('preferPiModelThinkingLevels');
     expect(source).toContain('getModelMetadata');
     expect(source).toContain('availableLevels.map');
     expect(source).toContain('availableLevels.length > 0');
     expect(source).toContain('clampSessionDefaultThinkingLevel');
     expect(source).toContain('pickPiSessionDefaultModel');
     expect(source).toContain('filterPiEnabledModelsToCatalog');
+    expect(source).toContain('model?.thinkingLevels ?? model?.availableThinkingLevels');
     expect(source).not.toContain('PI_THINKING_LEVELS.map');
     expect(source).not.toMatch(/import\s*\{[^}]*resolveVisiblePiThinkingLevels/);
   });
