@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed / Improved
 - Mini Chat: default window height lowered to 640 so the composer fits on ~800px-tall displays (#724).
+- Files: opening the empty Files surface forces the tree visible when persist hid it (#725).
 - Settings: nested Esc (`data-settings-escape-form`) abandons only the draft; Settings stays open (#717).
 - Settings: sidebar gear and Ctrl+, open on General instead of the last visited section (#719).
 - Desktop: Ctrl/Cmd+1…9 switches session tabs even while the composer is focused (#718).

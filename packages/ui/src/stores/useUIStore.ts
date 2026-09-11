@@ -975,6 +975,7 @@ interface UIStore {
   setContextRailSurfaceVisible: (surfaceId: string, visible: boolean) => void;
   setContextRailHiddenSurfaces: (surfaceIds: string[]) => void;
   toggleContextEditorTree: () => void;
+  ensureContextEditorTreeVisibleForEmptyFiles: () => void;
   setContextEditorTreeWidth: (width: number) => void;
   openContextSurface: (directory: string, mode: ContextPanelMode) => void;
   openContextPanelTab: (directory: string, tab: ContextPanelTabDescriptor) => void;
@@ -1390,6 +1391,16 @@ export const useUIStore = create<UIStore>()(
           set((state) => ({ contextEditorTreeVisible: !state.contextEditorTreeVisible }));
         },
 
+        // Empty Files must never leave the tree hidden behind a persisted false
+        // (checklist files-tree-hidden-persist / #725).
+        ensureContextEditorTreeVisibleForEmptyFiles: () => {
+          const state = get();
+          if (state.contextEditorTreeVisible) {
+            return;
+          }
+          set({ contextEditorTreeVisible: true });
+        },
+
         setContextEditorTreeWidth: (width) => {
           if (!Number.isFinite(width)) {
             return;
@@ -1423,9 +1434,9 @@ export const useUIStore = create<UIStore>()(
             const mostRecent = tabsOfMode.reduce((best, tab) => (tab.touchedAt >= best.touchedAt ? tab : best));
             state.setActiveContextPanelTab(normalizedDirectory, mostRecent.id);
             // Opening Files must show the tree even if the user previously hid
-            // the editor side column (#578).
-            if (mode === 'file' && !state.contextEditorTreeVisible) {
-              set({ contextEditorTreeVisible: true });
+            // the editor side column (#578, #725).
+            if (mode === 'file') {
+              get().ensureContextEditorTreeVisibleForEmptyFiles();
             }
             return;
           }
@@ -1438,8 +1449,8 @@ export const useUIStore = create<UIStore>()(
             return;
           }
 
-          if (mode === 'file' && !state.contextEditorTreeVisible) {
-            set({ contextEditorTreeVisible: true });
+          if (mode === 'file') {
+            get().ensureContextEditorTreeVisibleForEmptyFiles();
           }
           state.openContextPanelTab(normalizedDirectory, { mode });
         },
