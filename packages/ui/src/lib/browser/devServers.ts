@@ -90,17 +90,18 @@ const portOf = (url: string): number | null => {
 };
 
 /**
- * Combines what servers said with what is actually listening.
+ * Combines what servers announced with what is actually listening.
  *
- * Each source knows something the other cannot. An announcement carries the base
- * path an app is served under, which a socket cannot reveal. A listening port is
- * ground truth, which an announcement is not: terminals wrap long lines, and a
- * URL split mid-port reads as a perfectly plausible address on a port where
- * nothing is running.
+ * Announcements are the product signal: project actions and terminal
+ * announce-protocol lines name the URLs a user just started, including base
+ * paths a socket scan cannot see. A raw listener scan also sees every other
+ * loopback service on the machine; offering those as "Running dev servers" is
+ * noise.
  *
- * So discovery decides which servers exist and announcements supply their paths.
+ * Discovery therefore only validates announcements (drop mangled / dead ports).
  * When discovery is unavailable the announcements stand on their own — offering
- * something unverified beats offering nothing.
+ * something unverified beats offering nothing. With no announcements, the list
+ * is empty even if many ports are listening.
  */
 export const mergeDevServerCandidates = ({
   announced,
@@ -115,24 +116,24 @@ export const mergeDevServerCandidates = ({
     if (port !== null && !announcedByPort.has(port)) announcedByPort.set(port, url);
   }
 
+  // Announcements are the only honest "dev server" signal. A raw port scan
+  // sees every loopback listener (agents, databases' admin UIs, random local
+  // tools) and labeling them all "Running dev servers" is noise. Discovery
+  // still matters: it confirms an announced address is actually listening and
+  // drops mangled announcement ports that point nowhere.
+  if (announcedByPort.size === 0) {
+    return [];
+  }
+
   if (!discovered) {
     return [...announcedByPort.entries()]
       .map(([port, url]) => ({ url, port, announced: true }))
       .sort((left, right) => left.port - right.port);
   }
 
-  return discovered
-    .map((server) => {
-      const announcedUrl = announcedByPort.get(server.port);
-      return {
-        url: announcedUrl ?? server.url,
-        port: server.port,
-        announced: announcedUrl !== undefined,
-      };
-    })
-    .sort((left, right) => {
-      // Servers this run announced come first: they are the ones just started.
-      if (left.announced !== right.announced) return left.announced ? -1 : 1;
-      return left.port - right.port;
-    });
+  const discoveredPorts = new Set(discovered.map((server) => server.port));
+  return [...announcedByPort.entries()]
+    .filter(([port]) => discoveredPorts.has(port))
+    .map(([port, url]) => ({ url, port, announced: true }))
+    .sort((left, right) => left.port - right.port);
 };
