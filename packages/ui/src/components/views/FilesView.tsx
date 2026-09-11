@@ -30,6 +30,7 @@ import {
   resolveFilesGoToLineFocus,
   shouldOpenFilesGoToLine,
   shouldOpenFilesGoToLineWithoutFocus,
+  shouldPromoteFilesPreviewForGoToLine,
 } from './filesViewGoToLine';
 import { PreviewToggleButton } from './PreviewToggleButton';
 import { JsonTreeView } from '@/components/ui/JsonTreeView';
@@ -1024,6 +1025,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const [copiedContent, setCopiedContent] = React.useState(false);
   const [copiedPath, setCopiedPath] = React.useState(false);
   const [isGoToLineOpen, setIsGoToLineOpen] = React.useState(false);
+  /** Alt+G from preview: switch to edit, then open once the editor mounts. */
+  const [pendingGoToLineAfterEdit, setPendingGoToLineAfterEdit] = React.useState(false);
   // In-preview find for the rendered Markdown preview (Ctrl/Cmd+F).
   const [mdPreviewFindOpen, setMdPreviewFindOpen] = React.useState(false);
   const [mdPreviewFindFocusNonce, setMdPreviewFindFocusNonce] = React.useState(0);
@@ -3034,6 +3037,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       setIsFloatingToolbarOpen(true);
     }
     setIsGoToLineOpen(true);
+    setPendingGoToLineAfterEdit(false);
   }, [isMobile, settingsExpandedEditorToolbar]);
 
   useKeybind('open_go_to_line', (event) => {
@@ -3042,6 +3046,29 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     const eventFocus = resolveFilesGoToLineFocus(event.target, editorRoot);
     const activeFocus = resolveFilesGoToLineFocus(document.activeElement, editorRoot);
     const focus = eventFocus.inEditor && eventFocus.inEditorRoot ? eventFocus : activeFocus;
+
+    // Preview (.md eye / Shiki view / HTML preview): auto-switch to edit, then
+    // open go-to-line once CodeMirror mounts — silent no-op was the HOLD.
+    if (shouldPromoteFilesPreviewForGoToLine({
+      canEdit,
+      isMobile,
+      textViewMode,
+      mdViewMode,
+      isMarkdown,
+      htmlViewMode,
+      isHtml,
+    })) {
+      if (isMarkdown && mdViewMode === 'preview') {
+        saveMdViewMode('edit');
+      } else if (isHtml && htmlViewMode === 'preview') {
+        saveHtmlViewMode('edit');
+      } else if (textViewMode === 'view') {
+        saveTextViewMode('edit');
+      }
+      setPendingGoToLineAfterEdit(true);
+      return;
+    }
+
     if (shouldOpenFilesGoToLine({ canEdit, textViewMode, isMobile, focus, hasEditor })) {
       revealGoToLineField();
       return;
@@ -3059,6 +3086,55 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     }
     return false;
   });
+
+  React.useEffect(() => {
+    if (!pendingGoToLineAfterEdit) {
+      return;
+    }
+    if (!canEdit || isMobile) {
+      setPendingGoToLineAfterEdit(false);
+      return;
+    }
+    // Wait until edit chrome + CodeMirror exist (md/html/text promotion).
+    const editing = (isMarkdown && mdViewMode === 'edit')
+      || (isHtml && htmlViewMode === 'edit')
+      || (!isMarkdown && !isHtml && textViewMode === 'edit');
+    if (!editing) {
+      return;
+    }
+    if (editorViewRef.current) {
+      revealGoToLineField();
+      return;
+    }
+    // CodeMirror mounts after the mode flip; retry briefly without a render dep on the ref.
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      if (editorViewRef.current) {
+        window.clearInterval(timer);
+        revealGoToLineField();
+        return;
+      }
+      if (attempts >= 30) {
+        window.clearInterval(timer);
+        setPendingGoToLineAfterEdit(false);
+      }
+    }, 50);
+    return () => window.clearInterval(timer);
+  }, [
+    pendingGoToLineAfterEdit,
+    canEdit,
+    isMobile,
+    isMarkdown,
+    mdViewMode,
+    isHtml,
+    htmlViewMode,
+    textViewMode,
+    revealGoToLineField,
+    // Re-check when selected file / loading settles so the editor can mount.
+    selectedFile?.path,
+    fileLoading,
+  ]);
 
   const editorFontSize = useUIStore((state) => state.editorFontSize);
 

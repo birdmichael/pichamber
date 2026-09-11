@@ -114,3 +114,37 @@ export function consumeGoToLineSubmitKey(event: {
   event.stopImmediatePropagation?.();
   return true;
 }
+
+/** Preview modes that must become edit before go-to-line can run. */
+export type FilesPreviewModeForGoToLine = {
+  canEdit: boolean;
+  isMobile: boolean;
+  /** Generic text / Shiki preview eye toggle. */
+  textViewMode: 'view' | 'edit';
+  /** Markdown eye toggle (defaults to preview). */
+  mdViewMode?: 'preview' | 'edit';
+  isMarkdown?: boolean;
+  /** HTML preview toggle. */
+  htmlViewMode?: 'preview' | 'edit';
+  isHtml?: boolean;
+};
+
+/**
+ * Alt+G in preview was a silent no-op because open gates on edit mode.
+ * Prefer switching to edit, then opening go-to-line (Desktop checklist).
+ */
+export function shouldPromoteFilesPreviewForGoToLine(input: FilesPreviewModeForGoToLine): boolean {
+  if (!input.canEdit || input.isMobile) {
+    return false;
+  }
+  if (input.isMarkdown && input.mdViewMode === 'preview') {
+    return true;
+  }
+  if (input.isHtml && input.htmlViewMode === 'preview') {
+    return true;
+  }
+  if (!input.isMarkdown && !input.isHtml && input.textViewMode === 'view') {
+    return true;
+  }
+  return false;
+}
