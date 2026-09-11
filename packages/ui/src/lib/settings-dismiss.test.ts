@@ -63,19 +63,24 @@ test('treats clicks inside the settings view as in-pane', () => {
 
 test('treats the Settings window popup as the Settings dialog', () => {
   const settingsView = {};
+  const matchesSettings = (selector: string) => (
+    selector.includes('[data-settings-view="true"]')
+    || selector.includes('[data-settings-dialog="true"]')
+  );
   const popup = {
     closest(selector: string) {
+      if (matchesSettings(selector)) return this;
       if (selector === '[role="dialog"]') return this;
       return null;
     },
     querySelector: (selector: string) => (
-      selector === '[data-settings-view="true"]' ? settingsView : null
+      matchesSettings(selector) ? settingsView : null
     ),
   };
 
   expect(isInsideSettingsDialog(popup as unknown as EventTarget)).toBe(true);
   expect(isInsideSettingsDialog({
-    closest: (selector: string) => (selector === '[data-settings-view="true"]' ? settingsView : null),
+    closest: (selector: string) => (matchesSettings(selector) ? settingsView : null),
   } as unknown as EventTarget)).toBe(true);
 });
 

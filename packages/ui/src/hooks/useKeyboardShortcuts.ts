@@ -44,7 +44,7 @@ import { addSelectionToChat } from '@/lib/addSelectionToChat';
 import { requestCloseFilesFind, shouldYieldFilesPanelEscape } from '@/lib/files-panel-escape';
 import { shouldCloseMainSurfaceOnEscape } from '@/lib/main-surface-dismiss';
 import { shouldCollapseExpandedInputOnEscape } from '@/lib/composer/expandedInputEscape';
-import { isInsideSettingsDialog, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
+import { isInsideSettingsDialog, notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { hasOpenDropdown, isEditableEventTarget, shouldClearShortcutPrefixForTyping, shouldStopDropdownImeEscape, shouldYieldHeldDigitShortcutToEditor } from './keyboard-shortcut-dom';
 
 const dropdownTargetSelector = [
@@ -404,7 +404,6 @@ export const useKeyboardShortcuts = () => {
       if (
         insideForeignDialog
         || isTerminalEventTarget(target)
-        || dropdownOpen
       ) {
         resetAbortPriming();
         return;
@@ -415,13 +414,20 @@ export const useKeyboardShortcuts = () => {
         resetAbortPriming();
         return;
       }
+      // Settings before bare dropdownOpen yield: combobox/select focus inside Settings
+      // must not skip close. Real open overlays/forms use shouldBlockSettingsDismiss (#717).
       if (state.isSettingsDialogOpen) {
         if (shouldBlockSettingsDismiss(false, { reason: 'escape-key', event })) {
+          notifySettingsEscapeForm();
           resetAbortPriming();
           return;
         }
         event.preventDefault();
         state.setSettingsDialogOpen(false);
+        resetAbortPriming();
+        return;
+      }
+      if (dropdownOpen) {
         resetAbortPriming();
         return;
       }

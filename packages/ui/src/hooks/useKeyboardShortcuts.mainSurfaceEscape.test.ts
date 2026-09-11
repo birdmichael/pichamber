@@ -26,9 +26,15 @@ test('Escape inside Settings closes the window after nested overlays yield', () 
 
   expect(handler).toContain('isInsideSettingsDialog(target)');
   expect(handler).toContain('shouldBlockSettingsDismiss(false, { reason: \'escape-key\', event })');
+  expect(handler).toContain('notifySettingsEscapeForm()');
   expect(handler).toContain('setSettingsDialogOpen(false)');
   expect(handler.indexOf('isInsideSettingsDialog(target)')).toBeLessThan(handler.indexOf('shouldBlockSettingsDismiss'));
   expect(handler.indexOf('shouldBlockSettingsDismiss')).toBeLessThan(handler.indexOf('setSettingsDialogOpen(false)'));
+  // Settings close runs before bare dropdownOpen yield so combobox focus cannot skip it (#717).
+  const settingsClose = handler.indexOf('setSettingsDialogOpen(false)');
+  const dropdownYield = handler.indexOf('if (dropdownOpen)');
+  expect(dropdownYield).toBeGreaterThan(-1);
+  expect(settingsClose).toBeLessThan(dropdownYield);
 });
 
 test('Escape closes the header session switcher before yielding to open menus', () => {

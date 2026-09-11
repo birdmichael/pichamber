@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Settings: Esc closes the Settings window again when no nested overlay or draft owns Escape (#717).
 - Browser: empty state lists only announced dev servers, not every localhost listener (#713).
 - Files: first Esc closes only the find bar again; the Files panel stays open (#712).
 - Desktop: Help menu **Pi Status** label matches the status dialog (was Show Diagnostics) (#711).
