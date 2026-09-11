@@ -3308,6 +3308,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.mcp.needsAuth': 'Увійти',
   'chat.workStatus.mcp.failed': 'Помилка',
   'chat.workStatus.pinned.unavailable': 'Запінене повідомлення',
+  'chat.workStatus.pinned.empty': 'Немає закріплених повідомлень',
   'chat.workStatus.section.session': 'Сесія',
   'chat.workStatus.section.project': 'Проєкт',
   'chat.workStatus.section.subagents': 'Сабагенти',

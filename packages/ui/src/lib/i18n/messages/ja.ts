@@ -3307,6 +3307,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.workStatus.mcp.needsAuth': 'サインイン',
   'chat.workStatus.mcp.failed': '失敗',
   'chat.workStatus.pinned.unavailable': 'ピン留めしたメッセージ',
+  'chat.workStatus.pinned.empty': 'ピン留めされたメッセージはありません',
   'chat.workStatus.section.session': 'セッション',
   'chat.workStatus.section.project': 'プロジェクト',
   'chat.workStatus.section.subagents': 'サブエージェント',

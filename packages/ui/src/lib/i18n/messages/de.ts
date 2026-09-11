@@ -3305,6 +3305,7 @@ export const dict = {
   'chat.workStatus.mcp.needsAuth': 'Anmelden',
   'chat.workStatus.mcp.failed': 'Fehlgeschlagen',
   'chat.workStatus.pinned.unavailable': 'Angeheftete Nachricht',
+  'chat.workStatus.pinned.empty': 'Keine angehefteten Nachrichten',
   'chat.workStatus.section.session': 'Sitzung',
   'chat.workStatus.section.project': 'Projekt',
   'chat.workStatus.section.subagents': 'Subagenten',
