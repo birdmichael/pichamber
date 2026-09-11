@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Browser: local `file://` / `file:///` addresses open in the Desktop panel (remote `file://host/...`, `javascript:`, and `data:` stay blocked) (#730).
 - Mini Chat: default window height lowered to 640 so the composer fits on ~800px-tall displays (#724).
 - Files: opening the empty Files surface forces the tree visible when persist hid it (#725).
 - Browser: refuse navigating to the host Pichamber UI origin (no nested app) (#726).

@@ -24,6 +24,14 @@ describe('what is worth remembering', () => {
     expect(historyUrl('')).toBe('');
   });
 
+  test('remembers a local file preview', () => {
+    expect(historyUrl('file:///tmp/preview.html')).toBe('file:///tmp/preview.html');
+  });
+
+  test('refuses a remote file:// host', () => {
+    expect(historyUrl('file://remote-host/share/x.html')).toBe('');
+  });
+
   test('refuses an address too long to be one', () => {
     expect(historyUrl(`http://example.test/${'a'.repeat(3000)}`)).toBe('');
   });
@@ -104,6 +112,13 @@ describe('suggestions', () => {
 
   test('does not offer back the address already typed in full', () => {
     expect(suggestFromHistory(entries, 'http://localhost:3000/')).toEqual([]);
+  });
+
+  test('suggests a visited local file by path fragment', () => {
+    const visited = recordVisit([], { url: 'file:///tmp/preview.html', title: 'Preview', at: 5 });
+    expect(suggestFromHistory(visited, 'preview').map((item) => item.url)).toEqual([
+      'file:///tmp/preview.html',
+    ]);
   });
 
   test('never offers more than it was asked for', () => {

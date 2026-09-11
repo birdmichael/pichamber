@@ -5,6 +5,7 @@ import {
   browserUrlLabel,
   collectHostAppBrowserOrigins,
   isHostAppBrowserUrl,
+  isLocalFileUrl,
   isLoopbackUrl,
   isStartingServerFailure,
   normalizeBrowsableUrl,
@@ -31,10 +32,17 @@ describe('normalizeBrowserUrl', () => {
     expect(normalizeBrowserUrl('localhost.example.com')).toBe('https://localhost.example.com/');
   });
 
-  test('rejects non-http schemes rather than handing them to the browser', () => {
-    expect(normalizeBrowserUrl('file:///etc/passwd')).toBe(BLANK_URL);
+  test('accepts local file:// URLs for Desktop previews', () => {
+    expect(normalizeBrowserUrl('file:///tmp/preview.html')).toBe('file:///tmp/preview.html');
+    expect(normalizeBrowserUrl('file:///etc/passwd')).toBe('file:///etc/passwd');
+    // WHATWG collapses file://localhost/... to file:///...
+    expect(normalizeBrowserUrl('file://localhost/private/tmp/a.html')).toBe('file:///private/tmp/a.html');
+  });
+
+  test('rejects javascript, data, and remote file:// hosts', () => {
     expect(normalizeBrowserUrl('javascript://alert(1)')).toBe(BLANK_URL);
     expect(normalizeBrowserUrl('data://text/html,x')).toBe(BLANK_URL);
+    expect(normalizeBrowserUrl('file://remote-host/share/report.html')).toBe(BLANK_URL);
   });
 
   test('treats empty and unparseable input as blank', () => {
@@ -59,6 +67,10 @@ describe('isLoopbackUrl', () => {
 describe('browserUrlLabel', () => {
   test('shows host and port', () => {
     expect(browserUrlLabel('http://localhost:5173/a/b')).toBe('localhost:5173');
+  });
+
+  test('shows the path for a local file URL', () => {
+    expect(browserUrlLabel('file:///tmp/preview.html')).toBe('/tmp/preview.html');
   });
 
   test('is empty for a blank page', () => {
@@ -89,6 +101,15 @@ describe('isStartingServerFailure', () => {
 });
 
 
+describe('isLocalFileUrl', () => {
+  test('matches empty-host and localhost file URLs only', () => {
+    expect(isLocalFileUrl('file:///private/tmp/report%20viewer.html')).toBe(true);
+    expect(isLocalFileUrl('file://localhost/private/tmp/REPORT.md')).toBe(true);
+    expect(isLocalFileUrl('file://remote-host/share/report.html')).toBe(false);
+    expect(isLocalFileUrl('javascript:alert(1)')).toBe(false);
+  });
+});
+
 describe('host app Browser nesting (#726)', () => {
   const host = {
     pageOrigin: 'http://127.0.0.1:4125',
@@ -118,5 +139,9 @@ describe('host app Browser nesting (#726)', () => {
     expect(normalizeBrowsableUrl('127.0.0.1:4125', host)).toBe(BLANK_URL);
     expect(normalizeBrowsableUrl('http://127.0.0.1:5173', host)).toBe('http://127.0.0.1:5173/');
     expect(normalizeBrowsableUrl('example.com', host)).toBe('https://example.com/');
+  });
+
+  test('normalizeBrowsableUrl still allows local file:// (host nesting is http only)', () => {
+    expect(normalizeBrowsableUrl('file:///tmp/preview.html', host)).toBe('file:///tmp/preview.html');
   });
 });

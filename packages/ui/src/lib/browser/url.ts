@@ -16,12 +16,32 @@ const isLoopbackAuthority = (value: string): boolean => {
 export const BLANK_URL = 'about:blank';
 
 /**
+ * True for a local filesystem URL the Browser panel may open.
+ *
+ * Matches chat markdown (`isLocalFileUrl`): empty host / `localhost` only.
+ * WHATWG normalizes `file://localhost/...` to `file:///...` (empty hostname).
+ * Remote UNC-style hosts (`file://other-host/...`) stay rejected.
+ */
+export const isLocalFileUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'file:' && (!parsed.hostname || parsed.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Normalizes what the user typed into a URL the browser can load.
  *
  * Schemeless input defaults to `https:`, except for loopback authorities:
  * dev servers overwhelmingly speak plain HTTP, and defaulting `localhost:5173`
  * to HTTPS turns the single most common address in this panel into a
  * connection error.
+ *
+ * Local `file://` / `file:///` / `file://localhost/...` are kept so Desktop can
+ * preview HTML on disk. `javascript:`, `data:`, and remote `file://host/...`
+ * stay blank.
  */
 export const normalizeBrowserUrl = (value: string): string => {
   const trimmed = value.trim();
@@ -33,8 +53,13 @@ export const normalizeBrowserUrl = (value: string): string => {
 
   try {
     const parsed = new URL(withScheme);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return BLANK_URL;
-    return parsed.toString();
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    if (parsed.protocol === 'file:' && isLocalFileUrl(parsed.toString())) {
+      return parsed.toString();
+    }
+    return BLANK_URL;
   } catch {
     return BLANK_URL;
   }
@@ -53,7 +78,12 @@ export const isLoopbackUrl = (value: string): boolean => {
 export const browserUrlLabel = (value: string): string => {
   if (!value || value === BLANK_URL) return '';
   try {
-    return new URL(value).host || value;
+    const parsed = new URL(value);
+    if (parsed.protocol === 'file:') {
+      // Prefer the path so a local HTML preview is recognizable in chrome.
+      return decodeURIComponent(parsed.pathname) || value;
+    }
+    return parsed.host || value;
   } catch {
     return value;
   }
