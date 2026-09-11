@@ -1323,6 +1323,7 @@ export const dict: Record<I18nKey, string> = {
   "contextPanel.browser.device.schemeDark": "Escuro",
   "contextPanel.browser.device.schemeFailed": "Não foi possível mudar a aparência da página",
   "contextPanel.browser.frameTitle": "Navegador",
+  "contextPanel.browser.hostAppBlocked": "Não é possível abrir o app Pichamber dentro do navegador.",
   "contextPanel.browser.loadFailed": "Não foi possível carregar esta página",
   "contextPanel.browser.waitingForServer": "Aguardando o servidor de desenvolvimento",
   "contextPanel.browser.waitingForServerHint": "Ele ainda não aceita conexões. A página carregará assim que aceitar.",

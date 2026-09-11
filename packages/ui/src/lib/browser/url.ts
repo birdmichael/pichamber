@@ -86,3 +86,103 @@ const RETRYABLE_LOAD_ERROR_CODES = new Set([
 export const isStartingServerFailure = (code: number, url: string): boolean => (
   RETRYABLE_LOAD_ERROR_CODES.has(code) && isLoopbackUrl(url)
 );
+
+/**
+ * Origins that belong to this Pichamber instance (UI + local API), never to be
+ * loaded inside the embedded Browser — that nests the whole app (#726).
+ */
+export type HostAppBrowserOrigins = {
+  pageOrigin?: string | null;
+  localOrigin?: string | null;
+  apiBaseUrl?: string | null;
+};
+
+const originOf = (value: string | null | undefined): string | null => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    try {
+      return new URL(raw, 'http://127.0.0.1').origin;
+    } catch {
+      return null;
+    }
+  }
+};
+
+/** Collect unique http(s) origins that identify the host app for this runtime. */
+export const collectHostAppBrowserOrigins = (
+  input: HostAppBrowserOrigins = {},
+): readonly string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of [input.pageOrigin, input.localOrigin, input.apiBaseUrl]) {
+    const origin = originOf(candidate);
+    if (!origin || seen.has(origin)) continue;
+    // Only loopback / same-machine UI nests; a remote API host is a normal site.
+    try {
+      if (!LOOPBACK_HOSTNAMES.has(new URL(origin).hostname.toLowerCase())) continue;
+    } catch {
+      continue;
+    }
+    seen.add(origin);
+    out.push(origin);
+  }
+  return out;
+};
+
+/**
+ * True when `url` would load this Pichamber instance inside Browser.
+ * Compares origin only — path/query differences still nest the shell.
+ */
+export const isHostAppBrowserUrl = (
+  url: string,
+  origins: HostAppBrowserOrigins | readonly string[] = {},
+): boolean => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+  const list = Array.isArray(origins)
+    ? origins
+    : collectHostAppBrowserOrigins(origins);
+  return list.includes(parsed.origin);
+};
+
+/** Runtime defaults: page origin, injected local origin, API base. */
+export const readHostAppBrowserOrigins = (): readonly string[] => {
+  if (typeof window === 'undefined') return [];
+  const local = typeof window.__OPENCHAMBER_LOCAL_ORIGIN__ === 'string'
+    ? window.__OPENCHAMBER_LOCAL_ORIGIN__
+    : '';
+  let apiBase = '';
+  try {
+    // Lazy: avoid a hard import cycle with runtime-switch from this leaf module.
+    const injected = (window as typeof window & { __OPENCHAMBER_API_BASE_URL__?: string }).__OPENCHAMBER_API_BASE_URL__;
+    if (typeof injected === 'string') apiBase = injected;
+  } catch {
+    apiBase = '';
+  }
+  return collectHostAppBrowserOrigins({
+    pageOrigin: window.location?.origin ?? '',
+    localOrigin: local,
+    apiBaseUrl: apiBase,
+  });
+};
+
+/**
+ * Like normalizeBrowserUrl, then blank out the host app UI/API origin so Browser
+ * never nests Pichamber inside itself.
+ */
+export const normalizeBrowsableUrl = (
+  value: string,
+  origins: HostAppBrowserOrigins | readonly string[] = readHostAppBrowserOrigins(),
+): string => {
+  const normalized = normalizeBrowserUrl(value);
+  if (normalized === BLANK_URL) return BLANK_URL;
+  return isHostAppBrowserUrl(normalized, origins) ? BLANK_URL : normalized;
+};

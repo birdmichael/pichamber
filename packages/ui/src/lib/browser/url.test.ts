@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-import { BLANK_URL, browserUrlLabel, isLoopbackUrl, isStartingServerFailure, normalizeBrowserUrl } from './url';
+import {
+  BLANK_URL,
+  browserUrlLabel,
+  collectHostAppBrowserOrigins,
+  isHostAppBrowserUrl,
+  isLoopbackUrl,
+  isStartingServerFailure,
+  normalizeBrowsableUrl,
+  normalizeBrowserUrl,
+} from './url';
 
 describe('normalizeBrowserUrl', () => {
   test('keeps an explicit scheme', () => {
@@ -76,5 +85,38 @@ describe('isStartingServerFailure', () => {
 
   test('does not retry an unparseable url', () => {
     expect(isStartingServerFailure(-102, 'not-a-url')).toBe(false);
+  });
+});
+
+
+describe('host app Browser nesting (#726)', () => {
+  const host = {
+    pageOrigin: 'http://127.0.0.1:4125',
+    localOrigin: 'http://127.0.0.1:4125',
+    apiBaseUrl: 'http://127.0.0.1:4125',
+  };
+
+  test('collectHostAppBrowserOrigins keeps unique loopback origins', () => {
+    expect(collectHostAppBrowserOrigins(host)).toEqual(['http://127.0.0.1:4125']);
+    expect(collectHostAppBrowserOrigins({
+      pageOrigin: 'http://127.0.0.1:4125',
+      localOrigin: 'http://localhost:4125',
+      apiBaseUrl: 'https://example.com',
+    })).toEqual(['http://127.0.0.1:4125', 'http://localhost:4125']);
+  });
+
+  test('isHostAppBrowserUrl matches the host origin regardless of path', () => {
+    const origins = collectHostAppBrowserOrigins(host);
+    expect(isHostAppBrowserUrl('http://127.0.0.1:4125/', origins)).toBe(true);
+    expect(isHostAppBrowserUrl('http://127.0.0.1:4125/sessions', origins)).toBe(true);
+    expect(isHostAppBrowserUrl('http://127.0.0.1:5173/', origins)).toBe(false);
+    expect(isHostAppBrowserUrl('https://example.com/', origins)).toBe(false);
+  });
+
+  test('normalizeBrowsableUrl blanks the host app UI', () => {
+    expect(normalizeBrowsableUrl('http://127.0.0.1:4125', host)).toBe(BLANK_URL);
+    expect(normalizeBrowsableUrl('127.0.0.1:4125', host)).toBe(BLANK_URL);
+    expect(normalizeBrowsableUrl('http://127.0.0.1:5173', host)).toBe('http://127.0.0.1:5173/');
+    expect(normalizeBrowsableUrl('example.com', host)).toBe('https://example.com/');
   });
 });

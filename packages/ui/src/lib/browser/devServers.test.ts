@@ -62,3 +62,17 @@ describe('dev server candidates', () => {
     expect(mergeDevServerCandidates({ announced: [], discovered: [] })).toEqual([]);
   });
 });
+
+describe('mergeDevServerCandidates host-app filter (#726)', () => {
+  test('drops an announced URL that is the host Pichamber origin', () => {
+    const merged = mergeDevServerCandidates({
+      announced: ['http://127.0.0.1:4125/', 'http://localhost:5173/'],
+      discovered: [
+        { port: 4125, url: 'http://localhost:4125/', command: 'pichamber' },
+        { port: 5173, url: 'http://localhost:5173/', command: 'vite' },
+      ],
+      hostOrigins: ['http://127.0.0.1:4125'],
+    });
+    expect(merged.map((entry) => entry.port)).toEqual([5173]);
+  });
+});

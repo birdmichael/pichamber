@@ -7,7 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/url';
 import { useUIStore } from '@/stores/useUIStore';
-import { BLANK_URL, isLoopbackUrl, isStartingServerFailure, normalizeBrowserUrl } from '@/lib/browser/url';
+import { BLANK_URL, isLoopbackUrl, isStartingServerFailure, normalizeBrowsableUrl, normalizeBrowserUrl } from '@/lib/browser/url';
 import { probeLoopbackStatus } from '@/lib/browser/devServers';
 import {
   cancelAnnotationSession,
@@ -96,7 +96,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
 
   // Captured once: the webview owns its history from here on, and re-deriving
   // this from props would drag the view back to where the tab started.
-  const initialUrlRef = React.useRef(normalizeBrowserUrl(initialUrl));
+  const initialUrlRef = React.useRef(normalizeBrowsableUrl(initialUrl));
   const startUrl = initialUrlRef.current !== BLANK_URL ? initialUrlRef.current : '';
 
   // The view is created with its final URL already in `src`, never navigated
@@ -174,7 +174,12 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
   );
 
   const loadUrl = React.useCallback((value: string) => {
-    const next = normalizeBrowserUrl(value);
+    const normalized = normalizeBrowserUrl(value);
+    const next = normalizeBrowsableUrl(value);
+    if (normalized !== BLANK_URL && next === BLANK_URL) {
+      toast.error(t('contextPanel.browser.hostAppBlocked'));
+      return;
+    }
     if (next === BLANK_URL) return;
     // The address bar shows what the user asked for; a tunnel only changes
     // where the bytes come from, and surfacing 127.0.0.1:<random> would be
@@ -199,7 +204,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
       // showing the remote one's address. Say what happened instead.
       if (error instanceof DevTunnelUnavailableError) setTunnelFailedUrl(next);
     });
-  }, []);
+  }, [t]);
 
   // Resolving through the tunnel is what lets a persisted loopback URL reach a
   // dev server on a remote host; locally it returns the URL unchanged.
@@ -521,7 +526,14 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
     const onWillNavigate = (event: Event) => {
       const detail = readEventPayload<{ url?: string }>(event);
       const target = typeof detail.url === 'string' ? detail.url : '';
-      if (!target || !shouldTunnelLoopbackUrl(target)) return;
+      if (!target) return;
+      // Never let in-page navigations nest the host Pichamber UI (#726).
+      if (normalizeBrowsableUrl(target) === BLANK_URL && normalizeBrowserUrl(target) !== BLANK_URL) {
+        event.preventDefault();
+        toast.error(t('contextPanel.browser.hostAppBlocked'));
+        return;
+      }
+      if (!shouldTunnelLoopbackUrl(target)) return;
       event.preventDefault();
       loadUrl(target);
     };
@@ -548,7 +560,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
       webviewElement.removeEventListener('will-navigate', onWillNavigate);
       webviewElement.removeEventListener('did-fail-load', onFailLoad);
     };
-  }, [loadUrl, webviewElement]);
+  }, [loadUrl, t, webviewElement]);
 
   // Popups open in place; a detached window would escape the panel entirely.
   React.useEffect(() => {
@@ -821,7 +833,7 @@ const WebviewBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tab
 const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabID }) => {
   const { t } = useI18n();
   const setContextPanelTabTargetPath = useUIStore((state) => state.setContextPanelTabTargetPath);
-  const normalized = normalizeBrowserUrl(initialUrl);
+  const normalized = normalizeBrowsableUrl(initialUrl);
   const startUrl = normalized !== BLANK_URL ? normalized : '';
 
   const [address, setAddress] = React.useState(startUrl);
@@ -844,7 +856,12 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
   );
 
   const navigate = React.useCallback((value: string) => {
-    const next = normalizeBrowserUrl(value);
+    const normalized = normalizeBrowserUrl(value);
+    const next = normalizeBrowsableUrl(value);
+    if (normalized !== BLANK_URL && next === BLANK_URL) {
+      toast.error(t('contextPanel.browser.hostAppBlocked'));
+      return;
+    }
     if (next === BLANK_URL) return;
     setAddress(next);
     setLoadedUrl(next);
@@ -861,7 +878,7 @@ const IframeBrowser: React.FC<BrowserPaneProps> = ({ initialUrl, directory, tabI
       setHistoryIndex(kept.length);
       return [...kept, next];
     });
-  }, [directory, historyIndex, persistUrl, recordHistoryVisit]);
+  }, [directory, historyIndex, persistUrl, recordHistoryVisit, t]);
 
   const goTo = React.useCallback((index: number) => {
     const next = history[index];

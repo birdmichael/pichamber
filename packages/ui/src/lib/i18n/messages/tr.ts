@@ -1321,6 +1321,7 @@ export const dict = {
   'contextPanel.browser.device.schemeDark': 'Koyu',
   'contextPanel.browser.device.schemeFailed': 'Sayfa görünümü değiştirilemedi',
   'contextPanel.browser.frameTitle': 'Tarayıcı',
+  'contextPanel.browser.hostAppBlocked': 'Pichamber uygulaması Tarayıcı panelinde açılamaz.',
   'contextPanel.browser.loadFailed': 'Bu sayfa yüklenemedi',
   'contextPanel.browser.waitingForServer': 'Dev server bekleniyor',
   'contextPanel.browser.waitingForServerHint': 'Sunucu henüz bağlantı kabul etmiyor. Kabul ettiği anda bu sayfa yüklenecek.',
