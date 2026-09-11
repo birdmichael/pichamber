@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Settings: nested Esc (`data-settings-escape-form`) abandons only the draft; Settings stays open (#717).
 - Settings: sidebar gear and Ctrl+, open on General instead of the last visited section (#719).
 - Desktop: Ctrl/Cmd+1…9 switches session tabs even while the composer is focused (#718).
 - Settings: Esc closes the Settings window again when no nested overlay or draft owns Escape (#717).
