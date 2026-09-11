@@ -95,7 +95,7 @@ test('treats a nested span inside a contenteditable or CodeMirror parent as edit
   expect(isEditableEventTarget(cmLine as unknown as HTMLElement)).toBe(true);
 });
 
-test('Ctrl+Alt+digit still switches the context rail while the composer is focused', () => {
+test('mod(+alt)+digit switches tabs/surfaces even while the composer is focused', () => {
   expect(shouldYieldHeldDigitShortcutToEditor({
     isEditableTarget: true,
     requiresAlternateModifier: true,
@@ -103,7 +103,7 @@ test('Ctrl+Alt+digit still switches the context rail while the composer is focus
   expect(shouldYieldHeldDigitShortcutToEditor({
     isEditableTarget: true,
     requiresAlternateModifier: false,
-  })).toBe(true);
+  })).toBe(false);
   expect(shouldYieldHeldDigitShortcutToEditor({
     isEditableTarget: false,
     requiresAlternateModifier: true,

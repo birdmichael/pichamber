@@ -579,11 +579,11 @@ export const useKeyboardShortcuts = () => {
       }
 
       const sessionTabDigit = rawDigit !== null && rawDigit !== '0' ? Number(rawDigit) : null;
+      // Prefer session-tab switch on mod+digit even when the composer is focused (#718).
       if (
         sessionTabDigit !== null
         && !event.repeat
         && !isVSCodeRuntime()
-        && !isEditableEventTarget(event.target)
         && useUIStore.getState().sessionTabsEnabled
         && eventMatchesShortcutPrefix(
           event,
