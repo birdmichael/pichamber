@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  SettingsCheckboxRow,
   SettingsChipGroup,
   SettingsSection,
   SettingsStackedField,
@@ -28,6 +29,8 @@ import {
   addRemoteModelsToForm,
   applyModelContextChange,
   applyModelIdChange,
+  applyModelReasoningChange,
+  applyModelVisionChange,
   buildFetchRemoteModelsRequest,
   createEmptyCustomProviderForm,
   createHeaderRow,
@@ -35,6 +38,8 @@ import {
   fetchRemoteModelsErrorKey,
   isInferredModelContext,
   mergeCatalogIntoModelRow,
+  modelRowHasReasoning,
+  modelRowHasVision,
   parseRemoteProviderModelsPayload,
   prepareRemoteModelPicker,
   remoteModelAlreadyAdded,
@@ -207,6 +212,24 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
       ...prev,
       models: prev.models.map((row, rowIndex) => (
         rowIndex === index ? applyModelContextChange(row, contextWindow) : row
+      )),
+    }));
+  };
+
+  const setModelVision = (index: number, enabled: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      models: prev.models.map((row, rowIndex) => (
+        rowIndex === index ? applyModelVisionChange(row, enabled) : row
+      )),
+    }));
+  };
+
+  const setModelReasoning = (index: number, enabled: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      models: prev.models.map((row, rowIndex) => (
+        rowIndex === index ? applyModelReasoningChange(row, enabled) : row
       )),
     }));
   };
@@ -537,6 +560,26 @@ export const CustomProviderForm: React.FC<CustomProviderFormProps> = ({
                       {t('settings.providers.page.custom.models.contextInferred')}
                     </p>
                   ) : null}
+                </div>
+                <div className="space-y-1 pt-1">
+                  <SettingsCheckboxRow
+                    checked={modelRowHasVision(model)}
+                    onChange={(checked) => setModelVision(index, checked)}
+                    disabled={busy}
+                    label={t('settings.providers.page.custom.models.visionLabel')}
+                    info={t('settings.providers.page.custom.models.visionInfo')}
+                    ariaLabel={t('settings.providers.page.custom.models.visionLabel')}
+                    settingsItem="providers.custom.model.vision"
+                  />
+                  <SettingsCheckboxRow
+                    checked={modelRowHasReasoning(model)}
+                    onChange={(checked) => setModelReasoning(index, checked)}
+                    disabled={busy}
+                    label={t('settings.providers.page.custom.models.reasoningLabel')}
+                    info={t('settings.providers.page.custom.models.reasoningInfo')}
+                    ariaLabel={t('settings.providers.page.custom.models.reasoningLabel')}
+                    settingsItem="providers.custom.model.reasoning"
+                  />
                 </div>
               </div>
               <Button

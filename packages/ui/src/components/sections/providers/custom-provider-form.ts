@@ -47,10 +47,14 @@ export type ModelRow = {
   contextWindow?: number;
   /** True after the user edits or clears context. Auto-prefill must not overwrite. */
   contextTouched?: boolean;
-  /** Persisted Pi `input`. Not a Settings control — save must not strip it. */
+  /** Persisted Pi `input`. Vision toggle and catalog prefill; save must not strip it. */
   input?: PiModelInputType[];
-  /** Persisted Pi `reasoning`. Filled from models.dev / published ids. */
+  /** True after the user toggles Vision. Catalog auto-prefill must not overwrite. */
+  visionTouched?: boolean;
+  /** Persisted Pi `reasoning`. Filled from models.dev / published ids / user toggle. */
   reasoning?: true;
+  /** True after the user toggles Reasoning. Catalog auto-prefill must not overwrite. */
+  reasoningTouched?: boolean;
 };
 
 export type HeaderRow = {
@@ -148,7 +152,8 @@ export type ProviderLikeForCustomForm = {
     name?: string;
     contextWindow?: number;
     input?: unknown;
-    capabilities?: { input?: unknown };
+    reasoning?: unknown;
+    capabilities?: { input?: unknown; reasoning?: unknown };
     limit?: { context?: number };
     api?: { npm?: string };
   }> | Record<string, unknown>;
@@ -173,6 +178,8 @@ export function catalogFieldsForModelId(
     input?: unknown;
     reasoning?: unknown;
     contextTouched?: boolean;
+    visionTouched?: boolean;
+    reasoningTouched?: boolean;
   } = {},
 ): Pick<ModelRow, 'contextWindow' | 'input' | 'reasoning'> {
   const trimmed = id.trim();
@@ -185,16 +192,22 @@ export function catalogFieldsForModelId(
         id: trimmed,
         catalogContextWindow: source.contextWindow,
       });
-  const input = resolvePersistedImageInput({
-    id: trimmed,
-    input: source.input,
-    catalog: source.catalog,
-  });
-  const reasoning = resolvePersistedReasoning({
-    id: trimmed,
-    reasoning: source.reasoning,
-    catalog: source.catalog,
-  });
+  const input = source.visionTouched
+    ? (Array.isArray(source.input) && source.input.includes('image')
+      ? (['text', 'image'] as PiModelInputType[])
+      : undefined)
+    : resolvePersistedImageInput({
+        id: trimmed,
+        input: source.input,
+        catalog: source.catalog,
+      });
+  const reasoning = source.reasoningTouched
+    ? (source.reasoning === true ? true as const : undefined)
+    : resolvePersistedReasoning({
+        id: trimmed,
+        reasoning: source.reasoning,
+        catalog: source.catalog,
+      });
   return {
     ...(resolved.contextWindow !== undefined ? { contextWindow: resolved.contextWindow } : {}),
     ...(input ? { input } : {}),
@@ -212,12 +225,31 @@ export function mergeCatalogIntoModelRow(
     input: row.input,
     reasoning: row.reasoning,
     contextTouched: row.contextTouched,
+    visionTouched: row.visionTouched,
+    reasoningTouched: row.reasoningTouched,
   });
-  return {
+  const next: ModelRow = {
     ...row,
     ...fields,
-    ...(row.contextTouched ? { contextWindow: row.contextWindow } : {}),
   };
+  if (row.contextTouched) {
+    next.contextWindow = row.contextWindow;
+  }
+  if (row.visionTouched) {
+    if (row.input) {
+      next.input = row.input;
+    } else {
+      delete next.input;
+    }
+  }
+  if (row.reasoningTouched) {
+    if (row.reasoning) {
+      next.reasoning = row.reasoning;
+    } else {
+      delete next.reasoning;
+    }
+  }
+  return next;
 }
 
 const readModelContextWindow = (model: unknown): number | undefined => {
@@ -264,6 +296,23 @@ const readModelInput = (model: unknown): PiModelInputType[] | undefined => {
   return undefined;
 };
 
+const readModelReasoning = (model: unknown): true | undefined => {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) {
+    return undefined;
+  }
+  const record = model as Record<string, unknown>;
+  if (record.reasoning === true) {
+    return true;
+  }
+  const capabilities = record.capabilities;
+  if (capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)) {
+    if ((capabilities as Record<string, unknown>).reasoning === true) {
+      return true;
+    }
+  }
+  return undefined;
+};
+
 export const applyModelIdChange = (
   row: ModelRow,
   id: string,
@@ -272,6 +321,8 @@ export const applyModelIdChange = (
   const next: ModelRow = { ...row, id };
   delete next.input;
   delete next.reasoning;
+  delete next.visionTouched;
+  delete next.reasoningTouched;
   if (!row.contextTouched) {
     delete next.contextWindow;
   }
@@ -286,6 +337,36 @@ export const applyModelContextChange = (
   contextWindow,
   contextTouched: true,
 });
+
+/** User Vision toggle — persists as Pi `input: ['text','image']` or omit. */
+export const applyModelVisionChange = (row: ModelRow, enabled: boolean): ModelRow => {
+  const next: ModelRow = { ...row, visionTouched: true };
+  if (enabled) {
+    next.input = ['text', 'image'];
+  } else {
+    delete next.input;
+  }
+  return next;
+};
+
+/** User Reasoning toggle — persists as Pi `reasoning: true` or omit. */
+export const applyModelReasoningChange = (row: ModelRow, enabled: boolean): ModelRow => {
+  const next: ModelRow = { ...row, reasoningTouched: true };
+  if (enabled) {
+    next.reasoning = true;
+  } else {
+    delete next.reasoning;
+  }
+  return next;
+};
+
+export const modelRowHasVision = (row: Pick<ModelRow, 'input'>): boolean => (
+  Array.isArray(row.input) && row.input.includes('image')
+);
+
+export const modelRowHasReasoning = (row: Pick<ModelRow, 'reasoning'>): boolean => (
+  row.reasoning === true
+);
 
 export const isInferredModelContext = (row: Pick<ModelRow, 'id' | 'contextWindow'>): boolean => {
   if (row.contextWindow === undefined) {
@@ -463,12 +544,14 @@ export function providerToCustomFormState(
             : id,
           contextWindow: readModelContextWindow(value),
           input: readModelInput(value),
+          reasoning: readModelReasoning(value),
         }))
       : []);
 
   const models = modelEntries.length > 0
     ? modelEntries.map((model) => {
         const input = readModelInput(model);
+        const reasoning = readModelReasoning(model);
         const id = typeof model?.id === 'string' ? model.id : '';
         return mergeCatalogIntoModelRow({
           row: nextRow(),
@@ -476,6 +559,7 @@ export function providerToCustomFormState(
           name: typeof model?.name === 'string' ? model.name : id,
           contextWindow: readModelContextWindow(model) ?? (typeof model?.contextWindow === 'number' ? model.contextWindow : undefined),
           ...(input ? { input } : {}),
+          ...(reasoning ? { reasoning: true as const } : {}),
         }, catalog);
       })
     : [createModelRow()];
@@ -562,16 +646,20 @@ export function validateCustomProvider(input: ValidateCustomProviderInput): Vali
         id,
         contextWindow: model.contextWindow,
       });
-      const modelInput = resolvePersistedImageInput({
-        id,
-        input: model.input,
-        catalog: input.catalog,
-      });
-      const reasoning = resolvePersistedReasoning({
-        id,
-        reasoning: model.reasoning,
-        catalog: input.catalog,
-      });
+      const modelInput = model.visionTouched
+        ? (modelRowHasVision(model) ? (['text', 'image'] as PiModelInputType[]) : undefined)
+        : resolvePersistedImageInput({
+            id,
+            input: model.input,
+            catalog: input.catalog,
+          });
+      const reasoning = model.reasoningTouched
+        ? (modelRowHasReasoning(model) ? true as const : undefined)
+        : resolvePersistedReasoning({
+            id,
+            reasoning: model.reasoning,
+            catalog: input.catalog,
+          });
       return [
         id,
         {
@@ -998,7 +1086,14 @@ export function remoteModelAlreadyAdded(current: readonly ModelRow[], modelId: s
 }
 
 const isBlankModelRow = (row: ModelRow): boolean => (
-  !row.id.trim() && !row.name.trim() && row.contextWindow === undefined && !row.contextTouched && !row.input
+  !row.id.trim()
+  && !row.name.trim()
+  && row.contextWindow === undefined
+  && !row.contextTouched
+  && !row.input
+  && !row.reasoning
+  && !row.visionTouched
+  && !row.reasoningTouched
 );
 
 /**
