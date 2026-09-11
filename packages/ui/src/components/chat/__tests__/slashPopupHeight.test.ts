@@ -11,6 +11,7 @@ import {
   measureDesktopSlashAvailablePx,
   readOverlayMaxHeight,
   resolveDesktopSlashPopupMaxHeight,
+  shouldDockComposerForDesktopWelcome,
   shouldDockComposerForDesktopSlashMenu,
   shouldHideNewSessionWelcomeForDesktopSlashMenu,
   snapSlashPopupMaxHeight,
@@ -133,8 +134,32 @@ describe('resolveDesktopSlashPopupMaxHeight', () => {
   });
 });
 
-describe('shouldDockComposerForDesktopSlashMenu', () => {
-  test('docks only a Desktop new-session composer while `/` is open', () => {
+describe('shouldDockComposerForDesktopWelcome', () => {
+  test('docks Desktop welcome chrome independently of whether `/` is open', () => {
+    expect(shouldDockComposerForDesktopWelcome({
+      isMobile: false,
+      isDesktopExpanded: false,
+      showDesktopDraftWelcomeChrome: true,
+    })).toBe(true);
+    expect(shouldDockComposerForDesktopWelcome({
+      isMobile: false,
+      isDesktopExpanded: false,
+      showDesktopDraftWelcomeChrome: false,
+    })).toBe(false);
+    expect(shouldDockComposerForDesktopWelcome({
+      isMobile: true,
+      isDesktopExpanded: false,
+      showDesktopDraftWelcomeChrome: true,
+    })).toBe(false);
+  });
+
+  test('legacy slash helper docks welcome without requiring `/` open (#688)', () => {
+    expect(shouldDockComposerForDesktopSlashMenu({
+      isMobile: false,
+      isDesktopExpanded: false,
+      newSessionDraftOpen: true,
+      commandAutocompleteOpen: false,
+    })).toBe(true);
     expect(shouldDockComposerForDesktopSlashMenu({
       isMobile: false,
       isDesktopExpanded: false,
@@ -144,18 +169,13 @@ describe('shouldDockComposerForDesktopSlashMenu', () => {
     expect(shouldDockComposerForDesktopSlashMenu({
       isMobile: false,
       isDesktopExpanded: false,
-      newSessionDraftOpen: true,
-      commandAutocompleteOpen: false,
-    })).toBe(false);
-    expect(shouldDockComposerForDesktopSlashMenu({
-      isMobile: true,
-      isDesktopExpanded: false,
-      newSessionDraftOpen: true,
+      newSessionDraftOpen: false,
       commandAutocompleteOpen: true,
-    })).toBe(false);
+      showDesktopDraftWelcomeChrome: true,
+    })).toBe(true);
   });
 
-  test('hides the new-session title and starter chips on that same Desktop `/` moment', () => {
+  test('never hides new-session title and starter chips for Desktop `/` (#688)', () => {
     const open = {
       isMobile: false,
       isDesktopExpanded: false,
@@ -163,16 +183,15 @@ describe('shouldDockComposerForDesktopSlashMenu', () => {
       commandAutocompleteOpen: true,
     };
     const closed = { ...open, commandAutocompleteOpen: false };
-    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(open)).toBe(true);
+    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(open)).toBe(false);
     expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(closed)).toBe(false);
-    expect(shouldHideNewSessionWelcomeForDesktopSlashMenu(open)).toBe(
-      shouldDockComposerForDesktopSlashMenu(open),
-    );
   });
 
-  test('ChatInput hides welcome chrome and cancels the 6vh inset while Desktop `/` is open', () => {
+  test('ChatInput keeps welcome chrome and uses a stable docked welcome layout', () => {
+    expect(chatInputSource.includes('shouldDockComposerForDesktopWelcome')).toBe(true);
     expect(chatInputSource.includes('shouldHideNewSessionWelcomeForDesktopSlashMenu')).toBe(true);
     expect(chatInputSource.includes('showNewSessionWelcome')).toBe(true);
+    expect(chatInputSource.includes('compactWelcomeComposer')).toBe(true);
     expect(chatInputSource.includes('-mb-[6vh]')).toBe(true);
   });
 

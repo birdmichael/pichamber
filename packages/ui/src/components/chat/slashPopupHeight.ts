@@ -1,14 +1,14 @@
 /**
  * Desktop `/` popup height. Command rows are the name plus up to two wrapped
  * description lines. The old 256px (`max-h-64`) cap showed a clipped last
- * name on shorter one-line-description rows. A new-session composer is
- * vertically centered, so the space above it is also ~256px until the form
- * docks to the bottom while `/` is open. Docking the whole welcome block is
- * not enough: the title and starter chips stay in that block and steal the
- * list viewport (observed ~5 short rows / ~295px on 1280×800). Hide that
- * chrome in the same turn, cancel the new-session `pb-[6vh]` inset, then
- * measure the space above the composer and snap to whole rows so the last
- * visible name stays intact.
+ * name on shorter one-line-description rows.
+ *
+ * New-session / empty-session welcome chrome used to sit in a vertically
+ * centered block. Opening `/` docked the composer and hid the title + chips
+ * in the same turn (#223), which gained slash rows but caused a jarring
+ * layout jump (#688). Welcome layout is now stably bottom-docked with the
+ * hero reserved in the flex space above the composer, so `/` can measure a
+ * tall list without collapsing chrome.
  */
 
 export const DESKTOP_SLASH_POPUP_DESIGN_CAP_PX = 640;
@@ -21,23 +21,50 @@ export const DESKTOP_SLASH_DESCRIPTION_CLASS = 'typography-meta text-muted-foreg
 /** CSS fallback when JS has not measured yet. Must not be `max-h-64` (256px). */
 export const DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS = 'max-h-[min(40rem,calc(100dvh-11rem))]';
 
+/**
+ * Desktop welcome (new-session draft or empty session) keeps the composer
+ * docked at the bottom so opening `/` does not jump the layout (#688).
+ * Hero title + starter chips stay mounted in the reserved space above.
+ */
+export function shouldDockComposerForDesktopWelcome(options: {
+  isMobile: boolean;
+  isDesktopExpanded: boolean;
+  showDesktopDraftWelcomeChrome: boolean;
+}): boolean {
+  return options.showDesktopDraftWelcomeChrome
+    && !options.isMobile
+    && !options.isDesktopExpanded;
+}
+
+/** @deprecated Prefer shouldDockComposerForDesktopWelcome — slash no longer toggles dock. */
 export function shouldDockComposerForDesktopSlashMenu(options: {
   isMobile: boolean;
   isDesktopExpanded: boolean;
   newSessionDraftOpen: boolean;
   commandAutocompleteOpen: boolean;
+  /** When set, docks for any desktop welcome chrome (draft or empty session). */
+  showDesktopDraftWelcomeChrome?: boolean;
 }): boolean {
-  return options.commandAutocompleteOpen
-    && !options.isMobile
-    && !options.isDesktopExpanded
-    && options.newSessionDraftOpen;
+  if (typeof options.showDesktopDraftWelcomeChrome === 'boolean') {
+    return shouldDockComposerForDesktopWelcome({
+      isMobile: options.isMobile,
+      isDesktopExpanded: options.isDesktopExpanded,
+      showDesktopDraftWelcomeChrome: options.showDesktopDraftWelcomeChrome,
+    });
+  }
+  // Legacy callers: treat an open new-session draft as welcome chrome, ignore `/` open.
+  return shouldDockComposerForDesktopWelcome({
+    isMobile: options.isMobile,
+    isDesktopExpanded: options.isDesktopExpanded,
+    showDesktopDraftWelcomeChrome: options.newSessionDraftOpen,
+  });
 }
 
-/** Same moment as the dock: drop the title and starter chips so they cannot steal list height. */
+/** Never hide welcome chrome for `/` — reserve it so the layout stays stable (#688). */
 export function shouldHideNewSessionWelcomeForDesktopSlashMenu(
-  options: Parameters<typeof shouldDockComposerForDesktopSlashMenu>[0],
+  _options: Parameters<typeof shouldDockComposerForDesktopSlashMenu>[0],
 ): boolean {
-  return shouldDockComposerForDesktopSlashMenu(options);
+  return false;
 }
 
 export function measureDesktopSlashAvailablePx(options: {

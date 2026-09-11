@@ -1454,7 +1454,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 								? 'flex-1 bg-background'
 								: useCompactDraftLayout
 									? 'bg-background px-0'
-									: 'flex-1 items-center justify-center bg-background px-0 pb-[6vh]'
+									: 'flex-1 flex-col bg-background px-0 pb-[6vh]'
 						)}
 					>
                           {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
@@ -1581,7 +1581,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 								? 'flex-1 bg-background'
 								: useCompactDraftLayout
 									? 'bg-background px-0'
-									: 'flex-1 items-center justify-center bg-background px-0 pb-[6vh]'
+									: 'flex-1 flex-col bg-background px-0 pb-[6vh]'
 						)}
 					>
 						{promptReadOnly ? <ReadOnlyPromptBanner /> : (
