@@ -5338,7 +5338,7 @@ const buildMacMenu = () => {
         // accelerator, so the catalog string is display-only (#515).
         // dispatchMenuActionOnce → toggle must not dual-fire IPC+DOM (#514).
         { label: 'Keyboard Shortcuts', accelerator: 'Cmd+K, H', registerAccelerator: false, click: () => dispatchMenuActionOnce('help-dialog') },
-        { label: 'Show Diagnostics', accelerator: 'Cmd+Shift+L', click: () => dispatchAction('download-logs') },
+        { label: 'Pi Status', accelerator: 'Cmd+Shift+L', click: () => dispatchAction('download-logs') },
         { label: 'Toggle Developer Tools', accelerator: 'Cmd+Alt+I', click: () => openDevToolsForMenuTarget() },
         { type: 'separator' },
         { label: 'Clear Cache', click: () => void handleInvoke(null, 'desktop_clear_cache') },
@@ -5471,7 +5471,7 @@ const buildAutoHiddenMenu = () => {
         // accelerator, so the catalog string is display-only (#515).
         // dispatchMenuActionOnce → toggle must not dual-fire IPC+DOM (#514).
         { label: 'Keyboard Shortcuts', accelerator: 'Ctrl+K, H', registerAccelerator: false, click: () => dispatchMenuActionOnce('help-dialog') },
-        { label: 'Show Diagnostics', accelerator: 'Ctrl+Shift+L', click: () => dispatchAction('download-logs') },
+        { label: 'Pi Status', accelerator: 'Ctrl+Shift+L', click: () => dispatchAction('download-logs') },
         { type: 'separator' },
         { label: 'Clear Cache', click: () => void handleInvoke(null, 'desktop_clear_cache') },
         { type: 'separator' },

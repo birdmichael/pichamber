@@ -101,6 +101,21 @@ test('Command Palette keeps Cmd+P / Ctrl+P as a hint and does not register it', 
   }
 });
 
+test('Help Pi Status replaces Show Diagnostics and still dispatches download-logs', () => {
+  const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  const items = [...source.matchAll(/\{ label: 'Pi Status', accelerator: '(Cmd\+Shift\+L|Ctrl\+Shift\+L)'[^}]*\}/g)]
+    .map((match) => match[0]);
+  assert.equal(items.length, 2, 'expected darwin and Linux/Windows Pi Status items');
+  for (const item of items) {
+    assert.match(item, /click: \(\) => dispatchAction\('download-logs'\)/);
+  }
+  assert.equal(
+    [...source.matchAll(/label: 'Show Diagnostics'/g)].length,
+    0,
+    'Show Diagnostics must not remain on the Help menu',
+  );
+});
+
 test('Help Keyboard Shortcuts advertises Cmd+K, H / Ctrl+K, H and does not register it', () => {
   const source = fs.readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
   const items = [...source.matchAll(/\{ label: 'Keyboard Shortcuts', accelerator: '(Cmd\+K, H|Ctrl\+K, H)'[^}]*\}/g)]
