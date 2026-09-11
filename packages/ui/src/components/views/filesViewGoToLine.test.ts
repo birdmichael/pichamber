@@ -9,6 +9,7 @@ import {
   resolveFilesGoToLineFocus,
   shouldOpenFilesGoToLine,
   shouldOpenFilesGoToLineWithoutFocus,
+  shouldPromoteFilesPreviewForGoToLine,
 } from './filesViewGoToLine';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -283,6 +284,12 @@ describe('consumeGoToLineSubmitKey', () => {
 });
 
 describe('Files go-to-line wiring', () => {
+  test('Alt+G from preview promotes to edit then opens go-to-line', () => {
+    expect(filesViewSource).toContain('shouldPromoteFilesPreviewForGoToLine');
+    expect(filesViewSource).toContain('pendingGoToLineAfterEdit');
+    expect(filesViewSource).toContain("saveMdViewMode('edit')");
+  });
+
   test('Alt+G reveals the kebab Line field, including editor-only FilesView', () => {
     expect(filesViewSource).toContain("useKeybind('open_go_to_line'");
     expect(filesViewSource).toContain('shouldOpenFilesGoToLine');
@@ -312,5 +319,47 @@ describe('Files go-to-line wiring', () => {
     expect(listener).toContain('consumeGoToLineSubmitKey(event)');
     expect(listener).toContain('handleSubmit()');
     expect(listener.indexOf('consumeGoToLineSubmitKey')).toBeLessThan(listener.indexOf("event.key !== 'Escape'"));
+  });
+});
+
+describe('shouldPromoteFilesPreviewForGoToLine', () => {
+  test('promotes markdown preview to edit for Alt+G', () => {
+    expect(shouldPromoteFilesPreviewForGoToLine({
+      canEdit: true,
+      isMobile: false,
+      textViewMode: 'edit',
+      isMarkdown: true,
+      mdViewMode: 'preview',
+    })).toBe(true);
+  });
+
+  test('promotes Shiki/text preview mode', () => {
+    expect(shouldPromoteFilesPreviewForGoToLine({
+      canEdit: true,
+      isMobile: false,
+      textViewMode: 'view',
+      isMarkdown: false,
+      isHtml: false,
+    })).toBe(true);
+  });
+
+  test('does not promote when already editing or read-only/mobile', () => {
+    expect(shouldPromoteFilesPreviewForGoToLine({
+      canEdit: true,
+      isMobile: false,
+      textViewMode: 'edit',
+      isMarkdown: true,
+      mdViewMode: 'edit',
+    })).toBe(false);
+    expect(shouldPromoteFilesPreviewForGoToLine({
+      canEdit: false,
+      isMobile: false,
+      textViewMode: 'view',
+    })).toBe(false);
+    expect(shouldPromoteFilesPreviewForGoToLine({
+      canEdit: true,
+      isMobile: true,
+      textViewMode: 'view',
+    })).toBe(false);
   });
 });
