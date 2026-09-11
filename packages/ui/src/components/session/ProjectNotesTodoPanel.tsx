@@ -46,6 +46,7 @@ import { renderMagicPrompt } from '@/lib/magicPrompts';
 import { getCurrentIntlLocale, useI18n } from '@/lib/i18n';
 import { runtimeFetch } from '@/lib/runtime-fetch';
 import { TodoSendDialog, type TodoSendExecution } from './TodoSendDialog';
+import { isJunkNotesProjectLabel } from './notesProjectLabel';
 
 const TODO_PANEL_MIN_ITEMS = 5;
 const TODO_PANEL_MAX_ITEMS = 15;
