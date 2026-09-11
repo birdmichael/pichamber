@@ -36,8 +36,13 @@ export const historyUrl = (value: string): string => {
   if (!normalized || normalized.length > MAX_URL_LENGTH) return '';
   try {
     const parsed = new URL(normalized);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
-    return parsed.toString();
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    // Local file previews are places worth returning to; remote file:// stay out
+    // because normalizeBrowserUrl already blanks them.
+    if (parsed.protocol === 'file:') return parsed.toString();
+    return '';
   } catch {
     return '';
   }
@@ -74,7 +79,7 @@ export const forgetVisit = (
 
 /** What a query matches against: the address without its scheme, plus the title. */
 const searchableText = (entry: BrowserHistoryEntry): string => (
-  `${entry.url.replace(/^https?:\/\//, '')} ${entry.title}`.toLowerCase()
+  `${entry.url.replace(/^(https?:|file:)\/\//, '')} ${entry.title}`.toLowerCase()
 );
 
 /**
@@ -93,7 +98,7 @@ export const suggestFromHistory = (
   const ordered = [...entries].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt);
   if (!needle) return ordered.slice(0, limit);
 
-  const scheme = needle.replace(/^https?:\/\//, '');
+  const scheme = needle.replace(/^(https?:|file:)\/\//, '');
   return ordered
     .filter((entry) => {
       const text = searchableText(entry);

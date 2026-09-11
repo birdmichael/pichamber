@@ -48,7 +48,7 @@ import { decorateMenuTemplateForPlatform } from './menu-accelerators.mjs';
 import { normalizeThemeMenuMode, themeMenuItemDescriptors } from './theme-menu-items.mjs';
 import { attachModKHelpSequenceFallback } from './mod-k-help-sequence.mjs';
 import { unsupportedAppSpecificOpenError, validateLocalPath } from './path-open-utils.mjs';
-import { shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
+import { isBrowsablePanelUrl, shouldAllowBrowserPanelCertificateError } from './browser-panel-security.mjs';
 import { attachRendererRecovery } from './renderer-recovery.mjs';
 import {
   applyChromiumCommandLineSwitches,
@@ -5494,7 +5494,9 @@ contextMenu({
 const loadUrlInsideWebContents = (contents, rawUrl) => {
   try {
     const url = new URL(rawUrl);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    // Local file:// previews are allowed; javascript:/data:/remote file stay out.
+    // webSecurity stays enabled — only top-level loadURL of a local path.
+    if (!isBrowsablePanelUrl(url.toString())) return false;
     if (contents.isDestroyed()) return false;
     void contents.loadURL(url.toString()).catch((error) => {
       log.warn('[webview] failed to load popup URL in place:', error);

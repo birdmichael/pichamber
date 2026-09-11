@@ -10,3 +10,30 @@ export const shouldAllowBrowserPanelCertificateError = ({ url, error }) => {
     return false;
   }
 };
+
+/**
+ * Local filesystem URLs the browser panel may load (address bar / popup in place).
+ *
+ * Empty host and `localhost` only — same rule as UI `isLocalFileUrl`. Keeps
+ * remote `file://other-host/...` out. Does not require disabling webSecurity:
+ * top-level `loadURL` of a local file keeps Chromium's origin isolation.
+ */
+export const isLocalBrowserFileUrl = (value) => {
+  try {
+    const parsed = new URL(String(value ?? '').trim());
+    return parsed.protocol === 'file:' && (!parsed.hostname || parsed.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+};
+
+/** http(s) or local file — schemes the panel webview may navigate to. */
+export const isBrowsablePanelUrl = (value) => {
+  try {
+    const parsed = new URL(String(value ?? '').trim());
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return true;
+    return isLocalBrowserFileUrl(parsed.toString());
+  } catch {
+    return false;
+  }
+};
