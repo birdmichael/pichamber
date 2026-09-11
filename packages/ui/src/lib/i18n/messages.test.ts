@@ -109,6 +109,17 @@ describe('i18n dictionaries', () => {
     }
   });
 
+
+  test('timeline tooltip and dialog title share one product term', () => {
+    for (const [locale, dictionary] of Object.entries(localeDictionaries)) {
+      expect(dictionary['chat.promptNavigator.openTimeline'], locale).toBe(
+        dictionary['chat.timeline.title'],
+      );
+    }
+    expect(enDict['chat.promptNavigator.openTimeline']).toBe('Session timeline');
+    expect(enDict['chat.timeline.title']).toBe('Session timeline');
+  });
+
   test('composer @/# empty states name files/agents or snippets, and add snippet has no extra plus', () => {
     expect(enDict['chat.fileMentionAutocomplete.empty']).toBe('No files or agents found');
     expect(enDict['chat.snippetAutocomplete.empty']).toBe('No snippets found');

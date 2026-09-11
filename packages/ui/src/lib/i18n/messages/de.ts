@@ -1892,7 +1892,7 @@ export const dict = {
   'chat.timeline.relative.minutesAgo': '{count}m her',
   'chat.timeline.relative.hoursAgo': '{count}h her',
   'chat.timeline.relative.daysAgo': '{count}d her',
-  'chat.timeline.title': 'Konversations-Zeitleiste',
+  'chat.timeline.title': 'Sitzungs-Zeitleiste',
   'chat.timeline.description': 'Navigieren Sie zu einem beliebigen Punkt in der Konversation oder erstellen Sie eine neue Sitzung',
   'chat.timeline.searchPlaceholder': 'Nachrichten durchsuchen...',
   'chat.timeline.empty.search': 'Keine Nachrichten gefunden',

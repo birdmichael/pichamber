@@ -2084,7 +2084,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.timeline.relative.minutesAgo": "{count} хв тому",
   "chat.timeline.relative.hoursAgo": "{count} год тому",
   "chat.timeline.relative.daysAgo": "{count} дн тому",
-  "chat.timeline.title": "Хронологія розмови",
+  "chat.timeline.title": "Хронологія сесії",
   "chat.timeline.description": "Перейдіть до будь-якої точки розмови або створіть нову сесію",
   "chat.timeline.searchPlaceholder": "Пошук повідомлень...",
   "chat.timeline.empty.search": "Повідомлень не знайдено",
