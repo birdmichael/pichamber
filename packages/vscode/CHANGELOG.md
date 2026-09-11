@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.19] - 2026-09-11
+
+- Browser file:// support, Mini Chat height, Files tree/find Esc, Settings Esc/gear/tabs, Browser host block and announced servers, Pi Status label, and related UI fixes; see the root CHANGELOG.md (#590, #591, #592, #593, #631, #670, #672, #711, #712, #713, #717, #718, #719, #724, #725, #726, #730).
+
 ## [1.2.18] - 2026-09-08
 
 - Agents, subagent Work Status, model synchronization, and Kimi usage fixes are included; see the root CHANGELOG.md (#611, #613, #614, #615, #616, #617, #618, #619, #620, #621, #622, #623).
