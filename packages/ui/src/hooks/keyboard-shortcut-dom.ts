@@ -26,13 +26,16 @@ export function isEditableEventTarget(target: EventTarget | null): boolean {
   return Boolean(target.closest(EDITABLE_SELECTOR));
 }
 
-/** Session-tab digits (mod+digit) yield to typing. Context-surface digits (mod+alt+digit) do not. */
+/**
+ * Held digit chords prefer surface/tab switching over typing in the composer.
+ * Both session tabs (mod+digit) and context surfaces (mod+alt+digit) keep the shortcut (#718).
+ */
 export function shouldYieldHeldDigitShortcutToEditor(options: {
   isEditableTarget: boolean;
   requiresAlternateModifier: boolean;
 }): boolean {
-  if (!options.isEditableTarget) return false;
-  return !options.requiresAlternateModifier;
+  void options;
+  return false;
 }
 
 function getEditableRoot(target: EventTarget | null): Element | null {
