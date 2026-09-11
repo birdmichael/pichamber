@@ -3,6 +3,8 @@ import {
   addRemoteModelsToForm,
   applyModelContextChange,
   applyModelIdChange,
+  applyModelReasoningChange,
+  applyModelVisionChange,
   buildAuthSetRequest,
   buildFetchRemoteModelsRequest,
   buildProviderUpsertRequest,
@@ -11,6 +13,9 @@ import {
   fetchRemoteModelsErrorKey,
   filterRemoteModels,
   isInferredModelContext,
+  mergeCatalogIntoModelRow,
+  modelRowHasReasoning,
+  modelRowHasVision,
   parseRemoteProviderModelsPayload,
   prepareRemoteModelPicker,
   remoteModelAlreadyAdded,
@@ -877,5 +882,149 @@ describe('fetch remote models request', () => {
       input: ['text'],
     }, 'mystery-model');
     expect(dropped.input).toEqual(undefined);
+  });
+});
+
+describe('model capability toggles', () => {
+  test('persists vision and reasoning for an unknown model id', () => {
+    const toggled = applyModelReasoningChange(
+      applyModelVisionChange({ row: 'm0', id: 'deepseek-v4.1-flash-expires-on-0910', name: 'DeepSeek V4.1 Flash Vision Exp' }, true),
+      true,
+    );
+    expect(modelRowHasVision(toggled)).toBe(true);
+    expect(modelRowHasReasoning(toggled)).toBe(true);
+    expect(toggled.visionTouched).toBe(true);
+    expect(toggled.reasoningTouched).toBe(true);
+
+    const saved = validateCustomProvider({
+      form: baseForm({
+        models: [toggled],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+    });
+    expect(saved.result?.config.models).toEqual({
+      'deepseek-v4.1-flash-expires-on-0910': {
+        name: 'DeepSeek V4.1 Flash Vision Exp',
+        input: ['text', 'image'],
+        reasoning: true,
+      },
+    });
+  });
+
+  test('round-trips stored input/reasoning on edit for an unknown id', () => {
+    const state = providerToCustomFormState({
+      id: 'deepseek',
+      name: 'DeepSeek',
+      options: { baseURL: 'https://api.deepseek.com/v1' },
+      models: [{
+        id: 'deepseek-v4.1-flash-expires-on-0910',
+        name: 'DeepSeek V4.1 Flash Vision Exp',
+        input: ['text', 'image'],
+        reasoning: true,
+      }],
+    });
+    expect(state.models[0]?.input).toEqual(['text', 'image']);
+    expect(state.models[0]?.reasoning).toBe(true);
+
+    const saved = validateCustomProvider({
+      form: {
+        providerID: 'deepseek',
+        name: 'DeepSeek',
+        protocol: 'openai-chat',
+        baseURL: 'https://api.deepseek.com/v1',
+        apiKey: 'sk-test',
+        models: state.models,
+        headers: [{ row: 'h0', key: '', value: '' }],
+      },
+      t,
+      existingProviderIDs: new Set(['deepseek']),
+      editingProviderID: 'deepseek',
+      allowExistingAuth: true,
+    });
+    expect(saved.result?.config.models).toEqual({
+      'deepseek-v4.1-flash-expires-on-0910': {
+        name: 'DeepSeek V4.1 Flash Vision Exp',
+        input: ['text', 'image'],
+        reasoning: true,
+      },
+    });
+  });
+
+  test('user vision/reasoning off overrides catalog prefill and persists omit', () => {
+    const catalog = [{
+      id: 'gpt-6-astra',
+      providerId: 'openai',
+      attachment: true,
+      reasoning: true,
+      modalities: { input: ['text', 'image'] },
+    }];
+    const prefilled = mergeCatalogIntoModelRow({
+      row: 'm0',
+      id: 'gpt-6-astra',
+      name: 'gpt-6-astra',
+    }, catalog);
+    expect(modelRowHasVision(prefilled)).toBe(true);
+    expect(modelRowHasReasoning(prefilled)).toBe(true);
+
+    const disabled = applyModelReasoningChange(applyModelVisionChange(prefilled, false), false);
+    expect(modelRowHasVision(disabled)).toBe(false);
+    expect(modelRowHasReasoning(disabled)).toBe(false);
+    expect(mergeCatalogIntoModelRow(disabled, catalog).input).toEqual(undefined);
+    expect(mergeCatalogIntoModelRow(disabled, catalog).reasoning).toEqual(undefined);
+
+    const saved = validateCustomProvider({
+      form: baseForm({
+        models: [disabled],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+      catalog,
+    });
+    expect(saved.result?.config.models).toEqual({
+      'gpt-6-astra': { name: 'gpt-6-astra' },
+    });
+  });
+
+  test('catalog still prefills when the user has not touched the toggles', () => {
+    const catalog = [{
+      id: 'gpt-6-astra',
+      providerId: 'openai',
+      attachment: true,
+      reasoning: true,
+      modalities: { input: ['text', 'image'] },
+    }];
+    const saved = validateCustomProvider({
+      form: baseForm({
+        models: [{ row: 'm0', id: 'gpt-6-astra', name: 'gpt-6-astra' }],
+      }),
+      t,
+      existingProviderIDs: new Set(),
+      catalog,
+    });
+    expect(saved.result?.config.models).toEqual({
+      'gpt-6-astra': {
+        name: 'gpt-6-astra',
+        input: ['text', 'image'],
+        reasoning: true,
+      },
+    });
+  });
+
+  test('changing model id clears capability toggles so catalog can refill', () => {
+    const toggled = applyModelVisionChange({
+      row: 'm0',
+      id: 'mystery',
+      name: 'Mystery',
+      input: ['text', 'image'],
+      visionTouched: true,
+      reasoning: true,
+      reasoningTouched: true,
+    }, true);
+    const switched = applyModelIdChange(toggled, 'grok-4.6');
+    expect(switched.visionTouched).toEqual(undefined);
+    expect(switched.reasoningTouched).toEqual(undefined);
+    expect(switched.input).toEqual(['text', 'image']);
+    expect(switched.reasoning).toBe(true);
   });
 });

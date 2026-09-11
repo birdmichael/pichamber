@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Providers: Edit custom provider model rows can toggle Vision and Reasoning for unknown model ids (persist Pi `input` / `reasoning`; catalog prefill still works, user toggles override) (#735).
 - UI: restore `@pichamber/ui` typecheck for publish-npm (assistant visible-content / notes tests, assistant status casts, Browser host-origin narrowing, header meta draft open) (#733) ($).
 
 ## [1.2.19] - 2026-09-11
