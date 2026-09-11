@@ -20,14 +20,17 @@ describe('issue #512: Escape with Files editor find open must not close Files', 
   test('while the find bar is open, a window capture listener consumes Escape and closes only the bar', () => {
     const start = filesViewSource.indexOf('const [isSearchOpen, setIsSearchOpen]');
     expect(start).toBeGreaterThan(-1);
-    const end = filesViewSource.indexOf('}, [isSearchOpen]);', start);
+    // Last isSearchOpen effect is the Escape consumer (surface sync + close-event effects precede it).
+    const end = filesViewSource.lastIndexOf('}, [isSearchOpen]);');
     expect(end).toBeGreaterThan(start);
     const effect = filesViewSource.slice(start, end);
 
+    expect(effect).toContain('setFilesFindSurfaceOpen');
+    expect(effect).toContain('CLOSE_FILES_FIND_EVENT');
     expect(effect).toContain('if (!isSearchOpen)');
     expect(effect).toContain("event.key !== 'Escape'");
     expect(effect).toContain('event.preventDefault()');
-    expect(effect).toContain('event.stopPropagation()');
+    expect(effect).toContain('event.stopImmediatePropagation()');
     expect(effect).toContain('setIsSearchOpen(false)');
     expect(effect).toContain("window.addEventListener('keydown', handleWindowKeyDown, { capture: true })");
     expect(effect).toContain("window.removeEventListener('keydown', handleWindowKeyDown, { capture: true })");
@@ -57,6 +60,7 @@ type SimulatedEvent = {
   target: SimNode;
   preventDefault(): void;
   stopPropagation(): void;
+  stopImmediatePropagation(): void;
 };
 
 class SimNode {
@@ -97,6 +101,9 @@ class SimNode {
       stopPropagation() {
         event.propagationStopped = true;
       },
+      stopImmediatePropagation() {
+        event.propagationStopped = true;
+      },
     };
 
     for (let i = 0; i < path.length; i += 1) {
@@ -133,7 +140,7 @@ describe('issue #512: window capture consumes Escape before the context panel ca
       onEvent: (event) => {
         calls.push('window-capture-close-find');
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
       },
     });
     panel.addListener({
@@ -141,7 +148,7 @@ describe('issue #512: window capture consumes Escape before the context panel ca
       onEvent: (event) => {
         calls.push('panel-capture-closed');
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
       },
     });
 
@@ -163,7 +170,7 @@ describe('issue #512: window capture consumes Escape before the context panel ca
       onEvent: (event) => {
         calls.push('panel-capture-closed');
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
       },
     });
 

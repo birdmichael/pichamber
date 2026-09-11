@@ -6,6 +6,10 @@ import { Icon } from '@/components/icon/Icon';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { findMatchRanges } from './markdownPreviewFind';
+import {
+  CLOSE_FILES_FIND_EVENT,
+  setFilesFindSurfaceOpen,
+} from '@/lib/files-panel-escape';
 
 /**
  * In-preview text search for the rendered Markdown file preview.
@@ -304,6 +308,21 @@ export const MarkdownPreviewSearch: React.FC<MarkdownPreviewSearchProps> = ({
   // Listen on window in the capture phase so Escape closes only the find bar
   // (same as X) and never the Files panel. Clean up on unmount or close.
   React.useEffect(() => {
+    setFilesFindSurfaceOpen('markdown-preview', open);
+    return () => setFilesFindSurfaceOpen('markdown-preview', false);
+  }, [open]);
+
+  React.useEffect(() => {
+    const handleCloseFind = () => {
+      close();
+    };
+    window.addEventListener(CLOSE_FILES_FIND_EVENT, handleCloseFind);
+    return () => {
+      window.removeEventListener(CLOSE_FILES_FIND_EVENT, handleCloseFind);
+    };
+  }, [close]);
+
+  React.useEffect(() => {
     if (!open) {
       return;
     }
@@ -312,7 +331,7 @@ export const MarkdownPreviewSearch: React.FC<MarkdownPreviewSearchProps> = ({
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       close();
     };
     window.addEventListener('keydown', handleWindowKeyDown, { capture: true });
