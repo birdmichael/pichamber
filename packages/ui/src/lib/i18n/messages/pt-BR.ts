@@ -2085,7 +2085,7 @@ export const dict: Record<I18nKey, string> = {
   "chat.timeline.relative.minutesAgo": "há {count}m",
   "chat.timeline.relative.hoursAgo": "há {count}h",
   "chat.timeline.relative.daysAgo": "há {count}d",
-  "chat.timeline.title": "Linha do tempo da conversa",
+  "chat.timeline.title": "Linha do tempo da sessão",
   "chat.timeline.description": "Navegue até qualquer ponto da conversa ou crie uma nova sessão",
   "chat.timeline.searchPlaceholder": "Buscar mensagens...",
   "chat.timeline.empty.search": "Nenhuma mensagem encontrada",

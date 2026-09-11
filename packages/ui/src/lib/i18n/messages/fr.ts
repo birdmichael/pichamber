@@ -1843,7 +1843,7 @@ export const dict = {
   'chat.timeline.relative.minutesAgo': 'il y a {count} min',
   'chat.timeline.relative.hoursAgo': 'il y a {count} h',
   'chat.timeline.relative.daysAgo': 'il y a {count} j',
-  'chat.timeline.title': 'Chronologie des conversations',
+  'chat.timeline.title': 'Chronologie de la session',
   'chat.timeline.description': 'Accédez à n’importe quel point de la conversation ou créez une nouvelle session',
   'chat.timeline.searchPlaceholder': 'Rechercher des messages...',
   'chat.timeline.empty.search': 'Aucun message trouvé',

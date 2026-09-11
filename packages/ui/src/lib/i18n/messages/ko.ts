@@ -2103,7 +2103,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.timeline.relative.minutesAgo': '{count}분 전',
   'chat.timeline.relative.hoursAgo': '{count}시간 전',
   'chat.timeline.relative.daysAgo': '{count}일 전',
-  'chat.timeline.title': '대화 타임라인',
+  'chat.timeline.title': '세션 타임라인',
   'chat.timeline.description': '대화의 원하는 지점으로 이동하거나 새 세션으로 분기하세요',
   'chat.timeline.searchPlaceholder': '메시지 검색…',
   'chat.timeline.empty.search': '메시지 없음',

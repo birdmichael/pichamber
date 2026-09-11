@@ -807,7 +807,7 @@ export const dict: Record<I18nKey, string> = {
   'chat.timeline.relative.minutesAgo': '{count}m temu',
   'chat.timeline.relative.hoursAgo': '{count}h temu',
   'chat.timeline.relative.daysAgo': '{count}d temu',
-  'chat.timeline.title': 'Oś Czasu Rozmowy',
+  'chat.timeline.title': 'Oś czasu sesji',
   'chat.timeline.description': 'Nawiguj do dowolnego punktu w rozmowie lub rozwidl nową sesję',
   'chat.timeline.searchPlaceholder': 'Szukaj wiadomości...',
   'chat.timeline.empty.search': 'Nie znaleziono wiadomości',

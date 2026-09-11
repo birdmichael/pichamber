@@ -2099,7 +2099,7 @@ export const dict = {
   'chat.timeline.relative.minutesAgo': '{count} dk önce',
   'chat.timeline.relative.hoursAgo': '{count} sa önce',
   'chat.timeline.relative.daysAgo': '{count} gün önce',
-  'chat.timeline.title': 'Konuşma Zaman Çizelgesi',
+  'chat.timeline.title': 'Session zaman çizelgesi',
   'chat.timeline.description': 'Konuşmadaki herhangi bir noktaya git veya yeni bir session fork\'la',
   'chat.timeline.searchPlaceholder': 'Mesajlarda ara...',
   'chat.timeline.empty.search': 'Mesaj bulunamadı',
