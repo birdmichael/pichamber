@@ -1653,6 +1653,7 @@ export const dict: Record<I18nKey, string> = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': '計画',
   'rightSidebar.contextNotesTodo.empty.selectProject': 'プロジェクトを選択してメモとTODOを追加します。',
   'rightSidebar.contextNotesTodo.notes.title': 'クイックメモ - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': 'クイックメモ',
   'rightSidebar.contextNotesTodo.notes.placeholder': 'コンテキスト、リマインダー、リンクを記録',
   'rightSidebar.contextNotesTodo.todo.title': 'TODO',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count}項目',

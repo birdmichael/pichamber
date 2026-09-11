@@ -1657,6 +1657,7 @@ export const dict = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': 'Plan',
   'rightSidebar.contextNotesTodo.empty.selectProject': 'Select a project to add notes and todos.',
   'rightSidebar.contextNotesTodo.notes.title': 'Quick notes - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': 'Quick notes',
   'rightSidebar.contextNotesTodo.notes.placeholder': 'Capture context, reminders, or links',
   'rightSidebar.contextNotesTodo.todo.title': 'Todo',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count} item',

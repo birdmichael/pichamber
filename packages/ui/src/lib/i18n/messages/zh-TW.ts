@@ -1633,6 +1633,7 @@ export const dict: Record<I18nKey, string> = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': '計畫',
   'rightSidebar.contextNotesTodo.empty.selectProject': '請選擇一個專案以新增筆記和待辦事項。',
   'rightSidebar.contextNotesTodo.notes.title': '快速筆記 - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': '快速筆記',
   'rightSidebar.contextNotesTodo.notes.placeholder': '記錄上下文、提醒或連結',
   'rightSidebar.contextNotesTodo.todo.title': '待辦',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count} 項',
