@@ -1454,6 +1454,7 @@ export const dict = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': 'Plan',
   'rightSidebar.contextNotesTodo.empty.selectProject': 'Wähle ein Projekt aus, um Notizen und Aufgaben hinzuzufügen.',
   'rightSidebar.contextNotesTodo.notes.title': 'Schnelle Notizen - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': 'Schnelle Notizen',
   'rightSidebar.contextNotesTodo.notes.placeholder': 'Kontext, Erinnerungen oder Links festhalten',
   'rightSidebar.contextNotesTodo.todo.title': 'Aufgaben',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count} Element',

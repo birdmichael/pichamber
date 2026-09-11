@@ -1655,6 +1655,7 @@ export const dict = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': 'Plan',
   'rightSidebar.contextNotesTodo.empty.selectProject': 'Not ve yapılacak eklemek için bir proje seçin.',
   'rightSidebar.contextNotesTodo.notes.title': 'Hızlı notlar - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': 'Hızlı notlar',
   'rightSidebar.contextNotesTodo.notes.placeholder': 'Bağlam, hatırlatıcı veya bağlantı yakala',
   'rightSidebar.contextNotesTodo.todo.title': 'Todo',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count} öğe',

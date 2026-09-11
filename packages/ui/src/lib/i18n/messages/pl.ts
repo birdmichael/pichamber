@@ -2860,6 +2860,7 @@ export const dict: Record<I18nKey, string> = {
   'rightSidebar.contextNotesTodo.empty.selectProject': 'Wybierz projekt, aby dodać notatki i zadania.',
   'rightSidebar.contextNotesTodo.notes.placeholder': 'Zapisz kontekst, przypomnienia lub linki',
   'rightSidebar.contextNotesTodo.notes.title': 'Szybkie notatki — {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': 'Szybkie notatki',
   'rightSidebar.contextNotesTodo.plan.defaultTitle': 'Plan',
   'rightSidebar.contextNotesTodo.plans.deletePlan': 'Usuń plan',
   'rightSidebar.contextNotesTodo.plans.deletePlanWithTitle': 'Usuń plan „{title}”',

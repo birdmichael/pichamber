@@ -1623,6 +1623,7 @@ export const dict: Record<I18nKey, string> = {
   'rightSidebar.contextNotesTodo.plan.defaultTitle': '计划',
   'rightSidebar.contextNotesTodo.empty.selectProject': '请选择一个项目以添加笔记和待办事项。',
   'rightSidebar.contextNotesTodo.notes.title': '快速笔记 - {project}',
+  'rightSidebar.contextNotesTodo.notes.titlePlain': '快速笔记',
   'rightSidebar.contextNotesTodo.notes.placeholder': '记录上下文、提醒或链接',
   'rightSidebar.contextNotesTodo.todo.title': '待办',
   'rightSidebar.contextNotesTodo.todo.itemsSingle': '{count} 项',

@@ -1641,6 +1641,7 @@ export const dict: Record<I18nKey, string> = {
   "rightSidebar.contextNotesTodo.plan.defaultTitle": "Plano",
   "rightSidebar.contextNotesTodo.empty.selectProject": "Selecione um projeto para adicionar notas e tarefas pendentes.",
   "rightSidebar.contextNotesTodo.notes.title": "Notas rápidas — {project}",
+  "rightSidebar.contextNotesTodo.notes.titlePlain": "Notas rápidas",
   "rightSidebar.contextNotesTodo.notes.placeholder": "Capture contexto, lembretes ou links",
   "rightSidebar.contextNotesTodo.todo.title": "Tarefas pendentes",
   "rightSidebar.contextNotesTodo.todo.itemsSingle": "{count} elemento",
