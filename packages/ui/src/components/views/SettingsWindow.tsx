@@ -25,7 +25,7 @@ const SettingsView = lazy(() => prefetchSettingsView());
 
 /** Keep the dialog useful while the SettingsView chunk is being fetched. */
 const SettingsWindowLoading: React.FC<{ label: string }> = ({ label }) => (
-  <div className="flex h-full min-h-0 flex-1 bg-[var(--surface-background)] text-[var(--surface-foreground)]" aria-busy="true" aria-label={label}>
+  <div data-settings-view="true" className="flex h-full min-h-0 flex-1 bg-[var(--surface-background)] text-[var(--surface-foreground)]" aria-busy="true" aria-label={label}>
     <div className="flex w-64 shrink-0 flex-col gap-3 border-r border-border bg-sidebar p-4">
       <div className="h-8 animate-pulse rounded-md bg-muted" />
       <div className="flex flex-col gap-2 pt-2">
@@ -121,6 +121,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChan
         />
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <Dialog.Popup
+            data-settings-dialog="true"
             aria-describedby={descriptionId}
             className={cn(
               'relative flex min-h-0 flex-col pointer-events-auto',

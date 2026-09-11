@@ -84,14 +84,16 @@ export function isInsideSettingsDialog(target: EventTarget | null): boolean {
   if (!hasClosest(target)) {
     return false;
   }
-  if (target.closest('[data-settings-view="true"]')) {
+  if (target.closest('[data-settings-view="true"], [data-settings-dialog="true"]')) {
     return true;
   }
   const dialog = target.closest('[role="dialog"]');
   if (!dialog || typeof (dialog as { querySelector?: unknown }).querySelector !== 'function') {
     return false;
   }
-  return Boolean((dialog as ParentNode).querySelector('[data-settings-view="true"]'));
+  return Boolean(
+    (dialog as ParentNode).querySelector('[data-settings-view="true"], [data-settings-dialog="true"]'),
+  );
 }
 
 export type SettingsDismissDetails = {
