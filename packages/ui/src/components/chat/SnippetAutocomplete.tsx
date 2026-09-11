@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Snippet } from '@/types/snippet';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 import { shouldDismissAutocompleteOnOutsidePointer } from './composer/submit/autocompleteOutsideClick';
+import { prefetchSettingsView } from '@/components/views/SettingsWindow';
 
 export interface SnippetAutocompleteHandle {
   handleKeyDown: (key: string) => void;
@@ -48,6 +49,11 @@ export const SnippetAutocomplete = React.forwardRef<SnippetAutocompleteHandle, S
   React.useEffect(() => {
     void loadSnippets();
   }, [loadSnippets]);
+
+  // Prefetch settings chunk while the user scans the # list so Add new snippet opens promptly.
+  React.useEffect(() => {
+    void prefetchSettingsView();
+  }, []);
 
   React.useEffect(() => {
     const query = searchQuery.trim();
@@ -92,10 +98,12 @@ export const SnippetAutocomplete = React.forwardRef<SnippetAutocompleteHandle, S
     while (existing.has(name)) {
       name = `new-snippet-${counter++}`;
     }
-    setSnippetDraft({ name, scope: 'global' });
-    setSelectedSnippet(name);
+    // Kick the chunk (no-op if already warm), open the dialog shell immediately, then seed draft.
+    void prefetchSettingsView();
     setSettingsPage('snippets');
     setSettingsDialogOpen(true);
+    setSnippetDraft({ name, scope: 'global' });
+    setSelectedSnippet(name);
     onClose();
   }, [onClose, setSelectedSnippet, setSettingsDialogOpen, setSettingsPage, setSnippetDraft, snippets]);
 
@@ -132,6 +140,7 @@ export const SnippetAutocomplete = React.forwardRef<SnippetAutocompleteHandle, S
           ref={(el) => { itemRefs.current[0] = el; }}
           className={cn('flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-lg typography-ui-label', selectedIndex === 0 && 'bg-interactive-selection')}
           onClick={openNewSnippetSettings}
+          onPointerEnter={() => { void prefetchSettingsView(); }}
           onMouseMove={() => setSelectedIndex(0)}
         >
           <Icon name="add" className="h-3.5 w-3.5 text-muted-foreground" />

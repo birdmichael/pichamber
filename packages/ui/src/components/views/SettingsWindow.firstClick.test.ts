@@ -24,9 +24,9 @@ describe('sidebar Settings gear first click', () => {
   });
 
   test('SettingsWindow keeps Dialog.Root mounted when closed and lazy-loads SettingsView', () => {
-    expect(settingsWindowSource).toMatch(
-      /lazyWithChunkRecovery\(\(\)\s*=>\s*\n?\s*import\('\.\/SettingsView'\)/,
-    );
+    expect(settingsWindowSource).toContain('prefetchSettingsView');
+    expect(settingsWindowSource).toMatch(/lazy\(\(\)\s*=>\s*prefetchSettingsView\(\)\)/);
+    expect(settingsWindowSource).toContain("import('./SettingsView')");
     expect(settingsWindowSource).not.toMatch(/import\s*\{\s*SettingsView\s*\}\s*from\s*'\.\/SettingsView'/);
 
     const dialogRootIndex = settingsWindowSource.indexOf('<Dialog.Root');
@@ -43,5 +43,20 @@ describe('sidebar Settings gear first click', () => {
     expect(settingsWindowSource).toContain("fallback={<SettingsWindowLoading");
     expect(settingsWindowSource).toContain("<ErrorBoundary");
     expect(settingsWindowSource).toContain("<SettingsWindowError");
+  });
+});
+
+describe('settings view chunk prefetch', () => {
+  test('SettingsWindow exports prefetchSettingsView and warms on idle', () => {
+    expect(settingsWindowSource).toContain('export function prefetchSettingsView');
+    expect(settingsWindowSource).toContain('requestIdleCallback');
+    expect(settingsWindowSource).toContain("import('./SettingsView')");
+  });
+
+  test('SnippetAutocomplete prefetches settings when # menu opens', () => {
+    const snippetSource = readFileSync(join(viewsDir, '../chat/SnippetAutocomplete.tsx'), 'utf8');
+    expect(snippetSource).toContain("import { prefetchSettingsView } from '@/components/views/SettingsWindow'");
+    expect(snippetSource).toContain('void prefetchSettingsView()');
+    expect(snippetSource).toContain('onPointerEnter={() => { void prefetchSettingsView(); }}');
   });
 });

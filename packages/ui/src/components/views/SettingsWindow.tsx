@@ -1,17 +1,27 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { markDialogLayerMounted } from '@/components/ui/dialog-open-layer';
 import { notifySettingsEscapeForm, shouldBlockSettingsDismiss } from '@/lib/settings-dismiss';
 import { focusDesktopWindow } from '@/lib/desktop';
-import { lazyWithChunkRecovery } from '@/lib/chunkLoadRecovery';
+import { importWithChunkRecovery } from '@/lib/chunkLoadRecovery';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 
 // SettingsView pulls CodeMirror / vim / theme tooling; load it only when open.
-const SettingsView = lazyWithChunkRecovery(() =>
-  import('./SettingsView').then((m) => ({ default: m.SettingsView })),
-);
+// Keep one shared promise so autocomplete / idle prefetch and Suspense share the same chunk load.
+let settingsViewImportPromise: Promise<{ default: typeof import('./SettingsView').SettingsView }> | null = null;
+
+export function prefetchSettingsView(): Promise<{ default: typeof import('./SettingsView').SettingsView }> {
+  if (!settingsViewImportPromise) {
+    settingsViewImportPromise = importWithChunkRecovery(() =>
+      import('./SettingsView').then((m) => ({ default: m.SettingsView })),
+    );
+  }
+  return settingsViewImportPromise;
+}
+
+const SettingsView = lazy(() => prefetchSettingsView());
 
 /** Keep the dialog useful while the SettingsView chunk is being fetched. */
 const SettingsWindowLoading: React.FC<{ label: string }> = ({ label }) => (
@@ -55,6 +65,20 @@ interface SettingsWindowProps {
 export const SettingsWindow: React.FC<SettingsWindowProps> = ({ open, onOpenChange }) => {
   const { t } = useI18n();
   const descriptionId = React.useId();
+
+  // Warm the SettingsView chunk after startup idle so first open (gear or # → Add snippet)
+  // paints the real form instead of sitting on a ~2s dead click / long skeleton.
+  React.useEffect(() => {
+    const warm = () => {
+      void prefetchSettingsView();
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const handle = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timeout = window.setTimeout(warm, 1500);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   React.useLayoutEffect(() => {
     if (!open) {
