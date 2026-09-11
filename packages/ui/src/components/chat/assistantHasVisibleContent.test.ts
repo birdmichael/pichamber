@@ -2,8 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import { assistantHasVisibleContent } from './assistantHasVisibleContent';
 import type { ChatMessageEntry } from './lib/turns/types';
 
-const base = (over: Partial<ChatMessageEntry> & { info?: Record<string, unknown> }): ChatMessageEntry => ({
-  info: { id: 'a1', role: 'assistant', ...(over.info || {}) } as ChatMessageEntry['info'],
+const base = (over: {
+  parts?: ChatMessageEntry['parts'];
+  info?: Record<string, unknown>;
+}): ChatMessageEntry => ({
+  info: {
+    ...(over.info ?? {}),
+    id: 'a1',
+    role: 'assistant',
+  },
   parts: over.parts ?? [],
 } as ChatMessageEntry);
 

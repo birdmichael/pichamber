@@ -20,7 +20,7 @@ export function resolveHeaderMetaProjectLabel(input: {
 }): string | null {
   const draft = input.draft ?? null;
   if (draft?.open) {
-    if (isProjectlessNewSessionDraft(draft)) return null;
+    if (isProjectlessNewSessionDraft({ ...draft, open: true })) return null;
     const draftLabel = typeof input.draftProjectLabel === 'string' ? input.draftProjectLabel.trim() : '';
     if (draftLabel) return draftLabel;
     return null;

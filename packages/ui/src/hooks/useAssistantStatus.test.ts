@@ -41,9 +41,9 @@ describe('getActiveAssistantContext', () => {
     });
 
     test('carries the active parent thinking level instead of a later queued selection', () => {
-        const activeParent = { ...userMessage('user_1', 'anthropic', 'claude-opus-4-1'), thinking: 'high' } as Message;
+        const activeParent = { ...userMessage('user_1', 'anthropic', 'claude-opus-4-1'), thinking: 'high' } as unknown as Message;
         const assistant = assistantMessage('assistant_1', activeParent.id);
-        const laterSelection = { ...userMessage('user_2', 'openai', 'gpt-5.6-sol'), thinking: 'low' } as Message;
+        const laterSelection = { ...userMessage('user_2', 'openai', 'gpt-5.6-sol'), thinking: 'low' } as unknown as Message;
         expect(getActiveAssistantContext([activeParent, assistant, laterSelection])).toEqual({
             assistantId: assistant.id,
             model: { providerId: 'anthropic', modelId: 'claude-opus-4-1' },

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { isJunkNotesProjectLabel } from './notesProjectLabel';
 
 describe('notes quick name label', () => {
@@ -17,8 +18,8 @@ describe('notes quick name label', () => {
     expect(isJunkNotesProjectLabel('~/Documents/Code')).toBe(false);
   });
 
-  test('ProjectNotesTodoPanel imports isJunkNotesProjectLabel', async () => {
-    const source = await Bun.file(new URL('./ProjectNotesTodoPanel.tsx', import.meta.url)).text();
+  test('ProjectNotesTodoPanel imports isJunkNotesProjectLabel', () => {
+    const source = readFileSync(new URL('./ProjectNotesTodoPanel.tsx', import.meta.url), 'utf8');
     expect(source).toContain("import { isJunkNotesProjectLabel } from './notesProjectLabel'");
   });
 });
