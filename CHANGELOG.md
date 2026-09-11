@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Browser: empty state lists only announced dev servers, not every localhost listener (#713).
 - Files: first Esc closes only the find bar again; the Files panel stays open (#712).
 - Desktop: Help menu **Pi Status** label matches the status dialog (was Show Diagnostics) (#711).
 - Settings: Pi Agents Create agent no longer crashes with React #310 when hooks ran after the default explainer early return (#672).
