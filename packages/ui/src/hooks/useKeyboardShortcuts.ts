@@ -418,6 +418,11 @@ export const useKeyboardShortcuts = () => {
       // must not skip close. Real open overlays/forms use shouldBlockSettingsDismiss (#717).
       if (state.isSettingsDialogOpen) {
         if (shouldBlockSettingsDismiss(false, { reason: 'escape-key', event })) {
+          // Nested draft/overlay owns Esc. Must cancel the event: notify abandons
+          // the form first, which clears the block — without preventDefault the
+          // Dialog still closes Settings on the same keydown (#717 nested).
+          event.preventDefault();
+          event.stopPropagation();
           notifySettingsEscapeForm();
           resetAbortPriming();
           return;
