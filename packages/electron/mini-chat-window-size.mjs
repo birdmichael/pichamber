@@ -8,9 +8,10 @@ const positiveInt = (value, fallback = 1) => {
 /**
  * Clamp Mini Chat to the display work area.
  *
- * Preferred 520×760 must stay fully inside an 800px / docked ~743px work area.
- * If the work area is smaller than minSize, use the work area (do not force
- * 480px minHeight off-screen). Missing workArea returns preferred (≥1×1).
+ * Preferred 520×640 leaves composer room on an 800px-tall display.
+ * Still clamps fully inside shorter docked work areas. If the work area is
+ * smaller than minSize, use the work area (do not force 480px minHeight
+ * off-screen). Missing workArea returns preferred (≥1×1).
  */
 export const resolveMiniChatWindowSize = ({
   workArea = null,

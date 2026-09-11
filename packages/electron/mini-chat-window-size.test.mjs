@@ -10,7 +10,7 @@ import {
   resolveMiniChatWindowSize,
 } from './mini-chat-window-size.mjs';
 
-const PREFERRED = { width: 520, height: 760 };
+const PREFERRED = { width: 520, height: 640 };
 const MIN_SIZE = { width: 360, height: 480 };
 
 const assertFullyInside = (bounds, workArea) => {
@@ -20,19 +20,27 @@ const assertFullyInside = (bounds, workArea) => {
   assert.ok(bounds.y + bounds.height <= workArea.y + workArea.height);
 };
 
-test('800px work area keeps preferred 520×760 fully inside', () => {
+test('800px work area keeps preferred 520×640 fully inside with composer room', () => {
   const workArea = { x: 0, y: 0, width: 1280, height: 800 };
   const next = resolveMiniChatWindowSize({ workArea, preferred: PREFERRED, minSize: MIN_SIZE });
   assert.equal(next.width, 520);
-  assert.equal(next.height, 760);
+  assert.equal(next.height, 640);
   assertFullyInside(next, workArea);
 });
 
-test('743px docked work area clamps 760h so the window stays fully inside', () => {
+test('743px docked work area keeps preferred 640h fully inside', () => {
   const workArea = { x: 0, y: 0, width: 1280, height: 743 };
   const next = resolveMiniChatWindowSize({ workArea, preferred: PREFERRED, minSize: MIN_SIZE });
   assert.equal(next.width, 520);
-  assert.equal(next.height, 743);
+  assert.equal(next.height, 640);
+  assertFullyInside(next, workArea);
+});
+
+test('work area shorter than preferred clamps height to the work area', () => {
+  const workArea = { x: 0, y: 0, width: 1280, height: 600 };
+  const next = resolveMiniChatWindowSize({ workArea, preferred: PREFERRED, minSize: MIN_SIZE });
+  assert.equal(next.width, 520);
+  assert.equal(next.height, 600);
   assert.equal(next.y, 0);
   assertFullyInside(next, workArea);
 });
@@ -46,7 +54,7 @@ test('work area smaller than minSize uses the work area', () => {
 test('missing workArea returns preferred at least 1×1', () => {
   assert.deepEqual(
     resolveMiniChatWindowSize({ workArea: null, preferred: PREFERRED, minSize: MIN_SIZE }),
-    { width: 520, height: 760 },
+    { width: 520, height: 640 },
   );
   assert.deepEqual(
     resolveMiniChatWindowSize({ preferred: { width: 0, height: -4 } }),
@@ -81,8 +89,9 @@ test('Linux Mini Chat work-area fill is treated as maximized', () => {
   assert.equal(isLinuxMiniChatWorkAreaMaximized({ __ocMiniChatFilledWorkArea: true }, 'linux'), false);
 });
 
-test('main.mjs wires Mini Chat size clamp and Linux work-area maximize', () => {
+test('main.mjs wires Mini Chat preferred height 640 and size clamp', () => {
   const source = readFileSync(fileURLToPath(new URL('./main.mjs', import.meta.url)), 'utf8');
+  assert.match(source, /MINI_CHAT_WINDOW_HEIGHT = 640/);
   assert.match(source, /resolveMiniChatWindowSize/);
   assert.match(source, /resolveMiniChatMaximizedBounds/);
   assert.match(source, /__ocMiniChatFilledWorkArea/);
