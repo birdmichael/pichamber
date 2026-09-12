@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed / Improved
 - Worktrees: sidebar/mobile/mini-chat refresh topology on server `worktree-changed` events; Git status waits out checkout bootstrap so new sessions see project settings without mid-create dirty noise (upstream OpenChamber 1.23.1).
+- Chat: reasoning and bash/tool output keep following incoming text until you scroll up (upstream OpenChamber 1.23.1).
 - Terminal: right-click Copy/Paste; macOS Option+Left/Right/Backspace word editing at shell prompts; Attach selection focuses the composer (upstream OpenChamber 1.23.1).
 - Sessions: Rename with AI generates a title from recent completed turns via the Small Model (upstream OpenChamber 1.23.1).
 - Chat: queued messages collapse by default and preview quote/comment context when the composer text is empty (upstream OpenChamber 1.23.1).
