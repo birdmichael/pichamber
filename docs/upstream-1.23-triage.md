@@ -24,7 +24,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | 3 | Session AI rename | **PORT** | No `SessionAiRenameMenuItem` / `use-session-ai-rename`; `session-assist` is recap/suggestion only | Adapt small-model/Pi title generation |
 | 3b | Enter saves rename | **ALREADY** | `SessionNodeItem.tsx` rename form: `key === 'Enter'` → `handleSaveEdit` | |
 | 4 | Archived-only retention + cascade-safe | **PORT** | Has `sessionRetentionAction` / auto-delete; **missing** `sessionRetentionOnlyArchived` + entire `sync/session-retention.ts` | Port OC retention module + setting |
-| 5 | Attachments inside composer + non-image paste cite | **ALREADY** (mostly) | `LinkedReferenceRow` in composer; `createPastedContextFile`; drop handlers in `ChatInput` | Spot-check non-image file cite parity; skip glass/recap visual overhaul |
+| 5 | Attachments inside composer + non-image paste cite | **ALREADY** (mostly) | `LinkedReferenceRow` in composer; `createPastedContextFile`; drop handlers in `ChatInput` | Spot-check non-image file cite parity; glass/recap visual-align PORTED separately |
 | 6a | Queued message preview/collapse | **PORT** | PC `QueuedMessageChips` still uses first-line truncate; no collapse/`getQueuedMessagePreview` | Diff vs OC shows collapse + annotation preview |
 | 6b | Turn changed-files accuracy | **PORT** | `showTurnChangedFiles` / `TurnChangedFilesDropdown` exist; verify direct-edit filter + collapse-after-4 vs OC | Likely partial — confirm during port |
 | 6c | Reasoning/bash auto-follow | **PORT** | No general reasoning/bash follow fix beyond BTW `stickToBottom` | Port OC follow-scroll behavior |
@@ -53,7 +53,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Sessions: AI rename | PORT | see HP#3 | |
 | Retention: archived-only | PORT | see HP#4 | |
 | Chat: paste/drop non-image cite | ALREADY | see HP#5 | |
-| Chat visual refinements / glass composer | **SKIP** | Fights Pichamber layout | Product rule |
+| Chat visual refinements / glass composer | **PORTED** (visual-align) | Floating/`oc-glass-composer` + glass popups; PC features retained | Relative visual parity with OC 1.23; no OC Usage/Revert/Share |
 | Attachments inside message box; queue collapsed | PORT (queue) / ALREADY (attachments) | see HP#5/#6a | |
 | Recaps substance / quiet suggestions | **PORTED** | session-assist prompt + SessionRecapNote vanish-in-place (Batch B) | PR #756 |
 | Markdown exports quotes/comments | **PORTED** | `formatMessageText` in exportSession (Batch B) | PR #756 |
@@ -114,7 +114,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Terminal render consistency / touch copy | **DEFER** | Tied to terminal stack | |
 | Ctrl+N/P model lists | **PORTED** | dropdown-navigation + ModelPicker/menus/select/ChatInput (Batch B) | PR #756 |
 | Send-shortcut / large-paste copy | **PORTED** | clearer queueMessages + largeTextPaste hints (Batch B); enterToSend skipped (PC uses queueMessages) | PR pending |
-| Chat typography/spacing polish | SKIP | fights layout with glass overhaul | |
+| Chat typography/spacing polish | **PORTED** (with glass visual-align) | Spacing/focus with floating composer | Bundled with glass composer port |
 | Selection highlight unify | **PORTED** | `--oc-text-selection` + unified ::selection (Batch B) | PR #756 |
 | Queue clear after reconnect | **PORTED** | client `reconcileAfterReconnect` on stream-reconnect/transport-switch (adapt; OC server queue N/A) | Batch C2 |
 | False history-loading error | **ALREADY** | `session-message-loader`/`materialization` match OC 1.23.1; empty sessions commit ready; worktree bootstrap gate (#744) | no distinct delta vs OC tip |
@@ -158,7 +158,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 ## Deferred (explicit)
 
 - Full OC preferences.json + settings-registry per-surface split (PC ships Desktop `surfaceProfiles` overlay slice for theme/fonts/layout)
-- Glass/recap visual overhaul, chat typography fights layout  
+- ~~Glass/recap visual overhaul~~ → PORTED visual-align (features retained)  
 - Mobile/Capacitor-only and VS Code-only items  
 - OpenCode Usage providers (ClinePass/Hyper/Go/etc.)  
 - AppImage OpenCode path  

@@ -35,6 +35,7 @@ describe('idle chrome animations', () => {
 
   test('hidden documents can pause glass backdrop-filter without changing the focused rule', () => {
     expect(designSystemCss).toContain('html.oc-pause-expensive-paint .oc-glass-panel');
+    expect(designSystemCss).toContain('html.oc-pause-expensive-paint .oc-glass-composer');
     expect(designSystemCss).toContain('backdrop-filter: blur(var(--oc-glass-blur))');
   });
 });

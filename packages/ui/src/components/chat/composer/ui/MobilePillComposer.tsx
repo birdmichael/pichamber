@@ -102,8 +102,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
         />
         <div className="flex items-center gap-2">
             <div
-                className="flex h-11 min-w-0 flex-1 items-center gap-x-0.5 rounded-full border border-border/80 pl-2 pr-1 shadow-[0_4px_16px_-4px_rgb(0_0_0_/_0.12)]"
-                style={{ backgroundColor: currentTheme?.colors?.surface?.subtle }}
+                className="oc-glass-composer flex h-11 min-w-0 flex-1 items-center gap-x-0.5 rounded-full border border-border/80 pl-2 pr-1 shadow-[0_4px_16px_-4px_rgb(0_0_0_/_0.12)]"
             >
                 <ComposerAttachmentControls
                     isVSCode={isVSCode}
@@ -181,8 +180,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
             >
                 <button
                     type="button"
-                    className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-border/80 text-foreground shadow-[0_4px_16px_-4px_rgb(0_0_0_/_0.12)]"
-                    style={{ backgroundColor: currentTheme?.colors?.surface?.subtle }}
+                    className="oc-glass-composer flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-border/80 text-foreground shadow-[0_4px_16px_-4px_rgb(0_0_0_/_0.12)]"
                     onClick={onNewSession}
                     disabled={newSessionDraftOpen}
                     title={t('mobile.sessions.newChat')}

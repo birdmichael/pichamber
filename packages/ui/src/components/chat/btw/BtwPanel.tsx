@@ -1,4 +1,5 @@
 import React from 'react';
+import { ComposerFloatingPanel } from '../composer/ui/ComposerFloatingPanel';
 import type { Message, Part } from '@opencode-ai/sdk/v2';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
@@ -225,13 +226,7 @@ const BtwFrame: React.FC<{
     headerSpinner?: boolean;
     children?: React.ReactNode;
 }> = ({ title, actions, onTitleClick, titleClickLabel, collapsed, headerSpinner, children }) => (
-    <div
-        className="chat-input-column absolute bottom-full left-0 right-0 z-30 mb-3"
-        role="dialog"
-        aria-label="btw"
-    >
-        <div className="oc-glass-popover oc-glass-floating w-full overflow-hidden rounded-xl">
-            <div className="flex items-center gap-2 px-3 py-1.5">
+    <ComposerFloatingPanel role="dialog" ariaLabel="btw" compact={collapsed} header={<>
                 {onTitleClick ? (
                     <button
                         type="button"
@@ -260,15 +255,14 @@ const BtwFrame: React.FC<{
                 )}
                 <div className="min-w-0 flex-1" />
                 {actions}
-            </div>
+    </>}>
             {children ? (
                 <>
                     {children}
                     <div className="h-2" />
                 </>
             ) : null}
-        </div>
-    </div>
+    </ComposerFloatingPanel>
 );
 
 const BtwSheet: React.FC<{

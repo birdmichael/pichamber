@@ -103,6 +103,10 @@ const CHAT_SCROLL_STYLE = {
     overscrollBehaviorY: 'contain',
 } as const;
 const STATUS_OVERLAY_RESERVED_HEIGHT = 40;
+/** Gap between the last transcript row and the floating composer's top edge. */
+const FLOATING_COMPOSER_GAP_PX = 80;
+/** Footer reserve before the floating composer slot has been measured. */
+const FLOATING_COMPOSER_DEFAULT_HEIGHT = 128;
 const TIMELINE_SETTLE_STABLE_FRAMES = 2;
 const TIMELINE_SETTLE_CAP_MS = 300;
 const CHAT_NAVIGATION_IGNORED_TARGET_SELECTOR = [
@@ -185,6 +189,8 @@ type ChatViewportProps = {
     currentSessionKey: string;
     isDesktopExpandedInput: boolean;
     isMobile: boolean;
+    /** Composer floats over the transcript; footer spacer reads --chat-composer-inset. */
+    floatingComposer: boolean;
     directory?: string;
     scrollRef: React.RefObject<HTMLDivElement | null>;
     messageListRef: React.RefObject<MessageListHandle | null>;
@@ -230,6 +236,7 @@ const ChatViewport = React.memo(({
     currentSessionKey,
     isDesktopExpandedInput,
     isMobile,
+    floatingComposer,
     directory,
     scrollRef,
     messageListRef,
@@ -410,11 +417,23 @@ const ChatViewport = React.memo(({
                 </div>
             )}
 
-            <SessionRecapNote sessionId={currentSessionId} directory={directory} isMobile={isMobile} />
+            {/* Recap floats above the glass composer when the composer floats;
+                keep it in-flow only for expanded / non-floating layouts. */}
+            {!floatingComposer ? (
+                <SessionRecapNote sessionId={currentSessionId} directory={directory} isMobile={isMobile} />
+            ) : null}
 
-            <div className="flex-shrink-0" style={{ height: isMobile ? '40px' : '10vh' }} aria-hidden="true" />
+            <div
+                className="flex-shrink-0"
+                style={{
+                    height: floatingComposer
+                        ? `calc(var(--chat-composer-inset, ${FLOATING_COMPOSER_DEFAULT_HEIGHT}px) + ${FLOATING_COMPOSER_GAP_PX}px)`
+                        : (isMobile ? '40px' : '10vh'),
+                }}
+                aria-hidden="true"
+            />
         </>
-    ), [currentSessionId, directory, isMobile, sessionPermissions, sessionQuestions, transcriptPiPrompts]);
+    ), [currentSessionId, directory, floatingComposer, isMobile, sessionPermissions, sessionQuestions, transcriptPiPrompts]);
 
     const timelineRootRef = React.useRef<HTMLDivElement | null>(null);
     const endPinningReleasedRef = React.useRef(endPinningReleased);
@@ -544,6 +563,7 @@ const ChatViewport = React.memo(({
         && prev.currentSessionKey === next.currentSessionKey
         && prev.isDesktopExpandedInput === next.isDesktopExpandedInput
         && prev.isMobile === next.isMobile
+        && prev.floatingComposer === next.floatingComposer
         && prev.directory === next.directory
         && prev.scrollRef === next.scrollRef
         && prev.messageListRef === next.messageListRef
@@ -963,6 +983,30 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     // Despite the historical name, this now covers mobile too: the mobile
     // composer enters the same fullscreen-input mode via its drag handle.
     const isDesktopExpandedInput = isExpandedInput;
+    // Session transcript view: composer floats over the list (glass). Draft /
+    // empty welcome and the expanded editor keep it in normal document flow.
+    const floatingComposer = Boolean(currentSessionId) && !isDesktopExpandedInput;
+    const composerSlotRef = React.useRef<HTMLDivElement | null>(null);
+    const [composerSlotNode, setComposerSlotNode] = React.useState<HTMLDivElement | null>(null);
+    const attachComposerSlot = React.useCallback((node: HTMLDivElement | null) => {
+        composerSlotRef.current = node;
+        setComposerSlotNode(node);
+    }, []);
+    React.useLayoutEffect(() => {
+        const slot = composerSlotNode;
+        const column = slot?.parentElement;
+        if (!floatingComposer || !slot || !column || !globalThis.ResizeObserver) return;
+        const update = () => {
+            column.style.setProperty('--chat-composer-inset', `${Math.round(slot.getBoundingClientRect().height)}px`);
+        };
+        const observer = new ResizeObserver(update);
+        observer.observe(slot);
+        update();
+        return () => {
+            observer.disconnect();
+            column.style.removeProperty('--chat-composer-inset');
+        };
+    }, [composerSlotNode, floatingComposer]);
     const useCompactDraftLayout = isMobile || isVSCode || chatSurfaceMode === 'mini-chat';
     // Work-status panel: a borderless column to the right of the transcript.
     // It stays open beside a child tab; the context panel / card shrink so the
@@ -1163,6 +1207,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         isFollowingProgrammatically,
         showScrollButton,
         userOwnsScroll,
+        viewportAtEnd,
     } = useChatTimelineScroll({
         currentSessionId,
         currentSessionKey,
@@ -1216,6 +1261,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     useScrollShadow(scrollNodeRef, {
         observeMutations: false,
         hideTopShadow: isMobile && stickyUserHeader,
+        // Glass composer is the visible end of the transcript.
+        hideBottomShadow: floatingComposer,
     });
     const handleHistoryScroll = timelineController.handleHistoryScroll;
     React.useEffect(() => {
@@ -1657,6 +1704,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 currentSessionKey={currentSessionKey ?? currentSessionId}
                 isDesktopExpandedInput={isDesktopExpandedInput}
                 isMobile={isMobile}
+                floatingComposer={floatingComposer}
                 directory={effectiveSessionDirectory}
                 scrollRef={scrollRef}
                 messageListRef={messageListRef}
@@ -1688,42 +1736,65 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 canLoadEarlierPrompts={canLoadEarlierPrompts}
                 isLoadingOlderPrompts={timelineController.isLoadingOlder}
                 onLoadEarlierPrompts={handleLoadOlderClick}
-                composerOverlayHeight={statusOverlayHeight > 0 ? composerOverlayHeight : 0}
+                composerOverlayHeight={floatingComposer ? 0 : (statusOverlayHeight > 0 ? composerOverlayHeight : 0)}
             />
 
             <div
+                ref={attachComposerSlot}
                 className={cn(
-                    'relative z-10',
+                    'z-10 flex min-h-0',
+                    floatingComposer
+                        ? 'absolute inset-x-0 bottom-0'
+                        : 'relative',
                     isDesktopExpandedInput
                         ? 'flex-1 min-h-0 bg-background'
-                        : 'bg-background'
+                        : !floatingComposer && 'bg-background'
                 )}
             >
                 {!isDesktopExpandedInput && sessionMessages.length > 0 && (
-                    <ScrollToBottomButton
-                        visible={timelineController.showScrollToBottom}
-                        onClick={navigation.resumeToLatest}
-                    />
-                )}
-                {!isDesktopExpandedInput && (
-                    <div
-                        className={cn(
-                            'pointer-events-none absolute bottom-full inset-x-0 mb-2 transition-opacity duration-100',
-                            userOwnsScroll && 'opacity-0',
-                        )}
-                    >
-                        <div className="chat-input-column">
-                            <div
-                                ref={onStatusOverlayNode}
-                                className={cn(
-                                    '[&:not(:has(*))]:hidden',
-                                    userOwnsScroll ? 'pointer-events-none' : 'pointer-events-auto',
-                                )}
-                            >
-                                <StatusRowContainer />
+                    <>
+                        <ScrollToBottomButton
+                            visible={timelineController.showScrollToBottom}
+                            working={sessionIsWorking}
+                            onClick={navigation.resumeToLatest}
+                        />
+                        <div
+                            className={cn(
+                                'pointer-events-none absolute bottom-full inset-x-0 mb-2 transition-opacity duration-100',
+                                userOwnsScroll && 'opacity-0',
+                            )}
+                            style={{ transform: 'translateY(calc(-1 * var(--chat-floating-panel-clearance, 0px)))' }}
+                        >
+                            <div className="chat-input-column">
+                                <div
+                                    ref={onStatusOverlayNode}
+                                    className={cn(
+                                        '[&:not(:has(*))]:hidden',
+                                        userOwnsScroll ? 'pointer-events-none' : 'pointer-events-auto',
+                                    )}
+                                >
+                                    <StatusRowContainer />
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        {currentSessionId ? (
+                            <div
+                                className={cn(
+                                    'oc-recap-hint pointer-events-none absolute bottom-full inset-x-0 mb-2 transition-opacity duration-100',
+                                    !viewportAtEnd && 'opacity-0',
+                                )}
+                                style={{ transform: 'translateY(calc(-1 * var(--chat-floating-panel-clearance, 0px)))' }}
+                            >
+                                <div className="chat-input-column">
+                                    <SessionRecapNote
+                                        sessionId={currentSessionId}
+                                        directory={effectiveSessionDirectory}
+                                        isMobile={isMobile}
+                                    />
+                                </div>
+                            </div>
+                        ) : null}
+                    </>
                 )}
                 {promptReadOnly ? <ReadOnlyPromptBanner /> : <ChatInput key={composerMountKey} active={active} scrollToBottom={scrollToBottomOnSend} />}
             </div>
