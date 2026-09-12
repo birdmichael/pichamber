@@ -58,6 +58,7 @@ const ICONS = {
   fit: spriteIcon('refresh'),
   textWrap: spriteIcon('text-wrap'),
   image: spriteIcon('file-image'),
+  disclosure: spriteIcon('arrow-right-s'),
 } as const;
 
 const ICON_BTN_CLASS =
@@ -76,6 +77,20 @@ const decorateImageLabels = (root: HTMLElement): void => {
     icon.setAttribute('data-openchamber-markdown-image-label-icon', 'true');
     setIconHtml(icon, ICONS.image);
     label.prepend(icon);
+  }
+};
+
+const decorateDisclosures = (root: HTMLElement): void => {
+  for (const summary of root.querySelectorAll<HTMLElement>('details[data-md-details] > summary')) {
+    if (summary.querySelector('[data-md-disclosure-icon]')) continue;
+    const label = document.createElement('span');
+    label.append(...Array.from(summary.childNodes));
+    const icon = document.createElement('span');
+    icon.setAttribute('data-md-disclosure-icon', '');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.className = 'inline-flex shrink-0';
+    setIconHtml(icon, ICONS.disclosure);
+    summary.append(icon, label);
   }
 };
 
@@ -501,6 +516,7 @@ const decorateLinks = (root: HTMLElement, ctx: DecorateContext): void => {
 /** Run all idempotent DOM decoration passes over freshly-rendered markdown. */
 export const decorateMarkdown = (root: HTMLElement, ctx: DecorateContext): void => {
   decorateImageLabels(root);
+  decorateDisclosures(root);
   decorateInlineCode(root);
   decorateMermaid(root, ctx);
   decorateCodeBlocks(root, ctx);
