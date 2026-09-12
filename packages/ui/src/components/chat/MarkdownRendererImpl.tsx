@@ -816,6 +816,10 @@ const useMorphdomMarkdown = ({
     void renderMarkdownBlocks(text, streaming, cacheKey, imageMode).then((blocks) => {
       if (!active) return;
       const existing = Array.from(target.children) as HTMLElement[];
+      // Match by disclosure order plus heading so unrelated replacements cannot
+      // inherit the previous disclosure's state. No persistent/global state.
+      const disclosureStates = Array.from(target.querySelectorAll<HTMLDetailsElement>('details[data-md-details]'))
+        .map((details) => ({ summary: details.querySelector('summary')?.textContent, open: details.open }));
 
       // Reconcile per block: only re-morph blocks whose content changed, leaving
       // stable leading blocks untouched. Keeps per-stream-step DOM work bounded
@@ -837,7 +841,13 @@ const useMorphdomMarkdown = ({
         const tempHasMermaidBlock = shouldRefreshMermaidViewers(temp);
         morphdom(el, temp, {
           childrenOnly: true,
-          onBeforeElUpdated: (fromEl, toEl) => !fromEl.isEqualNode(toEl),
+          onBeforeElUpdated: (fromEl, toEl) => {
+            if (fromEl.matches('details[data-md-details]') && toEl.matches('details[data-md-details]')
+              && fromEl.querySelector('summary')?.textContent === toEl.querySelector('summary')?.textContent) {
+              toEl.toggleAttribute('open', fromEl.hasAttribute('open'));
+            }
+            return !fromEl.isEqualNode(toEl);
+          },
         });
         el.setAttribute('data-md-id', block.id);
         if (hadMermaidBlock || tempHasMermaidBlock || shouldRefreshMermaidViewers(el)) {
@@ -857,6 +867,14 @@ const useMorphdomMarkdown = ({
       }
       if (removedMermaidBlock || (existing.length > blocks.length && hadMermaidBeforeTrailingCleanup)) {
         refreshMermaidViewers();
+      }
+      if (disclosureStates.length > 0) {
+        target.querySelectorAll<HTMLDetailsElement>('details[data-md-details]').forEach((details, index) => {
+          const previous = disclosureStates[index];
+          if (previous && previous.summary === details.querySelector('summary')?.textContent) {
+            details.open = previous.open;
+          }
+        });
       }
 
     });
