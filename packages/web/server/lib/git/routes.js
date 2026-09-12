@@ -1,8 +1,11 @@
-export function registerGitRoutes(app) {
+export function registerGitRoutes(app, { emitWorktreeChanged } = {}) {
   let gitLibraries = null;
   const getGitLibraries = async () => {
     if (!gitLibraries) {
       gitLibraries = await import('./index.js');
+      if (emitWorktreeChanged) {
+        gitLibraries.subscribeWorktreeTopologyChanges(emitWorktreeChanged);
+      }
     }
     return gitLibraries;
   };
@@ -220,7 +223,7 @@ export function registerGitRoutes(app) {
   });
 
   app.get('/api/git/status', async (req, res) => {
-    const { getStatus, isGitRepository } = await getGitLibraries();
+    const { getStatus, isGitRepository, observeWorktreeTopology } = await getGitLibraries();
 
     try {
       const directory = resolveDirectoryQuery(req.query.directory);
@@ -235,6 +238,7 @@ export function registerGitRoutes(app) {
 
       const mode = req.query.mode === 'light' ? 'light' : undefined;
       const status = await getStatus(directory, { mode });
+      void observeWorktreeTopology(directory);
       res.json(status);
     } catch (error) {
       // Non-repo / GitError must not abort callers that enumerate projects or
@@ -1061,7 +1065,7 @@ export function registerGitRoutes(app) {
   });
 
   app.get('/api/git/worktrees', async (req, res) => {
-    const { getWorktrees } = await getGitLibraries();
+    const { getWorktrees, observeWorktreeTopology } = await getGitLibraries();
     try {
       const directory = req.query.directory;
       if (!directory) {
@@ -1069,6 +1073,7 @@ export function registerGitRoutes(app) {
       }
 
       const worktrees = await getWorktrees(directory);
+      void observeWorktreeTopology(directory);
       res.json(worktrees);
     } catch (error) {
       // Worktrees are an optional feature. Avoid repeated 500s (and repeated client retries)
