@@ -11,7 +11,16 @@ import { isVSCodeRuntime } from './desktop';
 import { sanitizeStarterRefs, type DraftStarterRef } from './draftStarters';
 import { createProjectIdFromPath } from './projectId';
 import { runtimeFetch } from './runtime-fetch';
-import { resolveProjectPlansDirectory } from './projectPlansPath';
+import { resolveProjectPlansDirectoryFromShared } from './projectPlansPath';
+import {
+  applySharedProjectSetupPatch,
+  EMPTY_SHARED_PROJECT_CONFIG,
+  isSharedProjectConfigEmpty,
+  parseSharedProjectConfig,
+  serializeSharedProjectConfig,
+  SHARED_CONFIG_RELATIVE_PATH,
+  type SharedProjectConfigRead,
+} from './sharedProjectConfig';
 
 type ProjectRef = { id: string; path: string };
 
@@ -525,8 +534,64 @@ const createProjectPlanId = (): string => {
   return `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 };
 
+/** Read `<repo>/.pichamber/project.json` (missing when absent). */
+export async function readSharedProjectConfig(project: ProjectRef): Promise<SharedProjectConfigRead> {
+  const projectDirectory = typeof project?.path === 'string' ? project.path.trim() : '';
+  if (!projectDirectory) {
+    return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
+  }
+  const absolute = joinPath(joinPath(normalize(projectDirectory), '.pichamber'), 'project.json');
+  const text = await readTextFile(absolute);
+  if (text === null || !String(text).trim()) {
+    return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
+  }
+  return parseSharedProjectConfig(text);
+}
+
+/**
+ * Update the team's shared plans folder pointer. Creates `.pichamber/project.json`
+ * when needed; removes it when nothing remains. Returns the fresh read, or null on failure.
+ */
+export async function updateSharedProjectPlansDir(
+  project: ProjectRef,
+  plansDir: string | null,
+): Promise<SharedProjectConfigRead | null> {
+  const projectDirectory = typeof project?.path === 'string' ? project.path.trim() : '';
+  if (!projectDirectory) return null;
+  const absolute = joinPath(joinPath(normalize(projectDirectory), '.pichamber'), 'project.json');
+  const currentRead = await readSharedProjectConfig(project);
+  const current = currentRead.status === 'ok' ? currentRead.config : { ...EMPTY_SHARED_PROJECT_CONFIG };
+  let next;
+  try {
+    next = applySharedProjectSetupPatch(current, { plansDir });
+  } catch (error) {
+    console.warn('Invalid shared project config patch:', error);
+    return null;
+  }
+
+  if (isSharedProjectConfigEmpty(next)) {
+    if (currentRead.status !== 'missing') {
+      const removed = await deleteFile(absolute);
+      if (!removed) {
+        console.warn('Failed to remove empty shared project config');
+        return null;
+      }
+    }
+    return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
+  }
+
+  const parent = joinPath(normalize(projectDirectory), '.pichamber');
+  if (!(await mkdirp(parent))) {
+    return null;
+  }
+  const wrote = await writeTextFile(absolute, serializeSharedProjectConfig(next));
+  if (!wrote) return null;
+  return { status: 'ok', path: SHARED_CONFIG_RELATIVE_PATH, config: next };
+}
+
 const getProjectPlansDirectory = async (project: ProjectRef): Promise<string | null> => {
-  return resolveProjectPlansDirectory(project);
+  const shared = await readSharedProjectConfig(project);
+  return resolveProjectPlansDirectoryFromShared(project, shared);
 };
 
 const formatProjectPlanMarkdown = (title: string, body: string): string => {
