@@ -1,3 +1,5 @@
+import { parseSource } from './sources.js';
+
 // `req.destroyed` is true for every healthy request once the body parser has
 // consumed the stream, so using it as a disconnect check silently swallows every
 // response. The response socket is the one that actually reflects whether the
@@ -55,6 +57,24 @@ export function registerWalkthroughRoutes(app, { getWalkthroughService }) {
   // minutes and a refresh must not throw the work away. Leaving detaches the
   // client; the job finishes and caches its result. Stopping is an explicit
   // request below.
+
+  // The comparison view needs the complete published patch, without model
+  // readiness checks, generated-file filtering, or local working-tree reads.
+  app.get('/api/walkthrough/pr-diff', async (req, res) => {
+    try {
+      const query = new URL(req.originalUrl, 'http://localhost').searchParams;
+      const directory = query.get('directory')?.trim() ?? '';
+      if (!directory) return res.status(400).json({ error: 'directory parameter is required' });
+      const source = parseSource(readSource(query.get('source')));
+      if (source.kind !== 'pr') return res.status(400).json({ error: 'A pull request source is required' });
+      const { getPullRequestDiff } = await getWalkthroughService();
+      const { patch } = await getPullRequestDiff(directory, source.number, source.sourceRepo, { allowEmpty: true });
+      res.type('text/plain').send(patch);
+    } catch (error) {
+      respondWithError(res, error, 'Failed to load pull request diff');
+    }
+  });
+
   app.post('/api/walkthrough/generate', async (req, res) => {
     try {
       const { generateWalkthrough, getPullRequestDiff } = await getWalkthroughService();

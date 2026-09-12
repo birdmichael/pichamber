@@ -753,6 +753,7 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.sessionDialogs.actions.deleteWorktree': 'Usuń worktree',
   'session.githubIntegration.title': 'Wybierz z GitHub',
   'session.githubIntegration.tabs.issues': 'Zagadnienia',
+  'pullRequestComparison.select': 'Wybierz pull request',
   'session.githubIntegration.tabs.pullRequests': 'Pull requesty',
   'session.githubIntegration.connect.title': 'Połącz z GitHub',
   'session.githubIntegration.connect.description': 'Połącz zagadnienia lub pull requesty aby auto-wypełnić szczegóły worktree',

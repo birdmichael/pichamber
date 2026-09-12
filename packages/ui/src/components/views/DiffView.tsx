@@ -43,6 +43,10 @@ import type { DiffViewMode } from '@/components/chat/message/types';
 import { ReviewFlowDialog, type ReviewFlowExecution } from '@/components/session/ReviewFlowDialog';
 import { PierreDiffViewer, type DiffHunkActions } from './PierreDiffViewer';
 import { HunkActions, type HunkBusyState, type HunkDiffAction } from './git/HunkActions';
+import { PullRequestComparisonSelector } from './git/PullRequestComparisonSelector';
+import { usePullRequestComparison } from '@/hooks/usePullRequestComparison';
+import { useGitComparison, type GitComparisonSource } from '@/hooks/useGitComparison';
+
 import { useDeviceInfo } from '@/lib/device';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import { Icon } from "@/components/icon/Icon";
@@ -100,7 +104,7 @@ type DiffData = {
     fileDiff?: FileDiffMetadata;
     contextMode?: DiffContextMode;
 };
-type DiffScope = 'all' | 'staged' | 'working' | 'turn' | 'branch';
+type DiffScope = 'all' | 'staged' | 'working' | 'turn' | 'branch' | 'pr';
 
 /** Reservation slot for a branch range diff while its fetch is in flight. */
 const EMPTY_BRANCH_DIFF_PLACEHOLDER: DiffData = {
@@ -262,13 +266,15 @@ const formatDiffTotals = (
 };
 
 interface ChangeScopeSelectorProps {
-    scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch'>;
+    scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch' | 'pr'>;
     workingCount: number;
     stagedCount: number;
     turnCount: number;
     branchCount: number | null;
+    prCount: number | null;
     showBranchOption: boolean;
-    onScopeChange?: (scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch'>) => void;
+    showPrOption: boolean;
+    onScopeChange?: (scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch' | 'pr'>) => void;
 }
 
 const ChangeScopeSelector = React.memo<ChangeScopeSelectorProps>(({
@@ -277,13 +283,17 @@ const ChangeScopeSelector = React.memo<ChangeScopeSelectorProps>(({
     stagedCount,
     turnCount,
     branchCount,
+    prCount,
     showBranchOption,
+    showPrOption,
     onScopeChange,
 }) => {
     const { t } = useI18n();
     const [open, setOpen] = React.useState(false);
-    const currentCount = scope === 'staged' ? stagedCount : scope === 'turn' ? turnCount : scope === 'branch' ? (branchCount ?? 0) : workingCount;
-    const currentLabel = scope === 'staged'
+    const currentCount = scope === 'pr' ? (prCount ?? 0) : scope === 'staged' ? stagedCount : scope === 'turn' ? turnCount : scope === 'branch' ? (branchCount ?? 0) : workingCount;
+    const currentLabel = scope === 'pr'
+        ? t('session.githubIntegration.tabs.pullRequests')
+        : scope === 'staged'
         ? t('diffView.scope.staged')
         : scope === 'turn'
             ? t('diffView.scope.lastTurn')
@@ -309,7 +319,7 @@ const ChangeScopeSelector = React.memo<ChangeScopeSelectorProps>(({
                 <DropdownMenuRadioGroup
                     value={scope}
                     onValueChange={(value) => {
-                        if (value === 'working' || value === 'staged' || value === 'turn' || value === 'branch') {
+                        if (value === 'working' || value === 'staged' || value === 'turn' || value === 'branch' || value === 'pr') {
                             onScopeChange?.(value);
                             setOpen(false);
                         }
@@ -338,6 +348,14 @@ const ChangeScopeSelector = React.memo<ChangeScopeSelectorProps>(({
                             <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
                                 <span>{t('diffView.scope.branch')}</span>
                                 <span className="typography-meta text-muted-foreground">{branchCount ?? '…'}</span>
+                            </span>
+                        </DropdownMenuRadioItem>
+                    ) : null}
+                    {showPrOption ? (
+                        <DropdownMenuRadioItem value="pr">
+                            <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                                <span>{t('session.githubIntegration.tabs.pullRequests')}</span>
+                                <span className="typography-meta text-muted-foreground">{prCount ?? '…'}</span>
                             </span>
                         </DropdownMenuRadioItem>
                     ) : null}
@@ -1152,7 +1170,7 @@ interface DiffViewProps {
     pinSelectedFileHeaderToTopOnNavigate?: boolean;
     showOpenInEditorAction?: boolean;
     diffScope?: DiffScope;
-    onDiffScopeChange?: (scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch'>) => void;
+    onDiffScopeChange?: (scope: Extract<DiffScope, 'working' | 'staged' | 'turn' | 'branch' | 'pr'>) => void;
     targetFilePath?: string | null;
     /** Render diff content flush with the container edges (no outer padding). */
     flushContent?: boolean;
@@ -1223,7 +1241,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
     const activeDiffStaged = forcedStaged ?? displayFileStaged;
 
     const isMobileLayout = isMobile || screenWidth <= 768;
-    const showReviewAction = Boolean(currentSessionId) && activeDiffScope !== 'turn' && !isMobileLayout && !isVSCodeRuntime();
+    const showReviewAction = Boolean(currentSessionId) && activeDiffScope !== 'turn' && activeDiffScope !== 'pr' && !isMobileLayout && !isVSCodeRuntime();
     // Same runtime and width rules as the rail surface: no point offering an
     // entry point to a surface that cannot open here.
     const showWalkthroughAction = activeDiffScope !== 'turn' && screenWidth >= WALKTHROUGH_MIN_WIDTH && !isVSCodeRuntime();
@@ -1311,6 +1329,31 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
     // ----- Branch scope (all changes on this branch vs its base) -----
     const currentBranch = status?.current ?? null;
+    const runtimeKey = useGitStore((state) => state.runtimeKey);
+    const prComparison = usePullRequestComparison(
+        effectiveDirectory ?? null,
+        currentBranch,
+        activeDiffScope === 'pr' && !isVSCodeRuntime(),
+    );
+    const selectedPr = prComparison.selectedSource;
+    React.useEffect(() => {
+        if (activeDiffScope === 'pr' && isVSCodeRuntime()) {
+            setActiveDiffScope('working');
+            onDiffScopeChange?.('working');
+        }
+    }, [activeDiffScope, onDiffScopeChange]);
+    const comparisonSource = React.useMemo<GitComparisonSource | null>(() => {
+        if (activeDiffScope === 'pr') return selectedPr;
+        return null;
+    }, [activeDiffScope, selectedPr]);
+    const comparison = useGitComparison(
+        effectiveDirectory ?? null,
+        comparisonSource,
+        activeDiffScope === 'pr' && !isVSCodeRuntime(),
+    );
+    const { fetchDiff: loadComparisonDiff } = comparison;
+    const [comparisonRetryRevision, setComparisonRetryRevision] = React.useState(0);
+
     const branches = useGitStore((state) => (effectiveDirectory ? state.directories.get(effectiveDirectory)?.branches ?? null : null));
     const isLoadingBranches = useGitStore((state) => (effectiveDirectory ? state.directories.get(effectiveDirectory)?.isLoadingBranches ?? false : false));
 
@@ -1477,9 +1520,42 @@ export const DiffView: React.FC<DiffViewProps> = ({
         EMPTY_BRANCH_DIFF_PLACEHOLDER
     );
 
+    const comparisonRangeKey = comparison.files
+        ? JSON.stringify([comparison.key, comparison.revision])
+        : null;
+    const comparisonPathsKey = React.useMemo(
+        () => (activeDiffScope === 'pr' ? Array.from(expandedFiles).sort().join('\0') : ''),
+        [activeDiffScope, expandedFiles],
+    );
+    const fetchComparisonDiffEntry = React.useCallback(
+        async (filePath: string): Promise<DiffData> => {
+            const response = await loadComparisonDiff(filePath, DEFAULT_CONTEXT_DIFF_LINES);
+            return createTextDiffDataFromPatch(filePath, response.diff, 'patch');
+        },
+        [loadComparisonDiff],
+    );
+    const prDiffData = useRangeKeyedCache<DiffData>(
+        comparisonRangeKey,
+        activeDiffScope === 'pr' ? comparisonPathsKey : '',
+        comparisonRangeKey ? fetchComparisonDiffEntry : null,
+        EMPTY_BRANCH_DIFF_PLACEHOLDER,
+    );
+    void comparisonRetryRevision;
+
     const branchFileCount = branchFiles?.length ?? null;
 
     const changedFiles: FileEntry[] = React.useMemo(() => {
+        if (activeDiffScope === 'pr') {
+            return (comparison.files ?? []).map((file) => ({
+                path: file.path,
+                index: '',
+                working_dir: file.status,
+                insertions: file.insertions,
+                deletions: file.deletions,
+                isNew: file.status === 'A',
+            }));
+        }
+
         if (activeDiffScope === 'branch') {
             return (branchFiles ?? [])
                 .map((file) => ({
@@ -1524,7 +1600,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
                 isNew: isNewStatusFile(file),
             }))
             .sort((a, b) => a.path.localeCompare(b.path));
-    }, [activeDiffScope, branchFiles, lastTurnDiffs, status]);
+    }, [activeDiffScope, branchFiles, comparison.files, lastTurnDiffs, status]);
 
     const changedFilePathsKey = React.useMemo(
         () => changedFiles.map((file) => file.path).join('\0'),
@@ -2072,15 +2148,17 @@ export const DiffView: React.FC<DiffViewProps> = ({
                                         void openFileInEditorAtChange(filePath, diffData);
                                     }}
                                     staged={getFileStaged(file.path)}
-                                    loadFullFiles={loadFullFiles}
-                                    readOnlyActions={activeDiffScope === 'branch'}
+                                    loadFullFiles={loadFullFiles && activeDiffScope !== 'pr'}
+                                    readOnlyActions={activeDiffScope === 'branch' || activeDiffScope === 'pr'}
                                     hunkActionsEnabled={activeDiffScope === 'all' || activeDiffScope === 'working' || activeDiffScope === 'staged'}
                                     initialDiffData={
                                         activeDiffScope === 'turn'
                                             ? lastTurnDiffData.get(file.path) ?? null
                                             : activeDiffScope === 'branch'
                                                 ? branchDiffData.get(file.path) ?? null
-                                                : null
+                                                : activeDiffScope === 'pr'
+                                                    ? prDiffData.get(file.path) ?? null
+                                                    : null
                                     }
                                 />
                             ))}
@@ -2116,6 +2194,47 @@ export const DiffView: React.FC<DiffViewProps> = ({
                     {t('diffView.state.notGitRepository')}
                 </div>
             );
+        }
+
+        if (activeDiffScope === 'pr') {
+            if (!selectedPr || comparison.error) {
+                return (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                        <p className="typography-meta text-muted-foreground">
+                            {comparison.error ?? prComparison.error ?? (prComparison.loading
+                                ? t('session.githubPrPicker.loading.pullRequests')
+                                : t('pullRequestComparison.select'))}
+                        </p>
+                        {(comparison.error || prComparison.error) ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    if (selectedPr) {
+                                        setComparisonRetryRevision((value) => value + 1);
+                                        void comparison.refresh();
+                                    } else {
+                                        void prComparison.refresh();
+                                    }
+                                }}
+                            >
+                                {t('diffView.actions.retry')}
+                            </Button>
+                        ) : null}
+                        {!selectedPr && !prComparison.loading ? (
+                            <PullRequestComparisonSelector comparison={prComparison} />
+                        ) : null}
+                    </div>
+                );
+            }
+            if (!comparison.files) {
+                return (
+                    <div className="flex flex-1 items-center justify-center gap-2 typography-meta text-muted-foreground">
+                        <Icon name="loader-4" className="size-4 animate-spin" />
+                        {t('diffView.state.loadingDiff')}
+                    </div>
+                );
+            }
         }
 
         if (activeDiffScope === 'branch') {
@@ -2217,6 +2336,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
             return (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
                     {activeDiffScope === 'turn' ? t('diffView.state.noLastTurnChanges')
+                        : activeDiffScope === 'pr' ? t('walkthrough.blocked.emptyDiff.description')
                         : t('diffView.state.cleanWorkingTree')}
                 </div>
             );
@@ -2239,14 +2359,16 @@ export const DiffView: React.FC<DiffViewProps> = ({
                     />
                 ) : null}
                 {!isMobile && (
-                    activeDiffScope === 'working' || activeDiffScope === 'staged' || activeDiffScope === 'turn' || activeDiffScope === 'branch' ? (
+                    activeDiffScope === 'working' || activeDiffScope === 'staged' || activeDiffScope === 'turn' || activeDiffScope === 'branch' || activeDiffScope === 'pr' ? (
                         <ChangeScopeSelector
                             scope={activeDiffScope}
                             workingCount={workingFileCount}
                             stagedCount={stagedFileCount}
                             turnCount={turnFileCount}
                             branchCount={branchFileCount}
+                            prCount={activeDiffScope === 'pr' ? comparison.files?.length ?? null : null}
                             showBranchOption={showBranchOption}
+                            showPrOption={!isVSCodeRuntime()}
                             onScopeChange={(scope) => {
                                 setActiveDiffScope(scope);
                                 onDiffScopeChange?.(scope);
@@ -2264,6 +2386,29 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         </div>
                     )
                 )}
+                {activeDiffScope === 'pr' ? (
+                    <>
+                        <PullRequestComparisonSelector
+                            key={JSON.stringify([runtimeKey, effectiveDirectory, currentBranch])}
+                            comparison={prComparison}
+                        />
+                        {selectedPr ? (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={comparison.loading}
+                                aria-label={t('session.githubIssuePicker.actions.refresh')}
+                                title={t('session.githubIssuePicker.actions.refresh')}
+                                onClick={() => {
+                                    setComparisonRetryRevision((value) => value + 1);
+                                    void comparison.refresh();
+                                }}
+                            >
+                                <Icon name="refresh" className="size-4" />
+                            </Button>
+                        ) : null}
+                    </>
+                ) : null}
                 <Button
                     variant="ghost"
                     size="sm"
@@ -2320,6 +2465,8 @@ export const DiffView: React.FC<DiffViewProps> = ({
                                     baseRef: branchBase,
                                     headRef: currentBranch,
                                 });
+                            } else if (activeDiffScope === 'pr' && selectedPr) {
+                                requestWalkthroughSource(directory, selectedPr);
                             } else {
                                 requestWalkthroughSource(directory, {
                                     kind: 'working-tree',

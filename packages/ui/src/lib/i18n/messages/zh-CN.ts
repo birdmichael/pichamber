@@ -2014,6 +2014,7 @@ export const dict: Record<I18nKey, string> = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - 正在后台初始化',
   'session.githubIntegration.title': '从 GitHub 选择',
   'session.githubIntegration.tabs.issues': 'Issues',
+  'pullRequestComparison.select': '选择拉取请求',
   'session.githubIntegration.tabs.pullRequests': 'Pull Requests',
   'session.githubIntegration.connect.title': '连接到 GitHub',
   'session.githubIntegration.connect.description': '关联 Issue 或 Pull Request 以自动填充 worktree 详情',

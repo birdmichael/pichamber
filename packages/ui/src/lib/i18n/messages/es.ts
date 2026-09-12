@@ -2032,6 +2032,7 @@ export const dict: Record<I18nKey, string> = {
   "session.newWorktree.toast.worktreeCreatedDescription": "{target} - configurando en segundo plano",
   "session.githubIntegration.title": "Seleccionar desde GitHub",
   "session.githubIntegration.tabs.issues": "Issues",
+  "pullRequestComparison.select": "Seleccionar pull request",
   "session.githubIntegration.tabs.pullRequests": "PR",
   "session.githubIntegration.connect.title": "Conectar a GitHub",
   "session.githubIntegration.connect.description": "Vincula issues o PR para rellenar automáticamente los detalles del worktree",

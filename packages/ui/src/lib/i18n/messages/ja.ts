@@ -2044,6 +2044,7 @@ export const dict: Record<I18nKey, string> = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - バックグラウンドでブートストラップ中',
   'session.githubIntegration.title': 'GitHubから選択',
   'session.githubIntegration.tabs.issues': 'Issue',
+  'pullRequestComparison.select': 'プルリクエストを選択',
   'session.githubIntegration.tabs.pullRequests': 'プルリクエスト',
   'session.githubIntegration.connect.title': 'GitHubに接続',
   'session.githubIntegration.connect.description': 'Issueまたはプルリクエストをリンクしてワークツリー詳細を自動入力',

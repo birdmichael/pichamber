@@ -2032,6 +2032,7 @@ export const dict: Record<I18nKey, string> = {
   "session.newWorktree.toast.worktreeCreatedDescription": "{target} - завантаження у фоні",
   "session.githubIntegration.title": "Виберіть із GitHub",
   "session.githubIntegration.tabs.issues": "Issue",
+  "pullRequestComparison.select": "Вибрати pull request",
   "session.githubIntegration.tabs.pullRequests": "PR",
   "session.githubIntegration.connect.title": "Підключитися до GitHub",
   "session.githubIntegration.connect.description": "Пов’яжіть issue або PR, щоб автоматично заповнити деталі worktree",
