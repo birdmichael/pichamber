@@ -270,10 +270,13 @@ export const isSharedProjectConfigEmpty = (config: SharedProjectConfig): boolean
 
 const withoutEmptyIcon = (action: SharedProjectAction): SharedProjectAction => {
   if (action.icon !== null && action.icon !== undefined) {
-    const { source: _source, ...rest } = action;
+    const { source, ...rest } = action;
+    void source;
     return rest;
   }
-  const { icon: _icon, source: _source, ...rest } = action;
+  const { icon, source, ...rest } = action;
+  void icon;
+  void source;
   return rest;
 };
 

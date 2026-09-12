@@ -270,7 +270,11 @@ strip a stored `["text", "image"]`, `reasoning: true`, or
 window (`grok-4.6` = 500k) and, when the same id is a known vision /
 thinking model, `input: ["text", "image"]` and `reasoning: true`.
 Known thinking/vision ids include the published table plus GPT-5.5 /
-GPT-5.6 / GPT-6 families (`gpt-6-astra`, `gpt-5.6-terra`) and o1/o3/o4.
+GPT-5.6 / GPT-6 families (`gpt-6-astra`, `gpt-5.6-terra`), DeepSeek V4.1
+Flash Vision proxies (`deepseek-v4.1-flash-expires-on-0910`), and o1/o3/o4.
+When models.dev has no row for a proxy slug, known id / prefix tables still
+apply. A stored `thinkingLevelMap` also implies `reasoning: true` so the
+composer thinking chip does not clamp to Off.
 Lookup uses the official `provider/model` key first, then the same
 model id in models.dev, then that table. A live or stored Pi-default
 `["text"]` is empty, not a user override. Host startup hydrates
