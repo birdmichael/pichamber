@@ -560,6 +560,7 @@ const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopS
     autoSaveEnabled: defaults.autoSaveEnabled,
     autoDeleteAfterDays: defaults.autoDeleteAfterDays,
     sessionRetentionAction: defaults.sessionRetentionAction,
+    sessionRetentionOnlyArchived: defaults.sessionRetentionOnlyArchived,
     followUpBehavior: DEFAULT_FOLLOW_UP_BEHAVIOR,
     showDeletionDialog: defaults.showDeletionDialog,
     nativeNotificationsEnabled: defaults.nativeNotificationsEnabled,
@@ -686,6 +687,9 @@ const applyDesktopUiPreferences = (settings: DesktopSettings) => {
     if (normalized !== store.autoDeleteAfterDays) {
       store.setAutoDeleteAfterDays(normalized);
     }
+  }
+  if (typeof settings.sessionRetentionOnlyArchived === 'boolean' && settings.sessionRetentionOnlyArchived !== store.sessionRetentionOnlyArchived) {
+    store.setSessionRetentionOnlyArchived(settings.sessionRetentionOnlyArchived);
   }
   if (settings.sessionRetentionAction === 'archive' || settings.sessionRetentionAction === 'delete') {
     if (settings.sessionRetentionAction !== store.sessionRetentionAction) {
@@ -1169,6 +1173,9 @@ const sanitizeWebSettings = (payload: unknown): DesktopSettings | null => {
   }
   if (typeof candidate.autoDeleteAfterDays === 'number' && Number.isFinite(candidate.autoDeleteAfterDays)) {
     result.autoDeleteAfterDays = candidate.autoDeleteAfterDays;
+  }
+  if (typeof candidate.sessionRetentionOnlyArchived === 'boolean') {
+    result.sessionRetentionOnlyArchived = candidate.sessionRetentionOnlyArchived;
   }
   if (candidate.sessionRetentionAction === 'archive' || candidate.sessionRetentionAction === 'delete') {
     result.sessionRetentionAction = candidate.sessionRetentionAction;

@@ -1,57 +1,19 @@
 import React from 'react';
 import type { Session } from '@opencode-ai/sdk/v2';
 import { opencodeClient } from '@/lib/opencode/client';
-import { ensureGlobalSessionsLoaded, useGlobalSessionsStore, resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
+import { ensureGlobalSessionsLoaded, refreshArchivedSessions, useGlobalSessionsStore, resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { getAllSyncSessions } from '@/sync/sync-refs';
 import { useUIStore } from '@/stores/useUIStore';
+import { useGlobalSessionStatusStore } from '@/sync/global-session-status';
+import {
+  buildSessionRetentionCandidates,
+  isRetentionEligible,
+  RETENTION_KEEP_RECENT,
+} from '@/sync/session-retention';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const AUTO_DELETE_KEEP_RECENT = 5;
 const AUTO_DELETE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const EMPTY_SESSIONS: Session[] = [];
-
-const getSessionLastActivity = (session: Session): number => {
-  return session.time?.updated ?? session.time?.created ?? 0;
-};
-
-type BuildAutoDeleteCandidatesOptions = {
-  sessions: Session[];
-  currentSessionId: string | null;
-  cutoffDays: number;
-  keepRecent?: number;
-  now?: number;
-};
-
-const buildAutoDeleteCandidates = ({
-  sessions,
-  currentSessionId,
-  cutoffDays,
-  keepRecent = AUTO_DELETE_KEEP_RECENT,
-  now = Date.now(),
-}: BuildAutoDeleteCandidatesOptions): string[] => {
-  if (!Array.isArray(sessions) || cutoffDays <= 0) {
-    return [];
-  }
-
-  const cutoffTime = now - cutoffDays * DAY_MS;
-  const sorted = [...sessions].sort(
-    (a, b) => getSessionLastActivity(b) - getSessionLastActivity(a)
-  );
-  const protectedIds = new Set(sorted.slice(0, keepRecent).map((session) => session.id));
-
-  return sorted
-    .filter((session) => {
-      if (!session?.id) return false;
-      if (protectedIds.has(session.id)) return false;
-      if (session.id === currentSessionId) return false;
-      if (session.share) return false;
-      const lastActivity = getSessionLastActivity(session);
-      if (!lastActivity) return false;
-      return lastActivity < cutoffTime;
-    })
-    .map((session) => session.id);
-};
 
 type CleanupResult = {
   completedIds: string[];
@@ -74,71 +36,92 @@ export const useSessionAutoCleanup = (enabledOrOptions?: boolean | CleanupOption
   const isLoading = useSessionUIStore((state) => state.isLoading);
   const autoDeleteEnabled = useUIStore((state) => state.autoDeleteEnabled);
   const autoDeleteAfterDays = useUIStore((state) => state.autoDeleteAfterDays);
+  const sessionRetentionOnlyArchived = useUIStore((state) => state.sessionRetentionOnlyArchived);
   const sessionRetentionAction = useUIStore((state) => state.sessionRetentionAction);
+  const action = sessionRetentionOnlyArchived ? 'delete' as const : sessionRetentionAction;
   const autoDeleteLastRunAt = useUIStore((state) => state.autoDeleteLastRunAt);
   const setAutoDeleteLastRunAt = useUIStore((state) => state.setAutoDeleteLastRunAt);
   const needsGlobalSessions = enabled && (!autoRun || autoDeleteEnabled);
   const globalSessions = useGlobalSessionsStore(React.useCallback(
-    (state) => needsGlobalSessions ? state.activeSessions : EMPTY_SESSIONS,
-    [needsGlobalSessions],
+    (state) => {
+      if (!needsGlobalSessions) return EMPTY_SESSIONS;
+      return sessionRetentionOnlyArchived ? state.archivedSessions : state.activeSessions;
+    },
+    [needsGlobalSessions, sessionRetentionOnlyArchived],
   ));
   const hasLoadedGlobalSessions = useGlobalSessionsStore((state) => state.hasLoaded);
+  const statusById = useGlobalSessionStatusStore((state) => state.statusById);
+  const activeSessionIds = React.useMemo(
+    () => new Set(statusById.keys()),
+    [statusById],
+  );
 
   const [isRunning, setIsRunning] = React.useState(false);
   const runningRef = React.useRef(false);
 
   React.useEffect(() => {
     void ensureGlobalSessionsLoaded(getAllSyncSessions());
-  }, []);
+    if (sessionRetentionOnlyArchived) {
+      void refreshArchivedSessions();
+    }
+  }, [sessionRetentionOnlyArchived]);
 
   const candidates = React.useMemo(() => {
-    if (autoDeleteAfterDays <= 0) {
-      return [];
-    }
-    return buildAutoDeleteCandidates({
+    if (autoDeleteAfterDays <= 0) return [];
+    return buildSessionRetentionCandidates({
       sessions: globalSessions,
       currentSessionId,
       cutoffDays: autoDeleteAfterDays,
+      action,
+      onlyArchived: sessionRetentionOnlyArchived,
+      activeSessionIds,
     });
-  }, [autoDeleteAfterDays, currentSessionId, globalSessions]);
+  }, [action, activeSessionIds, autoDeleteAfterDays, currentSessionId, globalSessions, sessionRetentionOnlyArchived]);
 
   const runCleanup = React.useCallback(
-      async ({ force = false }: { force?: boolean } = {}): Promise<CleanupResult> => {
+    async ({ force = false }: { force?: boolean } = {}): Promise<CleanupResult> => {
       if (runningRef.current) {
-        return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'running' };
+        return { completedIds: [], failedIds: [], action, skippedReason: 'running' };
       }
 
       if (!autoDeleteEnabled || autoDeleteAfterDays <= 0) {
         if (!force) {
-          return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'disabled' };
+          return { completedIds: [], failedIds: [], action, skippedReason: 'disabled' };
         }
       }
 
       if (isLoading) {
-        return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'loading' };
+        return { completedIds: [], failedIds: [], action, skippedReason: 'loading' };
       }
 
       const now = Date.now();
       if (!force && autoDeleteLastRunAt && now - autoDeleteLastRunAt < AUTO_DELETE_INTERVAL_MS) {
-        return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'cooldown' };
+        return { completedIds: [], failedIds: [], action, skippedReason: 'cooldown' };
       }
 
-      const { activeSessions: sessions } = await ensureGlobalSessionsLoaded(getAllSyncSessions());
+      const loaded = await ensureGlobalSessionsLoaded(getAllSyncSessions());
+      const sessions = sessionRetentionOnlyArchived
+        ? (await refreshArchivedSessions()).archivedSessions
+        : loaded.activeSessions;
 
       if (sessions.length === 0) {
-        return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'no-candidates' };
+        return { completedIds: [], failedIds: [], action, skippedReason: 'no-candidates' };
       }
 
-      const candidateIds = buildAutoDeleteCandidates({
+      const liveActiveIds = new Set(useGlobalSessionStatusStore.getState().statusById.keys());
+      const candidateIds = buildSessionRetentionCandidates({
         sessions,
         currentSessionId,
         cutoffDays: autoDeleteAfterDays,
+        action,
+        onlyArchived: sessionRetentionOnlyArchived,
+        activeSessionIds: liveActiveIds,
         now,
       });
 
       if (candidateIds.length === 0) {
         setAutoDeleteLastRunAt(now);
-        return { completedIds: [], failedIds: [], action: sessionRetentionAction, skippedReason: 'no-candidates' };
+        return { completedIds: [], failedIds: [], action, skippedReason: 'no-candidates' };
       }
 
       runningRef.current = true;
@@ -147,33 +130,57 @@ export const useSessionAutoCleanup = (enabledOrOptions?: boolean | CleanupOption
         const sessionMap = new Map(sessions.map((session) => [session.id, session]));
         const completedIds: string[] = [];
         const failedIds: string[] = [];
+        const failedSet = new Set<string>();
 
         for (const id of candidateIds) {
           const session = sessionMap.get(id);
-          const directory = session ? resolveGlobalSessionDirectory(session) : null;
+          if (!session || !isRetentionEligible(session, {
+            onlyArchived: sessionRetentionOnlyArchived,
+            currentSessionId: useSessionUIStore.getState().currentSessionId,
+            activeSessionIds: new Set(useGlobalSessionStatusStore.getState().statusById.keys()),
+            cutoffDays: autoDeleteAfterDays,
+            now,
+          })) {
+            continue;
+          }
+
+          if (action === 'delete') {
+            const children = sessions.filter((candidate) => candidate.parentID === id).map((candidate) => candidate.id);
+            if (children.length > 0) {
+              if (children.some((childId) => failedSet.has(childId))) {
+                failedSet.add(id);
+                failedIds.push(id);
+              }
+              continue;
+            }
+          }
+
+          const directory = resolveGlobalSessionDirectory(session);
           if (!directory) {
+            failedSet.add(id);
             failedIds.push(id);
             continue;
           }
 
           try {
-            if (sessionRetentionAction === 'archive') {
+            if (action === 'archive') {
               await opencodeClient.updateSession(id, { time: { archived: Date.now() } }, directory);
             } else {
               await opencodeClient.deleteSession(id, directory);
             }
             completedIds.push(id);
           } catch {
+            failedSet.add(id);
             failedIds.push(id);
           }
         }
 
-        if (sessionRetentionAction === 'archive') {
+        if (action === 'archive') {
           useGlobalSessionsStore.getState().archiveSessions(completedIds);
         } else {
           useGlobalSessionsStore.getState().removeSessions(completedIds);
         }
-        return { completedIds, failedIds, action: sessionRetentionAction };
+        return { completedIds, failedIds, action };
       } finally {
         runningRef.current = false;
         setIsRunning(false);
@@ -181,34 +188,23 @@ export const useSessionAutoCleanup = (enabledOrOptions?: boolean | CleanupOption
       }
     },
     [
+      action,
       autoDeleteAfterDays,
       autoDeleteEnabled,
       autoDeleteLastRunAt,
       currentSessionId,
       isLoading,
-      sessionRetentionAction,
+      sessionRetentionOnlyArchived,
       setAutoDeleteLastRunAt,
     ]
   );
 
   React.useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    if (!autoRun) {
-      return;
-    }
-    if (!autoDeleteEnabled || autoDeleteAfterDays <= 0) {
-      return;
-    }
-    if (isLoading || !hasLoadedGlobalSessions || globalSessions.length === 0) {
-      return;
-    }
+    if (!enabled || !autoRun) return;
+    if (!autoDeleteEnabled || autoDeleteAfterDays <= 0) return;
+    if (isLoading || !hasLoadedGlobalSessions || globalSessions.length === 0) return;
     const now = Date.now();
-    if (autoDeleteLastRunAt && now - autoDeleteLastRunAt < AUTO_DELETE_INTERVAL_MS) {
-      return;
-    }
+    if (autoDeleteLastRunAt && now - autoDeleteLastRunAt < AUTO_DELETE_INTERVAL_MS) return;
     void runCleanup();
   }, [
     autoDeleteAfterDays,
@@ -226,7 +222,8 @@ export const useSessionAutoCleanup = (enabledOrOptions?: boolean | CleanupOption
     candidates,
     isRunning,
     runCleanup,
-    keepRecentCount: AUTO_DELETE_KEEP_RECENT,
-    action: sessionRetentionAction,
+    keepRecentCount: RETENTION_KEEP_RECENT,
+    action,
+    status: hasLoadedGlobalSessions ? 'ready' as const : 'loading' as const,
   };
 };
