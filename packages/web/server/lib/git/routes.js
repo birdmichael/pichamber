@@ -1289,6 +1289,26 @@ export function registerGitRoutes(app, { emitWorktreeChanged } = {}) {
     }
   });
 
+  app.get('/api/git/commit-diff', async (req, res) => {
+    const { getCommitDiff } = await getGitLibraries();
+    try {
+      const directory = resolveDirectoryQuery(req.query.directory);
+      const hash = resolveDirectoryQuery(req.query.hash);
+      if (!directory || !hash) return res.status(400).json({ error: 'directory and hash are required' });
+      const context = Number(req.query.context ?? 3);
+      const diff = await getCommitDiff(directory, {
+        hash,
+        path: resolveDirectoryQuery(req.query.path) ?? undefined,
+        previousPath: resolveDirectoryQuery(req.query.previousPath) ?? undefined,
+        contextLines: Number.isFinite(context) ? context : 3,
+      });
+      res.json({ diff });
+    } catch (error) {
+      console.error('Failed to get commit diff:', error);
+      res.status(500).json({ error: error.message || 'Failed to get commit diff' });
+    }
+  });
+
   app.get('/api/git/commit-file-diff', async (req, res) => {
     const { getCommitFileDiff } = await getGitLibraries();
     try {

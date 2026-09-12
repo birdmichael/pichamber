@@ -350,10 +350,18 @@ export interface CommitFileEntry {
   deletions: number;
   isBinary: boolean;
   changeType: 'A' | 'M' | 'D' | 'R' | 'C' | string;
+  previousPath?: string;
 }
 
 export interface GitCommitFilesResponse {
   files: CommitFileEntry[];
+}
+
+export interface GetGitCommitDiffOptions {
+  hash: string;
+  path?: string;
+  previousPath?: string;
+  contextLines?: number;
 }
 
 export interface CommitFileDiffResponse {
@@ -523,6 +531,7 @@ export interface GitAPI {
   renameBranch(directory: string, oldName: string, newName: string): Promise<{ success: boolean; branch: string }>;
   getGitLog(directory: string, options?: GitLogOptions): Promise<GitLogResponse>;
   getCommitFiles(directory: string, hash: string): Promise<GitCommitFilesResponse>;
+  getGitCommitDiff?(directory: string, options: GetGitCommitDiffOptions): Promise<GitDiffResponse>;
   getCommitFileDiff?(directory: string, hash: string, filePath: string, isBinary: boolean): Promise<CommitFileDiffResponse>;
   getCurrentGitIdentity(directory: string): Promise<GitIdentitySummary | null>;
   hasLocalIdentity?(directory: string): Promise<boolean>;

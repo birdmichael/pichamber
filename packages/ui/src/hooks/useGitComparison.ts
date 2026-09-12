@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GitDiffResponse } from '@/lib/api/types';
+import { getCommitFiles, getGitCommitDiff } from '@/lib/gitApi';
 import { useI18n } from '@/lib/i18n';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import type { WalkthroughSource } from '@/lib/walkthrough/types';
@@ -8,8 +9,8 @@ import { fetchPullRequestDiff } from '@/lib/diff/pullRequestDiff';
 import { PullRequestSnapshotCache } from '@/lib/diff/pullRequestSnapshotCache';
 import { gitPushScopeKey, subscribeGitPush } from '@/lib/gitPushEvents';
 
-/** MVP: PR comparison only (branch/commit remain on DiffView's existing paths). */
-export type GitComparisonSource = Extract<WalkthroughSource, { kind: 'pr' }>;
+/** PR + commit comparison (branch remains on DiffView's existing path). */
+export type GitComparisonSource = Extract<WalkthroughSource, { kind: 'commit' | 'pr' }>;
 
 export interface GitComparisonFile {
   path: string;
@@ -51,7 +52,16 @@ export function useGitComparison(directory: string | null, source: GitComparison
     const runtime = getRuntimeKey();
     setResult((previous) => previous?.key === key && previous.status === 'ready' ? { ...previous, refreshing: true } : { key, status: 'loading' });
     try {
-      const files: GitComparisonFile[] = await prCache.load(pushScope, target, () => fetchPullRequestDiff(directory, target), force);
+      const files: GitComparisonFile[] = target.kind === 'pr'
+        ? await prCache.load(pushScope, target, () => fetchPullRequestDiff(directory, target), force)
+        : (await getCommitFiles(directory, target.hash)).files
+          .map((file) => ({
+            path: file.path,
+            status: file.changeType,
+            previousPath: file.previousPath,
+            insertions: file.insertions,
+            deletions: file.deletions,
+          }));
       if (generation.current !== request || getRuntimeKey() !== runtime) return;
       setResult((previous) => previous?.key === key && previous.status === 'ready' && previous.files === files
         ? { ...previous, refreshing: false }
@@ -71,12 +81,20 @@ export function useGitComparison(directory: string | null, source: GitComparison
   const current = result?.key === key ? result : null;
   const files = current?.status === 'ready' ? current.files : null;
   const filesByPath = useMemo(() => new Map((files ?? []).map((file) => [file.path, file])), [files]);
-  const fetchDiff = useCallback(async (filePath: string, _contextLines = 3): Promise<GitDiffResponse> => {
+  const fetchDiff = useCallback(async (filePath: string, contextLines = 3): Promise<GitDiffResponse> => {
     const { key: targetKey, source: target, enabled: active } = sourceRef.current;
     const file = filesByPath.get(filePath);
     if (!directory || targetKey !== key || !target || !file || !enabled || !active) throw new Error(t('diffView.state.failedToLoadDiff'));
-    if (file.patch === undefined) throw new Error(t('diffView.state.failedToLoadDiff'));
-    return { diff: file.patch };
+    if (target.kind === 'pr') {
+      if (file.patch === undefined) throw new Error(t('diffView.state.failedToLoadDiff'));
+      return { diff: file.patch };
+    }
+    return getGitCommitDiff(directory, {
+      hash: target.hash,
+      path: filePath,
+      previousPath: file.previousPath,
+      contextLines,
+    });
   }, [directory, enabled, filesByPath, key, t]);
 
   return {

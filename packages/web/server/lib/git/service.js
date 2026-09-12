@@ -4634,12 +4634,11 @@ export async function getLog(directory, options = {}) {
     };
     const resolvedFrom = await resolveBaseRefForLog(options.from, checkRef);
 
-    const baseLog = await git.log({
-      maxCount,
-      from: resolvedFrom,
-      to: options.to,
-      file: filePath
-    });
+    // simple-git's object form treats lone `to` as an empty range; pass the
+    // tip as a positional revision so recent-commit comparison can load history.
+    const baseLog = options.to && !resolvedFrom
+      ? await git.log([`--max-count=${maxCount}`, options.to, ...(filePath ? ['--', filePath] : [])])
+      : await git.log({ maxCount, from: resolvedFrom, to: options.to, file: filePath });
 
     const logArgs = [
       'log',
@@ -4881,6 +4880,23 @@ export async function canonicalizeWorktreeState(directory) {
     degraded: false,
     attentionReason,
   };
+}
+
+async function resolveCommitHash(git, hash) {
+  if (!/^[0-9a-f]{7,64}$/i.test(hash)) throw new Error('A commit hash is required');
+  return (await git.raw(['rev-parse', '--verify', '--end-of-options', `${hash}^{commit}`])).trim();
+}
+
+const commitShowArgs = (hash) => ['show', '--format=', '--root', '--diff-merges=first-parent', '--find-renames', hash];
+
+export async function getCommitDiff(directory, { hash, path: filePath, previousPath, contextLines = 3 } = {}) {
+  const { git } = await createRepositoryGitContext(directory);
+  const commit = await resolveCommitHash(git, hash);
+  const paths = [filePath, previousPath].filter(Boolean).map((value) => `:(literal)${value}`);
+  return git.raw([
+    ...commitShowArgs(commit), '--no-color', '--no-ext-diff', `-U${Math.max(0, contextLines)}`,
+    '--', ...paths,
+  ]);
 }
 
 export async function getCommitFiles(directory, commitHash) {

@@ -978,6 +978,19 @@ export async function getCommitFiles(
   return response.json();
 }
 
+export async function getGitCommitDiff(directory: string, options: import('./api/types').GetGitCommitDiffOptions): Promise<import('./api/types').GitDiffResponse> {
+  const response = await runtimeFetch(buildUrl(`${API_BASE}/commit-diff`, directory, {
+    hash: options.hash,
+    path: options.path,
+    previousPath: options.previousPath,
+    context: options.contextLines,
+  }));
+  if (!response.ok) {
+    throw new Error(`Failed to get commit diff: ${response.statusText}`);
+  }
+  return response.json();
+}
+
 export async function getCommitFileDiff(
   directory: string,
   hash: string,
