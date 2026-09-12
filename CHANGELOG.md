@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- Mobile: Rename with AI on session swipe actions (parity with Desktop sidebar / OpenChamber 1.23.1).
+- Mobile: Changes drawer Branch / Commit / Pull Request comparison modes with the same selectors as Desktop (OpenChamber 1.23).
+- Settings: Appearance notes when theme/fonts/layout apply to the Mobile surface (`?surface=mobile`).
 - Settings: full preferences.json + settings-registry per-surface split (upstream OpenChamber 1.23) — profile keys in `preferences.json` with `{value,updatedAt}` / `surfaces.<kind>`; generated `settings-registry.json` gates PUT; UI `lib/settings/registry.ts` + `bun run settings-registry:generate`; interim `surfaceProfiles` seeds then retires (VS Code bridge skipped).
 - Projects: share actions, worktree setup commands, and draft starters via `.pichamber/project.json`, with trust prompts before running repository commands (upstream OpenChamber 1.23 repository config).
 - Projects: configurable repository Plans folder via `.pichamber/project.json` `plansDir` (default `.pichamber/plans`; upstream OpenChamber 1.23 repository config / plans pointer).
@@ -16,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Mobile: workspace Changes pane pauses comparison work while the drawer tab is hidden (`visible` prop).
 - Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
 - Chat: pinned end-follow survives panel/window resize using measured list footer size (upstream OpenChamber 1.23).
 - Chat: message footer facts drop by priority on narrow columns without leaving holes (`useFactsFit`; upstream OpenChamber 1.23).

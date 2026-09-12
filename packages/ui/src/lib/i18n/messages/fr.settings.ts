@@ -2636,4 +2636,9 @@ export const settingsDict = {
   'settings.piAgents.agentsMdInfo': 'Global and project AGENTS.md rules are part of Pi’s main prompt context. They are separate from subagent definitions and Magic Prompts.',
   'settings.piAgents.projectAgentsMd': 'Project AGENTS.md',
   ...thirdPartyIntegrationI18n.fr,
+  'settings.page.appearance.descriptionDesktop': 'Theme, font sizes, and chat layout on Desktop can differ from other surfaces. Panel sizes stay on this device.',
+  'settings.openchamber.visual.surface.desktopThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Desktop. Other surfaces keep their own values when set.',
+  'settings.openchamber.visual.surface.mobileThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Mobile. Other surfaces keep their own values when set.',
+  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Always show scrollbars',
+  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Keep scrollbars visible even when the pointer is outside the scrollable area. Applies on this device only.',
 } as const;

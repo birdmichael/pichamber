@@ -30,6 +30,7 @@ import {
 import { useDeviceInfo } from '@/lib/device';
 import { usePwaDetection } from '@/hooks/usePwaDetection';
 import { updateDesktopSettings } from '@/lib/persistence';
+import { getSettingsSurface } from '@/lib/settings/surface';
 import { CODE_FONT_OPTIONS, DEFAULT_MONO_FONT, DEFAULT_UI_FONT, UI_FONT_OPTIONS, type MonoFontOption, type UiFontOption } from '@/lib/fontOptions';
 import { useI18n, type Locale } from '@/lib/i18n';
 import { useConfigStore } from '@/stores/useConfigStore';
@@ -657,6 +658,12 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const showWindowControlsPositionSetting = shouldShow('windowControlsPosition') && showWindowControlsPosition;
     const hasLocalizationSettings = shouldShow('theme') || shouldShow('timeFormat') || shouldShow('weekStart');
     const showMobileLayoutSetting = isMobile && isWebRuntime() && !isDesktopShell() && !isVSCode;
+    const settingsSurface = getSettingsSurface();
+    const surfaceThemeDescription = settingsSurface === 'desktop'
+      ? t('settings.openchamber.visual.surface.desktopThemeFontsLayout')
+      : settingsSurface === 'mobile'
+        ? t('settings.openchamber.visual.surface.mobileThemeFontsLayout')
+        : undefined;
     const hasAppearanceSettings = isVSCode
         ? hasLocalizationSettings
         : (shouldShow('theme') || showWindowControlsPositionSetting || showMobileLayoutSetting || shouldShow('pwaInstallName') || shouldShow('pwaOrientation') || shouldShow('timeFormat') || shouldShow('weekStart'));
@@ -903,7 +910,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                         {hasThemeSettings && (
                             <SettingsSection
                                 title={t('settings.openchamber.visual.section.colorModeAndTheme')}
-                                description={isDesktopShell() ? t('settings.openchamber.visual.surface.desktopThemeFontsLayout') : undefined}
+                                description={surfaceThemeDescription}
                                 divider={false}
                             >
                                 <SettingsTwoColumn>
