@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Chat: queued messages collapse by default and preview quote/comment context when the composer text is empty (upstream OpenChamber 1.23.1).
 - Scheduled tasks: Run now works for paused tasks while their schedule stays paused (upstream OpenChamber 1.23.1).
 - Scheduled tasks: a project that fails to load no longer stops tasks in other projects from starting (upstream OpenChamber 1.23.1).
 - Files: large text files can be edited and saved in full without truncating contents (upstream OpenChamber 1.23.1).
