@@ -329,7 +329,9 @@ const isFileMissingError = (error: unknown): boolean => {
     || normalized.includes('does not exist');
 };
 
-const MAX_VIEW_CHARS = 200_000;
+// Soft threshold for pierre/shiki render strategy only — never truncates
+// editable content. Large files remain fully loadable and savable.
+const LARGE_FILE_CHAR_THRESHOLD = 200_000;
 type FileLineEnding = '\n' | '\r\n';
 
 // Fast cache key for pierre's line/highlight caches: content-derived (not a
@@ -1736,12 +1738,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     };
   }, [files, openPaths, removeOpenPathsByPrefix, resolveFileReadOptions, root]);
 
-  const displayedContent = React.useMemo(() =>
-    fileContent.length > MAX_VIEW_CHARS
-      ? `${fileContent.slice(0, MAX_VIEW_CHARS)}\n\n… truncated …`
-      : fileContent,
-    [fileContent]
-  );
+  const displayedContent = fileContent;
 
   const isDirty = draftContent !== displayedContent;
 
@@ -2013,9 +2010,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
         setFileContent(editorContent);
         diagramXmlRef.current = editorContent;
         diagramSavedXmlRef.current = editorContent;
-        setDraftContent(editorContent.length > MAX_VIEW_CHARS
-          ? `${editorContent.slice(0, MAX_VIEW_CHARS)}\n\n… truncated …`
-          : editorContent);
+        setDraftContent(editorContent);
         setLoadedFilePath(node.path);
         void readFileStat(node.path)
           .then((stat) => {
@@ -2506,7 +2501,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const canCopyPath = Boolean(selectedFile && displaySelectedPath.length > 0);
   // Keep image/SVG on the preview path: `isBinaryFile` excludes `.svg`, so binary
   // alone would flip canEdit/isTextFile true and show a dead edit toggle + no-op Save.
-  const canEdit = Boolean(selectedFile && !selectedFileIsOutsideWorkspace && !isSelectedBinary && !isSelectedImage && files.writeFile && fileContent.length <= MAX_VIEW_CHARS);
+  const canEdit = Boolean(selectedFile && !selectedFileIsOutsideWorkspace && !isSelectedBinary && !isSelectedImage && files.writeFile);
   const isMarkdown = Boolean(selectedFile?.path && isMarkdownFile(selectedFile.path));
   const isJson = Boolean(selectedFile?.path && isJsonFile(selectedFile.path));
   const isHtml = Boolean(selectedFile?.path && isHtmlFile(selectedFile.path));
@@ -3355,7 +3350,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   // Files above the editable size cap are rendered as a read-only preview; give
   // them the full file content plus pierre's viewport virtualization and the
   // shared Shiki worker pool so large files stay responsive.
-  const isLargeFile = fileContent.length > MAX_VIEW_CHARS;
+  const isLargeFile = fileContent.length > LARGE_FILE_CHAR_THRESHOLD;
   const largeFileCacheKey = React.useMemo(
     () => (isLargeFile ? makeContentCacheKey(fileContent) : undefined),
     [fileContent, isLargeFile],
