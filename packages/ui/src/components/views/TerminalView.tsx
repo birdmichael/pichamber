@@ -1,4 +1,5 @@
 import React from 'react';
+import { focusChatInput } from '@/components/chat/composer/editor/dom';
 
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { EMPTY_TERMINAL_BUFFER, useTerminalStore } from '@/stores/useTerminalStore';
@@ -646,6 +647,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
             text: '',
             terminalId: activeTab.terminalSessionId ?? activeTab.id,
         });
+        queueMicrotask(focusChatInput);
     }, [activeTab, addContextDraft, currentSessionId, effectiveDirectory, newSessionDraft?.open]);
 
     const handleSelectTab = React.useCallback(

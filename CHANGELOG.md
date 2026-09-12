@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Terminal: right-click Copy/Paste; macOS Option+Left/Right/Backspace word editing at shell prompts; Attach selection focuses the composer (upstream OpenChamber 1.23.1).
 - Sessions: Rename with AI generates a title from recent completed turns via the Small Model (upstream OpenChamber 1.23.1).
 - Chat: queued messages collapse by default and preview quote/comment context when the composer text is empty (upstream OpenChamber 1.23.1).
 - Chat: collapsible Markdown `<details>` disclosures render safely with stream-stable open state (upstream OpenChamber 1.23.0).

@@ -2,6 +2,10 @@ import React from 'react';
 import type { FitAddon, Ghostty, Terminal as GhosttyTerminal } from 'ghostty-web';
 
 import { cn } from '@/lib/utils';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { useI18n } from '@/lib/i18n';
+import { toast } from 'sonner';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from '@/components/ui/context-menu';
 import type { TerminalTheme } from '@/lib/terminalTheme';
 import { getGhosttyTerminalOptions } from '@/lib/terminalTheme';
 import {
@@ -105,6 +109,11 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
 }, ref) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const terminalRef = React.useRef<GhosttyTerminal | null>(null);
+  const { t } = useI18n();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [menuSelection, setMenuSelection] = React.useState('');
+  const clipboardLifetimeRef = React.useRef(0);
+  const restoreMenuFocusRef = React.useRef(false);
   const fitRef = React.useRef<FitAddon | null>(null);
   const inputRef = React.useRef(onInput);
   const resizeRef = React.useRef(onResize);
@@ -248,6 +257,28 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
       terminalRef.current = terminal;
       fitRef.current = fitAddon;
       subscriptions = [terminal.onData((data) => inputRef.current(data))];
+      const keyedTerminal = terminal;
+      keyedTerminal.attachCustomKeyEventHandler((event) => {
+        if (event.type !== 'keydown') return true;
+        if (!/mac/i.test(navigator.platform || navigator.userAgent || '')) return true;
+        if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return true;
+        let data: string | null = null;
+        switch (event.key) {
+          case 'ArrowLeft': data = '\x1bb'; break;
+          case 'ArrowRight': data = '\x1bf'; break;
+          case 'Backspace': data = '\x17'; break;
+          default: return true;
+        }
+        try {
+          if (keyedTerminal.wasmTerm?.isAlternateScreen?.()) return true;
+        } catch {
+          // ignore missing helper
+        }
+        event.preventDefault();
+        inputRef.current(data);
+        return false;
+      });
+
       observer = new ResizeObserver(() => {
         if (resizeTimeout) clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(fit, 80);
@@ -520,6 +551,37 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
     };
   }, [enableTouchScroll, fontSize, ready]);
 
+  const copySelection = async () => {
+    if (!menuSelection) return;
+    try {
+      const result = await copyTextToClipboard(menuSelection);
+      if (!result.ok) toast.error(t('terminalView.toast.copyFailed'));
+    } catch {
+      toast.error(t('terminalView.toast.copyFailed'));
+    }
+  };
+
+  const pasteClipboard = async () => {
+    const terminal = terminalRef.current;
+    if (!terminal || !visibleRef.current) return;
+    const lifetime = clipboardLifetimeRef.current;
+    const isCurrent = () => terminalRef.current === terminal
+      && visibleRef.current && clipboardLifetimeRef.current === lifetime;
+    try {
+      const data = await navigator.clipboard.readText();
+      if (!isCurrent()) return;
+      terminal.paste(data);
+    } catch {
+      if (isCurrent()) toast.error(t('terminalView.toast.pasteFailed'));
+    }
+  };
+
+  React.useEffect(() => {
+    setMenuOpen(false);
+    clipboardLifetimeRef.current += 1;
+    return () => { clipboardLifetimeRef.current += 1; };
+  }, [sessionKey, isVisible, ready]);
+
   React.useImperativeHandle(ref, () => ({
     focus: () => terminalRef.current?.focus(),
     fit,
@@ -533,11 +595,41 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
   }), [fit]);
 
   return (
-    <div
-      ref={containerRef}
-      data-terminal-owner="main"
-      className={cn('terminal-viewport-container h-full w-full overflow-hidden touch-none', className)}
-    />
+    <ContextMenu
+      open={menuOpen && isVisible && !enableTouchScroll}
+      onOpenChange={(open) => {
+        restoreMenuFocusRef.current = !open;
+        setMenuOpen(open);
+        if (!open && restoreMenuFocusRef.current && visibleRef.current) {
+          terminalRef.current?.focus();
+        }
+      }}
+    >
+      <ContextMenuTrigger
+        render={(
+          <div
+            ref={containerRef}
+            data-terminal-owner="main"
+            className={cn('terminal-viewport-container relative h-full w-full overflow-hidden touch-none', className)}
+            onContextMenu={(event) => {
+              if (enableTouchScroll || !isVisible) {
+                event.preventDefault();
+                return;
+              }
+              setMenuSelection(terminalRef.current?.getSelection() ?? '');
+            }}
+          />
+        )}
+      />
+      <ContextMenuContent>
+        <ContextMenuItem disabled={!menuSelection} onClick={() => { void copySelection(); }}>
+          {t('terminalView.actions.copy')}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => { void pasteClipboard(); }}>
+          {t('terminalView.actions.paste')}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });
 
