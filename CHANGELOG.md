@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- Changes: select a published pull request and review its GitHub diff in the Changes panel (upstream OpenChamber 1.23.1).
 - Work Status: Turn stats section (response speed, model/tool time, tokens, USD cost) for the latest completed turn (upstream OpenChamber 1.23.0).
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 

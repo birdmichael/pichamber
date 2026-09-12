@@ -45,6 +45,16 @@ export function parseSource(raw) {
     if (!Number.isInteger(number) || number <= 0) {
       throw new WalkthroughSourceError('pr sources require a positive number');
     }
+    if (raw.sourceRepo !== undefined) {
+      const { owner, repo } = raw.sourceRepo ?? {};
+      try {
+        assert.match(owner, /^[a-zA-Z0-9-]+$/);
+        assert.match(repo, /^[a-zA-Z0-9_.-]+$/);
+      } catch {
+        throw new WalkthroughSourceError('pr sources require a valid repository');
+      }
+      return { kind: 'pr', number, sourceRepo: { owner, repo } };
+    }
     return { kind: 'pr', number };
   }
 
@@ -58,7 +68,8 @@ export function parseSource(raw) {
 export function sourceKey(source) {
   if (source.kind === 'working-tree') return `working-tree:${source.scope}`;
   if (source.kind === 'branch') return `branch:${source.baseRef}...${source.headRef}`;
-  return `pr:${source.number}`;
+  if (source.kind === 'commit') return `commit:${source.hash}`;
+  return source.sourceRepo ? `pr:${source.sourceRepo.owner}/${source.sourceRepo.repo}:${source.number}` : `pr:${source.number}`;
 }
 
 // `git diff` never reports untracked files, so a brand-new file would be
@@ -108,7 +119,7 @@ export async function loadSourceSections(directory, source, { getPullRequestDiff
     throw new WalkthroughSourceError('Pull request diffs are unavailable', 500);
   }
 
-  const { patch, meta } = await getPullRequestDiff(directory, source.number);
+  const { patch, meta } = await getPullRequestDiff(directory, source.number, source.sourceRepo);
   return {
     sections: patch && patch.trim() ? [{ scope: `pr:${source.number}`, patch }] : [],
     meta: meta || {},

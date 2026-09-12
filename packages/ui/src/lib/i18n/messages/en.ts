@@ -2048,6 +2048,7 @@ export const dict = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - bootstrapping in background',
   'session.githubIntegration.title': 'Select from GitHub',
   'session.githubIntegration.tabs.issues': 'Issues',
+  'pullRequestComparison.select': 'Select pull request',
   'session.githubIntegration.tabs.pullRequests': 'Pull Requests',
   'session.githubIntegration.connect.title': 'Connect to GitHub',
   'session.githubIntegration.connect.description': 'Link issues or pull requests to auto-fill worktree details',

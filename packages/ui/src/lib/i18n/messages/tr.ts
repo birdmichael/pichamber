@@ -2046,6 +2046,7 @@ export const dict = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - arka planda hazırlanıyor',
   'session.githubIntegration.title': 'GitHub\'dan seç',
   'session.githubIntegration.tabs.issues': 'Issue\'lar',
+  'pullRequestComparison.select': 'Pull request seç',
   'session.githubIntegration.tabs.pullRequests': 'Pull Request\'ler',
   'session.githubIntegration.connect.title': 'GitHub\'a bağlan',
   'session.githubIntegration.connect.description': 'Worktree ayrıntılarını otomatik doldurmak için issue veya pull request bağlayın',

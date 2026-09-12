@@ -2018,6 +2018,7 @@ export const dict: Record<I18nKey, string> = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - 正在背景初始化',
   'session.githubIntegration.title': '從 GitHub 選擇',
   'session.githubIntegration.tabs.issues': 'Issues',
+  'pullRequestComparison.select': '選擇拉取請求',
   'session.githubIntegration.tabs.pullRequests': 'Pull Requests',
   'session.githubIntegration.connect.title': '連接到 GitHub',
   'session.githubIntegration.connect.description': '關聯 Issue 或 Pull Request 以自動填入 worktree 詳情',

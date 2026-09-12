@@ -1835,6 +1835,7 @@ export const dict = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - im Hintergrund initialisiert',
   'session.githubIntegration.title': 'Aus GitHub auswählen',
   'session.githubIntegration.tabs.issues': 'Probleme',
+  'pullRequestComparison.select': 'Pull Request auswählen',
   'session.githubIntegration.tabs.pullRequests': 'Pull Requests',
   'session.githubIntegration.connect.title': 'Mit GitHub verbinden',
   'session.githubIntegration.connect.description': 'Verknüpfen Sie Probleme oder Pull Requests, um Worktree-Details automatisch auszufüllen',

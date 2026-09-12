@@ -2050,6 +2050,7 @@ export const dict: Record<I18nKey, string> = {
   'session.newWorktree.toast.worktreeCreatedDescription': '{target} - 백그라운드에서 초기 설정 중',
   'session.githubIntegration.title': 'GitHub에서 선택',
   'session.githubIntegration.tabs.issues': '이슈',
+  'pullRequestComparison.select': '풀 리퀘스트 선택',
   'session.githubIntegration.tabs.pullRequests': 'PR',
   'session.githubIntegration.connect.title': 'GitHub에 연결',
   'session.githubIntegration.connect.description': '이슈 또는 PR을 연결해 워크트리 정보를 자동으로 채웁니다',
