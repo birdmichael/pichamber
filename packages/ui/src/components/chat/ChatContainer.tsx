@@ -199,6 +199,7 @@ type ChatViewportProps = {
     onAnchorReady: (messageId: string, anchorIndex: number) => void;
     onAnchorSizeChanged: (messageId: string) => void;
     onIsAtEndChange: (isAtEnd: boolean) => void;
+    onListMetricsChange: (metrics: { readonly footerSize: number }) => void;
     onTimelineDataChange: () => void;
     renderedMessages: SessionMessageRecord[];
     isLoadingOlder: boolean;
@@ -245,6 +246,7 @@ const ChatViewport = React.memo(({
     onAnchorReady,
     onAnchorSizeChanged,
     onIsAtEndChange,
+    onListMetricsChange,
     onTimelineDataChange,
     renderedMessages,
     isLoadingOlder,
@@ -536,7 +538,7 @@ const ChatViewport = React.memo(({
                     onAnchorSizeChanged={onAnchorSizeChanged}
                     composerOverlayHeight={composerOverlayHeight}
                     onIsAtEndChange={onIsAtEndChange}
-                onListMetricsChange={onListMetricsChange}
+                    onListMetricsChange={onListMetricsChange}
                     onTimelineDataChange={onTimelineDataChange}
                     listHeader={listHeader}
                     listFooter={listFooter}
@@ -581,6 +583,7 @@ const ChatViewport = React.memo(({
         && prev.onAnchorReady === next.onAnchorReady
         && prev.onAnchorSizeChanged === next.onAnchorSizeChanged
         && prev.onIsAtEndChange === next.onIsAtEndChange
+        && prev.onListMetricsChange === next.onListMetricsChange
         && prev.onTimelineDataChange === next.onTimelineDataChange
         && prev.revealWaited === next.revealWaited
         && prev.revealGate === next.revealGate
@@ -1715,7 +1718,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 onAnchorReady={onAnchorReady}
                 onAnchorSizeChanged={onAnchorSizeChanged}
                 onIsAtEndChange={onIsAtEndChange}
-                onListMetricsChange={onListMetricsChange}
+                    onListMetricsChange={onListMetricsChange}
                 onTimelineDataChange={onTimelineDataChange}
                 renderedMessages={timelineController.renderedMessages}
                 isLoadingOlder={timelineController.isLoadingOlder}

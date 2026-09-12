@@ -7,7 +7,7 @@ export const isSessionIdSearchQuery = (query: string): boolean => {
 
 export const normalizeSessionIdSearchQuery = (query: string): string => query.trim().toLowerCase();
 
-export type SearchableSessionNode<TSession = { title?: string | null }> = {
+export type SearchableSessionNode<TSession = { id?: string; title?: string | null }> = {
   session: TSession;
   children: Array<SearchableSessionNode<TSession>>;
 };
