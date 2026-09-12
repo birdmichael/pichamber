@@ -37,6 +37,7 @@ type AppearanceSlice = {
   autoSaveEnabled: boolean;
   autoDeleteAfterDays: number;
   sessionRetentionAction: 'archive' | 'delete';
+  sessionRetentionOnlyArchived: boolean;
   fontSize: number;
   terminalFontSize: number;
   terminalShell: TerminalShell;
@@ -88,6 +89,7 @@ export const startAppearanceAutoSave = (): void => {
     autoSaveEnabled: useUIStore.getState().autoSaveEnabled,
     autoDeleteAfterDays: useUIStore.getState().autoDeleteAfterDays,
     sessionRetentionAction: useUIStore.getState().sessionRetentionAction,
+    sessionRetentionOnlyArchived: useUIStore.getState().sessionRetentionOnlyArchived,
     fontSize: useUIStore.getState().fontSize,
     terminalFontSize: useUIStore.getState().terminalFontSize,
     terminalShell: useUIStore.getState().terminalShell,
@@ -131,6 +133,7 @@ export const startAppearanceAutoSave = (): void => {
       autoSaveEnabled: state.autoSaveEnabled,
       autoDeleteAfterDays: state.autoDeleteAfterDays,
       sessionRetentionAction: state.sessionRetentionAction,
+      sessionRetentionOnlyArchived: state.sessionRetentionOnlyArchived,
       fontSize: state.fontSize,
       terminalFontSize: state.terminalFontSize,
       terminalShell: state.terminalShell,
@@ -227,6 +230,9 @@ export const startAppearanceAutoSave = (): void => {
     }
     if (current.sessionRetentionAction !== previous.sessionRetentionAction) {
       diff.sessionRetentionAction = current.sessionRetentionAction;
+    }
+    if (current.sessionRetentionOnlyArchived !== previous.sessionRetentionOnlyArchived) {
+      diff.sessionRetentionOnlyArchived = current.sessionRetentionOnlyArchived;
     }
     if (current.fontSize !== previous.fontSize) {
       diff.fontSize = current.fontSize;
