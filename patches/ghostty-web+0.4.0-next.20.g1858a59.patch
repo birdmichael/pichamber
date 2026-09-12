@@ -2,10 +2,18 @@ diff --git a/node_modules/ghostty-web/dist/ghostty-web.js b/node_modules/ghostty
 index 0000000000000000000000000000000000000000..1111111111111111111111111111111111111111 100644
 --- a/node_modules/ghostty-web/dist/ghostty-web.js
 +++ b/node_modules/ghostty-web/dist/ghostty-web.js
-@@ -1538,1 +1538,1 @@
--    if (A.grapheme_len > 0 && ((k = this.currentBuffer) != null && k.getGraphemeString) ? N = this.currentBuffer.getGraphemeString(g, B) : N = String.fromCodePoint(A.codepoint || 32), this.ctx.fillText(N, w, s), A.flags & e.FAINT && (this.ctx.globalAlpha = 1), A.flags & e.UNDERLINE) {
-+    if (A.grapheme_len > 0 && ((k = this.currentBuffer) != null && k.getGraphemeString) ? N = this.currentBuffer.getGraphemeString(g, B) : N = A.codepoint == null || A.codepoint <= 0 || A.codepoint > 1114111 || A.codepoint >= 55296 && A.codepoint <= 57343 ? " " : String.fromCodePoint(A.codepoint), this.renderBlockChar(A.codepoint || 32, E, C, I) || this.ctx.fillText(N, w, s), A.flags & e.FAINT && (this.ctx.globalAlpha = 1), A.flags & e.UNDERLINE) {
-@@ -1557,5 +1557,40 @@
+@@ -1844,7 +1844,7 @@
+     A.flags & G.FAINT && (this.ctx.globalAlpha = 0.5);
+     const s = C, h = I + this.metrics.baseline;
+     let N;
+-    if (A.grapheme_len > 0 && ((k = this.currentBuffer) != null && k.getGraphemeString) ? N = this.currentBuffer.getGraphemeString(g, Q) : N = String.fromCodePoint(A.codepoint || 32), this.ctx.fillText(N, s, h), A.flags & G.FAINT && (this.ctx.globalAlpha = 1), A.flags & G.UNDERLINE) {
++    if (A.grapheme_len > 0 && ((k = this.currentBuffer) != null && k.getGraphemeString) ? N = this.currentBuffer.getGraphemeString(g, Q) : N = A.codepoint == null || A.codepoint <= 0 || A.codepoint > 1114111 || A.codepoint >= 55296 && A.codepoint <= 57343 ? " " : String.fromCodePoint(A.codepoint), this.renderBlockChar(A.codepoint || 32, C, I, D) || this.ctx.fillText(N, s, h), A.flags & G.FAINT && (this.ctx.globalAlpha = 1), A.flags & G.UNDERLINE) {
+       const t = I + this.metrics.baseline + 2;
+       this.ctx.strokeStyle = this.ctx.fillStyle, this.ctx.lineWidth = 1, this.ctx.beginPath(), this.ctx.moveTo(C, t), this.ctx.lineTo(C + D, t), this.ctx.stroke();
+     }
+@@ -1864,6 +1864,41 @@
+       }
+     }
    }
 +  renderBlockChar(A, B, g, E) {
 +    const C = this.metrics.height, I = E / 2, D = C / 2;
@@ -45,4 +53,3 @@ index 0000000000000000000000000000000000000000..11111111111111111111111111111111
    /**
     * Render cursor
     */
-   renderCursor(A, B) {

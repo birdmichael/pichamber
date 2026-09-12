@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - Chat: history-scroll measure parity while older history loads (verified ALREADY from prior port).
 - Terminal: unset `NODE_CHANNEL_FD` on POSIX PTY shells via `env -u` (upstream OpenChamber 1.23).
 - Terminal: replay snapshot history at the PTY size it was drawn for so tab switches/resizes keep output isolated (upstream OpenChamber 1.23).
+- Terminal: pin ghostty-web 0.4.0-next.20 so recycled WASM rows clear across tab/project switches; keep the local block-glyph patch; remount the renderer after mono/Nerd fonts load; add a tab-strip Copy button for touch hosts; fix TerminalViewport `onProvisionalSize` destructure crash from #761 sized-replay (upstream OpenChamber 1.23 render consistency / touch copy on PC's ghostty-web stack — full in-repo libghostty-vt remains intentional HARD SKIP).
 - Git: token identity switching passes `allowUnsafeCredentialHelper` (upstream OpenChamber 1.23).
 - Git: new-file / untracked diffs tolerate Git line-ending warnings (exit 0/1 via `getNoIndexDiff`; upstream OpenChamber 1.23).
 - Desktop: updating a desktop host from the browser uses the native Electron updater, verifies the installed version, and reports restart failures (`web-update` + `desktopUpdater`; upstream OpenChamber 1.23).
