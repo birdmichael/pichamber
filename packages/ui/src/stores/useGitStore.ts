@@ -11,6 +11,7 @@ import { getDeferredSafeStorage } from '@/stores/utils/safeStorage';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { GitDirectoriesOutsideWorkspaceError, GitDirectoriesUnsupportedError, listGitDirectories } from '@/lib/gitApiHttp';
 import { subscribeGitStatusInvalidations } from '@/lib/gitStatusInvalidation';
+import { getWorktreeBootstrapState } from '@/lib/worktrees/worktreeBootstrap';
 
 const LOG_STALE_THRESHOLD = 10000;
 const REPO_CHECK_STALE_THRESHOLD = 60_000;
@@ -693,6 +694,9 @@ export const useGitStore = create<GitStore>()(
       },
 
       fetchStatus: async (directory, git, options = {}) => {
+        if (getWorktreeBootstrapState(directory)?.status === 'pending') {
+          return false;
+        }
         const statusFetchMode: GitStatusFetchMode = options.mode ?? 'full';
         const runtimeKey = getRuntimeKey();
         const statusFetchKey = getStatusFetchKey(runtimeKey, directory, statusFetchMode);
@@ -756,6 +760,9 @@ export const useGitStore = create<GitStore>()(
 
             const newStatus = await git.getGitStatus(directory, options.mode ? { mode: options.mode } : undefined);
             if (!isRequestCurrent(token, directory)) return false;
+            // A request admitted before worktree creation must not publish a
+            // transient --no-checkout/reset snapshot after bootstrap begins.
+            if (getWorktreeBootstrapState(directory)?.status === 'pending') return false;
 
             const latestState = get().directories.get(directory) ?? createEmptyDirectoryState();
             if (hasStatusChanged(latestState.status, newStatus)) {

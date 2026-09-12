@@ -65,6 +65,7 @@ import {
   partitionWorktreesByRegisteredProject,
   worktreeMapsEqual,
 } from '@/lib/worktrees/worktreeManager';
+import { refreshWorktreeTopologyForChange } from '@/lib/worktrees/worktreeTopologyRefresh';
 import { checkIsGitRepository } from '@/lib/gitApi';
 import type { WorktreeMetadata } from '@/types/worktree';
 import type { SortableDragHandleProps } from './sidebar/sortableItems';
@@ -706,6 +707,9 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       } else if (event.type === 'session-created') {
         sessionDirectories.add(event.directory);
         requestWorktreeDiscovery();
+      } else if (event.type === 'worktree-changed') {
+        void refreshWorktreeTopologyForChange(projects, event.directories);
+        return;
       } else {
         // Browser control events carry no session state; nothing to refresh.
         return;
@@ -734,7 +738,7 @@ const SessionSidebarComponent: React.FC<SessionSidebarProps> = ({
       }
       unsubscribe();
     };
-  }, []);
+  }, [projects]);
 
   const isDesktopShellRuntime = React.useMemo(() => isDesktopShell(), []);
 

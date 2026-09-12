@@ -293,6 +293,7 @@ export const worktreeMapsEqual = (
         || next.projectDirectory !== current.projectDirectory
         || next.worktreeRoot !== current.worktreeRoot
         || next.headState !== current.headState
+        || next.worktreeStatus !== current.worktreeStatus
         || next.worktreeSource !== current.worktreeSource
         || next.source !== current.source) return false;
     }
@@ -372,11 +373,108 @@ export const partitionWorktreesByRegisteredProject = (
   return partitioned;
 };
 
+/**
+ * A worktree this client created and is still bootstrapping, or whose
+ * bootstrap failed, keeps that status through an authoritative refresh: git
+ * lists the entry as a plain registered worktree and would otherwise report
+ * `ready` while population or setup scripts are still running.
+ */
+const isClientTrackedWorktreeStatus = (status: WorktreeMetadata['worktreeStatus']): boolean =>
+  status === 'pending' || status === 'invalid';
+
+/**
+ * Replace the worktree buckets of one repository with a freshly listed set.
+ *
+ * A registered project may itself be a linked worktree, so every bucket whose
+ * repository root matches the refreshed one is replaced together; buckets of
+ * other repositories keep their references. An empty refreshed set removes the
+ * repository's buckets.
+ */
+export const replaceRepositoryWorktrees = (
+  worktreesByProject: ReadonlyMap<string, WorktreeMetadata[]>,
+  projectPath: string,
+  refreshedWorktrees: WorktreeMetadata[],
+  fallbackRepositoryRoot?: string | null,
+): Map<string, WorktreeMetadata[]> => {
+  const normalizedProjectPath = normalizePath(projectPath);
+  const existingProjectWorktrees = worktreesByProject.get(normalizedProjectPath) ?? [];
+  const refreshedRepositoryRoot = refreshedWorktrees.find(
+    (worktree) => normalizePath(worktree.projectDirectory ?? null),
+  )?.projectDirectory;
+  const existingRepositoryRoot = existingProjectWorktrees.find(
+    (worktree) => normalizePath(worktree.projectDirectory ?? null),
+  )?.projectDirectory;
+  const repositoryRoot = normalizePath(
+    refreshedRepositoryRoot
+      ?? existingRepositoryRoot
+      ?? fallbackRepositoryRoot
+      ?? normalizedProjectPath,
+  );
+
+  const next = new Map(worktreesByProject);
+  const matchingProjectPaths = new Set<string>([normalizedProjectPath]);
+  for (const [candidatePath, worktrees] of next) {
+    const candidateRepositoryRoot = normalizePath(
+      worktrees.find((worktree) => normalizePath(worktree.projectDirectory ?? null))?.projectDirectory ?? candidatePath,
+    );
+    if (repositoryRoot && candidateRepositoryRoot === repositoryRoot) {
+      matchingProjectPaths.add(candidatePath);
+    }
+  }
+
+  for (const candidatePath of matchingProjectPaths) {
+    if (refreshedWorktrees.length === 0) {
+      next.delete(candidatePath);
+    } else {
+      next.set(candidatePath, refreshedWorktrees.map((worktree) => ({ ...worktree })));
+    }
+  }
+  return next;
+};
+
+/**
+ * Carry client-tracked bootstrap statuses from the published topology into a
+ * freshly partitioned one before it is published. Buckets without such an
+ * entry keep their references.
+ */
+export const preserveClientTrackedWorktreeStatus = (
+  nextByProject: Map<string, WorktreeMetadata[]>,
+  publishedByProject: ReadonlyMap<string, WorktreeMetadata[]>,
+): Map<string, WorktreeMetadata[]> => {
+  const trackedByPath = new Map<string, WorktreeMetadata>();
+  for (const worktrees of publishedByProject.values()) {
+    for (const worktree of worktrees) {
+      if (isClientTrackedWorktreeStatus(worktree.worktreeStatus)) {
+        trackedByPath.set(normalizePath(worktree.path), worktree);
+      }
+    }
+  }
+  if (trackedByPath.size === 0) return nextByProject;
+
+  let changed = false;
+  const result = new Map(nextByProject);
+  for (const [projectPath, worktrees] of nextByProject) {
+    let bucketChanged = false;
+    const nextWorktrees = worktrees.map((worktree) => {
+      const tracked = trackedByPath.get(normalizePath(worktree.path));
+      if (!tracked || worktree.worktreeStatus !== 'ready') return worktree;
+      bucketChanged = true;
+      return { ...worktree, worktreeStatus: tracked.worktreeStatus, worktreeSource: tracked.worktreeSource };
+    });
+    if (bucketChanged) {
+      changed = true;
+      result.set(projectPath, nextWorktrees);
+    }
+  }
+  return changed ? result : nextByProject;
+};
+
 // Cache worktree listings to avoid repeated git worktree list + rev-parse calls
 const _worktreeListCache = new Map<string, { value: WorktreeMetadata[]; at: number }>();
-const _worktreeListInflight = new Map<string, Promise<WorktreeMetadata[]>>();
+const _worktreeListInflight = new Map<string, { generation: number; promise: Promise<WorktreeMetadata[]> }>();
 const _worktreeListGeneration = new Map<string, number>();
 const WORKTREE_LIST_CACHE_TTL = 30_000; // 30 seconds
+const WORKTREE_LIST_MAX_CONVERGENCE_ATTEMPTS = 3;
 
 const getWorktreeListGeneration = (projectDirectory: string): number => {
   return _worktreeListGeneration.get(projectDirectory) ?? 0;
@@ -391,7 +489,7 @@ const readProjectWorktrees = async (projectDirectory: string): Promise<WorktreeM
   const metadataProjectDirectory = await resolveProjectRoot(projectDirectory).catch(() => projectDirectory);
   const normalizedProjectDirectory = normalizePath(projectDirectory);
 
-  const worktrees = await git.worktree.list(projectDirectory).catch(() => []);
+  const worktrees = await git.worktree.list(projectDirectory);
   const results: WorktreeMetadata[] = worktrees
     .filter((entry) => typeof entry.path === 'string' && entry.path.trim().length > 0)
     .map((entry) => {
@@ -424,38 +522,64 @@ const readProjectWorktrees = async (projectDirectory: string): Promise<WorktreeM
   });
 };
 
-const readStableProjectWorktrees = async (projectDirectory: string): Promise<WorktreeMetadata[]> => {
-  while (true) {
+const readStableProjectWorktrees = async (
+  projectDirectory: string,
+  minimumGeneration = getWorktreeListGeneration(projectDirectory),
+): Promise<WorktreeMetadata[]> => {
+  for (let attempt = 0; attempt < WORKTREE_LIST_MAX_CONVERGENCE_ATTEMPTS; attempt += 1) {
     const generation = getWorktreeListGeneration(projectDirectory);
     const worktrees = await readProjectWorktrees(projectDirectory);
 
-    if (generation === getWorktreeListGeneration(projectDirectory)) {
+    if (generation >= minimumGeneration && generation === getWorktreeListGeneration(projectDirectory)) {
       _worktreeListCache.set(projectDirectory, { value: worktrees, at: Date.now() });
       return worktrees;
     }
   }
+
+  throw new Error(
+    `Worktree list did not converge after ${WORKTREE_LIST_MAX_CONVERGENCE_ATTEMPTS} attempts`
+  );
 };
 
-export async function listProjectWorktrees(project: ProjectRef): Promise<WorktreeMetadata[]> {
+export async function listProjectWorktrees(project: ProjectRef, options?: { force?: boolean }): Promise<WorktreeMetadata[]> {
   const projectDirectory = normalizePath(project.path);
+  const force = options?.force === true;
+  const previousCache = force ? _worktreeListCache.get(projectDirectory) : undefined;
+
+  if (force) {
+    invalidateWorktreeList(projectDirectory);
+  }
+
+  const generation = getWorktreeListGeneration(projectDirectory);
 
   // Return cached if fresh
   const cached = _worktreeListCache.get(projectDirectory);
-  if (cached && Date.now() - cached.at < WORKTREE_LIST_CACHE_TTL) {
+  if (!force && cached && Date.now() - cached.at < WORKTREE_LIST_CACHE_TTL) {
     return cached.value;
   }
 
   // Dedup in-flight requests
   const inflight = _worktreeListInflight.get(projectDirectory);
-  if (inflight) return inflight;
+  if (inflight && inflight.generation === generation) return inflight.promise;
 
-  const promise = readStableProjectWorktrees(projectDirectory).finally(() => {
-    if (_worktreeListInflight.get(projectDirectory) === promise) {
-      _worktreeListInflight.delete(projectDirectory);
-    }
-  });
+  const promise = readStableProjectWorktrees(projectDirectory, generation)
+    .catch((error) => {
+      if (
+        previousCache
+        && !_worktreeListCache.has(projectDirectory)
+        && getWorktreeListGeneration(projectDirectory) === generation
+      ) {
+        _worktreeListCache.set(projectDirectory, previousCache);
+      }
+      throw error;
+    })
+    .finally(() => {
+      if (_worktreeListInflight.get(projectDirectory)?.promise === promise) {
+        _worktreeListInflight.delete(projectDirectory);
+      }
+    });
 
-  _worktreeListInflight.set(projectDirectory, promise);
+  _worktreeListInflight.set(projectDirectory, { generation, promise });
   return promise;
 }
 

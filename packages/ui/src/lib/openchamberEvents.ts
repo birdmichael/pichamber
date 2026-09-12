@@ -21,6 +21,18 @@ type SessionCreatedEvent = {
 };
 
 /**
+ * The set of linked worktrees of one repository changed: created or removed by
+ * this server, by an agent, or from a terminal. `directories` are the
+ * directories inside that repository the server has seen requests for, so a
+ * listener can map them onto its registered projects and refresh only those.
+ */
+type WorktreeChangedEvent = {
+  type: 'worktree-changed';
+  directories: string[];
+  changedAt: number;
+};
+
+/**
  * One in-app browser action requested by the agent tool. Broadcast to every
  * connected client; only the one owning a browser view answers.
  */
@@ -31,7 +43,7 @@ type BrowserControlRequestEvent = {
   parameters: Record<string, unknown>;
 };
 
-type OpenChamberEvent = ScheduledTaskRanEvent | SessionCreatedEvent | BrowserControlRequestEvent;
+type OpenChamberEvent = ScheduledTaskRanEvent | SessionCreatedEvent | WorktreeChangedEvent | BrowserControlRequestEvent;
 type Listener = (event: OpenChamberEvent) => void;
 
 let eventSource: EventSource | null = null;
@@ -140,6 +152,21 @@ const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) =
     for (const listener of listeners) {
       listener(nextEvent);
     }
+    return;
+  }
+
+  if (envelope.type === 'openchamber:worktree-changed') {
+    const properties = getEventProperties(envelope.properties);
+    const directories = Array.isArray(properties?.directories)
+      ? properties.directories.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      : [];
+    if (directories.length === 0) return;
+    const nextEvent: WorktreeChangedEvent = {
+      type: 'worktree-changed',
+      directories,
+      changedAt: typeof properties?.at === 'number' ? properties.at : Date.now(),
+    };
+    for (const listener of listeners) listener(nextEvent);
     return;
   }
 

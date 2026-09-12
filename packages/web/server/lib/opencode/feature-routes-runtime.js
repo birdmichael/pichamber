@@ -305,7 +305,21 @@ export const createFeatureRoutesRuntime = (dependencies) => {
     registerWalkthroughRoutes(app, { getWalkthroughService });
     registerSessionGoalRoutes(app);
     registerGitHubRoutes(app);
-    registerGitRoutes(app);
+    registerGitRoutes(app, {
+      emitWorktreeChanged: ({ directories, at }) => {
+        const clients = getOpenChamberEventClients();
+        for (const client of clients) {
+          try {
+            writeSseEvent(client, {
+              type: 'openchamber:worktree-changed',
+              properties: { directories, at },
+            });
+          } catch {
+            clients.delete(client);
+          }
+        }
+      },
+    });
     registerDevServerRoutes(app, { scanner: devServerScanner, getOwnPorts });
     registerMagicPromptRoutes(app, {
       fsPromises,
