@@ -21,6 +21,7 @@ import { isTerminalShell } from '@/lib/terminalShell';
 import { getRuntimeKey, subscribeRuntimeEndpointChanged, subscribeRuntimeEndpointWillChange } from '@/lib/runtime-switch';
 import { DEFAULT_DARK_THEME_ID, DEFAULT_LIGHT_THEME_ID } from '@/lib/theme/themes';
 import { DEFAULT_OPEN_IN_APP_ID } from '@/lib/openInApps';
+import { SETTINGS_SURFACE_QUERY, getSettingsSurface } from '@/lib/settings/surface';
 
 export const applyPersistedHomeDirectoryToWindow = (homeDirectory: string): void => {
   if (typeof window === 'undefined') {
@@ -537,6 +538,11 @@ const getPersistApi = (): PersistApi | undefined => {
 };
 
 const getRuntimeSettingsAPI = () => getRegisteredRuntimeAPIs()?.settings ?? null;
+
+
+/** Settings GET/PUT carry ?surface= so the server resolves Desktop theme/font/layout overlays. */
+const settingsEndpointForSurface = (): string => `/api/config/settings?${SETTINGS_SURFACE_QUERY}=${getSettingsSurface()}`;
+
 
 const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopSettings => {
   const defaults = useUIStore.getInitialState();
@@ -1754,7 +1760,8 @@ const fetchWebSettings = async (context = captureSettingsRuntimeContext()): Prom
 
       if (!isSettingsRuntimeContextCurrent(context)) return null;
       try {
-        const response = await runtimeFetch('/api/config/settings', {
+        // Surface kind travels as a query parameter (not a header) so CORS stays simple.
+        const response = await runtimeFetch(settingsEndpointForSurface(), {
           method: 'GET',
           headers: { Accept: 'application/json' },
         });
@@ -1921,7 +1928,7 @@ async function _flushSettingsUpdate(): Promise<void> {
 
     if (!isSettingsRuntimeContextCurrent(context)) return;
     try {
-      const response = await runtimeFetch('/api/config/settings', {
+      const response = await runtimeFetch(settingsEndpointForSurface(), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

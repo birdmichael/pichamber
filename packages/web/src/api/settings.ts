@@ -1,8 +1,13 @@
 import type { SettingsAPI, SettingsLoadResult, SettingsPayload } from '@pichamber/ui/lib/api/types';
 import { runtimeFetch } from '@pichamber/ui/lib/runtime-fetch';
+import { SETTINGS_SURFACE_QUERY, getSettingsSurface } from '@pichamber/ui/lib/settings/surface';
 
 const SETTINGS_ENDPOINT = '/api/config/settings';
 const RELOAD_ENDPOINT = '/api/config/reload';
+
+// The server resolves per-surface profile fields for this surface kind. It is
+// a query parameter (not a header) so CORS stays simple for the desktop shell.
+const settingsEndpoint = (): string => `${SETTINGS_ENDPOINT}?${SETTINGS_SURFACE_QUERY}=${getSettingsSurface()}`;
 
 const sanitizePayload = (data: unknown): SettingsPayload => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid settings response');
@@ -11,7 +16,7 @@ const sanitizePayload = (data: unknown): SettingsPayload => {
 
 export const createWebSettingsAPI = (): SettingsAPI => ({
   async load(): Promise<SettingsLoadResult> {
-    const response = await runtimeFetch(SETTINGS_ENDPOINT, {
+    const response = await runtimeFetch(settingsEndpoint(), {
       method: 'GET',
       headers: { Accept: 'application/json' },
     });
@@ -28,7 +33,7 @@ export const createWebSettingsAPI = (): SettingsAPI => ({
   },
 
   async save(changes: Partial<SettingsPayload>): Promise<SettingsPayload> {
-    const response = await runtimeFetch(SETTINGS_ENDPOINT, {
+    const response = await runtimeFetch(settingsEndpoint(), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
