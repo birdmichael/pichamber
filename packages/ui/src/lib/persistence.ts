@@ -632,6 +632,23 @@ const materializeAuthoritativeUiSettings = (settings: DesktopSettings): DesktopS
   };
 };
 
+// True while server values are being copied into the stores. Store
+// subscribers that mirror changes back to the server (appearanceAutoSave,
+// modelPrefsAutoSave) read this to tell "a person changed it" from "we just
+// adopted it" — the second must never become a write.
+let _applyingServerSettings = false;
+
+export const isApplyingServerSettings = (): boolean => _applyingServerSettings;
+
+const applyServerSettings = (settings: DesktopSettings): void => {
+  _applyingServerSettings = true;
+  try {
+    applyDesktopUiPreferences(settings);
+  } finally {
+    _applyingServerSettings = false;
+  }
+};
+
 const applyDesktopUiPreferences = (settings: DesktopSettings) => {
   const store = useUIStore.getState();
   const configStore = typeof window !== 'undefined'
@@ -1835,7 +1852,7 @@ export const syncDesktopSettings = async (options?: { adoptWorkspace?: boolean }
       useUIStore.setState({ globalDraftStarters: null });
     }
     try {
-      applyDesktopUiPreferences(authoritativeSettings);
+      applyServerSettings(authoritativeSettings);
     } catch (error) {
       console.warn('applyDesktopUiPreferences failed:', error);
     }
@@ -1890,7 +1907,7 @@ async function _flushSettingsUpdate(): Promise<void> {
         const updated = await runtimeSettings.save(changes);
         if (!isSettingsRuntimeContextCurrent(context)) return;
         if (updated) {
-          applyDesktopUiPreferences(updated);
+          applyServerSettings(updated);
           dispatchSettingsSynced(updated, false);
           _settingsCache = null;
         }
@@ -1923,7 +1940,7 @@ async function _flushSettingsUpdate(): Promise<void> {
       const updated = (await response.json().catch(() => null)) as DesktopSettings | null;
       if (!isSettingsRuntimeContextCurrent(context)) return;
       if (updated) {
-        applyDesktopUiPreferences(updated);
+        applyServerSettings(updated);
         dispatchSettingsSynced(updated, false);
         dispatchSettingsSaveState('saved');
         // Invalidate GET cache so next read sees the fresh data
