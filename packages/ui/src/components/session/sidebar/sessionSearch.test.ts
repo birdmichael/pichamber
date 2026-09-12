@@ -92,10 +92,10 @@ describe('sidebar exact session id search', () => {
 
   test('matches only a complete ID (case/whitespace insensitive)', () => {
     expect(isSessionIdSearchQuery('  SES_F88B1A2B3C4D ')).toBe(true);
-    const filtered = filterSessionNodesForSearch(tree as any, '  SES_F88B1A2B3C4D ', text as any);
+    const filtered = filterSessionNodesForSearch(tree as never, '  SES_F88B1A2B3C4D ', text as never);
     expect(filtered.map((n) => n.session.id)).toEqual(['ses_f88b1a2b3c4d']);
-    expect(countMatchingSessionNodes(filtered as any, 'ses_f88b1a2b3c4d', text as any)).toBe(1);
-    expect(filterSessionNodesForSearch(tree as any, 'ses_f88b', text as any)).toEqual([]);
+    expect(countMatchingSessionNodes(filtered as never, 'ses_f88b1a2b3c4d', text as never)).toBe(1);
+    expect(filterSessionNodesForSearch(tree as never, 'ses_f88b', text as never)).toEqual([]);
   });
 
   test('skips archived sessions for id queries unless opted in', () => {
@@ -103,7 +103,7 @@ describe('sidebar exact session id search', () => {
       session: { id: 'ses_f88b1a2b3c4d', title: 'Archived', time: { archived: 2 } },
       children: [],
     }];
-    expect(filterSessionNodesForSearch(archived as any, 'ses_f88b1a2b3c4d', text as any)).toEqual([]);
-    expect(filterSessionNodesForSearch(archived as any, 'ses_f88b1a2b3c4d', text as any, { includeArchivedForIdQuery: true }).map((n) => n.session.id)).toEqual(['ses_f88b1a2b3c4d']);
+    expect(filterSessionNodesForSearch(archived as never, 'ses_f88b1a2b3c4d', text as never)).toEqual([]);
+    expect(filterSessionNodesForSearch(archived as never, 'ses_f88b1a2b3c4d', text as never, { includeArchivedForIdQuery: true }).map((n) => n.session.id)).toEqual(['ses_f88b1a2b3c4d']);
   });
 });

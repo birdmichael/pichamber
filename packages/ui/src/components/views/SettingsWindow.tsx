@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 // Keep one shared promise so autocomplete / idle prefetch and Suspense share the same chunk load.
 let settingsViewImportPromise: Promise<{ default: typeof import('./SettingsView').SettingsView }> | null = null;
 
+// eslint-disable-next-line react-refresh/only-export-components -- intentional prefetch API for dialog open
 export function prefetchSettingsView(): Promise<{ default: typeof import('./SettingsView').SettingsView }> {
   if (!settingsViewImportPromise) {
     settingsViewImportPromise = importWithChunkRecovery(() =>

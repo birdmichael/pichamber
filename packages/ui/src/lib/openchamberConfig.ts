@@ -27,8 +27,6 @@ import {
   SHARED_CONFIG_RELATIVE_PATH,
   type ProjectSetup,
   type ProjectSetupSource,
-  type SharedDraftStarter,
-  type SharedProjectAction,
   type SharedProjectConfig,
   type SharedProjectConfigPatch,
   type SharedProjectConfigRead,
@@ -490,21 +488,6 @@ const sanitizeProjectActions = (value: unknown): OpenChamberProjectAction[] => {
   return sanitized;
 };
 
-const sanitizeProjectActionsState = (value: {
-  actions?: unknown;
-  primaryActionId?: unknown;
-} | null | undefined): OpenChamberProjectActionsState => {
-  const actions = sanitizeProjectActions(value?.actions);
-  const primaryRaw = typeof value?.primaryActionId === 'string' ? value.primaryActionId.trim() : '';
-  const primaryActionId = primaryRaw && actions.some((entry) => entry.id === primaryRaw)
-    ? primaryRaw
-    : null;
-
-  return {
-    actions,
-    primaryActionId,
-  };
-};
 
 const sanitizeProjectNotesAndTodos = (value: {
   notes?: unknown;

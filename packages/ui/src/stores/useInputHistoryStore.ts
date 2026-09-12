@@ -38,6 +38,6 @@ export const useInputHistoryStore = Object.assign(
   {
     getState: () => state,
     setState: (partial: Partial<State>) => { state = { ...state, ...partial }; },
-    subscribe: (_listener: () => void) => () => {},
+    subscribe: (_listener: () => void) => { void _listener; return () => {}; },
   },
 );
