@@ -1,6 +1,6 @@
 {
   "name": "@pichamber/web",
-  "version": "1.2.20",
+  "version": "1.2.21",
   "private": false,
   "type": "module",
   "main": "./server/index.js",

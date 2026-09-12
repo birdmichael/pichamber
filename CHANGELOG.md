@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.21] - 2026-09-12
+
+### Fixed
+- Chat: hotfix `ReferenceError: onListMetricsChange is not defined` that crashed the chat surface (ChatErrorBoundary). v1.2.20 shipped ChatViewport JSX using `onListMetricsChange` without destructuring it from ChatContainer props; includes #764 (`68f32ca7`).
+
 ## [1.2.20] - 2026-09-12
 
 ### Added
