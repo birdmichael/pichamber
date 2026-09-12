@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+- Work Status: Turn stats section (response speed, model/tool time, tokens, USD cost) for the latest completed turn (upstream OpenChamber 1.23.0).
+
 ### Fixed / Improved
+- Chat: remove the non-git turn changed-files dropdown under final answers; git turn file pills from the accuracy port remain (upstream OpenChamber 1.23.1).
 - Chat: slash commands stay available when switching projects (upstream OpenChamber 1.23.1).
 - Chat: reading older messages keeps your place as earlier history finishes measuring (upstream OpenChamber 1.23.1).
 - Chat: file lists under answers use the turn's own edit/write/patch calls (not the whole working-tree snapshot) and collapse after four files (upstream OpenChamber 1.23.1).

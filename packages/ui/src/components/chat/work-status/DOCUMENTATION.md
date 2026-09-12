@@ -218,9 +218,12 @@ todo list is the top readout when that section is offered.
    open. Usage sits here rather than lower down because a spent quota stops the
    work outright. On Pi the provider-quota Usage section appears when the
    the matching provider is connected; the Session context meter is unchanged;
-3. **Subagents** — what is happening right now. On Pi this section exists
+3. **Turn stats** (`telemetry`) — response speed, model/tool time, tokens, and
+   USD cost for the latest completed turn. On by default; uses session message
+   timestamps and token/cost fields (Pi maps these onto the OpenCode shape).
+4. **Subagents** — what is happening right now. On Pi this section exists
    only when the Subagents slot is installed and enabled;
-4. **MCP**, **Pinned messages**, **Context sources** — supporting material.
+5. **MCP**, **Pinned messages**, **Context sources** — supporting material.
 
 ## Switching it off
 
