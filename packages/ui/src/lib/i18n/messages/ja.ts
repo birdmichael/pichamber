@@ -2082,6 +2082,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.pendingChanges.changedInWorkspace': 'ワークスペースで変更',
   'chat.changedFiles.title': '変更されたファイル',
   'chat.changedFiles.actions.openFileTitle': '{path}を開く',
+  'chat.changedFiles.actions.showMore': 'ほか {count} 件を表示',
+  'chat.changedFiles.actions.collapse': '閉じる',
   'chat.emptyState.opencodeUnreachable': 'Piに接続できません',
   'chat.emptyState.startNewChat': '新しいチャットを開始',
   'chat.emptyState.draftTitle': '何に取り組みますか？',

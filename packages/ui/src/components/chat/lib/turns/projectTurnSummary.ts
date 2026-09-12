@@ -1,3 +1,4 @@
+import { summarizeLiveActivity } from './liveActivitySummary';
 import type { ChatMessageEntry, TurnChangedFile, TurnDiffStats, TurnSummaryRecord } from './types';
 
 interface SummaryDiff {
@@ -110,30 +111,48 @@ export const projectTurnDiffStats = (userMessage: ChatMessageEntry): TurnDiffSta
     };
 };
 
-export const projectTurnChangedFiles = (userMessage: ChatMessageEntry): TurnChangedFile[] | undefined => {
-    const summary = (userMessage.info as { summary?: UserSummaryPayload | null }).summary;
-    const diffs = summary?.diffs;
-    if (!Array.isArray(diffs) || diffs.length === 0) {
-        return undefined;
+export const projectTurnChangedFiles = (
+    assistantMessages: ChatMessageEntry[],
+    userMessage: ChatMessageEntry,
+): TurnChangedFile[] | undefined => {
+    /**
+     * Files this turn changed, as evidenced by its own edit/write/patch calls.
+     * The user message summary.diffs is a working-tree snapshot and may include
+     * unrelated edits; use it only for line counts of files this turn touched.
+     */
+    const summary = summarizeLiveActivity(assistantMessages);
+    const snapshotDiffs = userMessage.info.role === 'user'
+        ? ((userMessage.info as { summary?: { diffs?: SummaryDiff[] | null } | null }).summary?.diffs ?? [])
+        : [];
+    const snapshotByFile = new Map<string, SummaryDiff>();
+    for (const diff of snapshotDiffs) {
+        if (diff && typeof diff.file === 'string' && diff.file.trim()) snapshotByFile.set(diff.file, diff);
     }
 
-    const files = diffs
-        .map((diff) => {
-            if (!diff || typeof diff.file !== 'string' || diff.file.trim().length === 0) {
-                return null;
-            }
+    const files = summary.changedFiles.map((change): TurnChangedFile => {
+        const snapshot = snapshotByFile.get(change.path);
+        if (!snapshot) {
+            return change.additions !== undefined && change.deletions !== undefined
+                ? { file: change.path, additions: change.additions, deletions: change.deletions, inTurnDiff: false }
+                : { file: change.path, inTurnDiff: false };
+        }
+        const additions = typeof snapshot.additions === 'number' ? snapshot.additions : 0;
+        const deletions = typeof snapshot.deletions === 'number' ? snapshot.deletions : 0;
+        return additions === 0 && deletions === 0
+            ? { file: change.path, inTurnDiff: true }
+            : { file: change.path, additions, deletions, inTurnDiff: true };
+    });
+
+    if (summary.subagents > 0) {
+        const own = new Set(files.map((file) => file.file));
+        for (const diff of snapshotDiffs) {
+            if (!diff?.file || own.has(diff.file)) continue;
             const additions = typeof diff.additions === 'number' ? diff.additions : 0;
             const deletions = typeof diff.deletions === 'number' ? diff.deletions : 0;
-            if (additions === 0 && deletions === 0) {
-                return null;
-            }
-            return {
-                file: diff.file,
-                additions,
-                deletions,
-            };
-        })
-        .filter((file): file is TurnChangedFile => file !== null);
+            if (additions === 0 && deletions === 0) continue;
+            files.push({ file: diff.file, additions, deletions, inTurnDiff: true });
+        }
+    }
 
     return files.length > 0 ? files : undefined;
 };

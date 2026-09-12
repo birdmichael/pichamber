@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Chat: slash commands stay available when switching projects (upstream OpenChamber 1.23.1).
+- Chat: reading older messages keeps your place as earlier history finishes measuring (upstream OpenChamber 1.23.1).
+- Chat: file lists under answers use the turn's own edit/write/patch calls (not the whole working-tree snapshot) and collapse after four files (upstream OpenChamber 1.23.1).
+- Files: returning to a file restores code/Markdown preview scroll and editor cursor position (upstream OpenChamber 1.23.0/1.23.1).
+- Chat: inline code uses each theme's code colour with a softened chip (upstream OpenChamber 1.23.1).
+- Desktop: Electron runtime updated to 43.7.0 (upstream OpenChamber 1.23.1).
 - Worktrees: sidebar/mobile/mini-chat refresh topology on server `worktree-changed` events; Git status waits out checkout bootstrap so new sessions see project settings without mid-create dirty noise (upstream OpenChamber 1.23.1).
 - Chat: reasoning and bash/tool output keep following incoming text until you scroll up (upstream OpenChamber 1.23.1).
 - Terminal: right-click Copy/Paste; macOS Option+Left/Right/Backspace word editing at shell prompts; Attach selection focuses the composer (upstream OpenChamber 1.23.1).
