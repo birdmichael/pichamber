@@ -15,6 +15,11 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Chat: Markdown session export keeps quote and comment blocks with source (upstream OpenChamber 1.23).
+- Chat: Ctrl+N / Ctrl+P navigate model lists, menus, selects, and composer autocomplete like arrows (upstream OpenChamber 1.23).
+- Chat: selection highlight uses one accent token across messages, file previews, and comment quotes (upstream OpenChamber 1.23).
+- Chat: session recaps keep substance after short closings, stay quiet when empty, and vanish in place without jump (upstream OpenChamber 1.23).
+- Settings: clearer Large text paste and Follow-up / queue send-shortcut copy for the expanded composer (upstream OpenChamber 1.23).
 - Settings: "Always show scrollbars" device preference keeps overlay scrollbars visible; hovering a scrollable area reveals its scrollbar without layout shift (upstream OpenChamber 1.23.0/1.23.1).
 - Desktop: Zoom In/Out/Reset adjust interface scale in chat (and terminal/editor fonts when those are focused); macOS traffic-light clearance stays a fixed 88px so scale cannot overlap window buttons (upstream OpenChamber 1.23.0/1.23.1).
 - App: Hidden Files, Changes, terminal, and walkthrough panels pause background polling while another panel is focused (upstream OpenChamber 1.23.1).

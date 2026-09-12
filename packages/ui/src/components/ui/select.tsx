@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { dropdownTriggerVariants } from "@/components/ui/dropdown-trigger"
 import { ScrollableOverlay } from "@/components/ui/ScrollableOverlay";
 import { Icon } from "@/components/icon/Icon";
+import { handleDropdownNavigationKey } from "./dropdown-navigation";
 
 type AsChildProps = { asChild?: boolean };
 type AsChildRenderProps = {
@@ -177,11 +178,23 @@ function SelectContent({
   side,
   align,
   collisionAvoidance,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof BaseSelect.Popup> & SelectContentExtra) {
   const portalContext = React.useContext(SelectPortalContext);
   const alignItemWithTrigger = position === "item-aligned";
   const portalContainer = portalContext?.portalContainer ?? null;
+
+  const handleKeyDown: NonNullable<React.ComponentProps<typeof BaseSelect.Popup>['onKeyDown']> = (event) => {
+    onKeyDown?.(event);
+    handleDropdownNavigationKey(event, (navigationKey) => {
+      event.currentTarget.dispatchEvent(new KeyboardEvent('keydown', {
+        key: navigationKey,
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+  };
 
   return (
     <BaseSelect.Portal container={portalToBody ? undefined : portalContainer || undefined}>
@@ -206,6 +219,7 @@ function SelectContent({
             className
           )}
           {...props}
+          onKeyDown={handleKeyDown}
         >
           <ScrollableOverlay
             outerClassName={cn(

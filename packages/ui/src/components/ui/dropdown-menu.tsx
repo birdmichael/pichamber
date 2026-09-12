@@ -3,6 +3,7 @@ import { Menu as BaseMenu } from "@base-ui/react/menu"
 
 import { cn } from "@/lib/utils"
 import { Icon } from "@/components/icon/Icon";
+import { handleDropdownNavigationKey } from "./dropdown-navigation";
 import { dropdownMenuItemClass, dropdownMenuPopupClass, dropdownMenuSeparatorClass, dropdownMenuSubTriggerClass } from "./dropdown-menu.styles";
 
 type AsChildProps = { asChild?: boolean };
@@ -106,10 +107,22 @@ function DropdownMenuContent({
   style,
   children,
   onCloseAutoFocus,
+  onKeyDown,
   ...props
 }: ContentProps) {
   const portalContext = React.useContext(DropdownPortalContext);
   void onCloseAutoFocus
+
+  const handleKeyDown: NonNullable<React.ComponentProps<typeof BaseMenu.Popup>['onKeyDown']> = (event) => {
+    onKeyDown?.(event);
+    handleDropdownNavigationKey(event, (navigationKey) => {
+      event.currentTarget.dispatchEvent(new KeyboardEvent('keydown', {
+        key: navigationKey,
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+  };
 
   return (
     <BaseMenu.Portal container={portalToBody ? undefined : portalContext?.portalContainer || undefined}>
@@ -131,6 +144,7 @@ function DropdownMenuContent({
             className
           )}
           {...props}
+          onKeyDown={handleKeyDown}
         >
           {children}
         </BaseMenu.Popup>
