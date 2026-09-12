@@ -2095,6 +2095,8 @@ export const settingsDict = {
   'settings.openchamber.visual.field.selectTimeFormatAria': '選擇時間格式',
   'settings.openchamber.visual.field.selectWeekStartAria': '選擇一週起始日',
   'settings.openchamber.visual.actions.reloadThemes': '重新載入主題',
+  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Always show scrollbars',
+  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Keep scrollbars visible even when the pointer is outside the scrollable area. Applies on this device only.',
   'settings.openchamber.visual.field.dockBadge': 'Dock 標記',
   'settings.openchamber.visual.field.dockBadgeHint': '在 macOS Dock 圖示上顯示有未讀動態的對話數量。',
   'settings.openchamber.visual.actions.saveAndRestart': '儲存並重新啟動',

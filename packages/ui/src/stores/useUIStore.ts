@@ -916,6 +916,8 @@ interface UIStore {
   notifyOnSubtasks: boolean;
   // Desktop dock badge showing the count of sessions with unseen activity (macOS).
   dockBadgeEnabled: boolean;
+  // Device preference: keep overlay scrollbars visible even when the pointer leaves.
+  alwaysShowScrollbars: boolean;
 
   // Event toggles (which events trigger notifications)
   notifyOnCompletion: boolean;
@@ -1113,6 +1115,7 @@ interface UIStore {
   setSessionTabsEnabled: (value: boolean) => void;
   setNotifyOnSubtasks: (value: boolean) => void;
   setDockBadgeEnabled: (value: boolean) => void;
+  setAlwaysShowScrollbars: (value: boolean) => void;
   setNotifyOnCompletion: (value: boolean) => void;
   setNotifyOnError: (value: boolean) => void;
   setNotifyOnQuestion: (value: boolean) => void;
@@ -1269,6 +1272,7 @@ export const useUIStore = create<UIStore>()(
         notificationMode: 'hidden-only',
         notifyOnSubtasks: true,
         dockBadgeEnabled: true,
+        alwaysShowScrollbars: false,
 
         // Event toggles (which events trigger notifications)
         notifyOnCompletion: true,
@@ -2337,21 +2341,20 @@ export const useUIStore = create<UIStore>()(
 
           const entries = Object.entries(SEMANTIC_TYPOGRAPHY) as Array<[SemanticTypographyKey, string]>;
 
-          // Default must be SEMANTIC_TYPOGRAPHY (from CSS). Remove overrides.
+          // Scale the root rem unit so regular utility classes, icons, spacing,
+          // and semantic typography all respond to the same interface setting.
           if (scale === 1) {
+            root.style.removeProperty('font-size');
             for (const [key] of entries) {
               root.style.removeProperty(getTypographyVariable(key));
             }
             return;
           }
 
-          for (const [key, baseValue] of entries) {
-            const numericValue = parseFloat(baseValue);
-            if (!Number.isFinite(numericValue)) {
-              continue;
-            }
-            root.style.setProperty(getTypographyVariable(key), `${numericValue * scale}rem`);
-          }
+          root.style.fontSize = `${scale * 100}%`;
+
+          // The variables remain authored in rem and inherit the root scale.
+          for (const [key] of entries) root.style.removeProperty(getTypographyVariable(key));
         },
 
         applyPadding: () => {
@@ -2734,6 +2737,10 @@ export const useUIStore = create<UIStore>()(
 
         setDockBadgeEnabled: (value) => {
           set({ dockBadgeEnabled: value });
+        },
+
+        setAlwaysShowScrollbars: (value) => {
+          set({ alwaysShowScrollbars: value });
         },
 
         setNotifyOnCompletion: (value) => { set({ notifyOnCompletion: value }); },
@@ -3144,6 +3151,7 @@ export const useUIStore = create<UIStore>()(
           sessionTabsEnabled: state.sessionTabsEnabled,
           notifyOnSubtasks: state.notifyOnSubtasks,
           dockBadgeEnabled: state.dockBadgeEnabled,
+          alwaysShowScrollbars: state.alwaysShowScrollbars,
           notifyOnCompletion: state.notifyOnCompletion,
           notifyOnError: state.notifyOnError,
           notifyOnQuestion: state.notifyOnQuestion,

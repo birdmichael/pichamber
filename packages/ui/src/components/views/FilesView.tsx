@@ -709,6 +709,8 @@ const Dialogs: React.FC<DialogsProps> = ({
 };
 
 interface FilesViewProps {
+  /** When false, pause directory/file background polling (keep-alive host). */
+  visible?: boolean;
   mode?: 'full' | 'editor-only';
 }
 
@@ -821,7 +823,7 @@ const useAssetAuthRefresh = (
   return { readyKey, nonce };
 };
 
-export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
+export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full', visible = true }) => {
   const { t } = useI18n();
   const { files, runtime } = useRuntimeAPIs();
   const { currentTheme, availableThemes, lightThemeId, darkThemeId } = useThemeSystem();
@@ -1476,7 +1478,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
   // Auto-refresh expanded directories when user returns to the tab
   React.useEffect(() => {
-    if (!files.listDirectory) return;
+    if (!visible || !files.listDirectory) return;
 
     const handleVisibilityChange = () => {
       if (!document.hidden && expandedPaths.length > 0) {
@@ -1488,11 +1490,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [expandedPaths, files.listDirectory, refreshDirectory]);
+  }, [expandedPaths, files.listDirectory, refreshDirectory, visible]);
 
   // Poll expanded directories for external changes
   React.useEffect(() => {
-    if (!files.listDirectory) return;
+    if (!visible || !files.listDirectory) return;
     if (expandedPaths.length === 0) return;
 
     const interval = setInterval(() => {
@@ -1503,7 +1505,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [expandedPaths, files.listDirectory, refreshDirectory]);
+  }, [expandedPaths, files.listDirectory, refreshDirectory, visible]);
 
   const handleDialogSubmit = React.useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -2198,6 +2200,9 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   }, [ensurePathVisible, selectedFile?.path]);
 
   React.useEffect(() => {
+    if (!visible) {
+      return;
+    }
     if (!selectedFile) {
       activeFileLoadIdRef.current += 1;
       loadingFilePathRef.current = null;
@@ -2217,7 +2222,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
         loadingFilePathRef.current = null;
       }
     });
-  }, [loadSelectedFile, loadedFilePath, selectedFile]);
+  }, [loadSelectedFile, loadedFilePath, selectedFile, visible]);
 
   // Sync isDirty to a ref so the polling interval can read the latest value
   // without isDirty in its dependency array (avoids interval restart on every edit/save).
@@ -2228,7 +2233,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   // When a change is detected, reset loadedFilePath so the effect above
   // triggers a single reload — no double-load.
   React.useEffect(() => {
-    if (!selectedFile?.path || loadedFilePath !== selectedFile.path) {
+    if (!visible || !selectedFile?.path || loadedFilePath !== selectedFile.path) {
       return;
     }
 
@@ -2274,7 +2279,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [loadedFilePath, readFileStat, selectedFile?.path]);
+  }, [loadedFilePath, readFileStat, selectedFile?.path, visible]);
 
   const discardAndContinue = React.useCallback(() => {
     const nextFile = pendingSelectFileRef.current;

@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Settings: "Always show scrollbars" device preference keeps overlay scrollbars visible; hovering a scrollable area reveals its scrollbar without layout shift (upstream OpenChamber 1.23.0/1.23.1).
+- Desktop: Zoom In/Out/Reset adjust interface scale in chat (and terminal/editor fonts when those are focused); macOS traffic-light clearance stays a fixed 88px so scale cannot overlap window buttons (upstream OpenChamber 1.23.0/1.23.1).
+- App: Hidden Files, Changes, terminal, and walkthrough panels pause background polling while another panel is focused (upstream OpenChamber 1.23.1).
 - Git: branch comparisons include local edits and follow the selected base when you switch comparisons (upstream OpenChamber 1.23.0).
 - Git: `getLog` with only `to` (branch tip) returns recent commits again so Changes commit comparison can load history (upstream OpenChamber 1.23.0).
 - Chat: remove the non-git turn changed-files dropdown under final answers; git turn file pills from the accuracy port remain (upstream OpenChamber 1.23.1).

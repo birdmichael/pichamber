@@ -2328,6 +2328,8 @@ export const settingsDict = {
   'settings.openchamber.visual.actions.reloadingThemes': 'Reloading themes...',
   'settings.openchamber.visual.toast.themesReloaded': 'Themes reloaded',
   'settings.openchamber.visual.toast.themesReloadFailed': 'Could not reload themes',
+  'settings.openchamber.visual.field.alwaysShowScrollbars': 'Always show scrollbars',
+  'settings.openchamber.visual.field.alwaysShowScrollbarsHint': 'Keep scrollbars visible even when the pointer is outside the scrollable area. Applies on this device only.',
   'settings.openchamber.visual.field.dockBadge': 'Dock badge',
   'settings.openchamber.visual.field.dockBadgeHint': 'Show a count of chats with unseen activity on the macOS dock icon.',
   'settings.openchamber.visual.actions.saveAndRestart': 'Save & restart',

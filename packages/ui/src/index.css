@@ -696,6 +696,13 @@ html:not(.dark) .chat-scroll {
 }
 
 /* Overlay scrollbar styling (custom thumb) */
+/* Reserve the thumb's 6px width, 4px right inset and a 4px content gap.
+   Follow overflow, not hover visibility, so showing the thumb never shifts text.
+   Direct-child matching prevents nested scrollers from reserving space twice. */
+.overlay-scrollbar-wrapper:has(> .overlay-scrollbar > .overlay-scrollbar__thumb--vertical:not([hidden])) {
+  padding-right: 6px;
+}
+
 .overlay-scrollbar {
   position: absolute;
   inset: 0;
