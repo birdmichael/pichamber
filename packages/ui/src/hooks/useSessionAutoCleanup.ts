@@ -50,10 +50,11 @@ export const useSessionAutoCleanup = (enabledOrOptions?: boolean | CleanupOption
     [needsGlobalSessions, sessionRetentionOnlyArchived],
   ));
   const hasLoadedGlobalSessions = useGlobalSessionsStore((state) => state.hasLoaded);
-  const activeSessionIds = useGlobalSessionStatusStore((state) => {
-    // statusById only keeps non-idle sessions.
-    return new Set(state.statusById.keys());
-  });
+  const statusById = useGlobalSessionStatusStore((state) => state.statusById);
+  const activeSessionIds = React.useMemo(
+    () => new Set(statusById.keys()),
+    [statusById],
+  );
 
   const [isRunning, setIsRunning] = React.useState(false);
   const runningRef = React.useRef(false);
