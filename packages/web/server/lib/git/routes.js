@@ -423,6 +423,7 @@ export function registerGitRoutes(app, { emitWorktreeChanged } = {}) {
         head,
         path: pathParam,
         contextLines: Number.isFinite(context) ? context : 3,
+        includeWorkingTree: req.query.includeWorkingTree === 'true',
       });
 
       res.json({ diff });
@@ -467,7 +468,7 @@ export function registerGitRoutes(app, { emitWorktreeChanged } = {}) {
         return res.status(400).json({ error: 'base and head parameters are required' });
       }
 
-      const files = await getRangeFiles(directory, { base, head });
+      const files = await getRangeFiles(directory, { base, head, includeWorkingTree: req.query.includeWorkingTree === 'true' });
       res.json({ files });
     } catch (error) {
       console.error('Failed to get git range files:', error);

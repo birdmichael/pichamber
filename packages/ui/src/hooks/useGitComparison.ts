@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GitDiffResponse } from '@/lib/api/types';
-import { getCommitFiles, getGitCommitDiff } from '@/lib/gitApi';
+import { getCommitFiles, getGitCommitDiff, getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
 import { useI18n } from '@/lib/i18n';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import type { WalkthroughSource } from '@/lib/walkthrough/types';
@@ -9,8 +9,7 @@ import { fetchPullRequestDiff } from '@/lib/diff/pullRequestDiff';
 import { PullRequestSnapshotCache } from '@/lib/diff/pullRequestSnapshotCache';
 import { gitPushScopeKey, subscribeGitPush } from '@/lib/gitPushEvents';
 
-/** PR + commit comparison (branch remains on DiffView's existing path). */
-export type GitComparisonSource = Extract<WalkthroughSource, { kind: 'commit' | 'pr' }>;
+export type GitComparisonSource = Extract<WalkthroughSource, { kind: 'branch' | 'commit' | 'pr' }>;
 
 export interface GitComparisonFile {
   path: string;
@@ -26,7 +25,7 @@ type ComparisonFiles =
   | { key: string; status: 'ready'; files: GitComparisonFile[]; revision: number; refreshing: boolean }
   | { key: string; status: 'error'; message: string };
 
-/** File-list authority for published pull-request diffs in Changes. */
+/** File-list authority shared by Changes branch / commit / PR scopes. */
 export function useGitComparison(directory: string | null, source: GitComparisonSource | null, enabled = true, revision = '') {
   const { t } = useI18n();
   const runtimeKey = useGitStore((state) => state.runtimeKey);
@@ -54,6 +53,9 @@ export function useGitComparison(directory: string | null, source: GitComparison
     try {
       const files: GitComparisonFile[] = target.kind === 'pr'
         ? await prCache.load(pushScope, target, () => fetchPullRequestDiff(directory, target), force)
+        : target.kind === 'branch'
+        ? (await getGitRangeFiles(directory, { base: target.baseRef, head: target.headRef, includeWorkingTree: true }))
+          .map((file) => ({ ...file, insertions: 0, deletions: 0 }))
         : (await getCommitFiles(directory, target.hash)).files
           .map((file) => ({
             path: file.path,
@@ -89,12 +91,9 @@ export function useGitComparison(directory: string | null, source: GitComparison
       if (file.patch === undefined) throw new Error(t('diffView.state.failedToLoadDiff'));
       return { diff: file.patch };
     }
-    return getGitCommitDiff(directory, {
-      hash: target.hash,
-      path: filePath,
-      previousPath: file.previousPath,
-      contextLines,
-    });
+    return target.kind === 'branch'
+      ? getGitRangeDiff(directory, { base: target.baseRef, head: target.headRef, path: filePath, contextLines, includeWorkingTree: true })
+      : getGitCommitDiff(directory, { hash: target.hash, path: filePath, previousPath: file.previousPath, contextLines });
   }, [directory, enabled, filesByPath, key, t]);
 
   return {
