@@ -51,6 +51,7 @@ import { useSync } from '@/sync/use-sync';
 import { ConfigUpdateOverlay } from '@/components/ui/ConfigUpdateOverlay';
 import { AboutDialog } from '@/components/ui/AboutDialog';
 import { AppLinkConfirmDialog } from '@/components/chat/AppLinkConfirmDialog';
+import { SharedTrustConfirmDialog } from '@/components/projects/SharedTrustConfirmDialog';
 import { RuntimeAPIProvider } from '@/contexts/RuntimeAPIProvider';
 import { registerRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { useUIStore } from '@/stores/useUIStore';
@@ -1033,6 +1034,7 @@ function App({ apis }: AppProps) {
                       <ConfigUpdateOverlay />
                       <AboutDialogWrapper />
                       <AppLinkConfirmDialog />
+                      <SharedTrustConfirmDialog />
                       {showMemoryDebug && (
                         <MemoryDebugPanel onClose={() => setShowMemoryDebug(false)} />
                       )}

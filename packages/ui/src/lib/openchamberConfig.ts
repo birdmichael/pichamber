@@ -16,9 +16,21 @@ import {
   applySharedProjectSetupPatch,
   EMPTY_SHARED_PROJECT_CONFIG,
   isSharedProjectConfigEmpty,
+  mergeProjectSetup,
   parseSharedProjectConfig,
+  personalSetupOf,
+  sanitizeDraftStarters as sanitizeSharedDraftStarters,
+  sanitizeProjectActions as sanitizeSharedProjectActions,
+  sanitizeSetupCommands as sanitizeSharedSetupCommands,
   serializeSharedProjectConfig,
+  sharedTrustHashOfAsync,
   SHARED_CONFIG_RELATIVE_PATH,
+  type ProjectSetup,
+  type ProjectSetupSource,
+  type SharedDraftStarter,
+  type SharedProjectAction,
+  type SharedProjectConfig,
+  type SharedProjectConfigPatch,
   type SharedProjectConfigRead,
 } from './sharedProjectConfig';
 
@@ -45,12 +57,15 @@ interface OpenChamberConfig {
   projectPath?: string;
   'setup-worktree'?: string[];
   'setup-worktree-wait'?: boolean;
+  setupWorktreeMode?: 'append' | 'replace';
   projectNotes?: string;
   projectTodos?: OpenChamberProjectTodoItem[];
   projectPlanFiles?: OpenChamberProjectPlanFileLink[];
   projectActions?: OpenChamberProjectAction[];
   projectActionsPrimaryId?: string;
   draftStarters?: DraftStarterRef[];
+  hiddenSharedActionIds?: string[];
+  sharedTrust?: { hash: string; trustedAt: number } | null;
 }
 
 type OpenChamberProjectActionPlatform = 'macos' | 'linux' | 'windows';
@@ -60,10 +75,13 @@ export interface OpenChamberProjectAction {
   name: string;
   command: string;
   icon?: string | null;
+  runIn?: 'parent';
   platforms?: OpenChamberProjectActionPlatform[];
   autoOpenUrl?: boolean;
   openUrl?: string;
   desktopOpenSshForward?: string;
+  /** Present on merged entries only. */
+  source?: ProjectSetupSource;
 }
 
 export interface OpenChamberProjectActionsState {
@@ -541,35 +559,22 @@ export async function readSharedProjectConfig(project: ProjectRef): Promise<Shar
     return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
   }
   const absolute = joinPath(joinPath(normalize(projectDirectory), '.pichamber'), 'project.json');
-  const text = await readTextFile(absolute);
-  if (text === null || !String(text).trim()) {
+  const raw = await readTextFile(absolute);
+  if (raw === null || !String(raw).trim()) {
     return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
   }
-  return parseSharedProjectConfig(text);
+  return parseSharedProjectConfig(raw);
 }
 
-/**
- * Update the team's shared plans folder pointer. Creates `.pichamber/project.json`
- * when needed; removes it when nothing remains. Returns the fresh read, or null on failure.
- */
-export async function updateSharedProjectPlansDir(
+const writeSharedProjectConfigFile = async (
   project: ProjectRef,
-  plansDir: string | null,
-): Promise<SharedProjectConfigRead | null> {
+  next: SharedProjectConfig,
+): Promise<SharedProjectConfigRead | null> => {
   const projectDirectory = typeof project?.path === 'string' ? project.path.trim() : '';
   if (!projectDirectory) return null;
   const absolute = joinPath(joinPath(normalize(projectDirectory), '.pichamber'), 'project.json');
-  const currentRead = await readSharedProjectConfig(project);
-  const current = currentRead.status === 'ok' ? currentRead.config : { ...EMPTY_SHARED_PROJECT_CONFIG };
-  let next;
-  try {
-    next = applySharedProjectSetupPatch(current, { plansDir });
-  } catch (error) {
-    console.warn('Invalid shared project config patch:', error);
-    return null;
-  }
-
   if (isSharedProjectConfigEmpty(next)) {
+    const currentRead = await readSharedProjectConfig(project);
     if (currentRead.status !== 'missing') {
       const removed = await deleteFile(absolute);
       if (!removed) {
@@ -579,14 +584,109 @@ export async function updateSharedProjectPlansDir(
     }
     return { status: 'missing', path: SHARED_CONFIG_RELATIVE_PATH };
   }
-
   const parent = joinPath(normalize(projectDirectory), '.pichamber');
-  if (!(await mkdirp(parent))) {
-    return null;
-  }
+  if (!(await mkdirp(parent))) return null;
   const wrote = await writeTextFile(absolute, serializeSharedProjectConfig(next));
   if (!wrote) return null;
   return { status: 'ok', path: SHARED_CONFIG_RELATIVE_PATH, config: next };
+};
+
+/**
+ * Change the team's shared file in the checkout (`<repo>/.pichamber/project.json`).
+ * Removes the file when nothing remains, and records trust for commands this
+ * instance just shared. Resolves the merged view, or null on failure.
+ */
+export async function updateSharedProjectSetup(
+  project: ProjectRef,
+  patch: SharedProjectConfigPatch,
+): Promise<ProjectSetup | null> {
+  const currentRead = await readSharedProjectConfig(project);
+  const current = currentRead.status === 'ok' ? currentRead.config : { ...EMPTY_SHARED_PROJECT_CONFIG };
+  let next: SharedProjectConfig;
+  try {
+    next = applySharedProjectSetupPatch(current, patch);
+  } catch (error) {
+    console.warn('Invalid shared project config patch:', error);
+    return null;
+  }
+  const written = await writeSharedProjectConfigFile(project, next);
+  if (!written) return null;
+
+  // Moving your own command into the repository counts as trusting it.
+  const trustHash = await sharedTrustHashOfAsync(next);
+  if (trustHash) {
+    await updateOpenChamberConfig(project, {
+      sharedTrust: { hash: trustHash, trustedAt: Date.now() },
+    });
+  } else {
+    await updateOpenChamberConfig(project, { sharedTrust: null });
+  }
+  return getProjectSetup(project);
+}
+
+/** Update only the plans folder pointer (Settings → Projects). */
+export async function updateSharedProjectPlansDir(
+  project: ProjectRef,
+  plansDir: string | null,
+): Promise<SharedProjectConfigRead | null> {
+  const setup = await updateSharedProjectSetup(project, { plansDir });
+  if (!setup) return null;
+  return readSharedProjectConfig(project);
+}
+
+export type ProjectSetupPatch = Partial<{
+  setupWorktree: string[];
+  setupWorktreeWait: boolean;
+  setupWorktreeMode: 'append' | 'replace';
+  projectActions: OpenChamberProjectAction[];
+  projectActionsPrimaryId: string | null;
+  draftStarters: DraftStarterRef[];
+  hiddenSharedActionIds: string[];
+  sharedTrustHash: string | null;
+}>;
+
+/** Change the personal part of the project's setup. */
+export async function updateProjectSetup(project: ProjectRef, patch: ProjectSetupPatch): Promise<boolean> {
+  const updates: Partial<OpenChamberConfig> = {};
+  if ('setupWorktree' in patch && patch.setupWorktree) {
+    updates['setup-worktree'] = sanitizeSharedSetupCommands(patch.setupWorktree);
+  }
+  if ('setupWorktreeWait' in patch && typeof patch.setupWorktreeWait === 'boolean') {
+    updates['setup-worktree-wait'] = patch.setupWorktreeWait;
+  }
+  if ('setupWorktreeMode' in patch && (patch.setupWorktreeMode === 'append' || patch.setupWorktreeMode === 'replace')) {
+    updates.setupWorktreeMode = patch.setupWorktreeMode;
+  }
+  if ('projectActions' in patch && patch.projectActions) {
+    updates.projectActions = sanitizeSharedProjectActions(patch.projectActions) as OpenChamberProjectAction[];
+  }
+  if ('projectActionsPrimaryId' in patch) {
+    updates.projectActionsPrimaryId = patch.projectActionsPrimaryId ?? undefined;
+  }
+  if ('draftStarters' in patch && patch.draftStarters) {
+    updates.draftStarters = sanitizeSharedDraftStarters(patch.draftStarters) as DraftStarterRef[];
+  }
+  if ('hiddenSharedActionIds' in patch && patch.hiddenSharedActionIds) {
+    updates.hiddenSharedActionIds = patch.hiddenSharedActionIds;
+  }
+  if ('sharedTrustHash' in patch) {
+    updates.sharedTrust = patch.sharedTrustHash
+      ? { hash: patch.sharedTrustHash, trustedAt: Date.now() }
+      : null;
+  }
+  return updateOpenChamberConfig(project, updates);
+}
+
+/** Merged personal + repository setup for this project. */
+export async function getProjectSetup(project: ProjectRef): Promise<ProjectSetup> {
+  const [personalRaw, sharedRead] = await Promise.all([
+    readOpenChamberConfig(project),
+    readSharedProjectConfig(project),
+  ]);
+  const personal = personalSetupOf(personalRaw);
+  const sharedConfig = sharedRead.status === 'ok' ? sharedRead.config : EMPTY_SHARED_PROJECT_CONFIG;
+  const trustHash = await sharedTrustHashOfAsync(sharedConfig);
+  return mergeProjectSetup(personal, sharedRead, trustHash);
 }
 
 const getProjectPlansDirectory = async (project: ProjectRef): Promise<string | null> => {
@@ -774,35 +874,38 @@ async function updateOpenChamberConfig(
 /**
  * Get worktree setup commands from config.
  */
+/**
+ * Merged worktree setup commands (shared first, then personal) without the
+ * trust prompt. Callers that are about to run them should use
+ * `resolveWorktreeSetupCommands` from `sharedTrustConfirmation.ts`.
+ */
 export async function getWorktreeSetupCommands(project: ProjectRef): Promise<string[]> {
-  const config = await readOpenChamberConfig(project);
-  return config?.['setup-worktree'] ?? [];
+  return (await getProjectSetup(project)).setupWorktree;
 }
 
 export async function saveWorktreeSetupCommands(project: ProjectRef, commands: string[]): Promise<boolean> {
   const filtered = commands.filter((cmd) => cmd.trim().length > 0);
-  return updateOpenChamberConfig(project, { 'setup-worktree': filtered });
+  return updateProjectSetup(project, { setupWorktree: filtered });
 }
 
 export async function getWorktreeSetupWaitEnabled(project: ProjectRef): Promise<boolean> {
-  const config = await readOpenChamberConfig(project);
-  return config?.['setup-worktree-wait'] === true;
+  return (await getProjectSetup(project)).setupWorktreeWait;
 }
 
 export async function saveWorktreeSetupWaitEnabled(project: ProjectRef, enabled: boolean): Promise<boolean> {
-  return updateOpenChamberConfig(project, { 'setup-worktree-wait': enabled });
+  return updateProjectSetup(project, { setupWorktreeWait: enabled });
 }
 
-/**
- * Get this project's pinned draft welcome starters.
- */
-export async function getProjectDraftStarters(project: ProjectRef): Promise<DraftStarterRef[]> {
-  const config = await readOpenChamberConfig(project);
-  return sanitizeStarterRefs(config?.draftStarters);
+export type ProjectDraftStarter = DraftStarterRef & { source: ProjectSetupSource };
+
+/** Pinned starters for this project, shared ones first, each marked with its source. */
+export async function getProjectDraftStarters(project: ProjectRef): Promise<ProjectDraftStarter[]> {
+  return (await getProjectSetup(project)).draftStarters as ProjectDraftStarter[];
 }
 
+/** Replace the user's own project starters; shared ones are untouched. */
 export async function saveProjectDraftStarters(project: ProjectRef, starters: DraftStarterRef[]): Promise<boolean> {
-  return updateOpenChamberConfig(project, { draftStarters: sanitizeStarterRefs(starters) });
+  return updateProjectSetup(project, { draftStarters: sanitizeStarterRefs(starters) });
 }
 
 export async function getProjectNotesAndTodos(project: ProjectRef): Promise<OpenChamberProjectNotesTodos> {
@@ -965,27 +1068,28 @@ export async function createProjectPlanFile(
 }
 
 export async function getProjectActionsState(project: ProjectRef): Promise<OpenChamberProjectActionsState> {
-  const config = await readOpenChamberConfig(project);
-  return sanitizeProjectActionsState({
-    actions: config?.projectActions,
-    primaryActionId: config?.projectActionsPrimaryId,
-  });
+  const setup = await getProjectSetup(project);
+  return {
+    actions: setup.projectActions as OpenChamberProjectAction[],
+    primaryActionId: setup.projectActionsPrimaryId,
+  };
 }
 
 export async function saveProjectActionsState(
   project: ProjectRef,
   value: OpenChamberProjectActionsState
 ): Promise<boolean> {
-  const sanitized = sanitizeProjectActionsState({
-    actions: value.actions,
-    primaryActionId: value.primaryActionId,
-  });
-
-  return updateOpenChamberConfig(project, {
-    projectActions: sanitized.actions,
-    projectActionsPrimaryId: sanitized.primaryActionId ?? undefined,
+  const withoutSource = (action: OpenChamberProjectAction): OpenChamberProjectAction => {
+    const copy = { ...action };
+    delete copy.source;
+    return copy;
+  };
+  return updateProjectSetup(project, {
+    projectActions: value.actions.map(withoutSource),
+    projectActionsPrimaryId: value.primaryActionId,
   });
 }
+
 
 /**
  * Substitute variables in a command string.
@@ -1026,4 +1130,4 @@ async function deleteLegacyOpenChamberConfig(projectDirectory: string): Promise<
   }
 }
 
-export type { ProjectRef };
+export type { ProjectRef, ProjectSetup, ProjectSetupSource, SharedProjectConfigPatch };
