@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- Walkthrough: pick Commit / Branch base / Pull Requests with the same selectors as Changes (upstream OpenChamber 1.23.0).
 - Changes: pick a comparison base branch from the Branch scope toolbar (upstream OpenChamber 1.23.0).
 - Changes: choose a recent commit to review in Changes (upstream OpenChamber 1.23.0).
 - Changes: select a published pull request and review its GitHub diff in the Changes panel (upstream OpenChamber 1.23.1).
