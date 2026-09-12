@@ -118,6 +118,15 @@ interface MessageQueueActions {
     getSendableQueue: (target: MessageQueueTarget) => QueuedMessage[];
     setFollowUpBehavior: (behavior: FollowUpBehavior) => void;
     getQueueForTarget: (target: MessageQueueTarget) => QueuedMessage[];
+    /**
+     * Client-owned queue adaptation of OC server `resync()` after a stream gap:
+     * drop queued items whose text already appears in the session transcript
+     * (already delivered while disconnected) and clear in-flight sending flags.
+     */
+    reconcileAfterReconnect: (
+        runtimeKey: string,
+        deliveredTextsBySession: ReadonlyMap<string, ReadonlySet<string>>,
+    ) => void;
 }
 
 type MessageQueueStore = MessageQueueState & MessageQueueActions;
@@ -319,6 +328,51 @@ export const useMessageQueueStore = create<MessageQueueStore>()(
 
                 getQueueForTarget: (target) => {
                     return get().queuedMessages[getMessageQueueKey(target)] ?? [];
+                },
+
+                reconcileAfterReconnect: (runtimeKey, deliveredTextsBySession) => {
+                    set((state) => {
+                        let queuedMessages = state.queuedMessages;
+                        let sendingIds = state.sendingIds;
+                        let queuedChanged = false;
+                        let sendingChanged = false;
+                        const keys = new Set([
+                            ...Object.keys(state.queuedMessages),
+                            ...Object.keys(state.sendingIds),
+                        ]);
+                        for (const key of keys) {
+                            const target = parseMessageQueueKey(key);
+                            if (!target || target.runtimeKey !== runtimeKey) continue;
+                            const delivered = deliveredTextsBySession.get(target.sessionId);
+                            const queue = queuedMessages[key] ?? [];
+                            if (delivered && delivered.size > 0 && queue.length > 0) {
+                                const nextQueue = queue.filter((message) => {
+                                    const text = message.content.trim();
+                                    return !text || !delivered.has(text);
+                                });
+                                if (nextQueue.length !== queue.length) {
+                                    if (!queuedChanged) {
+                                        queuedMessages = { ...queuedMessages };
+                                        queuedChanged = true;
+                                    }
+                                    if (nextQueue.length === 0) delete queuedMessages[key];
+                                    else queuedMessages[key] = nextQueue;
+                                }
+                            }
+                            if ((sendingIds[key] ?? []).length > 0) {
+                                if (!sendingChanged) {
+                                    sendingIds = { ...sendingIds };
+                                    sendingChanged = true;
+                                }
+                                delete sendingIds[key];
+                            }
+                        }
+                        if (!queuedChanged && !sendingChanged) return state;
+                        return {
+                            ...(queuedChanged ? { queuedMessages } : {}),
+                            ...(sendingChanged ? { sendingIds } : {}),
+                        };
+                    });
                 },
             }),
             {

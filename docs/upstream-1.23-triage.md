@@ -61,7 +61,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Inline code theme colors | **PORT** | Check markdown theme vars vs OC | Small |
 | Mobile workspace dirty dot | **SKIP** | Capacitor-mobile-only unless shared | |
 | Remove non-git changed-files dropdown | **PORT** | Verify `TurnChangedFilesDropdown` gating | |
-| Default model/agent/thinking survive restarts | **DEFER/verify** | PC has draft defaults work | |
+| Default model/agent/thinking survive restarts | **ALREADY** | `settingsDefaultModel/Agent` + ModelControls thinking; ModelPickerList `React.memo`; OC #3422 sidecar reconcile N/A for Pi | pickers already memoized |
 | Model favorites first-change save | **PORTED** | modelPrefsAutoSave flush on first change + isApplyingServerSettings (Batch C) | PR #757 |
 | Scroll place while history loads; composer growth | DEFER/verify | HP#6d | |
 | Reasoning/shell auto-follow | PORT | HP#6c | |
@@ -107,7 +107,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Activity collapse summary | **ALREADY** | `activityRenderMode` collapsed|summary | |
 | `/btw` isolated composer | **ALREADY** | `BtwPanel.tsx` present | |
 | Files restore scroll/cursor | PORT | HP#8b | |
-| Per-surface theme/fonts/layout | **DEFER** | Large settings split | |
+| Per-surface theme/fonts/layout | **DEFER** | Large settings split; Desktop-first slice not feasible without layout fight | remains optional D |
 | Desktop zoom → interface scale | **PORTED** | HP#13b / PR #755 (DOM rem zoom; traffic-light inset) | #755 |
 | Mobile drawer UX batch | SKIP | mobile-only | |
 | Comments Enter attaches | **ALREADY?** | Verify comment input | |
@@ -116,12 +116,12 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Send-shortcut / large-paste copy | **PORTED** | clearer queueMessages + largeTextPaste hints (Batch B); enterToSend skipped (PC uses queueMessages) | PR pending |
 | Chat typography/spacing polish | SKIP | fights layout with glass overhaul | |
 | Selection highlight unify | **PORTED** | `--oc-text-selection` + unified ::selection (Batch B) | PR #756 |
-| Queue clear after reconnect | **DEFER/verify** | | |
-| False history-loading error | **DEFER/verify** | | |
-| Relay/tunnel flow control | **DEFER** | server | |
-| Fork restores attachments | **DEFER/verify** | | |
+| Queue clear after reconnect | **PORTED** | client `reconcileAfterReconnect` on stream-reconnect/transport-switch (adapt; OC server queue N/A) | Batch C2 |
+| False history-loading error | **ALREADY** | `session-message-loader`/`materialization` match OC 1.23.1; empty sessions commit ready; worktree bootstrap gate (#744) | no distinct delta vs OC tip |
+| Relay/tunnel flow control | **ALREADY** | `event-stream/protocol.js` WS backpressure warn + isolate failed clients (matches OC) | |
+| Fork restores attachments | **PORTED** | `pendingComposerRestore` destination-scoped handoff (OC #3387) | Batch C2 |
 | Interrupted tools timer | **ALREADY** | `interruptedTurnToolParts` + tests present | |
-| Duplicate attached images | **DEFER/verify** | | |
+| Duplicate attached images | **PORTED** | optimistic file replace scans all slots after text echo (event-reducer) | Batch C2 |
 | Follow end on panel resize | **DEFER** | | |
 | Message details narrow columns | **DEFER** | | |
 | Streaming Thinking scroll box | **DEFER/verify** | partial may exist | |

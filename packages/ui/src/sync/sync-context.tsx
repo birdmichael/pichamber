@@ -52,6 +52,7 @@ import {
   processVSCodeReconciledPermissionAutoAccept,
 } from "./vscode-permission-auto-accept"
 import { useConfigStore } from "@/stores/useConfigStore"
+import { useMessageQueueStore } from "@/stores/messageQueueStore"
 import { useTodosPersistStore } from "@/stores/useTodosPersistStore"
 import { cleanupPersistedSessionState } from "./session-deletion-cleanup"
 import { toast } from "@/components/ui"
@@ -2225,6 +2226,29 @@ export function SyncProvider(props: {
 
   // Event pipeline — created once per mount. No class, no start/stop.
   // Abort controller owned by the pipeline closure. Cleanup aborts + flushes.
+  
+  const reconcileClientMessageQueues = useCallback(() => {
+    const delivered = new Map<string, Set<string>>()
+    for (const store of childStores.children.values()) {
+      const state = store.getState()
+      for (const [sessionId, messages] of Object.entries(state.message ?? {})) {
+        const texts = delivered.get(sessionId) ?? new Set<string>()
+        for (const message of messages ?? []) {
+          if (message.role !== "user") continue
+          const parts = state.part[message.id] ?? []
+          const text = parts
+            .filter((part) => part.type === "text")
+            .map((part) => String((part as { text?: string; content?: string }).text ?? (part as { content?: string }).content ?? ""))
+            .join("\n")
+            .trim()
+          if (text) texts.add(text)
+        }
+        if (texts.size > 0) delivered.set(sessionId, texts)
+      }
+    }
+    useMessageQueueStore.getState().reconcileAfterReconnect(runtimeKey, delivered)
+  }, [childStores, runtimeKey])
+
   useEffect(() => {
     const pipeline = createEventPipeline({
       sdk: props.sdk,
@@ -2272,6 +2296,7 @@ export function SyncProvider(props: {
         if (isRecentBoot()) {
           return
         }
+        reconcileClientMessageQueues()
         for (const dir of childStores.children.keys()) {
           triggerDirectoryResync(dir, "stream-reconnect")
         }
@@ -2295,6 +2320,7 @@ export function SyncProvider(props: {
           hasEverConnected: true,
           connectionPhase: "connected",
         })
+        reconcileClientMessageQueues()
         for (const dir of childStores.children.keys()) {
           triggerDirectoryResync(dir, "transport-switch")
         }
@@ -2307,7 +2333,7 @@ export function SyncProvider(props: {
       }
       pipeline.cleanup()
     }
-  }, [props.sdk, childStores, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync])
+  }, [props.sdk, childStores, routingIndex, messageStreamTransport, runtimeKey, triggerDirectoryResync, reconcileClientMessageQueues])
 
   useEffect(() => {
     let stopped = false

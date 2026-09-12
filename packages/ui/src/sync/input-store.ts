@@ -4,6 +4,7 @@
  */
 
 import { create } from "zustand"
+import { getChatDraftIdentityKey, type ChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import type { ContextPartMetadata } from "@/lib/messages/contextParts"
 import type { AttachedFile } from "@/stores/types/sessionTypes"
 import { prepareAttachmentFiles } from "./attachment-files"
@@ -99,6 +100,12 @@ export type VSCodeActiveEditorFile = {
 }
 
 export type InputState = {
+  pendingComposerRestore: {
+    target: ChatDraftIdentity
+    text: string
+    files: Array<{ url: string; mimeType: string; filename: string }>
+  } | null
+  consumePendingComposerRestore: (target: ChatDraftIdentity | null) => InputState["pendingComposerRestore"]
   pendingInputText: string | null
   pendingInputMode: "replace" | "append" | "append-inline"
   pendingSyntheticParts: SyntheticContextPart[] | null
@@ -134,6 +141,13 @@ export type InputState = {
 }
 
 export const useInputStore = create<InputState>()((set, get) => ({
+  pendingComposerRestore: null,
+  consumePendingComposerRestore: (target) => {
+    const pending = get().pendingComposerRestore
+    if (!pending || !target || getChatDraftIdentityKey(pending.target) !== getChatDraftIdentityKey(target)) return null
+    set({ pendingComposerRestore: null })
+    return pending
+  },
   pendingInputText: null,
   pendingInputMode: "replace",
   pendingSyntheticParts: null,

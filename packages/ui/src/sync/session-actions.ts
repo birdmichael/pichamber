@@ -39,6 +39,7 @@ import { withContextObligatoryMessage, type ContextObligatoryMessage } from "@/l
 import { withLinkedIssue, type LinkedIssue } from "@/lib/linkedIssues"
 import { getImperativeSessionMessageLoader } from "./session-message-loader"
 import { cleanupPersistedSessionState } from "./session-deletion-cleanup"
+import { createChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import { getRuntimeKey } from "@/lib/runtime-switch"
 import { isAmbiguousTransportFailure } from "@/lib/relay/transport-error"
 import { dropGoneSessionTabs } from "@/lib/sessionTabs"
@@ -2179,9 +2180,10 @@ export async function unrevertSession(sessionId: string): Promise<void> {
  * 1. Extract text from the message for input restoration
  * 2. Call the runtime fork endpoint
  * 3. Insert the new session into the child store (so sidebar updates immediately)
- * 4. Switch to new session and set pending input text
+ * 4. Switch to the new session and stage its composer replay
  */
 export async function forkFromMessage(sessionId: string, messageId: string): Promise<void> {
+  const expectedRuntimeKey = getRuntimeKey()
   const { store, directory } = dirStoreForSession(sessionId)
   const state = store.getState()
 
@@ -2199,6 +2201,9 @@ export async function forkFromMessage(sessionId: string, messageId: string): Pro
   const fileParts = parts.filter((p) => p.type === "file" && !isSyntheticPart(p)) as Array<Record<string, unknown>>
 
   const forkedSession = await opencodeClient.forkSession(sessionId, messageId, directory)
+  if (isStaleRuntime(expectedRuntimeKey)) return
+  const target = createChatDraftIdentity(expectedRuntimeKey, resolveSessionOwnedDirectory(forkedSession) ?? directory, forkedSession.id)
+  if (!target) throw new Error("Forked session has no composer directory")
 
   // Insert new session into child store so sidebar updates immediately
   const current = store.getState()
@@ -2210,22 +2215,24 @@ export async function forkFromMessage(sessionId: string, messageId: string): Pro
   }
 
   // Switch to new session
-  useSessionUIStore.getState().setCurrentSession(forkedSession.id)
+  useSessionUIStore.getState().setCurrentSession(forkedSession.id, target.directory)
 
-  // Restore forked message text and file attachments to input
-  if (messageText) {
-    useInputStore.setState({
-      pendingInputText: messageText,
-      pendingInputMode: "replace" as const,
-    })
-  }
-  // Clear existing attachments and restore file parts from the forked message.
-  restoreFilePartsToInput(fileParts)
+  // Navigation is deferred in the chat column. Leave the source composer alone
+  // until the rendered draft identity matches the fork, including for file-only prompts.
+  useInputStore.setState({
+    pendingComposerRestore: {
+      target,
+      text: messageText,
+      files: fileParts.filter((part) => typeof part.url === "string" && part.url).map((part) => ({
+        url: part.url as string,
+        mimeType: typeof part.mime === "string" ? part.mime : "application/octet-stream",
+        filename: typeof part.filename === "string" ? part.filename : "attachment",
+      })),
+    },
+  })
   // The forked session is a fresh draft target, so the attached context of the
   // forked message follows the text into its composer.
-  if (directory) {
-    restoreContextPartsToInput(parts, { directory, sessionKey: forkedSession.id })
-  }
+  restoreContextPartsToInput(parts, { directory: target.directory, sessionKey: forkedSession.id })
 }
 
 export async function fetchMessagesForSession(sessionID: string, directory?: string | null): Promise<void> {
