@@ -488,21 +488,6 @@ const sanitizeProjectActions = (value: unknown): OpenChamberProjectAction[] => {
   return sanitized;
 };
 
-const _sanitizeProjectActionsState = (value: {
-  actions?: unknown;
-  primaryActionId?: unknown;
-} | null | undefined): OpenChamberProjectActionsState => {
-  const actions = sanitizeProjectActions(value?.actions);
-  const primaryRaw = typeof value?.primaryActionId === 'string' ? value.primaryActionId.trim() : '';
-  const primaryActionId = primaryRaw && actions.some((entry) => entry.id === primaryRaw)
-    ? primaryRaw
-    : null;
-
-  return {
-    actions,
-    primaryActionId,
-  };
-};
 
 const sanitizeProjectNotesAndTodos = (value: {
   notes?: unknown;
