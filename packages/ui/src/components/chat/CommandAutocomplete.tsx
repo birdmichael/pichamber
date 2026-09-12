@@ -461,7 +461,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
     <div
       ref={containerRef}
       className={cn(
-        'absolute z-[100] min-w-0 w-full max-w-[450px] overflow-hidden bg-background border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col',
+        'absolute z-[100] min-w-0 w-full max-w-[450px] overflow-hidden oc-glass-popover border-2 border-border/60 rounded-xl shadow-none bottom-full mb-2 left-0 flex flex-col',
         isMobile ? 'max-h-64' : DESKTOP_SLASH_POPUP_MAX_HEIGHT_CLASS,
       )}
       style={popupMaxHeight !== undefined ? { ...style, maxHeight: popupMaxHeight } : style}

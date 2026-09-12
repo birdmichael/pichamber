@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Chat: visual-align composer with OpenChamber 1.23 glass / floating look (`oc-glass-composer` over transcript, glass autocomplete/queue/BTW, floating recap + scroll pill). Pichamber Plan/Build chips, multi-run, scheduled tasks, Pi model chips, provider display names, and Work Status retained (visual-only).
 - Chat: forking a user message restores its text and attachments in the destination composer without overwriting the source draft (upstream OpenChamber 1.23).
 - Chat: attached images no longer appear twice just after send when the server echoes text then file parts (upstream OpenChamber 1.23).
 - Chat: client message queue drops already-delivered items after reconnect/stream gaps (PC adaptation of upstream OpenChamber 1.23 server queue resync).

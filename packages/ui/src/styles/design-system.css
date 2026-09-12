@@ -212,7 +212,8 @@
      Utilities remain able to opt an individual consumer out. */
   .oc-glass-popover,
 .oc-glass-tooltip,
-.oc-glass-panel {
+.oc-glass-panel,
+.oc-glass-composer {
   background-color: color-mix(in srgb, var(--oc-glass-color) var(--oc-glass-opacity), transparent);
   -webkit-backdrop-filter: blur(var(--oc-glass-blur)) saturate(var(--oc-glass-saturation));
   backdrop-filter: blur(var(--oc-glass-blur)) saturate(var(--oc-glass-saturation));
@@ -230,6 +231,12 @@
 
 .oc-glass-panel {
   --oc-glass-color: var(--surface-muted);
+}
+
+/* The chat composer floating over the transcript. */
+.oc-glass-composer {
+  --oc-glass-color: var(--surface-subtle);
+  --oc-glass-opacity: var(--oc-glass-popover-opacity);
 }
 
 .oc-glass-floating {
@@ -257,10 +264,18 @@
   backdrop-filter: blur(4px);
 }
 
+/* The recap hint floats in the band above the composer; a panel docked
+   there (queue, suggestion, BTW) would push it up over the transcript, so it
+   hides while any panel is mounted. See ComposerFloatingPanel. */
+[data-composer-bound][data-floating-panel] .oc-recap-hint {
+  opacity: 0;
+}
+
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   .oc-glass-popover,
   .oc-glass-tooltip,
-  .oc-glass-panel {
+  .oc-glass-panel,
+  .oc-glass-composer {
     background-color: var(--oc-glass-color);
   }
 }
@@ -269,6 +284,7 @@
   .oc-glass-popover,
   .oc-glass-tooltip,
   .oc-glass-panel,
+  .oc-glass-composer,
   .oc-glass-backdrop {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -276,7 +292,8 @@
 
   .oc-glass-popover,
   .oc-glass-tooltip,
-  .oc-glass-panel {
+  .oc-glass-panel,
+  .oc-glass-composer {
     background-color: var(--oc-glass-color);
   }
 }
@@ -286,6 +303,7 @@
   html.oc-pause-expensive-paint .oc-glass-popover,
   html.oc-pause-expensive-paint .oc-glass-tooltip,
   html.oc-pause-expensive-paint .oc-glass-panel,
+  html.oc-pause-expensive-paint .oc-glass-composer,
   html.oc-pause-expensive-paint .oc-glass-backdrop {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
