@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   areFilesEqual,
   areOptionsEqual,
@@ -29,8 +30,23 @@ import { getDefaultTheme } from '@/lib/theme/themes';
 
 import { useDeviceInfo } from '@/lib/device';
 import { cn } from '@/lib/utils';
+import type { PatchHunkAnchor } from '@/lib/diff/patchFileDiff';
 import { PIERRE_DIFF_OVERFLOW_CSS, resolvePierreOverflow } from './pierreDiffOverflow';
 
+
+
+export interface DiffHunkActions {
+  anchors: readonly PatchHunkAnchor[];
+  render: (index: number) => React.ReactNode;
+}
+
+type DiffAnnotation = PierreAnnotationData | { type: 'hunk-action'; index: number };
+const EMPTY_HUNK_ANCHORS: readonly PatchHunkAnchor[] = [];
+
+const HUNK_ACTION_OVERLAY_CSS = `
+  [data-gutter-buffer="annotation"] { min-height: 0; }
+  [data-code] { min-height: 2.5rem; align-content: start; }
+`;
 
 // Threshold (bytes) above which syntax highlighting is degraded for performance
 const LARGE_CONTENT_BYTES = 500_000;
@@ -45,6 +61,7 @@ interface PierreDiffViewerProps {
   wrapLines?: boolean;
   layout?: 'fill' | 'inline';
   enableComments?: boolean;
+  hunkActions?: DiffHunkActions;
 }
 
 /**
@@ -426,7 +443,7 @@ function acquireSharedVirtualizer(container: HTMLElement): SharedVirtualizer | n
 }
 
 const wakeVirtualizer = (
-  instance: PierreFileDiff<PierreAnnotationData>,
+  instance: PierreFileDiff<DiffAnnotation>,
   sharedVirtualizer: SharedVirtualizer | null,
   forceUpdate: () => void,
 ): (() => void) => {
@@ -473,6 +490,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
   wrapLines,
   layout = 'fill',
   enableComments = true,
+  hunkActions,
 }) => {
   const themeContext = useOptionalThemeSystem();
 
@@ -481,6 +499,12 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
   const darkTheme = themeContext?.availableThemes.find(t => t.metadata.id === themeContext.darkThemeId) ?? getDefaultTheme(true);
 
   const { isMobile } = useDeviceInfo();
+  const hunkAnchors = hunkActions?.anchors ?? EMPTY_HUNK_ANCHORS;
+  const [hunkTargets, setHunkTargets] = React.useState<{
+    fileDiff: FileDiffMetadata | undefined;
+    anchors: readonly PatchHunkAnchor[];
+    targets: ReadonlyMap<number, HTMLElement>;
+  }>(() => ({ fileDiff: undefined, anchors: EMPTY_HUNK_ANCHORS, targets: new Map() }));
 
   const diffCommentController = useInlineCommentController<SelectedLineRange>({
     source: 'diff',
@@ -569,9 +593,15 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     cancel();
   }, [cancel]);
 
-  const renderAnnotation = useCallback((annotation: DiffLineAnnotation<PierreAnnotationData>) => {
+  const renderAnnotation = useCallback((annotation: DiffLineAnnotation<DiffAnnotation>) => {
     const div = document.createElement('div');
     div.style.position = 'relative';
+
+    if (annotation.metadata.type === 'hunk-action') {
+      div.dataset.hunkActionTarget = String(annotation.metadata.index);
+      div.style.height = '0px';
+      return div;
+    }
 
     const id = toPierreAnnotationId(annotation.metadata);
 
@@ -581,7 +611,47 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     return div;
   }, []);
 
-  const handleSaveComment = useCallback((textToSave: string, rangeOverride?: SelectedLineRange) => {
+  const captureHunkTargets = useCallback<NonNullable<FileDiffOptions<DiffAnnotation>['onPostRender']>>((node, instance, phase) => {
+    const targets = new Map<number, HTMLElement>();
+    if (phase !== 'unmount') {
+      const capsuleHeight = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 2;
+      const columns = new Map<HTMLElement, DOMRect>();
+      const placements: Array<{ target: HTMLElement; offset: number }> = [];
+      for (const slot of node.shadowRoot?.querySelectorAll('slot') ?? []) {
+        for (const wrapper of slot.assignedElements()) {
+          const target = wrapper.querySelector<HTMLElement>('[data-hunk-action-target]');
+          const index = Number(target?.dataset.hunkActionTarget);
+          if (!target || !Number.isInteger(index) || index < 0) continue;
+          targets.set(index, target);
+          const column = slot.closest<HTMLElement>('[data-code]');
+          if (!column) continue;
+          let bounds = columns.get(column);
+          if (!bounds) {
+            bounds = column.getBoundingClientRect();
+            columns.set(column, bounds);
+          }
+          const markerTop = target.getBoundingClientRect().top;
+          const top = Math.max(bounds.top + 4, Math.min(markerTop + 4, bounds.bottom - capsuleHeight - 4));
+          placements.push({ target, offset: top - markerTop });
+        }
+      }
+      for (const { target, offset } of placements) {
+        const value = `${offset}px`;
+        if (target.style.getPropertyValue('--oc-hunk-action-offset') !== value) {
+          target.style.setProperty('--oc-hunk-action-offset', value);
+        }
+      }
+    }
+    const renderedDiff = instance.fileDiff;
+    setHunkTargets((previous) => {
+      if (previous.fileDiff === renderedDiff && previous.anchors === hunkAnchors
+          && previous.targets.size === targets.size
+          && [...targets].every(([index, target]) => previous.targets.get(index) === target)) return previous;
+      return { fileDiff: renderedDiff, anchors: hunkAnchors, targets };
+    });
+  }, [hunkAnchors]);
+
+    const handleSaveComment = useCallback((textToSave: string, rangeOverride?: SelectedLineRange) => {
     saveComment(textToSave, rangeOverride ?? selection ?? undefined);
   }, [saveComment, selection]);
 
@@ -652,11 +722,11 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
 
   const diffRootRef = useRef<HTMLDivElement | null>(null);
   const diffContainerRef = useRef<HTMLDivElement | null>(null);
-  const diffInstanceRef = useRef<PierreFileDiff<PierreAnnotationData> | null>(null);
+  const diffInstanceRef = useRef<PierreFileDiff<DiffAnnotation> | null>(null);
   const sharedVirtualizerRef = useRef<SharedVirtualizer | null>(null);
   const instanceVirtualizerRef = useRef<Virtualizer | null>(null);
   const instanceWorkerPoolRef = useRef<unknown>(null);
-  const instanceVirtualHunkSeparatorsRef = useRef<FileDiffOptions<PierreAnnotationData>['hunkSeparators'] | undefined>(undefined);
+  const instanceVirtualHunkSeparatorsRef = useRef<FileDiffOptions<DiffAnnotation>['hunkSeparators'] | undefined>(undefined);
   const instanceFileDiffRef = useRef<FileDiffMetadata | undefined>(undefined);
   const instanceOldFileRef = useRef<FileContents | undefined>(undefined);
   const instanceNewFileRef = useRef<FileContents | undefined>(undefined);
@@ -741,7 +811,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
   }, [darkResolvedTheme, diffThemeKey, isDark, lightResolvedTheme]);
 
 
-  const options = useMemo(() => ({
+  const options = useMemo<FileDiffOptions<DiffAnnotation>>(() => ({
     theme: {
       dark: darkTheme.metadata.id,
       light: lightTheme.metadata.id,
@@ -763,22 +833,23 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     enableLineSelection: enableComments,
     enableHoverUtility: false,
     onLineSelected: enableComments ? handleSelectionChange : undefined,
-    unsafeCSS: WEBKIT_SCROLL_FIX_CSS,
-    renderAnnotation: enableComments ? renderAnnotation : undefined,
-  }), [darkTheme.metadata.id, enableComments, isDark, isLargeContent, lightTheme.metadata.id, renderSideBySide, wrapLines, handleSelectionChange, renderAnnotation]);
+    unsafeCSS: hunkAnchors.length > 0 ? `${WEBKIT_SCROLL_FIX_CSS}\n${HUNK_ACTION_OVERLAY_CSS}` : WEBKIT_SCROLL_FIX_CSS,
+    renderAnnotation: enableComments || hunkAnchors.length > 0 ? renderAnnotation : undefined,
+    onPostRender: hunkAnchors.length > 0 ? captureHunkTargets : undefined,
+  }), [captureHunkTargets, hunkAnchors.length, darkTheme.metadata.id, enableComments, isDark, isLargeContent, lightTheme.metadata.id, renderSideBySide, wrapLines, handleSelectionChange, renderAnnotation]);
 
 
-  const lineAnnotations = useMemo(() => {
-    if (!enableComments) {
-      return [];
-    }
-
-    return buildPierreLineAnnotations({
+  const lineAnnotations = useMemo<DiffLineAnnotation<DiffAnnotation>[]>(() => {
+    const annotations: DiffLineAnnotation<DiffAnnotation>[] = enableComments ? buildPierreLineAnnotations({
       drafts: fileDrafts,
       editingDraftId,
       selection,
-    });
-  }, [editingDraftId, enableComments, fileDrafts, selection]);
+    }) : [];
+    for (const anchor of hunkAnchors) {
+      annotations.push({ side: anchor.side, lineNumber: anchor.lineNumber, metadata: { type: 'hunk-action', index: anchor.index } });
+    }
+    return annotations;
+  }, [editingDraftId, enableComments, fileDrafts, hunkAnchors, selection]);
 
   const lineAnnotationsRef = useRef(lineAnnotations);
 
@@ -867,17 +938,17 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
       : false;
     if (!instance) {
       instance = sharedVirtualizer
-        ? new VirtualizedFileDiff<PierreAnnotationData>(
-            options as FileDiffOptions<PierreAnnotationData>,
+        ? new VirtualizedFileDiff<DiffAnnotation>(
+            options,
             sharedVirtualizer.virtualizer,
             VIRTUAL_METRICS,
             workerPool,
           )
-        : new PierreFileDiff(options as FileDiffOptions<PierreAnnotationData>, workerPool);
+        : new PierreFileDiff(options, workerPool);
       diffInstanceRef.current = instance;
       lastAppliedSelectionRef.current = null;
     } else {
-      instance.setOptions(options as FileDiffOptions<PierreAnnotationData>);
+      instance.setOptions(options);
     }
 
     instanceVirtualizerRef.current = virtualizer;
@@ -1067,6 +1138,10 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     return null;
   }
 
+  const hunkActionPortals = hunkActions && fileDiff && hunkTargets.fileDiff === fileDiff && hunkTargets.anchors === hunkAnchors
+    ? [...hunkTargets.targets].map(([index, target]) => createPortal(hunkActions.render(index), target, `hunk-${index}`))
+    : null;
+
   const commentOverlays = enableComments ? (
     <PierreDiffCommentOverlays
       diffRootRef={diffRootRef}
@@ -1105,6 +1180,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
             </div>
           </ScrollableOverlay>
           {commentOverlays}
+        {hunkActionPortals}
         </div>
       </div>
     );
@@ -1117,6 +1193,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
       <div ref={diffContainerRef} className="w-full" />
     </div>
     {commentOverlays}
+        {hunkActionPortals}
   </div>
   );
 };

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Work Status: Turn stats section (response speed, model/tool time, tokens, USD cost) for the latest completed turn (upstream OpenChamber 1.23.0).
+- Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
 - Chat: remove the non-git turn changed-files dropdown under final answers; git turn file pills from the accuracy port remain (upstream OpenChamber 1.23.1).
