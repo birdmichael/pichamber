@@ -145,12 +145,11 @@ function calculateCompletedStepStats(record: SessionMessageRecord): CompletedSte
 
   if (completed === undefined) return null;
 
-  const validWindow = nonnegative(created) !== null && nonnegative(completed) !== null && completed >= created;
-  const totalDurationMs = validWindow ? nonnegative(completed - created) : null;
-
-  // An unfinished or invalid tool makes duration-dependent metrics unknown.
+  // Pi stamps message_end (and freezes `completed`) before tools run. Collect
+  // tool intervals first so the effective window can extend past that stamp.
   const rawToolIntervals: Array<[number, number]> = [];
-  let validTools = validWindow;
+  let validTools = nonnegative(created) !== null;
+  let latestToolEnd: number | null = null;
   for (const part of parts) {
     if (part.type !== 'tool') continue;
     if (part.state.status !== 'completed' && part.state.status !== 'error') {
@@ -159,12 +158,20 @@ function calculateCompletedStepStats(record: SessionMessageRecord): CompletedSte
     }
     const start = part.state.time?.start;
     const end = part.state.time?.end;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < created || end > completed || end < start) {
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || start < created) {
       validTools = false;
       continue;
     }
     rawToolIntervals.push([start, end]);
+    latestToolEnd = latestToolEnd === null ? end : Math.max(latestToolEnd, end);
   }
+
+  const effectiveCompleted = latestToolEnd !== null
+    ? Math.max(completed, latestToolEnd)
+    : completed;
+  const validWindow = nonnegative(created) !== null && nonnegative(effectiveCompleted) !== null && effectiveCompleted >= created;
+  if (!validWindow) validTools = false;
+  const totalDurationMs = validWindow ? nonnegative(effectiveCompleted - created) : null;
 
   const toolDurationMs = validTools ? nonnegative(sumIntervalsDuration(mergeTimeIntervals(rawToolIntervals))) : null;
   const adjustedLlmDurationMs = totalDurationMs !== null && toolDurationMs !== null
@@ -176,7 +183,7 @@ function calculateCompletedStepStats(record: SessionMessageRecord): CompletedSte
   for (const part of parts) {
     if (part.type === 'text' || part.type === 'reasoning') {
       const partStart = part.time?.start;
-      if (validWindow && partStart !== undefined && Number.isFinite(partStart) && partStart >= created && partStart <= completed) {
+      if (validWindow && partStart !== undefined && Number.isFinite(partStart) && partStart >= created && partStart <= effectiveCompleted) {
         const delta = partStart - created;
         ttftMs = ttftMs === null ? delta : Math.min(ttftMs, delta);
       }

@@ -274,8 +274,12 @@ const completedMillisFromPiAssistant = (message, created) => {
   return created;
 };
 
-/** OpenCode `info.time` / `finish` for hydrate. Users and open assistants stay created-only. */
-const facadeMessageTimeFromPi = (message, created) => {
+/**
+ * OpenCode `info.time` / `finish` for hydrate. Users and open assistants stay created-only.
+ * Pi jsonl: `message.timestamp` is assistant start; entry `timestamp` is when the row was
+ * written (message_end). Never swap them — that inverts the window and blanks turn stats.
+ */
+const facadeMessageTimeFromPi = (message, created, completedAt) => {
   if (!isFinishedPiAssistantMessage(message)) {
     return { time: { created } };
   }
@@ -283,8 +287,12 @@ const facadeMessageTimeFromPi = (message, created) => {
   const finish = stopReason === 'error' || asTrimmedString(message?.errorMessage)
     ? 'error'
     : 'stop';
+  const fromMessage = completedMillisFromPiAssistant(message, created);
+  const completed = typeof completedAt === 'number' && Number.isFinite(completedAt) && completedAt > 0
+    ? Math.max(created, completedAt, fromMessage)
+    : Math.max(created, fromMessage);
   return {
-    time: { created, completed: completedMillisFromPiAssistant(message, created) },
+    time: { created, completed },
     finish,
   };
 };
@@ -505,7 +513,7 @@ const facadeToolPart = (item, sessionID, messageID) => {
   };
 };
 
-const applyToolResultToPart = (part, message) => {
+const applyToolResultToPart = (part, message, timing = {}) => {
   if (!part || !isRecord(message)) return;
   const output = textFromToolContent(message.content);
   const isError = message.isError === true;
@@ -515,9 +523,12 @@ const applyToolResultToPart = (part, message) => {
   if (toolName && (!part.tool || part.tool === 'tool')) {
     part.tool = toolName;
   }
-  const created = typeof part.state?.time?.start === 'number' ? part.state.time.start : undefined;
-  const endedAt = Date.now();
-  const startedAt = created ?? endedAt;
+  const existingStart = typeof part.state?.time?.start === 'number' ? part.state.time.start : undefined;
+  const endedAt = typeof timing.endedAt === 'number' && Number.isFinite(timing.endedAt)
+    ? timing.endedAt
+    : Date.now();
+  const startedAt = existingStart
+    ?? (typeof timing.startedAt === 'number' && Number.isFinite(timing.startedAt) ? timing.startedAt : endedAt);
   const duration = Math.max(0, endedAt - startedAt);
   part.state = {
     status: isError ? 'error' : 'completed',
@@ -2063,7 +2074,16 @@ const facadeFromPiMessage = (entry, fallbackModel) => {
   if (message.role === 'toolResult') return null;
   const role = message.role === 'assistant' ? 'assistant' : 'user';
   const messageID = asTrimmedString(entry?.id) || createMessageId();
-  const created = millisFromUnknown(entry?.timestamp ?? message.timestamp);
+  const messageTs = message.timestamp != null ? millisFromUnknown(message.timestamp) : null;
+  const entryTs = entry?.timestamp != null ? millisFromUnknown(entry.timestamp) : null;
+  // Prefer message.timestamp for created (assistant start). Entry time is the
+  // persist/message_end stamp and must not become `created` or the window inverts.
+  const created = messageTs != null && messageTs > 0
+    ? (entryTs != null && entryTs > 0 ? Math.min(messageTs, entryTs) : messageTs)
+    : (entryTs != null && entryTs > 0 ? entryTs : Date.now());
+  const completedAt = role === 'assistant' && entryTs != null && entryTs > 0
+    ? entryTs
+    : undefined;
   return {
     info: {
       id: messageID,
@@ -2072,7 +2092,7 @@ const facadeFromPiMessage = (entry, fallbackModel) => {
       ...(role === 'assistant' ? { mode: 'pi' } : {}),
       ...(asTrimmedString(entry?.parentId) ? { parentID: entry.parentId } : {}),
       ...facadeAssistantInfoFromPiMessage(message, fallbackModel),
-      ...facadeMessageTimeFromPi(message, created),
+      ...facadeMessageTimeFromPi(message, created, completedAt),
     },
     parts: partsFromPiContent(message.content, '', messageID),
   };
@@ -2275,7 +2295,18 @@ export const facadeMessagesFromPiEntries = (entries, sessionID, options = {}) =>
     if (message.role === 'toolResult') {
       const callID = asTrimmedString(message.toolCallId);
       const part = callID ? toolPartsByCallID.get(callID) : null;
-      if (part) applyToolResultToPart(part, message);
+      if (part) {
+        const owner = messages.find((item) => item.info.id === part.messageID);
+        const ownerCompleted = owner?.info?.time?.completed;
+        const ownerCreated = owner?.info?.time?.created;
+        const startedAt = typeof ownerCompleted === 'number' && ownerCompleted > 0
+          ? ownerCompleted
+          : (typeof ownerCreated === 'number' && ownerCreated > 0 ? ownerCreated : undefined);
+        applyToolResultToPart(part, message, {
+          endedAt: millisFromUnknown(entry.timestamp),
+          startedAt,
+        });
+      }
       continue;
     }
     const facade = facadeFromPiMessage(entry, fallbackModel);

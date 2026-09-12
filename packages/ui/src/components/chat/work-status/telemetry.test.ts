@@ -115,7 +115,7 @@ describe('turn telemetry', () => {
     expect(stats?.avgTtftMs).toBe(200);
   });
 
-  for (const [start, end] of [[0, 2000], [2000, 6000], [3000, 2000], [NaN, 3000]]) {
+  for (const [start, end] of [[0, 2000], [3000, 2000], [NaN, 3000]]) {
     test(`invalid tool interval ${start}..${end} omits duration-dependent metrics`, () => {
     const stats = getLatestCompletedTurnStats(turn(assistant(), [tool(start, end)]));
     expect(stats?.totalToolDurationMs).toBeNull();
@@ -124,6 +124,15 @@ describe('turn telemetry', () => {
     expect(stats?.outputTokens).toBe(100);
     });
   }
+
+  test('Pi tools that finish after frozen message_end still count toward durations', () => {
+    // created=1000 completed=5000; tool ends at 6000 (after message_end).
+    const stats = getLatestCompletedTurnStats(turn(assistant(), [tool(2000, 6000)]));
+    expect(stats?.totalToolDurationMs).toBe(4000);
+    expect(stats?.totalLlmDurationMs).toBe(1000);
+    expect(stats?.tokensPerSecond).toBe(100);
+    expect(stats?.outputTokens).toBe(100);
+  });
 
   test('unfinished tools and missing tool timing cannot produce a rate', () => {
     const unfinished: Part = { id: 'pending', sessionID: user.sessionID, messageID: 'a1', type: 'tool', tool: 'bash', callID: 'pending',
@@ -191,6 +200,14 @@ describe('turn telemetry', () => {
       expect(stats?.responseTokensPerSecond).toBeNull();
       expect(stats?.tokensPerSecond !== null).toBe(true);
     }
+  });
+
+  test('uses text part delivery intervals for response speed when stamped', () => {
+    const stats = getLatestCompletedTurnStats(turn(assistant({ tokens: { ...assistant().tokens, output: 100 } }), [
+      { ...text(2000), text: 'Final reply', time: { start: 2000, end: 4000 } },
+    ]));
+    expect(stats?.responseTokensPerSecond).toBe(50);
+    expect(stats?.tokensPerSecond).toBe(25);
   });
 
   test('response speed needs valid output usage and a successful final reply', () => {

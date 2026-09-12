@@ -544,6 +544,33 @@ describe('session-transfer', () => {
     expect(messages[1].info.finish).toBe('stop');
   });
 
+  it('keeps message.timestamp as created and entry timestamp as completed', () => {
+    const messages = facadeMessagesFromPiEntries([
+      {
+        type: 'message',
+        id: 'u1',
+        timestamp: 1_700_000_000_100,
+        message: { role: 'user', content: [{ type: 'text', text: 'hello' }], timestamp: 1_700_000_000_100 },
+      },
+      {
+        type: 'message',
+        id: 'a1',
+        parentId: 'u1',
+        timestamp: 1_700_000_005_000,
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'done' }],
+          timestamp: 1_700_000_000_200,
+          stopReason: 'stop',
+          usage: { input: 10, output: 4, reasoning: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0.001 } },
+        },
+      },
+    ], 'ses_times');
+    expect(messages[1].info.time).toEqual({ created: 1_700_000_000_200, completed: 1_700_000_005_000 });
+    expect(messages[1].info.tokens.output).toBe(4);
+    expect(messages[1].info.cost).toBe(0.001);
+  });
+
   it('hydrates provider errorMessage onto info.error with finish error (#565)', () => {
     const created = 1_700_000_000_300;
     const messages = facadeMessagesFromPiEntries([

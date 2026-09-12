@@ -57,6 +57,8 @@ export const createEventTranslator = ({
 } = {}) => {
   const textParts = new Map();
   const reasoningParts = new Map();
+  const textPartStarts = new Map();
+  const reasoningPartStarts = new Map();
   const toolParts = new Map();
   const toolStartTimes = new Map();
   let assistantMessageID = null;
@@ -110,6 +112,8 @@ export const createEventTranslator = ({
     assistantParentID = facadeUserParentID();
     textParts.clear();
     reasoningParts.clear();
+    textPartStarts.clear();
+    reasoningPartStarts.clear();
     toolParts.clear();
     toolStartTimes.clear();
     lastUsage = undefined;
@@ -165,20 +169,22 @@ export const createEventTranslator = ({
   const messageUpdated = (info) => event('message.updated', { sessionID, info });
   const partUpdated = (part) => event('message.part.updated', { sessionID, part, time: now() });
 
-  const textPart = (partID, text = '') => ({
+  const textPart = (partID, text = '', time) => ({
     id: partID,
     sessionID,
     messageID: assistantMessageID,
     type: 'text',
     text,
+    ...(time ? { time } : {}),
   });
 
-  const reasoningPart = (partID, text = '') => ({
+  const reasoningPart = (partID, text = '', time) => ({
     id: partID,
     sessionID,
     messageID: assistantMessageID,
     type: 'reasoning',
     text,
+    ...(time ? { time } : {}),
   });
 
   const toolPart = (partID, { callID, tool, status, input, output, error, metadata }) => {
@@ -244,10 +250,12 @@ export const createEventTranslator = ({
       case 'text_start': {
         ensureAssistantMessage();
         const partID = nextPartId();
+        const startedAt = now();
         textParts.set(contentIndex, partID);
+        textPartStarts.set(partID, startedAt);
         return [
           messageUpdated(assistantInfo()),
-          partUpdated(textPart(partID, '')),
+          partUpdated(textPart(partID, '', { start: startedAt })),
         ];
       }
       case 'text_delta': {
@@ -258,7 +266,9 @@ export const createEventTranslator = ({
           partID = nextPartId();
           textParts.set(contentIndex, partID);
           created.push(messageUpdated(assistantInfo()));
-          created.push(partUpdated(textPart(partID, '')));
+          const startedAt = now();
+          textPartStarts.set(partID, startedAt);
+          created.push(partUpdated(textPart(partID, '', { start: startedAt })));
         }
         created.push(event('message.part.delta', {
           sessionID,
@@ -274,15 +284,20 @@ export const createEventTranslator = ({
         if (!partID || !assistantMessageID) return [];
         const text = typeof delta.content === 'string' ? delta.content : undefined;
         if (text === undefined) return [];
-        return [partUpdated(textPart(partID, text))];
+        const startedAt = textPartStarts.get(partID) ?? now();
+        const endedAt = now();
+        if (endedAt < startedAt) return [partUpdated(textPart(partID, text, { start: startedAt }))];
+        return [partUpdated(textPart(partID, text, { start: startedAt, end: endedAt }))];
       }
       case 'thinking_start': {
         ensureAssistantMessage();
         const partID = nextPartId();
+        const startedAt = now();
         reasoningParts.set(contentIndex, partID);
+        reasoningPartStarts.set(partID, startedAt);
         return [
           messageUpdated(assistantInfo()),
-          partUpdated(reasoningPart(partID, '')),
+          partUpdated(reasoningPart(partID, '', { start: startedAt })),
         ];
       }
       case 'thinking_delta': {
@@ -293,7 +308,9 @@ export const createEventTranslator = ({
           partID = nextPartId();
           reasoningParts.set(contentIndex, partID);
           created.push(messageUpdated(assistantInfo()));
-          created.push(partUpdated(reasoningPart(partID, '')));
+          const startedAt = now();
+          reasoningPartStarts.set(partID, startedAt);
+          created.push(partUpdated(reasoningPart(partID, '', { start: startedAt })));
         }
         created.push(event('message.part.delta', {
           sessionID,
@@ -313,7 +330,10 @@ export const createEventTranslator = ({
             ? delta.thinking
             : undefined;
         if (text === undefined) return [];
-        return [partUpdated(reasoningPart(partID, text))];
+        const startedAt = reasoningPartStarts.get(partID) ?? now();
+        const endedAt = now();
+        if (endedAt < startedAt) return [partUpdated(reasoningPart(partID, text, { start: startedAt }))];
+        return [partUpdated(reasoningPart(partID, text, { start: startedAt, end: endedAt }))];
       }
       case 'toolcall_start': {
         ensureAssistantMessage();
@@ -382,6 +402,8 @@ export const createEventTranslator = ({
         assistantParentID = null;
         textParts.clear();
         reasoningParts.clear();
+        textPartStarts.clear();
+        reasoningPartStarts.clear();
         toolParts.clear();
         toolStartTimes.clear();
         lastUsage = undefined;
