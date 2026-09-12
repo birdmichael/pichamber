@@ -155,12 +155,13 @@ describe('createEventTranslator', () => {
       args: { command: 'ls' },
     });
     const toolStart = start.find((event) => event.type === 'message.part.updated');
-    expect(toolStart.properties.part).toMatchObject({
-      type: 'tool',
-      tool: 'bash',
-      callID: 'call_1',
-      state: expect.objectContaining({ status: 'running', input: { command: 'ls' } }),
-    });
+    const toolStartTime = toolStart.properties.part.state.time.start;
+    expect(toolStart.properties.part.type).toBe('tool');
+    expect(toolStart.properties.part.tool).toBe('bash');
+    expect(toolStart.properties.part.callID).toBe('call_1');
+    expect(toolStart.properties.part.state.status).toBe('running');
+    expect(toolStart.properties.part.state.input).toEqual({ command: 'ls' });
+    expect(typeof toolStartTime).toBe('number');
 
     const end = t.translate({
       type: 'tool_execution_end',
@@ -171,7 +172,7 @@ describe('createEventTranslator', () => {
     });
     expect(end[0].properties.part.state.status).toBe('completed');
     expect(end[0].properties.part.state.output).toBe('ok');
-    expect(end[0].properties.part.state.time.start).toBe(toolStart.properties.part.state.time.start);
+    expect(end[0].properties.part.state.time.start).toBe(toolStartTime);
     expect(end[0].properties.part.state.time.end).toBeGreaterThanOrEqual(end[0].properties.part.state.time.start);
     expect(end[0].properties.part.state.time.duration).toBe(
       end[0].properties.part.state.time.end - end[0].properties.part.state.time.start,
@@ -623,6 +624,31 @@ describe('createEventTranslator', () => {
       parentID: 'msg_user',
       finish: 'stop',
       time: { created: 1_700_000_000_000, completed: 1_700_000_000_000 },
+    });
+  });
+
+  it('stamps text and reasoning part start/end times for turn stats', () => {
+    let nowMs = 1_700_000_000_000;
+    const t = translator({ now: () => nowMs });
+    t.setUserMessage('msg_user');
+    t.translate({ type: 'message_start', message: { role: 'assistant', content: [] } });
+    nowMs += 100;
+    t.translate({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_start', contentIndex: 0 },
+      message: {},
+    });
+    nowMs += 250;
+    const ended = t.translate({
+      type: 'message_update',
+      assistantMessageEvent: { type: 'text_end', contentIndex: 0, content: 'hello' },
+      message: {},
+    });
+    const part = ended.find((event) => event.type === 'message.part.updated')?.properties?.part;
+    expect(part).toMatchObject({
+      type: 'text',
+      text: 'hello',
+      time: { start: 1_700_000_000_100, end: 1_700_000_000_350 },
     });
   });
 
