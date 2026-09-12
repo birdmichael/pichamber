@@ -2056,6 +2056,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.pendingChanges.changedInWorkspace': '工作區中有變更',
   'chat.changedFiles.title': '已變更檔案',
   'chat.changedFiles.actions.openFileTitle': '開啟 {path}',
+  'chat.changedFiles.actions.showMore': '顯示另外 {count} 個',
+  'chat.changedFiles.actions.collapse': '收起',
   'chat.emptyState.opencodeUnreachable': '無法連線 Pi',
   'chat.emptyState.startNewChat': '開始新的聊天',
   'chat.emptyState.draftTitle': '我們在做什麼？',

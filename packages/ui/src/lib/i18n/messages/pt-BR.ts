@@ -2070,6 +2070,8 @@ export const dict: Record<I18nKey, string> = {
   "chat.pendingChanges.changedInWorkspace": "modificado no workspace",
   "chat.changedFiles.title": "Arquivos modificados",
   "chat.changedFiles.actions.openFileTitle": "Abrir {path}",
+  "chat.changedFiles.actions.showMore": "Mostrar mais {count}",
+  "chat.changedFiles.actions.collapse": "Mostrar menos",
   "chat.emptyState.opencodeUnreachable": "Pi não está acessível",
   "chat.emptyState.startNewChat": "Iniciar uma nova conversa",
   "chat.emptyState.draftTitle": "No que estamos trabalhando?",
