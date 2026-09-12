@@ -131,11 +131,13 @@ export const getWorkStatusPanelPresentation = ({
   showEmptyState: contentMounted && allSectionsHidden,
 });
 
-export const sanitizeWorkStatusHiddenSections = (value: unknown): WorkStatusSectionId[] => {
+export const sanitizeWorkStatusHiddenSections = (value: unknown, explicit = true): WorkStatusSectionId[] => {
   if (!Array.isArray(value)) return [];
   const seen = new Set<WorkStatusSectionId>();
   for (const entry of value) {
     if (isWorkStatusSectionId(entry)) seen.add(entry);
   }
+  // Older clients hid telemetry automatically until the user chose a list.
+  if (!explicit) seen.delete('telemetry');
   return [...seen];
 };

@@ -108,6 +108,8 @@ export interface UseChatTimelineScrollResult {
     showScrollButton: boolean;
     /** A real gesture took the scroll; flips back on any explicit opt-in. */
     userOwnsScroll: boolean;
+    /** Viewport is within the follow-rearm threshold of the end. */
+    viewportAtEnd: boolean;
     isFollowingProgrammatically: boolean;
     goToBottom: (mode?: 'instant' | 'smooth') => void;
     scrollToBottomOnSend: () => void;
@@ -154,6 +156,7 @@ export const useChatTimelineScroll = ({
     // True after a real gesture until an explicit opt back in; drives the
     // overlay scrollbar suppression instead of the anchor's mere existence.
     const [userOwnsScroll, setUserOwnsScroll] = React.useState(false);
+    const [viewportAtEnd, setViewportAtEnd] = React.useState(true);
     const userOwnsScrollRef = React.useRef(userOwnsScroll);
     userOwnsScrollRef.current = userOwnsScroll;
 
@@ -408,6 +411,7 @@ export const useChatTimelineScroll = ({
         // is handled by the list staying at the end, not by a timed hold.
         isAtEndRef.current = true;
         setUserOwnsScroll(false);
+        setViewportAtEnd(true);
         modeRef.current = 'following-end';
         liveFollowGenerationRef.current = userGenerationRef.current;
         clearAnchor();
@@ -869,6 +873,8 @@ export const useChatTimelineScroll = ({
         };
         const handleScroll = () => {
             queueSave();
+            const distance = scrollNode.scrollHeight - scrollNode.clientHeight - scrollNode.scrollTop;
+            setViewportAtEnd(distance <= TIMELINE_FOLLOW_REARM_THRESHOLD_PX);
         };
 
         const handleOverlayThumbPointerDown = (event: PointerEvent) => {
@@ -1113,6 +1119,7 @@ export const useChatTimelineScroll = ({
         onTimelineDataChange,
         showScrollButton,
         userOwnsScroll,
+        viewportAtEnd,
         isFollowingProgrammatically,
         goToBottom,
         scrollToBottomOnSend,
