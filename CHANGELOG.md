@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Scheduled tasks: Run now works for paused tasks while their schedule stays paused (upstream OpenChamber 1.23.1).
+- Scheduled tasks: a project that fails to load no longer stops tasks in other projects from starting (upstream OpenChamber 1.23.1).
 - Providers: Edit custom provider model rows can toggle Vision and Reasoning for unknown model ids (persist Pi `input` / `reasoning`; catalog prefill still works, user toggles override) (#735).
 - UI: restore `@pichamber/ui` typecheck for publish-npm (assistant visible-content / notes tests, assistant status casts, Browser host-origin narrowing, header meta draft open) (#733) ($).
 
