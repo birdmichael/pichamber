@@ -16,7 +16,7 @@ function assistant(id: string, parts: Part[], options: Partial<AssistantMessage>
     };
 }
 
-function user(id = 'user', hidden = false): ChatMessageEntry {
+function _user(id = 'user', hidden = false): ChatMessageEntry {
     return {
         info: { id, sessionID: 'session', role: 'user', time: { created: 1 }, agent: 'build', model: { providerID: 'provider', modelID: 'model' } },
         parts: hidden ? [] : [text(`Request ${id}`)],

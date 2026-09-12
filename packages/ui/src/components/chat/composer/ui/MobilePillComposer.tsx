@@ -62,7 +62,7 @@ export function MobilePillComposer(props: MobilePillComposerProps) {
         footerIconButtonClass,
         iconSizeClass,
         stopIconSizeClass,
-        theme: currentTheme,
+        theme: _currentTheme,
         onExpand,
         onApplySuggestion,
         onNewSession,
