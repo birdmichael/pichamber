@@ -97,7 +97,17 @@ describe('terminal viewport remount guard', () => {
     test('derives the initial PTY size before Ghostty mounts', () => {
         expect(terminalViewportSource).toContain('const getProvisionalTerminalSize');
         expect(terminalViewportSource).toContain('React.useLayoutEffect(() => {');
-        expect(terminalViewportSource).toContain('resizeRef.current(size.cols, size.rows)');
+        expect(terminalViewportSource).toContain('(provisionalSizeCallbackRef.current ?? resizeRef.current)(size.cols, size.rows)');
         expect(terminalViewportSource).toContain('...(provisionalSizeRef.current ?? {})');
+    });
+
+    test('waits for mono/Nerd fonts and remounts if they arrive late', () => {
+        expect(terminalViewportSource).toContain('waitForTerminalFonts');
+        expect(terminalViewportSource).toContain('fonts.loadedBeforeTimeout');
+        expect(terminalViewportSource).toContain('if (!fontsLoaded)');
+        expect(terminalViewSource).toContain('monoFont={monoFont}');
+        expect(terminalViewSource).toContain('handleCopySelection');
+        expect(terminalViewSource).toContain('terminalView.actions.copySelection');
+        expect(terminalViewportSource).toContain('onProvisionalSize, theme, monoFont');
     });
 });

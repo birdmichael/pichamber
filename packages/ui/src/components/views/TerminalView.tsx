@@ -1,6 +1,8 @@
 import React from 'react';
 import { terminalSnapshotSize } from '@/lib/terminalApi';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { toast } from 'sonner';
 
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { EMPTY_TERMINAL_BUFFER, useTerminalStore } from '@/stores/useTerminalStore';
@@ -634,6 +636,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
         disconnectStream();
     }, [createTab, disconnectStream, effectiveDirectory, setActiveTab]);
 
+
+    // Touch hosts have no keyboard shortcut for copy, so the toolbar offers the
+    // same action the desktop gets from Cmd/Ctrl+C on a selection.
+    const handleCopySelection = React.useCallback(() => {
+        const selection = terminalControllerRef.current?.getSelection();
+        if (!selection?.text) return;
+        void copyTextToClipboard(selection.text).then((result) => {
+            if (result.ok) toast.success(t('terminalView.toast.selectionCopied'));
+            else toast.error(t('terminalView.toast.copyFailed'));
+        });
+    }, [t]);
+
     const handleAttachSelection = React.useCallback(() => {
         const selection = terminalControllerRef.current?.getSelection();
         const sessionKey = currentSessionId ?? (newSessionDraft?.open ? 'draft' : null);
@@ -1055,6 +1069,17 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
                             >
                                 <Icon name="attachment-2" className="h-4 w-4" />
                             </Button>
+                            <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={handleCopySelection}
+                                title={t('terminalView.actions.copySelection')}
+                                aria-label={t('terminalView.actions.copySelection')}
+                            >
+                                <Icon name="file-copy" className="h-4 w-4" />
+                            </Button>
                             {previewUrl ? (
                                 <Button
                                     type="button"
@@ -1105,6 +1130,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
                             onResize={handleViewportResize}
                             onProvisionalSize={handleProvisionalSize}
                             theme={xtermTheme}
+                            monoFont={monoFont}
                             fontFamily={resolvedFontStack}
                             fontSize={terminalFontSize}
                             enableTouchScroll={useTouchTerminalInput}
