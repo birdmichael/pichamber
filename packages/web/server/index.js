@@ -87,6 +87,7 @@ import { createTunnelWiringRuntime } from './lib/opencode/tunnel-wiring-runtime.
 import { createStartupPipelineRuntime } from './lib/opencode/startup-pipeline-runtime.js';
 import { runCliEntryIfMain } from './lib/opencode/cli-entry-runtime.js';
 import { resolveAppDataDir } from './lib/app-data/index.js';
+import { migrateLegacyUserDirs } from './lib/data-dir-migration.js';
 import { registerNotificationRoutes } from './lib/notifications/routes.js';
 import { createNotificationEmitterRuntime } from './lib/notifications/emitter-runtime.js';
 import { createNotificationTriggerRuntime } from './lib/notifications/runtime.js';
@@ -263,6 +264,24 @@ const sanitizeProjects = (...args) => settingsNormalizationRuntime.sanitizeProje
 const OPENCHAMBER_USER_CONFIG_ROOT = resolveAppDataDir();
 const OPENCHAMBER_USER_THEMES_DIR = path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'themes');
 const OPENCHAMBER_PROJECTS_CONFIG_DIR = path.join(OPENCHAMBER_USER_CONFIG_ROOT, 'projects');
+
+// When PICHAMBER_DATA_DIR / OPENCHAMBER_DATA_DIR points elsewhere, copy
+// projects/themes/speech-models from the default config roots once (copy, not move).
+const PICHAMBER_DEFAULT_CONFIG_ROOT = path.join(os.homedir(), '.config', 'pichamber');
+const OPENCHAMBER_LEGACY_CONFIG_ROOT = path.join(os.homedir(), '.config', 'openchamber');
+for (const legacyRoot of [PICHAMBER_DEFAULT_CONFIG_ROOT, OPENCHAMBER_LEGACY_CONFIG_ROOT]) {
+  const movedUserDirs = await migrateLegacyUserDirs({
+    fsPromises,
+    path,
+    dataDir: OPENCHAMBER_USER_CONFIG_ROOT,
+    legacyRoot,
+    warn: (message) => console.warn(`[data-dir] ${message}`),
+  });
+  if (movedUserDirs.length > 0) {
+    console.log(`[data-dir] Copied ${movedUserDirs.join(', ')} from ${legacyRoot} into ${OPENCHAMBER_USER_CONFIG_ROOT}`);
+  }
+}
+
 
 const MAX_THEME_JSON_BYTES = 512 * 1024;
 

@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
 - Settings: "Always show scrollbars" device preference keeps overlay scrollbars visible; hovering a scrollable area reveals its scrollbar without layout shift (upstream OpenChamber 1.23.0/1.23.1).
 - Desktop: Zoom In/Out/Reset adjust interface scale in chat (and terminal/editor fonts when those are focused); macOS traffic-light clearance stays a fixed 88px so scale cannot overlap window buttons (upstream OpenChamber 1.23.0/1.23.1).
 - App: Hidden Files, Changes, terminal, and walkthrough panels pause background polling while another panel is focused (upstream OpenChamber 1.23.1).
+- Chat: model favorites (and related model prefs) save from the first change without waiting for a later edit (upstream OpenChamber 1.23.1).
+- Desktop: reachable remote instances no longer appear offline when the probe needs a longer budget; Chromium networking with one deadline per attempt and one unreachable retry (upstream OpenChamber 1.23.0 #3415).
+- Server: custom `PICHAMBER_DATA_DIR` / `OPENCHAMBER_DATA_DIR` copies `projects/`, `themes/`, and `speech-models/` from default config roots once at startup (upstream OpenChamber 1.23.0).
 - Git: branch comparisons include local edits and follow the selected base when you switch comparisons (upstream OpenChamber 1.23.0).
 - Git: `getLog` with only `to` (branch tip) returns recent commits again so Changes commit comparison can load history (upstream OpenChamber 1.23.0).
 - Chat: remove the non-git turn changed-files dropdown under final answers; git turn file pills from the accuracy port remain (upstream OpenChamber 1.23.1).

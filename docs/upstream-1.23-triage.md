@@ -62,7 +62,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Mobile workspace dirty dot | **SKIP** | Capacitor-mobile-only unless shared | |
 | Remove non-git changed-files dropdown | **PORT** | Verify `TurnChangedFilesDropdown` gating | |
 | Default model/agent/thinking survive restarts | **DEFER/verify** | PC has draft defaults work | |
-| Model favorites first-change save | **DEFER/verify** | | |
+| Model favorites first-change save | **PORTED** | modelPrefsAutoSave flush on first change + isApplyingServerSettings (Batch C) | PR #757 |
 | Scroll place while history loads; composer growth | DEFER/verify | HP#6d | |
 | Reasoning/shell auto-follow | PORT | HP#6c | |
 | Turn file lists direct edits + collapse@4 | PORT | HP#6b | |
@@ -120,7 +120,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | False history-loading error | **DEFER/verify** | | |
 | Relay/tunnel flow control | **DEFER** | server | |
 | Fork restores attachments | **DEFER/verify** | | |
-| Interrupted tools timer | **DEFER/verify** | | |
+| Interrupted tools timer | **ALREADY** | `interruptedTurnToolParts` + tests present | |
 | Duplicate attached images | **DEFER/verify** | | |
 | Follow end on panel resize | **DEFER** | | |
 | Message details narrow columns | **DEFER** | | |
@@ -138,13 +138,13 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | New-file diffs line-ending warnings | **DEFER** | | |
 | Usage provider fixes (Go/OpenRouter/Ollama/NeuralWatt/z.ai) | **SKIP** | OpenCode usage providers; keep Pichamber provider model | |
 | Small-model endpoint details | **PORT** | titles/summaries/walkthroughs — Pi adapt | |
-| Electron instance probe timeout | **DEFER** | Desktop | |
+| Electron instance probe timeout | **PORTED** | electron-host-probe + host-probe-policy (Batch C) | PR #757 |
 | Interface scaling layout | **PORTED** | HP#13b — root rem scale + fixed traffic-light inset (PR #755) | #755 |
 | Sidebar width preserve | ALREADY | HP#13a | |
 | Linux Open In non-Latin | **SKIP** | Linux-specific; optional later | |
 | Overlay scrollbar hover | **PORTED** | OverlayScrollbar pointerenter/leave reveal (PR #755) | #755 |
 | Turkish glossary | **SKIP** | i18n-only unless touching strings we port | |
-| `OPENCHAMBER_DATA_DIR` expansion | **DEFER** | server paths | |
+| `OPENCHAMBER_DATA_DIR` expansion | **PORTED** | migrateLegacyUserDirs for projects/themes/speech-models (Batch C) | PR #757 |
 
 ## Port order (planned PRs)
 
