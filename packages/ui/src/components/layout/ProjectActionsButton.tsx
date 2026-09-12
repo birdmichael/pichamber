@@ -23,9 +23,11 @@ import { openExternalUrl } from '@/lib/url';
 import { useI18n } from '@/lib/i18n';
 import {
   getProjectActionsState,
+  getProjectSetup,
   type OpenChamberProjectAction,
   type ProjectRef,
 } from '@/lib/openchamberConfig';
+import { ensureSharedSetupTrusted } from '@/lib/sharedTrustConfirmation';
 import {
   normalizeProjectActionDirectory,
   PROJECT_ACTIONS_UPDATED_EVENT,
@@ -451,6 +453,13 @@ export const ProjectActionsButton = ({
     startingRunKeysRef.current.add(runKey);
 
     try {
+      if (action.source === 'shared' && stableProjectRef) {
+        const setup = await getProjectSetup(stableProjectRef);
+        if (!(await ensureSharedSetupTrusted(stableProjectRef, setup))) {
+          return;
+        }
+      }
+
       const discovered = action.id === AUTO_DISCOVER_ACTION_ID
         ? await (async (): Promise<OpenChamberProjectAction> => {
           const [actionsState, scripts] = await Promise.all([

@@ -108,7 +108,36 @@ mock.module('@/lib/worktrees/worktreeStatus', () => ({
 mock.module('@/lib/openchamberConfig', () => ({
   getWorktreeSetupCommands: async () => [],
   getWorktreeSetupWaitEnabled: async () => false,
+  getProjectSetup: async () => ({
+    trust: { hash: null, trusted: true },
+    setupWorktree: [],
+    setupWorktreeWait: false,
+    projectActions: [],
+    projectActionsPrimaryId: null,
+    draftStarters: [],
+    shared: {
+      status: 'missing',
+      path: '.pichamber/project.json',
+      setupWorktree: [],
+      setupWorktreeWait: null,
+      projectActions: [],
+      draftStarters: [],
+      plansDir: null,
+    },
+    personal: {
+      setupWorktree: [],
+      setupWorktreeWait: null,
+      setupWorktreeMode: 'append',
+      projectActions: [],
+      projectActionsPrimaryId: null,
+      draftStarters: [],
+      hiddenSharedActionIds: [],
+      sharedTrust: null,
+    },
+  }),
+  updateProjectSetup: async () => true,
 }));
+
 
 mock.module('@/lib/worktrees/worktreeManager', () => ({
   removeProjectWorktree: async () => undefined,

@@ -1949,7 +1949,8 @@ export const useSessionUIStore = create<SessionUIState>()((set, get) => ({
       ])
       const branchName = branchNameModule.generateBranchName()
       createdWorktreeProject = { id: project.id, path: project.path }
-      const setupCommands = await configModule.getWorktreeSetupCommands(createdWorktreeProject)
+      const { resolveWorktreeSetupCommands } = await import('@/lib/sharedTrustConfirmation');
+      const setupCommands = await resolveWorktreeSetupCommands(createdWorktreeProject)
       createdWorktree = await createModule.createWorktreeWithDefaults(createdWorktreeProject, {
         preferredName: branchName,
         mode: "new",

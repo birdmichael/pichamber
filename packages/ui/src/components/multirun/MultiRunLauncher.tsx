@@ -13,7 +13,7 @@ import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useMultiRunStore } from '@/stores/useMultiRunStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { useProjectsStore } from '@/stores/useProjectsStore';
-import { getWorktreeSetupCommands } from '@/lib/openchamberConfig';
+import { resolveWorktreeSetupCommands } from '@/lib/sharedTrustConfirmation';
 import type { ProjectRef } from '@/lib/openchamberConfig';
 import type { CreateMultiRunParams, MultiRunGroup } from '@/types/multirun';
 import { ModelMultiSelect, generateInstanceId, type ModelSelectionWithId } from './ModelMultiSelect';
@@ -287,7 +287,7 @@ export const MultiRunLauncher: React.FC<MultiRunLauncherProps> = ({
     setIsLoadingSetupCommands(true);
     (async () => {
       try {
-        const commands = await getWorktreeSetupCommands(projectRef);
+        const commands = await resolveWorktreeSetupCommands(projectRef);
         if (!cancelled) setSetupCommands(commands);
       } catch {
         // Ignore
