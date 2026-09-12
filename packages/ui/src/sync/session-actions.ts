@@ -6,6 +6,7 @@
 import type { OpencodeClient, Session, Message, Part } from "@opencode-ai/sdk/v2/client"
 import { Binary } from "./binary"
 import { useSessionUIStore } from "./session-ui-store"
+import { cancelSessionTitleGeneration } from "./session-title-generation"
 import { useInputStore } from "./input-store"
 import type { ChildStoreManager } from "./child-store"
 import { computeSubtreeIds } from "./scoped-blocking-requests"
@@ -1352,9 +1353,22 @@ export async function unarchiveSessions(
   return { restoredIds, failedIds }
 }
 
-export async function updateSessionTitle(sessionId: string, title: string): Promise<void> {
-  const sessionDirectory = getSessionDirectory(sessionId)
+export async function updateSessionTitle(
+  sessionId: string,
+  title: string,
+  options?: { directory?: string | null; expectedRuntimeKey?: string; signal?: AbortSignal },
+): Promise<void> {
+  if (options?.expectedRuntimeKey && options.expectedRuntimeKey !== getRuntimeKey()) {
+    throw new Error("runtime changed")
+  }
+  if (options?.signal) options.signal.throwIfAborted()
+  else cancelSessionTitleGeneration(sessionId)
+  const sessionDirectory = options?.directory ?? getSessionDirectory(sessionId)
   const session = await opencodeClient.updateSession(sessionId, { title }, sessionDirectory)
+  if (options?.expectedRuntimeKey && options.expectedRuntimeKey !== getRuntimeKey()) {
+    throw new Error("runtime changed")
+  }
+  options?.signal?.throwIfAborted()
   useGlobalSessionsStore.getState().upsertSession(session)
   mirrorSessionIntoLiveStores(session, sessionDirectory)
 }

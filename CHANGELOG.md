@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Fixed / Improved
+- Sessions: Rename with AI generates a title from recent completed turns via the Small Model (upstream OpenChamber 1.23.1).
 - Chat: queued messages collapse by default and preview quote/comment context when the composer text is empty (upstream OpenChamber 1.23.1).
 - Chat: collapsible Markdown `<details>` disclosures render safely with stream-stable open state (upstream OpenChamber 1.23.0).
 - Sessions: retention can target archived-only cleanup with cascade-safe parent/child deletes (upstream OpenChamber 1.23.1).

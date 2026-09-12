@@ -88,6 +88,8 @@ import {
 import { ProjectActionsButton } from '@/components/layout/ProjectActionsButton';
 import { SessionTabsStrip, type SessionTabMenuArgs } from '@/components/layout/SessionTabsStrip';
 import { SessionSwitcherDropdown } from '@/components/session/SessionSwitcherDropdown';
+import { SessionAiRenameMenuItem } from '@/components/session/SessionAiRenameMenuItem';
+import { useIsSessionAiRenamePending } from '@/sync/use-session-ai-rename';
 import { canUseElectronDesktopIPC, invokeDesktop, isDesktopLocalOriginActive, isDesktopShell, isVSCodeRuntime, startDesktopWindowDrag, type UpdateInfo } from '@/lib/desktop';
 import { desktopHostsGet, redactSensitiveUrl } from '@/lib/desktopHosts';
 import {
@@ -1135,6 +1137,8 @@ export const Header: React.FC<HeaderProps> = ({
     return normalize(raw || '');
   }, [currentSession?.directory]);
 
+  const isCurrentSessionAiRenaming = useIsSessionAiRenamePending(currentSessionId ?? '', sessionDirectory);
+
   const draftDirectory = useSessionUIStore((state) => {
     if (!state.newSessionDraft?.open) {
       return '';
@@ -2141,6 +2145,7 @@ export const Header: React.FC<HeaderProps> = ({
         <Item onClick={() => { if (!isActive) select(); pendingHeaderRenameRef.current = session.id; }}>
           <Icon name="pencil-ai" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.rename')}
         </Item>
+        <SessionAiRenameMenuItem sessionID={session.id} directory={session.directory} open={true} Item={Item} />
         <Item onClick={() => copySessionIdFor(session.id)}>
           <Icon name="file-copy" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.copyId')}
         </Item>
@@ -2380,6 +2385,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-[190px]">
                     <DropdownMenuItem onClick={() => { pendingHeaderRenameRef.current = currentSessionId; }}><Icon name="pencil-ai" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.rename')}</DropdownMenuItem>
+                    <SessionAiRenameMenuItem sessionID={currentSessionId} directory={sessionDirectory} open={isHeaderSessionMenuOpen} Item={DropdownMenuItem} />
                     <DropdownMenuItem onClick={copyCurrentSessionId}><Icon name="file-copy" className="mr-2 size-4" />{t('sessions.sidebar.session.menu.copyId')}</DropdownMenuItem>
                     {showSessionTitleReload ? (
                       <DropdownMenuItem
@@ -2499,8 +2505,11 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   </form>
                 ) : (
-                  <span className="block overflow-hidden whitespace-nowrap text-[13px] font-medium leading-4 text-foreground max-w-full">
-                    {isNewSessionDraftOpen ? t('sessions.switcher.draftTitle') : currentSessionTitle}
+                  <span className="flex min-w-0 items-center overflow-hidden whitespace-nowrap text-[13px] font-medium leading-4 text-foreground max-w-full">
+                    {isCurrentSessionAiRenaming ? <Icon name="loader-4" className="mr-1 size-3 shrink-0 animate-spin text-primary" aria-label={t('sessions.aiRename.generating')} /> : null}
+                    <span className="block min-w-0 overflow-hidden whitespace-nowrap">
+                      {isNewSessionDraftOpen ? t('sessions.switcher.draftTitle') : currentSessionTitle}
+                    </span>
                   </span>
                 )}
               </div>
