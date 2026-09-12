@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { resolveTurnUsageTooltip } from './turnUsageTooltip';
 import { ArrowsMerge } from '@/components/icons/ArrowsMerge';
 import type { ContentChangeReason } from '@/hooks/useChatAutoFollow';
+import { useFactsFit } from './useFactsFit';
 
 import { MarkdownImageGallery, SimpleMarkdownRenderer } from '../MarkdownRenderer';
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -2200,6 +2201,9 @@ const AssistantMessageBody = React.memo(({
         return formatTurnDuration(completedAt - userCreatedAt);
     }, [frozenCompletedAt, isLastAssistantInTurn, hasStopFinish, turnGroupingContext?.userMessageCreatedAt, messageCompletedAt]);
 
+    const footerFactsRef = React.useRef<HTMLDivElement>(null);
+    useFactsFit(footerFactsRef);
+
     const footerTimestamp = React.useMemo(() => {
         void locale;
         const timestamp = typeof messageCompletedAt === 'number' && messageCompletedAt > 0
@@ -2426,9 +2430,9 @@ const AssistantMessageBody = React.memo(({
                         className="mt-2 mb-1 flex flex-wrap items-center justify-start gap-x-3 gap-y-1.5"
                         style={MESSAGE_FOOTER_CONTAINER_STYLE}
                     >
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-muted-foreground/60">
+                        <div ref={footerFactsRef} className="message-footer__facts whitespace-nowrap text-sm text-muted-foreground/60">
                         {footerModelName ? (
-                            <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="flex min-w-0 shrink items-center gap-1.5">
                                 {footerHasLogo && footerLogoSrc ? (
                                     <img
                                         src={footerLogoSrc}
@@ -2446,59 +2450,51 @@ const AssistantMessageBody = React.memo(({
                                         style={{ color: `var(${getAgentColor(footerAgentName).var})` }}
                                     />
                                 )}
-                                <span className="truncate">{footerModelName}</span>
+                                <span data-fact-model className="truncate">{footerModelName}</span>
                             </span>
                         ) : null}
                         {footerVariant && !['default', 'none'].includes(footerVariant.toLowerCase()) ? (
-                            <span className="flex items-center gap-1">
-                                <Icon name="brain-ai-3" className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="message-footer__label">
-                                    {footerVariant[0].toLowerCase() + footerVariant.slice(1)}
-                                </span>
+                            <span data-fact-priority="3" className="message-footer__fact">
+                                <span className="opacity-60" aria-hidden>·</span>
+                                {footerVariant[0].toLowerCase() + footerVariant.slice(1)}
                             </span>
                         ) : null}
                         {footerAgentName ? (
-                            <span className="flex items-center gap-1">
-                                <Icon name="ai-agent" className="h-3.5 w-3.5 flex-shrink-0" />
-                                <span className="message-footer__label">{footerAgentName}</span>
+                            <span data-fact-priority="2" className="message-footer__fact">
+                                <span className="opacity-60" aria-hidden>·</span>
+                                {footerAgentName}
                             </span>
                         ) : null}
                         {turnDurationText ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="text-sm text-muted-foreground/60 tabular-nums flex items-center gap-1">
-                                        <Icon name="hourglass" className="h-3.5 w-3.5" />
-                                        <span className="message-footer__label">{turnDurationText}</span>
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent className={usageTooltipRows ? 'text-left tabular-nums' : undefined}>
-                                    {usageTooltipRows ?? turnDurationText}
-                                </TooltipContent>
-                            </Tooltip>
+                            <span className="message-footer__fact tabular-nums">
+                                {footerModelName ? <span className="opacity-60" aria-hidden>·</span> : null}
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="tabular-nums">{turnDurationText}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className={usageTooltipRows ? 'text-left tabular-nums' : undefined}>
+                                        {usageTooltipRows ?? turnDurationText}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </span>
                         ) : null}
-                        {footerTimestamp ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span
-                                        className={footerTimestampClassName}
-                                        aria-label={`Message time: ${footerTimestamp}`}
-                                    >
-                                        <Icon name="time" className="h-3.5 w-3.5" />
-                                        <span className="message-footer__label">{footerTimestamp}</span>
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent className={!turnDurationText && usageTooltipRows ? 'text-left tabular-nums' : undefined}>
-                                    {!turnDurationText && usageTooltipRows ? usageTooltipRows : footerTimestamp}
-                                </TooltipContent>
-                            </Tooltip>
+                        {footerTimestamp && !(alwaysShowMessageActions || isTouchContext) ? (
+                            <span
+                                data-fact-priority="1"
+                                className={cn(footerTimestampClassName, 'message-footer__fact')}
+                                aria-label={`Message time: ${footerTimestamp}`}
+                            >
+                                <span className="opacity-60" aria-hidden>·</span>
+                                {footerTimestamp}
+                            </span>
                         ) : null}
+                        </div>
                         {!isMiniChatSurface && isLastAssistantInTurn && hasStopFinish ? (
                             <TurnChangedFilePills
                                 files={turnGroupingContext?.changedFiles}
                                 isInteractive={turnGroupingContext?.isLatestTurn === true}
                             />
                         ) : null}
-                        </div>
                         <div
                             className={cn(
                                 'flex items-center gap-1.5',

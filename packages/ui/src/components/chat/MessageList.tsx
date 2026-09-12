@@ -336,6 +336,7 @@ interface MessageListProps {
     onAnchorSizeChanged?: (messageId: string) => void;
     composerOverlayHeight?: number;
     onIsAtEndChange?: (isAtEnd: boolean) => void;
+    onListMetricsChange?: (metrics: { readonly footerSize: number }) => void;
     onTimelineDataChange?: () => void;
     // Content that used to sit as siblings of the list inside the scroll
     // container. The list owns that container now, so they render as its
@@ -976,6 +977,7 @@ type TimelineListProps = {
     };
     composerOverlayHeight: number;
     onIsAtEndChange: (isAtEnd: boolean) => void;
+    onListMetricsChange: (metrics: { readonly footerSize: number }) => void;
     onTimelineDataChange: () => void;
     listHeader?: React.ReactNode;
     listFooter?: React.ReactNode;
@@ -990,6 +992,7 @@ const TimelineList = React.memo(({
     anchoredEndSpace,
     composerOverlayHeight,
     onIsAtEndChange,
+    onListMetricsChange,
     onTimelineDataChange,
     listHeader,
     listFooter,
@@ -1107,6 +1110,7 @@ const TimelineList = React.memo(({
                 // reader is held on the end by the owning hook instead.
                 maintainVisibleContentPosition={{ data: true, size: endPinningReleased }}
                 onScroll={handleScroll}
+                onMetricsChange={onListMetricsChange}
                 ListHeaderComponent={header}
                 ListFooterComponent={footer}
                 {...scrollContainerProps}
@@ -1197,6 +1201,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
     onAnchorSizeChanged,
     composerOverlayHeight = 0,
     onIsAtEndChange,
+    onListMetricsChange,
     onTimelineDataChange,
     listHeader,
     listFooter,
@@ -1439,6 +1444,10 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
     // re-render every mounted row.
     const stableIsAtEndChange = useStableEvent((isAtEnd: boolean) => {
         onIsAtEndChange?.(isAtEnd);
+    });
+
+    const stableListMetricsChange = useStableEvent((metrics: { readonly footerSize: number }) => {
+        onListMetricsChange?.(metrics);
     });
 
     const stableTimelineDataChange = useStableEvent(() => {
@@ -1872,6 +1881,7 @@ const MessageList = React.forwardRef<MessageListHandle, MessageListProps>(({
                 anchoredEndSpace={anchoredEndSpace}
                 composerOverlayHeight={composerOverlayHeight}
                 onIsAtEndChange={stableIsAtEndChange}
+                onListMetricsChange={stableListMetricsChange}
                 onTimelineDataChange={stableTimelineDataChange}
                 listHeader={listHeader}
                 listFooter={listFooter}

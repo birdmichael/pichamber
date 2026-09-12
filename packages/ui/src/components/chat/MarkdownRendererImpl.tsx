@@ -32,6 +32,7 @@ import {
   type DecorateLabels,
   type MermaidControlOptions,
   type MermaidRender,
+  stabilizeMarkdownTableWidths,
 } from './markdown/decorate';
 import { findTextPosition } from './markdown/textPosition';
 import { createMermaidViewerRegistry, MERMAID_BLOCK_SELECTOR, shouldRefreshMermaidViewers } from './markdown/mermaidViewer';
@@ -758,6 +759,27 @@ const useMorphdomMarkdown = ({
   }, []);
 
   const mermaidViewerRef = React.useRef<ReturnType<typeof createMermaidViewerRegistry> | null>(null);
+
+  // Re-measure markdown tables when the chat column width changes (narrow columns).
+  React.useEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+    let frame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        const target = container.querySelector<HTMLElement>('[data-markdown-content]') ?? container;
+        stabilizeMarkdownTableWidths(target);
+      });
+    });
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [containerRef]);
+
   const refreshMermaidViewers = React.useCallback(() => {
     const container = containerRef.current;
     if (!container) {
@@ -795,6 +817,7 @@ const useMorphdomMarkdown = ({
       // <pre>/tables that "snap" into their decorated form a tick later. Matching
       // the structure here keeps the async morph to syntax colors only.
       decorateMarkdown(block, ctx);
+      stabilizeMarkdownTableWidths(block);
       target.appendChild(block);
       if (shouldRefreshMermaidViewers(block)) {
         refreshMermaidViewers();
@@ -837,6 +860,7 @@ const useMorphdomMarkdown = ({
         const temp = document.createElement('div');
         temp.innerHTML = block.html;
         decorateMarkdown(temp, ctx);
+        stabilizeMarkdownTableWidths(temp);
         const hadMermaidBlock = shouldRefreshMermaidViewers(el);
         const tempHasMermaidBlock = shouldRefreshMermaidViewers(temp);
         morphdom(el, temp, {

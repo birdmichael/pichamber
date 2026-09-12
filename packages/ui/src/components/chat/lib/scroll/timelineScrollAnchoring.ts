@@ -119,17 +119,20 @@ export const resolveRealContentEndOffset = ({
     state,
     composerOverlayHeight,
     extraInset = 0,
+    footerSize = 0,
 }: {
     readonly state: TimelineListMeasurementState;
     readonly composerOverlayHeight: number;
     readonly extraInset?: number;
+    /** List footer (cards/spacer) size — not in getState(); caller reports it. */
+    readonly footerSize?: number;
 }): number | null => {
     const lastIndex = state.data.length - 1;
     if (lastIndex < 0) return null;
     const lastBottom = getRowBottom(state, lastIndex);
     if (lastBottom === null) return null;
     const visibleLength = Math.max(0, state.scrollLength - composerOverlayHeight - extraInset);
-    return Math.max(0, lastBottom - visibleLength);
+    return Math.max(0, lastBottom + Math.max(0, footerSize) - visibleLength);
 };
 
 // "At the end" for follow purposes is a tight band, not the list's isNearEnd

@@ -1103,6 +1103,25 @@ html.vscode-runtime {
   }
 }
 
+/* Assistant message footer: one line of facts; useFactsFit hides lower-priority
+   facts until the model name stops truncating (avoids wrap/clip holes). */
+.message-footer__facts {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.message-footer__fact {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-inline-start: 0.375rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Assistant message footer: collapse text labels only on very narrow layouts. */
 @container message-footer (max-width: 16rem) {
   .message-footer__label {

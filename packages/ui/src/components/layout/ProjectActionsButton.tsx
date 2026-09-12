@@ -15,6 +15,7 @@ import { useDeviceInfo } from '@/lib/device';
 import { isDesktopShell } from '@/lib/desktop';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTerminalStore } from '@/stores/useTerminalStore';
+import { terminalSnapshotSize } from '@/lib/terminalApi';
 import { extractAnnouncedUrls, extractProjectActionUrl } from '@/lib/terminalPreview';
 import { setAnnouncedDevServers } from '@/lib/browser/announcedServers';
 import { useThemeSystem } from '@/contexts/useThemeSystem';
@@ -515,7 +516,7 @@ export const ProjectActionsButton = ({
           activeSessionId,
           { onEvent: (event) => {
             if (event.type === 'snapshot') {
-              useTerminalStore.getState().replaceBuffer(normalizedDirectory, tabId, event.data ?? '', event.sequence ?? 0);
+              useTerminalStore.getState().replaceBuffer(normalizedDirectory, tabId, event.data ?? '', event.sequence ?? 0, terminalSnapshotSize(event));
               useTerminalStore.getState().setConnecting(normalizedDirectory, tabId, false);
             }
             if (event.type === 'data' && typeof event.data === 'string' && event.data.length > 0) {

@@ -153,12 +153,12 @@ describe('terminal runtime', () => {
       expect(response.body).toEqual({ sessionId: 'term-1', cols: 120, rows: 40, status: 'running' });
       expect(harness.processes[0].options.cwd).toBe('/repo');
       expect(harness.processes[0].options.env.COLORFGBG).toBe('0;15');
-      expect(harness.processes[0].options.env.NODE_CHANNEL_FD).toBe('');
+      expect(harness.processes[0].options.env).not.toHaveProperty('NODE_CHANNEL_FD');
       expect(harness.processes[0].options.env).not.toHaveProperty('ARGV0');
       expect(harness.processes[0].options.env).not.toHaveProperty('ELECTRON_RUN_AS_NODE');
       if (process.platform === 'linux') {
         expect(harness.processes[0].shell).toMatch(/\/env$/);
-        expect(harness.processes[0].args.slice(0, 3)).toEqual(['-u', 'ARGV0', expect.any(String)]);
+        expect(harness.processes[0].args.slice(0, 5)).toEqual(['-u', 'ARGV0', '-u', 'NODE_CHANNEL_FD', expect.any(String)]);
       }
       harness.processes[0].emitData('\u001b[?2031h\u001b]10;?\u0007\u001b]11;?\u0007\u001b[0c');
       expect(harness.processes[0].writes).toEqual(['\u001b]10;rgb:1b1b/1b1b/1b1b\u001b\\', '\u001b]11;rgb:fafa/f8f8/f0f0\u001b\\', '\u001b[?1;2c']);
@@ -227,7 +227,7 @@ describe('terminal runtime', () => {
       expect(created.statusCode).toBe(200);
       if (process.platform === 'linux') {
         expect(harness.processes[0].shell).toMatch(/\/env$/);
-        expect(harness.processes[0].args).toEqual(['-u', 'ARGV0', '/bin/zsh', '-l']);
+        expect(harness.processes[0].args).toEqual(['-u', 'ARGV0', '-u', 'NODE_CHANNEL_FD', '/bin/zsh', '-l']);
       } else {
         expect(harness.processes[0].shell).toBe('/bin/zsh');
         expect(harness.processes[0].args).toEqual(['-l']);
@@ -238,7 +238,7 @@ describe('terminal runtime', () => {
       expect(restarted.statusCode).toBe(200);
       if (process.platform === 'linux') {
         expect(harness.processes[1].shell).toMatch(/\/env$/);
-        expect(harness.processes[1].args).toEqual(['-u', 'ARGV0', '/bin/bash', '-l']);
+        expect(harness.processes[1].args).toEqual(['-u', 'ARGV0', '-u', 'NODE_CHANNEL_FD', '/bin/bash', '-l']);
       } else {
         expect(harness.processes[1].shell).toBe('/bin/bash');
         expect(harness.processes[1].args).toEqual(['-l']);

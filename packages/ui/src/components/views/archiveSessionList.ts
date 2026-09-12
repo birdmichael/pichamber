@@ -5,6 +5,7 @@
  */
 
 type ArchiveTimeFields = {
+  id?: string;
   title?: string | null;
   time?: {
     archived?: number | null;
@@ -29,6 +30,9 @@ export const filterArchivedSessions = <T extends ArchiveTimeFields>(
 ): T[] => {
   const normalizedQuery = options.query.trim().toLowerCase();
   if (normalizedQuery) {
+    if (normalizedQuery.startsWith('ses_')) {
+      return sessions.filter((session) => (session.id ?? '').toLowerCase() === normalizedQuery);
+    }
     return sessions.filter((session) => (session.title ?? '').toLowerCase().includes(normalizedQuery));
   }
   if (options.selectedDirectory === null) return [...sessions];

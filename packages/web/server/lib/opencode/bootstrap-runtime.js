@@ -61,6 +61,7 @@ export const createBootstrapRuntime = (dependencies) => {
       modelsMetadataCacheTtl,
       fetchFreeZenModels,
       getCachedZenModels,
+      desktopUpdater,
       setAutoAcceptSession,
       agentToolRuntime,
     } = options;
@@ -153,6 +154,7 @@ export const createBootstrapRuntime = (dependencies) => {
       readSettingsFromDiskMigrated,
       fetchFreeZenModels,
       getCachedZenModels,
+      desktopUpdater,
     });
 
     return {

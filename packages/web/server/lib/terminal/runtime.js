@@ -10,7 +10,7 @@ import {
 import { sanitizeTerminalHistoryChunk } from './history.js';
 import { consumeTerminalThemeQueries, terminalThemeModeReport } from './theme-response.js';
 import { createTerminalShellResolver, getTerminalShellLoginArgs, normalizeTerminalShell } from './shells.js';
-import { stripAppImageArgv0Leak, resolveLinuxPtyLaunch } from '../inherited-env.js';
+import { stripAppImageArgv0Leak, resolvePosixPtyLaunch } from '../inherited-env.js';
 
 const MAX_SESSIONS = 20;
 const MAX_HISTORY_BYTES = 512 * 1024;
@@ -63,14 +63,14 @@ export function createTerminalRuntime({
       if (!args) throw new Error(`Terminal shell "${resolvedShell.id}" does not support login mode`);
       try {
         const env = { ...process.env, PATH: buildAugmentedPath(), TERM: 'xterm-256color', COLORTERM: 'truecolor', COLORFGBG: themeMode === 'light' ? '0;15' : '15;0' };
-        // The daemon's IPC fd is closed inside the PTY. An explicit override is
-        // required because bun-pty also inherits Bun's native process environment.
-        env.NODE_CHANNEL_FD = '';
+        // The daemon's IPC fd is closed inside the PTY; an inherited NODE_CHANNEL_FD
+        // (even an empty one) makes Node CLIs warn about an unparsable IPC channel.
+        delete env.NODE_CHANNEL_FD;
         delete env.BASH_XTRACEFD; delete env.BASH_ENV; delete env.ENV; delete env.ELECTRON_RUN_AS_NODE;
         // AppImage exports ARGV0; zsh would otherwise rewrite argv[0] for every command (#2588).
         // bun-pty also merges the native OS environ, so wrap with `env -u ARGV0` on Linux.
         stripAppImageArgv0Leak(env);
-        const launch = resolveLinuxPtyLaunch(executable, args);
+        const launch = resolvePosixPtyLaunch(executable, args);
         const options = { name: 'xterm-256color', cwd, cols, rows, env, ...(process.platform === 'win32' ? { useConpty: true } : {}) };
         return { process: provider.spawn(launch.executable, launch.args, options), backend: provider.backend, shell: resolvedShell.id, loginShell };
       } catch (error) { lastError = error; }
@@ -122,6 +122,8 @@ export function createTerminalRuntime({
 
   const snapshot = (session) => ({
     t: 'snapshot', v: 3, s: session.id, q: session.sequence, history: session.history,
+    // PTY size history was drawn for — client replays at this size before fit.
+    cols: session.cols, rows: session.rows,
     status: session.status, exitCode: session.exitCode, signal: session.signal,
     runtime, ptyBackend: session.backend,
   });

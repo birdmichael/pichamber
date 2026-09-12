@@ -158,6 +158,9 @@ export const useSessionSidebarSections = (args: Args) => {
       return result;
     }
 
+    const idQuery = normalizedSessionSearchQuery.trim().toLowerCase();
+    const isIdQuery = idQuery.startsWith('ses_');
+
     visibleProjectSections.forEach((section) => {
       section.groups.forEach((group) => {
         const filteredNodes = filterSessionNodesForSearch(group.sessions, normalizedSessionSearchQuery);
@@ -166,10 +169,10 @@ export const useSessionSidebarSections = (args: Args) => {
           normalizedSessionSearchQuery,
           buildSessionSearchText,
         );
-        const groupMatches = sessionSearchTextMatches(buildGroupSearchText(group), normalizedSessionSearchQuery);
+        const groupMatches = !isIdQuery && sessionSearchTextMatches(buildGroupSearchText(group), normalizedSessionSearchQuery);
         const scopeKey = normalizePath(group.directory ?? null);
         const scopeFolders = scopeKey ? (foldersMap[scopeKey] ?? []) : [];
-        const folderNameMatchCount = scopeFolders.filter((folder) => sessionSearchTextMatches(folder.name.toLowerCase(), normalizedSessionSearchQuery)).length;
+        const folderNameMatchCount = isIdQuery ? 0 : scopeFolders.filter((folder) => sessionSearchTextMatches(folder.name.toLowerCase(), normalizedSessionSearchQuery)).length;
 
         result.set(group, {
           filteredNodes,

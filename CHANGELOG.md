@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
-- Settings: Desktop theme, font sizes, and chat layout prefs can differ from other surfaces (`?surface=` + `surfaceProfiles` overlay; upstream OpenChamber 1.23 per-surface profile slice — full preferences.json registry split deferred).
+- Settings: full preferences.json + settings-registry per-surface split (upstream OpenChamber 1.23) — profile keys in `preferences.json` with `{value,updatedAt}` / `surfaces.<kind>`; generated `settings-registry.json` gates PUT; UI `lib/settings/registry.ts` + `bun run settings-registry:generate`; interim `surfaceProfiles` seeds then retires (VS Code bridge skipped).
 - Projects: share actions, worktree setup commands, and draft starters via `.pichamber/project.json`, with trust prompts before running repository commands (upstream OpenChamber 1.23 repository config).
 - Projects: configurable repository Plans folder via `.pichamber/project.json` `plansDir` (default `.pichamber/plans`; upstream OpenChamber 1.23 repository config / plans pointer).
 - Walkthrough: pick Commit / Branch base / Pull Requests with the same selectors as Changes (upstream OpenChamber 1.23.0).
@@ -16,6 +16,23 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
+- Chat: pinned end-follow survives panel/window resize using measured list footer size (upstream OpenChamber 1.23).
+- Chat: message footer facts drop by priority on narrow columns without leaving holes (`useFactsFit`; upstream OpenChamber 1.23).
+- Chat: streaming Thinking stays in its capped scroll box and pauses follow on upward scroll (verified ALREADY; no code delta).
+- Chat: expanded composer Enter = newline / Ctrl·Cmd+Enter send (verified ALREADY focus-mode parity).
+- Chat: narrow Markdown tables size columns to content and shrink wrappers (`stabilizeMarkdownTableWidths`; upstream OpenChamber 1.23).
+- Comments: desktop Enter attaches a code comment; Shift+Enter adds a newline (upstream OpenChamber 1.23).
+- Sessions: paste a full `ses_…` ID into sidebar/archive search for an exact match (upstream OpenChamber 1.23).
+- Sessions: new-session project picker search (verified ALREADY).
+- Chat: history-scroll measure parity while older history loads (verified ALREADY from prior port).
+- Terminal: unset `NODE_CHANNEL_FD` on POSIX PTY shells via `env -u` (upstream OpenChamber 1.23).
+- Terminal: replay snapshot history at the PTY size it was drawn for so tab switches/resizes keep output isolated (upstream OpenChamber 1.23).
+- Git: token identity switching passes `allowUnsafeCredentialHelper` (upstream OpenChamber 1.23).
+- Git: new-file / untracked diffs tolerate Git line-ending warnings (exit 0/1 via `getNoIndexDiff`; upstream OpenChamber 1.23).
+- Desktop: updating a desktop host from the browser uses the native Electron updater, verifies the installed version, and reports restart failures (`web-update` + `desktopUpdater`; upstream OpenChamber 1.23).
+- Small-model: titles/summaries/walkthroughs on Pi use the selected model via `ModelRuntime.getModel` (Pi adapt of upstream OpenChamber 1.23 endpoint fix; OpenCode runtime-providers path N/A).
+
 - Chat: visual-align composer with OpenChamber 1.23 glass / floating look (`oc-glass-composer` over transcript, glass autocomplete/queue/BTW, floating recap + scroll pill). Pichamber Plan/Build chips, multi-run, scheduled tasks, Pi model chips, provider display names, and Work Status retained (visual-only).
 - Chat: forking a user message restores its text and attachments in the destination composer without overwriting the source draft (upstream OpenChamber 1.23).
 - Chat: attached images no longer appear twice just after send when the server echoes text then file parts (upstream OpenChamber 1.23).
@@ -56,6 +73,7 @@ All notable changes to this project will be documented in this file.
 ## [1.2.19] - 2026-09-11
 
 ### Fixed / Improved
+- Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
 - Browser: local `file://` / `file:///` addresses open in the Desktop panel (remote `file://host/...`, `javascript:`, and `data:` stay blocked) (#730).
 - Mini Chat: default window height lowered to 640 so the composer fits on ~800px-tall displays (#724).
 - Files: opening the empty Files surface forces the tree visible when persist hid it (#725).
@@ -81,6 +99,7 @@ All notable changes to this project will be documented in this file.
 - Work Status visualizes subagent fan-out and reports each subagent’s cost and usage (#616, #618, #621).
 
 ### Fixed / Improved
+- Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
 - Subagent launch and parent handoff are more reliable, and failed or stopped runs now settle with the correct lifecycle state (#616, #622).
 - Plan controls show provider-qualified model names, while Build keeps its model synchronized with the composer and session (#619, #620).
 - Provider-qualified model labels prefer display names without losing provider/model routing identity (#611, #614).
@@ -89,12 +108,14 @@ All notable changes to this project will be documented in this file.
 ## [1.2.17] - 2026-09-07
 
 ### Fixed / Improved
+- Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
 - Running status stays aligned with the active prompt model without a stale model flash (#608).
 - Custom Completions providers preserve Kimi compatibility by disabling the developer role where required (#609).
 
 ## [1.2.16] - 2026-09-07
 
 ### Fixed / Improved
+- Settings: server merges preferences.json with settings.json; Desktop `?surface=` resolves per-surface profile fields without the old surfaceProfiles bag after seed (upstream OpenChamber 1.23).
 - Usage now follows the connected Provider configuration automatically (#604).
 - Custom GPT providers stay pinned to the Completions API instead of Responses (#605).
 - Running status shows the active thinking level (#606).

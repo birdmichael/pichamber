@@ -26,6 +26,7 @@ import {
   unstageFiles,
   applyHunk,
   getDiff,
+  getUntrackedDiffs,
   getFileDiff,
   parseBranchCreationSource,
   isOwnBranchCreationSource,
@@ -175,6 +176,41 @@ describe.runIf(canRunGit())('setLocalIdentity', () => {
   });
 });
 
+describe.runIf(canRunGit())('setLocalIdentity token credential helper', () => {
+  it('can switch to a token-based identity without credential-helper permission errors', async () => {
+    const { tmpDir } = await createTempRepo();
+    await setLocalIdentity(tmpDir, {
+      userName: 'Token User',
+      userEmail: 'token@example.com',
+      authType: 'token',
+      host: 'github.com',
+      token: 'ghp_test_token',
+    });
+    expect(runGit(tmpDir, ['config', '--local', '--get', 'credential.helper']).trim()).toBe('store');
+  });
+
+  it('clears the stored credential helper when switching to SSH auth', async () => {
+    const { tmpDir } = await createTempRepo();
+    await setLocalIdentity(tmpDir, {
+      userName: 'Token User',
+      userEmail: 'token@example.com',
+      authType: 'token',
+      host: 'github.com',
+    });
+    await setLocalIdentity(tmpDir, {
+      userName: 'SSH User',
+      userEmail: 'ssh@example.com',
+      authType: 'ssh',
+      sshKey: '/tmp/test key',
+    });
+    expect(runGit(tmpDir, ['config', '--local', '--get', 'core.sshCommand']).trim()).toBe(
+      "ssh -i '/tmp/test key' -o IdentitiesOnly=yes"
+    );
+    expect(() => runGit(tmpDir, ['config', '--local', '--get', 'credential.helper'])).toThrow();
+  });
+});
+
+
 // ---------------------------------------------------------------------------
 // applyHunk (per-hunk stage / unstage / discard)
 // ---------------------------------------------------------------------------
@@ -309,6 +345,43 @@ describe('applyHunk', () => {
 
     const staged = (await git.raw(['show', `:${filePath}`])).replace(/\r\n/g, '\n');
     expect(staged).toBe(makeFile('TOP', 'line20'));
+  });
+});
+
+
+describe.runIf(canRunGit())('untracked diffs', () => {
+  it.each(['false', 'warn'])('returns only the patch with core.safecrlf=%s', async (safecrlf) => {
+    const { tmpDir, git } = await createTempRepo();
+    await git.addConfig('core.autocrlf', 'true');
+    await git.addConfig('core.safecrlf', safecrlf);
+    fs.writeFileSync(path.join(tmpDir, 'new file.txt'), 'first\nsecond\n');
+
+    let expectedPatch;
+    try {
+      runGit(tmpDir, ['diff', '--no-color', '--no-index', '--', '/dev/null', 'new file.txt']);
+      throw new Error('Expected git diff to exit with differences');
+    } catch (error) {
+      expect(error.status).toBe(1);
+      expectedPatch = error.stdout;
+      if (safecrlf === 'warn') {
+        expect(error.stderr).toContain('LF will be replaced by CRLF');
+      }
+    }
+
+    const diff = await getDiff(tmpDir, { path: 'new file.txt' });
+    expect(diff).toBe(expectedPatch);
+    expect(diff).toContain('+first\n+second\n');
+    expect(diff).not.toContain('warning:');
+    expect(await getUntrackedDiffs(tmpDir, ['new file.txt'])).toEqual([diff]);
+  });
+
+  it('accepts an empty untracked file without a process error', async () => {
+    const { tmpDir } = await createTempRepo();
+    fs.writeFileSync(path.join(tmpDir, 'empty.txt'), '');
+    const diff = await getDiff(tmpDir, { path: 'empty.txt' });
+    expect(diff).toContain('new file mode 100644');
+    expect(diff).not.toContain('@@');
+    expect(await getUntrackedDiffs(tmpDir, ['empty.txt'])).toEqual([diff]);
   });
 });
 

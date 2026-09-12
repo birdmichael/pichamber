@@ -266,6 +266,9 @@ describe('settings runtime', () => {
       });
       expect(migrated.notificationTemplates.error.message).toBe('{last_message}');
 
+      // preferences.json wins over the legacy copy in settings.json; replace both
+      // so a custom template written after the first seed is what the merge returns.
+      await fsPromises.rm(path.join(path.dirname(settingsFilePath), 'preferences.json'), { force: true });
       await fsPromises.writeFile(
         settingsFilePath,
         JSON.stringify({
@@ -310,4 +313,31 @@ describe('settings runtime', () => {
       await cleanup();
     }
   });
+
+  it('seeds preferences.json from surfaceProfiles and resolves Desktop overlay', async () => {
+    const { runtime, settingsFilePath, cleanup } = await createRuntime();
+    try {
+      await fsPromises.writeFile(
+        settingsFilePath,
+        JSON.stringify({
+          themeId: 'base-theme',
+          surfaceProfiles: {
+            desktop: { themeId: 'desktop-theme', fontSize: 16 },
+          },
+        }, null, 2),
+        'utf8',
+      );
+      const desktop = await runtime.readSettingsFromDiskMigrated({ surface: 'desktop' });
+      expect(desktop.themeId).toBe('desktop-theme');
+      expect(desktop.fontSize).toBe(16);
+      expect(desktop.surfaceProfiles).toBeUndefined();
+      const web = await runtime.readSettingsFromDiskMigrated({ surface: 'web' });
+      expect(web.themeId).toBe('base-theme');
+      const prefsRaw = await fsPromises.readFile(path.join(path.dirname(settingsFilePath), 'preferences.json'), 'utf8');
+      expect(prefsRaw).toContain('desktop-theme');
+    } finally {
+      await cleanup();
+    }
+  });
+
 });

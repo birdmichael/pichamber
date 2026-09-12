@@ -536,6 +536,7 @@ const ChatViewport = React.memo(({
                     onAnchorSizeChanged={onAnchorSizeChanged}
                     composerOverlayHeight={composerOverlayHeight}
                     onIsAtEndChange={onIsAtEndChange}
+                onListMetricsChange={onListMetricsChange}
                     onTimelineDataChange={onTimelineDataChange}
                     listHeader={listHeader}
                     listFooter={listFooter}
@@ -1198,6 +1199,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         onAnchorReady,
         onAnchorSizeChanged,
         onIsAtEndChange,
+        onListMetricsChange,
         onManualNavigation,
         onTimelineDataChange,
         goToBottom,
@@ -1713,6 +1715,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 onAnchorReady={onAnchorReady}
                 onAnchorSizeChanged={onAnchorSizeChanged}
                 onIsAtEndChange={onIsAtEndChange}
+                onListMetricsChange={onListMetricsChange}
                 onTimelineDataChange={onTimelineDataChange}
                 renderedMessages={timelineController.renderedMessages}
                 isLoadingOlder={timelineController.isLoadingOlder}

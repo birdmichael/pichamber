@@ -1,4 +1,17 @@
+import { createRequire } from 'node:module';
 import { resolvePiAgentDir } from '../pi/pi-resources.js';
+
+// Generated companion of the OpenChamber settings registry (Pi-adapted snapshot).
+// Keys not listed here are dropped at the end of sanitizeSettingsUpdate.
+const settingsRegistry = createRequire(import.meta.url)('./settings-registry.json');
+
+const isPersistableSettingsKey = (key) => {
+  const field = settingsRegistry.fields[key];
+  if (!field) return false;
+  if (field.computed || field.local) return false;
+  if (field.owner === 'desktop-shell') return false;
+  return true;
+};
 
 export const createSettingsHelpers = (dependencies) => {
   const {
@@ -876,6 +889,13 @@ export const createSettingsHelpers = (dependencies) => {
       const trimmed = candidate.sttLanguage.trim();
       if (trimmed.length <= STT_LANGUAGE_MAX_LENGTH) {
         result.sttLanguage = trimmed;
+      }
+    }
+
+    // Registry is the last word on what a client may persist.
+    for (const key of Object.keys(result)) {
+      if (!isPersistableSettingsKey(key)) {
+        delete result[key];
       }
     }
 
