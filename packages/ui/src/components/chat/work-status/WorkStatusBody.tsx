@@ -7,6 +7,7 @@ import { WorkStatusPinnedSection } from './WorkStatusPinnedSection';
 import { WorkStatusPrimaryGroup } from './WorkStatusPrimaryGroup';
 import { WorkStatusSubagentsSection } from './WorkStatusSubagentsSection';
 import { WorkStatusTasksSection } from './WorkStatusTasksSection';
+import { WorkStatusTelemetrySection } from './WorkStatusTelemetrySection';
 import { WorkStatusUsageSection } from './WorkStatusUsageSection';
 import { useWorkStatusSectionVisibility } from './useWorkStatusSectionVisibility';
 
@@ -20,7 +21,7 @@ type Props = {
  * Section list in Desktop display order. Desktop's card and the mobile host
  * both render this; visibility stays in `useWorkStatusSectionVisibility`.
  *
- * Order: tasks, PrimaryGroup (session + repository), usage, subagents, mcp,
+ * Order: tasks, PrimaryGroup (session + repository), usage, telemetry, subagents, mcp,
  * pinned, contextSources.
  */
 export const WorkStatusBody: React.FC<Props> = ({
@@ -41,6 +42,7 @@ export const WorkStatusBody: React.FC<Props> = ({
         goalRow={<WorkStatusGoalRow sessionId={sessionId} directory={directory} />}
       />
       {sectionVisible('usage') ? <WorkStatusUsageSection /> : null}
+      {sectionVisible('telemetry') ? <WorkStatusTelemetrySection sessionId={sessionId} directory={directory} /> : null}
       {sectionVisible('subagents') ? <WorkStatusSubagentsSection sessionId={sessionId} directory={directory} /> : null}
       {sectionVisible('mcp') ? <WorkStatusMcpSection directory={directory} /> : null}
       {sectionVisible('pinned') ? <WorkStatusPinnedSection sessionId={sessionId} directory={directory} /> : null}

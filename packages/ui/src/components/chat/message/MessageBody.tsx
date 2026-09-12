@@ -6,7 +6,6 @@ import ToolPart from './parts/ToolPart';
 import AssistantTextPart from './parts/AssistantTextPart';
 import ReasoningPart from './parts/ReasoningPart';
 import { MessageFilesDisplay } from '../FileAttachment';
-import { TurnChangedFilesDropdown } from '../TurnChangedFilesDropdown';
 import type { ToolPart as ToolPartType } from '@opencode-ai/sdk/v2';
 import type { StreamPhase, ToolPopupContent, AgentMentionInfo } from './types';
 import type { TurnActivityGroup, TurnChangedFile, TurnGroupingContext } from '../lib/turns/types';
@@ -2492,9 +2491,6 @@ const AssistantMessageBody = React.memo(({
                                     {!turnDurationText && usageTooltipRows ? usageTooltipRows : footerTimestamp}
                                 </TooltipContent>
                             </Tooltip>
-                        ) : null}
-                        {!isMiniChatSurface && isLastAssistantInTurn && hasStopFinish ? (
-                            <TurnChangedFilesDropdown activityParts={turnGroupingContext?.activityParts} />
                         ) : null}
                         {!isMiniChatSurface && isLastAssistantInTurn && hasStopFinish ? (
                             <TurnChangedFilePills
