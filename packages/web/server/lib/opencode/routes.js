@@ -10,6 +10,7 @@ import { getClaudeCliAuthStatus } from './claude-cli-auth.js';
 import { isPiKernelEnabled } from '../pi/kernel.js';
 import { readBehaviorAgentsMd, resolvePiAgentsMdPath, readPiSystemPromptFiles, writePiSystemPromptFile } from '../pi/pi-resources.js';
 import { handleFetchRemoteProviderModels } from '../pi/remote-provider-models.js';
+import { settingsSurfaceOf } from './settings-surface-profile.js';
 
 export const registerOpenCodeRoutes = (app, dependencies) => {
   const {
@@ -177,9 +178,10 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
     }
   };
 
-  app.get('/api/config/settings', async (_req, res) => {
+  app.get('/api/config/settings', async (req, res) => {
     try {
-      const settings = await readSettingsFromDiskMigrated();
+      // The surface kind resolves per-surface theme/font/layout keys; absent means base.
+      const settings = await readSettingsFromDiskMigrated({ surface: settingsSurfaceOf(req) });
       res.json(formatSettingsResponse(settings));
     } catch (error) {
       console.error('Failed to read settings:', error);
@@ -389,7 +391,7 @@ ${desktopReturn ? `<a class="return" href="pichamber://focus/mcp-auth">Return to
 
   app.put('/api/config/settings', async (req, res) => {
     try {
-      const updated = await persistSettings(req.body ?? {});
+      const updated = await persistSettings(req.body ?? {}, { surface: settingsSurfaceOf(req) });
       res.json(updated);
     } catch (error) {
       console.error('[API:PUT /api/config/settings] Failed to save settings:', error);

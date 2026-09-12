@@ -901,7 +901,11 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                 {hasAppearanceSettings && (
                     <div className="space-y-0">
                         {hasThemeSettings && (
-                            <SettingsSection title={t('settings.openchamber.visual.section.colorModeAndTheme')} divider={false}>
+                            <SettingsSection
+                                title={t('settings.openchamber.visual.section.colorModeAndTheme')}
+                                description={isDesktopShell() ? t('settings.openchamber.visual.surface.desktopThemeFontsLayout') : undefined}
+                                divider={false}
+                            >
                                 <SettingsTwoColumn>
                                     <div className={SETTINGS_FIELDS_STACK_CLASS}>
                                         <SettingsRadioGroup aria-label={t('settings.openchamber.visual.section.colorMode')}>

@@ -1,3 +1,9 @@
+import {
+  commitPerSurfaceProfileWrite,
+  normalizeSettingsSurface,
+  resolveSettingsForSurface,
+} from './settings-surface-profile.js';
+
 import os from 'node:os';
 
 import { createProjectIdFromPath } from '../projects/project-id.js';
@@ -930,7 +936,7 @@ export const createSettingsRuntime = (deps) => {
     return { settings: next, changed: true };
   };
 
-  const readSettingsFromDiskMigrated = async () => {
+  const readSettingsFromDiskMigrated = async ({ surface = null } = {}) => {
     const current = await readSettingsFromDisk();
     const migration0 = await migrateSettingsFromPiSessionProjects(current);
     const migration1 = await migrateSettingsFromLegacyLastDirectory(migration0.settings);
@@ -944,10 +950,11 @@ export const createSettingsRuntime = (deps) => {
     if (migration0.changed || migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed) {
       await writeSettingsToDisk(migration8.settings);
     }
-    return migration8.settings;
+    // Migrations run on the base document; a surface asks for its own overlay on top.
+    return resolveSettingsForSurface(migration8.settings, normalizeSettingsSurface(surface));
   };
 
-  const persistSettings = async (changes) => {
+  const persistSettings = async (changes, { surface = null } = {}) => {
     persistSettingsLock = persistSettingsLock.then(async () => {
       // Log field names only — changes can carry credentials (UI password,
       // client tokens, tunnel tokens) that must never reach the log file.
@@ -957,6 +964,9 @@ export const createSettingsRuntime = (deps) => {
       const sanitized = sanitizeSettingsUpdate(changes);
       let next = mergePersistedSettings(seed.settings, sanitized);
       next = restoreSeededProjectsAfterPersist(seed, sanitized, next);
+      // Theme/font/chat-layout keys land under surfaceProfiles[surface] when the
+      // client identifies itself (Desktop-first OpenChamber 1.23 slice).
+      next = commitPerSurfaceProfileWrite(seed.settings, next, sanitized, surface);
 
       const normalizedState = normalizeSettingsPaths(next);
       if (normalizedState.changed) {
@@ -1025,7 +1035,7 @@ export const createSettingsRuntime = (deps) => {
       }
 
       await writeSettingsToDisk(next);
-      return formatSettingsResponse(next);
+      return formatSettingsResponse(resolveSettingsForSurface(next, normalizeSettingsSurface(surface)));
     });
 
     return persistSettingsLock;

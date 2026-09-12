@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- Settings: Desktop theme, font sizes, and chat layout prefs can differ from other surfaces (`?surface=` + `surfaceProfiles` overlay; upstream OpenChamber 1.23 per-surface profile slice — full preferences.json registry split deferred).
 - Projects: share actions, worktree setup commands, and draft starters via `.pichamber/project.json`, with trust prompts before running repository commands (upstream OpenChamber 1.23 repository config).
 - Projects: configurable repository Plans folder via `.pichamber/project.json` `plansDir` (default `.pichamber/plans`; upstream OpenChamber 1.23 repository config / plans pointer).
 - Walkthrough: pick Commit / Branch base / Pull Requests with the same selectors as Changes (upstream OpenChamber 1.23.0).

@@ -107,7 +107,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Activity collapse summary | **ALREADY** | `activityRenderMode` collapsed|summary | |
 | `/btw` isolated composer | **ALREADY** | `BtwPanel.tsx` present | |
 | Files restore scroll/cursor | PORT | HP#8b | |
-| Per-surface theme/fonts/layout | **DEFER** | Large settings split; Desktop-first slice not feasible without layout fight | remains optional D |
+| Per-surface theme/fonts/layout | **PORTED** (Desktop slice) | `settings/surface.ts` + `?surface=` on settings GET/PUT; `surfaceProfiles` overlay for theme/font-size/chat-layout keys; Appearance copy notes Desktop scope | Follow-ups: full preferences.json registry split; VS Code bridge surface; mobile parity UI |
 | Desktop zoom → interface scale | **PORTED** | HP#13b / PR #755 (DOM rem zoom; traffic-light inset) | #755 |
 | Mobile drawer UX batch | SKIP | mobile-only | |
 | Comments Enter attaches | **ALREADY?** | Verify comment input | |
@@ -157,6 +157,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 
 ## Deferred (explicit)
 
+- Full OC preferences.json + settings-registry per-surface split (PC ships Desktop `surfaceProfiles` overlay slice for theme/fonts/layout)
 - Glass/recap visual overhaul, chat typography fights layout  
 - Mobile/Capacitor-only and VS Code-only items  
 - OpenCode Usage providers (ClinePass/Hyper/Go/etc.)  
