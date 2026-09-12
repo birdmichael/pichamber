@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 ### Added
+- Changes: choose a recent commit to review in Changes (upstream OpenChamber 1.23.0).
 - Changes: select a published pull request and review its GitHub diff in the Changes panel (upstream OpenChamber 1.23.1).
 - Work Status: Turn stats section (response speed, model/tool time, tokens, USD cost) for the latest completed turn (upstream OpenChamber 1.23.0).
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Git: `getLog` with only `to` (branch tip) returns recent commits again so Changes commit comparison can load history (upstream OpenChamber 1.23.0).
 - Chat: remove the non-git turn changed-files dropdown under final answers; git turn file pills from the accuracy port remain (upstream OpenChamber 1.23.1).
 - Chat: slash commands stay available when switching projects (upstream OpenChamber 1.23.1).
 - Chat: reading older messages keeps your place as earlier history finishes measuring (upstream OpenChamber 1.23.1).
