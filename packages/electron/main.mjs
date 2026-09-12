@@ -2465,6 +2465,13 @@ const getMenuTargetWindow = () => {
 
 const dispatchMenuAction = (action) => {
   const target = getMenuTargetWindow();
+  // Zoom actions are consumed by the renderer's DOM listener. Sending them
+  // through both the IPC bridge and the DOM event would invoke the handler
+  // multiple times because preload fans the IPC event back into both paths.
+  if (action === 'zoom-in' || action === 'zoom-out' || action === 'zoom-reset') {
+    dispatchDomEventToWindow(target, 'openchamber:zoom', action);
+    return;
+  }
   emitToWindow(target, 'openchamber:menu-action', action);
   dispatchDomEventToWindow(target, 'openchamber:menu-action', action);
 };
@@ -5318,6 +5325,10 @@ const buildMacMenu = () => {
         { label: 'Toggle Session Sidebar', accelerator: 'Cmd+Alt+L', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-sidebar') },
         { label: 'Toggle Memory Debug', accelerator: 'Cmd+Shift+D', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-memory-debug') },
         { type: 'separator' },
+        { label: 'Zoom In', accelerator: 'CmdOrCtrl+=', click: () => dispatchAction('zoom-in') },
+        { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => dispatchAction('zoom-out') },
+        { label: 'Reset Zoom', accelerator: 'CmdOrCtrl+0', click: () => dispatchAction('zoom-reset') },
+        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
@@ -5431,6 +5442,10 @@ const buildAutoHiddenMenu = () => {
         // so the native menu does not toggle a second time (#509).
         { label: 'Toggle Session Sidebar', accelerator: 'Ctrl+Alt+L', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-sidebar') },
         { label: 'Toggle Memory Debug', accelerator: 'Ctrl+Shift+D', registerAccelerator: false, click: () => dispatchViewToggleAction('toggle-memory-debug') },
+        { type: 'separator' },
+        { label: 'Zoom In', accelerator: 'Ctrl+=', click: () => dispatchAction('zoom-in') },
+        { label: 'Zoom Out', accelerator: 'Ctrl+-', click: () => dispatchAction('zoom-out') },
+        { label: 'Reset Zoom', accelerator: 'Ctrl+0', click: () => dispatchAction('zoom-reset') },
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],

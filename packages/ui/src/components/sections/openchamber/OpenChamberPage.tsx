@@ -190,6 +190,7 @@ const VisualSectionContent: React.FC = () => {
         'terminalFontSize',
         'editorFontSize',
         'spacing',
+        'scrollbars',
         'inputBarOffset',
     ]} />;
 };

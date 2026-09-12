@@ -1264,7 +1264,7 @@ export const ContextPanel: React.FC = () => {
             ) : (
               <>
                 <div className="h-full min-w-0 flex-1">
-                  <React.Suspense fallback={null}><FilesView mode="editor-only" /></React.Suspense>
+                  <React.Suspense fallback={null}><FilesView mode="editor-only" visible={isOpen && isFileTabActive} /></React.Suspense>
                 </div>
                 <EditorTreeColumn visible={contextEditorTreeVisible} panelWidth={width} />
               </>
@@ -1332,7 +1332,7 @@ export const ContextPanel: React.FC = () => {
         {hasWalkthroughTab ? (
           <div className={cn('absolute inset-0', activeTab?.mode === 'walkthrough' ? 'block' : 'hidden')}>
             <React.Suspense fallback={null}>
-              <WalkthroughView directory={effectiveDirectory} visible={activeTab?.mode === 'walkthrough'} />
+              <WalkthroughView directory={effectiveDirectory} visible={isOpen && activeTab?.mode === 'walkthrough'} />
             </React.Suspense>
           </div>
         ) : null}
