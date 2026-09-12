@@ -64,6 +64,7 @@ export function shouldDockComposerForDesktopSlashMenu(options: {
 export function shouldHideNewSessionWelcomeForDesktopSlashMenu(
   _options: Parameters<typeof shouldDockComposerForDesktopSlashMenu>[0],
 ): boolean {
+  void _options;
   return false;
 }
 

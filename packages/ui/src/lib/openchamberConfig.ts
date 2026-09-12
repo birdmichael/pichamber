@@ -27,8 +27,6 @@ import {
   SHARED_CONFIG_RELATIVE_PATH,
   type ProjectSetup,
   type ProjectSetupSource,
-  type SharedDraftStarter,
-  type SharedProjectAction,
   type SharedProjectConfig,
   type SharedProjectConfigPatch,
   type SharedProjectConfigRead,
@@ -490,7 +488,7 @@ const sanitizeProjectActions = (value: unknown): OpenChamberProjectAction[] => {
   return sanitized;
 };
 
-const sanitizeProjectActionsState = (value: {
+const _sanitizeProjectActionsState = (value: {
   actions?: unknown;
   primaryActionId?: unknown;
 } | null | undefined): OpenChamberProjectActionsState => {

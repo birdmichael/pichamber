@@ -41,7 +41,7 @@ describe('queued message preview', () => {
     test('falls back to attachment filename', () => {
         expect(getQueuedMessagePreview({
             content: '',
-            attachments: [{ filename: 'notes.txt' } as any],
+            attachments: [{ filename: 'notes.txt' } as never],
         })).toBe('notes.txt');
     });
 
