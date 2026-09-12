@@ -201,6 +201,42 @@ describe('mapPiModelsToProviders', () => {
       'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max',
     ]);
   });
+
+  it('keeps thinking levels for DeepSeek V4.1 Flash Vision without an explicit reasoning flag', () => {
+    const providers = mapPiModelsToProviders([
+      {
+        id: 'deepseek-v4.1-flash-expires-on-0910',
+        name: 'DeepSeek V4.1 Flash Vision',
+        provider: 'deepseek',
+      },
+    ]);
+    const model = providers[0].models['deepseek-v4.1-flash-expires-on-0910'];
+    expect(model.reasoning).toBe(true);
+    expect(model.thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high',
+    ]);
+    expect(model.thinkingLevels).not.toEqual(['off']);
+  });
+
+  it('keeps thinking levels when only thinkingLevelMap is stored', () => {
+    const providers = mapPiModelsToProviders([
+      {
+        id: 'custom-reasoner',
+        name: 'Custom',
+        provider: 'bmlab',
+        thinkingLevelMap: {
+          off: 'none',
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          xhigh: 'xhigh',
+        },
+      },
+    ]);
+    expect(providers[0].models['custom-reasoner'].thinkingLevels).toEqual([
+      'off', 'minimal', 'low', 'medium', 'high', 'xhigh',
+    ]);
+  });
 });
 
 describe('getProviders catalog filter', () => {

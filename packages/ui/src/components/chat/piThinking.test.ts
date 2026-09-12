@@ -330,6 +330,11 @@ describe('preferPiModelThinkingLevels', () => {
     });
   });
 
+  test('narrow Pi off-only list falls through to catalog levels', () => {
+    expect(preferPiModelThinkingLevels(['off'], grokCatalog)).toEqual(grokCatalog);
+    expect(preferPiModelThinkingLevels(['off'], [])).toEqual([]);
+  });
+
   test('still shows xhigh when the Pi/SDK list includes it', () => {
     expect(preferPiModelThinkingLevels(
       ['low', 'medium', 'high', 'xhigh'],

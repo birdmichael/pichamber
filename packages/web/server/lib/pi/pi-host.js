@@ -1055,16 +1055,21 @@ const kernelThinkingLevelsFromModel = (model) => {
   if (supportedThinkingLevelsFn) {
     try {
       const levels = parseThinkingLevelList(supportedThinkingLevelsFn(model));
-      if (levels.length > 0) return levels;
+      // Match readThinkingLevelsFromModel: empty/`off`-only is not authoritative.
+      if (!isNarrowThinkingAvailable(levels)) return levels;
     } catch {
     }
   }
-  if (!model.reasoning) return ['off'];
   const map = model.thinkingLevelMap && typeof model.thinkingLevelMap === 'object' && !Array.isArray(model.thinkingLevelMap)
     ? model.thinkingLevelMap
-    : {};
+    : null;
+  const hasThinkingLevelMap = Boolean(map && Object.keys(map).length > 0);
+  // reasoning:true, a stored thinkingLevelMap, or user Edit→Reasoning all keep
+  // the full effort set. Do not silently clamp custom DeepSeek / GPT proxies to Off.
+  if (!model.reasoning && !hasThinkingLevelMap) return ['off'];
+  const levelMap = map || {};
   return THINKING_LEVELS.filter((level) => {
-    const mapped = map[level];
+    const mapped = levelMap[level];
     if (mapped === null) return false;
     if (level === 'xhigh' || level === 'max') return mapped !== undefined;
     return true;
