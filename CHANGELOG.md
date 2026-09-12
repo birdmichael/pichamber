@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## [1.2.20] - 2026-09-12
+
 ### Added
 - Mobile: Rename with AI on session swipe actions (parity with Desktop sidebar / OpenChamber 1.23.1).
 - Mobile: Changes drawer Branch / Commit / Pull Request comparison modes with the same selectors as Desktop (OpenChamber 1.23).

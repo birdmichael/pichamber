@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.20] - 2026-09-12
+
+- OpenChamber 1.23 ports: glass/floating composer, per-surface Appearance, projects/plans config, Changes/Walkthrough/Git review modes, terminal/git soft-UX, web updater, and mobile parity (AI rename, Changes compare, Appearance); see the root CHANGELOG.md (#737–#763).
+
 ## [1.2.19] - 2026-09-11
 
 - Browser file:// support, Mini Chat height, Files tree/find Esc, Settings Esc/gear/tabs, Browser host block and announced servers, Pi Status label, and related UI fixes; see the root CHANGELOG.md (#590, #591, #592, #593, #631, #670, #672, #711, #712, #713, #717, #718, #719, #724, #725, #726, #730).
