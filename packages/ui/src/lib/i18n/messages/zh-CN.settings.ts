@@ -2261,6 +2261,7 @@ export const settingsDict = {
   'settings.openchamber.visual.section.colorMode': '颜色模式',
   'settings.openchamber.visual.section.colorModeAndTheme': '颜色模式与主题',
   'settings.openchamber.visual.surface.desktopThemeFontsLayout': '这些主题、字号与聊天布局选项作用于桌面端。其他端在单独设置前仍使用各自的值。',
+  'settings.openchamber.visual.surface.mobileThemeFontsLayout': '这些主题、字号和聊天布局选项适用于手机端。其他端如已单独设置则保持各自的值。',
   'settings.openchamber.visual.section.mobileLayout': '移动端布局',
   'settings.openchamber.visual.option.mobileLayout.default': '旧版',
   'settings.openchamber.visual.option.mobileLayout.new': '新版',

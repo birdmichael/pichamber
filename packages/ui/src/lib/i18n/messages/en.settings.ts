@@ -2284,6 +2284,7 @@ export const settingsDict = {
   'settings.openchamber.visual.section.colorMode': 'Color Mode',
   'settings.openchamber.visual.section.colorModeAndTheme': 'Color mode & Theme',
   'settings.openchamber.visual.surface.desktopThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Desktop. Other surfaces keep their own values when set.',
+  'settings.openchamber.visual.surface.mobileThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Mobile. Other surfaces keep their own values when set.',
   'settings.openchamber.visual.section.mobileLayout': 'Mobile Layout',
   'settings.openchamber.visual.option.mobileLayout.default': 'Old',
   'settings.openchamber.visual.option.mobileLayout.new': 'New',

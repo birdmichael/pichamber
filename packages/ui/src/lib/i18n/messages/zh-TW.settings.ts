@@ -2638,4 +2638,7 @@ export const settingsDict = {
   'settings.piAgents.agentsMd': 'AGENTS.md',
   'settings.piAgents.agentsMdInfo': 'Global and project AGENTS.md rules are part of Pi’s main prompt context. They are separate from subagent definitions and Magic Prompts.',
   'settings.piAgents.projectAgentsMd': 'Project AGENTS.md',
+  'settings.page.appearance.descriptionDesktop': 'Theme, font sizes, and chat layout on Desktop can differ from other surfaces. Panel sizes stay on this device.',
+  'settings.openchamber.visual.surface.desktopThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Desktop. Other surfaces keep their own values when set.',
+  'settings.openchamber.visual.surface.mobileThemeFontsLayout': 'These theme, font size, and chat layout choices apply to Mobile. Other surfaces keep their own values when set.',
 } as const;
