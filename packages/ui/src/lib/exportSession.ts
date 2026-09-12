@@ -4,6 +4,7 @@ import { getCurrentIntlLocale } from '@/lib/i18n';
 import { canSaveDesktopTextFile, isVSCodeRuntime, openDesktopPath, revealDesktopPath, saveDesktopMarkdownFile, saveDesktopTextFile } from '@/lib/desktop';
 import { exportSessionTextFile as exportSessionTextFileWithDeps, type SessionTextExportFilter, type SessionTextExportResult } from '@/lib/exportSessionSave';
 import { getRevealLabelKey } from '@/lib/utils';
+import { formatMessageText } from '@/lib/messages/messageMarkdown';
 
 type SessionMessageRecord = { info: Message; parts: Part[] };
 
@@ -59,16 +60,9 @@ function formatMessageHeader(record: SessionMessageRecord): string {
   return details ? `**${label}**\n\n*${details}*` : `**${label}**`;
 }
 
-function extractTextFromParts(parts: Part[]): string {
-  return parts
-    .filter((p): p is Part & { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string')
-    .map((p) => p.text)
-    .join('');
-}
-
 function formatMessageAsMarkdown(record: SessionMessageRecord): string {
   const role = formatMessageHeader(record);
-  const text = extractTextFromParts(record.parts).trim();
+  const text = formatMessageText(record.parts, { user: record.info.role === 'user' });
 
   if (!text) return '';
   return `${role}\n\n${text}`;

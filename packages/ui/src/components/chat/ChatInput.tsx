@@ -74,6 +74,7 @@ import { useThemeSystem } from '@/contexts/useThemeSystem';
 import { GitHubIssuePickerDialog } from '@/components/session/GitHubIssuePickerDialog';
 import { GitHubPrPickerDialog } from '@/components/session/GitHubPrPickerDialog';
 import { Icon } from "@/components/icon/Icon";
+import { getDropdownNavigationKey } from '@/components/ui/dropdown-navigation';
 import { DraftPresetChips } from './DraftPresetChips';
 import { useChatSearchDirectory } from '@/hooks/useChatSearchDirectory';
 import { opencodeClient } from '@/lib/opencode/client';
@@ -1760,8 +1761,9 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
 
         if (openAutocomplete === 'command' && commandRef.current) {
-            if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
-                const consumed = commandRef.current.handleKeyDown(e.key);
+            const autocompleteKey = getDropdownNavigationKey(e) ?? e.key;
+            if (autocompleteKey === 'Enter' || autocompleteKey === 'ArrowUp' || autocompleteKey === 'ArrowDown' || autocompleteKey === 'Escape' || autocompleteKey === 'Tab') {
+                const consumed = commandRef.current.handleKeyDown(autocompleteKey);
                 if (consumed) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1773,28 +1775,31 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({
         }
 
         if (openAutocomplete === 'skill' && skillRef.current) {
-            if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
+            const autocompleteKey = getDropdownNavigationKey(e) ?? e.key;
+            if (autocompleteKey === 'Enter' || autocompleteKey === 'ArrowUp' || autocompleteKey === 'ArrowDown' || autocompleteKey === 'Escape' || autocompleteKey === 'Tab') {
                 e.preventDefault();
                 e.stopPropagation();
-                skillRef.current.handleKeyDown(e.key);
+                skillRef.current.handleKeyDown(autocompleteKey);
                 return;
             }
         }
 
         if (openAutocomplete === 'snippet' && snippetRef.current) {
-            if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
+            const autocompleteKey = getDropdownNavigationKey(e) ?? e.key;
+            if (autocompleteKey === 'Enter' || autocompleteKey === 'ArrowUp' || autocompleteKey === 'ArrowDown' || autocompleteKey === 'Escape' || autocompleteKey === 'Tab') {
                 e.preventDefault();
                 e.stopPropagation();
-                snippetRef.current.handleKeyDown(e.key);
+                snippetRef.current.handleKeyDown(autocompleteKey);
                 return;
             }
         }
 
         if (openAutocomplete === 'mention' && mentionRef.current) {
-            if (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape' || e.key === 'Tab') {
+            const autocompleteKey = getDropdownNavigationKey(e) ?? e.key;
+            if (autocompleteKey === 'Enter' || autocompleteKey === 'ArrowUp' || autocompleteKey === 'ArrowDown' || autocompleteKey === 'Escape' || autocompleteKey === 'Tab') {
                 e.preventDefault();
                 e.stopPropagation();
-                mentionRef.current.handleKeyDown(e.key);
+                mentionRef.current.handleKeyDown(autocompleteKey);
                 return;
             }
         }

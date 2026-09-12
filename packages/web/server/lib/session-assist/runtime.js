@@ -44,11 +44,11 @@ const buildAssistSystemPrompt = ({ recap, suggestion }) => [
   'You assist a user who chats with a coding agent. Based on the conversation transcript, return exactly one JSON object and nothing else — no prose, no markdown, no code fences.',
   `Shape: {${[recap ? '"recap": string' : '', suggestion ? '"suggestion": string' : ''].filter(Boolean).join(', ')}}`,
   recap
-    ? 'recap: at most 20 words. State the substance directly — the facts, result, or conclusion, plus the next move if there is one. NEVER narrate ("The assistant explained…", "The agent did…") — write the content itself, like a note the user jotted down.'
+    ? 'recap: at most 20 words. State the substance directly — the facts, result, or conclusion, plus the next move if there is one. NEVER narrate ("The assistant explained…", "The agent did…") — write the content itself, like a note the user jotted down. If the latest assistant turn is only a short closing, acknowledgment, or farewell, look earlier in the transcript for the last real answer and recap that substance instead of the empty closer. Prefer "" when there is no durable substance worth keeping (pure chitchat, failed/empty replies, or noise).'
     : '',
   suggestion ? 'suggestion: write ONE immediately sendable next user message addressed TO the coding agent.' : '',
   suggestion ? 'The suggestion should be the most useful next step after the assistant\'s latest reply. It should help the user continue productively, not inspect already-known details.' : '',
-  suggestion ? 'Prefer suggestions that ask the agent to make a concrete improvement, implement something specific, validate the latest change, explain tradeoffs, improve the current approach, or continue from the current result.' : '',
+  suggestion ? 'Prefer suggestions that ask the agent to make a concrete improvement, implement something specific, validate the latest change, explain tradeoffs, improve the current approach, or continue from the current result. Prefer "" when the next useful step is unclear or would only restate the last reply.' : '',
   suggestion ? 'Rules for suggestion:' : '',
   suggestion ? '- Output exactly one message the user could click and send without editing.' : '',
   suggestion ? '- Pick one best next action yourself.' : '',
