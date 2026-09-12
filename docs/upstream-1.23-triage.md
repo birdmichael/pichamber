@@ -1,7 +1,7 @@
 # Pichamber ← OpenChamber v1.22.0 → v1.23.1 triage
 
 **Date:** 2026-09-12 (Asia/Shanghai)  
-**Pichamber base:** `origin/main` @ `76a56f01` (worktree: `~/Documents/Code/Other/pichamber-wt-upstream`)  
+**Pichamber base:** `origin/main` @ `169ec4e` (worktree: `/tmp/pichamber-port-defer-rest-*`; this PR branch)
 **Upstream ref:** `openchamber/openchamber` tags `v1.23.0` / `v1.23.1` (local read-only clone: `~/Documents/Code/Other/openchamber-ref`)  
 **Product scope:** macOS Desktop Electron + Pi kernel. Adapt ideas; do not blind-cherry-pick OpenCode-only paths.
 
@@ -19,31 +19,31 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 
 | # | Upstream item | Verdict | Evidence in Pichamber | Notes |
 |---|---------------|---------|----------------------|-------|
-| 1 | Git hunk stage/unstage/discard (#3443) | **PORT** | Server `applyHunk` + `POST /api/git/apply-hunk` + `gitApiHttp.applyGitHunk` exist; **no** `HunkActions.tsx`; `DiffView`/`PierreDiffViewer` lack `hunkActions` wiring | CHANGELOG already mentions hunks via `git apply` but UI controls are missing — port OC `HunkActions.tsx` + DiffView/Pierre wiring |
-| 2 | PR diff review in Changes | **PORT** | Has `PullRequestView` / create PR; **missing** `PullRequestComparisonSelector`, `usePullRequestComparison`, `pullRequestDiff.ts`, `pullRequestSnapshotCache.ts`, `usePullRequestSelectionStore` | Desktop+Pi relevant |
-| 3 | Session AI rename | **PORT** | No `SessionAiRenameMenuItem` / `use-session-ai-rename`; `session-assist` is recap/suggestion only | Adapt small-model/Pi title generation |
+| 1 | Git hunk stage/unstage/discard (#3443) | **PORTED** | Server `applyHunk` + `POST /api/git/apply-hunk` + `gitApiHttp.applyGitHunk` exist; **no** `HunkActions.tsx`; `DiffView`/`PierreDiffViewer` lack `hunkActions` wiring | CHANGELOG already mentions hunks via `git apply` but UI controls are missing — port OC `HunkActions.tsx` + DiffView/Pierre wiring |
+| 2 | PR diff review in Changes | **PORTED** | Has `PullRequestView` / create PR; **missing** `PullRequestComparisonSelector`, `usePullRequestComparison`, `pullRequestDiff.ts`, `pullRequestSnapshotCache.ts`, `usePullRequestSelectionStore` | Desktop+Pi relevant |
+| 3 | Session AI rename | **PORTED** | No `SessionAiRenameMenuItem` / `use-session-ai-rename`; `session-assist` is recap/suggestion only | Adapt small-model/Pi title generation |
 | 3b | Enter saves rename | **ALREADY** | `SessionNodeItem.tsx` rename form: `key === 'Enter'` → `handleSaveEdit` | |
-| 4 | Archived-only retention + cascade-safe | **PORT** | Has `sessionRetentionAction` / auto-delete; **missing** `sessionRetentionOnlyArchived` + entire `sync/session-retention.ts` | Port OC retention module + setting |
+| 4 | Archived-only retention + cascade-safe | **PORTED** | Has `sessionRetentionAction` / auto-delete; **missing** `sessionRetentionOnlyArchived` + entire `sync/session-retention.ts` | Port OC retention module + setting |
 | 5 | Attachments inside composer + non-image paste cite | **ALREADY** (mostly) | `LinkedReferenceRow` in composer; `createPastedContextFile`; drop handlers in `ChatInput` | Spot-check non-image file cite parity; glass/recap visual-align PORTED separately |
-| 6a | Queued message preview/collapse | **PORT** | PC `QueuedMessageChips` still uses first-line truncate; no collapse/`getQueuedMessagePreview` | Diff vs OC shows collapse + annotation preview |
-| 6b | Turn changed-files accuracy | **PORT** | `showTurnChangedFiles` / `TurnChangedFilesDropdown` exist; verify direct-edit filter + collapse-after-4 vs OC | Likely partial — confirm during port |
-| 6c | Reasoning/bash auto-follow | **PORT** | No general reasoning/bash follow fix beyond BTW `stickToBottom` | Port OC follow-scroll behavior |
-| 6d | Scroll while older history loads | **DEFER/verify** | Both have `historyLoading` in timeline controller | Diff for preserve-scroll measure; verify before port |
-| 7 | Slash commands across project switch | **PORT** | Slash helpers exist; OC 1.23.1 fix not present as dedicated preserve logic | Verify command cache keying during port |
-| 8a | Large text without truncation | **PORT** | `FilesView.tsx` `MAX_VIEW_CHARS = 200_000` still truncates; OC removed limit | |
-| 8b | Restore preview scroll/cursor | **PORT** | Missing `useFilePreviewScrollPosition.ts` | |
-| 9a | Worktrees: settings after checkout | **PORT** | Missing OC worktree checkout gate (`Timed out waiting for worktree checkout` / readiness test) | Adapt to Pi init, not OpenCode proxy blindly |
-| 9b | Worktrees: sidebar topology refresh | **PORT** | Missing `worktreeTopologyRefresh.ts` / `worktree-changed` event handling | |
+| 6a | Queued message preview/collapse | **PORTED** | PC `QueuedMessageChips` still uses first-line truncate; no collapse/`getQueuedMessagePreview` | Diff vs OC shows collapse + annotation preview |
+| 6b | Turn changed-files accuracy | **PORTED** | `showTurnChangedFiles` / `TurnChangedFilesDropdown` exist; verify direct-edit filter + collapse-after-4 vs OC | Likely partial — confirm during port |
+| 6c | Reasoning/bash auto-follow | **PORTED** | No general reasoning/bash follow fix beyond BTW `stickToBottom` | Port OC follow-scroll behavior |
+| 6d | Scroll while older history loads | **ALREADY** | Both have `historyLoading` in timeline controller | Diff for preserve-scroll measure; verify before port |
+| 7 | Slash commands across project switch | **PORTED** | Slash helpers exist; OC 1.23.1 fix not present as dedicated preserve logic | Verify command cache keying during port |
+| 8a | Large text without truncation | **PORTED** | `FilesView.tsx` `MAX_VIEW_CHARS = 200_000` still truncates; OC removed limit | |
+| 8b | Restore preview scroll/cursor | **PORTED** | Missing `useFilePreviewScrollPosition.ts` | |
+| 9a | Worktrees: settings after checkout | **PORTED** | Missing OC worktree checkout gate (`Timed out waiting for worktree checkout` / readiness test) | Adapt to Pi init, not OpenCode proxy blindly |
+| 9b | Worktrees: sidebar topology refresh | **PORTED** | Missing `worktreeTopologyRefresh.ts` / `worktree-changed` event handling | |
 | 10 | Projects: deep nested path filename bounds | **ALREADY** | `projectConfigFileStemOf` / `path_sha256_` in `project-id.js` | |
-| 11a | Scheduled: runNow while paused | **PORT** | `runTask` still `if (!task \|\| !task.enabled)` for all reasons; OC allows `reason === 'manual'` | Small fix |
-| 11b | Scheduled: one project fail isolation | **PORT** | `syncAllProjects` awaits `syncProject` with no per-project try/catch | Small fix |
-| 12a | Terminal: right-click copy/paste | **PORT** | PC `TerminalViewport.tsx` has no `ContextMenu` copy/paste | Adapt to PC terminal stack (file larger/different than OC ghostty) |
-| 12b | Terminal: macOS Option word editing | **PORT** | No `macOptionIsMeta` / Option-word handling found | Adapt to PC terminal/PTY |
+| 11a | Scheduled: runNow while paused | **PORTED** | `runTask` still `if (!task \|\| !task.enabled)` for all reasons; OC allows `reason === 'manual'` | Small fix |
+| 11b | Scheduled: one project fail isolation | **PORTED** | `syncAllProjects` awaits `syncProject` with no per-project try/catch | Small fix |
+| 12a | Terminal: right-click copy/paste | **PORTED** | PC `TerminalViewport.tsx` has no `ContextMenu` copy/paste | Adapt to PC terminal stack (file larger/different than OC ghostty) |
+| 12b | Terminal: macOS Option word editing | **PORTED** | No `macOptionIsMeta` / Option-word handling found | Adapt to PC terminal/PTY |
 | 13a | Sidebar width preserve | **ALREADY** | `sidebarWidth` persisted in `useUIStore` + Sidebar resize | |
 | 13b | Interface scale | **PORTED** | ThemeProvider zoom → `fontSize` root rem scale; Electron Zoom menu; Header 88px traffic lights (PR #755) | Desktop zoom acts on chat/panels; terminal/editor when focused |
 | 14 | MCP auto-reconnect removal | **SKIP** | Pi MCP stack (`pi/mcp-config`, `useMcpStore`); OC change targets OpenCode reconnect plugin | N/A unless PC still ships OC reconnect plugin |
-| 15a | Collapsible Markdown disclosures | **PORT** | OC `detailsExtension` in `markdownCore.ts` + decorate icons; PC markdownCore lacks disclosure tokenizer | |
-| 15b | Turn stats in Work Status | **PORT** | Missing `WorkStatusTelemetrySection.tsx` / `telemetry.ts` | KEEP Providers/Usage-follows-provider |
+| 15a | Collapsible Markdown disclosures | **PORTED** | OC `detailsExtension` in `markdownCore.ts` + decorate icons; PC markdownCore lacks disclosure tokenizer | |
+| 15b | Turn stats in Work Status | **PORTED** | Missing `WorkStatusTelemetrySection.tsx` / `telemetry.ts` | KEEP Providers/Usage-follows-provider |
 
 ## v1.23.1 release notes
 
@@ -98,8 +98,8 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Mobile branch/commit compare | SKIP | mobile-only unless shared Changes | |
 | Mobile settings manage snippets/agents/… | SKIP | mobile-only | |
 | Mobile + start session in project root | SKIP | mobile-only | |
-| New-session project search | **ALREADY?** | Verify picker search; BTW exists | Confirm during pass |
-| Paste full session ID search | **ALREADY?** | Sidebar search docs mention ID; verify | |
+| New-session project search | **ALREADY** | `DraftTargetSelectors` `searchProjects` | verified |
+| Paste full session ID search | **PORTED** | exact `ses_` match in sidebar/archive | this PR |
 | Collapsible Markdown sections | PORT | HP#15a | |
 | Usage: ClinePass | **SKIP** | OpenCode-only usage provider | |
 | Usage: Charm Hyper | **SKIP** | OpenCode-only usage provider | |
@@ -107,10 +107,10 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Activity collapse summary | **ALREADY** | `activityRenderMode` collapsed|summary | |
 | `/btw` isolated composer | **ALREADY** | `BtwPanel.tsx` present | |
 | Files restore scroll/cursor | PORT | HP#8b | |
-| Per-surface theme/fonts/layout | **PORTED** (Desktop slice) | `settings/surface.ts` + `?surface=` on settings GET/PUT; `surfaceProfiles` overlay for theme/font-size/chat-layout keys; Appearance copy notes Desktop scope | Follow-ups: full preferences.json registry split; VS Code bridge surface; mobile parity UI |
+| Per-surface theme/fonts/layout | **PORTED** (full prefs) | `preferences.json` + `settings-registry.json` + UI `lib/settings/registry.ts`; `?surface=` via profile surfaces; `surfaceProfiles` seeds then drops | VS Code bridge HARD SKIP; persistence.ts still uses updateDesktopSettings (registry apply path available) |
 | Desktop zoom → interface scale | **PORTED** | HP#13b / PR #755 (DOM rem zoom; traffic-light inset) | #755 |
 | Mobile drawer UX batch | SKIP | mobile-only | |
-| Comments Enter attaches | **ALREADY?** | Verify comment input | |
+| Comments Enter attaches | **PORTED** | desktop Enter attaches; Shift+Enter newline | this PR |
 | Terminal render consistency / touch copy | **DEFER** | Tied to terminal stack | |
 | Ctrl+N/P model lists | **PORTED** | dropdown-navigation + ModelPicker/menus/select/ChatInput (Batch B) | PR #756 |
 | Send-shortcut / large-paste copy | **PORTED** | clearer queueMessages + largeTextPaste hints (Batch B); enterToSend skipped (PC uses queueMessages) | PR pending |
@@ -122,22 +122,22 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 | Fork restores attachments | **PORTED** | `pendingComposerRestore` destination-scoped handoff (OC #3387) | Batch C2 |
 | Interrupted tools timer | **ALREADY** | `interruptedTurnToolParts` + tests present | |
 | Duplicate attached images | **PORTED** | optimistic file replace scans all slots after text echo (event-reducer) | Batch C2 |
-| Follow end on panel resize | **DEFER** | | |
-| Message details narrow columns | **DEFER** | | |
-| Streaming Thinking scroll box | **DEFER/verify** | partial may exist | |
-| Expanded composer Enter newline | **DEFER/verify** | | |
-| Narrow markdown tables | **DEFER/verify** | | |
+| Follow end on panel resize | **PORTED** | `onListMetricsChange` + `footerSize` end assert on resize settle | this PR |
+| Message details narrow columns | **PORTED** | `useFactsFit` + `data-fact-priority` footer | this PR |
+| Streaming Thinking scroll box | **ALREADY** | `ReasoningPart` capped scroll box + upward pause | verified vs OC 1.23 |
+| Expanded composer Enter newline | **ALREADY** | `requiresModifierToSend = isMobile \|\| isDesktopExpanded` | verified |
+| Narrow markdown tables | **PORTED** | `stabilizeMarkdownTableWidths` | this PR |
 | Missing worktree relocation manual | **DEFER/verify** | | |
 | Mobile dirty warning flash | SKIP | mobile | |
 | Android nav bar | SKIP | mobile | |
-| Terminal tab output isolation | **DEFER** | | |
-| NODE_CHANNEL_FD warning | **DEFER** | POSIX PTY | |
-| Native updater from web | **DEFER** | Desktop | |
-| Git token identity credential-helper | **DEFER** | | |
+| Terminal tab output isolation | **PORTED** | snapshot cols/rows + sized replay | this PR |
+| NODE_CHANNEL_FD warning | **PORTED** | `resolvePosixPtyLaunch` + `delete env.NODE_CHANNEL_FD` | this PR |
+| Native updater from web | **PORTED** | `desktopUpdater` + `web-update.ts` | this PR |
+| Git token identity credential-helper | **PORTED** | `allowUnsafeCredentialHelper` | this PR |
 | Branch compare local edits | **DEFER** | | |
-| New-file diffs line-ending warnings | **DEFER** | | |
+| New-file diffs line-ending warnings | **PORTED** | `getNoIndexDiff` exit 0/1 | this PR |
 | Usage provider fixes (Go/OpenRouter/Ollama/NeuralWatt/z.ai) | **SKIP** | OpenCode usage providers; keep Pichamber provider model | |
-| Small-model endpoint details | **PORT** | titles/summaries/walkthroughs — Pi adapt | |
+| Small-model endpoint details | **ALREADY** (Pi) | `callPiSmallModel` → `ModelRuntime.getModel(provider, model)` | OpenCode runtime-providers N/A |
 | Electron instance probe timeout | **PORTED** | electron-host-probe + host-probe-policy (Batch C) | PR #757 |
 | Interface scaling layout | **PORTED** | HP#13b — root rem scale + fixed traffic-light inset (PR #755) | #755 |
 | Sidebar width preserve | ALREADY | HP#13a | |
@@ -157,7 +157,7 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 
 ## Deferred (explicit)
 
-- Full OC preferences.json + settings-registry per-surface split (PC ships Desktop `surfaceProfiles` overlay slice for theme/fonts/layout)
+- Full OC preferences.json + settings-registry per-surface split (**PORTED** this PR — preferences.json + registry gate + UI registry/generate; VS Code bridge HARD SKIP)
 - ~~Glass/recap visual overhaul~~ → PORTED visual-align (features retained)  
 - Mobile/Capacitor-only and VS Code-only items  
 - OpenCode Usage providers (ClinePass/Hyper/Go/etc.)  
@@ -174,3 +174,9 @@ High-priority checklist (user list) mapped below; full release-note coverage fol
 - Never PR/push `openchamber/openchamber`  
 - Cloud agents quota-exhausted — all work on Air worktrees  
 - Terminal/hunk/PR ports need Desktop smoke after merge  
+
+
+## Session 2026-09-12 defer-rest
+
+Soft-UX + Terminal/Git + native updater ports in `port/upstream-1.23-defer-rest-softux`.
+Remaining explicit: terminal render consistency via OC libghostty-vt migration (PC stays on ghostty-web + sized replay); OpenCode-only Usage/Revert/Share/AppImage/Capacitor/VS Code chrome (HARD SKIP). Desktop isolate PASS for softux on CDP 9755.

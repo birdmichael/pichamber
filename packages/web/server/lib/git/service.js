@@ -354,16 +354,17 @@ const buildGitEnv = async () => {
   return env;
 };
 
-const createGit = async (directory, { allowUnsafeSshCommand = false } = {}) => {
+const createGit = async (directory, { allowUnsafeSshCommand = false, allowUnsafeCredentialHelper = false } = {}) => {
   const env = await buildGitEnv();
   const spawnOptions = { windowsHide: true };
   const binary = getGitBinary();
   const hasCustomBinary = typeof binary === 'string' && binary.trim() && binary !== 'git' && binary !== 'git.exe';
-  const unsafe = hasCustomBinary || allowUnsafeSshCommand
+  const unsafe = hasCustomBinary || allowUnsafeSshCommand || allowUnsafeCredentialHelper
     ? {
-      ...(hasCustomBinary && { allowUnsafeCustomBinary: true }),
-      ...(allowUnsafeSshCommand && { allowUnsafeSshCommand: true }),
-    }
+        ...(hasCustomBinary && { allowUnsafeCustomBinary: true }),
+        ...(allowUnsafeSshCommand && { allowUnsafeSshCommand: true }),
+        ...(allowUnsafeCredentialHelper && { allowUnsafeCredentialHelper: true }),
+      }
     : undefined;
   // Always pin simple-git to an explicit working directory. Omitting baseDir
   // makes simple-git use process.cwd(), which breaks when the OpenChamber
@@ -934,7 +935,7 @@ const runGitCommand = async (cwd, args) => {
   } catch (error) {
     return {
       success: false,
-      exitCode: typeof error?.code === 'number' ? error.code : 1,
+      exitCode: Number.isInteger(error?.code) ? error.code : null,
       stdout: String(error?.stdout || ''),
       stderr: String(error?.stderr || ''),
       message: parseGitErrorText(error),
@@ -2062,7 +2063,7 @@ export async function hasLocalIdentity(directory) {
 }
 
 export async function setLocalIdentity(directory, profile) {
-  const git = await createGit(directory, { allowUnsafeSshCommand: true });
+  const git = await createGit(directory, { allowUnsafeSshCommand: true, allowUnsafeCredentialHelper: true });
 
   try {
 
@@ -2387,6 +2388,22 @@ export async function getStatus(directory, options = {}) {
   }
 }
 
+
+const getNoIndexDiff = async (repoRoot, repoPath, contextLines) => {
+  const args = ['diff', '--no-color'];
+  if (Number.isFinite(contextLines)) {
+    args.push(`-U${Math.max(0, contextLines)}`);
+  }
+  args.push('--no-index', '--', '/dev/null', repoPath);
+  const result = await runGitCommand(repoRoot, args);
+  // Exit 1 means differences, even when Git also writes warnings to stderr.
+  // Spawn and buffer errors have no numeric exit code and must still fail.
+  if (result.exitCode === 0 || result.exitCode === 1) {
+    return result.stdout;
+  }
+  throw new Error(result.stderr || result.message || 'Failed to get untracked Git diff');
+};
+
 export async function getDiff(directory, { path: filePath, staged = false, contextLines = 3 } = {}) {
   const { directoryPath, directoryGit, repoRoot, git } = await createRepositoryGitContext(directory);
 
@@ -2437,21 +2454,7 @@ export async function getDiff(directory, { path: filePath, staged = false, conte
         ].join('\n');
       }
 
-      const noIndexArgs = ['diff', '--no-color'];
-      if (typeof contextLines === 'number' && !Number.isNaN(contextLines)) {
-        noIndexArgs.push(`-U${Math.max(0, contextLines)}`);
-      }
-      noIndexArgs.push('--no-index', '--', '/dev/null', fileContext.repoPath);
-      try {
-        const noIndexDiff = await git.raw(noIndexArgs);
-        return noIndexDiff;
-      } catch (noIndexError) {
-        // git diff --no-index returns exit code 1 when differences exist (not a real error)
-        if (noIndexError.exitCode === 1 && noIndexError.message) {
-          return noIndexError.message;
-        }
-        throw noIndexError;
-      }
+      return await getNoIndexDiff(repoRoot, fileContext.repoPath, contextLines);
     }
   } catch (error) {
     console.error('Failed to get Git diff:', error);
@@ -2500,7 +2503,7 @@ export async function getUntrackedDiffs(directory, filePaths = [], { concurrency
   const paths = (Array.isArray(filePaths) ? filePaths : []).filter((value) => typeof value === 'string' && value);
   if (paths.length === 0) return [];
 
-  const { directoryPath, directoryGit, repoRoot, git } = await createRepositoryGitContext(directory);
+  const { directoryPath, directoryGit, repoRoot } = await createRepositoryGitContext(directory);
   const results = new Array(paths.length).fill('');
   let cursor = 0;
 
@@ -2509,18 +2512,7 @@ export async function getUntrackedDiffs(directory, filePaths = [], { concurrency
       const index = cursor++;
       try {
         const fileContext = await resolveGitFileContext(directoryPath, directoryGit, paths[index], repoRoot);
-        const args = ['diff', '--no-color'];
-        if (typeof contextLines === 'number' && !Number.isNaN(contextLines)) {
-          args.push(`-U${Math.max(0, contextLines)}`);
-        }
-        args.push('--no-index', '--', '/dev/null', fileContext.repoPath);
-        try {
-          results[index] = await git.raw(args);
-        } catch (error) {
-          // `git diff --no-index` exits 1 whenever there are differences, which
-          // for a new file is always.
-          results[index] = error?.exitCode === 1 && error?.message ? error.message : '';
-        }
+        results[index] = await getNoIndexDiff(repoRoot, fileContext.repoPath, contextLines);
       } catch {
         results[index] = '';
       }

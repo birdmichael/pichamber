@@ -1,7 +1,21 @@
 import {
-  commitPerSurfaceProfileWrite,
+  buildPreferencesFields,
+  flattenPreferences,
+  instancePartOf,
+  legacySettingsDocumentOf,
+  profilePartOf,
+  isDeviceSettingsKey,
+  isProfileSettingsKey,
   normalizeSettingsSurface,
-  resolveSettingsForSurface,
+  parsePreferencesDocument,
+  preferencesFilePathFor,
+  seedPreferencesFrom,
+  serializePreferencesDocument,
+} from './settings-files.js';
+import {
+  PER_SURFACE_PROFILE_KEYS,
+  SURFACE_PROFILES_KEY,
+  stripSurfaceProfiles,
 } from './settings-surface-profile.js';
 
 import os from 'node:os';
@@ -84,6 +98,14 @@ export const createSettingsRuntime = (deps) => {
   } = deps;
 
   let persistSettingsLock = Promise.resolve();
+
+  const PREFERENCES_FILE_PATH = preferencesFilePathFor(SETTINGS_FILE_PATH, path);
+  // True while preferences.json exists but cannot be read. Profile writes are
+  // refused meanwhile so a corrupt file is never overwritten with a seed or a
+  // partial document; clients keep the values they hold.
+  let preferencesUnavailable = false;
+  let preferencesFailureLogged = false;
+
 
   // Orphan recovery is a one-shot best-effort scan: when orphans can't be
   // matched on first pass they stay on disk and every subsequent settings
@@ -458,7 +480,7 @@ export const createSettingsRuntime = (deps) => {
     }
   };
 
-  const readSettingsFromDisk = async () => {
+  const readInstanceSettingsFromDisk = async () => {
     try {
       const raw = await fsPromises.readFile(SETTINGS_FILE_PATH, 'utf8');
       const parsed = JSON.parse(raw);
@@ -473,6 +495,107 @@ export const createSettingsRuntime = (deps) => {
       console.warn('Failed to read settings file:', error);
       return {};
     }
+  };
+
+  /**
+   * Lift the interim Desktop `surfaceProfiles` bag into the preferences.json
+   * per-surface shape so a single seed covers installs that only had the slice.
+   */
+  const expandSurfaceProfilesForSeed = (document) => {
+    const base = stripSurfaceProfiles(document);
+    const profiles = document?.[SURFACE_PROFILES_KEY];
+    if (!profiles || typeof profiles !== 'object') return base;
+    // Seed uses base values; per-surface overlays are applied after seed via a
+    // one-shot preferences write below when we detect surfaceProfiles.
+    return base;
+  };
+
+  const seedPreferencesIncludingSurfaceProfiles = async (instance) => {
+    const base = expandSurfaceProfilesForSeed(instance);
+    let fields = seedPreferencesFrom(base, Date.now());
+    const profiles = instance?.[SURFACE_PROFILES_KEY];
+    if (profiles && typeof profiles === 'object') {
+      const now = Date.now();
+      for (const [surface, overlay] of Object.entries(profiles)) {
+        if (!overlay || typeof overlay !== 'object') continue;
+        for (const key of PER_SURFACE_PROFILE_KEYS) {
+          if (!Object.prototype.hasOwnProperty.call(overlay, key)) continue;
+          const previous = fields[key] || { updatedAt: 0 };
+          fields = {
+            ...fields,
+            [key]: {
+              ...previous,
+              surfaces: {
+                ...(previous.surfaces || {}),
+                [surface]: { value: overlay[key], updatedAt: now },
+              },
+            },
+          };
+        }
+      }
+    }
+    await writePreferencesToDisk(fields);
+    // Drop the interim bag from settings.json once preferences owns it.
+    if (Object.prototype.hasOwnProperty.call(instance, SURFACE_PROFILES_KEY)) {
+      const nextInstance = { ...instance };
+      delete nextInstance[SURFACE_PROFILES_KEY];
+      await writeJsonFileAtomic(SETTINGS_FILE_PATH, JSON.stringify(legacySettingsDocumentOf(nextInstance, fields), null, 2));
+    }
+    return fields;
+  };
+
+  const readPreferenceFields = async () => {
+    let raw;
+    try {
+      raw = await fsPromises.readFile(PREFERENCES_FILE_PATH, 'utf8');
+    } catch (error) {
+      if (error && typeof error === 'object' && error.code === 'ENOENT') {
+        return { status: 'missing' };
+      }
+      if (!preferencesFailureLogged) {
+        preferencesFailureLogged = true;
+        console.warn('Failed to read preferences file:', error);
+      }
+      return { status: 'failed' };
+    }
+    const parsed = parsePreferencesDocument(raw);
+    if (!parsed.ok) {
+      if (!preferencesFailureLogged) {
+        preferencesFailureLogged = true;
+        console.warn(`Preferences file is unreadable (${parsed.reason}); profile writes are paused until it is fixed or removed.`);
+      }
+      return { status: 'failed' };
+    }
+    preferencesFailureLogged = false;
+    return { status: 'ok', fields: parsed.fields };
+  };
+
+  const writePreferencesToDisk = async (fields) => {
+    await writeJsonFileAtomic(PREFERENCES_FILE_PATH, serializePreferencesDocument(fields));
+  };
+
+  const readSettingsFromDisk = async ({ surface = null } = {}) => {
+    const instance = await readInstanceSettingsFromDisk();
+    const preferences = await readPreferenceFields();
+    if (preferences.status === 'failed') {
+      preferencesUnavailable = true;
+      return stripSurfaceProfiles(instance);
+    }
+    preferencesUnavailable = false;
+    if (preferences.status === 'missing') {
+      try {
+        await seedPreferencesIncludingSurfaceProfiles(instance);
+      } catch (error) {
+        console.warn('Failed to seed preferences file:', error);
+      }
+      // Re-read so per-surface overlays from surfaceProfiles apply.
+      const seeded = await readPreferenceFields();
+      if (seeded.status === 'ok') {
+        return { ...stripSurfaceProfiles(instance), ...flattenPreferences(seeded.fields, normalizeSettingsSurface(surface)) };
+      }
+      return stripSurfaceProfiles(instance);
+    }
+    return { ...stripSurfaceProfiles(instance), ...flattenPreferences(preferences.fields, normalizeSettingsSurface(surface)) };
   };
 
   // Strict variant for callers that REGENERATE persisted identity when a key is
@@ -537,24 +660,47 @@ export const createSettingsRuntime = (deps) => {
     await fsPromises.rm(tmp, { force: true });
   };
 
-  const writeSettingsToDisk = async (settings) => {
+  const writeJsonFileAtomic = async (filePath, textValue) => {
+    const directory = path.dirname(filePath);
+    await fsPromises.mkdir(directory, { recursive: true, mode: 0o700 });
+    if (process.platform !== 'win32') await fsPromises.chmod(directory, 0o700);
+    const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const settingsDirectory = path.dirname(SETTINGS_FILE_PATH);
-      await fsPromises.mkdir(settingsDirectory, { recursive: true, mode: 0o700 });
-      if (process.platform !== 'win32') await fsPromises.chmod(settingsDirectory, 0o700);
-      // Atomic write: Electron main and ssh-manager read this file via plain
-      // readFile + JSON.parse and silently coerce parse errors to {}. A
-      // partial read during a non-atomic writeFile would make their next
-      // read-modify-write wipe the settings file.
-      const tmp = `${SETTINGS_FILE_PATH}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await fsPromises.writeFile(tmp, JSON.stringify(settings, null, 2), { encoding: 'utf8', mode: 0o600 });
+      await fsPromises.writeFile(tmp, textValue, { encoding: 'utf8', mode: 0o600 });
       if (process.platform !== 'win32') await fsPromises.chmod(tmp, 0o600);
-      await replaceFile(tmp, SETTINGS_FILE_PATH);
-      if (process.platform !== 'win32') await fsPromises.chmod(SETTINGS_FILE_PATH, 0o600);
+      await replaceFile(tmp, filePath);
+      if (process.platform !== 'win32') await fsPromises.chmod(filePath, 0o600);
     } catch (error) {
-      console.warn('Failed to write settings file:', error);
+      await fsPromises.rm(tmp, { force: true }).catch(() => {});
+      console.warn(`Failed to write ${path.basename(filePath)}:`, error);
       throw error;
     }
+  };
+
+  /**
+   * Persist a merged document: profile keys go to preferences.json (stamped
+   * when their value changed), everything else to settings.json. While
+   * preferences.json is unreadable its part is skipped rather than replaced.
+   */
+  const writeSettingsToDisk = async (settings, { surface = null, changedKeys = null } = {}) => {
+    const cleaned = stripSurfaceProfiles(settings);
+    const current = preferencesUnavailable ? { status: 'failed' } : await readPreferenceFields();
+    if (current.status === 'failed') {
+      preferencesUnavailable = true;
+      const onDisk = await readInstanceSettingsFromDisk();
+      await writeJsonFileAtomic(SETTINGS_FILE_PATH, JSON.stringify({
+        ...instancePartOf(cleaned),
+        ...profilePartOf(onDisk),
+      }, null, 2));
+      return;
+    }
+    const previousFields = current.status === 'ok' ? current.fields : {};
+    const nextFields = buildPreferencesFields(previousFields, cleaned, Date.now(), {
+      surface: normalizeSettingsSurface(surface),
+      changedKeys,
+    });
+    await writeJsonFileAtomic(SETTINGS_FILE_PATH, JSON.stringify(legacySettingsDocumentOf(cleaned, nextFields), null, 2));
+    await writePreferencesToDisk(nextFields);
   };
 
   const validateProjectEntries = async (projects) => {
@@ -950,8 +1096,9 @@ export const createSettingsRuntime = (deps) => {
     if (migration0.changed || migration1.changed || migration2.changed || migration3.changed || migration4.changed || migration5.changed || migration6.changed || migration7.changed || migration8.changed) {
       await writeSettingsToDisk(migration8.settings);
     }
-    // Migrations run on the base document; a surface asks for its own overlay on top.
-    return resolveSettingsForSurface(migration8.settings, normalizeSettingsSurface(surface));
+    // Migrations run on the base view; a surface asks for its own resolution
+    // of the per-surface keys on top of the merged preferences.json document.
+    return normalizeSettingsSurface(surface) ? await readSettingsFromDisk({ surface }) : migration8.settings;
   };
 
   const persistSettings = async (changes, { surface = null } = {}) => {
@@ -959,14 +1106,19 @@ export const createSettingsRuntime = (deps) => {
       // Log field names only — changes can carry credentials (UI password,
       // client tokens, tunnel tokens) that must never reach the log file.
       console.log('[persistSettings] Updating fields:', Object.keys(changes || {}).join(', ') || '(none)');
-      const current = await readSettingsFromDisk();
+      const current = await readSettingsFromDisk({ surface });
       const seed = await migrateSettingsFromPiSessionProjects(current);
       const sanitized = sanitizeSettingsUpdate(changes);
+      for (const key of Object.keys(sanitized)) {
+        if (isDeviceSettingsKey(key)) {
+          delete sanitized[key];
+        } else if (preferencesUnavailable && isProfileSettingsKey(key)) {
+          console.warn(`[persistSettings] Dropping ${key}: preferences file is unreadable`);
+          delete sanitized[key];
+        }
+      }
       let next = mergePersistedSettings(seed.settings, sanitized);
       next = restoreSeededProjectsAfterPersist(seed, sanitized, next);
-      // Theme/font/chat-layout keys land under surfaceProfiles[surface] when the
-      // client identifies itself (Desktop-first OpenChamber 1.23 slice).
-      next = commitPerSurfaceProfileWrite(seed.settings, next, sanitized, surface);
 
       const normalizedState = normalizeSettingsPaths(next);
       if (normalizedState.changed) {
@@ -1034,8 +1186,11 @@ export const createSettingsRuntime = (deps) => {
         }
       }
 
-      await writeSettingsToDisk(next);
-      return formatSettingsResponse(resolveSettingsForSurface(next, normalizeSettingsSurface(surface)));
+      await writeSettingsToDisk(next, { surface, changedKeys: Object.keys(sanitized) });
+      const resolved = normalizeSettingsSurface(surface)
+        ? await readSettingsFromDisk({ surface })
+        : next;
+      return formatSettingsResponse(resolved);
     });
 
     return persistSettingsLock;

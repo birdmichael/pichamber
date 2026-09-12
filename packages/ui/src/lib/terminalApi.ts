@@ -1,3 +1,4 @@
+import type { TerminalChunkSize } from '@/stores/useTerminalStore';
 import type { CreateTerminalOptions, TerminalError, TerminalHandlers, TerminalSession, TerminalShellOption, TerminalStreamEvent } from './api/types';
 import { openRuntimeWebSocket } from './relay/runtime-socket';
 import type { RelayTunnelWebSocket } from './relay/tunnel-client';
@@ -11,6 +12,8 @@ type Subscriber = { handlers: TerminalHandlers; lastSequence: number };
 type TerminalProjection = {
   sequence: number;
   history: string;
+  cols?: number;
+  rows?: number;
   status: TerminalStreamEvent['status'];
   exitCode?: number;
   signal?: number | null;
@@ -30,6 +33,11 @@ const SOCKET_OPEN = 1;
 const IDLE_SOCKET_GRACE_MS = 15_000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+/** The PTY size a snapshot's history was drawn for, when the server reported one. */
+export const terminalSnapshotSize = (event: Pick<TerminalStreamEvent, 'cols' | 'rows'>): TerminalChunkSize | undefined =>
+  event.cols !== undefined && event.rows !== undefined ? { cols: event.cols, rows: event.rows } : undefined;
+
 
 const encode = (message: Message): Uint8Array => {
   const payload = encoder.encode(JSON.stringify(message));
@@ -98,7 +106,7 @@ export class TerminalTransport {
     const projection = this.projections.get(sessionId);
     if (projection) {
       subscriber.lastSequence = projection.sequence;
-      handlers.onEvent({ type: 'snapshot', sequence: projection.sequence, data: projection.history, status: projection.status, exitCode: projection.exitCode, signal: projection.signal, runtime: projection.runtime, ptyBackend: projection.ptyBackend });
+      handlers.onEvent({ type: 'snapshot', sequence: projection.sequence, data: projection.history, cols: projection.cols, rows: projection.rows, status: projection.status, exitCode: projection.exitCode, signal: projection.signal, runtime: projection.runtime, ptyBackend: projection.ptyBackend });
     }
     const socketWasOpen = this.socket?.readyState === SOCKET_OPEN;
     this.ensureConnected().then(() => {
@@ -160,6 +168,12 @@ export class TerminalTransport {
 
   forget(sessionId: string): void {
     this.projections.delete(sessionId);
+  }
+
+  noteResize(sessionId: string, cols: number, rows: number): void {
+    const projection = this.projections.get(sessionId);
+    if (!projection) return;
+    this.projections.set(sessionId, { ...projection, cols, rows });
   }
 
   private async ensureConnected(): Promise<void> {
@@ -269,6 +283,8 @@ export class TerminalTransport {
       const projection: TerminalProjection = {
         sequence: typeof message.q === 'number' ? message.q : 0,
         history: typeof message.history === 'string' ? message.history : '',
+        cols: typeof message.cols === 'number' ? message.cols : undefined,
+        rows: typeof message.rows === 'number' ? message.rows : undefined,
         status: message.status as TerminalStreamEvent['status'],
         exitCode: typeof message.exitCode === 'number' ? message.exitCode : undefined,
         signal: typeof message.signal === 'number' ? message.signal : null,
@@ -278,7 +294,7 @@ export class TerminalTransport {
       this.projections.set(message.s, projection);
       for (const sub of subscribers) {
         sub.lastSequence = projection.sequence;
-        sub.handlers.onEvent({ type: 'snapshot', sequence: projection.sequence, data: projection.history, status: projection.status, exitCode: projection.exitCode, signal: projection.signal, runtime: projection.runtime, ptyBackend: projection.ptyBackend });
+        sub.handlers.onEvent({ type: 'snapshot', sequence: projection.sequence, data: projection.history, cols: projection.cols, rows: projection.rows, status: projection.status, exitCode: projection.exitCode, signal: projection.signal, runtime: projection.runtime, ptyBackend: projection.ptyBackend });
       }
       return;
     }
@@ -379,7 +395,10 @@ async function command(path: string, method: string, body?: unknown): Promise<Re
   if (!response.ok) throw await responseError(response, 'Terminal command failed');
   return response;
 }
-export async function resizeTerminal(sessionId: string, cols: number, rows: number): Promise<void> { await command(`/api/terminal/${sessionId}/resize`, 'POST', { cols, rows }); }
+export async function resizeTerminal(sessionId: string, cols: number, rows: number): Promise<void> {
+  await command(`/api/terminal/${sessionId}/resize`, 'POST', { cols, rows });
+  transport.noteResize(sessionId, cols, rows);
+}
 export async function updateTerminalAppearance(sessionId: string, appearance: Pick<CreateTerminalOptions, 'themeMode' | 'terminalBackground' | 'terminalForeground'>): Promise<void> { await command(`/api/terminal/${sessionId}/appearance`, 'POST', appearance); }
 export async function closeTerminal(sessionId: string): Promise<void> { await command(`/api/terminal/${sessionId}`, 'DELETE'); transport.forget(sessionId); }
 export async function restartTerminalSession(currentSessionId: string, options: CreateTerminalOptions): Promise<TerminalSession> { return (await command(`/api/terminal/${currentSessionId}/restart`, 'POST', options)).json() as Promise<TerminalSession>; }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { countMatchingSessionNodes, filterSessionNodesForSearch, sessionSearchTextMatches } from './sessionSearch';
+import { countMatchingSessionNodes, filterSessionNodesForSearch, isSessionIdSearchQuery, sessionSearchTextMatches } from './sessionSearch';
 
 type Node = {
   session: { title: string };
@@ -74,3 +74,36 @@ describe('sidebar session search matcher', () => {
   });
 });
 
+
+describe('sidebar exact session id search', () => {
+  const text = (session: { title?: string | null }) => (session.title ?? '').toLowerCase();
+  const tree = [
+    {
+      session: { id: 'ses_f88b1a2b3c4d', title: 'Release notes', time: {} },
+      children: [
+        { session: { id: 'ses_child', title: 'Child', time: {} }, children: [] },
+      ],
+    },
+    {
+      session: { id: 'ses_other', title: 'ses_f88b1a2b3c4d', time: {} },
+      children: [],
+    },
+  ];
+
+  test('matches only a complete ID (case/whitespace insensitive)', () => {
+    expect(isSessionIdSearchQuery('  SES_F88B1A2B3C4D ')).toBe(true);
+    const filtered = filterSessionNodesForSearch(tree as any, '  SES_F88B1A2B3C4D ', text as any);
+    expect(filtered.map((n) => n.session.id)).toEqual(['ses_f88b1a2b3c4d']);
+    expect(countMatchingSessionNodes(filtered as any, 'ses_f88b1a2b3c4d', text as any)).toBe(1);
+    expect(filterSessionNodesForSearch(tree as any, 'ses_f88b', text as any)).toEqual([]);
+  });
+
+  test('skips archived sessions for id queries unless opted in', () => {
+    const archived = [{
+      session: { id: 'ses_f88b1a2b3c4d', title: 'Archived', time: { archived: 2 } },
+      children: [],
+    }];
+    expect(filterSessionNodesForSearch(archived as any, 'ses_f88b1a2b3c4d', text as any)).toEqual([]);
+    expect(filterSessionNodesForSearch(archived as any, 'ses_f88b1a2b3c4d', text as any, { includeArchivedForIdQuery: true }).map((n) => n.session.id)).toEqual(['ses_f88b1a2b3c4d']);
+  });
+});

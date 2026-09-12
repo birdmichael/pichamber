@@ -93,7 +93,14 @@ type Props = {
   sessionKey: string;
   chunks: TerminalChunk[];
   onInput: (data: string) => void;
+  /** Fitted size: the emulator has this size, so the PTY should follow. */
   onResize: (cols: number, rows: number) => void;
+  /**
+   * Size estimated from the container before Ghostty has measured anything.
+   * Good enough to spawn a shell early, not authoritative: an existing PTY
+   * must not be resized to it. Falls back to `onResize` when omitted.
+   */
+  onProvisionalSize?: (cols: number, rows: number) => void;
   theme: TerminalTheme;
   fontFamily: string;
   fontSize: number;
@@ -117,6 +124,7 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
   const fitRef = React.useRef<FitAddon | null>(null);
   const inputRef = React.useRef(onInput);
   const resizeRef = React.useRef(onResize);
+  const provisionalSizeCallbackRef = React.useRef(onProvisionalSize);
   const lastSizeRef = React.useRef<TerminalSize | null>(null);
   const provisionalSizeRef = React.useRef<TerminalSize | null>(null);
   const lastChunkRef = React.useRef<number | null>(null);
@@ -133,6 +141,7 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
   const [rendererGeneration, setRendererGeneration] = React.useState(0);
   inputRef.current = onInput;
   resizeRef.current = onResize;
+  provisionalSizeCallbackRef.current = onProvisionalSize;
   visibleRef.current = isVisible;
   safeResetRef.current = getGhosttySafeResetSequence(theme.background);
 
@@ -141,7 +150,7 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
     if (!container) return;
     const size = getProvisionalTerminalSize(container, fontFamily, fontSize);
     provisionalSizeRef.current = size;
-    if (size) resizeRef.current(size.cols, size.rows);
+    if (size) (provisionalSizeCallbackRef.current ?? resizeRef.current)(size.cols, size.rows);
   }, [fontFamily, fontSize]);
 
   const fit = React.useCallback(() => {
@@ -334,6 +343,26 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
     terminal.options.cursorBlink = isVisible && document.hasFocus() && container.contains(document.activeElement);
   }, [isVisible, ready]);
 
+  const writeReplayAtDrawnSize = React.useCallback((terminal: GhosttyTerminal, chunk: (typeof chunks)[number]): boolean => {
+    if (!chunk.size || writingRef.current || writeQueueRef.current) return false;
+    const rewritten = rewriteGhosttyDefaultBackgroundResets(
+      chunk.replayData ?? chunk.data,
+      outputRewriteCarryRef.current,
+      safeResetRef.current,
+    );
+    outputRewriteCarryRef.current = rewritten.carry;
+    if (!rewritten.data) return true;
+    const fitted = { cols: terminal.cols, rows: terminal.rows };
+    const resizeForReplay = chunk.size.cols !== fitted.cols || chunk.size.rows !== fitted.rows;
+    if (resizeForReplay) terminal.resize(chunk.size.cols, chunk.size.rows);
+    try {
+      terminal.write(rewritten.data);
+    } finally {
+      if (resizeForReplay) terminal.resize(fitted.cols, fitted.rows);
+    }
+    return true;
+  }, []);
+
   React.useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
@@ -359,10 +388,11 @@ const TerminalViewport = React.forwardRef<TerminalController, Props>(({
     }
     const isReplay = previousIndex < 0;
     const pending = previousIndex >= 0 ? chunks.slice(previousIndex + 1) : chunks;
-    writeQueueRef.current += pending.map((chunk) => isReplay ? (chunk.replayData ?? chunk.data) : chunk.data).join('');
+    const queued = isReplay && pending[0] && writeReplayAtDrawnSize(terminal, pending[0]) ? pending.slice(1) : pending;
+    writeQueueRef.current += queued.map((chunk) => isReplay ? (chunk.replayData ?? chunk.data) : chunk.data).join('');
     lastChunkRef.current = chunks.at(-1)?.id ?? null;
     flush();
-  }, [chunks, flush, ready, recreateRenderer]);
+  }, [chunks, flush, ready, recreateRenderer, writeReplayAtDrawnSize]);
 
   React.useEffect(() => {
     if (!autoFocus || !isVisible) return;

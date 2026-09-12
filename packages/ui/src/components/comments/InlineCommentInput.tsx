@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { isIMECompositionEvent } from '@/lib/ime';
 import { useOptionalThemeSystem } from '@/contexts/useThemeSystem';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -100,12 +101,20 @@ export function InlineCommentInput({
     });
   }, [isMobile]);
 
+  const save = () => {
+    if (text.trim()) {
+      onSave(text, normalizeRange(stableRangeRef.current));
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (isIMECompositionEvent(e)) return;
+
+    // Desktop Enter attaches; Shift+Enter and mobile Enter break the line.
+    // Keep Cmd/Ctrl+Enter available for hardware keyboards on mobile.
+    if (e.key === 'Enter' && !e.shiftKey && (!isMobile || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      if (text.trim()) {
-        onSave(text, normalizeRange(stableRangeRef.current));
-      }
+      save();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();

@@ -1,10 +1,10 @@
 /**
- * Desktop-first per-surface theme / fonts / chat-layout overlay for settings.json.
+ * Legacy Desktop `surfaceProfiles` overlay helpers.
  *
- * OpenChamber 1.23 stores these under preferences.json field entries
- * (`surfaces.<kind>`). Pichamber keeps a flatter settings.json and nests the
- * same overlay under `surfaceProfiles` so Desktop can diverge without a full
- * preferences-registry split. Device-local panel sizes stay elsewhere.
+ * OpenChamber 1.23 stores per-surface theme/fonts/layout under preferences.json
+ * (`surfaces.<kind>`). New writes go through settings-files.js; on first read,
+ * settings-runtime seeds preferences.json from any residual `surfaceProfiles`
+ * bag and then drops it. These helpers remain for seed/strip compatibility.
  */
 
 export const SETTINGS_SURFACES = Object.freeze(['web', 'desktop', 'vscode', 'mobile']);

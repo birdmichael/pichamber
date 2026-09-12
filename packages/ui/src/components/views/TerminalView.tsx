@@ -1,4 +1,5 @@
 import React from 'react';
+import { terminalSnapshotSize } from '@/lib/terminalApi';
 import { focusChatInput } from '@/components/chat/composer/editor/dom';
 
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -276,7 +277,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
                                 setIsReconnectPending(false);
                                 focusTerminalWhenWindowActive();
 
-                                replaceBuffer(directory, tabId, event.data ?? '', event.sequence ?? 0);
+                                replaceBuffer(directory, tabId, event.data ?? '', event.sequence ?? 0, terminalSnapshotSize(event));
                                 scanTerminalPreviewOutput(directory, tabId, event.data ?? '');
                                 if (event.status === 'exited') setTabLifecycle(directory, tabId, 'exited');
                                 break;
@@ -715,6 +716,11 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
         [activeModifier, focusTerminalController, isReconnectPending, setActiveModifier, t, terminal]
     );
 
+    // Estimate only seeds a brand-new shell spawn size; running PTYs wait for a real fit.
+    const handleProvisionalSize = React.useCallback((cols: number, rows: number) => {
+        lastViewportSizeRef.current = { cols, rows };
+    }, []);
+
     const handleViewportResize = React.useCallback(
         (cols: number, rows: number) => {
             const previous = lastViewportSizeRef.current;
@@ -1097,6 +1103,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ visible }) => {
                             chunks={bufferChunks}
                             onInput={handleViewportInput}
                             onResize={handleViewportResize}
+                            onProvisionalSize={handleProvisionalSize}
                             theme={xtermTheme}
                             fontFamily={resolvedFontStack}
                             fontSize={terminalFontSize}
