@@ -5,9 +5,10 @@ import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useNestedGitDirectory } from '@/hooks/useNestedGitDirectory';
 import { NestedRepoPicker } from '@/components/views/git/NestedRepoPicker';
 import { useGitStore, useGitStatus, useIsGitRepo, useGitLoadingStatus } from '@/stores/useGitStore';
-import { useGitBaseBranchStore, gitBaseBranchEntryKey } from '@/stores/useGitBaseBranchStore';
-import { coerceDiffScope, branchRangeKey, branchEmptyExcludesWorkingTree, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, isOwnBranchCreationSource, resolveDiffToolbarLayout, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
-import { getBranchBase, getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
+import { useGitBaseBranchStore } from '@/stores/useGitBaseBranchStore';
+import { coerceDiffScope, branchRangeKey, isBranchScopeAvailable, isBranchScopeDefinitelyUnavailable, resolveDiffToolbarLayout, useRangeKeyedCache, useBoundedDirectoryRetry } from './branchDiffScope';
+import { getGitRangeDiff, getGitRangeFiles } from '@/lib/gitApi';
+import { useBranchComparisonBase } from '@/hooks/useBranchComparisonBase';
 import { getRuntimeKey } from '@/lib/runtime-switch';
 import { rankByQuery } from '@/lib/search/fuzzySearch';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ import type { DiffViewMode } from '@/components/chat/message/types';
 import { ReviewFlowDialog, type ReviewFlowExecution } from '@/components/session/ReviewFlowDialog';
 import { PierreDiffViewer, type DiffHunkActions } from './PierreDiffViewer';
 import { HunkActions, type HunkBusyState, type HunkDiffAction } from './git/HunkActions';
+import { BranchComparisonSelector } from './git/BranchComparisonSelector';
 import { CommitComparisonSelector } from './git/CommitComparisonSelector';
 import { PullRequestComparisonSelector } from './git/PullRequestComparisonSelector';
 import { useCommitComparison } from '@/hooks/useCommitComparison';
@@ -1428,19 +1430,6 @@ export const DiffView: React.FC<DiffViewProps> = ({
         );
 
     const setBaseOverride = useGitBaseBranchStore((state) => state.setOverride);
-    // Subscribe to the overrides map directly: `getOverride` reads `get()`
-    // imperatively, so a memo over it never recomputes when the store changes
-    // and a freshly picked base would be invisible until an unrelated rerender.
-    const baseOverride = useGitBaseBranchStore(
-        React.useCallback(
-            (state) => (effectiveDirectory && currentBranch
-                ? state.overrides[gitBaseBranchEntryKey(effectiveDirectory, currentBranch)] ?? null
-                : null),
-            [currentBranch, effectiveDirectory]
-        )
-    );
-    const [detectedBranchBase, setDetectedBranchBase] = React.useState<string | null>(null);
-    const [isBranchBaseResolved, setIsBranchBaseResolved] = React.useState(false);
     const [basePickerSearch, setBasePickerSearch] = React.useState('');
 
     React.useEffect(() => {
@@ -1453,42 +1442,11 @@ export const DiffView: React.FC<DiffViewProps> = ({
         }
     }, [activeDiffScope, branchScopeDefinitelyUnavailable, onDiffScopeChange]);
 
-    React.useEffect(() => {
-        if (!showBranchOption || !effectiveDirectory || !currentBranch) {
-            setDetectedBranchBase(null);
-            setIsBranchBaseResolved(false);
-            return;
-        }
-
-        let cancelled = false;
-        setIsBranchBaseResolved(false);
-        getBranchBase(effectiveDirectory, currentBranch)
-            .then((result) => {
-                if (!cancelled) setDetectedBranchBase(result.base);
-            })
-            .catch(() => {
-                if (!cancelled) setDetectedBranchBase(null);
-            })
-            .finally(() => {
-                if (!cancelled) setIsBranchBaseResolved(true);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [currentBranch, effectiveDirectory, showBranchOption]);
-
-    // Explicit user choice outranks the detected source; both are real answers
-    // from git or the user — never a main/master guess. A detected source that
-    // names this branch (or origin/<this-branch>) is not a parent: treat it as
-    // unknown so the one-time picker appears instead of a 0-file self-diff.
-    const usableDetectedBranchBase = isOwnBranchCreationSource(
-        detectedBranchBase,
+    const { base: branchBase, resolved: isBranchBaseResolved, revision: branchRevision } = useBranchComparisonBase(
+        effectiveDirectory ?? null,
         currentBranch,
-        branches?.defaultBranches ? Object.keys(branches.defaultBranches) : ['origin']
-    )
-        ? null
-        : detectedBranchBase;
-    const branchBase = baseOverride ?? usableDetectedBranchBase;
+        showBranchOption && activeDiffScope === 'branch',
+    );
 
     const [branchFiles, setBranchFiles] = React.useState<GitRangeFileEntry[] | null>(null);
     const [branchFilesError, setBranchFilesError] = React.useState<string | null>(null);
@@ -1500,7 +1458,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
         branchFilesFetchIdRef.current = fetchId;
         setBranchFiles(null);
         setBranchFilesError(null);
-        getGitRangeFiles(effectiveDirectory, { base: branchBase, head: currentBranch })
+        getGitRangeFiles(effectiveDirectory, { base: branchBase, head: currentBranch, includeWorkingTree: true })
             .then((files) => {
                 if (branchFilesFetchIdRef.current === fetchId) setBranchFiles(files);
             })
@@ -1515,7 +1473,7 @@ export const DiffView: React.FC<DiffViewProps> = ({
         if (activeDiffScope === 'branch') {
             reloadBranchFiles();
         }
-    }, [activeDiffScope, reloadBranchFiles]);
+    }, [activeDiffScope, branchRevision, reloadBranchFiles]);
 
     const branchDiffRangeKey = activeDiffScope === 'branch' && effectiveDirectory && currentBranch && branchBase
         ? branchRangeKey(effectiveDirectory, branchBase, currentBranch)
@@ -1530,8 +1488,12 @@ export const DiffView: React.FC<DiffViewProps> = ({
             if (!effectiveDirectory || !branchBase || !currentBranch) {
                 return Promise.reject(new Error('branch range is unavailable'));
             }
-            return getGitRangeDiff(effectiveDirectory, { base: branchBase, head: currentBranch, path: filePath })
-                .then((response) => createTextDiffDataFromPatch(filePath, response.diff, 'patch'));
+            return getGitRangeDiff(effectiveDirectory, {
+                base: branchBase,
+                head: currentBranch,
+                path: filePath,
+                includeWorkingTree: true,
+            }).then((response) => createTextDiffDataFromPatch(filePath, response.diff, 'patch'));
         },
         [branchBase, currentBranch, effectiveDirectory]
     );
@@ -1540,7 +1502,8 @@ export const DiffView: React.FC<DiffViewProps> = ({
         branchDiffRangeKey,
         branchDiffPathsKey,
         branchDiffRangeKey ? fetchBranchDiffEntry : null,
-        EMPTY_BRANCH_DIFF_PLACEHOLDER
+        EMPTY_BRANCH_DIFF_PLACEHOLDER,
+        branchRevision,
     );
 
     const comparisonRangeKey = comparison.files
@@ -2389,17 +2352,11 @@ export const DiffView: React.FC<DiffViewProps> = ({
 
         if (changedFiles.length === 0) {
             if (activeDiffScope === 'branch' && branchBase) {
-                const excludesWorkingTree = branchEmptyExcludesWorkingTree(workingFileCount, stagedFileCount);
                 return (
                     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
                         <div className="text-sm text-muted-foreground">
                             {t('diffView.branch.empty', { base: branchBase })}
                         </div>
-                        {excludesWorkingTree ? (
-                            <div className="max-w-sm typography-micro text-muted-foreground">
-                                {t('diffView.branch.emptyExcludesWorkingTree')}
-                            </div>
-                        ) : null}
                     </div>
                 );
             }
@@ -2460,6 +2417,17 @@ export const DiffView: React.FC<DiffViewProps> = ({
                         </div>
                     )
                 )}
+                {activeDiffScope === 'branch' ? (
+                    <BranchComparisonSelector
+                        key={JSON.stringify([effectiveDirectory, currentBranch])}
+                        branches={branches?.all ?? []}
+                        currentBranch={currentBranch}
+                        base={branchBase}
+                        onSelect={(base) => {
+                            if (effectiveDirectory && currentBranch) setBaseOverride(effectiveDirectory, currentBranch, base);
+                        }}
+                    />
+                ) : null}
                 {activeDiffScope === 'commit' ? (
                     <>
                         <CommitComparisonSelector

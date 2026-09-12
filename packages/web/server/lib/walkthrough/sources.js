@@ -117,7 +117,7 @@ export async function loadSourceSections(directory, source, { getPullRequestDiff
   }
 
   if (source.kind === 'branch') {
-    const patch = await getRangeDiff(directory, { base: source.baseRef, head: source.headRef });
+    const patch = await getRangeDiff(directory, { base: source.baseRef, head: source.headRef, includeWorkingTree: true });
     return {
       sections: patch && patch.trim() ? [{ scope: 'branch', patch }] : [],
       meta: { baseRef: source.baseRef, headRef: source.headRef },

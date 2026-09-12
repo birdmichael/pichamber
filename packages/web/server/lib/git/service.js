@@ -2531,7 +2531,70 @@ export async function getUntrackedDiffs(directory, filePaths = [], { concurrency
   return results;
 }
 
-export async function getRangeDiff(directory, { base, head, path: filePath, contextLines = 3 } = {}) {
+const refResolvesToCommit = async (git, ref) => git
+  .raw(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])
+  .then((value) => Boolean(String(value || '').trim()))
+  .catch(() => false);
+
+/**
+ * The branch list includes remote-only branches that `ls-remote` reported but
+ * the repository never fetched (#2098), so a comparison can name a ref that does
+ * not exist locally. Say that plainly instead of letting git's "ambiguous
+ * argument" surface as an opaque failure.
+ */
+async function assertRangeRefsResolve(git, refs) {
+  for (const ref of refs) {
+    if (!(await refResolvesToCommit(git, ref))) {
+      throw new Error(`Ref "${ref}" is not available locally. Fetch it before comparing.`);
+    }
+  }
+}
+
+// A private index lets git include untracked paths in the same tree comparison
+// as tracked files, including a staged deletion recreated at the same path.
+// Intent-to-add records only their existence; diff reads current file contents.
+async function runWorkingTreeRangeDiff(context, baseRef, headRef, args, paths = []) {
+  const { git, repoRoot } = context;
+  const readHead = async () => {
+    const commit = (await git.raw(['rev-parse', '--verify', 'HEAD'])).trim();
+    const ref = (await git.raw(['symbolic-ref', '--quiet', 'HEAD'])).trim();
+    return `${commit}\n${ref}`;
+  };
+  const startingHead = await readHead();
+  const [headCommit, currentRef] = startingHead.split('\n');
+  const requestedRef = (await git.raw(['rev-parse', '--verify', '--symbolic-full-name', '--end-of-options', headRef])).trim();
+  if (requestedRef !== currentRef) {
+    throw new Error('Working-tree comparisons require the checked-out branch. Refresh and try again.');
+  }
+  const mergeBase = (await git.raw(['merge-base', baseRef, headCommit])).trim();
+  const readDiff = async (comparisonGit) => {
+    const diff = await comparisonGit.raw([...args, mergeBase, '--', ...paths]);
+    if (await readHead() !== startingHead) {
+      throw new Error('The checked-out branch changed during comparison. Refresh and try again.');
+    }
+    return diff;
+  };
+  const untracked = await git.raw(['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths]);
+  if (!untracked) return readDiff(git);
+
+  const temporaryDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), 'openchamber-branch-diff-'));
+  try {
+    const indexPath = (await git.raw(['rev-parse', '--git-path', 'index'])).trim();
+    const temporaryIndex = path.join(temporaryDirectory, 'index');
+    await fsp.copyFile(path.resolve(repoRoot, indexPath), temporaryIndex);
+    const pathspecFile = path.join(temporaryDirectory, 'paths');
+    await fsp.writeFile(pathspecFile, untracked);
+    const comparisonGit = await createGit(repoRoot);
+    comparisonGit.env('GIT_INDEX_FILE', temporaryIndex);
+    comparisonGit.env('GIT_LITERAL_PATHSPECS', '1');
+    await comparisonGit.raw(['add', '--intent-to-add', '--pathspec-from-file=' + pathspecFile, '--pathspec-file-nul']);
+    return await readDiff(comparisonGit);
+  } finally {
+    await fsp.rm(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+export async function getRangeDiff(directory, { base, head, path: filePath, contextLines = 3, includeWorkingTree = false } = {}) {
   const { directoryPath, directoryGit, repoRoot, git } = await createRepositoryGitContext(directory);
   const baseRef = typeof base === 'string' ? base.trim() : '';
   const headRef = typeof head === 'string' ? head.trim() : '';
@@ -2539,49 +2602,39 @@ export async function getRangeDiff(directory, { base, head, path: filePath, cont
     throw new Error('base and head are required');
   }
 
-  // Prefer remote-tracking base ref so merged commits don't reappear
-  // when local base branch is stale (common when user stays on feature branch).
-  let resolvedBase = baseRef;
-  const originCandidate = `refs/remotes/origin/${baseRef}`;
-  try {
-    const verified = await git.raw(['rev-parse', '--verify', originCandidate]);
-    if (verified && verified.trim()) {
-      resolvedBase = `origin/${baseRef}`;
-    }
-  } catch {
-    // ignore
-  }
-
-  // Not every repository has an `origin`. When the base names a branch that
-  // exists only on another remote, a bare name does not resolve — git looks in
-  // refs/heads, not across remotes — and the diff fails with "ambiguous
-  // argument". Fall back to whichever remote actually carries it.
-  if (resolvedBase === baseRef && !/[*?[\]^~:\\]/.test(baseRef)) {
-    const resolvesLocally = await git
-      .raw(['rev-parse', '--verify', `refs/heads/${baseRef}`])
-      .then((value) => Boolean(String(value || '').trim()))
-      .catch(() => false);
-
-    if (!resolvesLocally) {
-      const remoteMatch = await git
-        .raw(['for-each-ref', '--count=1', '--format=%(refname:short)', `refs/remotes/*/${baseRef}`])
-        .then((value) => String(value || '').trim())
-        .catch(() => '');
-      if (remoteMatch) {
-        resolvedBase = remoteMatch;
-      }
-    }
-  }
+  await assertRangeRefsResolve(git, [baseRef, headRef]);
 
   const args = ['diff', '--no-color'];
   if (typeof contextLines === 'number' && !Number.isNaN(contextLines)) {
     args.push(`-U${Math.max(0, contextLines)}`);
   }
-  args.push(`${resolvedBase}...${headRef}`);
+  const paths = [];
   if (filePath) {
-    const fileContext = await resolveGitFileContext(directoryPath, directoryGit, filePath, repoRoot);
-    args.push('--', fileContext.repoPath);
+    try {
+      const fileContext = await resolveGitFileContext(directoryPath, directoryGit, filePath, repoRoot);
+      paths.push(fileContext.repoPath);
+    } catch (error) {
+      if (error.message !== 'Invalid file path') throw error;
+      // A committed deletion is absent from HEAD, the index, and the working
+      // tree. It is still a valid range path when it exists at the merge base.
+      const mergeBase = (await git.raw(['merge-base', baseRef, headRef])).trim();
+      for (const root of new Set([repoRoot, directoryPath])) {
+        const target = path.resolve(root, filePath);
+        if (!isInsideOrSameDirectory(repoRoot, target)) continue;
+        const repoPath = toGitPath(path.relative(repoRoot, target));
+        const exists = await git.raw(['cat-file', '-e', `${mergeBase}:${repoPath}`]).then(() => true).catch(() => false);
+        if (exists) {
+          paths.push(repoPath);
+          break;
+        }
+      }
+      if (paths.length === 0) throw error;
+    }
   }
+  if (includeWorkingTree) {
+    return runWorkingTreeRangeDiff({ git, repoRoot }, baseRef, headRef, args, paths);
+  }
+  args.push(`${baseRef}...${headRef}`, '--', ...paths);
   const diff = await git.raw(args);
   return diff;
 }
@@ -2592,22 +2645,30 @@ const BRANCH_CREATION_SOURCE_RE = /^branch: Created from (.+)$/;
  * Parse a branch reflog (`git reflog show --format=%gs`) and return the
  * ref the branch was created from, when that source is itself a named ref.
  *
- * Returns null when the branch was created from `HEAD@{...}` or a raw commit
- * (detached start): the original branch name is not recorded anywhere in that
- * case, and guessing a base from commit topology would be a heuristic, not an
- * answer. Callers should ask the user to pick a base instead.
+ * Returns null when the branch was created from `HEAD` / `HEAD@{...}` or a raw
+ * commit (detached start): the original branch name is not recorded anywhere
+ * in that case, and guessing a base from commit topology would be a heuristic,
+ * not an answer. Callers should ask the user to pick a base instead.
+ *
+ * Also returns null after a rebase: the creation ref is no longer evidence of
+ * the current base after restacking.
  */
 export function parseBranchCreationSource(reflogText) {
   const lines = String(reflogText || '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+  // Rebase records its destination as a commit, not a parent branch. The
+  // creation ref is no longer evidence of the current base after restacking.
+  if (lines.some((line) => /^rebase(?:\s|\()/.test(line))) return null;
   // Reflog lists newest entries first; the creation entry is the oldest one.
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const match = lines[index].match(BRANCH_CREATION_SOURCE_RE);
     if (!match) continue;
     const source = match[1].trim();
-    if (!source || /^HEAD@/.test(source) || /^[0-9a-f]{7,40}$/i.test(source)) {
+    // Bare `HEAD` (`git switch -c` from the current branch) and `HEAD@{...}`
+    // (detached start) both lack a named source; a raw commit hash does too.
+    if (!source || /^HEAD(@|$)/.test(source) || /^[0-9a-f]{7,40}$/i.test(source)) {
       return null;
     }
     return source;
@@ -2615,19 +2676,6 @@ export function parseBranchCreationSource(reflogText) {
   return null;
 }
 
-/**
- * True when `source` names this branch itself — locally or as a remote-tracking
- * copy (`origin/<branch>`, `refs/remotes/<remote>/<branch>`).
- *
- * A fetched feature worktree records `branch: Created from origin/<same-branch>`.
- * That is not a parent branch: comparing against it diffs HEAD against itself
- * (or only unpushed commits) and silently shows zero changes. Callers must
- * treat it as unknown and ask the user to pick a real base.
- *
- * A differently named parent that happens to share HEAD's commit (a brand-new
- * branch created from `origin/main`) is NOT own-branch: Git recorded a real
- * parent, and the empty range vs that parent is correct.
- */
 export function isOwnBranchCreationSource(source, branchName, remotes = ['origin']) {
   const branch = String(branchName || '').replace(/^refs\/heads\//, '').trim();
   const ref = String(source || '').replace(/^refs\/heads\//, '').trim();
@@ -2697,29 +2745,23 @@ export async function getBranchBase(directory, branch) {
   return { base: source };
 }
 
-export async function getRangeFiles(directory, { base, head } = {}) {
-  const { git } = await createRepositoryGitContext(directory);
+export async function getRangeFiles(directory, { base, head, includeWorkingTree = false } = {}) {
+  const { git, repoRoot } = await createRepositoryGitContext(directory);
   const baseRef = typeof base === 'string' ? base.trim() : '';
   const headRef = typeof head === 'string' ? head.trim() : '';
   if (!baseRef || !headRef) {
     throw new Error('base and head are required');
   }
 
-  let resolvedBase = baseRef;
-  const originCandidate = `refs/remotes/origin/${baseRef}`;
-  try {
-    const verified = await git.raw(['rev-parse', '--verify', originCandidate]);
-    if (verified && verified.trim()) {
-      resolvedBase = `origin/${baseRef}`;
-    }
-  } catch {
-    // ignore
-  }
+  await assertRangeRefsResolve(git, [baseRef, headRef]);
 
   // `-C` (copy detection among changed files only, so cheap) makes copies
   // surface as C entries instead of plain additions; rename detection is on
   // by default.
-  const raw = await git.raw(['diff', '--name-status', '-z', '-C', `${resolvedBase}...${headRef}`]);
+  const args = ['diff', '--name-status', '-z', '-C'];
+  const raw = includeWorkingTree
+    ? await runWorkingTreeRangeDiff({ git, repoRoot }, baseRef, headRef, args)
+    : await git.raw([...args, `${baseRef}...${headRef}`, '--']);
   // -z format: STATUS\0PATH\0[ORIG\0] repeated. For rename/copy entries
   // (`R100`, `C75`) the first path token is the ORIGINAL path and the second
   // is the DESTINATION — the diff (and the UI) must address the destination.
@@ -2729,7 +2771,7 @@ export async function getRangeFiles(directory, { base, head } = {}) {
     const status = (tokens[index] || '').trim();
     if (!status) continue;
     const isRenameOrCopy = status.startsWith('R') || status.startsWith('C');
-    const path = isRenameOrCopy ? (tokens[index + 2] || '').trim() : (tokens[index + 1] || '').trim();
+    const path = isRenameOrCopy ? (tokens[index + 2] || '') : (tokens[index + 1] || '');
     index += isRenameOrCopy ? 2 : 1;
     if (path) {
       files.push({ path, status: status.charAt(0) });

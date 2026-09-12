@@ -148,18 +148,22 @@ export interface GetGitDiffOptions {
 
 /**
  * Diff between two refs. Uses three-dot (`base...head`) semantics server-side, so changes
- * pulled into `head` by merging `base` are excluded — only the branch's own work is returned.
+ * pulled into `head` by merging `base` are excluded. Refs are used as selected.
+ * includeWorkingTree compares that merge base with the checked-out branch's
+ * current files, including staged, unstaged, and untracked changes.
  */
 export interface GetGitRangeDiffOptions {
   base: string;
   head: string;
   path?: string;
   contextLines?: number;
+  includeWorkingTree?: boolean;
 }
 
 export interface GetGitRangeFilesOptions {
   base: string;
   head: string;
+  includeWorkingTree?: boolean;
 }
 
 /** One changed file in a `base...head` range, with its change letter (A/M/D/R/C). */

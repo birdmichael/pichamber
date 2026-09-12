@@ -195,11 +195,14 @@ export const useRangeKeyedCache = <T>(
   rangeKey: string | null,
   pathsKey: string,
   fetchEntry: ((path: string) => Promise<T>) | null,
-  placeholder: T
+  placeholder: T,
+  revision = ''
 ): ReadonlyMap<string, T> => {
   const [entries, setEntries] = React.useState<Map<string, T>>(() => new Map());
   const entriesRef = React.useRef(entries);
   entriesRef.current = entries;
+  const completedRevisions = React.useRef(new Map<string, string>());
+  const entriesRangeKey = React.useRef<string | null>(null);
 
   // The fetcher is read through a ref so a caller passing an inline arrow (a
   // new function every render) cannot restart the fetch effect in a loop.
@@ -218,7 +221,8 @@ export const useRangeKeyedCache = <T>(
   }, []);
 
   React.useEffect(() => {
-    if (!rangeKey) return;
+    entriesRangeKey.current = rangeKey;
+    completedRevisions.current.clear();
     entriesRef.current = new Map();
     setEntries(entriesRef.current);
   }, [rangeKey]);
@@ -230,31 +234,34 @@ export const useRangeKeyedCache = <T>(
     }
     let cancelled = false;
     const pendingReservations = new Set<string>();
+    const revisions = completedRevisions.current;
 
     for (const path of pathsKey.split('\0')) {
-      if (entriesRef.current.has(path)) continue;
+      if (entriesRef.current.has(path) && revisions.get(path) === revision) continue;
       pendingReservations.add(path);
-      writeEntry(path, placeholder);
+      if (!entriesRef.current.has(path)) writeEntry(path, placeholder);
       fetcher(path)
         .then((value) => {
           if (cancelled) return;
           pendingReservations.delete(path);
+          revisions.set(path, revision);
           writeEntry(path, value);
         })
         .catch(() => {
           if (cancelled) return;
           // Release the reservation so a later run can retry this path.
           pendingReservations.delete(path);
+          revisions.delete(path);
           writeEntry(path, null);
         });
     }
     return () => {
       cancelled = true;
       for (const path of pendingReservations) {
-        writeEntry(path, null);
+        if (!revisions.has(path)) writeEntry(path, null);
       }
     };
-  }, [pathsKey, placeholder, rangeKey, writeEntry]);
+  }, [pathsKey, placeholder, rangeKey, revision, writeEntry]);
 
-  return entries;
+  return entriesRangeKey.current === rangeKey ? entries : new Map();
 };

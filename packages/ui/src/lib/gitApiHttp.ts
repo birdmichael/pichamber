@@ -299,7 +299,7 @@ export async function getGitRangeDiff(
   directory: string,
   options: GetGitRangeDiffOptions
 ): Promise<GitDiffResponse> {
-  const { base, head, path, contextLines } = options;
+  const { base, head, path, contextLines, includeWorkingTree } = options;
   if (!base || !head) {
     throw new Error('base and head are required to fetch git range diff');
   }
@@ -310,6 +310,7 @@ export async function getGitRangeDiff(
       head,
       path: path || undefined,
       context: contextLines,
+      includeWorkingTree,
     })
   );
 
@@ -324,13 +325,13 @@ export async function getGitRangeFiles(
   directory: string,
   options: GetGitRangeFilesOptions
 ): Promise<GitRangeFileEntry[]> {
-  const { base, head } = options;
+  const { base, head, includeWorkingTree } = options;
   if (!base || !head) {
     throw new Error('base and head are required to fetch git range files');
   }
 
   const response = await runtimeFetch(
-    buildUrl(`${API_BASE}/range-files`, directory, { base, head })
+    buildUrl(`${API_BASE}/range-files`, directory, { base, head, includeWorkingTree })
   );
 
   if (!response.ok) {
