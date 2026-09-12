@@ -1,3 +1,4 @@
+import { createChatDraftIdentity } from "@/lib/chatDraftPersistence"
 import { beforeEach, describe, expect, test } from "bun:test"
 import { strToU8, zipSync } from "fflate"
 import { useInputStore } from "./input-store"
@@ -369,5 +370,24 @@ describe("input-store attachments", () => {
     // Removing the text entry cascades to the slide image
     useInputStore.getState().removeAttachedFile(files[0].id)
     expect(useInputStore.getState().attachedFiles).toEqual([])
+  })
+})
+
+
+describe("pendingComposerRestore", () => {
+  test("only the destination can consume a restore, and only once", () => {
+    const target = createChatDraftIdentity("runtime-a", "/repo", "fork-ses")!
+    const other = createChatDraftIdentity("runtime-a", "/repo", "other-ses")!
+    const pending = {
+      target,
+      text: "replay",
+      files: [{ url: "data:image/png;base64,AA", mimeType: "image/png", filename: "a.png" }],
+    }
+    useInputStore.setState({ pendingComposerRestore: pending })
+    expect(useInputStore.getState().consumePendingComposerRestore(other)).toBeNull()
+    expect(useInputStore.getState().pendingComposerRestore).toBe(pending)
+    expect(useInputStore.getState().consumePendingComposerRestore(target)).toEqual(pending)
+    expect(useInputStore.getState().consumePendingComposerRestore(target)).toBeNull()
+    expect(useInputStore.getState().pendingComposerRestore).toBeNull()
   })
 })

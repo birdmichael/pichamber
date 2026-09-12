@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
 - Changes: per-hunk Stage / Unstage / Discard controls float beside each diff hunk (upstream OpenChamber 1.23.0 #3443).
 
 ### Fixed / Improved
+- Chat: forking a user message restores its text and attachments in the destination composer without overwriting the source draft (upstream OpenChamber 1.23).
+- Chat: attached images no longer appear twice just after send when the server echoes text then file parts (upstream OpenChamber 1.23).
+- Chat: client message queue drops already-delivered items after reconnect/stream gaps (PC adaptation of upstream OpenChamber 1.23 server queue resync).
 - Chat: Markdown session export keeps quote and comment blocks with source (upstream OpenChamber 1.23).
 - Chat: Ctrl+N / Ctrl+P navigate model lists, menus, selects, and composer autocomplete like arrows (upstream OpenChamber 1.23).
 - Chat: selection highlight uses one accent token across messages, file previews, and comment quotes (upstream OpenChamber 1.23).

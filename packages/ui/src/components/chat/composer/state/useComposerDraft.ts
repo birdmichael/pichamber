@@ -13,6 +13,7 @@
 
 import React from 'react';
 
+import { useInputStore } from '@/sync/input-store';
 import {
     getChatDraftIdentityKey,
     readChatDraft,
@@ -162,6 +163,8 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
     const callbacksRef = React.useRef({ onIdentityChange, onDraftRestored });
     callbacksRef.current = { onIdentityChange, onDraftRestored };
 
+    const pendingComposerRestore = useInputStore((state) => state.pendingComposerRestore);
+
     const persistNow = React.useCallback((target: ChatDraftIdentity | null, draft: string) => {
         if (!target) return;
         const key = getChatDraftIdentityKey(target);
@@ -257,6 +260,31 @@ export function useComposerDraft(options: ComposerDraftOptions): ComposerDraftCo
             requestAnimationFrame(() => callbacksRef.current.onDraftRestored?.());
         }
     }, [clearPending, confirmedMentionsRef, emptyIncomingComposer, identity, messageRef, persistEnabled, setMessage]);
+
+    // The chat column can still show the source after navigation selects a fork.
+    // Apply its replay only after the destination's draft has been loaded above.
+    React.useEffect(() => {
+        if (!pendingComposerRestore) return;
+        const input = useInputStore.getState();
+        const pending = input.consumePendingComposerRestore(identity);
+        if (!pending) return;
+
+        clearPending();
+        skipNextPersistRef.current = true;
+        messageRef.current = pending.text;
+        confirmedMentionsRef.current = new Set();
+        setMessage(pending.text);
+        // Equal source/replay text need not trigger another render to persist.
+        if (persistEnabled) persistNow(pending.target, pending.text);
+        input.clearAttachedFiles();
+        for (const file of pending.files) input.addRestoredAttachment(file);
+        requestAnimationFrame(() => {
+            const current = currentIdentityRef.current;
+            if (current && getChatDraftIdentityKey(current) === getChatDraftIdentityKey(pending.target)) {
+                callbacksRef.current.onDraftRestored?.();
+            }
+        });
+    }, [clearPending, confirmedMentionsRef, identity, messageRef, pendingComposerRestore, persistEnabled, persistNow, setMessage]);
 
     // A draft deleted elsewhere (session deleted, drafts cleared) clears the
     // composer if it is the one on screen.
