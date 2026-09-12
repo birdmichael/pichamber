@@ -3,6 +3,12 @@ import { settingsDict } from './ko.settings';
 
 export const dict: Record<I18nKey, string> = {
   ...settingsDict,
+  'sessions.aiRename.action': 'AI로 이름 변경',
+  'sessions.aiRename.generating': '세션 제목 생성 중...',
+  'sessions.aiRename.checking': '완료된 대화 확인 중...',
+  'sessions.aiRename.noCompletedTurns': '첫 번째 응답이 완료되면 사용할 수 있습니다.',
+  'sessions.aiRename.failed': '세션 이름을 변경하지 못했습니다. 소형 모델 설정을 확인하고 다시 시도해 주세요.',
+  'sessions.aiRename.unsupported': 'VS Code에서는 AI 이름 변경을 사용할 수 없습니다.',
   'terminalView.actions.attachSelection': '선택한 출력 첨부',
   'terminalView.actions.restart': '터미널 다시 시작',
   'chat.message.terminalContext': '{terminal}, {start}-{end}행',

@@ -2,6 +2,12 @@ import { settingsDict } from './tr.settings';
 
 export const dict = {
   ...settingsDict,
+  'sessions.aiRename.action': 'Yapay zekâ ile yeniden adlandır',
+  'sessions.aiRename.generating': 'Oturum başlığı oluşturuluyor...',
+  'sessions.aiRename.checking': 'Tamamlanan konuşma turları kontrol ediliyor...',
+  'sessions.aiRename.noCompletedTurns': 'İlk yanıt tamamlandıktan sonra kullanılabilir.',
+  'sessions.aiRename.failed': 'Oturum yeniden adlandırılamadı. Küçük model ayarlarını kontrol edip tekrar deneyin.',
+  'sessions.aiRename.unsupported': 'Yapay zekâ ile yeniden adlandırma VS Code içinde kullanılamaz.',
   'terminalView.actions.attachSelection': 'Seçili çıktıyı ekle',
   'terminalView.actions.restart': 'Terminali yeniden başlat',
   'chat.message.terminalContext': '{terminal}, {start}-{end}. satırlar',

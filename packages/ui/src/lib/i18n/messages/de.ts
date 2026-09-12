@@ -2,6 +2,12 @@ import { settingsDict } from './de.settings';
 
 export const dict = {
   ...settingsDict,
+  'sessions.aiRename.action': 'Mit KI umbenennen',
+  'sessions.aiRename.generating': 'Sitzungstitel wird generiert...',
+  'sessions.aiRename.checking': 'Abgeschlossene Antworten werden geprüft...',
+  'sessions.aiRename.noCompletedTurns': 'Nach der ersten abgeschlossenen Antwort verfügbar.',
+  'sessions.aiRename.failed': 'Die Sitzung konnte nicht umbenannt werden. Prüfe die Einstellungen für das kleine Modell und versuche es erneut.',
+  'sessions.aiRename.unsupported': 'Umbenennen mit KI ist in VS Code nicht verfügbar.',
   'common.language.german': 'Deutsch',
   'common.loading': 'Wird geladen...',
   'common.unavailable': 'Nicht verfügbar',

@@ -2,6 +2,12 @@ import { settingsDict } from './en.settings';
 
 export const dict = {
   ...settingsDict,
+  'sessions.aiRename.action': 'Rename with AI',
+  'sessions.aiRename.generating': 'Generating session title...',
+  'sessions.aiRename.checking': 'Checking completed turns...',
+  'sessions.aiRename.noCompletedTurns': 'Available after the first completed reply.',
+  'sessions.aiRename.failed': 'Could not rename the session. Check your Small Model settings and try again.',
+  'sessions.aiRename.unsupported': 'AI renaming is not available in VS Code.',
   'terminalView.actions.attachSelection': 'Attach selected output',
   'terminalView.actions.restart': 'Restart terminal',
   'chat.message.terminalContext': '{terminal}, lines {start}-{end}',

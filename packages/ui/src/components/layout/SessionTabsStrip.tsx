@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { dropdownMenuItemClass, dropdownMenuPopupClass, dropdownMenuSeparatorClass } from '@/components/ui/dropdown-menu.styles';
+import { useIsSessionAiRenamePending } from '@/sync/use-session-ai-rename';
 import { Icon } from '@/components/icon/Icon';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
@@ -103,6 +104,7 @@ const SessionTabItem: React.FC<{
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
 
   const title = tab.session.title?.trim() || t('sessions.sidebar.session.untitled');
+  const isAiRenaming = useIsSessionAiRenamePending(tab.id, resolveGlobalSessionDirectory(tab.session));
   const overlayVisible = !suppressControls && (menuOpen || menuVisible);
 
   // Session state for the dot and the hover tooltip.
@@ -196,7 +198,9 @@ const SessionTabItem: React.FC<{
                         </div>
                       )}
                     </div>
-                    {showDot ? (
+                    {isAiRenaming ? (
+                      <Icon name="loader-4" className="ml-1.5 size-3 shrink-0 animate-spin text-primary" aria-label={t('sessions.aiRename.generating')} />
+                    ) : showDot ? (
                       <span
                         className={cn(
                           'ml-1.5 h-1.5 w-1.5 shrink-0 rounded-full',

@@ -3,6 +3,12 @@ import { settingsDict } from './ja.settings';
 
 export const dict: Record<I18nKey, string> = {
   ...settingsDict,
+  'sessions.aiRename.action': 'AIで名前を変更',
+  'sessions.aiRename.generating': 'セッション名を生成中...',
+  'sessions.aiRename.checking': '完了したやり取りを確認中...',
+  'sessions.aiRename.noCompletedTurns': '最初の応答が完了すると利用できます。',
+  'sessions.aiRename.failed': 'セッション名を変更できませんでした。小規模モデルの設定を確認して、もう一度お試しください。',
+  'sessions.aiRename.unsupported': 'VS CodeではAIによる名前の変更は利用できません。',
   'terminalView.actions.attachSelection': '選択した出力を添付',
   'terminalView.actions.restart': 'ターミナルを再起動',
   'chat.message.terminalContext': '{terminal}、{start}〜{end}行',

@@ -154,9 +154,7 @@ export const SessionRetentionSettings: React.FC = () => {
           </Button>
         </SettingsFieldRow>
         <p className="typography-meta text-muted-foreground">
-          {status === 'error'
-            ? t('sessions.sidebar.group.empty.loadFailed')
-            : status !== 'ready'
+          {status !== 'ready'
             ? t('sessions.sidebar.group.empty.loadingSessions')
             : action === 'archive'
             ? t('settings.openchamber.sessionRetention.manualCleanup.eligibleArchiveNow', { count: pendingCount })

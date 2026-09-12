@@ -3,6 +3,12 @@ import { settingsDict } from './es.settings';
 
 export const dict: Record<I18nKey, string> = {
   ...settingsDict,
+  'sessions.aiRename.action': 'Renombrar con IA',
+  'sessions.aiRename.generating': 'Generando el título de la sesión...',
+  'sessions.aiRename.checking': 'Comprobando los turnos completados...',
+  'sessions.aiRename.noCompletedTurns': 'Disponible después de la primera respuesta completada.',
+  'sessions.aiRename.failed': 'No se pudo renombrar la sesión. Revisa la configuración del modelo pequeño e inténtalo de nuevo.',
+  'sessions.aiRename.unsupported': 'El cambio de nombre con IA no está disponible en VS Code.',
   'terminalView.actions.attachSelection': 'Adjuntar salida seleccionada',
   'terminalView.actions.restart': 'Reiniciar terminal',
   'chat.message.terminalContext': '{terminal}, líneas {start}-{end}',

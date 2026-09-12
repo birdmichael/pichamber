@@ -3,6 +3,12 @@ import { settingsDict } from './uk.settings';
 
 export const dict: Record<I18nKey, string> = {
   ...settingsDict,
+  'sessions.aiRename.action': 'Перейменувати за допомогою ШІ',
+  'sessions.aiRename.generating': 'Генеруємо назву сесії...',
+  'sessions.aiRename.checking': 'Перевіряємо завершені ходи...',
+  'sessions.aiRename.noCompletedTurns': 'Доступно після першої завершеної відповіді.',
+  'sessions.aiRename.failed': 'Не вдалося перейменувати сесію. Перевірте налаштування малої моделі та спробуйте ще раз.',
+  'sessions.aiRename.unsupported': 'Перейменування за допомогою ШІ недоступне у VS Code.',
   'terminalView.actions.attachSelection': 'Прикріпити вибраний вивід',
   'terminalView.actions.restart': 'Перезапустити термінал',
   'chat.message.terminalContext': '{terminal}, рядки {start}-{end}',

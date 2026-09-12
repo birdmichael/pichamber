@@ -142,6 +142,11 @@ function useSyncSystem() {
   return ctx
 }
 
+/** Full sync runtime (child stores, message loader, runtime key) for session helpers. */
+export function useSyncRuntime() {
+  return useSyncSystem()
+}
+
 function getLiveStates(childStores: ChildStoreManager): State[] {
   return Array.from(childStores.children.values(), (store) => store.getState())
 }
