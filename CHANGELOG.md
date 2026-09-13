@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- Chat: keep the Pi agent chip visible when Work Status is open on a wide Desktop column. Hide Agent from the parent column / footer band or real overflow, not the squeezed chip row alone.
+- Sessions: worker and researcher `/run` children keep a parent link and a `subagent-worker` / `subagent-researcher` title so they stay out of the top-level sidebar like scout.
+- Settings: drop the synthetic builtin `edit` agent that `/run` cannot start.
+- Chat: custom user agents from Settings → Agents write the name/description `/run` needs so Launch actually starts a run.
+- Mobile: Work Status Subagents (Open/Stop) scrolls in the sheet when the Subagents plugin is on.
+
 ## [1.2.21] - 2026-09-12
 
 ### Fixed

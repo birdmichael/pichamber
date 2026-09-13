@@ -61,6 +61,13 @@ and Capacitor wrap the same section components in `MobileWorkStatusHost`
 (`apps/MobileWorkStatusHost.tsx`), opened from the header context ring.
 That host is not the Desktop Context rail (`CONTEXT_SURFACES` id `context`).
 
+`MobileWorkStatusHost` is `flex-1 min-h-0` inside the overlay
+(`flex min-h-0 flex-col overflow-hidden` + max-height) so
+`WorkStatusContents` can scroll the same sections as Desktop, including
+Subagents Open/Stop when the Feature Plugin slot is on. A terminal
+child with a session id stays in the fleet even when the mobile sheet
+only has the parent directory.
+
 Mobile Work Status now includes pinned messages, context sources, and the
 equalizer / section-visibility dialog — the same `WorkStatusContents` chrome
 as Desktop (title row so the gear has a home). The 300px card is still not

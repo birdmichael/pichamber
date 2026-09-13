@@ -156,10 +156,12 @@ import {
   extractRunsFromFacadeMessages,
   extractRunsFromPiEntries,
   findAdapterRunByChildSessionId,
+  formatSubagentChildTitle,
+  isGenericSubagentTitle,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
   listNestedSessionRuns,
-  preferSubagentTitle,
+  parseSubagentRunAgentName,
   readSessionCwdFromSessionFile,
   readSessionIdFromSessionFile,
   readSessionTitleFromSessionFile,
@@ -167,6 +169,7 @@ import {
   toPublicSubagentRun,
   writeAdapterRunTerminalState,
 } from './subagent-runs.js';
+import { ensurePiSubagentDiscoverable, getPiSubagent } from './pi-agent-roster.js';
 import {
   buildSessionHtml,
   buildSessionJsonl,
@@ -2898,13 +2901,93 @@ export const createPiHost = ({
     return true;
   };
 
+  const hasAdapterSubagentRunMarker = (metadata) => {
+    const run = metadata?.pichamber?.subagentRun;
+    if (!run || typeof run !== 'object') return false;
+    return Boolean(
+      (typeof run.parentSessionID === 'string' && run.parentSessionID.trim())
+      || (typeof run.runId === 'string' && run.runId.trim()),
+    );
+  };
+
+  // Worker/researcher `/run` forks a top-level `{timestamp}_{id}.jsonl`.
+  // Persist clone-style `parentID` only — a `subagentRun` marker on that
+  // file is treated as stolen attach and stripped on list/hydrate.
+  const persistCloneStyleParentID = (record, parentID) => {
+    if (!record?.info || typeof parentID !== 'string' || !parentID.trim()) return false;
+    const nextParentID = parentID.trim();
+    const previous = { ...(record.info.metadata || {}) };
+    if (previous.pichamber && typeof previous.pichamber === 'object') {
+      const { subagentRun: _ignored, ...rest } = previous.pichamber;
+      if (Object.keys(rest).length > 0) previous.pichamber = rest;
+      else delete previous.pichamber;
+    }
+    const metadata = { ...previous, parentID: nextParentID };
+    record.info.metadata = metadata;
+    const persisted = persistSessionMetadata(record.sessionManager, metadata);
+    if (!persisted && typeof record.sessionFile === 'string' && record.sessionFile) {
+      try {
+        fs.appendFileSync(record.sessionFile, `${JSON.stringify({
+          type: 'custom',
+          customType: PICHAMBER_METADATA_CUSTOM_TYPE,
+          data: metadata,
+        })}\n`);
+      } catch {
+        return false;
+      }
+    } else if (!persisted) {
+      return false;
+    }
+    if (typeof record.sessionFile === 'string' && record.sessionFile) {
+      record.sessionFileStamp = statSessionFile(record.sessionFile);
+    }
+    return true;
+  };
+
+  const applySubagentChildTitle = (record, run, parent) => {
+    if (!record?.info) return;
+    const nextTitle = formatSubagentChildTitle({
+      sessionTitle: record.info.title,
+      runTitle: run?.title,
+      runName: run?.name,
+      role: run?.role || run?.name,
+      parentTitle: parent?.info?.title,
+    });
+    if (!nextTitle || record.info.title === nextTitle) return;
+    record.info.title = nextTitle;
+    persistConversationTitle(record, nextTitle);
+  };
+
   const applySubagentParentLink = (record, parentID, extraMetadata, { emitUpdated = true } = {}) => {
     if (!record?.info || typeof parentID !== 'string' || !parentID.trim()) return record;
     const nextParentID = parentID.trim();
-    // Adapter children live under async-subagent-runs or a nested
-    // session.jsonl. A top-level `{timestamp}_{id}.jsonl` chat is its own
-    // conversation — status/debug dumps must not reparent it.
-    if (isTopLevelUserSessionFile(record.sessionFile)) return record;
+    // Nested adapter children (`session.jsonl` / async-subagent-runs) keep
+    // the full marker. Worker/researcher forks are top-level timestamp
+    // jsonl: persist clone-style parentID only. A stolen `subagentRun`
+    // marker already on that file must not reparent an existing chat.
+    if (isTopLevelUserSessionFile(record.sessionFile)) {
+      if (hasAdapterSubagentRunMarker(record.info.metadata)) {
+        return record;
+      }
+      const previousParentID = typeof record.info.parentID === 'string' && record.info.parentID.trim()
+        ? record.info.parentID.trim()
+        : undefined;
+      const gained = previousParentID !== nextParentID;
+      record.info.parentID = nextParentID;
+      record.info.metadata = {
+        ...(record.info.metadata || {}),
+        parentID: nextParentID,
+      };
+      persistCloneStyleParentID(record, nextParentID);
+      if (gained && emitUpdated) {
+        emit(record.directory, {
+          id: createEventId(),
+          type: 'session.updated',
+          properties: { info: record.info },
+        });
+      }
+      return record;
+    }
     const previousParentID = typeof record.info.parentID === 'string' && record.info.parentID.trim()
       ? record.info.parentID.trim()
       : undefined;
@@ -3021,11 +3104,11 @@ export const createPiHost = ({
       info: createSessionInfo({
         id: resolvedId,
         directory: cwd,
-        title: preferSubagentTitle(
-          typeof manager?.getSessionName === 'function' ? manager.getSessionName() : '',
-          title,
-          'Subagent',
-        ),
+        title: formatSubagentChildTitle({
+          sessionTitle: typeof manager?.getSessionName === 'function' ? manager.getSessionName() : '',
+          runTitle: title,
+          runName: 'subagent',
+        }),
         parentID: listedParentID,
         metadata: {
           ...(persistedMetadata || {}),
@@ -3133,8 +3216,13 @@ export const createPiHost = ({
     const runs = [];
     for (const record of sessions.values()) {
       if (!record || record.id === parent.id) continue;
-      if (isTopLevelUserSessionFile(record.sessionFile)) continue;
-      if (hydratedParentID(record) !== parent.id) continue;
+      if (isTopLevelUserSessionFile(record.sessionFile)) {
+        // Worker/researcher forks persist clone-style parentID. Stolen
+        // attach (top-level + subagentRun marker) stays a root.
+        if (readListedParentID(record.info?.metadata, record.sessionFile) !== parent.id) continue;
+      } else if (hydratedParentID(record) !== parent.id) {
+        continue;
+      }
       const sameDirectory = record.directory === parent.directory;
       if (sameDirectory && !record.sessionFile && !record.subagentRun) continue;
       const existing = record.subagentRun;
@@ -3148,7 +3236,13 @@ export const createPiHost = ({
         role: existing?.role || existing?.name || 'subagent',
         mode: existing?.mode || 'background',
         state: existing?.state || (record.status?.type === 'busy' ? 'running' : 'done'),
-        title: preferSubagentTitle(record.info?.title, existing?.title, existing?.name),
+        title: formatSubagentChildTitle({
+          sessionTitle: record.info?.title,
+          runTitle: existing?.title,
+          runName: existing?.name,
+          role: existing?.role || existing?.name,
+          parentTitle: parent.info?.title,
+        }),
         toolCallId: existing?.toolCallId || null,
         asyncDir: existing?.asyncDir || null,
         startedAt: existing?.startedAt || record.info?.time?.created || null,
@@ -3242,15 +3336,18 @@ export const createPiHost = ({
           sessionID: run.sessionID || undefined,
           directory: run.directory || parent.directory,
           parentID: parent.id,
-          title: preferSubagentTitle(
-            readSessionTitleFromSessionFile(run.sessionFile),
-            run.title,
-            run.name,
-          ),
+          title: formatSubagentChildTitle({
+            sessionTitle: readSessionTitleFromSessionFile(run.sessionFile),
+            runTitle: run.title,
+            runName: run.name,
+            role: run.role || run.name,
+            parentTitle: parent.info?.title,
+          }),
           metadata: extraMetadata,
         });
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
+        applySubagentChildTitle(record, run, parent);
         const nextState = run.state === 'running' || run.state === 'queued' || run.state === 'blocked'
           ? { type: 'busy' }
           : { type: 'idle' };
@@ -3268,7 +3365,13 @@ export const createPiHost = ({
           ...run,
           sessionID: record.id,
           directory: record.directory || run.directory || null,
-          title: preferSubagentTitle(record.info?.title, run.title, run.name),
+          title: formatSubagentChildTitle({
+            sessionTitle: record.info?.title,
+            runTitle: run.title,
+            runName: run.name,
+            role: run.role || run.name,
+            parentTitle: parent.info?.title,
+          }),
         };
       }
       // A completed adapter can leave a stale sessionFile after its temporary
@@ -3285,6 +3388,7 @@ export const createPiHost = ({
         }
         record.subagentRun = run;
         applySubagentParentLink(record, parent.id, extraMetadata);
+        applySubagentChildTitle(record, run, parent);
         return { ...run, sessionID: record.id, directory: record.directory || run.directory || null };
       }
     } catch (error) {
@@ -3294,6 +3398,42 @@ export const createPiHost = ({
       console.warn(`[pi-host] failed to attach subagent run ${run.runId}:`, error?.message || error);
     }
     return run;
+  };
+
+  const isAttachableForkTitle = (title, parentTitle) => (
+    isGenericSubagentTitle(title, parentTitle) || isPlaceholderSessionTitle(title)
+  );
+
+  const attachForkedSubagentSessions = async (parent, { beforeIds, role } = {}) => {
+    if (!parent?.id) return;
+    const known = beforeIds instanceof Set ? new Set(beforeIds) : new Set();
+    known.add(parent.id);
+    const sessionDir = sessionDirForCwd(parent.directory, home);
+    for (const file of walkSessionJsonlFiles(sessionDir)) {
+      if (!isTopLevelUserSessionFile(file)) continue;
+      const childId = readSessionIdFromSessionFile(file);
+      if (!childId || known.has(childId)) continue;
+      const live = sessions.get(childId);
+      if (live && readListedParentID(live.info?.metadata, file) === parent.id) continue;
+      const sessionTitle = readSessionTitleFromSessionFile(file) || live?.info?.title || '';
+      if (!isAttachableForkTitle(sessionTitle, parent.info?.title)) continue;
+      try {
+        const child = await attachSessionFromFile(file, {
+          sessionID: childId,
+          directory: parent.directory,
+          parentID: parent.id,
+          title: formatSubagentChildTitle({
+            sessionTitle,
+            role: role || 'subagent',
+            parentTitle: parent.info?.title,
+          }),
+        });
+        applySubagentParentLink(child, parent.id);
+        applySubagentChildTitle(child, { name: role, role }, parent);
+      } catch {
+        // One unreadable fork must not block the parent /run reply.
+      }
+    }
   };
 
   const refreshConversationTitle = (record) => {
@@ -4764,6 +4904,25 @@ export const createPiHost = ({
           error.status = 404;
           throw error;
         }
+        const agentName = parseSubagentRunAgentName(argument);
+        if (agentName) {
+          try {
+            const rosterAgent = getPiSubagent({
+              agentDir: resolveAgentDir(),
+              directory: record.directory,
+              name: agentName,
+            });
+            if (rosterAgent) ensurePiSubagentDiscoverable(rosterAgent);
+          } catch {
+            // Invalid names fail the kernel /run, not this repair.
+          }
+        }
+        const beforeForkIds = new Set(
+          Array.from(sessions.values())
+            .filter((item) => recordMatchesDirectory(item, record.directory))
+            .map((item) => item.id),
+        );
+        beforeForkIds.add(record.id);
         record.status = { type: 'busy' };
         emit(record.directory, {
           id: createEventId(),
@@ -4813,11 +4972,13 @@ export const createPiHost = ({
               if (child) {
                 try { await record.piSession?.abort?.(); } catch {}
                 forceSettleRecord(record);
+                await attachForkedSubagentSessions(record, { beforeIds: beforeForkIds, role: agentName });
                 return;
               }
               const remaining = waitMs - (Date.now() - started);
               if (remaining <= 0) {
-                missingChildReply();
+                await attachForkedSubagentSessions(record, { beforeIds: beforeForkIds, role: agentName });
+                if (!await findStartedRun()) missingChildReply();
                 try {
                   await record.piSession?.abort?.();
                 } catch {
@@ -4829,6 +4990,7 @@ export const createPiHost = ({
                 sleep(Math.min(50, remaining)).then(() => 'wait'),
               ]);
               if (outcome === 'done') {
+                await attachForkedSubagentSessions(record, { beforeIds: beforeForkIds, role: agentName });
                 if (!await findStartedRun()) missingChildReply();
                 return;
               }

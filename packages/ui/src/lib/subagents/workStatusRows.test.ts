@@ -222,6 +222,40 @@ describe('buildWorkStatusSubagentRows', () => {
     expect(overlayWorkStatusSubagentRow(row, {}).status).toBe('working');
   });
 
+  test('keeps a terminal child openable using the parent directory fallback', () => {
+    const rows = buildWorkStatusSubagentRows({
+      runs: [run({ state: 'done', sessionID: 'child-1', directory: null })],
+      transcriptIds: [],
+      directory: null,
+      effectiveDirectory: '/repo',
+      untitledLabel: 'Subagent',
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual({
+      id: 'run_1',
+      label: 'List the README filename',
+      sessionID: 'child-1',
+      directory: '/repo',
+      openable: true,
+      mode: 'foreground',
+      status: 'done',
+    });
+  });
+
+  test('keeps a terminal child with a session id even when no directory is known', () => {
+    const rows = buildWorkStatusSubagentRows({
+      runs: [run({ state: 'stopped', sessionID: 'child-1', directory: null, openable: false })],
+      transcriptIds: [],
+      untitledLabel: 'Subagent',
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      sessionID: 'child-1',
+      openable: false,
+      status: 'stopped',
+    });
+  });
+
   test('drops terminal ghost rows that have no child session id', () => {
     const rows = buildWorkStatusSubagentRows({
       runs: [

@@ -260,6 +260,7 @@ export const buildWorkStatusSubagentRows = ({
   });
   return rows.filter((row) => (
     row.openable
+    || Boolean(row.sessionID)
     || row.status === 'working'
     || row.status === 'queued'
     || row.status === 'blocked'

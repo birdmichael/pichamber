@@ -56,11 +56,24 @@ describe('shouldOmitComposerAgentSlot', () => {
 });
 
 describe('shouldHideComposerAgentSlot', () => {
-  test('hides Agent below 576px (child/embedded footer band)', () => {
+  test('hides Agent below 576px when only the chip row was measured (child/embedded)', () => {
     expect(COMPOSER_AGENT_SLOT_HIDE_BELOW_PX).toBe(576);
     expect(shouldHideComposerAgentSlot({ rowWidth: 315 })).toBe(true);
     expect(shouldHideComposerAgentSlot({ rowWidth: 500 })).toBe(true);
     expect(shouldHideComposerAgentSlot({ rowWidth: 575 })).toBe(true);
+  });
+
+  test('keeps the Pi chip when Work Status squeezes the chip row but the column is wide', () => {
+    // Desktop 1920 + Work Status: column ~632, footer ~582, chip row ~402.
+    expect(shouldHideComposerAgentSlot({
+      rowWidth: 402,
+      footerWidth: 582,
+      parentColumnWidth: 632,
+    })).toBe(false);
+    expect(shouldHideComposerAgentSlot({
+      rowWidth: 402,
+      footerWidth: 582,
+    })).toBe(false);
   });
 
   test('hides Agent at a 328px parent column even if the chip row looks wide', () => {
@@ -329,16 +342,12 @@ describe('child/embedded composer Agent hide wiring', () => {
     );
   });
 
-  test('36rem Agent hide query is not nested under html', () => {
-    expect(indexCss).toMatch(
+  test('chip-row 36rem query does not hide Agent; the measure class does', () => {
+    expect(indexCss).not.toMatch(
       /@container model-controls \(max-width: 36rem\)\s*\{[\s\S]*?\.model-controls__agent-slot[\s\S]*?display:\s*none;/,
     );
-    expect(indexCss).not.toMatch(
-      /html:not\(\.vscode-runtime\) \{\s*@container model-controls \(max-width: 36rem\)/,
-    );
-    // Starting the subject at html never matches a footer descendant.
-    expect(indexCss).not.toMatch(
-      /@container model-controls \(max-width: 36rem\)\s*\{\s*html:not\(\.vscode-runtime\)/,
+    expect(indexCss).toMatch(
+      /\.model-controls--hide-agent \.model-controls__agent-slot[\s\S]*?display:\s*none;/,
     );
   });
 });

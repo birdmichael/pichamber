@@ -39,6 +39,8 @@ const chatContainerSource = readFileSync(
 describe('MobileWorkStatusHost', () => {
   test('wraps Desktop Work Status sections and does not mount the chat-column card', () => {
     expect(hostSource).toContain('WorkStatusContents');
+    expect(hostSource).toContain('flex min-h-0 flex-1 flex-col');
+    expect(metadataSource).toContain('flex min-h-0 flex-col overflow-hidden');
     expect(hostSource).not.toContain("from '@/components/chat/work-status/WorkStatusPanel'");
     expect(bodySource).toContain('WorkStatusPrimaryGroup');
     expect(bodySource).toContain('WorkStatusGoalRow');

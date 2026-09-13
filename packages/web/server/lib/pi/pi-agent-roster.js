@@ -3,7 +3,6 @@ import path from 'node:path';
 import yaml from 'yaml';
 
 const BUILTIN_SUBAGENTS = [
-  { name: 'edit', description: 'Focused implementation agent for small, bounded edits', tools: ['read', 'grep', 'find', 'ls', 'bash', 'edit', 'write', 'contact_supervisor'], systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, body: 'Make the smallest correct change requested and verify it.' },
   { name: 'scout', description: 'Fast codebase recon that returns compressed context for handoff', tools: ['read', 'grep', 'find', 'ls', 'bash', 'write'], thinking: 'low', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, output: 'context.md', defaultProgress: true, body: 'Explore the codebase and return concise evidence-backed context.' },
   { name: 'worker', description: 'Implementation agent for normal tasks and approved oracle handoffs', tools: ['read', 'grep', 'find', 'ls', 'bash', 'edit', 'write', 'contact_supervisor'], thinking: 'high', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, defaultContext: 'fork', defaultReads: ['context.md', 'plan.md'], defaultProgress: true, body: 'Implement the assigned task with narrow edits and verify the result.' },
   { name: 'reviewer', description: 'Versatile review specialist for code diffs, plans, proposed solutions, codebase health, and PR/issue validation', tools: ['read', 'grep', 'find', 'ls'], thinking: 'high', systemPromptMode: 'replace', inheritProjectContext: true, inheritSkills: false, body: 'Review with evidence and report concrete findings without modifying code.' },
@@ -25,7 +24,8 @@ const parseAgentMarkdown = (source) => {
 };
 const asAgent = ({ name, scope, filePath, source, readOnly = false, description, ...builtin }) => {
   const parsed = parseAgentMarkdown(source); const frontmatter = source ? parsed.frontmatter || {} : { name, ...builtin, description };
-  return { id: name, name, description: typeof frontmatter.description === 'string' ? frontmatter.description : (description || ''), model: typeof frontmatter.model === 'string' ? frontmatter.model.trim() : '', thinking: typeof frontmatter.thinking === 'string' ? frontmatter.thinking.trim() : '', tools: frontmatter.tools ?? frontmatter.capabilities ?? [], scope, readOnly, path: filePath || null, frontmatter, body: source ? parsed.body : (builtin.body || '') };
+  const runtimeName = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : name;
+  return { id: runtimeName, name: runtimeName, description: typeof frontmatter.description === 'string' ? frontmatter.description : (description || ''), model: typeof frontmatter.model === 'string' ? frontmatter.model.trim() : '', thinking: typeof frontmatter.thinking === 'string' ? frontmatter.thinking.trim() : '', tools: frontmatter.tools ?? frontmatter.capabilities ?? [], scope, readOnly, path: filePath || null, frontmatter, body: source ? parsed.body : (builtin.body || '') };
 };
 const readDirectoryAgents = (root, scope) => {
   if (!isDirectory(root)) return []; let entries = [];
@@ -45,6 +45,26 @@ export const listPiSubagents = ({ agentDir, directory } = {}) => {
 };
 export const getPiSubagent = ({ agentDir, directory, name } = {}) => { const safeName = safeAgentName(name); return listPiSubagents({ agentDir, directory }).find((agent) => agent.name === safeName) || null; };
 const serializeAgentMarkdown = ({ frontmatter, body }) => '---\n' + yaml.stringify(frontmatter) + '---\n\n' + String(body || '').trim() + '\n';
+/** pi-subagents `discoverAgents` skips files without frontmatter name+description. */
+export const ensurePiSubagentDiscoverable = (agent) => {
+  if (!agent || agent.readOnly || agent.scope === 'builtin') return false;
+  const filePath = typeof agent.path === 'string' ? agent.path : '';
+  if (!filePath || !isFile(filePath)) return false;
+  let source = '';
+  try { source = fs.readFileSync(filePath, 'utf8'); } catch { return false; }
+  const parsed = parseAgentMarkdown(source);
+  const frontmatter = parsed.frontmatter || {};
+  const name = typeof frontmatter.name === 'string' ? frontmatter.name.trim() : '';
+  const description = typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '';
+  if (name && description) return false;
+  const next = {
+    ...frontmatter,
+    name: name || agent.name,
+    description: description || agent.description || `${agent.name} custom agent`,
+  };
+  fs.writeFileSync(filePath, serializeAgentMarkdown({ frontmatter: next, body: parsed.body }), 'utf8');
+  return true;
+};
 export const writePiSubagent = ({ agentDir, directory, name, scope = 'user', frontmatter = {}, body = '' } = {}) => {
   const safeName = safeAgentName(name); const targetScope = scope === "project" ? "project" : "user";
   const root = targetScope === "project" ? path.join(directory || "", ".pi", "agents") : path.join(agentDir || "", "agents");

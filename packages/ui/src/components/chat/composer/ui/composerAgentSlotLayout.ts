@@ -75,18 +75,27 @@ export function shouldOmitComposerAgentSlot(
 }
 
 /**
- * CSS-hide backup: Agent when the parent column / footer / chip row is
- * below 576px, or when the slot / label overflow-clips (`Ag` / `A` sliver
- * / `Agen(`). A 2-letter `Ag` truncation is a fail — hide the whole slot,
- * not a compact label. A wide parent column (~1000px) with no overflow
- * stays visible.
+ * CSS-hide backup: Agent when the parent column or footer is below 576px,
+ * or when the slot / label overflow-clips (`Ag` / `A` sliver / `Agen(`).
+ * A 2-letter `Ag` truncation is a fail — hide the whole slot, not a
+ * compact label.
+ *
+ * Do not hide from chip-row width alone when the parent column or footer
+ * is already measured and wide. Opening Work Status squeezes the
+ * model-controls row (~402px) while the chat column stays ~632px and the
+ * short `Pi` label still fits. Chip-row width is only a fallback when
+ * column and footer lookups both missed (child / embedded iframe).
  */
 export function shouldHideComposerAgentSlot(metrics: ComposerAgentSlotMetrics): boolean {
-  if (
-    isBelowHideBand(metrics.parentColumnWidth)
-    || isBelowHideBand(metrics.footerWidth)
-    || isBelowHideBand(metrics.rowWidth)
-  ) {
+  if (isBelowHideBand(metrics.parentColumnWidth)) {
+    return true;
+  }
+  const columnMeasured = typeof metrics.parentColumnWidth === 'number' && metrics.parentColumnWidth > 0;
+  if (!columnMeasured && isBelowHideBand(metrics.footerWidth)) {
+    return true;
+  }
+  const footerMeasured = typeof metrics.footerWidth === 'number' && metrics.footerWidth > 0;
+  if (!columnMeasured && !footerMeasured && isBelowHideBand(metrics.rowWidth)) {
     return true;
   }
   return isOverflowingBox(metrics.agentScrollWidth, metrics.agentClientWidth)
