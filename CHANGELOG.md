@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ## [1.2.21] - 2026-09-12
 
 ### Fixed
+
+- Keep composer thinking levels for DeepSeek V4.1 Flash Vision and other skinny custom reasoning proxies (`reasoning`, `thinkingLevelMap`, or known id prefixes) instead of silently resetting the chip to Off.
 - Chat: hotfix `ReferenceError: onListMetricsChange is not defined` that crashed the chat surface (ChatErrorBoundary). v1.2.20 shipped ChatViewport JSX using `onListMetricsChange` without destructuring it from ChatContainer props; includes #764 (`68f32ca7`).
 
 ## [1.2.20] - 2026-09-12

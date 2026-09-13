@@ -38,7 +38,7 @@ describe('known-model-capabilities', () => {
     expect(enrichKnownModelEntry('mystery-llm', { id: 'mystery-llm' }, { catalog }).model).toEqual({ id: 'mystery-llm' });
   });
 
-  it('uses catalog flags for GPT and falls back to known tables when catalog is down', () => {
+  it('uses catalog flags for GPT and falls back to known tables when catalog misses or is down', () => {
     const catalog = {
       openai: {
         id: 'openai',
@@ -56,6 +56,11 @@ describe('known-model-capabilities', () => {
       reasoning: true,
     });
     expect(enrichKnownModelEntry('gpt-6-astra', { id: 'gpt-6-astra' }, { catalog: null }).model).toMatchObject({
+      input: ['text', 'image'],
+      reasoning: true,
+    });
+    // Catalog fetched but no row for this proxy slug → known prefix tables still apply.
+    expect(enrichKnownModelEntry('gpt-6-astra', { id: 'gpt-6-astra' }, { catalog: { openai: { id: 'openai', models: {} } } }).model).toMatchObject({
       input: ['text', 'image'],
       reasoning: true,
     });
@@ -78,4 +83,36 @@ describe('known-model-capabilities', () => {
       },
     });
   });
+
+  it('hydrates DeepSeek V4.1 Flash Vision proxy ids via prefix even when catalog misses them', () => {
+    const catalog = {
+      deepseek: {
+        id: 'deepseek',
+        models: {
+          'deepseek-v4-flash': {
+            id: 'deepseek-v4-flash',
+            reasoning: true,
+          },
+        },
+      },
+    };
+    const id = 'deepseek-v4.1-flash-expires-on-0910';
+    expect(lookupKnownReasoning(id)).toBe(true);
+    expect(lookupKnownVisionInput(id)).toEqual(['text', 'image']);
+    expect(enrichKnownModelEntry(id, { id, name: 'DeepSeek V4.1 Flash Vision' }, { catalog }).model).toMatchObject({
+      input: ['text', 'image'],
+      reasoning: true,
+    });
+  });
+
+  it('treats a stored thinkingLevelMap as reasoning even without the flag', () => {
+    expect(enrichKnownModelEntry('mystery-llm', {
+      id: 'mystery-llm',
+      thinkingLevelMap: { high: 'high', xhigh: 'xhigh' },
+    }, { catalog: {} }).model).toMatchObject({
+      reasoning: true,
+      thinkingLevelMap: { high: 'high', xhigh: 'xhigh' },
+    });
+  });
+
 });

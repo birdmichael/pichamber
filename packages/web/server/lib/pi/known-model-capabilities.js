@@ -78,6 +78,8 @@ const KNOWN_VISION_ID_PREFIXES = [
   'gpt-6-',
   'gpt-5.6-',
   'gpt-5.5-',
+  // DeepSeek V4.1 Flash Vision proxy ids (e.g. deepseek-v4.1-flash-expires-on-0910).
+  'deepseek-v4.1-flash',
 ];
 
 const KNOWN_REASONING_MODEL_IDS = new Set([
@@ -144,6 +146,8 @@ const KNOWN_REASONING_ID_PREFIXES = [
   'o1-',
   'o3-',
   'o4-',
+  // DeepSeek V4.1 Flash / Pro proxies (vision-exp and skinny /v1/models rows).
+  'deepseek-v4.1-',
 ];
 
 const matchesKnownIdPrefix = (normalized, prefixes) => {
@@ -251,16 +255,23 @@ export const enrichKnownModelEntry = (id, model = {}, options = {}) => {
   const catalog = hasExplicitCatalog ? options.catalog : getCachedModelsMetadata();
   const hasCatalog = Boolean(catalog);
   const catalogEntry = hasCatalog ? lookupCatalogModel(id, catalog) : undefined;
-  // A fetched catalog is authoritative: hardcoded tables are only used when
-  // the catalog could not be fetched at all.
-  const vision = catalogEntry ? catalogInput(catalogEntry) : (hasCatalog ? undefined : lookupKnownVisionInput(id));
-  const reasoning = catalogEntry ? catalogReasoning(catalogEntry) : (hasCatalog ? undefined : lookupKnownReasoning(id));
+  // Catalog match wins. When models.dev has no row for this proxy slug, fall
+  // back to known id / prefix tables (GPT-5.5/5.6/6, DeepSeek V4.1, …) even if
+  // a catalog fetch succeeded — otherwise skinny custom ids stay thinking-off.
+  const vision = catalogEntry ? catalogInput(catalogEntry) : lookupKnownVisionInput(id);
+  const reasoning = catalogEntry ? catalogReasoning(catalogEntry) : lookupKnownReasoning(id);
+  const hasThinkingLevelMap = Boolean(
+    next.thinkingLevelMap
+    && typeof next.thinkingLevelMap === 'object'
+    && !Array.isArray(next.thinkingLevelMap)
+    && Object.keys(next.thinkingLevelMap).length > 0,
+  );
   let changed = false;
   if (vision && (!Array.isArray(next.input) || isDefaultTextInput(next.input))) {
     next.input = vision;
     changed = true;
   }
-  if (reasoning === true && next.reasoning !== true) {
+  if ((reasoning === true || hasThinkingLevelMap) && next.reasoning !== true) {
     next.reasoning = true;
     changed = true;
   }

@@ -168,7 +168,9 @@ export function preferPiModelThinkingLevels(
   catalogLevels: readonly string[] = [],
 ): PiThinkingLevel[] {
   const fromPi = parseAvailablePiThinkingLevels(piLevels);
-  if (fromPi.length > 0) return fromPi;
+  // Narrow Pi lists (empty / off-only) are not this model's effort set — fall
+  // through to catalog so a skinny custom reasoning row does not pin Off.
+  if (fromPi.length > 0 && !isNarrowPiThinkingAvailable(fromPi)) return fromPi;
   return parseAvailablePiThinkingLevels(catalogLevels);
 }
 
