@@ -8,6 +8,8 @@ import {
   extractRunsFromFacadeMessages,
   extractRunsFromPiEntries,
   extractSubagentRunFromToolPart,
+  formatSubagentChildTitle,
+  isGenericSubagentTitle,
   isSubagentManagementCall,
   isSubagentsSlotActive,
   listAdapterRunsFromFiles,
@@ -938,6 +940,25 @@ describe('mergeSubagentRuns', () => {
   });
 });
 
+describe('formatSubagentChildTitle', () => {
+  it('replaces a generic run or copied parent title with subagent-<role>', () => {
+    expect(isGenericSubagentTitle('run')).toBe(true);
+    expect(isGenericSubagentTitle('PARENT_SCAN79', 'PARENT_SCAN79')).toBe(true);
+    expect(formatSubagentChildTitle({
+      sessionTitle: 'run',
+      runTitle: 'run',
+      runName: 'worker',
+      role: 'worker',
+      parentTitle: 'PARENT_SCAN79',
+    })).toBe('subagent-worker');
+    expect(formatSubagentChildTitle({
+      sessionTitle: 'PARENT_SCAN79',
+      role: 'researcher',
+      parentTitle: 'PARENT_SCAN79',
+    })).toBe('subagent-researcher');
+  });
+});
+
 describe('mapStatusToSubagentRun', () => {
   it('returns null without a run id', () => {
     expect(mapStatusToSubagentRun({ state: 'running' })).toBeNull();
@@ -959,6 +980,15 @@ describe('mapStatusToSubagentRun', () => {
       mode: 'workflow',
       steps: [{ agent: 'scout', status: 'running' }],
     })).toMatchObject({ state: 'running' });
+  });
+
+  it('titles a worker workflow run instead of the generic run key', () => {
+    expect(mapStatusToSubagentRun({
+      runId: 'run_worker',
+      state: 'running',
+      mode: 'workflow',
+      steps: [{ agent: 'worker', label: 'run', workflowKey: 'run', status: 'running' }],
+    })).toMatchObject({ name: 'worker', title: 'subagent-worker' });
   });
 
   it('expands multiple session files into separate runs', () => {

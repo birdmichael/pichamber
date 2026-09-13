@@ -909,6 +909,103 @@ describe('Pi host subagent runs', () => {
     host.dispose();
   });
 
+  it('nests a top-level worker fork with clone-style parentID and a subagent-worker title', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'PARENT_SCAN79' });
+    const childId = 'worker-child';
+    const childFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `2026-09-13T12-00-00-000Z_${childId}.jsonl`,
+    );
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'session_info',
+      name: 'run',
+    })}\n`);
+    const tmpdir = path.join(home, 'tmp');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_worker');
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_worker',
+      sessionId: parent.id,
+      state: 'running',
+      mode: 'async',
+      sessionFile: childFile,
+      steps: [{ agent: 'worker', status: 'running', sessionFile: childFile, label: 'run' }],
+    }));
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    try {
+      const listed = await host.listSessionInfos('/tmp/project');
+      expect(listed.find((info) => info.id === childId)).toMatchObject({
+        id: childId,
+        parentID: parent.id,
+        title: 'subagent-worker',
+      });
+      expect(listed.find((info) => info.id === parent.id)?.parentID).toBeUndefined();
+      const persisted = readPersistedSessionMetadataFromFile(childFile);
+      expect(persisted?.parentID).toBe(parent.id);
+      expect(persisted?.pichamber?.subagentRun).toBeUndefined();
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
+
+  it('nests a top-level researcher fork titled run under the parent', async () => {
+    const home = makeHome();
+    enableSubagentsSlot(home);
+    const host = createMockHost(home);
+    const parent = await host.createSession({ directory: '/tmp/project', title: 'Research parent' });
+    const childId = 'researcher-child';
+    const childFile = path.join(
+      sessionDirForCwd('/tmp/project', home),
+      `2026-09-13T12-01-00-000Z_${childId}.jsonl`,
+    );
+    fs.mkdirSync(path.dirname(childFile), { recursive: true });
+    fs.writeFileSync(childFile, `${JSON.stringify({
+      type: 'session',
+      id: childId,
+      cwd: '/tmp/project',
+    })}\n${JSON.stringify({
+      type: 'session_info',
+      name: 'run',
+    })}\n`);
+    const tmpdir = path.join(home, 'tmp');
+    const runDir = path.join(tmpdir, 'pi-subagents-user', 'async-subagent-runs', 'run_researcher');
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(path.join(runDir, 'status.json'), JSON.stringify({
+      runId: 'run_researcher',
+      sessionId: parent.id,
+      state: 'stopped',
+      mode: 'async',
+      sessionFile: childFile,
+      steps: [{ agent: 'researcher', status: 'stopped', sessionFile: childFile, label: 'run' }],
+    }));
+    const originalTmp = process.env.TMPDIR;
+    process.env.TMPDIR = tmpdir;
+    try {
+      const listed = await host.listSessionInfos('/tmp/project');
+      expect(listed.find((info) => info.id === childId)).toMatchObject({
+        id: childId,
+        parentID: parent.id,
+        title: 'subagent-researcher',
+      });
+      expect(readPersistedSessionMetadataFromFile(childFile)?.parentID).toBe(parent.id);
+    } finally {
+      if (originalTmp === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmp;
+      host.dispose();
+    }
+  });
+
   it('does not reparent an existing top-level chat from a debug.run dump', async () => {
     const home = makeHome();
     enableSubagentsSlot(home);

@@ -47,20 +47,13 @@ describe('Desktop composer model chip squeeze', () => {
       /@container model-controls \(max-width: 22rem\)[\s\S]*?\.model-controls__agent-label \{\s*display:\s*none;/,
     );
 
-    const slotHide = indexCss.match(
-      /@container model-controls \(max-width: ([\d.]+)rem\) \{[\s\S]*?\.model-controls__agent-slot/,
-    );
-    expect(slotHide).toBeTruthy();
-    const hideRem = Number(slotHide![1]);
-    const hidePx = hideRem * 16;
-    // Child footer at intermediate width is ~500px (sidebar 280 + parent
-    // ~475). 27rem / 432px still painted `Ager`. Hide through 36rem /
-    // 576px so any footer that cannot fit model + thinking + full Agent
-    // + send drops Agent. Wide parent B (~1000px) stays above that.
-    expect(hideRem).toBeGreaterThanOrEqual(36);
-    expect(hidePx).toBeGreaterThanOrEqual(576);
-    expect(indexCss).toMatch(
+    // Agent hide is the measure class, not the 36rem chip-row container.
+    // Work Status squeezes that row below 36rem while Pi still fits.
+    expect(indexCss).not.toMatch(
       /@container model-controls \(max-width: 36rem\)\s*\{[\s\S]*?\.model-controls__agent-slot[\s\S]*?display:\s*none;/,
+    );
+    expect(indexCss).toMatch(
+      /\.model-controls--hide-agent \.model-controls__agent-slot[\s\S]*?display:\s*none;/,
     );
     expect(indexCss).toMatch(
       /html:not\(\.vscode-runtime\):not\(\.mobile-pointer\) \.model-controls__agent-slot \{[\s\S]*?overflow:\s*hidden;/,

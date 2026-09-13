@@ -848,12 +848,12 @@ html:not(.dark) .chat-scroll {
    itself.
 
    Hide the entire Agent chip (the slot, not just the word) when the
-   model-controls container is at or below ~36rem / 576px, or when the
-   measure hook adds `.model-controls--hide-agent`. That covers a
-   ~328px parent footer (1280 isolate + Work Status + child tabs) and
-   a ~315–500px child/embedded footer. A 2-letter `Ag` truncation is a
-   fail — hide the chip. A wide parent (~1000px) stays above 36rem and
-   keeps Agent. The model label may remain as a clean ellipsis (`grok-…`).
+   measure hook adds `.model-controls--hide-agent`: parent column or
+   footer below 576px, or the slot / label overflow-clips. A 2-letter
+   `Ag` truncation is a fail — hide the chip. Opening Work Status on a
+   wide Desktop column must keep the short Pi chip; do not treat the
+   squeezed chip row as the hide band. The model label may remain as a
+   clean ellipsis (`grok-…`).
 
    Hide the thinking *label* at the 22rem squeeze so High/Medium cannot
    paint over the icon. Keep a real row gap and shrink-0 / zero negative
@@ -936,17 +936,12 @@ html:not(.vscode-runtime):not(.mobile-pointer) .model-controls__model-label > .m
   white-space: nowrap;
 }
 
-/* Top-level named query so the nearest model-controls container is the
-   composer footer / chip row in THIS document (parent or child iframe),
-   not html. Do not start the subject at html — that never matches a
-   descendant of the footer. The measure hook still hides Agent if this
-   query misses (parent ~328px footer / overflowing chip row). */
-@container model-controls (max-width: 36rem) {
-  .model-controls__agent-slot,
-  .model-controls__agent-trigger {
-    display: none;
-  }
-}
+/* Do not CSS-hide Agent from the named model-controls container width.
+   That container is the chip row, which Work Status squeezes below 36rem
+   (~402px) while the parent chat column (~632px) and footer (~582px)
+   still fit the short Pi label. The measure hook hides Agent from the
+   parent column / footer band or real overflow — not row width alone.
+   `.model-controls--hide-agent` remains the display:none backup. */
 
 html:not(.vscode-runtime) {
   @container model-controls (max-width: 22rem) {

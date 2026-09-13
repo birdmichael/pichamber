@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { listPiSubagents, writePiSubagent } from './pi-agent-roster.js';
+import { ensurePiSubagentDiscoverable, listPiSubagents, writePiSubagent } from './pi-agent-roster.js';
 
 const roots = [];
 const tempRoot = () => { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pichamber-agent-roster-')); roots.push(root); return root; };
@@ -17,8 +17,28 @@ describe('Pi agent roster', () => {
     expect(agents.find((agent) => agent.name === 'reviewer')).toMatchObject({ scope: 'user', model: 'openai/gpt-5', thinking: 'high', body: 'Review body' });
     expect(agents.find((agent) => agent.name === 'worker')).toMatchObject({ scope: 'project' });
     expect(agents.find((agent) => agent.name === 'scout')).toMatchObject({ readOnly: true, scope: 'builtin', tools: ['read', 'grep', 'find', 'ls', 'bash', 'write'] });
-    expect(agents.find((agent) => agent.name === 'edit').tools).toContain('edit');
+    expect(agents.find((agent) => agent.name === 'edit')).toBeUndefined();
     expect(agents.find((agent) => agent.name === 'researcher').tools).toEqual(['read', 'write', 'web_search', 'fetch_content', 'get_search_content']);
+  });
+  it('uses frontmatter name as the runtime /run name', () => {
+    const root = tempRoot(); const home = path.join(root, 'home'); const project = path.join(root, 'project');
+    fs.mkdirSync(path.join(home, 'agents'), { recursive: true });
+    fs.writeFileSync(path.join(home, 'agents', 'scan37.md'), '---\nname: scan37-agent\ndescription: Scan the tree\n---\n\nLook around');
+    const agents = listPiSubagents({ agentDir: home, directory: project });
+    expect(agents.find((agent) => agent.name === 'scan37-agent')).toMatchObject({ scope: 'user', description: 'Scan the tree' });
+    expect(agents.find((agent) => agent.name === 'scan37')).toBeUndefined();
+  });
+  it('repairs a user agent file so pi-subagents can discover it', () => {
+    const root = tempRoot(); const home = path.join(root, 'home'); const project = path.join(root, 'project');
+    fs.mkdirSync(path.join(home, 'agents'), { recursive: true });
+    const filePath = path.join(home, 'agents', 'scan37-agent.md');
+    fs.writeFileSync(filePath, 'Look around without frontmatter\n');
+    const agent = listPiSubagents({ agentDir: home, directory: project }).find((entry) => entry.name === 'scan37-agent');
+    expect(ensurePiSubagentDiscoverable(agent)).toBe(true);
+    const source = fs.readFileSync(filePath, 'utf8');
+    expect(source).toContain('name: scan37-agent');
+    expect(source).toContain('description:');
+    expect(ensurePiSubagentDiscoverable(listPiSubagents({ agentDir: home, directory: project }).find((entry) => entry.name === 'scan37-agent'))).toBe(false);
   });
   it('writes a new markdown file while retaining unknown frontmatter', () => {
     const root = tempRoot(); const home = path.join(root, 'home'); const project = path.join(root, 'project'); const saved = writePiSubagent({ agentDir: home, directory: project, name: 'custom', scope: 'user', frontmatter: { description: 'Custom', inheritSkills: true, tools: ['read'] }, body: 'Prompt' });

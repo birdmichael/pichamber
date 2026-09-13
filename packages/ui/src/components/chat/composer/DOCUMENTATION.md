@@ -73,9 +73,15 @@ narrow rails (~0.6) still show thinking and a readable model name
 glyph hides on that squeeze so the name can use the slot; Agent/Plan
 yields next. Parent `ChatInput` under `[data-parent-chat-column]`
 measures that column (ResizeObserver) and `ModelControls` omits the
-Agent slot from the DOM below 576px (~328px parent + Work Status +
-child squeeze) instead of painting a clipped `Ag` pill. CSS hide stays
-backup. When the column is wide again, Agent remounts. The model name is the runtime display string — do not
+Agent slot from the DOM below 576px (~328px parent + child squeeze)
+instead of painting a clipped `Ag` pill. Opening Work Status on a
+typical 1920 Desktop column (~632px) must not hide the Pi chip: the
+squeezed model-controls row (~402px) is not the hide authority when
+the column / footer is already measured and wide, and the short `Pi`
+label is not overflowing. CSS hide is only the
+`model-controls--hide-agent` class from that measure — not a 36rem
+chip-row `@container` query. When the column is wide again, Agent
+remounts. The model name is the runtime display string — do not
 hardcode a provider, and do not move the chip into `/`. Labels collapse
 to icons only as a last resort, and the chip tooltip/aria-label keeps the
 same words. The leftover OpenCode agent label still hides first.

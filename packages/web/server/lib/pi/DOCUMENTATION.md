@@ -1141,10 +1141,13 @@ When the slot is on:
   scrape that path into a child. They do not appear in Work Status, do
   not enter `GET /api/session`, and do not mint a facade session or
   child jsonl. `mode: "management"` is never treated as foreground.
-  Attach never persists `parentID` onto a top-level project chat
-  (`{timestamp}_{id}.jsonl`). A stolen `subagentRun` marker already on
-  that file is ignored on list / hydrate so the conversation stays a
-  root. Clone/fork `parentID` without that marker is unchanged.
+  Worker/researcher `/run` forks a top-level `{timestamp}_{id}.jsonl`.
+  Attach persists clone-style `parentID` only — never a `subagentRun`
+  marker — so the child nests like scout and stays out of the top-level
+  sidebar. A stolen `subagentRun` marker already on that file is ignored
+  on list / hydrate so an existing conversation stays a root. Clone/fork
+  `parentID` without that marker is unchanged. Generic titles (`run`,
+  the parent title, Untitled) become `subagent-<role>-…`.
 - Terminal adapter files with no child id are dropped (not a pile of
   untitled ghosts). Status-only is only for a still-queued/running/blocked
   run whose id is not ready yet. A finished tool-call without a child is
@@ -1160,8 +1163,9 @@ When the slot is on:
   `session.jsonl`. `SessionManager.list()` stays non-recursive. Attach
   persists `pichamber.metadata.parentID`
   on the child jsonl so a new host still nests. An existing live child
-  that gains `parentID` emits `session.updated`. Top-level project chats
-  never gain adapter `parentID` from attach.
+  that gains `parentID` emits `session.updated`. Top-level worker/
+  researcher forks gain clone-style `parentID` (no adapter marker).
+  Existing top-level chats with a stolen marker do not.
   Attach and child-message refresh skip a full jsonl parse when that file's
   mtime and size are unchanged; a busy child still updates when the file
   changes. Re-attaching an already-live child rereads that file and

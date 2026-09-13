@@ -19,7 +19,7 @@ export const MobileWorkStatusHost: React.FC<{
   onSectionsDialogOpenChange?: (open: boolean) => void;
   onNavigate?: () => void;
 }> = ({ sessionId, directory, repositoryEnabled = true, onSectionsDialogOpenChange, onNavigate }) => (
-  <div data-work-status-host="session-metadata" className="relative flex min-h-0 flex-col">
+  <div data-work-status-host="session-metadata" className="relative flex min-h-0 flex-1 flex-col">
     <WorkStatusContents
       sessionId={sessionId}
       directory={directory}

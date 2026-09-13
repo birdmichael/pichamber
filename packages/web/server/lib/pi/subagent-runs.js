@@ -97,12 +97,53 @@ export const readSessionIdFromSessionFile = (filePath) => readSessionHeaderFromS
 
 export const readSessionCwdFromSessionFile = (filePath) => readSessionHeaderFromSessionFile(filePath).cwd;
 
+const GENERIC_SUBAGENT_TITLES = new Set(['subagent', 'run']);
+
+export const isGenericSubagentTitle = (value, parentTitle, role) => {
+  const title = asTrimmedString(value);
+  if (!title) return true;
+  if (GENERIC_SUBAGENT_TITLES.has(title.toLowerCase())) return true;
+  const parent = asTrimmedString(parentTitle);
+  if (parent && title === parent) return true;
+  const roleName = asTrimmedString(role);
+  return Boolean(roleName && title.toLowerCase() === roleName.toLowerCase());
+};
+
+export const formatSubagentRoleTitle = (role) => {
+  const name = asTrimmedString(role) || 'subagent';
+  return name.startsWith('subagent-') ? name : `subagent-${name}`;
+};
+
+/** Worker/researcher `/run` often titles the child `run` or copies the parent. */
+export const formatSubagentChildTitle = ({
+  sessionTitle,
+  runTitle,
+  runName,
+  role,
+  parentTitle,
+} = {}) => {
+  const fallback = formatSubagentRoleTitle(role || runName);
+  const genericRole = role || runName;
+  for (const value of [sessionTitle, runTitle, runName]) {
+    if (!isGenericSubagentTitle(value, parentTitle, genericRole)) return asTrimmedString(value);
+  }
+  return fallback;
+};
+
 export const preferSubagentTitle = (...candidates) => {
   for (const value of candidates) {
     const title = asTrimmedString(value);
-    if (title && title !== 'subagent') return title;
+    if (title && !GENERIC_SUBAGENT_TITLES.has(title.toLowerCase())) return title;
   }
   return 'subagent';
+};
+
+export const parseSubagentRunAgentName = (argument) => {
+  const input = asTrimmedString(argument);
+  if (!input) return '';
+  const first = input.split(/\s+/)[0] || '';
+  const bracket = first.indexOf('[');
+  return (bracket === -1 ? first : first.slice(0, bracket)).trim();
 };
 
 /** Prefer session_info.name over a run-folder basename like scout/scout_b. */
@@ -309,7 +350,12 @@ export const mapStatusToSubagentRun = (status, {
     ...(providerId || modelId ? { providerId, modelId } : {}),
     mode,
     state,
-    title: asTrimmedString(status.goal || status.task) || firstStepLabel(status) || agent,
+    title: formatSubagentChildTitle({
+      runTitle: asTrimmedString(status.goal || status.task),
+      sessionTitle: firstStepLabel(status),
+      runName: agent,
+      role: asTrimmedString(status.role) || agent,
+    }),
     toolCallId: asTrimmedString(status.toolCallId) || null,
     asyncDir: asTrimmedString(asyncDir) || null,
     startedAt: typeof status.startedAt === 'number' ? status.startedAt : null,
@@ -333,7 +379,12 @@ const mapStepToSubagentRun = (status, step, {
     candidates: [step.childSessionId, step.sessionId, step.sessionID],
   });
   const name = asTrimmedString(step.agent) || base.name;
-  const title = asTrimmedString(step.label || step.workflowKey || step.task) || name;
+  const title = formatSubagentChildTitle({
+    sessionTitle: asTrimmedString(step.label || step.workflowKey),
+    runTitle: asTrimmedString(step.task),
+    runName: name,
+    role: asTrimmedString(step.role) || name,
+  });
   const state = normalizeSubagentRunState(step.status || step.state || status.state);
   const blocker = readStatusBlocker(status, step);
   const { providerId, modelId } = readProviderModel(step);
